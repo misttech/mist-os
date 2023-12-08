@@ -92,7 +92,7 @@ class DriverCtx {
   std::optional<CodecMetrics> metrics_;
 
   // Inspector diagnostics
-  CodecDiagnostics diagnostics_{kDriverName};
+  CodecDiagnostics diagnostics_;
 };
 
 }  // namespace amlogic_decoder

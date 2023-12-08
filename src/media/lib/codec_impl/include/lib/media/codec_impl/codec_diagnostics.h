@@ -5,6 +5,8 @@
 #ifndef SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_DIAGNOSTICS_H_
 #define SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_DIAGNOSTICS_H_
 
+#include <lib/async/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/vmo/types.h>
@@ -107,11 +109,7 @@ class DriverCodecDiagnostics {
 
 class CodecDiagnostics {
  public:
-  explicit CodecDiagnostics(std::string_view driver_name);
-
-  // For non-driver components we need to accept the context since the inspector has to be wired to
-  // the component's output directory
-  CodecDiagnostics(std::unique_ptr<sys::ComponentContext>& context, std::string_view driver_name);
+  CodecDiagnostics(std::string_view driver_name, async_dispatcher_t* dispatcher);
 
   // Nodes and NumericProperty should be cleaned up when this class
   // is destroyed, so ensure it is not copy to imply ownership so that
@@ -145,7 +143,7 @@ class CodecDiagnostics {
   static constexpr std::string_view kNumOfActiveCodecs = "num_of_active_codecs";
   static constexpr std::string_view kCurrentlyDecoding = "currently_decoding";
 
-  inspect::Inspector inspector_;
+  inspect::ComponentInspector inspector_;
   inspect::Node root_;
   inspect::UintProperty bind_time_;
   inspect::UintProperty num_of_active_codecs_;

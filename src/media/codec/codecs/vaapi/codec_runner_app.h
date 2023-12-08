@@ -10,7 +10,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/inspect/cpp/inspector.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -46,7 +45,7 @@ class CodecRunnerApp {
     // This is bit of a misnomer since CodecRunnerApp isn't a driver but instead a component. Since
     // we need a new instance for every FIDL connection a driver does not make sense currently.
     codec_diagnostics_ =
-        std::make_unique<CodecDiagnostics>(component_context_, "vaapi_codec_runner");
+        std::make_unique<CodecDiagnostics>("vaapi_codec_runner", loop_.dispatcher());
 
     component_context_->outgoing()->AddPublicService(
         fidl::InterfaceRequestHandler<fuchsia::mediacodec::CodecFactory>(

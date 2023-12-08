@@ -61,11 +61,12 @@ void DriverCtx::Release(void* ctx) {
   delete driver_ctx;
 }
 
-DriverCtx::DriverCtx() {
-  // We use kAsyncLoopConfigNoAttachToCurrentThread here, because we don't really want
-  // to be setting the default async_t for the thread that creates the
-  // DriverCtx.  We'll plumb async_t(s) explicitly instead.
-  shared_fidl_loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+DriverCtx::DriverCtx()
+    :  // We use kAsyncLoopConfigNoAttachToCurrentThread here, because we don't really want
+       // to be setting the default async_t for the thread that creates the
+       // DriverCtx.  We'll plumb async_t(s) explicitly instead.
+      shared_fidl_loop_{std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread)},
+      diagnostics_{kDriverName, shared_fidl_loop_->dispatcher()} {
   shared_fidl_loop_->StartThread("shared_fidl_thread", &shared_fidl_thread_);
   metrics_.emplace();
   // This won't actually be logged until codec_factory opens a device and calls

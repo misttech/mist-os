@@ -78,11 +78,13 @@ class ComponentInspector final {
 #endif  // __Fuchsia_API_level__
 
   ComponentInspector(ComponentInspector&&) = default;
+  ComponentInspector& operator=(ComponentInspector&&) = default;
 
   // Get the Inspector's root node.
   Node& root() { return inspector_.GetRoot(); }
 
   // Get the wrapped Inspector.
+  const Inspector& inspector() const { return inspector_; }
   Inspector& inspector() { return inspector_; }
 
   // Gets the NodeHealth for this component.

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/service/cpp/service.h>
+#include <lib/async/default.h>
 #include <lib/media/codec_impl/codec_diagnostics.h>
 #include <lib/media/codec_impl/log.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
@@ -106,28 +106,14 @@ void DriverCodecDiagnostics::UpdateHardwareUtilizationStatus(zx::time now,
   currently_utilizing_hardware_ = is_utilizing_hardware;
 }
 
-CodecDiagnostics::CodecDiagnostics(std::string_view driver_name)
-    : root_(inspector_.GetRoot().CreateChild(driver_name)),
+CodecDiagnostics::CodecDiagnostics(std::string_view driver_name, async_dispatcher_t* dispatcher)
+    : inspector_(dispatcher, {}),
+      root_(inspector_.root().CreateChild(driver_name)),
       bind_time_(root_.CreateUint(kBindTime, 0)),
       num_of_active_codecs_(root_.CreateUint(kNumOfActiveCodecs, 0)),
       currently_decoding_(root_.CreateBool(kCurrentlyDecoding, false)) {}
 
-CodecDiagnostics::CodecDiagnostics(std::unique_ptr<sys::ComponentContext>& context,
-                                   std::string_view driver_name) {
-  // TODO(fxbug.dev/99504)
-  // Serve inspect data
-  context->outgoing()
-      ->GetOrCreateDirectory("diagnostics")
-      ->AddEntry(fuchsia::inspect::Tree::Name_,
-                 std::make_unique<vfs::Service>(inspect::MakeTreeHandler(&inspector_)));
-
-  root_ = inspector_.GetRoot().CreateChild(driver_name);
-  bind_time_ = root_.CreateUint(kBindTime, 0);
-  num_of_active_codecs_ = root_.CreateUint(kNumOfActiveCodecs, 0);
-  currently_decoding_ = root_.CreateBool(kCurrentlyDecoding, false);
-}
-
-zx::vmo CodecDiagnostics::DuplicateVmo() const { return inspector_.DuplicateVmo(); }
+zx::vmo CodecDiagnostics::DuplicateVmo() const { return inspector_.inspector().DuplicateVmo(); }
 
 void CodecDiagnostics::SetBindTime() {
   zx_time_t current_time = zx_clock_get_monotonic();
