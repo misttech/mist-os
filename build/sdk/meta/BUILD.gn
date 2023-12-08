@@ -8,37 +8,27 @@ import("//build/python/python_host_test.gni")
 import("//build/sdk/sdk_documentation.gni")
 import("//sdk/ctf/build/verify_json_schemas.gni")
 
-# Schemas that are required for the product_bundle_container.
-product_bundle_container_required_schemas = [
-  "product_bundle_container-32z5e391.json",
-  "common.json",
-  "product_bundle-6320eef1.json",
-  "flash_manifest-835e8f26.json",
-  "emu_manifest.json",
-  "hardware-f6f47515.json",
-  "physical_device-0bd5d21f.json",
-  "virtual_device-93A41932.json",
-]
-
 # This list should only contain schemas that are currently exported outside of
 # the Fuchsia source tree.
 schemas = [
-            # "banjo_library.json",
-            "cc_prebuilt_library.json",
-            "cc_source_library.json",
-            "dart_library.json",
-            "data.json",
-            "documentation.json",
-            "ffx_tool.json",
-            "fhcp_tests.json",
-            "fidl_library.json",
-            "host_tool.json",
-            "loadable_module.json",
-            "manifest.json",
-            "product_bundle_container-76a5c104.json",
-            "sysroot.json",
-            "version_history-22rnd667.json",
-          ] + product_bundle_container_required_schemas
+  # "banjo_library.json",
+  "cc_prebuilt_library.json",
+  "cc_source_library.json",
+  "common.json",
+  "dart_library.json",
+  "data.json",
+  "documentation.json",
+  "ffx_tool.json",
+  "fhcp_tests.json",
+  "fidl_library.json",
+  "hardware-f6f47515.json",
+  "host_tool.json",
+  "loadable_module.json",
+  "manifest.json",
+  "sysroot.json",
+  "version_history-22rnd667.json",
+  "virtual_device-93A41932.json",
+]
 
 sdk_documentation("meta") {
   name = "metadata_schemas"
@@ -53,19 +43,6 @@ sdk_documentation("meta") {
       },
     ]
   }
-}
-
-go_library("go_meta") {
-  deps = [ "//third_party/golibs:github.com/xeipuuv/gojsonschema" ]
-  sources = [
-              "product_bundle_container.go",
-              "product_bundle_container_test.go",
-            ] + product_bundle_container_required_schemas
-}
-
-go_test("go_meta_tests") {
-  library = ":go_meta"
-  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }
 
 verify_json_schemas("verify_json_schemas") {
@@ -114,7 +91,6 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:camino",
-      "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:pathdiff",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
@@ -148,12 +124,8 @@ if (is_host) {
       "src/lib.rs",
       "src/loadable_module.rs",
       "src/manifest.rs",
-      "src/metadata.rs",
-      "src/physical_device.rs",
       "src/product_bundle.rs",
-      "src/product_bundle/v1.rs",
       "src/product_bundle/v2.rs",
-      "src/product_bundle_container.rs",
       "src/sysroot.rs",
       "src/testing.rs",
       "src/virtual_device.rs",
@@ -169,18 +141,12 @@ if (is_host) {
       "dart_library.json",
       "data.json",
       "documentation.json",
-      "emu_manifest.json",
       "ffx_tool.json",
       "fidl_library.json",
-      "flash_manifest-835e8f26.json",
       "hardware-f6f47515.json",
       "host_tool.json",
       "loadable_module.json",
       "manifest.json",
-      "physical_device-0bd5d21f.json",
-      "product_bundle-6320eef1.json",
-      "product_bundle_container-76a5c104.json",
-      "product_bundle_container-32z5e391.json",
       "sysroot.json",
       "test_data/virtual_device.json",
       "test_data/empty_vd_manifest.json",
@@ -194,7 +160,6 @@ if (is_host) {
 group("tests") {
   testonly = true
   deps = [
-    ":go_meta_tests($host_toolchain)",
     ":rust_test($host_toolchain)",
     ":verify_json_schemas_test($host_toolchain)",
   ]

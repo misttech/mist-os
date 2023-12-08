@@ -4,7 +4,7 @@
 
 //! Generate a build archive from a product bundle.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembly_manifest::{AssemblyManifest, Image};
 use camino::Utf8PathBuf;
@@ -110,7 +110,6 @@ impl GenerateBuildArchive {
         println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         let product_bundle = ProductBundle::try_load_from(&self.product_bundle)?;
         let mut product_bundle = match product_bundle {
-            ProductBundle::V1(_) => bail!("Only v2 product bundles are supported"),
             ProductBundle::V2(pb) => pb,
         };
 

@@ -15,7 +15,6 @@ ffx_plugin("ffx_product_get_version") {
   args_deps = [ "//third_party/rust_crates:camino" ]
   deps = [
     "//build/sdk/meta:rust",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

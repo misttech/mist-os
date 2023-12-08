@@ -60,9 +60,6 @@ impl ProductBundle {
         let product_bundle = sdk::ProductBundle::try_load_from(&utf8_directory)
             .map_err(|error| Error::DeserializationFailure { error })?;
         let product_bundle = match product_bundle {
-            sdk::ProductBundle::V1(_) => {
-                return Err(Error::InvalidVerison { version: "V1".to_string() });
-            }
             sdk::ProductBundle::V2(product_bundle) => product_bundle,
         };
         let update_package_hash: Box<dyn api::Hash> = Box::new(Hash::from(
@@ -363,42 +360,6 @@ mod tests {
             Error::DeserializationFailure { .. } => {}
             _ => {
                 panic!("expected product bundle error when failing to load JSON");
-            }
-        }
-    }
-
-    #[fuchsia::test]
-    fn test_v1_json_file() {
-        let temp_dir = TempDir::new().expect("create temporary directory");
-        let temp_dir_path = path(temp_dir.path().to_path_buf());
-        let product_bundle_file = fs::File::create(temp_dir.path().join("product_bundle.json"))
-            .expect("create product bundle manifest");
-        serde_json::to_writer(
-            &product_bundle_file,
-            // Copied from sdk_metadata::product_bundle::tests::test_parse_v1.
-            &serde_json::json!({
-                "schema_id": "http://fuchsia.com/schemas/sdk/product_bundle-6320eef1.json",
-                "data": {
-                    "name": "generic-x64",
-                    "type": "product_bundle",
-                    "device_refs": ["generic-x64"],
-                    "images": [{
-                        "base_uri": "file://fuchsia/development/0.20201216.2.1/images/generic-x64.tgz",
-                        "format": "tgz"
-                    }],
-                    "manifests": {
-                    },
-                    "packages": [{
-                        "format": "tgz",
-                        "repo_uri": "file://fuchsia/development/0.20201216.2.1/packages/generic-x64.tar.gz"
-                    }]
-                }
-            })
-        ).expect("write product bundle manifest");
-        match ProductBundle::new(temp_dir_path).expect_err("product bundle with invalid version") {
-            Error::InvalidVerison { .. } => {}
-            _ => {
-                panic!("expected invalid version error when failing to generate JSON");
             }
         }
     }

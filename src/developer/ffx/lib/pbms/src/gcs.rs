@@ -15,47 +15,6 @@ use gcs::{
 use std::path::Path;
 use structured_ui;
 
-/// Return true if the blob is available.
-///
-/// `gcs_url` is the full GCS url, e.g. "gs://bucket/path/to/file".
-/// The resulting data will be written to a directory at `local_dir`.
-pub(crate) async fn exists_in_gcs<I>(
-    gcs_url: &str,
-    auth_flow: &AuthFlowChoice,
-    ui: &I,
-    client: &Client,
-) -> Result<bool>
-where
-    I: structured_ui::Interface + Sync,
-{
-    let (gcs_bucket, gcs_path) = split_gs_url(gcs_url).context("Splitting gs URL.")?;
-    loop {
-        match client.exists(gcs_bucket, gcs_path).await {
-            Ok(exists) => return Ok(exists),
-            Err(e) => match e.downcast_ref::<GcsError>() {
-                Some(GcsError::NeedNewAccessToken) => {
-                    tracing::debug!("exists_in_gcs got NeedNewRefreshToken");
-                    let access_token = handle_new_access_token(auth_flow, ui)
-                        .await
-                        .context("Getting new access token.")?;
-                    client.set_access_token(access_token).await;
-                }
-                Some(GcsError::NotFound(_, _)) => {
-                    // Ok(false) should be returned rather than NotFound.
-                    unreachable!();
-                }
-                Some(_) | None => bail!(
-                    "Cannot get product bundle container while \
-                    downloading from gs://{}/{}, error {:?}",
-                    gcs_bucket,
-                    gcs_path,
-                    e,
-                ),
-            },
-        }
-    }
-}
-
 /// Download from a given `gcs_url`.
 ///
 /// `gcs_url` is the full GCS url, e.g. "gs://bucket/path/to/file".

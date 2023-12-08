@@ -15,7 +15,6 @@ libs = [
   "fastboot",
   "fho",
   "fidl-fuchsia-developer-ffx-ext",
-  "fms",
   "fuchsia-controller",
   "isolate",
   "metrics",

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, bail, Context, Result},
+    anyhow::{anyhow, Context, Result},
     camino::Utf8PathBuf,
     fuchsia_url::AbsolutePackageUrl,
     scrutiny_utils::url::from_package_name,
@@ -212,7 +212,6 @@ impl ModelConfig {
             Utf8PathBuf::try_from(product_bundle_path).context("Converting Path to Utf8Path")?;
         let product_bundle = ProductBundle::try_load_from(&product_bundle_path)?;
         let product_bundle = match product_bundle {
-            ProductBundle::V1(_) => bail!("Only v2 product bundles are supported"),
             ProductBundle::V2(pb) => pb,
         };
 

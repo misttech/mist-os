@@ -15,7 +15,6 @@ ffx_plugin("ffx_product_get_repository") {
   args_deps = [ "//third_party/rust_crates:camino" ]
   deps = [
     "//build/sdk/meta:rust",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/utf8_path",

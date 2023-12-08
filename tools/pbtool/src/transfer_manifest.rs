@@ -4,7 +4,7 @@
 
 //! Generate a transfer manifest for uploading and downloading a product bundle.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembly_manifest::Image;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -34,7 +34,6 @@ impl GenerateTransferManifest {
     pub async fn generate(self) -> Result<()> {
         let product_bundle = ProductBundle::try_load_from(&self.product_bundle)?;
         let product_bundle = match product_bundle {
-            ProductBundle::V1(_) => bail!("Only v2 product bundles are supported"),
             ProductBundle::V2(pb) => pb,
         };
 

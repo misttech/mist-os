@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 if (is_host) {
-  import("//build/product.gni")
   import("//build/rust/rustc_library.gni")
 
   rustc_library("ffx_emulator_config") {
@@ -32,14 +31,6 @@ if (is_host) {
       "//third_party/rust_crates:tempfile",
     ]
     inputs = [ "//build/sdk/meta/test_data/virtual_device.json" ]
-    if (build_pb_v1) {
-      features = [ "build_pb_v1" ]
-      deps += [
-        "//src/developer/ffx/config:lib",
-        "//src/developer/ffx/lib/fms",
-        "//src/developer/ffx/lib/pbms:lib",
-      ]
-    }
   }
 
   group("tests") {

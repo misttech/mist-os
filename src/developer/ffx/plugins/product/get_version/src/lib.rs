@@ -6,7 +6,6 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use errors::ffx_bail;
 use ffx_product_get_version_args::GetVersionCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use sdk_metadata::ProductBundle;
@@ -28,7 +27,6 @@ impl FfxMain for PbGetVersionTool {
         let product_bundle = ProductBundle::try_load_from(self.cmd.product_bundle)
             .context("Failed to load product bundle")?;
         let version = match product_bundle {
-            ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
             ProductBundle::V2(pb) => pb.product_version,
         };
         write!(writer, "{}", &version).bug()?;

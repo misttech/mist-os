@@ -259,7 +259,6 @@ fn get_product_bundle_partitions(path: &Utf8Path) -> Result<PartitionsConfig, Er
     let product_bundle = LoadedProductBundle::try_load_from(path)?;
 
     match product_bundle.into() {
-        ProductBundle::V1(_) => bail!("does not support product bundle v1"),
         ProductBundle::V2(pb) => Ok(pb.partitions),
     }
 }

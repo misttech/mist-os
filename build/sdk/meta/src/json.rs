@@ -13,12 +13,7 @@ use valico::json_schema;
 
 pub mod schema {
     pub const COMMON: &str = include_str!("../common.json");
-    pub const EMU_MANIFEST: &str = include_str!("../emu_manifest.json");
-    pub const FLASH_MANIFEST_V1: &str = include_str!("../flash_manifest-835e8f26.json");
     pub const HARDWARE_V1: &str = include_str!("../hardware-f6f47515.json");
-    pub const PRODUCT_BUNDLE_V1: &str = include_str!("../product_bundle-6320eef1.json");
-    pub const PHYSICAL_DEVICE_V1: &str = include_str!("../physical_device-0bd5d21f.json");
-    pub const VIRTUAL_DEVICE_V1: &str = include_str!("../virtual_device-93A41932.json");
 }
 
 /// The various types of errors raised by this module.

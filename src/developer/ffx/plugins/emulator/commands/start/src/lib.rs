@@ -126,7 +126,7 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
 
         // List the devices available in this product bundle
         if self.cmd.device_list {
-            let virtual_devices = get_virtual_devices(&product_bundle.unwrap(), &self.sdk).await?;
+            let virtual_devices = get_virtual_devices(&product_bundle.unwrap()).await?;
             if virtual_devices.is_empty() {
                 println!("There are no virtual devices configured for this product bundle");
             } else {
@@ -347,8 +347,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             }
 
             if self.cmd.device.is_none() {
-                let virtual_devices =
-                    get_virtual_devices(&loaded_product_bundle, &self.sdk).await?;
+                let virtual_devices = get_virtual_devices(&loaded_product_bundle).await?;
                 if virtual_devices.is_empty() {
                     ffx_bail!("There are no virtual devices configured for this product bundle")
                 }

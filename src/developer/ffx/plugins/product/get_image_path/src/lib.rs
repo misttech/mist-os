@@ -38,7 +38,6 @@ fn extract_image_path(
     cmd: GetImagePathCommand,
 ) -> Result<Option<Utf8PathBuf>> {
     let product_bundle = match product_bundle {
-        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
     };
 

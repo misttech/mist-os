@@ -9,7 +9,6 @@ use emulator_instance::{
     get_instance_dir, AccelerationMode, ConsoleType, EmulatorConfiguration, GpuType, LogLevel,
     NetworkingMode, OperatingSystem,
 };
-use ffx_config::Sdk;
 use ffx_emulator_common::{
     config::{EMU_UPSCRIPT_FILE, KVM_PATH},
     split_once,
@@ -18,8 +17,6 @@ use ffx_emulator_common::{
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use pbms::ProductBundle;
-#[cfg(feature = "build_pb_v1")]
-use pbms::{fms_entries_from, select_product_bundle, ListingMode};
 
 use sdk_metadata::VirtualDeviceManifest;
 use std::{
@@ -269,43 +266,8 @@ fn generate_mac_address(name: &str) -> String {
     format!("52:54:{:02x}:{:02x}:{:02x}:{:02x}", bytes[0], bytes[1], bytes[2], bytes[3])
 }
 
-pub(crate) async fn get_virtual_devices(
-    product_bundle: &ProductBundle,
-    sdk: &Sdk,
-) -> Result<Vec<String>> {
+pub(crate) async fn get_virtual_devices(product_bundle: &ProductBundle) -> Result<Vec<String>> {
     match &product_bundle {
-        ProductBundle::V1(pb) => {
-            #[cfg(feature = "build_pb_v1")]
-            {
-                let should_print = false;
-                let product_url = select_product_bundle(
-                    &sdk,
-                    &Some(pb.name.clone()),
-                    ListingMode::ReadyBundlesOnly,
-                    should_print,
-                )
-                .await
-                .context("Selecting product bundle")?;
-
-                // Get the virtual device from the bundle.
-                let fms_entries = fms_entries_from(&product_url, sdk.get_path_prefix())
-                    .await
-                    .context("get fms entries")?;
-                let virtual_devices = fms::find_virtual_devices(&fms_entries, &pb.device_refs)
-                    .context("problem with virtual device")?
-                    .iter()
-                    .map(|dev| dev.name().to_string())
-                    .collect();
-
-                Ok(virtual_devices)
-            }
-            #[cfg(not(feature = "build_pb_v1"))]
-            {
-                let _sdk = sdk;
-                let _pb = pb;
-                bail!("select_product_bundle requires build_pb_v1=true");
-            }
-        }
         ProductBundle::V2(pb) => {
             // Determine the correct device name from the user, or default to the "recommended"
             // device, if one is provided in the product bundle.

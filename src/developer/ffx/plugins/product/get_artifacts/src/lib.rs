@@ -53,7 +53,6 @@ fn extract_bootloaders(
     cmd: GetArtifactsCommand,
 ) -> Result<Vec<String>> {
     let mut product_bundle = match product_bundle {
-        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
     };
 
@@ -84,7 +83,6 @@ fn extract_flashing_artifacts(
     cmd: GetArtifactsCommand,
 ) -> Result<Vec<String>> {
     let mut product_bundle = match product_bundle {
-        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
     };
 
@@ -136,7 +134,6 @@ fn extract_emu_artifacts(
     cmd: GetArtifactsCommand,
 ) -> Result<Vec<String>> {
     let mut product_bundle = match product_bundle {
-        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
     };
 

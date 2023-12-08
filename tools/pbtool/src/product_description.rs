@@ -17,7 +17,7 @@
 //! }
 //! ```
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use argh::FromArgs;
 use camino::Utf8PathBuf;
 use product_description::{ProductDescription, ProductDescriptionV1};
@@ -48,11 +48,6 @@ impl GenerateProductDescription {
                 format!("loading {:?} for GenerateProductDescription", self.product_bundle)
             })?;
         let product_bundle = match product_bundle {
-            ProductBundle::V1(_) => bail!(
-                "Only v2 product bundles are supported in \
-                GenerateProductDescription. {:?} is a v1 product bundle.",
-                self.product_bundle
-            ),
             ProductBundle::V2(pb) => pb,
         };
 

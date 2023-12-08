@@ -75,7 +75,6 @@ where
     I: structured_ui::Interface + Sync,
 {
     let virtual_devices = match product_bundle {
-        ProductBundle::V1(_) => unimplemented!(),
         ProductBundle::V2(product_bundle) => retrieve_v2_virtual_devices(product_bundle).await?,
     };
     let mut table = TableRows::builder();
@@ -101,7 +100,6 @@ where
     I: structured_ui::Interface + Sync,
 {
     let virtual_devices = match product_bundle {
-        ProductBundle::V1(_) => unimplemented!(),
         ProductBundle::V2(product_bundle) => retrieve_v2_virtual_devices(product_bundle).await?,
     };
     let selected = virtual_devices.iter().find(|v| v.name() == device_name);

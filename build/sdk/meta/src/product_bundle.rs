@@ -4,25 +4,25 @@
 
 //! Representation of the product_bundle metadata.
 
-mod v1;
 mod v2;
 
 use crate::VirtualDeviceManifest;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, ops::Deref};
 use zip::read::ZipArchive;
 
-pub use v1::*;
 pub use v2::{ProductBundleV2, Repository, Type};
 
 fn try_load_product_bundle(r: impl Read) -> Result<ProductBundle> {
     let helper: SerializationHelper =
         serde_json::from_reader(r).context("parsing product bundle")?;
     match helper {
-        SerializationHelper::V1 { schema_id: _, data } => Ok(ProductBundle::V1(data)),
+        SerializationHelper::V1 { schema_id: _ } => {
+            bail!("Product Bundle v1 is no longer supported")
+        }
         SerializationHelper::V2(SerializationHelperVersioned::V2(data)) => {
             Ok(ProductBundle::V2(data))
         }
@@ -94,7 +94,6 @@ impl LoadedProductBundle {
             .with_context(|| format!("opening product bundle: {:?}", &product_bundle_path))?;
 
         match try_load_product_bundle(file)? {
-            ProductBundle::V1(data) => Ok(LoadedProductBundle::new(ProductBundle::V1(data), path)),
             ProductBundle::V2(data) => {
                 let mut data = data.clone();
                 data.canonicalize_paths(path.as_ref())
@@ -134,7 +133,6 @@ impl Into<ProductBundle> for LoadedProductBundle {
 /// Versioned product bundle.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProductBundle {
-    V1(ProductBundleV1),
     V2(ProductBundleV2),
 }
 
@@ -144,7 +142,7 @@ pub enum ProductBundle {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum SerializationHelper {
-    V1 { schema_id: String, data: ProductBundleV1 },
+    V1 { schema_id: String },
     V2(SerializationHelperVersioned),
 }
 
@@ -155,9 +153,6 @@ enum SerializationHelperVersioned {
     #[serde(rename = "2")]
     V2(ProductBundleV2),
 }
-
-const PRODUCT_BUNDLE_SCHEMA_V1: &str =
-    "http://fuchsia.com/schemas/sdk/product_bundle-6320eef1.json";
 
 impl ProductBundle {
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
@@ -173,10 +168,6 @@ impl ProductBundle {
     /// Note that this only writes the manifest file, and not the artifacts, images, blobs.
     pub fn write(&self, path: impl AsRef<Utf8Path>) -> Result<()> {
         let helper = match self {
-            Self::V1(data) => SerializationHelper::V1 {
-                schema_id: PRODUCT_BUNDLE_SCHEMA_V1.into(),
-                data: data.clone(),
-            },
             Self::V2(data) => {
                 let mut data = data.clone();
                 data.relativize_paths(path.as_ref())?;
@@ -189,32 +180,15 @@ impl ProductBundle {
         Ok(())
     }
 
-    /// Returns ProductBundle entry name.
-    pub fn name(&self) -> &str {
-        match self {
-            Self::V1(data) => &data.name.as_str(),
-            Self::V2(_) => panic!("no product name"),
-        }
-    }
-
     /// Get the list of logical device names.
     pub fn device_refs(&self) -> Result<Vec<String>> {
         match self {
-            Self::V1(data) => Ok(data.device_refs.clone()),
             Self::V2(data) => {
                 let path = data.get_virtual_devices_path();
                 let manifest =
                     VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
                 Ok(manifest.device_names())
             }
-        }
-    }
-
-    /// Manifest for the emulator, if present.
-    pub fn emu_manifest(&self) -> &Option<EmuManifest> {
-        match self {
-            Self::V1(data) => &data.manifests.emu,
-            Self::V2(_) => panic!("no emu_manifest"),
         }
     }
 }
@@ -224,12 +198,6 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
     let pb = match ProductBundle::try_load_from(&product_bundle_dir)
         .with_context(|| format!("loading {}", product_bundle_dir))?
     {
-        ProductBundle::V1(_) => {
-            panic!(
-                "This command does not support product bundle v1, \
-                please use `ffx product-bundle get` to set up the repository."
-            )
-        }
         ProductBundle::V2(pb) => pb,
     };
 
@@ -258,11 +226,7 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::io::Write;
     use tempfile::TempDir;
-    use zip::write::FileOptions;
-    use zip::CompressionMethod;
-    use zip::ZipWriter;
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({
@@ -301,8 +265,7 @@ mod tests {
     fn test_parse_v1() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
-        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
-        assert!(matches!(pb.deref(), &ProductBundle::V1 { .. }));
+        assert!(LoadedProductBundle::try_load_from(pb_dir).is_err());
     }
 
     #[test]
@@ -330,135 +293,5 @@ mod tests {
         .unwrap();
         let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
         assert!(matches!(pb.deref(), &ProductBundle::V2 { .. }));
-    }
-
-    #[test]
-    fn test_loaded_from_path() {
-        let tmp = TempDir::new().unwrap();
-        let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
-        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
-        assert_eq!(pb_dir, pb.loaded_from_path());
-    }
-
-    #[test]
-    fn test_loaded_product_bundle_into() {
-        let tmp = TempDir::new().unwrap();
-        let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
-        let pb: ProductBundle = LoadedProductBundle::try_load_from(pb_dir).unwrap().into();
-        assert!(matches!(pb, ProductBundle::V1 { .. }));
-    }
-
-    #[test]
-    fn test_loaded_from_product_bundle_deref() {
-        let tmp = TempDir::new().unwrap();
-        let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
-        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
-
-        fn check_deref(_inner_pb: &ProductBundle) {
-            // Just make sure we have a compile time check.
-            assert!(true);
-        }
-
-        check_deref(&pb);
-        assert!(matches!(*pb.deref(), ProductBundle::V1 { .. }));
-    }
-
-    #[test]
-    fn test_zip_loaded() -> anyhow::Result<()> {
-        let tmp = TempDir::new().unwrap();
-
-        let pb = make_sample_pbv1("generic-x64");
-        let pb_filename = tmp.into_path().join("pb.zip");
-        let pb_file = File::create(pb_filename.clone())?;
-
-        let mut zip = ZipWriter::new(pb_file);
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
-        zip.start_file("product_bundle.json", options)?;
-        let buf = serde_json::to_vec(&pb)?;
-        let _ = zip.write(&buf)?;
-        zip.flush()?;
-        let _ = zip.finish()?;
-
-        let _ = ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_zip_product_bundle_into() -> anyhow::Result<()> {
-        let tmp = TempDir::new().unwrap();
-        let pb = make_sample_pbv1("generic-x64");
-        let pb_filename = tmp.into_path().join("pb.zip");
-        let pb_file = File::create(pb_filename.clone())?;
-
-        let mut zip = ZipWriter::new(pb_file);
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
-        zip.start_file("product_bundle.json", options)?;
-        let buf = serde_json::to_vec(&pb)?;
-        let _ = zip.write(&buf)?;
-        zip.flush()?;
-        let _ = zip.finish()?;
-        let pb: ProductBundle =
-            ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?
-                .into();
-        assert!(matches!(pb, ProductBundle::V1 { .. }));
-        Ok(())
-    }
-
-    #[test]
-    fn test_zip_from_product_bundle_deref() -> anyhow::Result<()> {
-        let tmp = TempDir::new().unwrap();
-        let pb = make_sample_pbv1("generic-x64");
-        let pb_filename = tmp.into_path().join("pb.zip");
-        let pb_file = File::create(pb_filename.clone())?;
-
-        let mut zip = ZipWriter::new(pb_file);
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
-        zip.start_file("product_bundle.json", options)?;
-        let buf = serde_json::to_vec(&pb)?;
-        let _ = zip.write(&buf)?;
-        zip.flush()?;
-        let _ = zip.finish()?;
-
-        let pb = ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
-
-        fn check_deref(_inner_pb: &ProductBundle) {
-            // Just make sure we have a compile time check.
-            assert!(true);
-        }
-
-        check_deref(&pb);
-        assert!(matches!(*pb.deref(), ProductBundle::V1 { .. }));
-        Ok(())
-    }
-
-    #[test]
-    fn test_product_bundle_try_load_from_for_zip() -> anyhow::Result<()> {
-        let tmp = TempDir::new().unwrap();
-
-        let pb = make_sample_pbv1("generic-x64");
-        let pb_filename = tmp.into_path().join("pb.zip");
-        let pb_file = File::create(pb_filename.clone())?;
-
-        let mut zip = ZipWriter::new(pb_file);
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
-        zip.start_file("product_bundle.json", options)?;
-        let buf = serde_json::to_vec(&pb)?;
-        let _ = zip.write(&buf)?;
-        zip.flush()?;
-        let _ = zip.finish()?;
-
-        // This should detect zip file and load from the zip
-        let _ = ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_product_bundle_try_load_from_for_dir() -> anyhow::Result<()> {
-        let tmp = TempDir::new().unwrap();
-        let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
-        let _ = ProductBundle::try_load_from(pb_dir).unwrap();
-        Ok(())
     }
 }

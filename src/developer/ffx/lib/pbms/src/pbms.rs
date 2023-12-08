@@ -4,104 +4,19 @@
 
 //! Private functionality for pbms lib.
 
-use crate::{
-    gcs::{exists_in_gcs, fetch_from_gcs},
-    repo::fetch_package_repository_from_mirrors,
-    repo_info::RepoInfo,
-    AuthFlowChoice,
-};
+use crate::{gcs::fetch_from_gcs, AuthFlowChoice};
 use ::gcs::client::{
     Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
 };
 use anyhow::{bail, Context, Result};
 use async_fs::File;
-use fms::{find_product_bundle, Entries};
 use futures::{AsyncWriteExt as _, TryStreamExt as _};
 use hyper::{header::CONTENT_LENGTH, StatusCode};
-use sdk::SdkVersion;
-use sdk_metadata::Metadata;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use structured_ui;
-use tempfile::TempDir;
 
-pub(crate) const CONFIG_METADATA: &str = "pbms.metadata";
 pub(crate) const CONFIG_STORAGE_PATH: &str = "pbms.storage.path";
 pub(crate) const GS_SCHEME: &str = "gs";
-
-/// Load FMS Entries.
-///
-/// Expandable tags (e.g. "{foo}") in `repos` must already be expanded, do not
-/// pass in repo URIs with expandable tags.
-pub(crate) async fn fetch_product_metadata<F, I>(
-    repo: &url::Url,
-    output_dir: &Path,
-    auth_flow: &AuthFlowChoice,
-    progress: &F,
-    ui: &I,
-    client: &Client,
-) -> Result<()>
-where
-    F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
-{
-    tracing::info!("Getting product metadata for {:?}", repo);
-    async_fs::create_dir_all(&output_dir).await.context("create directory")?;
-
-    let mut info = RepoInfo::default();
-    info.metadata_url = repo.to_string();
-    info.save(&output_dir.join("info"))?;
-    tracing::debug!("Wrote 'info' file to {:?}", output_dir);
-
-    fetch_from_url(&repo, output_dir.to_path_buf(), auth_flow, progress, ui, client)
-        .await
-        .context("fetching product bundle by URL")?;
-    Ok(())
-}
-
-/// Replace the {foo} placeholders in repo paths.
-///
-/// {version} is replaced with the Fuchsia SDK version string.
-/// {sdk.root} is replaced with the SDK directory path.
-fn expand_placeholders(uri: &str, version: &str, sdk_root: &str) -> Result<url::Url> {
-    let expanded = uri.replace("{version}", version).replace("{sdk.root}", sdk_root);
-    if uri.contains(":") {
-        Ok(url::Url::parse(&expanded).with_context(|| format!("url parse {:?}", expanded))?)
-    } else {
-        // If there's no colon, assume it's a local path.
-        let base_url = url::Url::parse("file:/").context("parsing minimal file URL")?;
-        Ok(url::Url::options()
-            .base_url(Some(&base_url))
-            .parse(&expanded)
-            .with_context(|| format!("url parse {:?}", expanded))?)
-    }
-}
-
-/// Get a list of the urls in the CONFIG_METADATA config with the placeholders
-/// expanded.
-///
-/// I.e. run expand_placeholders() on each element in CONFIG_METADATA.
-pub(crate) async fn pbm_repo_list(sdk: &ffx_config::Sdk) -> Result<Vec<url::Url>> {
-    let version = match sdk.get_version() {
-        SdkVersion::Version(version) => version,
-        SdkVersion::InTree => "",
-        SdkVersion::Unknown => bail!("Unable to determine SDK version vs. in-tree"),
-    };
-    let sdk_root = sdk.get_path_prefix();
-    let repos: Vec<String> = ffx_config::get::<Vec<String>, _>(CONFIG_METADATA)
-        .await
-        .context("get config CONFIG_METADATA")?;
-    let repos: Vec<url::Url> = repos
-        .iter()
-        .map(|s| {
-            expand_placeholders(s, &version, &sdk_root.to_string_lossy())
-                .unwrap_or_else(|e| panic!("URL for repo {:?}: {:?}", s, e))
-        })
-        .collect();
-    Ok(repos)
-}
 
 /// Retrieve the path portion of a "file:/" url. Non-file-paths return None.
 ///
@@ -116,22 +31,6 @@ pub(crate) fn path_from_file_url(product_url: &url::Url) -> Option<PathBuf> {
     } else {
         None
     }
-}
-
-/// Get a list of product bundle entry names from `path`.
-///
-/// These are not full product_urls, but just the name that is used in the
-/// fragment portion of the URL.
-pub(crate) fn pb_names_from_path(path: &Path) -> Result<Vec<String>> {
-    let mut entries = Entries::new();
-    entries.add_from_path(path).context("adding from path")?;
-    Ok(entries
-        .iter()
-        .filter_map(|entry| match entry {
-            Metadata::ProductBundleV1(_) => Some(entry.name().to_string()),
-            _ => None,
-        })
-        .collect::<Vec<String>>())
 }
 
 /// Helper function for determining local path.
@@ -188,147 +87,6 @@ pub(crate) fn url_sans_fragment(product_url: &url::Url) -> Result<url::Url> {
     Ok(product_url)
 }
 
-/// Helper for `get_product_data()`, see docs there.
-pub(crate) async fn get_product_data_from_gcs<I>(
-    product_url: &url::Url,
-    local_repo_dir: &std::path::Path,
-    auth_flow: &AuthFlowChoice,
-    ui: &I,
-    client: &Client,
-) -> Result<()>
-where
-    I: structured_ui::Interface + Sync,
-{
-    tracing::debug!("get_product_data_from_gcs {:?} to {:?}", product_url, local_repo_dir);
-    assert_eq!(product_url.scheme(), GS_SCHEME);
-    let product_name = product_url.fragment().expect("URL with trailing product_name fragment.");
-    let url = url_sans_fragment(product_url)?;
-
-    fetch_product_metadata(
-        &url,
-        local_repo_dir,
-        auth_flow,
-        &|_d, _f| Ok(ProgressResponse::Continue),
-        ui,
-        client,
-    )
-    .await
-    .context("fetching metadata")?;
-
-    let file_path = local_repo_dir.join("product_bundles.json");
-    if !file_path.is_file() {
-        bail!("product_bundles.json not found {:?}.", file_path);
-    }
-    let mut entries = Entries::new();
-    entries.add_from_path(&file_path).context("adding entries from gcs")?;
-    let product_bundle = find_product_bundle(&entries, &Some(product_name.to_string()))
-        .context("finding product bundle")?;
-    fetch_data_for_product_bundle_v1(&product_bundle, &url, local_repo_dir, auth_flow, ui, client)
-        .await
-}
-
-/// Helper for `get_product_data()`, see docs there.
-pub async fn fetch_data_for_product_bundle_v1<I>(
-    product_bundle: &sdk_metadata::ProductBundleV1,
-    product_url: &url::Url,
-    local_repo_dir: &std::path::Path,
-    auth_flow: &AuthFlowChoice,
-    ui: &I,
-    client: &Client,
-) -> Result<()>
-where
-    I: structured_ui::Interface + Sync,
-{
-    // Handy debugging switch to disable images download.
-    let temp_dir = TempDir::new_in(&local_repo_dir)?;
-    let temp_path = temp_dir.path();
-    if true {
-        let start = std::time::Instant::now();
-        tracing::info!(
-            "Getting product data for {:?} to {:?}",
-            product_bundle.name,
-            local_repo_dir
-        );
-        let local_dir = temp_path.join("images");
-        async_fs::create_dir_all(&local_dir).await.context("creating directory")?;
-
-        for image in &product_bundle.images {
-            tracing::debug!("image {:?}", image);
-
-            let base_url =
-                make_remote_url(product_url, &image.base_uri).context("image.base_uri")?;
-            if !exists_in_gcs(&base_url.as_str(), auth_flow, ui, client).await? {
-                tracing::warn!("The base_uri does not exist: {}", base_url);
-            }
-            fetch_by_format(
-                &image.format,
-                &base_url,
-                &local_dir,
-                auth_flow,
-                &|d, f| {
-                    let mut progress = structured_ui::Progress::builder();
-                    progress.title(&product_bundle.name);
-                    progress.entry("Image data", /*at=*/ 1, /*of=*/ 2, "steps");
-                    progress.entry(&d.name, d.at, d.of, "files");
-                    progress.entry(&f.name, f.at, f.of, "bytes");
-                    ui.present(&structured_ui::Presentation::Progress(progress))?;
-                    Ok(ProgressResponse::Continue)
-                },
-                ui,
-                client,
-            )
-            .await
-            .with_context(|| format!("fetching images for {}.", product_bundle.name))?;
-        }
-        tracing::debug!("Total fetch images runtime {} seconds.", start.elapsed().as_secs_f32());
-    }
-
-    // Handy debugging switch to disable packages download.
-    if true {
-        let start = std::time::Instant::now();
-        let local_dir = temp_path.join("packages");
-        async_fs::create_dir_all(&local_dir).await.context("creating directory")?;
-        tracing::info!(
-            "Getting package data for {:?}, local_dir {:?}",
-            product_bundle.name,
-            local_dir
-        );
-        fetch_package_repository_from_mirrors(
-            product_url,
-            &local_dir,
-            &product_bundle.packages,
-            auth_flow,
-            &|d, f| {
-                let mut progress = structured_ui::Progress::builder();
-                progress.title(&product_bundle.name);
-                progress.entry("Package data", /*at=*/ 2, /*at=*/ 2, "steps");
-                progress.entry(&d.name, d.at, d.of, "files");
-                progress.entry(&f.name, f.at, f.of, "bytes");
-                ui.present(&structured_ui::Presentation::Progress(progress))?;
-                Ok(ProgressResponse::Continue)
-            },
-            ui,
-            client,
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "fetch_package_repository_from_mirrors {:?}, local_dir {:?}",
-                product_url, local_dir
-            )
-        })?;
-
-        tracing::debug!("Total fetch packages runtime {} seconds.", start.elapsed().as_secs_f32());
-    }
-
-    let final_name = local_repo_dir.join(&product_bundle.name);
-    tracing::info!("Download of product data for {:?} is complete.", product_bundle.name);
-    tracing::info!("Renaming temporary directory to {}", final_name.display());
-    fs::rename(temp_path, final_name).expect("Renaming temp directory failed.");
-    tracing::info!("Data written to \"{}\".", local_repo_dir.display());
-    Ok(())
-}
-
 /// Generate a (likely) unique name for the URL.
 ///
 /// URLs don't always make good file paths.
@@ -345,43 +103,6 @@ pub(crate) fn pb_dir_name(gcs_url: &url::Url) -> String {
     let out = s.finish();
     tracing::debug!("pb_dir_name {:?}, hash {:?}", gcs_url, out);
     format!("{}", out)
-}
-
-/// Download and expand data.
-///
-/// For a directory, all files in the directory are downloaded.
-/// For a .tgz file, the file is downloaded and expanded.
-async fn fetch_by_format<F, I>(
-    format: &str,
-    uri: &url::Url,
-    local_dir: &Path,
-    auth_flow: &AuthFlowChoice,
-    progress: &F,
-    ui: &I,
-    client: &Client,
-) -> Result<()>
-where
-    F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
-{
-    tracing::debug!("fetch_by_format");
-    match format {
-        "files" | "tgz" => {
-            fetch_from_url(uri, local_dir.to_path_buf(), auth_flow, progress, ui, client).await
-        }
-        _ =>
-        // The schema currently defines only "files" or "tgz" (see RFC-100).
-        // This error could be a typo in the product bundle or a new image
-        // format has been added and this code needs an update.
-        {
-            bail!(
-                "Unexpected image format ({:?}) in product bundle. \
-            Supported formats are \"files\" and \"tgz\". \
-            Please report as a bug.",
-                format,
-            )
-        }
-    }
 }
 
 /// Download data from any of the supported schemes listed in RFC-100, Product
@@ -508,25 +229,6 @@ where
     Ok(())
 }
 
-/// If internal_url is a file scheme, join `product_url` and `internal_url`.
-/// Otherwise, return `internal_url`.
-pub(crate) fn make_remote_url(product_url: &url::Url, internal_url: &str) -> Result<url::Url> {
-    let result = if let Some(remainder) = internal_url.strip_prefix("file:/") {
-        // Note: The product_url must either be a path to the product_bundle.json file or to the
-        // parent directory (with a trailing slash).
-        product_url.join(remainder)?
-    } else {
-        url::Url::parse(&internal_url).with_context(|| format!("parsing url {:?}", internal_url))?
-    };
-    tracing::debug!(
-        "make_remote_url product_url {:?}, internal_url {:?}, result  {:?}",
-        product_url,
-        internal_url,
-        result
-    );
-    Ok(result)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,25 +305,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    #[should_panic(expected = "Unexpected image format")]
-    async fn test_fetch_by_format() {
-        let url = url::Url::parse("fake://foo").expect("url");
-        let ui = structured_ui::MockUi::new();
-        let client = Client::initial().expect("creating client");
-        fetch_by_format(
-            "bad",
-            &url,
-            &Path::new("unused"),
-            &AuthFlowChoice::Default,
-            &|_d, _f| Ok(ProgressResponse::Continue),
-            &ui,
-            &client,
-        )
-        .await
-        .expect("bad fetch");
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     #[should_panic(expected = "Unexpected URI scheme")]
     async fn test_fetch_from_url() {
         let url = url::Url::parse("fake://foo").expect("url");
@@ -646,55 +329,5 @@ mod tests {
         assert!(url.as_str() != hash);
         assert!(!hash.contains("/"));
         assert!(!hash.contains(" "));
-    }
-
-    #[test]
-    fn test_make_remote_url() {
-        let base = url::Url::parse("gs://foo/bar/cat/blah.txt").expect("url");
-        let base_directory = url::Url::parse("gs://foo/bar/cat/").expect("url directory");
-        assert_eq!(
-            make_remote_url(&base, &"gs://a/b").expect("make_remote_url").as_str(),
-            "gs://a/b"
-        );
-        assert_eq!(
-            make_remote_url(&base, &"file:/../../c").expect("make_remote_url").as_str(),
-            "gs://foo/c"
-        );
-        assert_eq!(
-            make_remote_url(&base_directory, &"file:/../../c").expect("make_remote_url").as_str(),
-            "gs://foo/c"
-        );
-        assert_eq!(
-            make_remote_url(&base, &"file:/../c").expect("make_remote_url").as_str(),
-            "gs://foo/bar/c"
-        );
-        assert_eq!(
-            make_remote_url(&base_directory, &"file:/../c").expect("make_remote_url").as_str(),
-            "gs://foo/bar/c"
-        );
-        assert_eq!(
-            make_remote_url(&base, &"file:/../c/").expect("make_remote_url").as_str(),
-            "gs://foo/bar/c/"
-        );
-        assert_eq!(
-            make_remote_url(&base_directory, &"file:/../c/").expect("make_remote_url").as_str(),
-            "gs://foo/bar/c/"
-        );
-        assert_eq!(
-            make_remote_url(&base, &"file:/c/").expect("make_remote_url").as_str(),
-            "gs://foo/bar/cat/c/"
-        );
-        assert_eq!(
-            make_remote_url(&base_directory, &"file:/c/").expect("make_remote_url").as_str(),
-            "gs://foo/bar/cat/c/"
-        );
-        assert_eq!(
-            make_remote_url(&base, &"file:/..").expect("make_remote_url").as_str(),
-            "gs://foo/bar/"
-        );
-        assert_eq!(
-            make_remote_url(&base_directory, &"file:/..").expect("make_remote_url").as_str(),
-            "gs://foo/bar/"
-        );
     }
 }

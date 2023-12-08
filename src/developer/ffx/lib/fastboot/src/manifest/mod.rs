@@ -14,22 +14,20 @@ use crate::{
         resolvers::{
             ArchiveResolver, FlashManifestResolver, FlashManifestTarResolver, ManifestResolver,
         },
-        sdk::SdkEntries,
         v1::FlashManifest as FlashManifestV1,
         v2::FlashManifest as FlashManifestV2,
         v3::FlashManifest as FlashManifestV3,
     },
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_manifest::Image as AssemblyManifestImage;
 use assembly_partitions_config::{Partition, Slot};
 use async_trait::async_trait;
 use camino::Utf8Path;
 use chrono::Utc;
-use errors::{ffx_bail, ffx_error};
-use fms::Entries;
+use errors::ffx_bail;
 use pbms::{load_product_bundle, ListingMode};
-use sdk_metadata::{Metadata, ProductBundle, ProductBundleV2};
+use sdk_metadata::{ProductBundle, ProductBundleV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
 use std::{
@@ -41,7 +39,6 @@ use std::{
 use termion::{color, style};
 
 pub mod resolvers;
-pub mod sdk;
 pub mod v1;
 pub mod v2;
 pub mod v3;
@@ -68,7 +65,6 @@ pub enum FlashManifestVersion {
     V1(FlashManifestV1),
     V2(FlashManifestV2),
     V3(FlashManifestV3),
-    Sdk(SdkEntries),
 }
 
 /// The type of the image used in the below ImageMap.
@@ -96,7 +92,6 @@ impl FlashManifestVersion {
             FlashManifestVersion::V3(manifest) => {
                 ManifestFile { version: 3, manifest: to_value(manifest)? }
             }
-            _ => ffx_bail!("{}", UNKNOWN_VERSION),
         };
         serde_json::to_writer_pretty(writer, &manifest).context("writing flash manifest")
     }
@@ -118,37 +113,8 @@ impl FlashManifestVersion {
         }
     }
 
-    pub fn from_in_tree(path: PathBuf) -> Result<Self> {
-        let mut entries = Entries::new();
-        let mut path = match path.parent() {
-            Some(p) => p.to_path_buf(),
-            None => path.clone(),
-        };
-        let manifest_path = path.join("images.json");
-        let images: Images = File::open(manifest_path.clone())
-            .map_err(|e| ffx_error!("Cannot open file {:?} \nerror: {:?}", manifest_path, e))
-            .map(BufReader::new)
-            .map(serde_json::from_reader)?
-            .map_err(|e| anyhow!("json parsing errored {}", e))?;
-        let product_bundle =
-            images.0.iter().find(|i| i.name == "product_bundle").map(|i| i.path.clone());
-        if let Some(pb) = product_bundle {
-            path.push(pb);
-        } else {
-            ffx_bail!("Could not find the Product Bundle in the SDK. Update your SDK and retry");
-        }
-        let file = File::open(path)?;
-        entries.add_json(&mut BufReader::new(file))?;
-        Ok(Self::Sdk(SdkEntries::new(entries)))
-    }
-
     pub fn from_product_bundle(product_bundle: &ProductBundle) -> Result<Self> {
         match product_bundle {
-            ProductBundle::V1(product_bundle) => {
-                let mut entries = Entries::new();
-                entries.add_metadata(Metadata::ProductBundleV1(product_bundle.clone()))?;
-                Ok(Self::Sdk(SdkEntries::new(entries)))
-            }
             ProductBundle::V2(product_bundle) => Self::from_product_bundle_v2(product_bundle),
         }
     }
@@ -363,7 +329,6 @@ impl Flash for FlashManifestVersion {
             Self::V1(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
             Self::V2(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
             Self::V3(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
-            Self::Sdk(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -398,7 +363,6 @@ impl Unlock for FlashManifestVersion {
             Self::V1(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
             Self::V2(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
             Self::V3(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
-            Self::Sdk(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -435,7 +399,6 @@ impl Boot for FlashManifestVersion {
             Self::V1(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
             Self::V2(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
             Self::V3(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
-            Self::Sdk(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -514,7 +477,6 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
 pub async fn from_in_tree<W: Write, T: FastbootInterface>(
     sdk: &ffx_config::Sdk,
     writer: &mut W,
-    path: PathBuf,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
@@ -523,12 +485,7 @@ pub async fn from_in_tree<W: Write, T: FastbootInterface>(
         tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
         from_sdk(sdk, writer, fastboot_interface, cmd).await
     } else {
-        FlashManifest {
-            resolver: Resolver::new(path.clone())?,
-            version: FlashManifestVersion::from_in_tree(path.clone())?,
-        }
-        .flash(writer, fastboot_interface, cmd)
-        .await
+        bail!("manifest or product_bundle must be specified")
     }
 }
 

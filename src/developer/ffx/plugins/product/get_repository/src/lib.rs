@@ -6,7 +6,6 @@
 
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
-use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_product_get_repository_args::GetRepositoryCommand;
 use ffx_writer::Writer;
@@ -46,7 +45,6 @@ fn extract_repository_info(
     cmd: GetRepositoryCommand,
 ) -> Result<Vec<RepositoryInfo>> {
     let product_bundle = match product_bundle {
-        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
     };
     let mut repository_infos = Vec::new();

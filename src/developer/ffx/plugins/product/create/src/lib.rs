@@ -797,7 +797,6 @@ mod test {
 
         let internal_pb = match pb {
             ProductBundle::V2(pb) => pb,
-            _ => bail!("We defined it as PBv2 above, so this can't happen."),
         };
 
         let path = internal_pb.get_virtual_devices_path();
