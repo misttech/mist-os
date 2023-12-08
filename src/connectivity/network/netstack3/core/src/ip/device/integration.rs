@@ -54,8 +54,8 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
-            DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext,
-            IpDeviceStateContext, RemovedReason,
+            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext,
+            IpDeviceSendContext, IpDeviceStateContext,
         },
         gmp::{
             self,
@@ -210,7 +210,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             ctx,
             device_id,
             DelIpv6Addr::SpecifiedAddr(addr.into_specified()),
-            RemovedReason::Manual,
+            AddressRemovedReason::Manual,
             config,
         )
         .map(|(addr_sub, config)| {

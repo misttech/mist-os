@@ -286,14 +286,14 @@ pub enum IpAddressState {
 
 /// The reason an address was removed.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum RemovedReason {
+pub enum AddressRemovedReason {
     /// The address was removed in response to external action.
     Manual,
     /// The address was removed because it was detected as a duplicate via DAD.
     DadFailed,
 }
 
-impl From<DelIpv6AddrReason> for RemovedReason {
+impl From<DelIpv6AddrReason> for AddressRemovedReason {
     fn from(reason: DelIpv6AddrReason) -> Self {
         match reason {
             DelIpv6AddrReason::ManualAction => Self::Manual,
@@ -323,7 +323,7 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
         /// The removed address.
         addr: SpecifiedAddr<I::Addr>,
         /// The reason the address was removed.
-        reason: RemovedReason,
+        reason: AddressRemovedReason,
     },
     /// Address state changed.
     AddressStateChanged {
@@ -1542,7 +1542,7 @@ pub(crate) fn del_ipv4_addr<
     ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),
         addr: addr_sub.addr(),
-        reason: RemovedReason::Manual,
+        reason: AddressRemovedReason::Manual,
     });
     Ok(())
 }
@@ -1560,7 +1560,7 @@ fn del_ipv6_addr_with_config<
     ctx: &mut C,
     device_id: &SC::DeviceId,
     addr: DelIpv6Addr<SC::AddressId>,
-    reason: RemovedReason,
+    reason: AddressRemovedReason,
     _config: &Ipv6DeviceConfiguration,
 ) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, Ipv6AddrConfig<C::Instant>), NotFoundError>
 {
@@ -2532,7 +2532,7 @@ mod tests {
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                     device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),
-                    reason: RemovedReason::Manual,
+                    reason: AddressRemovedReason::Manual,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                     device: weak_device_id.clone(),
@@ -2787,7 +2787,7 @@ mod tests {
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                 device: weak_device_id,
                 addr: assigned_addr.addr(),
-                reason: RemovedReason::DadFailed,
+                reason: AddressRemovedReason::DadFailed,
             }),]
         );
 

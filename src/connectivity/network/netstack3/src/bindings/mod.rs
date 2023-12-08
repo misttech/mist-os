@@ -81,8 +81,8 @@ use netstack3_core::{
             nud,
             slaac::SlaacConfiguration,
             state::{Ipv6DeviceConfiguration, Lifetime},
-            IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate, RemovedReason,
+            AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
+            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
         icmp::{self, IcmpBindingsContext},
         types::RawMetric,
@@ -602,8 +602,8 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, Stac
                     InterfaceUpdate::AddressRemoved(addr.to_ip_addr()),
                 );
                 match reason {
-                    RemovedReason::Manual => (),
-                    RemovedReason::DadFailed => self.notify_dad_failed(&device, addr.into()),
+                    AddressRemovedReason::Manual => (),
+                    AddressRemovedReason::DadFailed => self.notify_dad_failed(&device, addr.into()),
                 }
             }
             IpDeviceEvent::AddressStateChanged { device, addr, state } => {
