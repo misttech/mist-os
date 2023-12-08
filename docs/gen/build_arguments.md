@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2088
+From //build/config/BUILDCONFIG.gn:2089
 
 ### allowed_test_device_types
 
@@ -835,14 +835,6 @@ From //out/not-default/args.gn:19
 
 From //build/input/BUILD.gn:9
 
-### build_pb_v1
-
-Whether to build product bundle version 1 related tools and artifacts.
-
-**Current value (from the default):** `false`
-
-From //build/product.gni:7
-
 ### build_should_trace_actions
 
 If enabled, all filesystem activity by actions will be traced and checked
@@ -1024,7 +1016,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:65
+From //build/product.gni:62
 
 ### clang_embed_bitcode
 
@@ -1165,7 +1157,7 @@ TODO: redo comments
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:33
+From //build/product.gni:30
 
 ### crash_diagnostics_dir
 
@@ -2659,7 +2651,7 @@ From //BUILD.gn:106
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:57
+From //build/product.gni:54
 
 ### emu_window_size_width
 
@@ -2667,7 +2659,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:56
+From //build/product.gni:53
 
 ### enable_frame_pointers
 
@@ -3104,7 +3096,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1823
+From //build/config/BUILDCONFIG.gn:1824
 
 ### extra_vbmeta_descriptors
 
@@ -3242,7 +3234,7 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:38
+From //build/product.gni:35
 
 ### fuchsia_product_assembly_config_label
 
@@ -3253,7 +3245,7 @@ For Bazel products, netboot will only be available when this is supplied.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:44
+From //build/product.gni:41
 
 ### fuchsia_sdk_root
 
@@ -4222,7 +4214,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1628
+From //build/config/BUILDCONFIG.gn:1629
 
 ### legacy_base_driver_package_labels
 
@@ -5391,7 +5383,7 @@ From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
-From //build/product.gni:14
+From //build/product.gni:11
 
 **Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
 
@@ -5399,7 +5391,7 @@ From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
-From //build/product.gni:14
+From //build/product.gni:11
 
 ### product_bootfs_packages
 
@@ -5408,7 +5400,7 @@ meta.fars and content-id'd blobs.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:24
+From //build/product.gni:21
 
 ### product_description
 
@@ -5416,7 +5408,7 @@ A human readable product description.
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:27
+From //build/product.gni:24
 
 ### product_host_labels
 
@@ -5424,7 +5416,7 @@ A list of binary host tool labels to also build.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:20
+From //build/product.gni:17
 
 ### product_system_image_deps
 
@@ -5432,7 +5424,7 @@ A list of binary labels to include in the system_image package.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:17
+From //build/product.gni:14
 
 ### profile_source_files
 
@@ -7239,6 +7231,14 @@ ignore warnings.
 
 From //build/rust/config.gni:55
 
+### rust_debug_assertions
+
+Enable debug assertions, e.g. for overflow checking.
+
+**Current value (from the default):** `false`
+
+From //build/config/rust/BUILD.gn:32
+
 ### rust_incremental
 
 Enable incremental rust compilation. Takes a path to the directory to use
@@ -7670,7 +7670,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2078
+From //build/config/BUILDCONFIG.gn:2079
 
 ### select_variant_canonical
 
@@ -7680,7 +7680,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2083
+From //build/config/BUILDCONFIG.gn:2084
 
 ### select_variant_shortcuts
 
@@ -7738,7 +7738,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1869
+From //build/config/BUILDCONFIG.gn:1870
 
 ### size_checker_input
 
@@ -8272,7 +8272,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1853
+From //build/config/BUILDCONFIG.gn:1854
 
 ### universe_package_labels
 
@@ -8372,7 +8372,7 @@ From //products/bringup.gni:6
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:11
+From //build/product.gni:8
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -8380,7 +8380,7 @@ From //products/bringup.gni:6
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:11
+From //build/product.gni:8
 
 ### use_ccache
 
@@ -8760,7 +8760,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:53
+From //build/product.gni:50
 
 ### vm_tracing_level
 
@@ -8909,7 +8909,7 @@ From //products/bringup.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:47
+From //build/product.gni:44
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
@@ -8917,7 +8917,7 @@ From //products/bringup.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:47
+From //build/product.gni:44
 
 ### zircon_a_partition
 
