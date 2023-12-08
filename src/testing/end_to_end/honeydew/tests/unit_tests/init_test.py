@@ -42,23 +42,6 @@ class InitTests(unittest.TestCase):
     """Unit tests for honeydew.__init__.py."""
 
     # List all the tests related to public methods in alphabetical order
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "sl4f_transport",
-                    "transport": honeydew.transports.TRANSPORT.SL4F,
-                },
-            ),
-            (
-                {
-                    "label": "transport_arg_set_to_none",
-                    "transport": None,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
     )
@@ -77,7 +60,6 @@ class InitTests(unittest.TestCase):
     )
     def test_create_device_return_sl4f_device(
         self,
-        parameterized_dict,
         mock_sl4f_start_server,
         mock_sl4f_check_connection,
         mock_ssh_check_connection,
@@ -88,8 +70,8 @@ class InitTests(unittest.TestCase):
         self.assertIsInstance(
             honeydew.create_device(
                 device_name="fuchsia-emulator",
+                transport=honeydew.transports.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
-                transport=parameterized_dict["transport"],
             ),
             sl4f_fuchsia_device.FuchsiaDevice,
         )
@@ -175,6 +157,7 @@ class InitTests(unittest.TestCase):
         self.assertIsInstance(
             honeydew.create_device(
                 device_name=device_name,
+                transport=honeydew.transports.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 device_ip_port=device_ip_port,
             ),
@@ -229,6 +212,7 @@ class InitTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             honeydew.create_device(
                 device_name=device_name,
+                transport=honeydew.transports.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 device_ip_port=device_ip_port,
             )
@@ -255,7 +239,7 @@ class InitTests(unittest.TestCase):
     @mock.patch.object(
         base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
     )
-    def test_create_device_using_device_ip_port_throws_on_differnt_target_names(
+    def test_create_device_using_device_ip_port_throws_on_different_target_names(
         self,
         mock_ssh_check_connection,
         mock_sl4f_start_server,
@@ -279,6 +263,7 @@ class InitTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             honeydew.create_device(
                 device_name=device_name,
+                transport=honeydew.transports.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 device_ip_port=device_ip_port,
             )
@@ -326,6 +311,7 @@ class InitTests(unittest.TestCase):
 
         honeydew.create_device(
             device_name=device_name,
+            transport=honeydew.transports.TRANSPORT.SL4F,
             ssh_private_key="/tmp/pkey",
             device_ip_port=device_ip_port,
         )
@@ -349,7 +335,10 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() raising FuchsiaDeviceError
         exception."""
         with self.assertRaises(errors.FuchsiaDeviceError):
-            honeydew.create_device(device_name="fuchsia-1234")
+            honeydew.create_device(
+                device_name="fuchsia-1234",
+                transport=honeydew.transports.TRANSPORT.SL4F,
+            )
 
         mock_get_device_class.assert_called()
 

@@ -354,7 +354,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         )
 
         if (
-            device_config.get("transport", transports.DEFAULT_TRANSPORT.value)
+            device_config["transport"]
             in transports.FUCHSIA_CONTROLLER_TRANSPORTS
         ):
             return True

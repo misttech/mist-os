@@ -21,6 +21,3 @@ class TRANSPORT(enum.Enum):
 
     # use Fuchsia-Controller for Host-(Fuchsia)Target interactions.
     FUCHSIA_CONTROLLER = "fuchsia_controller"
-
-
-DEFAULT_TRANSPORT: TRANSPORT = TRANSPORT.SL4F

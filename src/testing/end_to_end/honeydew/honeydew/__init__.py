@@ -26,28 +26,23 @@ _AFFORDANCE_NOT_IMPLEMENTED: str = "raise NotImplementedError"
 # List all the public methods in alphabetical order
 def create_device(
     device_name: str,
+    transport: transports.TRANSPORT,
     ssh_private_key: str | None = None,
     ssh_user: str | None = None,
-    transport: transports.TRANSPORT | None = None,
     device_ip_port: custom_types.IpPort | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
-    This method will look at all the device class implementations available, and
-    if it finds a match it will return the corresponding device class object.
-    If not, GenericFuchsiaDevice instance will be returned.
-
     Args:
         device_name: Device name returned by `ffx target list`.
+
+        transport: Transport to use to perform host-target interactions.
 
         ssh_private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
-
-        transport: Transport to use to perform host-target interactions.
-            If not set, transports.DEFAULT_TRANSPORT will be used.
 
         device_ip_port: Ip Address and port of the target to create.
             If specified, this will cause the device to be added and tracked
@@ -60,9 +55,6 @@ def create_device(
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
         errors.FfxCommandError: Failure in running an FFX Command.
     """
-    if transport is None:
-        transport = transports.DEFAULT_TRANSPORT
-
     if device_ip_port:
         _add_and_verify_device(device_name, device_ip_port)
 

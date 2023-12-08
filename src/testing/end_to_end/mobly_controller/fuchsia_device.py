@@ -60,9 +60,9 @@ def create(
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
+                transport=device_config["transport"],
                 ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user"),
-                transport=device_config.get("transport"),
                 device_ip_port=device_config.get("device_ip_port"),
             )
         )
@@ -170,6 +170,9 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     #       device_ip_port: [::1]:8022
     if "name" not in config:
         raise RuntimeError("Missing fuchsia device name in the config")
+
+    if "transport" not in config:
+        raise RuntimeError("Missing transport field in the config")
 
     device_config: Dict[str, Any] = {}
 
