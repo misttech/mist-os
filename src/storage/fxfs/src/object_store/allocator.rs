@@ -202,12 +202,6 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
         self.inner.lock().unwrap().amount
     }
 
-    /// Returns the amount available after accounting for space that is reserved.
-    pub fn avail(&self) -> u64 {
-        let inner = self.inner.lock().unwrap();
-        inner.amount - inner.reserved
-    }
-
     /// Adds more to the reservation.
     pub fn add(&self, amount: u64) {
         self.inner.lock().unwrap().amount += amount;
@@ -257,13 +251,6 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
         let mut inner = self.inner.lock().unwrap();
         inner.reserved -= amount;
         inner.amount -= amount;
-    }
-
-    /// Returns the entire amount of the reservation.
-    pub fn take(&self) -> Self {
-        let mut inner = self.inner.lock().unwrap();
-        assert_eq!(inner.reserved, 0);
-        Self::new(self.owner.clone(), self.owner_object_id, std::mem::take(&mut inner.amount))
     }
 
     /// Returns some of the reservation.

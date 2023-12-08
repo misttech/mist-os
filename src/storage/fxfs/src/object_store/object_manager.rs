@@ -26,7 +26,6 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     fuchsia_inspect::{Property as _, UintProperty},
     futures::FutureExt as _,
-    fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
     rustc_hash::FxHashMap as HashMap,
     std::{
@@ -150,10 +149,6 @@ impl ObjectManager {
         }
     }
 
-    pub fn store_object_ids(&self) -> Vec<u64> {
-        self.inner.read().unwrap().stores.keys().cloned().collect()
-    }
-
     pub fn root_parent_store_object_id(&self) -> u64 {
         self.inner.read().unwrap().root_parent_store_object_id
     }
@@ -237,20 +232,6 @@ impl ObjectManager {
     /// Returns the store which might or might not be locked.
     pub fn store(&self, store_object_id: u64) -> Option<Arc<ObjectStore>> {
         self.inner.read().unwrap().stores.get(&store_object_id).cloned()
-    }
-
-    /// Tries to unlock a store.
-    pub async fn open_store(
-        &self,
-        store_object_id: u64,
-        crypt: Arc<dyn Crypt>,
-    ) -> Result<Arc<ObjectStore>, Error> {
-        let store = self.store(store_object_id).ok_or(FxfsError::NotFound)?;
-        store
-            .unlock(crypt)
-            .await
-            .context("Failed to unlock store; was the correct key provided?")?;
-        Ok(store)
     }
 
     /// This is not thread-safe: it assumes that a store won't be forgotten whilst the loop is

@@ -161,10 +161,6 @@ impl FxVolume {
         &self.pager
     }
 
-    pub fn executor(&self) -> &fasync::EHandle {
-        &self.executor
-    }
-
     pub fn id(&self) -> u64 {
         self.fs_id
     }
@@ -238,10 +234,6 @@ impl FxVolume {
                 Ok(node)
             }
         }
-    }
-
-    pub fn into_store(self) -> Arc<ObjectStore> {
-        self.store
     }
 
     /// Marks the given directory deleted.

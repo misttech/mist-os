@@ -39,9 +39,6 @@ pub enum Reason {
 
     /// After unlock and replay of encrypted mutations.
     Unlock,
-
-    /// Just prior to locking a store.
-    Lock,
 }
 
 #[fxfs_trace::trace]
@@ -73,7 +70,7 @@ impl ObjectStore {
                     return Ok(self.tree.get_earliest_version());
                 }
             }
-            Reason::Journal | Reason::Lock => {
+            Reason::Journal => {
                 if !object_manager.needs_flush(self.store_object_id) {
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.

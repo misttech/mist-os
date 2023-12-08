@@ -94,9 +94,8 @@ pub use journal::{
 };
 pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,
-    ObjectAttributesV5, ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5,
-    ObjectKind, ObjectValue, ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV31,
-    ObjectValueV5, ProjectProperty, RootDigest,
+    ObjectKey, ObjectKeyData, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV25,
+    ObjectValueV29, ObjectValueV30, ObjectValueV31, ObjectValueV5, ProjectProperty, RootDigest,
 };
 pub use transaction::Mutation;
 
@@ -1266,14 +1265,6 @@ impl ObjectStore {
     pub fn parent_objects(&self) -> Vec<u64> {
         assert!(self.store_info_handle.get().is_some());
         self.store_info.lock().unwrap().info().unwrap().parent_objects()
-    }
-
-    /// Returns the object ID of all layer files for this store (which are in the parent store).
-    pub fn layer_file_object_ids(&self) -> Vec<u64> {
-        assert!(self.store_info_handle.get().is_some());
-        let guard = self.store_info.lock().unwrap();
-        let store_info = guard.info().unwrap();
-        store_info.layers.clone()
     }
 
     /// Returns root objects for this store.

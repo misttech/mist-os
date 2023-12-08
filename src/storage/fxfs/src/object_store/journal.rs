@@ -1617,9 +1617,6 @@ impl Writer<'_> {
     pub fn write(&mut self, mutation: Mutation) {
         self.1.write_record(&JournalRecord::Mutation { object_id: self.0, mutation }).unwrap();
     }
-    pub fn journal_file_checkpoint(&self) -> JournalCheckpoint {
-        self.1.journal_file_checkpoint()
-    }
 }
 
 #[cfg(test)]

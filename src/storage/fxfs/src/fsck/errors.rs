@@ -584,7 +584,6 @@ pub enum FsckFatal {
     MalformedStore(u64),
     MisOrderedLayerFile(u64, u64),
     MisOrderedObjectStore(u64),
-    MissingLayerFile(u64, u64),
     OverlappingKeysInLayerFile(u64, u64, Key, Key),
 }
 
@@ -608,12 +607,6 @@ impl FsckFatal {
             }
             FsckFatal::MisOrderedObjectStore(store_id) => {
                 format!("Store/allocator {} contains out-of-order or duplicate records", store_id)
-            }
-            FsckFatal::MissingLayerFile(store_id, layer_file_id) => {
-                format!(
-                    "Object store {} requires layer file {} which is missing",
-                    store_id, layer_file_id
-                )
             }
             FsckFatal::OverlappingKeysInLayerFile(store_id, layer_file_id, key1, key2) => {
                 format!(
@@ -645,10 +638,6 @@ impl FsckFatal {
                     oid = store_id,
                     "Store/allocator contains out-of-order or duplicate records"
                 );
-            }
-            FsckFatal::MissingLayerFile(store_id, layer_file_id) => {
-                // This can be for stores or the allocator.
-                error!(oid = store_id, layer_file_id, "Missing layer file");
             }
             FsckFatal::OverlappingKeysInLayerFile(store_id, layer_file_id, key1, key2) => {
                 // This can be for stores or the allocator.

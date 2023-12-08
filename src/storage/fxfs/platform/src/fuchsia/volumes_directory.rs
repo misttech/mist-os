@@ -241,10 +241,6 @@ impl VolumesDirectory {
         &self.directory_node
     }
 
-    pub fn root_volume(&self) -> &RootVolume {
-        &self.root_volume
-    }
-
     // This serves as an exclusive lock for operations that manipulate the set of mounted volumes.
     async fn lock<'a>(self: &'a Arc<Self>) -> MountedVolumesGuard<'a> {
         MountedVolumesGuard {

@@ -73,10 +73,6 @@ impl FxFile {
         file
     }
 
-    pub fn open_count(&self) -> usize {
-        self.open_count.load(Ordering::Relaxed)
-    }
-
     pub fn create_connection_async(
         this: OpenedNode<FxFile>,
         scope: ExecutionScope,

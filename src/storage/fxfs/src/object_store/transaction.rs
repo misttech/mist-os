@@ -81,12 +81,6 @@ pub const TRANSACTION_METADATA_MAX_AMOUNT: u64 =
 #[must_use]
 pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 
-impl TransactionLocks<'_> {
-    pub async fn commit_prepare(&self) {
-        self.0.manager.commit_prepare_keys(&self.0.lock_keys).await;
-    }
-}
-
 /// The journal consists of these records which will be replayed at mount time.  Within a
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
@@ -416,18 +410,8 @@ pub enum LockKey {
         object_id: u64,
     },
 
-    /// Used to lock changes to the root volume (e.g. adding or removing a volume).
-    RootVolume,
-
     /// Locks the entire filesystem.
     Filesystem,
-
-    /// Used to lock cached writes to an object attribute.
-    CachedWrite {
-        store_object_id: u64,
-        object_id: u64,
-        attribute_id: u64,
-    },
 
     ProjectId {
         store_object_id: u64,
@@ -453,10 +437,6 @@ impl LockKey {
 
     pub const fn object(store_object_id: u64, object_id: u64) -> Self {
         LockKey::Object { store_object_id, object_id }
-    }
-
-    pub const fn cached_write(store_object_id: u64, object_id: u64, attribute_id: u64) -> Self {
-        LockKey::CachedWrite { store_object_id, object_id, attribute_id }
     }
 
     pub const fn flush(object_id: u64) -> Self {
