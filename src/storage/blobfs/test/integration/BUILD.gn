@@ -28,14 +28,16 @@ static_library("blobfs_integration_fixtures") {
     "fdio_test.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//sdk/lib/fdio",
     "//src/storage/lib/fs_management",
     "//zircon/system/ulib/fdio-caller",
   ]
   public_deps = [
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/storage/blobfs",
     "//src/storage/blobfs/test:test_utils",
     "//src/storage/fs_test",
@@ -76,6 +78,11 @@ fuchsia_unittest_component("external-decompressor-integration") {
 
 wrap_with_decompressor("external-decompressor") {
   test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/external-decompressor-integration.cm"
+  forwarded_protocols = [
+    "fuchsia.diagnostics.ArchiveAccessor",
+    "fuchsia.inspect.InspectSink",
+    "fuchsia.logger.LogSink",
+  ]
 }
 
 test("blobfs_integration") {
@@ -115,6 +122,7 @@ test("blobfs_integration") {
 }
 
 storage_driver_test_realm_v2_component("blobfs-integration-component") {
+  manifest = "meta/blobfs_integration.cml"
   deps = [
     ":blobfs_integration",
     ":decompressor_includes",
@@ -124,6 +132,8 @@ storage_driver_test_realm_v2_component("blobfs-integration-component") {
 wrap_with_decompressor("blobfs-integration") {
   test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/blobfs-integration-component.cm"
   forwarded_protocols = [
+    "fuchsia.diagnostics.ArchiveAccessor",
+    "fuchsia.inspect.InspectSink",
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
     "fuchsia.sys.Launcher",

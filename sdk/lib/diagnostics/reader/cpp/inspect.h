@@ -80,6 +80,8 @@ class InspectData {
   // - Otherwise, sort lexicographically.
   void Sort();
 
+  inspect::Hierarchy&& TakePayload() { return std::move(payload_); }
+
  private:
   // The document wrapped by this container.
   rapidjson::Document document_;

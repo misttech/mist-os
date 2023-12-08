@@ -19,7 +19,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/hierarchy.h>
-#include <lib/inspect/service/cpp/reader.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/vmo.h>
@@ -1274,9 +1273,8 @@ class BlobfsMetricIntegrationTest : public FdioTest {
   void GetReadBytes(uint64_t* total_read_bytes) {
     const std::array<std::string, 2> algorithms = {"uncompressed", "chunked"};
     const std::array<std::string, 2> read_methods = {"paged_read_stats", "unpaged_read_stats"};
-    fpromise::result<inspect::Hierarchy> snapshot = TakeSnapshot();
-    ASSERT_TRUE(snapshot.is_ok());
-    inspect::Hierarchy hierarchy = std::move(snapshot.value());
+    inspect::Hierarchy hierarchy;
+    TakeSnapshot(&hierarchy);
     *total_read_bytes = 0;
     for (const std::string& algorithm : algorithms) {
       for (const std::string& stat : read_methods) {
@@ -1326,36 +1324,34 @@ TEST_F(BlobfsMetricIntegrationTest, BlobfsInspectTree) {
   using namespace inspect::testing;
   using namespace ::testing;
 
-  fpromise::result<inspect::Hierarchy> snapshot = TakeSnapshot();
-  ASSERT_TRUE(snapshot.is_ok());
-
-  const inspect::Hierarchy* root_node = &snapshot.value();
+  inspect::Hierarchy hierarchy;
+  TakeSnapshot(&hierarchy);
 
   // Ensure that all nodes we expect exist.
   for (const char* name :
        {fs_inspect::kInfoNodeName, fs_inspect::kUsageNodeName, fs_inspect::kFvmNodeName}) {
-    ASSERT_NE(root_node->GetByPath({name}), nullptr)
+    ASSERT_NE(hierarchy.GetByPath({name}), nullptr)
         << "Could not find expected node in Blobfs inspect hierarchy: " << name;
   }
 
   // Test known values specific to Blobfs.
-  const inspect::Hierarchy* info_node = root_node->GetByPath({fs_inspect::kInfoNodeName});
+  const inspect::Hierarchy* info_node = hierarchy.GetByPath({fs_inspect::kInfoNodeName});
   ASSERT_NE(info_node, nullptr);
   EXPECT_THAT(
       *info_node,
       NodeMatches(AllOf(
           NameMatches(fs_inspect::kInfoNodeName),
           PropertyList(IsSupersetOf({StringIs(fs_inspect::InfoData::kPropName, "blobfs"),
-                                     UintIs(fs_inspect::InfoData::kPropMaxFilenameLength, 64),
+                                     IntIs(fs_inspect::InfoData::kPropMaxFilenameLength, 64),
                                      StringIs(fs_inspect::InfoData::kPropOldestVersion,
                                               ::testing::MatchesRegex("^[0-9]+\\/[0-9]+$"))})))));
 
-  const inspect::Hierarchy* usage_node = root_node->GetByPath({fs_inspect::kUsageNodeName});
+  const inspect::Hierarchy* usage_node = hierarchy.GetByPath({fs_inspect::kUsageNodeName});
   ASSERT_NE(usage_node, nullptr);
   EXPECT_THAT(*usage_node,
               NodeMatches(AllOf(
                   NameMatches(fs_inspect::kUsageNodeName),
-                  PropertyList(IsSupersetOf({UintIs(fs_inspect::UsageData::kPropUsedNodes, 0)})))));
+                  PropertyList(IsSupersetOf({IntIs(fs_inspect::UsageData::kPropUsedNodes, 0)})))));
 
   // Create a file to increase the used inode count.
   {
@@ -1368,16 +1364,14 @@ TEST_F(BlobfsMetricIntegrationTest, BlobfsInspectTree) {
   }
 
   // Take a new snapshot of the tree and check that the used node count went up.
-  snapshot = TakeSnapshot();
-  ASSERT_TRUE(snapshot.is_ok());
-  root_node = &snapshot.value();
+  TakeSnapshot(&hierarchy);
 
-  usage_node = root_node->GetByPath({fs_inspect::kUsageNodeName});
+  usage_node = hierarchy.GetByPath({fs_inspect::kUsageNodeName});
   ASSERT_NE(usage_node, nullptr);
   EXPECT_THAT(*usage_node,
               NodeMatches(AllOf(
                   NameMatches(fs_inspect::kUsageNodeName),
-                  PropertyList(IsSupersetOf({UintIs(fs_inspect::UsageData::kPropUsedNodes, 1)})))));
+                  PropertyList(IsSupersetOf({IntIs(fs_inspect::UsageData::kPropUsedNodes, 1)})))));
 }
 
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, BlobfsIntegrationTest,

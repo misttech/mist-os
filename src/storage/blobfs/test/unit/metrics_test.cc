@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/inspect/cpp/fidl.h>
+#include <fidl/fuchsia.inspect/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fzl/time.h>
+#include <lib/inspect/component/cpp/service.h>
+#include <lib/inspect/component/cpp/testing.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/service/cpp/reader.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <unistd.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -20,6 +20,7 @@
 #include <thread>
 
 #include <gtest/gtest.h>
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 #include "src/storage/blobfs/blobfs_metrics.h"
 #include "src/storage/blobfs/format.h"
@@ -104,55 +105,45 @@ TEST(VerificationMetricsTest, MerkleVerifyMultithreaded) {
   EXPECT_EQ(stats.verification_time, static_cast<zx_ticks_t>(kDuration * kNumThreads));
 }
 
-fpromise::result<inspect::Hierarchy> TakeSnapshot(fuchsia::inspect::TreePtr tree,
-                                                  async::Executor* executor) {
-  std::condition_variable cv;
-  std::mutex m;
-  bool done = false;
-  fpromise::result<inspect::Hierarchy> hierarchy_or_error;
+class MetricsTest : public gtest::RealLoopFixture {
+ public:
+  MetricsTest() : executor_(dispatcher()) {}
 
-  auto promise = inspect::ReadFromTree(std::move(tree))
-                     .then([&](fpromise::result<inspect::Hierarchy>& result) {
-                       {
-                         std::unique_lock<std::mutex> lock(m);
-                         hierarchy_or_error = std::move(result);
-                         done = true;
-                       }
-                       cv.notify_all();
-                     });
+  inspect::Hierarchy TakeSnapshot(inspect::testing::TreeClient tree) {
+    bool done = false;
+    inspect::Hierarchy hierarchy;
 
-  executor->schedule_task(std::move(promise));
+    executor_.schedule_task(inspect::testing::ReadFromTree(tree, dispatcher())
+                                .and_then([&](inspect::Hierarchy& result) {
+                                  hierarchy = std::move(result);
+                                  done = true;
+                                }));
 
-  std::unique_lock<std::mutex> lock(m);
-  cv.wait(lock, [&done]() { return done; });
+    RunLoopUntil([&] { return done; });
 
-  return hierarchy_or_error;
-}
+    return hierarchy;
+  }
 
-TEST(MetricsTest, PageInMetrics) {
-  // Setup an async thread on which the Inspect client and server can operate
-  async::Loop loop = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  loop.StartThread("inspect-thread");
-  async::Executor executor(loop.dispatcher());
+  async::Executor executor_;
+};
 
+TEST_F(MetricsTest, PageInMetrics) {
   // Create the Metrics object (with page-in recording enabled) and record a page-in
   BlobfsMetrics metrics{true};
   metrics.IncrementPageIn("0123456789", 8192, 100);
 
   // Setup a connection to the Inspect VMO
-  auto connector = inspect::MakeTreeHandler(
-      metrics.inspector(), loop.dispatcher(),
+  auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
+  inspect::TreeServer::StartSelfManagedServer(
+      *metrics.inspector(),
       inspect::TreeHandlerSettings{.snapshot_behavior = inspect::TreeServerSendPreference::Frozen(
-                                       inspect::TreeServerSendPreference::Type::DeepCopy)});
-  fuchsia::inspect::TreePtr tree;
-  fidl::InterfaceRequest<fuchsia::inspect::Tree> request = tree.NewRequest(loop.dispatcher());
-  connector(std::move(request));
+                                       inspect::TreeServerSendPreference::Type::DeepCopy)},
+      dispatcher(), std::move(endpoints->server));
 
   // Take a snapshot of the tree and verify the hierarchy
-  fpromise::result<inspect::Hierarchy> result = TakeSnapshot(std::move(tree), &executor);
-  EXPECT_TRUE(result.is_ok());
+  const inspect::Hierarchy hierarchy =
+      TakeSnapshot(inspect::testing::TreeClient{std::move(endpoints->client), dispatcher()});
 
-  inspect::Hierarchy hierarchy = result.take_value();
   const inspect::Hierarchy* blob_frequencies =
       hierarchy.GetByPath({"page_in_frequency_stats", "0123456789"});
   EXPECT_NE(blob_frequencies, nullptr);
@@ -162,9 +153,6 @@ TEST(MetricsTest, PageInMetrics) {
       blob_frequencies->node().get_property<inspect::UintPropertyValue>("1");
   EXPECT_NE(frequency, nullptr);
   EXPECT_EQ(frequency->value(), 1ul);
-
-  loop.Quit();
-  loop.JoinThreads();
 }
 
 }  // namespace

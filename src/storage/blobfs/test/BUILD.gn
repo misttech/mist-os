@@ -102,9 +102,10 @@ test("blobfs_unittest") {
   ]
   deps = [
     ":test_utils",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/lib/chunked-compression",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",
     "//src/storage/blobfs",
     "//src/storage/blobfs:decompressor_impl",

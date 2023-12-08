@@ -13,7 +13,6 @@
 #include <lib/fdio/io.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/inspect/cpp/hierarchy.h>
-#include <lib/inspect/service/cpp/reader.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>

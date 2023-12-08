@@ -10,7 +10,6 @@
 #include <lib/fzl/time.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
