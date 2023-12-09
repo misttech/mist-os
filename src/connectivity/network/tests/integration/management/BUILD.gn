@@ -36,6 +36,7 @@ rustc_test("management") {
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:test-case",

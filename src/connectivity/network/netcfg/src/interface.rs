@@ -100,12 +100,11 @@ fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<Strin
 pub struct InterfaceNamingConfig {
     naming_rules: Vec<NamingRule>,
     interfaces: HashMap<InterfaceNamingIdentifier, String>,
-    temp_id: u64,
 }
 
 impl InterfaceNamingConfig {
     pub(crate) fn from_naming_rules(naming_rules: Vec<NamingRule>) -> InterfaceNamingConfig {
-        InterfaceNamingConfig { naming_rules, interfaces: HashMap::new(), temp_id: 0u64 }
+        InterfaceNamingConfig { naming_rules, interfaces: HashMap::new() }
     }
 
     /// Returns a stable interface name for the specified interface.
@@ -151,22 +150,6 @@ impl InterfaceNamingConfig {
         }?;
 
         Ok((generated_name, interface_naming_id))
-    }
-
-    /// Returns a temporary name for an interface.
-    pub(crate) fn generate_temporary_name(
-        &mut self,
-        interface_type: crate::InterfaceType,
-    ) -> (String, Option<InterfaceNamingIdentifier>) {
-        let id = self.temp_id;
-        self.temp_id += 1;
-
-        let prefix = match interface_type {
-            crate::InterfaceType::Wlan => "wlant",
-            crate::InterfaceType::Ethernet => "etht",
-            crate::InterfaceType::Ap => "apt",
-        };
-        (format!("{}{}", prefix, id), None)
     }
 
     fn generate_name(&self, info: &DeviceInfoRef<'_>) -> Result<String, NameGenerationError> {
@@ -774,25 +757,6 @@ mod tests {
             // Ensure the number of interfaces we expect are present.
             assert_eq!(interface_naming_config.interfaces.len(), expected_size);
         }
-    }
-
-    #[test]
-    fn test_generate_temporary_name() {
-        let mut interface_naming_config = InterfaceNamingConfig::from_naming_rules(vec![]);
-        let (name_0, id_0) =
-            interface_naming_config.generate_temporary_name(crate::InterfaceType::Ethernet);
-        assert_eq!(&name_0, "etht0");
-        assert_matches!(id_0, None);
-
-        let (name_1, id_1) =
-            interface_naming_config.generate_temporary_name(crate::InterfaceType::Wlan);
-        assert_eq!(&name_1, "wlant1");
-        assert_matches!(id_1, None);
-
-        let (name_2, id_2) =
-            interface_naming_config.generate_temporary_name(crate::InterfaceType::Ap);
-        assert_eq!(&name_2, "apt2");
-        assert_matches!(id_2, None);
     }
 
     #[test]

@@ -104,9 +104,6 @@ const WLAN_AP_NETWORK_ADDR: fnet::Ipv4Address = fidl_ip_v4!("192.168.255.248");
 /// 1 day in seconds.
 const WLAN_AP_DHCP_LEASE_TIME_SECONDS: u32 = 24 * 60 * 60;
 
-/// The maximum number of times to attempt to add a device.
-const MAX_ADD_DEVICE_ATTEMPTS: u8 = 3;
-
 /// A map of DNS server watcher streams that yields `DnsServerWatcherEvent` as DNS
 /// server updates become available.
 ///
@@ -454,10 +451,7 @@ macro_rules! no_update_filter_rules {
 
 #[derive(Debug)]
 struct InterfaceState {
-    // TODO(fxb/56559): Use this field in the removal of
-    // the temporary naming policy, and drop the Option
-    #[allow(unused)]
-    interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
+    interface_naming_id: interface::InterfaceNamingIdentifier,
     // Hold on to control to enforce interface ownership, even if unused.
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
     device_class: DeviceClass,
@@ -485,7 +479,7 @@ struct WlanApInterfaceState {}
 
 impl InterfaceState {
     fn new_host(
-        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
+        interface_naming_id: interface::InterfaceNamingIdentifier,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -505,7 +499,7 @@ impl InterfaceState {
     }
 
     fn new_wlan_ap(
-        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
+        interface_naming_id: interface::InterfaceNamingIdentifier,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         provisioning: interface::ProvisioningAction,
@@ -1899,39 +1893,94 @@ impl<'a> NetCfg<'a> {
         &mut self,
         instance: devices::NetworkDeviceInstance,
     ) -> Result<(), anyhow::Error> {
-        let mut i = 0;
-        loop {
-            // TODO(fxbug.dev/56559): The same interface may flap so instead of using a
-            // temporary name, try to determine if the interface flapped and wait
-            // for the teardown to complete.
-            match self.add_new_device(&instance, i == 0 /* stable_name */).await {
-                Ok(()) => {
-                    break Ok(());
+        // Produce the identifier for the device to determine if it is already
+        // known to Netcfg.
+        let interface_naming_id =
+            match self.get_interface_naming_identifier_for_instance(&instance).await {
+                Ok(id) => id,
+                Err(e) => {
+                    error!("non-fatal error getting interface naming id {instance:?}: {e:?}");
+
+                    return Ok(());
                 }
-                Err(devices::AddDeviceError::AlreadyExists(name)) => {
-                    i += 1;
-                    if i == MAX_ADD_DEVICE_ATTEMPTS {
-                        error!(
-                            "failed to add {instance:?} after {MAX_ADD_DEVICE_ATTEMPTS} \
-                            attempts due to already exists error and name ({name})",
+            };
+
+        // TODO(https://fxbug.dev/136968): Add metrics/inspect data for devices
+        // that encounter the situations below
+        // Check if this device is known to Netcfg.
+        // The device creation process removes an existing interface with
+        // the same InterfaceNamingIdentifier. Therefore, two interfaces cannot
+        // exist concurrently with the same InterfaceNamingIdentifier. This
+        // should result in 0 or 1 interface to exist with the
+        // provided identifier.
+        match self.interface_states.iter().find_map(|(_id, state)| {
+            // A device with the same PersistentId is considered to be
+            // the same logical interface.
+            if state.interface_naming_id == interface_naming_id {
+                Some(state)
+            } else {
+                None
+            }
+        }) {
+            // If Netcfg knows about the device already, then it's likely
+            // flapped and we should uninstall the existing interface prior
+            // to adding the new one.
+            Some(InterfaceState { control, interface_naming_id, .. }) => {
+                warn!(
+                    "interface likely flapped. attempting to remove interface with \
+                    interface naming id ({interface_naming_id:?}) prior to adding \
+                    instance: {instance:?}"
+                );
+                match control.remove().await {
+                    Ok(Ok(())) => {
+                        // Successfully removed interface.
+                        // It may have been that Netstack responded to the
+                        // `remove()` request or Netstack noticed the flap
+                        // and removed the interface on its own.
+                        info!(
+                            "interface removed due to reason: {:?}",
+                            control.clone().wait_termination().await
                         );
-
-                        break Ok(());
                     }
+                    Ok(Err(e)) => {
+                        panic!("expected to be able to call remove on this interface: {e:?}")
+                    }
+                    Err(e) => {
+                        // Do nothing. The interface was already removed.
+                        info!("interface was already removed prior to calling `remove()`: {e:?}");
+                    }
+                }
+            }
+            None => {
+                // Do nothing. The device is not known to Netcfg so
+                // we should attempt to add the device.
+            }
+        }
 
-                    warn!(
-                        "got already exists error on attempt {} of adding {:?}, trying again...",
-                        i, instance,
-                    );
-                }
-                Err(devices::AddDeviceError::Other(errors::Error::NonFatal(e))) => {
-                    error!("non-fatal error adding device {:?}: {:?}", instance, e);
+        match self.add_new_device(&instance).await {
+            Ok(()) => {
+                return Ok(());
+            }
+            Err(devices::AddDeviceError::AlreadyExists(name)) => {
+                // Either the interface with this name was not installed
+                // by Netcfg or another device installed by Netcfg used
+                // the same name already. We will reject interface
+                // installation.
+                error!(
+                    "interface with name ({name}) is already present in the Netstack, \
+                    and the device was either not installed by Netcfg or a different \
+                    device installed by Netcfg used the same name. rejecting \
+                    installation for instance: {instance:?}"
+                );
+                return Ok(());
+            }
+            Err(devices::AddDeviceError::Other(errors::Error::NonFatal(e))) => {
+                error!("non-fatal error adding device {:?}: {:?}", instance, e);
 
-                    break Ok(());
-                }
-                Err(devices::AddDeviceError::Other(errors::Error::Fatal(e))) => {
-                    break Err(e.context(format!("error adding new device {:?}", instance)));
-                }
+                return Ok(());
+            }
+            Err(devices::AddDeviceError::Other(errors::Error::Fatal(e))) => {
+                return Err(e.context(format!("error adding new device {:?}", instance)));
             }
         }
     }
@@ -1940,7 +1989,6 @@ impl<'a> NetCfg<'a> {
     async fn add_new_device(
         &mut self,
         device_instance: &devices::NetworkDeviceInstance,
-        stable_name: bool,
     ) -> Result<(), devices::AddDeviceError> {
         let device_info =
             device_instance.get_device_info().await.context("error getting device info and MAC")?;
@@ -1960,24 +2008,22 @@ impl<'a> NetCfg<'a> {
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
         }
         .into();
-        let (interface_name, persistent_id) = if stable_name {
-            match self.interface_naming_config.generate_stable_name(
-                &topological_path,
-                &mac,
-                *device_class,
-            ) {
-                Ok((name, persistent_id)) => (name.to_string(), Some(persistent_id)),
-                Err(interface::NameGenerationError::GenerationError(e)) => {
-                    return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
-                        e.context("error getting stable name"),
-                    )))
-                }
+        let (interface_name, interface_naming_id) = match self
+            .interface_naming_config
+            .generate_stable_name(&topological_path, &mac, *device_class)
+        {
+            Ok((name, interface_naming_id)) => (name.to_string(), interface_naming_id),
+            Err(interface::NameGenerationError::GenerationError(e)) => {
+                return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
+                    e.context("error getting stable name"),
+                )))
             }
-        } else {
-            self.interface_naming_config.generate_temporary_name(interface_type)
         };
 
-        info!("adding {:?} to stack with name = {}", device_instance, interface_name);
+        info!(
+            "adding {device_instance:?} to stack with name = {interface_name} and \
+        naming id = {interface_naming_id:?}"
+        );
 
         let (interface_id, control) = device_instance
             .add_to_stack(self, InterfaceConfig { name: interface_name.clone(), metric })
@@ -1988,7 +2034,7 @@ impl<'a> NetCfg<'a> {
             interface_id.try_into().expect("interface ID should be nonzero"),
             control,
             interface_name,
-            persistent_id,
+            interface_naming_id,
             &device_info,
             &mac,
         )
@@ -2007,7 +2053,7 @@ impl<'a> NetCfg<'a> {
         interface_id: NonZeroU64,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         interface_name: String,
-        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
+        interface_naming_id: interface::InterfaceNamingIdentifier,
         // TODO(fxbug.dev/136874): Use DeviceInfoRef directly when the
         // same functions are  implemented for `is_wlan_ap`, `interface_type`
         device_info: &DeviceInfo,
@@ -2784,6 +2830,24 @@ impl<'a> NetCfg<'a> {
             self.dhcpv6_prefix_provider_handler.as_mut(),
         )
     }
+
+    async fn get_interface_naming_identifier_for_instance(
+        &self,
+        device_instance: &devices::NetworkDeviceInstance,
+    ) -> Result<interface::InterfaceNamingIdentifier, anyhow::Error> {
+        let device_info = device_instance
+            .get_device_info()
+            .await
+            .context("error getting device info and MAC")
+            .map_err(|e| match e {
+                errors::Error::NonFatal(e) | errors::Error::Fatal(e) => e,
+            })?;
+
+        let DeviceInfo { mac, device_class: _, topological_path: _ } = &device_info;
+        let mac = mac.ok_or_else(|| anyhow!("devices without mac not supported"))?;
+
+        Ok(interface::generate_identifier(&mac))
+    }
 }
 
 pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
@@ -3247,7 +3311,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_interface_naming_id()),
+                    test_interface_naming_id(),
                     control,
                     device_class.into(),
                     None,
@@ -3409,7 +3473,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_interface_naming_id()),
+                    test_interface_naming_id(),
                     control,
                     device_class.into(),
                     None,
@@ -3669,7 +3733,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_interface_naming_id()),
+                    test_interface_naming_id(),
                     control,
                     device_class.into(),
                     None,
@@ -3812,7 +3876,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_interface_naming_id()),
+                    test_interface_naming_id(),
                     control,
                     device_class.into(),
                     None,
@@ -4114,7 +4178,7 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_wlan_ap(
-                                Some(test_interface_naming_id()),
+                                test_interface_naming_id(),
                                 control,
                                 device_class,
                                 interface::ProvisioningAction::Local
@@ -4137,7 +4201,7 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_host(
-                                Some(test_interface_naming_id()),
+                                test_interface_naming_id(),
                                 control,
                                 device_class,
                                 None,
@@ -4536,7 +4600,7 @@ mod tests {
                 netcfg.interface_states.insert(
                     id,
                     InterfaceState::new_host(
-                        Some(test_interface_naming_id()),
+                        test_interface_naming_id(),
                         control,
                         device_class,
                         upstream.then_some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
