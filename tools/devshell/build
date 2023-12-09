@@ -153,15 +153,16 @@ function main {
   # to kick off the build and wait for the failure.
   goma-check
 
-  local rbe_wrapper=()
-  if fx-rbe-enabled
-  then
-    rbe_wrapper=("${RBE_WRAPPER[@]}")
-  fi
-
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
+
+    local rbe_wrapper=()
+    if fx-rbe-enabled
+    then
+      rbe_wrapper=("${RBE_WRAPPER[@]}")
+    fi
+
     # It's not ideal that we resort to constructing the textproto file as a
     # string, but it's easier than writing a Go tool solely for the purpose of
     # constructing a protobuf with a couple top-level string fields set.

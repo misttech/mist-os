@@ -43,6 +43,8 @@ import subprocess
 import sys
 from typing import Sequence
 
+import check_ninja_build_plan
+
 
 def get_host_platform() -> str:
     """Return host platform name, following Fuchsia conventions."""
@@ -624,21 +626,14 @@ def main():
         )
     )
 
-    if maybe_regenerate_ninja(gn_output_dir, ninja_binary):
-        log(
-            "Re-generating Ninja build plan and incrementally rebuilding Bazel main workspace (to make sure all dependencies are up-to-date)!"
+    if not check_ninja_build_plan.ninja_plan_is_up_to_date(gn_output_dir):
+        print(
+            "Ninja build plan is not up-to-date, please run `fx build` before this script!",
+            file=sys.stderr,
         )
-        subprocess.run(
-            [
-                ninja_binary,
-                "-C",
-                gn_output_dir,
-                "build.ninja",
-                "bazel_workspace",
-            ]
-        )
-    else:
-        log2("Ninja build plan up to date.")
+        return 1
+
+    log2("Ninja build plan up to date.")
 
     generated = GeneratedFiles()
 

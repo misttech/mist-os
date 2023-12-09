@@ -87,6 +87,9 @@ action("generate_main_workspace") {
     # The script reads this configuration file
     "//build/bazel/config/main_workspace_top_dir",
 
+    # The script imports this python file
+    "//build/bazel/scripts/check_ninja_build_plan.py",
+
     # The script reads RBE configs
     rewrapper_config_file,
     reproxy_config_file,

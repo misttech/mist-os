@@ -7,7 +7,10 @@ import("//build/python/python_host_test.gni")
 if (is_host) {
   python_host_test("update_workspace_test") {
     main_source = "update_workspace_test.py"
-    sources = [ "update_workspace.py" ]
+    sources = [
+      "check_ninja_build_plan.py",
+      "update_workspace.py",
+    ]
     libraries = [ "//third_party/parameterized" ]
   }
 }
