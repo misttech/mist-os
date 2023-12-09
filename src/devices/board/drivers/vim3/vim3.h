@@ -78,6 +78,7 @@ class Vim3 : public Vim3Type {
   // lifetime of the board driver.
   bool HasLcd();
 
+  zx::result<> AdcInit();
   zx_status_t AudioInit();
   zx_status_t BacklightInit();
   zx_status_t BluetoothInit();

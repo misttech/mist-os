@@ -8,31 +8,19 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/adc/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
+#include <bind/fuchsia/hardware/adc/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
+#include "src/devices/board/drivers/vim3/vim3-adc.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 
 namespace vim3 {
-
-static const std::vector<fuchsia_hardware_platform_bus::Mmio> saradc_mmios{
-    {{
-        .base = A311D_SARADC_BASE,
-        .length = A311D_SARADC_LENGTH,
-    }},
-    {{
-        .base = A311D_AOBUS_BASE,
-        .length = A311D_AOBUS_LENGTH,
-    }},
-};
-
-static const std::vector<fuchsia_hardware_platform_bus::Irq> saradc_irqs{
-    {{
-        .irq = A311D_SARADC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
 
 zx::result<> Vim3::ButtonsInit() {
   // Function Key
@@ -41,8 +29,6 @@ zx::result<> Vim3::ButtonsInit() {
   adc_buttons.vid() = PDEV_VID_GENERIC;
   adc_buttons.pid() = PDEV_PID_GENERIC;
   adc_buttons.did() = PDEV_DID_ADC_BUTTONS;
-  adc_buttons.mmio() = saradc_mmios;
-  adc_buttons.irq() = saradc_irqs;
 
   auto func_types = std::vector<fuchsia_input_report::ConsumerControlButton>{
       fuchsia_input_report::ConsumerControlButton::kFunction};
@@ -73,7 +59,26 @@ zx::result<> Vim3::ButtonsInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BTNS');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, adc_buttons));
+  const std::vector<fuchsia_driver_framework::BindRule> kFunctionButtonCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, VIM3_ADC_BUTTON),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kFunctionButtonCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_BUTTON),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, VIM3_ADC_BUTTON),
+  };
+
+  const std::vector<fuchsia_driver_framework::ParentSpec> kFunctionButtonParents = {
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kFunctionButtonCompositeRules,
+                                            .properties = kFunctionButtonCompositeProperties}}};
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, adc_buttons),
+      fidl::ToWire(fidl_arena,
+                   fuchsia_driver_framework::CompositeNodeSpec{
+                       {.name = "function-button", .parents = kFunctionButtonParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "NodeAdd Buttons(adc_buttons) request failed: %s",
            result.FormatDescription().data());

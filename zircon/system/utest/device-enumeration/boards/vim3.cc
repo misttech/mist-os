@@ -86,6 +86,12 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/vim3-mcu",
 
+      // ADC
+      "sys/platform/05:00:38/aml-saradc",
+
+      // Button
+      "sys/platform/00:00:35/function-button/adc-buttons",
+
 #ifdef include_packaged_drivers
 
       // RTC

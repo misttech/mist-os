@@ -15,6 +15,7 @@
         {
             service: [
                 "fuchsia.driver.compat.Service",
+                "fuchsia.hardware.adc.Service",
                 "fuchsia.hardware.platform.device.Service",
             ],
         },

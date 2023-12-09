@@ -6,29 +6,33 @@
 #define SRC_UI_INPUT_DRIVERS_ADC_BUTTONS_ADC_BUTTONS_DEVICE_H_
 
 #include <fidl/fuchsia.buttons/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.adc/cpp/fidl.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/input_report_reader/reader.h>
 
 #include <set>
 
-#include <fbl/ref_ptr.h>
-#include <soc/aml-common/aml-g12-saradc.h>
-
 namespace adc_buttons_device {
 
 class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
  public:
-  AdcButtonsDevice(async_dispatcher_t* dispatcher, std::unique_ptr<AmlSaradcDevice> saradc,
+  struct AdcButtonClient {
+    AdcButtonClient(fidl::ClientEnd<fuchsia_hardware_adc::Device> adc,
+                    std::vector<fuchsia_buttons::Button> buttons)
+        : adc_(std::move(adc)), buttons_(std::move(buttons)) {}
+
+    fidl::WireSyncClient<fuchsia_hardware_adc::Device> adc_;
+    std::vector<fuchsia_buttons::Button> buttons_;
+  };
+
+  AdcButtonsDevice(async_dispatcher_t* dispatcher, std::vector<AdcButtonClient> clients,
                    uint32_t polling_rate_usec,
-                   std::map<uint32_t, std::vector<fuchsia_buttons::Button>> configs,
                    std::set<fuchsia_input_report::ConsumerControlButton> buttons)
       : dispatcher_(dispatcher),
         polling_rate_usec_(polling_rate_usec),
-        saradc_(std::move(saradc)),
-        configs_(std::move(configs)),
+        clients_(std::move(clients)),
         buttons_(std::move(buttons)) {
-    saradc_->HwInit();
     polling_task_.Post(dispatcher_);
   }
   void Shutdown();
@@ -63,10 +67,7 @@ class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevi
   async::TaskMethod<AdcButtonsDevice, &AdcButtonsDevice::PollingTask> polling_task_{this};
   uint32_t polling_rate_usec_;
 
-  std::unique_ptr<AmlSaradcDevice> saradc_;
-
-  // Maps channels to a list of button configs.
-  std::map<uint32_t, std::vector<fuchsia_buttons::Button>> configs_;
+  std::vector<AdcButtonClient> clients_;
   std::set<fuchsia_input_report::ConsumerControlButton> buttons_;  // For descriptor
 
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;

@@ -11,7 +11,11 @@ driver_bind_rules("adc-buttons-bind") {
   rules = "adc-buttons.bind"
   bind_output = "adc-buttons.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.platform" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
+    "//src/devices/bind/fuchsia.adc",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 fuchsia_driver("adc-buttons-driver") {
@@ -45,6 +49,7 @@ source_set("common") {
   public_deps = [
     "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -63,10 +68,9 @@ test("adc-buttons-test") {
   sources = [ "adc-buttons-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/driver/runtime/testing/cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/testing/mock-mmio-reg",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -74,6 +78,11 @@ test("adc-buttons-test") {
 fuchsia_unittest_package("adc-buttons-test-package") {
   package_name = "adc-buttons-test"
   deps = [ ":adc-buttons-test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

@@ -31,17 +31,21 @@ void AdcButtonsDevice::PollingTask(async_dispatcher_t* dispatcher, async::TaskBa
   polling_task_.PostDelayed(dispatcher_, zx::usec(polling_rate_usec_));
 
   std::set<fuchsia_input_report::ConsumerControlButton> buttons;
-  for (const auto& [chan, configs] : configs_) {
-    uint32_t val;
-    auto status = saradc_->GetSample(chan, &val);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "%s: GetSample failed %d", __func__, status);
+  for (const auto& client : clients_) {
+    auto result = client.adc_->GetSample();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "%s: GetSample failed %s", __func__, result.FormatDescription().c_str());
+      return;
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "%s: GetSample failed %d", __func__, result->error_value());
       return;
     }
 
-    for (const auto& cfg : configs) {
+    for (const auto& cfg : client.buttons_) {
       const auto& saradc = cfg.button_config()->adc();
-      if (val >= saradc->press_threshold() && val < saradc->release_threshold()) {
+      if (result.value()->value >= saradc->press_threshold() &&
+          result.value()->value < saradc->release_threshold()) {
         buttons.insert(cfg.types()->begin(), cfg.types()->end());
       }
     }
@@ -97,9 +101,6 @@ void AdcButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   completer.Reply(descriptor);
 }
 
-void AdcButtonsDevice::Shutdown() {
-  polling_task_.Cancel();
-  saradc_->Shutdown();
-}
+void AdcButtonsDevice::Shutdown() { polling_task_.Cancel(); }
 
 }  // namespace adc_buttons_device

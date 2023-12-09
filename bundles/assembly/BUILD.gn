@@ -149,6 +149,10 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/network-device.cm" ]
     },
     {
+      package_target = "//src/devices/adc/drivers/adc:package"
+      driver_components = [ "meta/adc.cm" ]
+    },
+    {
       package_target = "//src/devices/block/drivers/core:package"
       driver_components = [ "meta/block.core.cm" ]
     },

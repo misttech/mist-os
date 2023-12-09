@@ -11,8 +11,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/mmio/mmio.h>
 
-#include "fbl/ref_ptr.h"
-
 namespace adc_buttons {
 
 namespace {
@@ -87,37 +85,6 @@ zx::result<MetadataValues> ParseMetadata(
 }  // namespace
 
 zx::result<> AdcButtons::Start() {
-  // Map hardware resources from pdev.
-  std::optional<fdf::MmioBuffer> adc_mmio;
-  std::optional<fdf::MmioBuffer> ao_mmio;
-  zx::interrupt irq;
-  {
-    zx::result result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto pdev = ddk::PDevFidl(std::move(result.value()));
-    if (!pdev.is_valid()) {
-      FDF_LOG(ERROR, "%s: failed to get pdev", __func__);
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto status = pdev.MapMmio(0, &adc_mmio);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    status = pdev.MapMmio(1, &ao_mmio);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    status = pdev.GetInterrupt(0, &irq);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-  }
-
   // Get metadata.
   MetadataValues values;
   {
@@ -152,10 +119,21 @@ zx::result<> AdcButtons::Start() {
     values = std::move(vals.value());
   }
 
+  // Get adc.
+  std::vector<adc_buttons_device::AdcButtonsDevice::AdcButtonClient> clients;
+  for (auto& [idx, buttons] : values.configs) {
+    char adc_name[32];
+    sprintf(adc_name, "adc-%u", idx);
+    zx::result result = incoming()->Connect<fuchsia_hardware_adc::Service::Device>(adc_name);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to open adc service: %s", result.status_string());
+      return result.take_error();
+    }
+    clients.emplace_back(std::move(result.value()), std::move(buttons));
+  }
+
   device_ = std::make_unique<adc_buttons_device::AdcButtonsDevice>(
-      dispatcher(),
-      std::make_unique<AmlSaradcDevice>(*std::move(adc_mmio), *std::move(ao_mmio), std::move(irq)),
-      values.polling_rate_usec, std::move(values.configs), std::move(values.buttons));
+      dispatcher(), std::move(clients), values.polling_rate_usec, std::move(values.buttons));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_input_report::InputDevice>(
       input_report_bindings_.CreateHandler(device_.get(), dispatcher(),
