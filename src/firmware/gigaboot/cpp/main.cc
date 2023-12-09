@@ -148,14 +148,14 @@ int main(int argc, char** argv) {
     }
   }
 
-  ZirconBootMode boot_mode = reboot_mode == gigaboot::RebootMode::kRecovery
-                                 ? kZirconBootModeForceRecovery
-                                 : kZirconBootModeAbr;
+  ZirconBootFlags boot_flags = reboot_mode == gigaboot::RebootMode::kRecovery
+                                   ? kZirconBootFlagsForceRecovery
+                                   : kZirconBootFlagsNone;
 
   // TODO(b/236039205): Implement logic to construct these arguments for the API. This
   // is currently a placeholder for testing compilation/linking.
   ZirconBootOps zircon_boot_ops = gigaboot::GetZirconBootOps();
-  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_mode);
+  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_flags);
   if (res != kBootResultOK) {
     printf("Failed to boot zircon\n");
     return 1;

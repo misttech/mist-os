@@ -334,7 +334,7 @@ static bool VerifiedBootReadPermanentAttributesHash(ZirconBootOps* ops, uint8_t*
 }
 
 // See GptBootMain() for details.
-ZirconBootMode WaitForUserForceRecoveryInput(uint32_t timeout_seconds);
+ZirconBootFlags WaitForUserForceRecoveryInput(uint32_t timeout_seconds);
 
 // Now integrate everything and start Zircon. The function should be called from the firmware main
 // function
@@ -381,10 +381,10 @@ ZirconBootResult GptBootMain(void) {
   // implement similar logic using device-specific APIs.
   uint32_t timeout_seconds = 2;
   printf("Autoboot in %u seconds. Listening for force recovery input...\n", timeout_seconds);
-  ZirconBootMode boot_mode = WaitForUserForceRecoveryInput(timeout_seconds);
+  ZirconBootFlags boot_flags = WaitForUserForceRecoveryInput(timeout_seconds);
 
   // Finally after all the preparation, we can call LoadAndBoot to boot zircon.
-  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_mode);
+  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_flags);
 
   // Should not reach here if booted successfully. In this example, boot is simply a return and we
   // need to release the gpt_data to avoid sanitizer build errors.

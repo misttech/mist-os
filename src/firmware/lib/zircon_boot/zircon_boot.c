@@ -12,6 +12,7 @@
 
 #include <lib/abr/abr.h>
 #include <lib/zbi/zbi.h>
+#include <lib/zircon_boot/android_boot_image.h>
 #include <lib/zircon_boot/zircon_boot.h>
 #include <zircon/hw/gpt.h>
 
@@ -151,10 +152,12 @@ static ZirconBootResult VerifyKernel(ZirconBootOps* ops, const AbrSlotIndex* slo
 //
 // @ops: boot callbacks.
 // @slot: slot to load, or NULL for slotless.
+// @boot_flags: boot flags.
 // @load_address: will be filled with the kernel load address.
 // @load_address_size: will be filled with the kernel load capacity.
 static ZirconBootResult LoadKernel(ZirconBootOps* ops, const AbrSlotIndex* slot,
-                                   void** load_address, size_t* load_address_size) {
+                                   ZirconBootFlags boot_flags, void** load_address,
+                                   size_t* load_address_size) {
   const char* zircon_part = GetSlotPartitionName(slot);
   if (zircon_part == NULL) {
     zircon_boot_dlog("Invalid slot idx %d\n", *slot);
@@ -167,22 +170,60 @@ static ZirconBootResult LoadKernel(ZirconBootOps* ops, const AbrSlotIndex* slot,
     return kBootResultErrorImageTooLarge;
   }
 
-  zbi_header_t zbi_hdr __attribute__((aligned(ZBI_ALIGNMENT)));
-  size_t read_size;
-  // This library only deals with zircon image and assume that it always starts from 0 offset.
-  if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, 0, sizeof(zbi_hdr), &zbi_hdr,
-                            &read_size) ||
-      read_size != sizeof(zbi_hdr)) {
-    zircon_boot_dlog("Failed to read ZBI header\n");
-    return kBootResultErrorReadHeader;
+  // Allocate space to read a header of any supported kernel type.
+  //
+  // Static allocation to avoid the risk of stack overflow since the Android
+  // header is >1KiB.
+  static union {
+    zircon_boot_android_image_headers android_headers;
+    zbi_header_t zbi_header;
+  } headers;
+  bool zbi_header_loaded = false;
+
+  // First check if it's an Android boot image, if the user allows it.
+  size_t zbi_offset = 0;
+  size_t zbi_max_size = 0;  // 0 means no max size.
+  size_t read_size = 0;
+  if (boot_flags & kZirconBootFlagsAndroidBootImage) {
+    if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, 0, sizeof(headers), &headers,
+                              &read_size) ||
+        read_size != sizeof(headers)) {
+      zircon_boot_dlog("Failed to load Android boot image header from disk\n");
+      return kBootResultErrorReadHeader;
+    }
+
+    if (zircon_boot_get_android_image_kernel_position(&headers.android_headers, &zbi_offset,
+                                                      &zbi_max_size)) {
+      zircon_boot_dlog("Found Android boot image header\n");
+    } else {
+      zircon_boot_dlog("Kernel does not look like an Android boot image\n");
+      // In this case, we've loaded the kernel header but it's not Android boot
+      // image, we don't need to load it again to check for ZBI below.
+      zbi_header_loaded = true;
+    }
   }
 
-  size_t image_size = ZbiCheckSize(&zbi_hdr, 0);
+  // If we haven't already loaded what should be the ZBI header, load it now.
+  if (!zbi_header_loaded) {
+    if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, zbi_offset,
+                              sizeof(headers.zbi_header), &headers.zbi_header, &read_size) ||
+        read_size != sizeof(headers.zbi_header)) {
+      zircon_boot_dlog("Failed to read ZBI header from disk\n");
+      return kBootResultErrorReadHeader;
+    }
+  }
+
+  // Figure out how large the ZBI header says the full image is, and make sure
+  // it fits within any previously determined size max.
+  size_t image_size = ZbiCheckSize(&headers.zbi_header, zbi_max_size);
   if (image_size == 0) {
     zircon_boot_dlog("Fail to find ZBI header\n");
     return kBootResultErrorInvalidZbi;
   }
 
+  // Use the size the ZBI header reports, not any Android image kernel size.
+  // Some use cases append ZBI + vbmeta in the Android boot image but we don't
+  // care about vbmeta here.
   *load_address_size = image_size;
   *load_address = ops->get_kernel_load_buffer(ops, load_address_size);
   if (*load_address == NULL) {
@@ -191,8 +232,8 @@ static ZirconBootResult LoadKernel(ZirconBootOps* ops, const AbrSlotIndex* slot,
     return kBootResultErrorImageTooLarge;
   }
 
-  if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, 0, image_size, *load_address,
-                            &read_size) ||
+  if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, zbi_offset, image_size,
+                            *load_address, &read_size) ||
       read_size != image_size) {
     zircon_boot_dlog("Fail to read ZBI image\n");
     return kBootResultErrorReadImage;
@@ -243,17 +284,17 @@ AbrSlotIndex AbrPeekBootSlot(const AbrOps* abr_ops) {
 // Loads and validates the kernel based on the provided boot mode A/B/R behavior.
 //
 // @ops: boot callbacks.
-// @boot_mode: where to load the kernel from.
+// @boot_flags: boot flags.
 // @load_address: will be filled with the kernel load address.
 // @load_address_size: will be filled with the kernel load capacity.
-static ZirconBootResult LoadAbr(ZirconBootOps* ops, ZirconBootMode boot_mode, void** load_address,
+static ZirconBootResult LoadAbr(ZirconBootOps* ops, uint32_t boot_flags, void** load_address,
                                 size_t* load_address_size) {
   // The code is simpler if we allocate some slot storage and grab the A/B/R ops
   // here, even though we won't use them in slotless boots.
   AbrSlotIndex slot_storage;
   AbrOps abr_ops = GetAbrOpsFromZirconBootOps(ops);
 
-  AbrSlotIndex* slot = (boot_mode == kZirconBootModeSlotless ? NULL : &slot_storage);
+  AbrSlotIndex* slot = (boot_flags & kZirconBootFlagsSlotless ? NULL : &slot_storage);
   do {
     // If we're doing a slotted boot, find the next slot to attempt.
     if (slot != NULL) {
@@ -263,7 +304,7 @@ static ZirconBootResult LoadAbr(ZirconBootOps* ops, ZirconBootMode boot_mode, vo
         // boot attempt counters) since we might have to reboot first to get
         // into the matching firmware slot.
         *slot =
-            boot_mode == kZirconBootModeForceRecovery ? kAbrSlotIndexR : AbrPeekBootSlot(&abr_ops);
+            boot_flags & kZirconBootFlagsForceRecovery ? kAbrSlotIndexR : AbrPeekBootSlot(&abr_ops);
         bool supported = false;
         if (!ZIRCON_BOOT_OPS_CALL(ops, firmware_can_boot_kernel_slot, *slot, &supported)) {
           zircon_boot_dlog("Fail to check slot supported\n");
@@ -274,13 +315,13 @@ static ZirconBootResult LoadAbr(ZirconBootOps* ops, ZirconBootMode boot_mode, vo
           zircon_boot_dlog(
               "Target kernel slot %s is not supported by current firmware. Rebooting...\n",
               AbrGetSlotSuffix(*slot));
-          ZIRCON_BOOT_OPS_CALL(ops, reboot, boot_mode == kZirconBootModeForceRecovery);
+          ZIRCON_BOOT_OPS_CALL(ops, reboot, boot_flags & kZirconBootFlagsForceRecovery);
           zircon_boot_dlog("Should not reach here. Reboot handoff failed\n");
           return kBootResultRebootReturn;
         }
       }
 
-      if (boot_mode == kZirconBootModeForceRecovery) {
+      if (boot_flags & kZirconBootFlagsForceRecovery) {
         *slot = kAbrSlotIndexR;
       } else {
         // This is the one place we call AbrGetBootSlot() which may modify the
@@ -289,7 +330,7 @@ static ZirconBootResult LoadAbr(ZirconBootOps* ops, ZirconBootMode boot_mode, vo
       }
     }
 
-    ZirconBootResult ret = LoadKernel(ops, slot, load_address, load_address_size);
+    ZirconBootResult ret = LoadKernel(ops, slot, boot_flags, load_address, load_address_size);
     if (ret == kBootResultOK) {
       break;
     }
@@ -325,10 +366,15 @@ static ZirconBootResult LoadAbr(ZirconBootOps* ops, ZirconBootMode boot_mode, vo
   return kBootResultOK;
 }
 
-ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode) {
+ZirconBootResult LoadAndBoot(ZirconBootOps* ops, uint32_t boot_flags) {
+  if ((boot_flags & kZirconBootFlagsForceRecovery) && (boot_flags & kZirconBootFlagsSlotless)) {
+    zircon_boot_dlog("Cannot give both ForceRecovery and Slotless flags\n");
+    return kBootResultErrorInvalidArguments;
+  }
+
   void* load_address = NULL;
   size_t load_address_size = 0;
-  ZirconBootResult res = LoadAbr(ops, boot_mode, &load_address, &load_address_size);
+  ZirconBootResult res = LoadAbr(ops, boot_flags, &load_address, &load_address_size);
   if (res != kBootResultOK) {
     return res;
   }
@@ -349,7 +395,15 @@ ZirconBootResult LoadFromRam(ZirconBootOps* ops, const void* image, size_t size,
 
   void* load_address = NULL;
   size_t load_address_size = 0;
-  res = LoadAbr(&ramboot_ops, kZirconBootModeSlotless, &load_address, &load_address_size);
+  // Maybe counter-intuitively, we do *not* need to pass `kZirconBootFlagsAndroidBootImage` here.
+  // This is because in the RAM-boot case we already had to parse the image in order to extract
+  // any vbmeta data that may have been concatenated, so we've already unpacked the Android image
+  // format.
+  //
+  // If we end up adding support for concatenated ZBI + vbmeta in the load-from-disk flow, we can
+  // use the `kZirconBootFlagsAndroidBootImage` flag here and just pass the RAM image through
+  // directly.
+  res = LoadAbr(&ramboot_ops, kZirconBootFlagsSlotless, &load_address, &load_address_size);
   if (res != kBootResultOK) {
     return res;
   }

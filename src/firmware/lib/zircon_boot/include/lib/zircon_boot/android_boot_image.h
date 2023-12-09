@@ -114,13 +114,41 @@ typedef struct {
   uint32_t signature_size;
 } __attribute((packed)) zircon_boot_android_image_hdr_v4;
 
+// A union of all known header versions.
+//
+// Reading this many bytes from disk guarantees you will always get at least the
+// entire header for all supported versions. However this is fairly large (>1Kib)
+// so be careful when allocating objects of this size;
+typedef union {
+  zircon_boot_android_image_hdr_v0 v0;
+  zircon_boot_android_image_hdr_v1 v1;
+  zircon_boot_android_image_hdr_v2 v2;
+  zircon_boot_android_image_hdr_v3 v3;
+  zircon_boot_android_image_hdr_v4 v4;
+} zircon_boot_android_image_headers;
+
+// C99 doesn't have any standard alignof(), hardcode it.
+#define ANDROID_IMAGE_HEADER_ALIGNMENT 8
+
+// Given an Android boot image header, returns the kernel offset and size.
+//
+// @header: pointer to the Android boot image header.
+// @kernel_offset: on success will be filled with the offset in bytes from the
+//                 beginning of the header to the beginning of the kernel.
+// @kernel_size: on success will be filled with the kernel size in bytes.
+//
+// Returns true on success.
+bool zircon_boot_get_android_image_kernel_position(const zircon_boot_android_image_headers* header,
+                                                   size_t* kernel_offset, size_t* kernel_size);
+
 // Locates the kernel in an Android boot image.
 //
 // Note that for Fuchsia, the "kernel" contained in the Android image may
 // be just the ZBI, or a combined ZBI+vbmeta.
 //
 // @image: pointer to the Android boot image. Must be properly-aligned.
-// @size: Android boot image size (header + contents).
+// @size: Android boot image size. Must contain at least the header and kernel
+//        but may omit any following contents.
 // @kernel: on success will point to the kernel image.
 // @kernel_size: on success will be filled with the kernel size.
 //

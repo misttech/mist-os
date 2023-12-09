@@ -147,7 +147,7 @@ struct ZirconBootOps {
   // @ops: Pointer to the host |ZirconBootOps|
   // @image: The loaded kernel image as a ZBI container. Items should be appended to it.
   // @capacity: Capacity of the ZBI container.
-  // @slot: A/B/R slot of the loaded image, or NULL for a kZirconBootModeSlotless boot.
+  // @slot: A/B/R slot of the loaded image, or NULL for a kZirconBootFlagsSlotless boot.
   //
   // Returns true on success.
   bool (*add_zbi_items)(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
@@ -255,26 +255,47 @@ struct ZirconBootOps {
   uint8_t* (*get_kernel_load_buffer)(ZirconBootOps* ops, size_t* size);
 };
 
-// Selector for A/B/R boot behavior.
-typedef enum ZirconBootMode {
-  // Boot from {zircon,vbmeta}_{a,b,r} partitions based on the A/B/R metadata.
-  kZirconBootModeAbr,
+// Flags to control boot behavior.
+//
+// Default behavior with no flags is to boot from {zircon,vbmeta}_{a,b,r}
+// partitions based on the state of the A/B/R metadata loaded from disk.
+//
+// Multiple flags can be combined except where indicated in the documentation.
+typedef enum ZirconBootFlags {
+  // No flags, use default behavior.
+  kZirconBootFlagsNone = 0,
 
   // Boot from {zircon,vbmeta}_r partitions, no A/B/R metadata used.
-  kZirconBootModeForceRecovery,
+  // Cannot be combined with `kZirconBootFlagsSlotless`.
+  kZirconBootFlagsForceRecovery = (1 << 0),
 
   // Boot from {zircon,vbmeta} partitions, no A/B/R metadata used.
-  kZirconBootModeSlotless
-} ZirconBootMode;
+  // Cannot be combined with `kZirconBootFlagsForceRecovery`.
+  kZirconBootFlagsSlotless = (1 << 1),
+
+  // Support Android Boot Image format in addition to ZBI format.
+  //
+  // In this case only the kernel data will be extracted, any other data in the
+  // Android Boot Image will be ignored.
+  //
+  // The kernel data is expected to contain a ZBI, optionally with some trailing
+  // data which will be ignored. If the caller needs this trailing data it has
+  // to be extracted separately.
+  //
+  // If vbmeta verification is supported in the given `ZirconBootOps`, the
+  // vbmeta image will only verify the contained ZBI; the Android boot image
+  // as a whole is not verified as it's only used to locate the ZBI.
+  kZirconBootFlagsAndroidBootImage = (1 << 2)
+} ZirconBootFlags;
 
 // Loads kernel image into memory and boots it. if ops.get_firmware_slot is set, the function
 // boots according to firwmare ABR. Otherwise it boots according to OS ABR.
 //
 // @ops: Required operations.
-// @boot_mode: boot moade as defined in ZirconBootMode
+// @boot_flags: boot flags as defined in ZirconBootFlags.
 //
 // The function is not expected to return if boot is successful.
-ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode);
+ZirconBootResult LoadAndBoot(ZirconBootOps* ops, uint32_t boot_flags);
 
 // Loads and verifies kernel image from RAM.
 //
@@ -303,8 +324,8 @@ ZirconBootResult LoadFromRam(ZirconBootOps* ops, const void* image, size_t size,
                              size_t* zbi_capacity);
 
 // Gets the slot that will be selected to boot according to current A/B/R metadata.
-// Specifically, this is the slot that will be booted by LoadAndBoot() with
-// `boot_mode=kZirconBootModeAbr` assuming the slot passes all verification.
+// Specifically, this is the slot that will be booted by LoadAndBoot() without any
+// boot flags, assuming the slot passes all verification.
 AbrSlotIndex GetActiveBootSlot(ZirconBootOps* ops);
 
 // Creates operations for libabr from a ZirconBootOps.
