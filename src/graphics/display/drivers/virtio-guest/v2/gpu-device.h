@@ -32,7 +32,24 @@ namespace virtio_display {
 // Implements the guest OS driver side of the VIRTIO GPU device specification.
 class GpuDevice : public virtio::Device {
  public:
-  GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend);
+  // Exposed for testing. Production code must use the Create() factory method.
+  //
+  // `bti` is used to obtain phyiscal memory addresses given to the virtio
+  // device.
+  //
+  // `virtio_queue_buffer_pool` must be large enough to store requests and
+  // responses exchanged with the virtio device. The buffer must reside at
+  // `virtio_queue_buffer_pool_physical_address` in the virtio device's physical
+  // address space.
+  //
+  // The instance hangs onto `virtio_queue_buffer_pool_vmo` and
+  // `virtio_queue_buffer_pool_pin` for the duration of its lifetime. They are
+  // intended to keep the memory backing `virtio_queue_buffer_pool` alive and
+  // pinned to `virtio_queue_buffer_pool_physical_address`.
+  GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend,
+            zx::vmo virtio_queue_buffer_pool_vmo, zx::pmt virtio_queue_buffer_pool_pin,
+            zx_paddr_t virtio_queue_buffer_pool_physical_address,
+            cpp20::span<uint8_t> virtio_queue_buffer_pool);
   ~GpuDevice() override;
 
   static zx::result<std::unique_ptr<GpuDevice>> Create(
@@ -65,28 +82,21 @@ class GpuDevice : public virtio::Device {
   // The GPU device's control virtqueue.
   //
   // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
-  virtio::Ring virtio_queue_ = {this};
+  virtio::Ring virtio_queue_;
 
   // Backs `virtio_queue_buffer_pool_`.
-  //
-  // Constant after Init() is called.
-  zx::vmo virtio_queue_buffer_pool_vmo_;
+  const zx::vmo virtio_queue_buffer_pool_vmo_;
 
   // Pins `virtio_queue_buffer_pool_vmo_` at a known physical address.
-  //
-  // Constant after Init() is called.
-  zx::pmt virtio_queue_buffer_pool_pin_;
+  const zx::pmt virtio_queue_buffer_pool_pin_;
 
   // The starting address of `virtio_queue_buffer_pool_`.
-  //
-  // Constant after Init() is called.
-  zx_paddr_t virtio_queue_buffer_pool_physical_address_;
+  const zx_paddr_t virtio_queue_buffer_pool_physical_address_;
 
   // Memory pinned at a known physical address, used for virtqueue buffers.
   //
-  // The span is constant after Init() is called. The span's data is not
-  // constant, and is modified by the driver and by the virtio device.
-  cpp20::span<uint8_t> virtio_queue_buffer_pool_;
+  // The span's data is modified by the driver and by the virtio device.
+  const cpp20::span<uint8_t> virtio_queue_buffer_pool_;
 
   std::optional<uint32_t> capset_count_;
 };
