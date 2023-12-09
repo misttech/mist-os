@@ -182,11 +182,6 @@ message Static {
   // validate that any labels added here only contain non-hermetic tests.
   repeated string test_packages = 37;
 
-  // Whether test packages will be added to the product's base package set or
-  // only available via the discoverable package set.  This causes the tests to
-  // become a dependency of assembly (when false they are not)
-  bool tests_in_base = 38;
-
   // End-to-end tests to add to the build configuration.  The build will
   // validate that any labels added here only contain e2e tests.
   repeated string e2e_test_labels = 39;

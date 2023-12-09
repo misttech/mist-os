@@ -444,7 +444,6 @@ func TestGenArgs(t *testing.T) {
 			orderMatters: true,
 			expectedArgs: []string{
 				`hermetic_test_package_labels=[]`,
-				`tests_in_base=false`,
 				`e2e_test_labels=[]`,
 				`host_test_labels=[]`,
 				`developer_test_labels=[]`,
@@ -466,7 +465,6 @@ func TestGenArgs(t *testing.T) {
 				Product:              "products/core.gni",
 				HermeticTestPackages: []string{"//a"},
 				TestPackages:         []string{"//b"},
-				TestsInBase:          true,
 				E2ETestLabels:        []string{"//c"},
 				HostTestLabels:       []string{"//d"},
 				DeveloperTestLabels:  []string{"//e"},
@@ -474,7 +472,6 @@ func TestGenArgs(t *testing.T) {
 			orderMatters: true,
 			expectedArgs: []string{
 				`hermetic_test_package_labels=["//a"]`,
-				`tests_in_base=true`,
 				`e2e_test_labels=["//c"]`,
 				`host_test_labels=["//d"]`,
 				`developer_test_labels=["//e"]`,
@@ -486,7 +483,6 @@ func TestGenArgs(t *testing.T) {
 				Product:              "products/core.gni",
 				HermeticTestPackages: []string{"//a"},
 				TestPackages:         []string{"//b"},
-				TestsInBase:          true,
 				E2ETestLabels:        []string{"//c"},
 				HostTestLabels:       []string{"//d"},
 				DeveloperTestLabels:  []string{"//e"},

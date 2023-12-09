@@ -319,7 +319,6 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	vars["host_labels"] = staticSpec.HostLabels
 	testVars["hermetic_test_package_labels"] = staticSpec.HermeticTestPackages
 	testVars["test_package_labels"] = staticSpec.TestPackages
-	testVars["tests_in_base"] = staticSpec.TestsInBase
 	testVars["e2e_test_labels"] = staticSpec.E2ETestLabels
 	testVars["host_test_labels"] = staticSpec.HostTestLabels
 
@@ -409,7 +408,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", "build_only_labels", toGNValue(staticSpec.BuildOnlyLabels)))
 
 	// The test vars are kept in a particular order to match the BUILD.gn files.
-	for _, k := range []string{"hermetic_test_package_labels", "test_package_labels", "tests_in_base", "e2e_test_labels", "host_test_labels"} {
+	for _, k := range []string{"hermetic_test_package_labels", "test_package_labels", "e2e_test_labels", "host_test_labels"} {
 		testArgs = append(testArgs, fmt.Sprintf("%s=%s", k, toGNValue(testVars[k])))
 	}
 
