@@ -26,7 +26,6 @@ group("tools") {
     "//tools/fidlcat:fidlcat_host",
     "//tools/fuchsia-sdk-run($host_toolchain)",
     "//tools/funnel:($host_toolchain)",
-    "//tools/gn_desc:gn_desc($host_toolchain)",
     "//tools/host_test_component($host_toolchain)",
     "//tools/jq5:install($host_toolchain)",
     "//tools/loglistener:host($host_toolchain)",
@@ -52,6 +51,13 @@ group("tools") {
     # sysroot is absent.
     "//tools/winsdk($win_x64_toolchain)",
   ]
+}
+
+# These are part of the build graph, but not depedendencies of //:default, so
+# they are never built if not explicitly requested via `fx build <target>`.
+group("defined_but_not_built") {
+  testonly = true
+  public_deps = [ "//tools/gn_desc:gn_desc($host_toolchain)" ]
 }
 
 # DEPRECATED! DO NOT ADD TO THIS GROUP
