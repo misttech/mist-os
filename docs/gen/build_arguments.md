@@ -1495,19 +1495,19 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:117
+From //BUILD.gn:112
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:117
+From //BUILD.gn:112
 
 ### devicetree_board_driver
 
@@ -2633,19 +2633,19 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:101
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:101
 
 ### emu_window_size_height
 
@@ -3564,7 +3564,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:124
+From //BUILD.gn:119
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3572,7 +3572,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:124
+From //BUILD.gn:119
 
 ### host_os
 
@@ -3587,19 +3587,19 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:26
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:112
+From //BUILD.gn:107
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:26
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:112
+From //BUILD.gn:107
 
 ### host_tools_dir
 
@@ -4238,7 +4238,7 @@ From //BUILD.gn:57
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:125
+From //BUILD.gn:120
 
 ### legacy_product_bootfs_labels
 
@@ -7494,7 +7494,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:136
+From //BUILD.gn:131
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7502,7 +7502,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:136
+From //BUILD.gn:131
 
 ### sdk_cross_compile_host_tools
 
@@ -8107,7 +8107,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:131
+From //BUILD.gn:126
 
 ### test_package_labels
 
@@ -8147,28 +8147,6 @@ Default value is 'all', it is preferable to set to 'none' for production
 **Current value (from the default):** `"all"`
 
 From //build/security.gni:19
-
-### tests_in_base
-
-Used by Infra (or developers) to put test packages into the base package set
-instead of adding the '//bundles/buildbot/<product>:<test group>' to the
-'base_package_labels' GN argument.
-
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:24
-
-**Overridden from the default:** `false`
-
-From //BUILD.gn:102
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:24
-
-**Overridden from the default:** `false`
-
-From //BUILD.gn:102
 
 ### thinlto_cache_dir
 
