@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zx/bti.h>
@@ -16,6 +17,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <cstdlib>
 #include <limits>
@@ -41,8 +43,6 @@ class GpuDevice : public virtio::Device {
   void IrqConfigChange() override;
   const char* tag() const override { return "virtio-gpu"; }
 
-  static uint64_t GetRequestSize(zx::vmo& vmo);
-
   // Synchronous request/response exchange on the main virtqueue.
   //
   // The returned reference points to data owned by the GpuDevice instance, and
@@ -67,10 +67,27 @@ class GpuDevice : public virtio::Device {
   // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
   virtio::Ring virtio_queue_ = {this};
 
-  zx::vmo request_vmo_;
-  zx::pmt request_pmt_;
-  zx_paddr_t request_phys_addr_ = {};
-  zx_vaddr_t request_virt_addr_ = {};
+  // Backs `virtio_queue_buffer_pool_`.
+  //
+  // Constant after Init() is called.
+  zx::vmo virtio_queue_buffer_pool_vmo_;
+
+  // Pins `virtio_queue_buffer_pool_vmo_` at a known physical address.
+  //
+  // Constant after Init() is called.
+  zx::pmt virtio_queue_buffer_pool_pin_;
+
+  // The starting address of `virtio_queue_buffer_pool_`.
+  //
+  // Constant after Init() is called.
+  zx_paddr_t virtio_queue_buffer_pool_physical_address_;
+
+  // Memory pinned at a known physical address, used for virtqueue buffers.
+  //
+  // The span is constant after Init() is called. The span's data is not
+  // constant, and is modified by the driver and by the virtio device.
+  cpp20::span<uint8_t> virtio_queue_buffer_pool_;
+
   std::optional<uint32_t> capset_count_;
 };
 
@@ -98,10 +115,10 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
       virtio_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
   ZX_ASSERT(request_descriptor);
 
-  uint8_t* const request_buffer = reinterpret_cast<uint8_t*>(request_virt_addr_);
-  std::memcpy(request_buffer, &request, request_size);
+  cpp20::span<uint8_t> request_span = virtio_queue_buffer_pool_.subspan(0, request_size);
+  std::memcpy(request_span.data(), &request, request_size);
 
-  const zx_paddr_t request_physical_address = request_phys_addr_;
+  const zx_paddr_t request_physical_address = virtio_queue_buffer_pool_physical_address_;
   request_descriptor->addr = request_physical_address;
   static_assert(request_size <= std::numeric_limits<uint32_t>::max());
   request_descriptor->len = static_cast<uint32_t>(request_size);
@@ -110,8 +127,9 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
   vring_desc* const response_descriptor = virtio_queue_.DescFromIndex(request_descriptor->next);
   ZX_ASSERT(response_descriptor);
 
-  uint8_t* const response_buffer = request_buffer + request_size;
-  std::memset(response_buffer, 0, response_size);
+  cpp20::span<uint8_t> response_span =
+      virtio_queue_buffer_pool_.subspan(request_size, response_size);
+  std::fill(response_span.begin(), response_span.end(), 0);
 
   const zx_paddr_t response_physical_address = request_physical_address + request_size;
   response_descriptor->addr = response_physical_address;
@@ -125,7 +143,7 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
 
   virtio_queue_buffer_used_signal_.Wait(&virtio_queue_mutex_);
 
-  return *reinterpret_cast<ResponseType*>(response_buffer);
+  return *reinterpret_cast<ResponseType*>(response_span.data());
 }
 
 }  // namespace virtio_display

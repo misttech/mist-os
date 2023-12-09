@@ -5,9 +5,12 @@
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
 
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/stdcompat/span.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/driver_utils.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <memory>
 #include <utility>
@@ -24,8 +27,10 @@ GpuDevice::GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
 }
 
 GpuDevice::~GpuDevice() {
-  if (request_virt_addr_) {
-    zx::vmar::root_self()->unmap(request_virt_addr_, GetRequestSize(request_vmo_));
+  if (!virtio_queue_buffer_pool_.empty()) {
+    zx_vaddr_t virtio_queue_buffer_pool_begin =
+        reinterpret_cast<zx_vaddr_t>(virtio_queue_buffer_pool_.data());
+    zx::vmar::root_self()->unmap(virtio_queue_buffer_pool_begin, virtio_queue_buffer_pool_.size());
   }
 }
 
@@ -90,25 +95,34 @@ zx_status_t GpuDevice::Init() {
     return status;
   }
 
-  status = zx::vmo::create(zx_system_get_page_size(), /*options=*/0, &request_vmo_);
+  status =
+      zx::vmo::create(zx_system_get_page_size(), /*options=*/0, &virtio_queue_buffer_pool_vmo_);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to allocate virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
   }
 
-  size_t size = GetRequestSize(request_vmo_);
+  uint64_t virtio_queue_buffer_pool_size;
+  status = virtio_queue_buffer_pool_vmo_.get_size(&virtio_queue_buffer_pool_size);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get virtqueue buffers VMO size: %s", zx_status_get_string(status));
+    return status;
+  }
 
   // Commit backing store and get the physical address.
-  status = bti().pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, request_vmo_, /*offset=*/0, size,
-                     &request_phys_addr_, 1, &request_pmt_);
+  status =
+      bti().pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, virtio_queue_buffer_pool_vmo_, /*offset=*/0,
+                virtio_queue_buffer_pool_size, &virtio_queue_buffer_pool_physical_address_, 1,
+                &virtio_queue_buffer_pool_pin_);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to pin virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
   }
 
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, /*vmar_offset=*/0,
-                                      request_vmo_,
-                                      /*vmo_offset=*/0, size, &request_virt_addr_);
+  zx_vaddr_t virtio_queue_buffer_pool_begin;
+  status = zx::vmar::root_self()->map(
+      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, /*vmar_offset=*/0, virtio_queue_buffer_pool_vmo_,
+      /*vmo_offset=*/0, virtio_queue_buffer_pool_size, &virtio_queue_buffer_pool_begin);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to map virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
@@ -117,19 +131,18 @@ zx_status_t GpuDevice::Init() {
   FDF_LOG(INFO,
           "Allocated virtqueue buffers at virtual address 0x%016" PRIx64
           ", physical address 0x%016" PRIx64,
-          request_virt_addr_, request_phys_addr_);
+          virtio_queue_buffer_pool_begin, virtio_queue_buffer_pool_physical_address_);
+
+  // NOLINTBEGIN(performance-no-int-to-ptr): Casting from zx_vaddr_t to a
+  // pointer is unavoidable due to the zx::vmar::map() API.
+  virtio_queue_buffer_pool_ = cpp20::span<uint8_t>(
+      reinterpret_cast<uint8_t*>(virtio_queue_buffer_pool_begin), virtio_queue_buffer_pool_size);
+  // NOLINTEND(performance-no-int-to-ptr)
 
   StartIrqThread();
   DriverStatusOk();
 
   return ZX_OK;
-}
-
-// static
-uint64_t GpuDevice::GetRequestSize(zx::vmo& vmo) {
-  uint64_t size = 0;
-  ZX_ASSERT(ZX_OK == vmo.get_size(&size));
-  return size;
 }
 
 void GpuDevice::IrqRingUpdate() {
