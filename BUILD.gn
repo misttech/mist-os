@@ -96,11 +96,6 @@ declare_args() {
   # be flagged as an error by the build.
   test_package_labels = []
 
-  # Used by Infra (or developers) to put test packages into the base package set
-  # instead of adding the '//bundles/buildbot/<product>:<test group>' to the
-  # 'base_package_labels' GN argument.
-  tests_in_base = false
-
   # Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
   # hardware or emulated).
   e2e_test_labels = []
@@ -1612,11 +1607,6 @@ group("developer_base_packages") {
 
   public_deps = base_package_labels
 
-  # The tests group can only be added if base packages are testonly
-  if (testonly) {
-    public_deps += [ ":base_tests" ]
-  }
-
   # the buildbot host tests should only be added via `--with-host`, to the
   # `host_labels` GN arg.
   assert_no_deps = [ "//bundles/buildbot/host/*" ]
@@ -1727,39 +1717,18 @@ group("test_packages") {
 }
 
 # These are all tests that are to be published in the 'discoverable' package
-# set.  Whether the on-device tests are here or in `:base_tests` is controlled
-# by the 'tests_in_base' GN build argument.
+# set.
 group("discoverable_tests") {
   testonly = true
   visibility = [
     ":*",
     "//build/images/*",
   ]
-  if (!tests_in_base) {
-    public_deps = [
-      "//:developer_specified_tests",
-      "//:hermetic_test_packages",
-      "//:test_packages",
-    ]
-  }
-}
-
-# These are all tests that are to be published as part of the product's 'base'
-# package set.  Whether the on-device tests are here or in `:discoverable_tests`
-# is controlled by the 'tests_in_base' GN build argument.
-group("base_tests") {
-  testonly = true
-  visibility = [
-    ":*",
-    "//build/images/*",
+  public_deps = [
+    "//:developer_specified_tests",
+    "//:hermetic_test_packages",
+    "//:test_packages",
   ]
-  if (tests_in_base) {
-    public_deps = [
-      "//:developer_specified_tests",
-      "//:hermetic_test_packages",
-      "//:test_packages",
-    ]
-  }
 }
 
 # Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
