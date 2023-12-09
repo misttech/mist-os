@@ -52,8 +52,8 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
-        OfferDeclCommon, UseDecl,
+        self, CapabilityDecl, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
+        NativeIntoFidl, OfferDeclCommon, UseDecl,
     },
     cm_types::Name,
     cm_util::channel,
@@ -877,8 +877,7 @@ impl ComponentInstance {
     ) -> Result<(), OpenOutgoingDirError> {
         let execution = self.lock_execution().await;
         let runtime = execution.runtime.as_ref().ok_or(OpenOutgoingDirError::InstanceNotRunning)?;
-        let out_dir =
-            runtime.outgoing_dir.as_ref().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
+        let out_dir = runtime.outgoing_dir().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
         let path = fuchsia_fs::canonicalize_path(&path);
         let server_chan = channel::take_channel(server_chan);
         let server_end = ServerEnd::new(server_chan);
@@ -1022,7 +1021,7 @@ impl ComponentInstance {
     pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
         let execution = self.lock_execution().await;
         match &execution.runtime {
-            Some(Runtime { logger: Some(ref logger), .. }) => {
+            Some(ComponentRuntime { logger: Some(ref logger), .. }) => {
                 let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
                 tracing::subscriber::with_default(logger, op)
             }
@@ -1150,7 +1149,7 @@ pub struct ExecutionState {
 
     /// Runtime support for the component. From component manager's point of view, the component
     /// instance is running iff this field is set.
-    pub runtime: Option<Runtime>,
+    pub runtime: Option<ComponentRuntime>,
 }
 
 impl ExecutionState {
@@ -1897,27 +1896,20 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
 }
 
 /// The execution state for a component instance that has started running.
-pub struct Runtime {
-    /// A client handle to the component instance's outgoing directory.
-    pub outgoing_dir: Option<fio::DirectoryProxy>,
-
+///
+/// If the component instance has a program, it may also have a [`ProgramRuntime`].
+pub struct ComponentRuntime {
     /// A client handle to the component instance's runtime directory hosted by the runner.
     pub runtime_dir: Option<fio::DirectoryProxy>,
 
-    /// Used to interact with the Runner to influence the component's execution.
-    ///
     /// If set, that means this component is associated with a running program.
-    program: Option<Program>,
+    program: Option<ProgramRuntime>,
 
     /// Approximates when the component was started.
     pub timestamp: zx::Time,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
-
-    /// Listens for the controller channel to close in the background. This task is cancelled when
-    /// the `Runtime` is dropped.
-    exit_listener: Option<fasync::Task<()>>,
 
     /// Channels scoped to lifetime of this component's execution context. This
     /// should only be used for the server_end of the `fuchsia.component.Binder`
@@ -1932,43 +1924,31 @@ pub struct Runtime {
     ///
     /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
     logger: Option<Arc<ScopedLogger>>,
+}
 
-    /// Reads messages from the program dict and dispatches those messages into the component's
+/// The execution state for a program instance that is running.
+struct ProgramRuntime {
+    /// Used to interact with the Runner to influence the program's execution.
+    program: Program,
+
+    /// Listens for the controller channel to close in the background. This task is cancelled when
+    /// the [`ProgramRuntime`] is dropped.
+    exit_listener: fasync::Task<()>,
+
+    /// Reads messages from the program dict and dispatches those messages into the program's
     /// outgoing directory.
     _dict_dispatcher: DictDispatcher,
 }
 
-impl Runtime {
+impl ProgramRuntime {
     pub fn new(
-        outgoing_dir: Option<fio::DirectoryProxy>,
-        runtime_dir: Option<fio::DirectoryProxy>,
-        start_reason: StartReason,
-        execution_controller_task: Option<controller::ExecutionControllerTask>,
-        logger: Option<ScopedLogger>,
-        dict_dispatcher: DictDispatcher,
+        program: Program,
+        dict: Dict,
+        capability_decls: Vec<CapabilityDecl>,
+        component: WeakComponentInstance,
     ) -> Self {
-        let timestamp = zx::Time::get_monotonic();
-        Runtime {
-            outgoing_dir,
-            runtime_dir,
-            program: None,
-            timestamp,
-            exit_listener: None,
-            binder_server_ends: vec![],
-            start_reason,
-            execution_controller_task,
-            logger: logger.map(Arc::new),
-            _dict_dispatcher: dict_dispatcher,
-        }
-    }
-
-    /// Associates the [Runtime] with a running [Program].
-    ///
-    /// Creates a background task waiting for the program to terminate. When that happens, use the
-    /// [WeakComponentInstance] to stop the component.
-    pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
         let terminated_fut = program.on_terminate();
-        self.program = Some(program);
+        let component_clone = component.clone();
         let exit_listener = fasync::Task::spawn(async move {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
@@ -1982,13 +1962,81 @@ impl Runtime {
                 }));
             }
         });
-        self.exit_listener = Some(exit_listener);
+        let dict_dispatcher = DictDispatcher::new(
+            dict,
+            capability_decls,
+            <fio::DirectoryProxy as Clone>::clone(program.outgoing()),
+            component_clone,
+        );
+        Self { program, exit_listener, _dict_dispatcher: dict_dispatcher }
+    }
+
+    pub async fn stop<'a, 'b>(
+        self,
+        stop_timer: BoxFuture<'a, ()>,
+        kill_timer: BoxFuture<'b, ()>,
+    ) -> Result<ComponentStopOutcome, program::StopError> {
+        let stop_result = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
+        // Drop the program and join on the exit listener. Dropping the program
+        // should cause the exit listener to stop waiting for the channel epitaph and
+        // exit.
+        //
+        // Note: this is more reliable than just cancelling `exit_listener` because
+        // even after cancellation future may still run for a short period of time
+        // before getting dropped. If that happens there is a chance of scheduling a
+        // duplicate Stop action.
+        drop(self.program);
+        self.exit_listener.await;
+        stop_result
+    }
+}
+
+impl ComponentRuntime {
+    pub fn new(
+        runtime_dir: Option<fio::DirectoryProxy>,
+        start_reason: StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
+        logger: Option<ScopedLogger>,
+    ) -> Self {
+        let timestamp = zx::Time::get_monotonic();
+        ComponentRuntime {
+            runtime_dir,
+            program: None,
+            timestamp,
+            binder_server_ends: vec![],
+            start_reason,
+            execution_controller_task,
+            logger: logger.map(Arc::new),
+        }
+    }
+
+    /// If this component is associated with a running [Program], obtain a capability
+    /// representing its outgoing directory.
+    pub fn outgoing_dir(&self) -> Option<&fio::DirectoryProxy> {
+        self.program.as_ref().map(|program_runtime| program_runtime.program.outgoing())
+    }
+
+    /// Associates the [Runtime] with a running [Program].
+    ///
+    /// Creates a background task waiting for the program to terminate. When that happens, use the
+    /// [WeakComponentInstance] to stop the component.
+    ///
+    /// Creates a background task that watches for incoming requests in `dict`, and dispatches
+    /// them to the outgoing directory of the program.
+    pub fn set_program(
+        &mut self,
+        program: Program,
+        dict: Dict,
+        capability_decls: Vec<CapabilityDecl>,
+        component: WeakComponentInstance,
+    ) {
+        self.program = Some(ProgramRuntime::new(program, dict, capability_decls, component));
     }
 
     /// Stop the program, if any. The timer defines how long the runner is given to stop the
     /// program gracefully before we request the controller to terminate the program.
     ///
-    /// Regardless if the runner honored our request, after this method, the [Runtime] is
+    /// Regardless if the runner honored our request, after this method, the [`ComponentRuntime`] is
     /// no longer associated with a [Program].
     pub async fn stop_program<'a, 'b>(
         &'a mut self,
@@ -1999,20 +2047,7 @@ impl Runtime {
         // Potentially there is no program, perhaps because the component
         // has no running code. In this case this is a no-op.
         if let Some(program) = program {
-            let stop_result = program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
-            // Drop the program and join on the exit listener. Dropping the program
-            // should cause the exit listener to stop waiting for the channel epitaph and
-            // exit.
-            //
-            // Note: this is more reliable than just cancelling `exit_listener` because
-            // even after cancellation future may still run for a short period of time
-            // before getting dropped. If that happens there is a chance of scheduling a
-            // duplicate Stop action.
-            drop(program);
-            if let Some(exit_listener) = self.exit_listener.take() {
-                exit_listener.await;
-            }
-            stop_result
+            program.stop(stop_timer, kill_timer).await
         } else {
             Ok(ComponentStopOutcome {
                 request: StopRequestSuccess::NoController,
@@ -2029,7 +2064,7 @@ impl Runtime {
     /// Gets a [`Koid`] that will uniquely identify the program.
     #[cfg(test)]
     pub fn program_koid(&self) -> Option<fuchsia_zircon::Koid> {
-        self.program.as_ref().map(Program::koid)
+        self.program.as_ref().map(|program_runtime| program_runtime.program.koid())
     }
 }
 
@@ -2042,14 +2077,11 @@ impl DictDispatcher {
     pub fn new(
         dict: Dict,
         capability_decls: Vec<cm_rust::CapabilityDecl>,
-        directory: Option<fio::DirectoryProxy>,
+        directory: fio::DirectoryProxy,
         component: WeakComponentInstance,
     ) -> Self {
         Self {
             _task: fasync::Task::spawn(async move {
-                // Components that do not have a runner do not have an outgoing directory, so
-                // there's nothing for us to do here.
-                let Some(directory) = directory else { return };
                 while let Some((name, message)) = dict.read_receivers().await {
                     let capability_decl = capability_decls
                         .iter()

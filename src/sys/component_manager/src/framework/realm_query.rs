@@ -462,8 +462,7 @@ async fn open(
                 .runtime
                 .as_ref()
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
-                .outgoing_dir
-                .as_ref()
+                .outgoing_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
             dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError)
         }

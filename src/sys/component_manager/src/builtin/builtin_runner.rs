@@ -430,7 +430,6 @@ mod tests {
         // Run the `signal-then-hang` component and add a numbered handle.
         // This way we can monitor when that program is running.
         let (ch1, ch2) = zx::Channel::create();
-        let (_, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
         let (_, runtime_server_end) = fidl::endpoints::create_proxy().unwrap();
         let (not_found, _) = channel::mpsc::unbounded();
         let mut namespace = NamespaceBuilder::new(not_found);
@@ -455,7 +454,6 @@ mod tests {
                 ..Default::default()
             },
             namespace,
-            outgoing_dir: Some(outgoing_server_end),
             runtime_dir: Some(runtime_server_end),
             numbered_handles: vec![fprocess::HandleInfo {
                 handle: ch1.into(),

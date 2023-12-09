@@ -8,8 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, DictDispatcher, ExecutionState, InstanceState, Package, Runtime,
-            StartReason, WeakComponentInstance,
+            ComponentInstance, ComponentRuntime, ExecutionState, InstanceState, Package,
+            StartReason,
         },
         error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -24,17 +24,19 @@ use {
     },
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
+    cm_rust::ComponentDecl,
     config_encoder::ConfigFields,
     fidl::{
         endpoints::{create_proxy, DiscoverableProtocolMarker},
         Vmo,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
+    fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
+    sandbox::Dict,
     std::string::ToString,
     std::sync::Arc,
     tracing::warn,
@@ -86,7 +88,6 @@ impl Action for StartAction {
 struct StartContext {
     runner: Option<RemoteRunner>,
     start_info: StartInfo,
-    diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
 }
 
 async fn do_start(
@@ -96,19 +97,6 @@ async fn do_start(
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
 ) -> Result<fsys::StartResult, StartActionError> {
-    // Pre-flight check: if the component is already started, or was shut down, return now. Note
-    // that `start` also performs this check before scheduling the action here. We do it again
-    // while the action is registered to avoid the risk of dispatching the Started event twice.
-    {
-        let state = component.lock_state().await;
-        let execution = component.lock_execution().await;
-        if let Some(res) = should_return_early(&state, &execution, &component.moniker) {
-            return res;
-        }
-    }
-
-    let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
-
     // Resolve the component.
     let resolved_component = component.resolve().await.map_err(|err| {
         StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
@@ -146,47 +134,27 @@ async fn do_start(
     )
     .await?;
 
-    let start_context = StartContext { runner, start_info, diagnostics_sender };
+    let start_context = StartContext { runner, start_info };
 
-    // Dispatch the Started and the DebugStarted event.
-    component
-        .hooks
-        .dispatch(&Event::new_with_timestamp(
-            component,
-            EventPayload::Started {
-                runtime: RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver),
-                component_decl: resolved_component.decl,
-            },
-            pending_runtime.timestamp,
-        ))
-        .await;
-    component
-        .hooks
-        .dispatch(&Event::new_with_timestamp(
-            component,
-            EventPayload::DebugStarted {
-                runtime_dir: pending_runtime.runtime_dir.clone(),
-                break_on_start: Arc::new(break_on_start),
-            },
-            pending_runtime.timestamp,
-        ))
-        .await;
+    let program_output_dict = component
+        .lock_resolved_state()
+        .await
+        .map_err(|err| StartActionError::ResolveActionError {
+            moniker: component.moniker.clone(),
+            err,
+        })?
+        .program_output_dict
+        .clone();
 
-    let res = start_component(&component, pending_runtime, start_context).await;
-    match res {
-        Ok(fsys::StartResult::AlreadyStarted) => {}
-        Ok(fsys::StartResult::Started) => {}
-        Err(ref _e) => {
-            // Since we dispatched a start event, dispatch a stop event
-            // TODO(fxbug.dev/87507): It is possible this issues Stop after
-            // Destroyed is issued.
-            component
-                .hooks
-                .dispatch(&Event::new(component, EventPayload::Stopped { status: zx::Status::OK }))
-                .await;
-        }
-    };
-    res
+    start_component(
+        &component,
+        program_output_dict,
+        resolved_component.decl,
+        pending_runtime,
+        start_context,
+        break_on_start,
+    )
+    .await
 }
 
 /// Set the Runtime in the Execution and start the exit watcher. From component manager's
@@ -196,9 +164,13 @@ async fn do_start(
 /// `Component`.
 async fn start_component(
     component: &Arc<ComponentInstance>,
-    mut pending_runtime: Runtime,
+    program_output_dict: Dict,
+    decl: ComponentDecl,
+    mut pending_runtime: ComponentRuntime,
     start_context: StartContext,
+    break_on_start: zx::EventPair,
 ) -> Result<fsys::StartResult, StartActionError> {
+    let _actions = component.lock_actions().await;
     let state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
 
@@ -206,7 +178,9 @@ async fn start_component(
         return r;
     }
 
-    let StartContext { runner, start_info, diagnostics_sender } = start_context;
+    let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
+
+    let StartContext { runner, start_info } = start_context;
     if let Some(runner) = runner {
         pending_runtime.set_program(
             Program::start(component.moniker.clone(), &runner, start_info, diagnostics_sender)
@@ -214,10 +188,45 @@ async fn start_component(
                     moniker: component.moniker.clone(),
                     err,
                 })?,
+            program_output_dict,
+            decl.capabilities.clone(),
             component.as_weak(),
         );
     }
+
+    let runtime_info = RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver);
+    let runtime_dir = pending_runtime.runtime_dir.clone();
+    let timestamp = pending_runtime.timestamp;
+
     execution.runtime = Some(pending_runtime);
+    drop(execution);
+    drop(state);
+
+    // Dispatch Started and DebugStarted events outside of the execution lock and state
+    // lock, but under the actions lock, so that:
+    //
+    // - Hooks implementations can use the execution state (such as re-entrantly ensuring
+    //   the component is started).
+    // - The Started events will be ordered before any stop events that may happen if the
+    //   program terminated in the meantime.
+    //
+    component
+        .hooks
+        .dispatch(&Event::new_with_timestamp(
+            component,
+            EventPayload::Started { runtime: runtime_info, component_decl: decl },
+            timestamp,
+        ))
+        .await;
+    component
+        .hooks
+        .dispatch(&Event::new_with_timestamp(
+            component,
+            EventPayload::DebugStarted { runtime_dir, break_on_start: Arc::new(break_on_start) },
+            timestamp,
+        ))
+        .await;
+
     Ok(fsys::StartResult::Started)
 }
 
@@ -377,7 +386,7 @@ async fn make_execution_runtime(
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
-) -> Result<(Runtime, StartInfo, zx::EventPair), StartActionError> {
+) -> Result<(ComponentRuntime, StartInfo, zx::EventPair), StartActionError> {
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
@@ -413,13 +422,6 @@ async fn make_execution_runtime(
 
     // Set up channels into/out of the new component. These are absent from non-executable
     // components.
-    let (outgoing_dir, outgoing_dir_server) = if decl.get_runner().is_some() {
-        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
-
     let (runtime_dir, runtime_dir_server) = if decl.get_runner().is_some() {
         let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
         (Some(proxy), Some(server_end))
@@ -428,26 +430,8 @@ async fn make_execution_runtime(
     };
 
     let encoded_config = make_structured_config(config, decl, component).await?;
-    let resolved_state = component
-        .lock_resolved_state()
-        .await
-        .expect("component must be resolved in order to start");
-
-    let dict_dispatcher = DictDispatcher::new(
-        resolved_state.program_output_dict.clone(),
-        decl.capabilities.clone(),
-        outgoing_dir.clone(),
-        WeakComponentInstance::new(&component),
-    );
-
-    let runtime = Runtime::new(
-        outgoing_dir,
-        runtime_dir,
-        start_reason,
-        execution_controller_task,
-        logger,
-        dict_dispatcher,
-    );
+    let runtime =
+        ComponentRuntime::new(runtime_dir, start_reason, execution_controller_task, logger);
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
     let start_info = StartInfo {
@@ -458,7 +442,6 @@ async fn make_execution_runtime(
             .map(|p| p.info.clone())
             .unwrap_or_else(|| fdata::Dictionary::default()),
         namespace,
-        outgoing_dir: outgoing_dir_server,
         runtime_dir: runtime_dir_server,
         numbered_handles,
         encoded_config,
@@ -503,9 +486,8 @@ mod tests {
                 start::should_return_early, ActionSet, ShutdownAction, StartAction, StopAction,
             },
             component::{
-                Component, ComponentInstance, DictDispatcher, ExecutionState, InstanceState,
-                ResolvedInstanceState, Runtime, StartReason, UnresolvedInstanceState,
-                WeakComponentInstance,
+                Component, ComponentInstance, ComponentRuntime, ExecutionState, InstanceState,
+                ResolvedInstanceState, StartReason, UnresolvedInstanceState,
             },
             error::{ModelError, StartActionError},
             hooks::{Event, EventType, Hook, HooksRegistration},
@@ -518,36 +500,44 @@ mod tests {
         async_trait::async_trait,
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
-        fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
+        fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
+        futures::{channel::mpsc, StreamExt},
         moniker::Moniker,
         routing::resolving::ComponentAddress,
         sandbox::Dict,
-        std::sync::{Arc, Weak},
+        std::sync::{Arc, Mutex, Weak},
     };
 
     // Child name for test child components instantiated during tests.
     const TEST_CHILD_NAME: &str = "child";
 
-    struct StartHook {
+    struct ShutdownOnStartHook {
         component: Arc<ComponentInstance>,
+        done: Mutex<mpsc::Sender<()>>,
     }
 
     #[async_trait]
-    impl Hook for StartHook {
+    impl Hook for ShutdownOnStartHook {
         async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
-            ActionSet::register(self.component.clone(), ShutdownAction::new())
-                .await
-                .expect("shutdown failed");
+            fasync::Task::spawn(async move {
+                ActionSet::register(self.component.clone(), ShutdownAction::new())
+                    .await
+                    .expect("shutdown failed");
+                self.done.lock().unwrap().try_send(()).unwrap();
+            })
+            .detach();
             Ok(())
         }
     }
 
     #[fuchsia::test]
-    /// Validate that if a start action is issued and the component stops
+    /// Validate that if a start action is issued and the component shuts down
     /// the action completes we see a Stop event emitted.
-    async fn start_issues_stop() {
+    async fn start_issues_shutdown() {
         let (test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
-        let start_hook = Arc::new(StartHook { component: child.clone() });
+        let (done, mut hook_done_receiver) = mpsc::channel(1);
+        let start_hook =
+            Arc::new(ShutdownOnStartHook { component: child.clone(), done: Mutex::new(done) });
         child
             .hooks
             .install(vec![HooksRegistration::new(
@@ -557,17 +547,81 @@ mod tests {
             )])
             .await;
 
-        match ActionSet::register(
+        let start_result = ActionSet::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, vec![], vec![]),
         )
         .await
-        {
-            Err(StartActionError::InstanceShutDown { moniker: m }) => {
-                assert_eq!(Moniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
-            }
-            e => panic!("Unexpected result from component start: {:?}", e),
+        .unwrap();
+        assert_eq!(start_result, fsys::StartResult::Started);
+
+        // Wait until the action in the hook is done.
+        hook_done_receiver.next().await.unwrap();
+
+        let events: Vec<_> = test_topology
+            .test_hook
+            .lifecycle()
+            .into_iter()
+            .filter(|event| match event {
+                Lifecycle::Start(_) | Lifecycle::Stop(_) => true,
+                _ => false,
+            })
+            .collect();
+        assert_eq!(
+            events,
+            vec![
+                Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap()),
+                Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap())
+            ]
+        );
+    }
+
+    struct StopOnStartHook {
+        component: Arc<ComponentInstance>,
+        done: Mutex<mpsc::Sender<()>>,
+    }
+
+    #[async_trait]
+    impl Hook for StopOnStartHook {
+        async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
+            fasync::Task::spawn(async move {
+                ActionSet::register(self.component.clone(), StopAction::new(false))
+                    .await
+                    .expect("stop failed");
+                self.done.lock().unwrap().try_send(()).unwrap();
+            })
+            .detach();
+            Ok(())
         }
+    }
+
+    #[fuchsia::test]
+    /// Validate that if a start action is issued and the component stops
+    /// the action completes we see a Stop event emitted.
+    async fn start_issues_stop() {
+        let (test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
+        let (done, mut hook_done_receiver) = mpsc::channel(1);
+        let start_hook =
+            Arc::new(StopOnStartHook { component: child.clone(), done: Mutex::new(done) });
+        child
+            .hooks
+            .install(vec![HooksRegistration::new(
+                "my_start_hook",
+                vec![EventType::Started],
+                Arc::downgrade(&start_hook) as Weak<dyn Hook>,
+            )])
+            .await;
+
+        let start_result = ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(start_result, fsys::StartResult::Started);
+
+        // Wait until the action in the hook is done.
+        hook_done_receiver.next().await.unwrap();
 
         let events: Vec<_> = test_topology
             .test_hook
@@ -735,14 +789,7 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime = Some(Runtime::new(
-                None,
-                None,
-                StartReason::Debug,
-                None,
-                None,
-                DictDispatcher::new(Dict::new(), vec![], None, WeakComponentInstance::invalid()),
-            ));
+            es.runtime = Some(ComponentRuntime::new(None, StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),

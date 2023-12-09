@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        component::{ComponentInstance, Runtime, WeakComponentInstance},
+        component::{ComponentInstance, ComponentRuntime, WeakComponentInstance},
         error::ModelError,
     },
     anyhow::format_err,
@@ -250,12 +250,12 @@ pub struct RuntimeInfo {
 
 impl RuntimeInfo {
     pub fn from_runtime(
-        runtime: &Runtime,
+        runtime: &ComponentRuntime,
         diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
-            outgoing_dir: clone_dir(runtime.outgoing_dir.as_ref()),
+            outgoing_dir: clone_dir(runtime.outgoing_dir()),
             runtime_dir: clone_dir(runtime.runtime_dir.as_ref()),
             diagnostics_receiver,
             start_time: runtime.timestamp,

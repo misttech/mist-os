@@ -322,7 +322,7 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
         let outgoing_dir = {
             let execution = component.lock_execution().await;
             match execution.runtime.as_ref() {
-                Some(runtime) => runtime.outgoing_dir.clone(),
+                Some(runtime) => runtime.outgoing_dir().map(Clone::clone),
                 None => return vec![],
             }
         };

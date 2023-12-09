@@ -36,13 +36,16 @@ use component_controller::ComponentController;
 pub struct Program {
     controller: ComponentController,
 
-    // The KOID of the controller server endpoint.
+    /// The KOID of the controller server endpoint.
     koid: Koid,
 
-    // Only here to keep the diagnostics task alive. Never read.
+    /// The outgoing directory of the program.
+    outgoing_dir: fio::DirectoryProxy,
+
+    /// Only here to keep the diagnostics task alive. Never read.
     _send_diagnostics: Task<()>,
 
-    // Dropping the task will stop serving the namespace.
+    /// Dropping the task will stop serving the namespace.
     namespace_task: Mutex<Option<fasync::Task<()>>>,
 }
 
@@ -78,7 +81,11 @@ impl Program {
             .koid;
         MONIKER_LOOKUP.add(koid, moniker);
 
-        let (start_info, fut) = start_info.into_fidl()?;
+        let (outgoing_dir, outgoing_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                .expect("creating FIDL proxy should not fail");
+
+        let (start_info, fut) = start_info.into_fidl(outgoing_server)?;
 
         runner.start(start_info, server_end);
         let mut controller = ComponentController::new(controller);
@@ -92,9 +99,15 @@ impl Program {
         Ok(Program {
             controller,
             koid,
+            outgoing_dir,
             _send_diagnostics: send_diagnostics,
             namespace_task: Mutex::new(Some(fasync::Task::spawn(fut))),
         })
+    }
+
+    /// Gets the outgoing directory of the program.
+    pub fn outgoing(&self) -> &fio::DirectoryProxy {
+        &self.outgoing_dir
     }
 
     /// Request to stop the program.
@@ -206,10 +219,13 @@ impl Program {
             .related_koid;
 
         let controller = ComponentController::new(controller.into_proxy().unwrap());
+        let (outgoing_dir, _outgoing_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let send_diagnostics = Task::spawn(async {});
         Program {
             controller,
             koid,
+            outgoing_dir,
             _send_diagnostics: send_diagnostics,
             namespace_task: Mutex::new(None),
         }
@@ -339,9 +355,6 @@ pub struct StartInfo {
     /// TODO(b/298106231): eventually this should become a sandbox and delivery map.
     pub namespace: NamespaceBuilder,
 
-    /// The directory this component serves.
-    pub outgoing_dir: Option<ServerEnd<fio::DirectoryMarker>>,
-
     /// The directory served by the runner to present runtime information about
     /// the component. The runner must either serve it, or drop it to avoid
     /// blocking any consumers indefinitely.
@@ -379,6 +392,7 @@ pub struct StartInfo {
 impl StartInfo {
     pub fn into_fidl(
         self,
+        outgoing_server_end: ServerEnd<fio::DirectoryMarker>,
     ) -> Result<(fcrunner::ComponentStartInfo, BoxFuture<'static, ()>), StartError> {
         let (ns, fut) = self.namespace.serve().map_err(StartError::ServeNamespace)?;
         Ok((
@@ -386,7 +400,7 @@ impl StartInfo {
                 resolved_url: Some(self.resolved_url),
                 program: Some(self.program),
                 ns: Some(ns.into()),
-                outgoing_dir: self.outgoing_dir,
+                outgoing_dir: Some(outgoing_server_end),
                 runtime_dir: self.runtime_dir,
                 numbered_handles: Some(self.numbered_handles),
                 encoded_config: self.encoded_config,
