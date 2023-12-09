@@ -5,14 +5,15 @@
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
 
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/fit/defer.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/driver_utils.h>
+#include <zircon/assert.h>
 
 #include <memory>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 
@@ -20,17 +21,12 @@ namespace virtio_display {
 
 GpuDevice::GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)) {
-  sem_init(&request_sem_, 0, 1);
-  sem_init(&response_sem_, 0, 0);
 }
 
 GpuDevice::~GpuDevice() {
   if (request_virt_addr_) {
     zx::vmar::root_self()->unmap(request_virt_addr_, GetRequestSize(request_vmo_));
   }
-
-  sem_destroy(&request_sem_);
-  sem_destroy(&response_sem_);
 }
 
 // static
@@ -87,16 +83,16 @@ zx_status_t GpuDevice::Init() {
     return status;
   }
 
-  // Allocate the main vring
-  status = vring_.Init(0, 16);
+  // Allocate the control virtqueue.
+  status = virtio_queue_.Init(0, 16);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to allocate vring: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate control virtqueue: %s", zx_status_get_string(status));
     return status;
   }
 
   status = zx::vmo::create(zx_system_get_page_size(), /*options=*/0, &request_vmo_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to allocate request vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -106,7 +102,7 @@ zx_status_t GpuDevice::Init() {
   status = bti().pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, request_vmo_, /*offset=*/0, size,
                      &request_phys_addr_, 1, &request_pmt_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to pin request vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -114,12 +110,12 @@ zx_status_t GpuDevice::Init() {
                                       request_vmo_,
                                       /*vmo_offset=*/0, size, &request_virt_addr_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map request vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map virtqueue buffers VMO: %s", zx_status_get_string(status));
     return status;
   }
 
   FDF_LOG(INFO,
-          "Allocated command buffer at virtual address 0x%016" PRIx64
+          "Allocated virtqueue buffers at virtual address 0x%016" PRIx64
           ", physical address 0x%016" PRIx64,
           request_virt_addr_, request_phys_addr_);
 
@@ -139,10 +135,17 @@ uint64_t GpuDevice::GetRequestSize(zx::vmo& vmo) {
 void GpuDevice::IrqRingUpdate() {
   FDF_LOG(TRACE, "IrqRingUpdate()");
 
+  // TODO(costan): `vring` may be used across threads without synchronization.
+  //
+  // VIRTIO spec Section 2.7.7.1 "Driver Requirements: Used Buffer Notification
+  // Suppression" requires that drivers handle spurious notifications. A data
+  // race can occur if a spurious interrupt is processed as the same time as an
+  // ExchangeRequestResponse() method call.
+
   // Parse our descriptor chain, add back to the free queue
   auto free_chain = [this](vring_used_elem* used_elem) {
     uint16_t i = static_cast<uint16_t>(used_elem->id);
-    struct vring_desc* desc = vring_.DescFromIndex(i);
+    struct vring_desc* desc = virtio_queue_.DescFromIndex(i);
     for (;;) {
       int next;
 
@@ -153,20 +156,29 @@ void GpuDevice::IrqRingUpdate() {
         next = -1;
       }
 
-      vring_.FreeDesc(i);
+      virtio_queue_.FreeDesc(i);
 
       if (next < 0) {
         break;
       }
       i = static_cast<uint16_t>(next);
-      desc = vring_.DescFromIndex(i);
+      desc = virtio_queue_.DescFromIndex(i);
     }
+
+    // TODO(costan): The signal may be fired prematurely.
+    //
+    // VIRTIO spec Section 2.7.7.1 "Driver Requirements: Used Buffer
+    // Notification Suppression" requires that drivers handle spurious
+    // notifications. This signal must only be fired when the virtqueue
+    // allocated in ExchangeRequestResponse() is used by the device.
+
     // Notify the request thread
-    sem_post(&response_sem_);
+    fbl::AutoLock virtqueue_lock(&virtio_queue_mutex_);
+    virtio_queue_buffer_used_signal_.Signal();
   };
 
   // Tell the ring to find free chains and hand it back to our lambda
-  vring_.IrqRingUpdate(free_chain);
+  virtio_queue_.IrqRingUpdate(free_chain);
 }
 
 void GpuDevice::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
