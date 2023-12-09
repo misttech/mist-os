@@ -28,8 +28,6 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
         prepend_args = [
             "--ffx",
             sdk.ffx,
-            "--pm",
-            sdk.pm,
             "--package",
         ] + far_files + repo_name_args,
     )

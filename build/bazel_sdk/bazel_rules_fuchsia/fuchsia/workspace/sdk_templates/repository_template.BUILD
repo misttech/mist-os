@@ -81,12 +81,11 @@ fuchsia_toolchain_info(
     merkleroot = "//tools:{{HOST_CPU}}/merkleroot",
     minfs = "//tools:{{HOST_CPU}}/minfs",
     minfs_manifest = "//tools:{{HOST_CPU}}/minfs-meta.json",
-    pm = "//tools:{{HOST_CPU}}/pm",
     sdk_id = "{{SDK_ID}}",
     sdk_manifest = "//:meta/manifest.json",
+    symbol_index_config = "//data/config/symbol_index",
     symbolizer = "//tools:{{HOST_CPU}}/symbolizer",
     symbolizer_manifest = "//tools:{{HOST_CPU}}/symbolizer-meta.json",
-    symbol_index_config = "//data/config/symbol_index",
     zbi = "//tools:{{HOST_CPU}}/zbi",
     zbi_manifest = "//tools:{{HOST_CPU}}/zbi-meta.json",
 )
@@ -107,8 +106,6 @@ sdk_host_tool(name = "ffx")
 sdk_host_tool(name = "fssh")
 
 sdk_host_tool(name = "cmc")
-
-sdk_host_tool(name = "pm")
 
 sdk_host_tool(name = "far")
 

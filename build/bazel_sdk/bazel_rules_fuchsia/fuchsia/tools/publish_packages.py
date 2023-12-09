@@ -36,12 +36,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
-            "--pm",
-            type=parser.path_arg(),
-            help="A path to the pm tool.",
-            required=True,
-        )
-        parser.add_argument(
             "--packages",
             help="Paths to far files to package.",
             nargs="+",
@@ -152,7 +146,7 @@ class FuchsiaTaskPublish(FuchsiaTask):
             user_specified_repo_name() or ffx_default_repo() or prompt_repo()
         )
 
-        # Determine the pm repo path (use the existing one from ffx, or create a new one).
+        # Determine the package repo path (use the existing one from ffx, or create a new one).
         existing_repos = json.loads(
             run(
                 args.ffx,
@@ -185,7 +179,13 @@ class FuchsiaTaskPublish(FuchsiaTask):
             print(f"Using existing repo: {args.repo_path}")
         else:
             print(f"Creating a new repository: {args.repo_path}")
-            run(args.pm, "newrepo", "-vt", "-repo", args.repo_path)
+            run(
+                args.ffx,
+                "repository",
+                "create",
+                "--time-versioning",
+                args.repo_path,
+            )
 
         # Ensure ffx repository.
         print(f"Associating {args.repo_name} to {args.repo_path}")
@@ -226,19 +226,20 @@ class FuchsiaTaskPublish(FuchsiaTask):
             )
 
     def publish_packages(self, args):
-        # TODO(fxbug.dev/110617): Publish all packages with 1 command invocation.
         print(f"Publishing packages: {args.packages}")
+        cmd = [
+            args.ffx,
+            "repository",
+            "publish",
+            "--time-versioning",
+        ]
         for package in args.packages:
-            run(
-                args.pm,
-                "publish",
-                "-vt",
-                "-a",
-                "-f",
-                package,
-                "-repo",
-                args.repo_path,
-            )
+            cmd.append("--package-archive")
+            cmd.append(package)
+
+        cmd.append(args.repo_path)
+
+        run(*cmd)
         print(f"Published {len(args.packages)} packages")
 
     def teardown(self, args):
@@ -247,7 +248,7 @@ class FuchsiaTaskPublish(FuchsiaTask):
         if self.prompt_repo_cleanup:
             input("Press enter to delete this repository, or ^C to quit.")
 
-            # Delete the pm repository.
+            # Delete the package repository.
             rmtree(args.repo_path)
             print(f"Deleted {args.repo_path}")
 
