@@ -1264,7 +1264,8 @@ zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
 zx_status_t AmlogicDisplay::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result = Vout::CreateHdmiVout(parent_);
+  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
+      Vout::CreateHdmiVout(parent_, root_node_.CreateChild("vout"));
   if (!create_hdmi_vout_result.is_ok()) {
     zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
            create_hdmi_vout_result.status_string());
@@ -1272,7 +1273,6 @@ zx_status_t AmlogicDisplay::InitializeHdmiVout() {
   }
   vout_ = std::move(create_hdmi_vout_result).value();
 
-  root_node_.CreateInt("vout_type", static_cast<int>(vout_->type()), &inspector_);
   return ZX_OK;
 }
 
@@ -1284,7 +1284,8 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(parent_, panel_info.panel_type, panel_info.width, panel_info.height);
+        Vout::CreateDsiVout(parent_, panel_info.panel_type, panel_info.width, panel_info.height,
+                            root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       zxlogf(ERROR, "Failed to initialize DSI Vout device: %s",
              create_dsi_vout_result.status_string());
@@ -1295,8 +1296,6 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
     display_attached_ = true;
   }
 
-  root_node_.CreateInt("vout_type", static_cast<int>(vout_->type()), &inspector_);
-  root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
   return ZX_OK;
 }
 

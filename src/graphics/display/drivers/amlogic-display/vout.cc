@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -65,21 +66,28 @@ zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
 }  // namespace
 
 Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-           uint32_t height, display_setting_t display_setting)
+           uint32_t height, display_setting_t display_setting, inspect::Node node)
     : type_(VoutType::kDsi),
       supports_hpd_(kDsiSupportedFeatures.hpd),
+      node_(std::move(node)),
       dsi_{
           .dsi_host = std::move(dsi_host),
           .clock = std::move(dsi_clock),
           .width = width,
           .height = height,
           .disp_setting = display_setting,
-      } {}
+      } {
+  node_.RecordInt("vout_type", static_cast<int>(type()));
+}
 
-Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host)
+Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
     : type_(VoutType::kHdmi),
       supports_hpd_(kHdmiSupportedFeatures.hpd),
-      hdmi_{.hdmi_host = std::move(hdmi_host)} {}
+      node_(std::move(node)),
+      hdmi_{.hdmi_host = std::move(hdmi_host)} {
+  node_.RecordInt("vout_type", static_cast<int>(type()));
+  node_.RecordUint("panel_type", panel_type());
+}
 
 uint32_t Vout::display_width() const {
   switch (type_) {
@@ -137,7 +145,8 @@ uint32_t Vout::panel_type() const {
 }
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
-                                                      uint32_t width, uint32_t height) {
+                                                      uint32_t width, uint32_t height,
+                                                      inspect::Node node) {
   zx::result<std::unique_ptr<DsiHost>> dsi_host_result = DsiHost::Create(parent, panel_type);
   if (dsi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create DSI host: %s", dsi_host_result.status_string());
@@ -166,8 +175,9 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   display_setting_t display_setting = display_setting_result.value();
 
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
-      &alloc_checker, std::move(dsi_host), std::move(clock), width, height, display_setting);
+  std::unique_ptr<Vout> vout =
+      fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
+                                     height, display_setting, std::move(node));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -183,9 +193,10 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   }
 
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
-      &alloc_checker,
-      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, display_setting.value());
+  std::unique_ptr<Vout> vout =
+      fbl::make_unique_checked<Vout>(&alloc_checker,
+                                     /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height,
+                                     display_setting.value(), inspect::Node{});
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -193,7 +204,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent, inspect::Node node) {
   zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(parent);
   if (hdmi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create HDMI host: %s", hdmi_host_result.status_string());
@@ -201,8 +212,8 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent) {
   }
 
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Vout> vout =
-      fbl::make_unique_checked<Vout>(&alloc_checker, std::move(hdmi_host_result).value());
+  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
+      &alloc_checker, std::move(hdmi_host_result).value(), std::move(node));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);

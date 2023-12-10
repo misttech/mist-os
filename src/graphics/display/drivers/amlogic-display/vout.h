@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
@@ -30,11 +31,12 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
   static zx::result<std::unique_ptr<Vout>> CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
-                                                         uint32_t width, uint32_t height);
+                                                         uint32_t width, uint32_t height,
+                                                         inspect::Node node);
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(zx_device_t* parent);
+  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(zx_device_t* parent, inspect::Node node);
 
   // Sets only the display size, feature bits and panel settings for testing.
   // Returns a non-null pointer to the Vout instance on success.
@@ -43,10 +45,10 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   // Creates a Vout instance that outputs MIPI-DSI signal.
   Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-       uint32_t height, display_setting_t display_setting);
+       uint32_t height, display_setting_t display_setting, inspect::Node node);
 
   // Creates a Vout instance that outputs HDMI signal.
-  explicit Vout(std::unique_ptr<HdmiHost> hdmi_host);
+  Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node);
 
   Vout(Vout&&) = delete;
   Vout(const Vout&) = delete;
@@ -108,6 +110,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   // Features
   bool supports_hpd_ = false;
+
+  inspect::Node node_;
 
   struct dsi_t {
     std::unique_ptr<DsiHost> dsi_host;
