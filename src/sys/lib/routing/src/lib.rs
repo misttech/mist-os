@@ -24,6 +24,7 @@ pub mod router;
 #[cfg(target_os = "fuchsia")]
 pub use self::router::{route, Completer, Request, Routable, Router};
 
+use fuchsia_zircon_status as zx;
 use {
     crate::{
         availability::{AvailabilityState, AvailabilityVisitor},
@@ -1244,13 +1245,30 @@ where
         AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability().clone());
     let source = legacy_router::route_from_use(
-        use_decl.into(),
+        use_decl.clone().into(),
         target.clone(),
         allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
-    .await?;
+    .await;
+    // If the route was not found, but it's a transitional availability then return
+    // a successful Void capability.
+    let source = match source {
+        Ok(s) => s,
+        Err(e) => {
+            if *use_decl.availability() == Availability::Transitional
+                && e.as_zx_status() == zx::Status::NOT_FOUND
+            {
+                CapabilitySource::Void {
+                    capability: InternalCapability::Config(use_decl.source_name),
+                    component: target.as_weak(),
+                }
+            } else {
+                return Err(e);
+            }
+        }
+    };
 
     target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))

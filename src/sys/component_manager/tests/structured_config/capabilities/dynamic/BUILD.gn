@@ -58,6 +58,7 @@ fuchsia_structured_config_values("values") {
   values = {
     my_flag = false
     my_int = 0
+    transitional = 5
   }
 }
 

@@ -70,6 +70,9 @@ TEST(ScTest, CheckValuesVoidOptional) {
   AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
                     fuchsia::component::decl::ConfigValue::WithSingle(
                         fuchsia::component::decl::ConfigSingleValue::WithBool_(true)));
+  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
+                    fuchsia::component::decl::ConfigValue::WithSingle(
+                        fuchsia::component::decl::ConfigSingleValue::WithUint8(5)));
   OfferConfigFromVoid(builder, "fuchsia.config.MyInt");
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
@@ -82,6 +85,7 @@ TEST(ScTest, CheckValuesVoidOptional) {
 
   config::Config my_config = config::Config::CreateFromVmo(std::move(result->config()));
   ASSERT_EQ(my_config.my_flag(), true);
+  ASSERT_EQ(my_config.transitional(), 5);
   // This value is coming from the CVF file since there is a void optional.
   ASSERT_EQ(my_config.my_int(), 0);
 }
@@ -93,6 +97,9 @@ TEST(ScTest, CheckValuesNoOptional) {
   AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
                     fuchsia::component::decl::ConfigValue::WithSingle(
                         fuchsia::component::decl::ConfigSingleValue::WithBool_(true)));
+  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
+                    fuchsia::component::decl::ConfigValue::WithSingle(
+                        fuchsia::component::decl::ConfigSingleValue::WithUint8(5)));
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();
@@ -114,6 +121,9 @@ TEST(ScTest, CheckValues) {
   AddAndOfferConfig(builder, "fuchsia.config.MyInt",
                     fuchsia::component::decl::ConfigValue::WithSingle(
                         fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
+  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
+                    fuchsia::component::decl::ConfigValue::WithSingle(
+                        fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();
@@ -126,6 +136,34 @@ TEST(ScTest, CheckValues) {
   config::Config my_config = config::Config::CreateFromVmo(std::move(result->config()));
   ASSERT_EQ(my_config.my_flag(), false);
   ASSERT_EQ(my_config.my_int(), 10);
+  ASSERT_EQ(my_config.transitional(), 10);
+}
+
+TEST(ScTest, NoTransitionalValue) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
+  AddChildComponent(builder);
+  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
+                    fuchsia::component::decl::ConfigValue::WithSingle(
+                        fuchsia::component::decl::ConfigSingleValue::WithBool_(false)));
+  AddAndOfferConfig(builder, "fuchsia.config.MyInt",
+                    fuchsia::component::decl::ConfigValue::WithSingle(
+                        fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
+  // We are specifically not routing fuchsia.config.MyTransitional.
+
+  component_testing::RealmRoot root = builder.Build(loop.dispatcher());
+  zx::result client_channel = root.component().Connect<test_config::Config>();
+  ASSERT_OK(client_channel);
+
+  fidl::SyncClient client(std::move(client_channel.value()));
+  fidl::Result result = client->Get();
+  ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());
+
+  config::Config my_config = config::Config::CreateFromVmo(std::move(result->config()));
+  ASSERT_EQ(my_config.my_flag(), false);
+  ASSERT_EQ(my_config.my_int(), 10);
+  // This value is coming from the CVF file.
+  ASSERT_EQ(my_config.transitional(), 5);
 }
 
 TEST(ScTest, BadValueType) {
