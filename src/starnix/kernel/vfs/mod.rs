@@ -76,9 +76,7 @@ use std::{cell::RefCell, ops::DerefMut, sync::Arc};
 pub enum FileObjectReleaserAction {}
 impl ReleaserAction<FileObject> for FileObjectReleaserAction {
     fn release(file_object: ReleaseGuard<FileObject>) {
-        RELEASERS.with(|cell| {
-            cell.borrow_mut().closed_files.push(file_object);
-        });
+        LocalReleasable::DropedFile(file_object).register();
     }
 }
 pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
@@ -86,9 +84,7 @@ pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub enum FsNodeReleaserAction {}
 impl ReleaserAction<FsNode> for FsNodeReleaserAction {
     fn release(fs_node: ReleaseGuard<FsNode>) {
-        RELEASERS.with(|cell| {
-            cell.borrow_mut().dropped_fs_nodes.push(fs_node);
-        });
+        LocalReleasable::DropedNode(fs_node).register();
     }
 }
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
@@ -98,18 +94,44 @@ thread_local! {
     static RELEASERS: RefCell<LocalReleasers> = RefCell::new(LocalReleasers::default());
 }
 
+/// Container for all the types that can be deferred released.
+#[derive(Debug)]
+enum LocalReleasable {
+    DropedNode(ReleaseGuard<FsNode>),
+    DropedFile(ReleaseGuard<FileObject>),
+    FlushedFile(FileHandle, FdTableId),
+}
+
+impl LocalReleasable {
+    /// Register the container to be deferred released.
+    fn register(self: Self) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().releasables.push(self);
+        });
+    }
+}
+
+impl Releasable for LocalReleasable {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, context: Self::Context<'_>) {
+        match self {
+            Self::DropedNode(fs_node) => fs_node.release(context),
+            Self::DropedFile(file_object) => file_object.release(context),
+            Self::FlushedFile(file_handle, id) => file_handle.flush(context, id),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct LocalReleasers {
-    dropped_fs_nodes: Vec<ReleaseGuard<FsNode>>,
-    closed_files: Vec<ReleaseGuard<FileObject>>,
-    flushed_files: Vec<(FileHandle, FdTableId)>,
+    /// The list of entities to be deferred released.
+    releasables: Vec<LocalReleasable>,
 }
 
 impl LocalReleasers {
     fn is_empty(&self) -> bool {
-        self.dropped_fs_nodes.is_empty()
-            && self.closed_files.is_empty()
-            && self.flushed_files.is_empty()
+        self.releasables.is_empty()
     }
 }
 
@@ -117,14 +139,8 @@ impl Releasable for LocalReleasers {
     type Context<'a> = &'a CurrentTask;
 
     fn release(self, context: Self::Context<'_>) {
-        for fs_node in self.dropped_fs_nodes {
-            fs_node.release(context);
-        }
-        for file in self.closed_files {
-            file.release(context);
-        }
-        for (file, id) in self.flushed_files {
-            file.flush(context, id);
+        for releasable in self.releasables {
+            releasable.release(context);
         }
     }
 }
@@ -138,9 +154,7 @@ pub struct DelayedReleaser {}
 
 impl DelayedReleaser {
     pub fn flush_file(&self, file: &FileHandle, id: FdTableId) {
-        RELEASERS.with(|cell| {
-            cell.borrow_mut().flushed_files.push((Arc::clone(file), id));
-        });
+        LocalReleasable::FlushedFile(Arc::clone(file), id).register();
     }
 
     /// Run all current delayed releases for the current thread.
