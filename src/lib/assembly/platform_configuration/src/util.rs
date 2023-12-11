@@ -36,7 +36,6 @@ pub(crate) fn add_build_type_config_data(
 /// Adds a core shard to the product by taking the core shard template found in the assembly
 /// resources named `core_shard_template_name` and filling in the COMPONENT_URL and PACKAGE_NAME
 /// fields with data found in the `product_component_url`.
-#[allow(dead_code)]
 pub(crate) fn add_platform_declared_product_provided_component(
     product_component_url: &str,
     core_shard_template_name: &str,

@@ -3230,6 +3230,9 @@ assembly_resources_directory("resources") {
     "${icu_tzres_path}/timezoneTypes.res",
     "${icu_tzres_path}/zoneinfo64.res",
     "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
+
+    # Core shard templates.
+    "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
   ]
   deps = [ "//src/lib/icu/tzdata:revision" ]
 }

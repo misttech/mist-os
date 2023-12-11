@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use crate::util;
 use anyhow::bail;
 use assembly_config_schema::{
     platform_config::connectivity_config::{
@@ -182,6 +183,16 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             if connectivity_config.thread.include_lowpan {
                 builder.platform_bundle("thread_lowpan");
             }
+        }
+
+        // Add the weave core shard if necessary.
+        if let Some(url) = &connectivity_config.weave.component_url {
+            util::add_platform_declared_product_provided_component(
+                url,
+                "weavestack.core_shard.cml.template",
+                context,
+                builder,
+            )?;
         }
 
         Ok(())

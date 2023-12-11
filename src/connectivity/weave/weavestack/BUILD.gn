@@ -71,8 +71,6 @@ resource("default_environment_schema") {
 
 # The default weavestack package contains no applets.
 weavestack_package_v2("weavestack") {
-  component_shard_file =
-      "//src/connectivity/weave/meta/weavestack.core_shard.cml"
 }
 
 config_data("config") {

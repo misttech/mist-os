@@ -56,8 +56,12 @@ template("_weavestack_package_v2") {
     }
   }
 
-  core_shard("weavestack-core-shard") {
-    shard_file = invoker.component_shard_file
+  # TODO(b/295033962): Remove once all products use assembly to provide
+  # weavestack.
+  if (defined(invoker.component_shard_file)) {
+    core_shard("weavestack-core-shard") {
+      shard_file = invoker.component_shard_file
+    }
   }
 }
 

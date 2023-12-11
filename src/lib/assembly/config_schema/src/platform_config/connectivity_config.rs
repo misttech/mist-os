@@ -17,6 +17,8 @@ pub struct PlatformConnectivityConfig {
     pub mdns: MdnsConfig,
     #[serde(default)]
     pub thread: ThreadConfig,
+    #[serde(default)]
+    pub weave: WeaveConfig,
 }
 
 /// Platform configuration options for the network area.
@@ -102,4 +104,14 @@ pub struct ThreadConfig {
     /// Include the LoWPAN service.
     #[serde(default)]
     pub include_lowpan: bool,
+}
+
+/// Platform configuration options to use for the weave area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WeaveConfig {
+    /// The URL of the weave component.
+    ///   e.g. fuchsia-pkg://fuchsia.com/weavestack#meta/weavestack.cm
+    #[serde(default)]
+    pub component_url: Option<String>,
 }

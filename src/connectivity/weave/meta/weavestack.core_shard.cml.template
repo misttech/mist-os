@@ -5,7 +5,7 @@
     children: [
         {
             name: "weavestack",
-            url: "fuchsia-pkg://fuchsia.com/weavestack#meta/weavestack.cm",
+            url: "{{COMPONENT_URL}}",
             environment: "#core-env",
         },
     ],
@@ -14,7 +14,7 @@
             directory: "config-data",
             from: "parent",
             to: "#weavestack",
-            subdir: "weavestack",
+            subdir: "{{PACKAGE_NAME}}",
         },
         {
             protocol: [
