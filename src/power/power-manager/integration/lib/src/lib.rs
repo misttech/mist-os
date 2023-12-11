@@ -8,7 +8,7 @@ mod mocks;
 use {
     crate::mocks::{
         activity_service::MockActivityService, input_settings_service::MockInputSettingsService,
-        system_controller::MockSystemControllerService,
+        kernel_service::MockKernelService, system_controller::MockSystemControllerService,
     },
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl::AsHandleRef as _,
@@ -114,6 +114,17 @@ impl TestEnvBuilder {
             .await
             .expect("Failed to add child: system_controller_service");
 
+        let kernel_service = MockKernelService::new();
+        let kernel_service_clone = kernel_service.clone();
+        let kernel_service_child = realm_builder
+            .add_local_child(
+                "kernel_service",
+                move |handles| Box::pin(kernel_service_clone.clone().run(handles)),
+                ChildOptions::new(),
+            )
+            .await
+            .expect("Failed to add child: kernel_service");
+
         // Set up Power Manager's required routes
         let parent_to_power_manager_routes = Route::new()
             .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
@@ -187,6 +198,17 @@ impl TestEnvBuilder {
             .add_route(
                 system_controller_to_power_manager_routes
                     .from(&system_controller_service_child)
+                    .to(&power_manager),
+            )
+            .await
+            .unwrap();
+
+        let kernel_service_to_power_manager_routes =
+            Route::new().capability(Capability::protocol_by_name("fuchsia.kernel.Stats"));
+        realm_builder
+            .add_route(
+                kernel_service_to_power_manager_routes
+                    .from(&kernel_service_child)
                     .to(&power_manager),
             )
             .await

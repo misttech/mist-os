@@ -18,6 +18,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
     "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile_rust",
     "//sdk/fidl/fuchsia.power.systemmode:fuchsia.power.systemmode_rust",
@@ -55,6 +56,7 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/mocks/activity_service.rs",
     "src/mocks/input_settings_service.rs",
+    "src/mocks/kernel_service.rs",
     "src/mocks/mod.rs",
     "src/mocks/system_controller.rs",
   ]
