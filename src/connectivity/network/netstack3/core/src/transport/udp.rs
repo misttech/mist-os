@@ -1616,11 +1616,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError>;
 
-    fn get_shutdown(
-        &mut self,
-        ctx: &C,
-        id: SocketId<I>,
-    ) -> Result<Option<ShutdownType>, datagram::DualStackNotImplementedError>;
+    fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType>;
 
     fn close(&mut self, ctx: &mut C, id: SocketId<I>) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
@@ -1829,11 +1825,7 @@ impl<
         datagram::shutdown_connected(self, ctx, id, which)
     }
 
-    fn get_shutdown(
-        &mut self,
-        ctx: &C,
-        id: SocketId<I>,
-    ) -> Result<Option<ShutdownType>, datagram::DualStackNotImplementedError> {
+    fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType> {
         datagram::get_shutdown_connected(self, ctx, id)
     }
 
@@ -2625,7 +2617,7 @@ pub fn get_shutdown<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
-) -> Result<Option<ShutdownType>, datagram::DualStackNotImplementedError> {
+) -> Option<ShutdownType> {
     let mut sync_ctx = Locked::new(sync_ctx);
 
     I::map_ip(

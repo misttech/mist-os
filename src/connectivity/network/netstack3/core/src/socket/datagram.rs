@@ -25,7 +25,6 @@ use net_types::{
 use packet::{BufferMut, Serializer};
 use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
-use tracing::warn;
 
 use crate::{
     algorithm::ProtocolFlowId,
@@ -304,9 +303,17 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     pub(crate) extra: S::ConnStateExtra,
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<O> for ConnState<I, D, S, O> {
-    fn as_ref(&self) -> &O {
+impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
+    AsRef<IpOptions<SocketI, D, S>> for ConnState<WireI, D, S, IpOptions<SocketI, D, S>>
+{
+    fn as_ref(&self) -> &IpOptions<SocketI, D, S> {
         self.socket.options()
+    }
+}
+
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<Shutdown> for ConnState<I, D, S, O> {
+    fn as_ref(&self) -> &Shutdown {
+        &self.shutdown
     }
 }
 
@@ -356,6 +363,17 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<IpOptions<I, D, S>>
         match self {
             DualStackConnState::ThisStack(state) => state.as_mut(),
             DualStackConnState::OtherStack(state) => state.as_mut(),
+        }
+    }
+}
+
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
+    for DualStackConnState<I, D, S>
+{
+    fn as_ref(&self) -> &Shutdown {
+        match self {
+            DualStackConnState::ThisStack(state) => state.as_ref(),
+            DualStackConnState::OtherStack(state) => state.as_ref(),
         }
     }
 }
@@ -3648,12 +3666,6 @@ pub(crate) fn shutdown_connected<
     })
 }
 
-/// TODO(https://fxbug.dev/21198): Remove once get_shutdown_connected is
-/// supported for dual-stack sockets.
-#[derive(GenericOverIp)]
-#[generic_over_ip()]
-pub struct DualStackNotImplementedError;
-
 pub(crate) fn get_shutdown_connected<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
@@ -3663,43 +3675,27 @@ pub(crate) fn get_shutdown_connected<
     sync_ctx: &mut SC,
     _ctx: &C,
     id: S::SocketId<I>,
-) -> Result<Option<ShutdownType>, DualStackNotImplementedError> {
+) -> Option<ShutdownType> {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_) => return Ok(None),
+            SocketState::Unbound(_) => return None,
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 match socket_type {
-                    BoundSocketStateType::Listener { state: _, sharing: _ } => return Ok(None),
+                    BoundSocketStateType::Listener { state: _, sharing: _ } => return None,
                     BoundSocketStateType::Connected { state, sharing: _ } => state,
                 }
             }
         };
-
-        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
-            match sync_ctx.dual_stack_context() {
-                MaybeDualStack::DualStack(dual_stack) => {
-                    match dual_stack.converter().convert(state) {
-                        DualStackConnState::ThisStack(state) => state,
-                        DualStackConnState::OtherStack(state) => {
-                            dual_stack.assert_dual_stack_enabled(state);
-                            // TODO(https://fxbug.dev/21198): Support dual-stack
-                            // get shutdown connected.
-                            warn!("get_shutdown not supported for dual-stack connected sockets");
-                            return Err(DualStackNotImplementedError);
-                        }
-                    }
-                }
-                MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    not_dual_stack.converter().convert(state)
-                }
-            };
-        let Shutdown { send, receive } = shutdown;
-        Ok(Some(match (send, receive) {
-            (false, false) => return Ok(None),
+        let Shutdown { send, receive } = match sync_ctx.dual_stack_context() {
+            MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_ref(),
+            MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_ref(),
+        };
+        Some(match (send, receive) {
+            (false, false) => return None,
             (true, false) => ShutdownType::Send,
             (false, true) => ShutdownType::Receive,
             (true, true) => ShutdownType::SendAndReceive,
-        }))
+        })
     })
 }
 
