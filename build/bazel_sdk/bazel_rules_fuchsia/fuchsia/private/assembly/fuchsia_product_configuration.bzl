@@ -88,7 +88,7 @@ def _fuchsia_product_configuration_impl(ctx):
     ctx.actions.write(product_config_file, content)
 
     return [
-        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.product_config_labels)),
+        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.product_config_labels + ctx.files.deps)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
         ),
@@ -127,6 +127,10 @@ _fuchsia_product_configuration = rule(
         "base_driver_packages": attr.label_list(
             doc = "Base-driver packages to include in product.",
             providers = [FuchsiaPackageInfo],
+            default = [],
+        ),
+        "deps": attr.label_list(
+            doc = "Additional dependencies that must be built.",
             default = [],
         ),
     },
