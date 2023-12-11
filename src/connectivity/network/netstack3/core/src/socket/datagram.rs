@@ -335,9 +335,6 @@ pub(crate) enum DualStackConnState<
     /// The [`ConnState`] for a socked connected with [`I::Version`].
     ThisStack(ConnState<I, D, S, IpOptions<I, D, S>>),
     /// The [`ConnState`] for a socked connected with [`I::OtherVersion`].
-    // TODO(https://fxbug.dev/21198): Require use once datagram sockets can
-    // connect to a dual-stack address.
-    #[allow(unused)]
     OtherStack(ConnState<I::OtherVersion, D, S, IpOptions<I, D, S>>),
 }
 
