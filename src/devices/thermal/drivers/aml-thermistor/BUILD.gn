@@ -48,7 +48,7 @@ fuchsia_driver_component("aml-thermistor") {
 }
 
 fuchsia_driver_package("package") {
-  package_name = "aml-thermistor"
+  package_name = "astro-thermistor"
   driver_components = [ ":aml-thermistor" ]
 }
 
