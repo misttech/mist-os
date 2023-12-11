@@ -1763,7 +1763,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_project_node_inheritence() {
+    async fn test_project_node_inheritance() {
         const BYTES_LIMIT: u64 = 123456;
         const NODES_LIMIT: u64 = 4321;
         const VOLUME_NAME: &str = "A";

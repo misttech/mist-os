@@ -324,7 +324,7 @@ impl BlockClosure for XtsProcessor<'_> {
             // SAFETY: We know each chunk is exactly 16 bytes and it should be safe to transmute to
             // u128 and GenericArray<u8, U16>.  There are safe ways of doing the following, but this
             // is extremely performance sensitive, and even seemingly innocuous changes here can
-            // have an order-of-maginature impact on what the compiler produces and that can be seen
+            // have an order-of-magnitude impact on what the compiler produces and that can be seen
             // in our benchmarks.  This assumes little-endianness which is likely to always be the
             // case.
             unsafe {

@@ -115,7 +115,7 @@ pub trait Allocator: ReservationOwner {
     async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64>;
 
     /// Marks allocations associated with a given |owner_object_id| for deletion.
-    /// Does not necessarily perform the deletion stratight away but if this is the case,
+    /// Does not necessarily perform the deletion straight away but if this is the case,
     /// implementation should be invisible to the caller.
     async fn mark_for_deletion(&self, transaction: &mut Transaction<'_>, owner_object_id: u64);
 
@@ -431,7 +431,7 @@ struct SimpleAllocatorCounters {
 }
 
 // For now this just implements a simple strategy of returning the first gap it can find (no matter
-// the size).  This is a very naiive implementation.
+// the size).  This is a very naive implementation.
 pub struct SimpleAllocator {
     filesystem: Weak<FxFilesystem>,
     block_size: u64,
@@ -2492,7 +2492,7 @@ mod tests {
                 .await
                 .expect("allocate failed");
 
-            // Prior to commiiting, the count of allocated bytes shouldn't change.
+            // Prior to committing, the count of allocated bytes shouldn't change.
             assert_eq!(allocator.get_allocated_bytes(), allocated_bytes);
         }
 

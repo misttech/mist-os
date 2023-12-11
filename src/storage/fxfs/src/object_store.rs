@@ -180,7 +180,7 @@ pub const MAX_STORE_INFO_SERIALIZED_SIZE: usize = 131072;
 
 // This needs to be large enough to accommodate the maximum amount of unflushed data (data that is
 // in the journal but hasn't yet been written to layer files) for a store.  We set a limit because
-// we want to limit the amount of memory use in the case the filesystem is corrupt or under attaack.
+// we want to limit the amount of memory use in the case the filesystem is corrupt or under attack.
 pub const MAX_ENCRYPTED_MUTATIONS_SIZE: usize = 8 * journal::DEFAULT_RECLAIM_SIZE as usize;
 
 #[derive(Default)]

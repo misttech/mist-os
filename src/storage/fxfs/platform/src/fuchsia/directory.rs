@@ -1738,7 +1738,7 @@ mod tests {
             root.unlink("symlink2", &fio::UnlinkOptions::default())
                 .await
                 .expect("FIDL call failed")
-                .expect("unlnk failed");
+                .expect("unlink failed");
 
             // Rename over the first symlink.
             open_file_checked(

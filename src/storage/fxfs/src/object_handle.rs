@@ -91,7 +91,7 @@ pub trait WriteBytes {
     /// or when buffers are full.
     async fn write_bytes(&mut self, buf: &[u8]) -> Result<(), Error>;
 
-    /// Called to flush to the handle.  Named to avoid confluct with the flush method above.
+    /// Called to flush to the handle.  Named to avoid conflict with the flush method above.
     async fn complete(&mut self) -> Result<(), Error>;
 
     /// Moves the offset forward by `amount`, which will result in zeroes in the output stream, even

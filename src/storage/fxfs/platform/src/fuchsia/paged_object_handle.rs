@@ -872,7 +872,7 @@ impl PagedObjectHandle {
     }
 
     pub async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        // We must extract informaton from `inner` *before* we try and retrieve the properties from
+        // We must extract information from `inner` *before* we try and retrieve the properties from
         // the handle to avoid a window where we might see old properties.  When we flush, we update
         // the handle and *then* remove the properties from `inner`.
         let (dirty_page_count, data_size, crtime, mtime) = {

@@ -138,7 +138,7 @@ fn merge_deleted_extents(
         return MergeResult::EmitLeft;
     }
     // Both of these are deleted extents which are either adjacent or overlapping, which means
-    // we can coalece the records.
+    // we can coalesce the records.
     if left_key.range.end >= right_key.range.end {
         // The left deletion eclipses the right, so just keep the left.
         return MergeResult::Other { emit: None, left: Keep, right: Discard };

@@ -547,7 +547,7 @@ pub struct SimplePersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
 
 impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
     /// Creates a new writer that will serialize items to the object accessible via |object_handle|
-    /// (which provdes a write interface to the object).
+    /// (which provides a write interface to the object).
     pub async fn new(mut writer: W, block_size: u64) -> Result<Self, Error> {
         ensure!(block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
         let layer_info = LayerInfo { block_size, key_value_version: LATEST_VERSION };

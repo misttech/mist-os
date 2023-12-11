@@ -50,7 +50,7 @@ from a previous storage format version to the latest storage format version.
 
    ```
    versioned_type! {
-     4.. => Foo,   // The new struct used for Fxfx 4.x and above
+     4.. => Foo,   // The new struct used for Fxfs 4.x and above
      2.. => FooV1  // The old struct used for Fxfs 2.x and 3.x
    }
    ```

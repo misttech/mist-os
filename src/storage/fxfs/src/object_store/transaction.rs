@@ -875,7 +875,7 @@ impl<'a> Transaction<'a> {
                         debug_assert!(
                             false,
                             "Not holding required lock for object {id} \
-                                in store {store_object_id} while mutating extented attribute"
+                                in store {store_object_id} while mutating extended attribute"
                         );
                         error!(
                             "Not holding required lock for object {id} in store \
@@ -1662,7 +1662,7 @@ mod tests {
                     .lock_manager()
                     .read_lock(lock_keys![LockKey::object_attribute(1, 2, 3)])
                     .await;
-                // Tell the next future to continue and then nwait.
+                // Tell the next future to continue and then wait.
                 send1.send(()).unwrap();
                 recv2.await.unwrap();
                 // It shouldn't proceed until we release our read lock, but it's a halting

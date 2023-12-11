@@ -113,9 +113,9 @@ pub fn versioned_type(input: TokenStream) -> TokenStream {
                     #(#assertions)*
                     assert!(#major <= LATEST_VERSION.major,
                         "Found version > LATEST_VERSION for {}.", stringify!(#ident));
-                    const future_ver : u32 = LATEST_VERSION.major + 1;
+                    const FUTURE_VER : u32 = LATEST_VERSION.major + 1;
                     match version.major {
-                        future_ver.. => anyhow::bail!(
+                        FUTURE_VER.. => anyhow::bail!(
                                 "Invalid future version {} > {} deserializing {}.",
                                 version, LATEST_VERSION, stringify!(#ident)),
                         #(#match_iter)*
@@ -181,7 +181,7 @@ pub fn migrate_to_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///   3. Changing an enum variant's fields where the all the fields implement From.
 ///
 /// This will also work if a new variant is added to an enum, but if that's the only change, and
-/// it's added to the end of the exsting variants, it will automatically be backward compatible
+/// it's added to the end of the existing variants, it will automatically be backward compatible
 /// because it won't affect how bincode serializes the old variants.  There are some other changes
 /// that can be made that are safe with bincode serialization, such as converting from Option to
 /// Vec.

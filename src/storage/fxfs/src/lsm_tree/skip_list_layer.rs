@@ -229,7 +229,7 @@ impl<K: Key, V: Value> Layer<K, V> for SkipListLayer<K, V> {
     }
 
     fn get_version(&self) -> Version {
-        // The SkipListLayer is stored in RAM and written to disk as a SimplePersitentLayer
+        // The SkipListLayer is stored in RAM and written to disk as a SimplePersistentLayer
         // Hence, the SkipListLayer is always at the latest version
         return LATEST_VERSION;
     }
@@ -889,7 +889,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_mutliple_readers_allowed() {
+    async fn test_multiple_readers_allowed() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
         skip_list.insert(items[1].clone()).await.expect("insert error");

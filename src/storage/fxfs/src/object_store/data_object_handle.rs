@@ -1711,7 +1711,7 @@ mod tests {
     // This is identical to the previous test except that we flush so that extents end up in
     // different layers.
     #[fuchsia::test]
-    async fn test_preallocate_suceeds_when_extents_are_in_different_layers() {
+    async fn test_preallocate_succeeds_when_extents_are_in_different_layers() {
         let (fs, object) = test_filesystem_and_object_with_key(None, true).await;
         object.owner().flush().await.expect("flush failed");
         test_preallocate_common(&fs, object).await;
@@ -2003,7 +2003,7 @@ mod tests {
         let mut write_buf = object.allocate_buffer(4096).await;
         write_buf.as_mut_slice().fill(95);
 
-        // Let's try to fill up the last block, and increase the filesize in doing so
+        // Let's try to fill up the last block, and increase the file size in doing so
         let last_block_offset = round_down(TEST_OBJECT_SIZE, 4096 as u32);
 
         // Expected to fail with allocations disabled

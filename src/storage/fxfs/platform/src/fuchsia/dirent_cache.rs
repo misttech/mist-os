@@ -35,7 +35,7 @@ impl DirentCacheInner {
         self.lru.insert(DirentCacheKey(dir_id, name), item);
         if self.lru.len() > self.limit {
             if let CacheHolder::Node(node) = self.lru.pop_front().unwrap().1 {
-                // Drop outsite the lock.
+                // Drop outside the lock.
                 return Some(node);
             } else {
                 self.timer_in_queue = false;

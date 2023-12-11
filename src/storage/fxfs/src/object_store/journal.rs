@@ -344,7 +344,7 @@ pub trait JournalHandle: ReadObjectHandle {
     /// be skipped if None is returned).
     fn start_offset(&self) -> Option<u64>;
     /// Adds an extent to the current end of the journal stream.
-    fn push_extent(&mut self, devic_range: Range<u64>);
+    fn push_extent(&mut self, device_range: Range<u64>);
     /// Discards all extents whose logical offset succeeds |discard_offset|.
     fn discard_extents(&mut self, discard_offset: u64);
 }
