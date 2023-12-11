@@ -452,9 +452,8 @@ zx_status_t sys_pci_get_nth_device(zx_handle_t hrsrc, uint32_t index,
    */
   LTRACEF("handle %x index %u\n", hrsrc, index);
 
-  // TODO(fxbug.dev/30918): finer grained validation
   zx_status_t status;
-  if ((status = validate_resource(hrsrc, ZX_RSRC_KIND_ROOT)) < 0) {
+  if ((status = validate_resource_irq(hrsrc, index)) < 0) {
     return status;
   }
 

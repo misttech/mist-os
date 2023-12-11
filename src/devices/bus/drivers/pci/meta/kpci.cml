@@ -21,6 +21,7 @@
             protocol: [
                 "fuchsia.boot.RootResource",
                 "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
             ],
         },
         { service: "fuchsia.hardware.platform.device.Service" },
