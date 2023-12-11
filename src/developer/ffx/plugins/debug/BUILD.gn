@@ -29,4 +29,23 @@ ffx_tool("ffx_debug_plugin_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+
+  sdk_target_name = "sdk"
+  sdk_category = "partner"
+}
+
+group("debug") {
+  public_deps = [
+    ":ffx_debug_plugin_tool",
+    ":ffx_debug_plugin_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_debug_plugin_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_debug_plugin_tests($host_toolchain)" ]
 }

@@ -42,4 +42,18 @@ ffx_tool("ffx_session_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+
+  sdk_target_name = "sdk"
+  sdk_category = "partner"
+}
+
+group("session") {
+  public_deps = [
+    ":ffx_session_tool",
+    ":ffx_session_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_session_tool_versioned" ]
 }

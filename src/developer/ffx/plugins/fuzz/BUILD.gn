@@ -61,4 +61,23 @@ ffx_tool("ffx_fuzz_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+
+  sdk_target_name = "sdk"
+  sdk_category = "partner"
+}
+
+group("fuzz") {
+  public_deps = [
+    ":ffx_fuzz_tool",
+    ":ffx_fuzz_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_fuzz_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_fuzz_tests($host_toolchain)" ]
 }
