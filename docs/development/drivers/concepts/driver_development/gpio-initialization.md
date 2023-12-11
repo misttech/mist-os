@@ -89,6 +89,7 @@ using fuchsia.gpio;
 
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_GPIO_CONTROLLER = 1;
 }
 ```
 
@@ -105,6 +106,26 @@ This is to ensure that as many pins as possible are put into a known state, and
 that drivers will not attempt to run with pins that are potentially
 misconfigured. Similarly, no init device is added if the GPIO driver does not
 have or cannot parse the initialization metadata.
+
+## Recommended use cases
+
+There are two cases where the use of GPIO init steps is recommended:
+
+- A driver requires static board- or platform-specific GPIO configuration.
+
+The pull-up/pull-down, alt function, and drive strength settings are typically
+board- or platform-specific, so using GPIO init to configure them in the board
+driver is preferred. Setting a GPIO output value this way is also recommended if
+the value is not the same (or not required) on all boards.
+
+- Multiple drivers depend on the static configuration of one GPIO.
+
+If multiple drivers depend on the static configuration of one GPIO, then that
+configuration should be done by GPIO init. This prevents multiple drivers from
+having to make potentially conflicting calls to a single GPIO.
+
+GPIO init steps should not be used for any configuration that will be changed by
+the driver at runtime.
 
 ## GPIO initialization options
 
