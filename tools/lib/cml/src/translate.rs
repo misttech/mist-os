@@ -9,7 +9,7 @@ use {
         offer_to_all_would_duplicate, validate,
         validate::ProtocolRequirements,
         AnyRef, AsClause, Availability, Capability, CapabilityClause, Child, Collection, ConfigKey,
-        ConfigNestedValueType, ConfigRuntimeSource, ConfigValueType, DebugRegistration,
+        ConfigNestedValueType, ConfigRuntimeSource, ConfigType, ConfigValueType, DebugRegistration,
         DictionaryRef, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
         Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OfferToRef, OneOrMany,
         Path, PathClause, Program, ResolverRegistration, RightsClause, RootDictionaryRef,
@@ -1936,7 +1936,7 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
 fn configuration_to_value(
     name: &Name,
     capability: &Capability,
-    config_type: &Option<cm::ConfigType>,
+    config_type: &Option<ConfigType>,
     value: &Option<serde_json::Value>,
 ) -> Result<fdecl::ConfigValue, Error> {
     let Some(config_type) = config_type.as_ref() else {
@@ -1953,16 +1953,16 @@ fn configuration_to_value(
     };
 
     let config_type = match config_type {
-        cm::ConfigType::Bool => cm_rust::ConfigValueType::Bool,
-        cm::ConfigType::Uint8 => cm_rust::ConfigValueType::Uint8,
-        cm::ConfigType::Uint16 => cm_rust::ConfigValueType::Uint16,
-        cm::ConfigType::Uint32 => cm_rust::ConfigValueType::Uint32,
-        cm::ConfigType::Uint64 => cm_rust::ConfigValueType::Uint64,
-        cm::ConfigType::Int8 => cm_rust::ConfigValueType::Int8,
-        cm::ConfigType::Int16 => cm_rust::ConfigValueType::Int16,
-        cm::ConfigType::Int32 => cm_rust::ConfigValueType::Int32,
-        cm::ConfigType::Int64 => cm_rust::ConfigValueType::Int64,
-        cm::ConfigType::String => {
+        ConfigType::Bool => cm_rust::ConfigValueType::Bool,
+        ConfigType::Uint8 => cm_rust::ConfigValueType::Uint8,
+        ConfigType::Uint16 => cm_rust::ConfigValueType::Uint16,
+        ConfigType::Uint32 => cm_rust::ConfigValueType::Uint32,
+        ConfigType::Uint64 => cm_rust::ConfigValueType::Uint64,
+        ConfigType::Int8 => cm_rust::ConfigValueType::Int8,
+        ConfigType::Int16 => cm_rust::ConfigValueType::Int16,
+        ConfigType::Int32 => cm_rust::ConfigValueType::Int32,
+        ConfigType::Int64 => cm_rust::ConfigValueType::Int64,
+        ConfigType::String => {
             let Some(max_size) = capability.config_max_size else {
                 return Err(Error::InvalidArgs(format!(
                     "Configuration field '{}' must have 'max_size' set",
@@ -1971,7 +1971,7 @@ fn configuration_to_value(
             };
             cm_rust::ConfigValueType::String { max_size: max_size.into() }
         }
-        cm::ConfigType::Vector => {
+        ConfigType::Vector => {
             let Some(ref element) = capability.config_element_type else {
                 return Err(Error::InvalidArgs(format!(
                     "Configuration field '{}' must have 'element_type' set",

@@ -41,8 +41,8 @@ use {
 };
 
 pub use cm_types::{
-    AllowedOffers, Availability, ConfigType, DependencyType, Durability, Name, OnTerminate,
-    ParseError, Path, RelativePath, StartupMode, StorageId, Url,
+    AllowedOffers, Availability, DependencyType, Durability, Name, OnTerminate, ParseError, Path,
+    RelativePath, StartupMode, StorageId, Url,
 };
 use error::Location;
 
@@ -2117,6 +2117,22 @@ impl Environment {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigType {
+    Bool,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    String,
+    Vector,
 }
 
 #[derive(Clone, Hash, Debug, PartialEq, PartialOrd, Eq, Ord, Serialize)]

@@ -869,22 +869,6 @@ pub enum StorageId {
 
 symmetrical_enums!(StorageId, fdecl::StorageId, StaticInstanceId, StaticInstanceIdOrMoniker);
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ConfigType {
-    Bool,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    String,
-    Vector,
-}
-
 #[cfg(test)]
 mod tests {
     use {
