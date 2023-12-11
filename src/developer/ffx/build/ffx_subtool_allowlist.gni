@@ -12,9 +12,6 @@ ffx_subtool_fidl_allowlist = [
   # Used by ffx
   "//src/developer/ffx/fidl:fuchsia.developer.ffx",
 
-  # Used by ffx and many subtools
-  "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
-
   # ffx driver
   "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",
@@ -28,9 +25,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx driver
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
   "//sdk/fidl/fuchsia.hardware.usb.device:fuchsia.hardware.usb.device",
-
-  # used by ffx profile memory
-  "//sdk/fidl/fuchsia.memory:fuchsia.memory",
 
   # used by ffx net
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug",
@@ -47,9 +41,6 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.net.root:fuchsia.net.root",
   "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin",
   "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack",
-
-  # used by ffx target forward
-  "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol",
 
   # used by ffx repository add-from-pm
   "//sdk/fidl/fuchsia.pkg:fuchsia.pkg",
