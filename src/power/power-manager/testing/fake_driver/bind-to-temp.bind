@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.powermanager.driver;
+using fuchsia.powermanager.driver;
 
-extend uint fuchsia.BIND_PROTOCOL {
-  PLATFORM = 0x0001,
-  TEMP = 0x0002,
-};
+fuchsia.BIND_PROTOCOL == fuchsia.powermanager.driver.BIND_PROTOCOL.TEMP;

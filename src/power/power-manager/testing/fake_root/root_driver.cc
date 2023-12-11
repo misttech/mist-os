@@ -103,6 +103,34 @@ class RootDriver : public fdf::DriverBase,
     }
 
     controllers_.emplace_back(std::move(controller_endpoints->client));
+
+    // TODO(b/313922891): This is a temporary solution for a test to add a driver without disrupting
+    // other tests.
+    auto temp_properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
+    temp_properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */,
+                                           bind_fuchsia_powermanager_driver::BIND_PROTOCOL_TEMP);
+
+    auto temp_args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                         .name(arena, "temp")
+                         .properties(temp_properties)
+                         .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result temp_controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(temp_controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
+                  temp_controller_endpoints.status_string());
+
+    fidl::WireResult temp_result =
+        fidl::WireCall(nodes_.back())
+            ->AddChild(temp_args, std::move(temp_controller_endpoints->server), {});
+    if (!temp_result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", temp_result.status_string()));
+      return zx::error(temp_result.status());
+    }
+
+    controllers_.emplace_back(std::move(temp_controller_endpoints->client));
+
     return zx::ok();
   }
 

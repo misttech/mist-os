@@ -39,6 +39,7 @@ fuchsia_unittest_package("power-manager-integration-test") {
     ":shutdown-integration-test-resources",
     ":thermal-client-service-integration-test-resources",
     "//src/power/power-manager/testing/fake_driver:component",
+    "//src/power/power-manager/testing/fake_driver:fake-cpu-ctrl-component",
     "//src/power/power-manager/testing/fake_root",
   ]
 }
