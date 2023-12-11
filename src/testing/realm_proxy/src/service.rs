@@ -12,7 +12,7 @@ use {
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon as zx,
     futures::{Future, StreamExt, TryStreamExt},
-    tracing::error,
+    tracing::{error, info},
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -77,18 +77,28 @@ impl RealmProxy for RealmInstanceProxy {
 pub async fn serve_with_proxy<P: RealmProxy>(
     mut proxy: P,
     mut stream: RealmProxy_RequestStream,
-) -> Result<(), Error> {
-    while let Some(Ok(request)) = stream.next().await {
-        match request {
-            RealmProxy_Request::ConnectToNamedProtocol {
-                protocol, server_end, responder, ..
-            } => {
-                let res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
-                responder.send(res)?;
-            }
+) -> Result<(), crate::Error> {
+    while let Some(option) = stream.next().await {
+        match option {
+            Ok(request) => match request {
+                RealmProxy_Request::ConnectToNamedProtocol {
+                    protocol,
+                    server_end,
+                    responder,
+                    ..
+                } => {
+                    let res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
+                    responder.send(res)?;
+                }
+            },
+            // Tell the user if we failed to read from the channel. These errors occur during
+            // testing and ignoring them can make it difficult to root cause test failures.
+            Err(e) => return Err(crate::error::Error::Fidl(e)),
         }
     }
 
+    // Tell the user we're disconnecting in case this is a premature shutdown.
+    info!("done serving the RealmProxy connection");
     Ok(())
 }
 
@@ -115,7 +125,8 @@ pub async fn serve_with_proxy<P: RealmProxy>(
 // ```
 pub async fn serve(realm: RealmInstance, stream: RealmProxy_RequestStream) -> Result<(), Error> {
     let proxy = RealmInstanceProxy(realm);
-    serve_with_proxy(proxy, stream).await
+    serve_with_proxy(proxy, stream).await?;
+    Ok(())
 }
 
 /// Dispatches incoming connections on `receiver_stream to `request_stream_handler`.
