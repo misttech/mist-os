@@ -43,9 +43,8 @@ template("ffx_command_golden_file_test") {
   compiled_action("describe_ffx_${command_name}_cli_goldens") {
     testonly = true
 
-    # Avoid using prebuilt versions of the host
-    # tool coming from previous builds.
-    allow_prebuilt_tool_use = false
+    # Avoid using the host tool coming from previous builds.
+    can_use_previously_built_tool = false
     tool = golden_processor_tool
 
     outputs = [
@@ -75,7 +74,7 @@ template("ffx_command_golden_file_test") {
 
     # Avoid using prebuilt versions of the host
     # tool coming from previous builds.
-    allow_prebuilt_tool_use = false
+    can_use_previously_built_tool = false
     tool = golden_processor_tool
     outputs = []
     _golden_filename_list = read_file(_golden_filelist, "list lines")

@@ -162,14 +162,13 @@ template("sdk_fuchsia_package") {
     _ffx_package_bin = "${host_out_dir}/ffx-package_unversioned"
     _far_tool_bin = "${host_out_dir}/far"
 
-    if (use_prebuilt_host_tools_from_build_dir == "") {
+    if (host_tools_base_path_override == "") {
       _tool_deps += [
         "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)",
         "//src/sys/pkg/bin/far:bin($host_toolchain)",
       ]
     } else {
-      _host_tool_dir =
-          "${root_build_dir}/${use_prebuilt_host_tools_from_build_dir}"
+      _host_tool_dir = "${root_build_dir}/${host_tools_base_path_override}"
       _ffx_package_bin =
           _host_tool_dir + "/" + rebase_path(_ffx_package_bin, root_build_dir)
       _far_tool_bin =

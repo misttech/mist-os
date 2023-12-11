@@ -285,7 +285,9 @@ def main():
     # sub-builds cannot use host tools that were not already built by
     # the top-level build, as there is no way to inject dependencies
     # between the two build graphs.
-    args_gn_content += f'use_prebuilt_host_tools_from_build_dir = "{args.prebuilt_host_tools_dir}"\n'
+    args_gn_content += (
+        f'host_tools_base_path_override = "{args.prebuilt_host_tools_dir}"\n'
+    )
     if api_level != 0:
         args_gn_content += "sdk_inside_supported_api_sub_build = true\n"
         args_gn_content += f"override_target_api_level = {api_level}\n"

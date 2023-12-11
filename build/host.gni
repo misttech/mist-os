@@ -18,7 +18,7 @@ declare_args() {
   # rebuilding SDK collections for different API levels and CPU architectures)
   # to avoid rebuilding the host tools every time.
   #
-  use_prebuilt_host_tools_from_build_dir = ""
+  host_tools_base_path_override = ""
 }
 
 # This declares that a host tool (a target built in host_toolchain)
@@ -37,9 +37,9 @@ declare_args() {
 #     It does not need to use explicit toolchain suffixes; the only target
 #     using the deps will be instantiated only in host_toolchain.
 #
-#   exclude_prebuilt_use (optional)
-#     [boolean] Set to true to prevent the use of prebuilt version when
-#     performing IDK sub-builds.
+#   allow_previously_built_tools (optional)
+#     [boolean] Set to false to prevent the use of previously built host tools
+#     when performing IDK sub-builds.
 #
 #   testonly (optional)
 #   visibility (optional)
@@ -75,17 +75,18 @@ template("install_host_tools") {
       }
       outputs = [ "$host_tools_dir/{{source_file_part}}" ]
       sources = []
-      _exclude_prebuilt_use =
-          defined(invoker.exclude_prebuilt_use) && invoker.exclude_prebuilt_use
-      if (!_exclude_prebuilt_use &&
-          use_prebuilt_host_tools_from_build_dir != "") {
+      _allow_previously_built_tools =
+          !defined(invoker.allow_previously_built_tools) ||
+          invoker.allow_previously_built_tools
+      if (_allow_previously_built_tools &&
+          host_tools_base_path_override != "") {
         not_needed(invoker, [ "deps" ])
         foreach(output_name, invoker.outputs) {
           # Compute location of prebuilt host binary, relative to the current
           # build directory first, then compute its GN unrebased path to list
           # it as a proper input.
           source_rebased =
-              "${use_prebuilt_host_tools_from_build_dir}/" +
+              "${host_tools_base_path_override}/" +
               rebase_path("$root_out_dir/$output_name", root_build_dir)
           sources +=
               [ "//" + rebase_path(source_rebased, "//", root_build_dir) ]

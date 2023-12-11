@@ -72,9 +72,8 @@ if (is_host && has_board) {
   compiled_action("generate_ffx_command_list") {
     testonly = true
 
-    # Avoid using prebuilt versions of the host
-    # tool coming from previous builds.
-    allow_prebuilt_tool_use = false
+    # Avoid using the host tool coming from previous builds.
+    can_use_previously_built_tool = false
     tool = ":ffx_cli_goldens"
 
     outputs = [ _command_list ]
