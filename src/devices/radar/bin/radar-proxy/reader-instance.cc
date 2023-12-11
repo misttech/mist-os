@@ -57,9 +57,9 @@ void ReaderInstance::SendBurst(const cpp20::span<const uint8_t> burst, const zx:
 
   sent_error_ = false;
 
-  const auto request = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithBurst(
+  const auto request = fuchsia_hardware_radar::RadarBurstReaderOnBurstRequest::WithBurst(
       {{*vmo_id, timestamp.get()}});
-  if (auto event_result = fidl::SendEvent(server_)->OnBurst2(request); event_result.is_error()) {
+  if (auto event_result = fidl::SendEvent(server_)->OnBurst(request); event_result.is_error()) {
     FX_PLOGS(ERROR, event_result.error_value().status()) << "Failed to send burst";
   }
 }
@@ -71,8 +71,8 @@ void ReaderInstance::SendError(const fuchsia_hardware_radar::StatusCode error) {
 
   sent_error_ = true;
 
-  const auto request = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithError(error);
-  if (auto event_result = fidl::SendEvent(server_)->OnBurst2(request); event_result.is_error()) {
+  const auto request = fuchsia_hardware_radar::RadarBurstReaderOnBurstRequest::WithError(error);
+  if (auto event_result = fidl::SendEvent(server_)->OnBurst(request); event_result.is_error()) {
     FX_PLOGS(ERROR, event_result.error_value().status()) << "Failed to send burst error";
   }
 }

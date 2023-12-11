@@ -236,7 +236,7 @@ struct BurstReaderClient : fidl::AsyncEventHandler<fuchsia_hardware_radar::Radar
                     async_dispatcher_t* dispatcher, std::function<void(uint32_t)> callback)
       : client(std::move(client_end), dispatcher, this), burst_callback(std::move(callback)) {}
 
-  void OnBurst2(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) override {
+  void OnBurst(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) override {
     if (event.burst()) {
       burst_count++;
       if (burst_callback) {

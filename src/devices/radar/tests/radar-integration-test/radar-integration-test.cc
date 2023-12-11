@@ -106,21 +106,6 @@ class RadarIntegrationTest : public zxtest::Test {
       }
     }
 
-    // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst.
-    void OnBurst2(fidl::WireEvent<BurstReader::OnBurst2>* event) override {
-      if (burst_handler_) {
-        if (event->is_burst()) {
-          const auto burst =
-              fidl::ObjectView<fuchsia_hardware_radar::wire::Burst>::FromExternal(&event->burst());
-          burst_handler_(
-              fuchsia_hardware_radar::wire::RadarBurstReaderOnBurstRequest::WithBurst(burst));
-        } else if (event->is_error()) {
-          burst_handler_(fuchsia_hardware_radar::wire::RadarBurstReaderOnBurstRequest::WithError(
-              event->error()));
-        }
-      }
-    }
-
     void on_fidl_error(fidl::UnbindInfo info) override {}
 
    private:

@@ -74,22 +74,6 @@ class ReaderClient : public fidl::AsyncEventHandler<fuchsia_hardware_radar::Rada
     }
   }
 
-  // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst.
-  void OnBurst2(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) override {
-    if (event.Which() == fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::Tag::kBurst) {
-      const uint32_t vmo_id = event.burst()->vmo_id();
-      ASSERT_LE(vmo_id, vmos_.size());
-
-      uint32_t header;
-      EXPECT_OK(vmos_[vmo_id].read(&header, 0, sizeof(header)));
-      (header == 0 ? real_bursts_ : injected_bursts_)++;
-
-      EXPECT_TRUE(client_->UnlockVmo(vmo_id).is_ok());
-
-      on_test_event_(kOnBurst);
-    }
-  }
-
   fidl::Client<fuchsia_hardware_radar::RadarBurstReader> client_;
   const fit::function<void(RadarEvent)> on_test_event_;
 
