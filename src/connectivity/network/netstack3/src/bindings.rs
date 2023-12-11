@@ -66,10 +66,6 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::{
-    context::{
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
-        TracingContext,
-    },
     device::{
         update_ipv4_configuration, update_ipv6_configuration, DeviceId, DeviceLayerEventDispatcher,
         DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, LoopbackDeviceId,
@@ -89,7 +85,8 @@ use netstack3_core::{
         IpExt,
     },
     transport::udp::{self, UdpBindingsContext},
-    NonSyncContext, SyncCtx, TimerId,
+    EventContext, InstantBindingsTypes, InstantContext, NonSyncContext, RngContext, SyncCtx,
+    TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {

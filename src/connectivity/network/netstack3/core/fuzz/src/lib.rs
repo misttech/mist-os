@@ -19,8 +19,8 @@ use net_types::{
     UnicastAddr,
 };
 use netstack3_core::{
-    context::testutil::FakeTimerCtxExt as _,
     device::EthernetDeviceId,
+    testutil::context::FakeTimerCtxExt as _,
     testutil::{Ctx, FakeCtx, FakeNonSyncCtx},
     TimerId,
 };

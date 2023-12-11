@@ -20,7 +20,7 @@
 
 /// Test utilities for NDP.
 #[cfg(any(test, feature = "testutils"))]
-pub mod testutil {
+pub(crate) mod testutil {
     use crate::ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
     use alloc::vec::Vec;
     use net_types::{

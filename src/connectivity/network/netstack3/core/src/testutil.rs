@@ -87,9 +87,13 @@ use crate::{
     SyncCtx,
 };
 
-/// Re-export NDP module test utilities.
+/// NDP test utilities.
 pub mod ndp {
     pub use crate::device::ndp::testutil::*;
+}
+/// Context test utilities.
+pub mod context {
+    pub use crate::context::testutil::*;
 }
 
 /// The default interface routing metric for test interfaces.

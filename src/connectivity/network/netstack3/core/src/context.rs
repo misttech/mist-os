@@ -432,7 +432,7 @@ impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
 /// the appropriate `AsRef` and/or `AsMut` implementations, and the blanket impl
 /// will take care of the rest.
 #[cfg(any(test, feature = "testutils"))]
-pub mod testutil {
+pub(crate) mod testutil {
     use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
     #[cfg(test)]
     use alloc::{collections::HashMap, vec};
@@ -1116,10 +1116,11 @@ pub mod testutil {
         should_error_for_frame: Option<Box<dyn Fn(&Meta) -> bool>>,
     }
 
+    #[cfg(test)]
     impl<Meta> FakeFrameCtx<Meta> {
         /// Closure which can decide to cause an error to be thrown when
         /// handling a frame, based on the metadata.
-        pub fn set_should_error_for_frame<F: Fn(&Meta) -> bool + 'static>(&mut self, f: F) {
+        pub(crate) fn set_should_error_for_frame<F: Fn(&Meta) -> bool + 'static>(&mut self, f: F) {
             self.should_error_for_frame = Some(Box::new(f));
         }
     }

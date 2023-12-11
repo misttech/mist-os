@@ -26,26 +26,24 @@ extern crate fakestd as std;
 mod macros;
 
 mod algorithm;
+mod context;
 mod convert;
+mod counters;
 mod data_structures;
 mod lock_ordering;
+mod state;
+mod time;
 mod trace;
+mod work_queue;
 
 #[cfg(test)]
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
-pub mod context;
-pub mod counters;
-pub mod error;
 pub mod ip;
 pub mod socket;
-pub mod state;
-pub mod sync;
-pub mod time;
 pub mod transport;
-pub mod work_queue;
 
 /// The device layer.
 pub mod device {
@@ -111,13 +109,58 @@ pub mod device_socket {
     };
 }
 
+// Allow direct public access to the error module. This module is unlikely to
+// evolve poorly or have sealed traits. We can revisit if this becomes hard to
+// uphold.
+pub mod error;
+
+/// Facilities for inspecting stack state for debugging.
+pub mod inspect {
+    // Re-exported functions.
+    //
+    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // objects.
+    pub use crate::counters::inspect_counters;
+
+    // Re-exported types.
+    pub use crate::counters::{CounterVisitor, StackCounters};
+}
+
+/// Useful synchronization primitives.
+pub mod sync {
+    // TODO(https://fxbug.dev/110884): Support single-threaded variants of types
+    // exported from this module.
+
+    #[cfg(all(feature = "instrumented", not(loom)))]
+    use netstack3_sync_instrumented as netstack3_sync;
+
+    // Don't perform recursive lock checks when benchmarking so that the benchmark
+    // results are not affected by the extra bookkeeping.
+    #[cfg(all(not(feature = "instrumented"), not(loom)))]
+    use netstack3_sync_not_instrumented as netstack3_sync;
+
+    #[cfg(loom)]
+    use netstack3_sync_loom as netstack3_sync;
+
+    // Exclusively re-exports from the sync crate.
+    pub use netstack3_sync::{
+        rc::{
+            DebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
+            Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+        },
+        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    };
+}
+
 /// Miscellaneous and common types.
 pub mod types {
     pub use crate::work_queue::WorkQueueReport;
 }
 
-use crate::context::RngContext;
-pub use context::{BindingsTypes, NonSyncContext, ReferenceNotifiers, SyncCtx};
+pub use context::{
+    BindingsTypes, EventContext, InstantBindingsTypes, InstantContext, NonSyncContext,
+    ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext,
+};
 pub use ip::forwarding::{select_device_for_gateway, set_routes};
 pub use time::{handle_timer, Instant, TimerId};
 

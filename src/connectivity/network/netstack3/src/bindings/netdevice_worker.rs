@@ -18,7 +18,6 @@ use fuchsia_zircon as zx;
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
-    context::RngContext as _,
     device::{
         update_ipv4_configuration, update_ipv6_configuration, EthernetWeakDeviceId,
         MaxEthernetFrameSize,
@@ -33,6 +32,7 @@ use netstack3_core::{
         },
         types::RawMetric,
     },
+    RngContext as _,
 };
 use rand::Rng as _;
 

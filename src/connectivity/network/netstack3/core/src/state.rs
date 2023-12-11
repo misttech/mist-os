@@ -20,30 +20,27 @@ use crate::{
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]
-pub struct StackStateBuilder {
+pub(crate) struct StackStateBuilder {
     transport: transport::TransportStateBuilder,
     ipv4: ip::Ipv4StateBuilder,
     ipv6: ip::Ipv6StateBuilder,
 }
 
 impl StackStateBuilder {
+    #[cfg(test)]
     /// Get the builder for the transport layer state.
-    pub fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
+    pub(crate) fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
         &mut self.transport
     }
 
+    #[cfg(test)]
     /// Get the builder for the IPv4 state.
-    pub fn ipv4_builder(&mut self) -> &mut ip::Ipv4StateBuilder {
+    pub(crate) fn ipv4_builder(&mut self) -> &mut ip::Ipv4StateBuilder {
         &mut self.ipv4
     }
 
-    /// Get the builder for the IPv6 state.
-    pub fn ipv6_builder(&mut self) -> &mut ip::Ipv6StateBuilder {
-        &mut self.ipv6
-    }
-
     /// Consume this builder and produce a `StackState`.
-    pub fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> StackState<C> {
+    pub(crate) fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> StackState<C> {
         StackState {
             transport: self.transport.build_with_ctx(ctx),
             ipv4: self.ipv4.build(),

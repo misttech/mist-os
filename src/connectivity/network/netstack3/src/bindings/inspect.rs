@@ -256,8 +256,8 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
 }
 
 pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl netstack3_core::counters::CounterVisitor for Visitor {
-        fn visit_counters(&self, counters: netstack3_core::counters::StackCounters<'_>) {
+    impl netstack3_core::inspect::CounterVisitor for Visitor {
+        fn visit_counters(&self, counters: netstack3_core::inspect::StackCounters<'_>) {
             let Self(inspector) = self;
             inspector.root().record_child("Devices", |node| {
                 node.record_child("Ethernet", |node| {
@@ -640,7 +640,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     }
     let sync_ctx = ctx.sync_ctx();
     let visitor = Visitor::new();
-    netstack3_core::counters::inspect_counters::<_, _>(sync_ctx, &visitor);
+    netstack3_core::inspect::inspect_counters::<_, _>(sync_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
