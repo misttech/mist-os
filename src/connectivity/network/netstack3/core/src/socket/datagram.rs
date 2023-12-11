@@ -317,9 +317,17 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<Shutdown> for ConnS
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsMut<O> for ConnState<I, D, S, O> {
-    fn as_mut(&mut self) -> &mut O {
+impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
+    AsMut<IpOptions<SocketI, D, S>> for ConnState<WireI, D, S, IpOptions<SocketI, D, S>>
+{
+    fn as_mut(&mut self) -> &mut IpOptions<SocketI, D, S> {
         self.socket.options_mut()
+    }
+}
+
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsMut<Shutdown> for ConnState<I, D, S, O> {
+    fn as_mut(&mut self) -> &mut Shutdown {
+        &mut self.shutdown
     }
 }
 
@@ -374,6 +382,17 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
         match self {
             DualStackConnState::ThisStack(state) => state.as_ref(),
             DualStackConnState::OtherStack(state) => state.as_ref(),
+        }
+    }
+}
+
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
+    for DualStackConnState<I, D, S>
+{
+    fn as_mut(&mut self) -> &mut Shutdown {
+        match self {
+            DualStackConnState::ThisStack(state) => state.as_mut(),
+            DualStackConnState::OtherStack(state) => state.as_mut(),
         }
     }
 }
@@ -3605,7 +3624,7 @@ fn disconnect_to_listener<
 }
 
 /// Which direction(s) to shut down for a socket.
-#[derive(Copy, Clone, Debug, GenericOverIp)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
 #[generic_over_ip()]
 pub enum ShutdownType {
     /// Prevent sending packets on the socket.
@@ -3639,27 +3658,15 @@ pub(crate) fn shutdown_connected<
                 }
             }
         };
-        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
-            match sync_ctx.dual_stack_context() {
-                MaybeDualStack::DualStack(dual_stack) => {
-                    match dual_stack.converter().convert(state) {
-                        DualStackConnState::ThisStack(state) => state,
-                        DualStackConnState::OtherStack(state) => {
-                            dual_stack.assert_dual_stack_enabled(state);
-                            todo!("https://fxbug.dev/21198: Support dual-stack shutdown connected");
-                        }
-                    }
-                }
-                MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    not_dual_stack.converter().convert(state)
-                }
-            };
         let (shutdown_send, shutdown_receive) = match which {
             ShutdownType::Send => (true, false),
             ShutdownType::Receive => (false, true),
             ShutdownType::SendAndReceive => (true, true),
         };
-        let Shutdown { send, receive } = shutdown;
+        let Shutdown { send, receive } = match sync_ctx.dual_stack_context() {
+            MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_mut(),
+            MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_mut(),
+        };
         *send |= shutdown_send;
         *receive |= shutdown_receive;
         Ok(())
@@ -6034,5 +6041,44 @@ mod test {
                 assert_eq!(ORIGINAL_REMOTE_PORT, identifier)
             }
         }
+    }
+
+    #[test_case(net_ip_v6!("::a:b:c:d"), ShutdownType::Send; "this_stack_send")]
+    #[test_case(net_ip_v6!("::a:b:c:d"), ShutdownType::Receive; "this_stack_receive")]
+    #[test_case(net_ip_v6!("::a:b:c:d"), ShutdownType::SendAndReceive; "this_stack_send_and_receive")]
+    #[test_case(net_ip_v6!("::FFFF:192.0.2.1"), ShutdownType::Send; "other_stack_send")]
+    #[test_case(net_ip_v6!("::FFFF:192.0.2.1"), ShutdownType::Receive; "other_stack_receive")]
+    #[test_case(net_ip_v6!("::FFFF:192.0.2.1"), ShutdownType::SendAndReceive; "other_stack_send_and_receive")]
+    fn set_get_shutdown_dualstack(remote_ip: Ipv6Addr, shutdown: ShutdownType) {
+        let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote_ip should be specified");
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                Ipv6::UNSPECIFIED_ADDRESS.into(),
+                remote_ip.into(),
+                |device_config| FakeSyncCtx::<Ipv6, _> {
+                    outer: FakeSocketsState::default(),
+                    inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                        FakeDualStackIpSocketCtx::new([device_config]),
+                        Default::default(),
+                    ),
+                },
+            );
+
+        const REMOTE_PORT: char = 'a';
+        let socket = create(&mut sync_ctx);
+        connect(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            socket,
+            Some(ZonedAddr::Unzoned(remote_ip).into()),
+            REMOTE_PORT,
+            Default::default(),
+        )
+        .expect("connect should succeed");
+        assert_eq!(get_shutdown_connected(&mut sync_ctx, &non_sync_ctx, socket), None);
+
+        shutdown_connected(&mut sync_ctx, &non_sync_ctx, socket, shutdown)
+            .expect("shutdown should succeed");
+        assert_eq!(get_shutdown_connected(&mut sync_ctx, &non_sync_ctx, socket), Some(shutdown));
     }
 }
