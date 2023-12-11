@@ -11,7 +11,7 @@ use starnix_uapi::{
     CSIGNAL,
 };
 
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(

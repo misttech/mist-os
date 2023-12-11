@@ -182,15 +182,9 @@
 //! let a = locked.lock::<LockA, _>(&state);
 //! ```
 
-pub mod lock;
-pub mod relation;
-
 use core::marker::PhantomData;
 
-pub use crate::{
-    lock::{LockFor, RwLockFor},
-    relation::LockBefore,
-};
+pub use crate::{LockBefore, LockFor, RwLockFor};
 
 /// Enforcement mechanism for lock ordering.
 ///
@@ -371,8 +365,7 @@ mod test {
 
     #[test]
     fn example() {
-        extern crate self as lock_sequence;
-        use crate::{impl_lock_after, relation::LockAfter, Unlocked};
+        use crate::{impl_lock_after, LockAfter, Unlocked};
 
         #[derive(Default)]
         pub struct HoldsLocks {
@@ -420,9 +413,7 @@ mod test {
         //! Lock ordering tree:
         //! A -> B -> {C, D, E -> F, G -> H}
 
-        extern crate self as lock_sequence;
-
-        use crate::{impl_lock_after, relation::LockAfter, Unlocked};
+        use crate::{impl_lock_after, LockAfter, Unlocked};
 
         pub enum A {}
         pub enum B {}
@@ -443,10 +434,7 @@ mod test {
         impl_lock_after!(G => H);
     }
 
-    use crate::{
-        lock::{LockFor, RwLockFor},
-        Unlocked,
-    };
+    use crate::{LockFor, RwLockFor, Unlocked};
     use lock_levels::{A, B, C, D, E, F, G, H};
 
     /// Data type with multiple locked fields.

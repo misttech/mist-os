@@ -15,8 +15,8 @@ use crate::{
     },
 };
 use bstr::B;
-use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_logging::{log_error, log_trace, log_warn, not_implemented};
+use starnix_sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred,

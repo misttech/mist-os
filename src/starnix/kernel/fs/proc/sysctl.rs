@@ -12,7 +12,7 @@ use crate::{
         FsNodeHandle, FsNodeInfo, FsNodeOps, StaticDirectoryBuilder,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{FsCred, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     error,

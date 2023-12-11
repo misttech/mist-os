@@ -5,11 +5,10 @@
 // Use these crates so that we don't need to make the dependencies conditional.
 use fuchsia_sync as _;
 use lock_api as _;
-use lock_sequence as _;
 use tracing_mutex as _;
 
+use crate::{LockBefore, LockFor, Locked, RwLockFor};
 use core::marker::PhantomData;
-use lock_sequence::*;
 use std::{any, fmt};
 
 #[cfg(not(debug_assertions))]
@@ -212,7 +211,7 @@ impl<T, L> OrderedRwLock<T, L> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use lock_sequence::Unlocked;
+    use crate::Unlocked;
 
     #[::fuchsia::test]
     fn test_lock_ordering() {
@@ -247,7 +246,7 @@ mod test {
         //! Unlocked -> A -> B -> C
         //!          -> D -> E -> F
         use super::{A, B, C, D, E, F};
-        use lock_sequence::{impl_lock_after, Unlocked};
+        use crate::{impl_lock_after, Unlocked};
 
         impl_lock_after!(Unlocked => A);
         impl_lock_after!(A => B);

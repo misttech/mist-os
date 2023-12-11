@@ -15,7 +15,7 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, ownership::WeakRef, pid_t,

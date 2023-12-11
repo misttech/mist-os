@@ -7,7 +7,7 @@ use fuchsia_zircon as zx;
 use fidl_fuchsia_buildinfo as buildinfo;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fuchsia_component::client::connect_to_protocol_sync;
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},

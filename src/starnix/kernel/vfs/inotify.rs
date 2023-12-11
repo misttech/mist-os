@@ -12,7 +12,7 @@ use crate::{
         FsString, WdNumber,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::WeakKey,

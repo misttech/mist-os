@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
+use starnix_sync::{Locked, Unlocked};
 
 use crate::{
     mm::MemoryAccessorExt,

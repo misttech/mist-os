@@ -11,8 +11,8 @@ use crate::{
         FdNumber, FileHandle,
     },
 };
-use starnix_lock::{ordered_lock, MutexGuard};
 use starnix_logging::{log_warn, not_implemented};
+use starnix_sync::{ordered_lock, MutexGuard};
 use starnix_uapi::{
     error,
     errors::Errno,

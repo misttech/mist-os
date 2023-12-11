@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef};
-use starnix_lock::RwLock;
 use starnix_sync::InterruptibleEvent;
+use starnix_sync::RwLock;
 use starnix_uapi::{
     __sifields__bindgen_ty_2, __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int, c_uint,
     error,

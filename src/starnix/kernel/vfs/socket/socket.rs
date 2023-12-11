@@ -27,8 +27,8 @@ use netlink_packet_route::{
     rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
     AddressMessage, LinkMessage, RtnlMessage,
 };
-use starnix_lock::Mutex;
 use starnix_logging::log_warn;
+use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,

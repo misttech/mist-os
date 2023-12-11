@@ -23,8 +23,8 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use starnix_lock::Mutex;
 use starnix_logging::{log_error, log_info};
+use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{Capabilities, Credentials},
     device_type::DeviceType,

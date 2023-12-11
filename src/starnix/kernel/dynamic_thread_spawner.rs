@@ -4,9 +4,9 @@
 
 use crate::task::{CurrentTask, Task};
 use futures::{channel::oneshot, TryFutureExt};
-use lock_sequence::{Locked, Unlocked};
-use starnix_lock::Mutex;
 use starnix_logging::log_error;
+use starnix_sync::Mutex;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     errno,
     errors::Errno,

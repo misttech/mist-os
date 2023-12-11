@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{SignalInfo, SignalState},
     task::{
@@ -18,12 +17,12 @@ use bitflags::bitflags;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
-use lock_sequence::{LockBefore, Locked};
 use once_cell::sync::OnceCell;
-use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_logging::{
     log_debug, log_warn, set_zx_name, {self},
 };
+use starnix_sync::{LockBefore, Locked, MmDumpable};
+use starnix_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::{
         Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,

@@ -148,7 +148,7 @@
 //! }
 //! ```
 
-use starnix_lock::{RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{RwLockReadGuard, RwLockWriteGuard};
 use std::ops::{Deref, DerefMut};
 
 /// Create the read() and write() accessor to respectively access the read guard and write guard.
@@ -242,7 +242,7 @@ pub(crate) use state_implementation;
 #[cfg(test)]
 mod test {
     use super::*;
-    use starnix_lock::RwLock;
+    use starnix_sync::RwLock;
     use std::sync::Arc;
 
     pub struct FooMutableState {

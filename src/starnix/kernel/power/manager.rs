@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::power::{SuspendState, SuspendStats};
-use starnix_lock::Mutex;
 use starnix_logging::not_implemented;
+use starnix_sync::Mutex;
 use starnix_uapi::{error, errors::Errno};
 use std::{collections::HashSet, sync::Arc};
 

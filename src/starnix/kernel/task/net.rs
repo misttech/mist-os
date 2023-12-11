@@ -11,7 +11,7 @@ use crate::{
         FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{errno, errors::Errno, off_t, open_flags::OpenFlags};
 use std::{collections::HashMap, sync::Arc};
 

@@ -4,8 +4,8 @@
 
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
-use starnix_lock::Mutex;
 use starnix_sync::InterruptibleEvent;
+use starnix_sync::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     hash::Hash,

@@ -10,7 +10,6 @@ use crate::{
         FdEvents, FileHandle,
     },
 };
-use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::OnceCell;
 use perfetto_consumer_proto::perfetto::protos::{
     ipc_frame,
@@ -20,6 +19,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,

@@ -6,7 +6,7 @@ use crate::{
     task::{syscalls::do_clone, CurrentTask},
     vfs::{syscalls::sys_renameat2, FdNumber},
 };
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     clone_args,
     errors::Errno,

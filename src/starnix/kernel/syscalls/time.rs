@@ -5,8 +5,8 @@
 use fuchsia_zircon::{
     Task, {self as zx},
 };
-use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
+use starnix_sync::{Locked, Unlocked};
 
 use crate::{
     mm::MemoryAccessorExt,

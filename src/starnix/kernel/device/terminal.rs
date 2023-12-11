@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use derivative::Derivative;
-use starnix_lock::{Mutex, RwLock};
+use starnix_sync::{Mutex, RwLock};
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
     sync::{Arc, Weak},

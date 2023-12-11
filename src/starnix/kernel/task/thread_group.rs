@@ -21,8 +21,8 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_logging::{log_error, log_warn, not_implemented};
+use starnix_sync::{Mutex, MutexGuard, RwLock};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     errno, error,

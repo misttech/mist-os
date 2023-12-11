@@ -112,23 +112,18 @@ impl<B: LockAfter<A>, A> LockBefore<B> for A {}
 #[macro_export]
 macro_rules! impl_lock_after {
     (Unlocked => $A:ty) => {
-        impl lock_sequence::relation::LockAfter<Unlocked> for $A {}
+        impl $crate::LockAfter<Unlocked> for $A {}
     };
     ($A:ty => $B:ty) => {
-        impl lock_sequence::relation::LockAfter<$A> for $B {}
-        impl<X: lock_sequence::relation::LockBefore<$A>> lock_sequence::relation::LockAfter<X>
-            for $B
-        {
-        }
+        impl $crate::LockAfter<$A> for $B {}
+        impl<X: $crate::LockBefore<$A>> $crate::LockAfter<X> for $B {}
     };
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{lock::LockFor, Unlocked};
+    use crate::{LockFor, Unlocked};
     use std::sync::{Mutex, MutexGuard};
-
-    extern crate self as lock_sequence;
 
     pub enum A {}
     pub enum B {}

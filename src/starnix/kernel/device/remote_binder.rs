@@ -29,11 +29,11 @@ use futures::{
     Future, Stream, StreamExt, TryStreamExt,
 };
 use starnix_lifecycle::DropWaiter;
-use starnix_lock::{Mutex, MutexGuard};
 use starnix_logging::{
     log_error, log_warn, trace_category_starnix, trace_duration, trace_flow_begin, trace_flow_end,
     trace_flow_step,
 };
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,

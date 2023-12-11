@@ -5,7 +5,17 @@
 //! Synchronization objects used by Starnix
 
 mod interruptible_event;
+mod lock_ordering;
+mod lock_relations;
+mod lock_sequence;
+mod lock_traits;
+mod locks;
 mod port_event;
 
 pub use interruptible_event::*;
+pub use lock_ordering::*;
+pub use lock_relations::*;
+pub use lock_sequence::*;
+pub use lock_traits::*;
+pub use locks::*;
 pub use port_event::*;

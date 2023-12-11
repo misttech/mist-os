@@ -15,7 +15,7 @@ use crate::{
         FsNodeInfo, FsStr, MountInfo, SpecialNode,
     },
 };
-use starnix_lock::{Mutex, MutexGuard};
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,

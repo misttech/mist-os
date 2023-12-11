@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_sequence::impl_lock_after;
-pub(crate) use lock_sequence::Unlocked;
+use crate::{impl_lock_after, Unlocked};
 
 pub enum BpfMapEntries {}
 pub enum KernelIpTables {}

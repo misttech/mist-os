@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessorExt},
     signals::{
         send_signal_first, send_standard_signal, syscalls::WaitingOptions, SignalDetail,
@@ -12,8 +11,8 @@ use crate::{
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
     vfs::parse_unsigned_file,
 };
-use lock_sequence::{LockBefore, Locked};
 use starnix_logging::not_implemented;
+use starnix_sync::{LockBefore, Locked, MmDumpable};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,

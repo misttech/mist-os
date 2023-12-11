@@ -4,7 +4,7 @@
 
 use super::{AccessVector, ObjectClass, SecurityId};
 
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Weak,

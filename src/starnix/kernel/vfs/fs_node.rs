@@ -18,8 +18,8 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use starnix_lock::{Mutex, RwLock, RwLockReadGuard};
 use starnix_logging::log_error;
+use starnix_sync::{Mutex, RwLock, RwLockReadGuard};
 use starnix_uapi::{
     __kernel_ulong_t,
     as_any::AsAny,

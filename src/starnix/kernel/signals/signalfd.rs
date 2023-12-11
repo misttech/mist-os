@@ -10,7 +10,7 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
     SFD_NONBLOCK,

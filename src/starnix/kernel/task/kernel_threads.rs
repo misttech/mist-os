@@ -9,9 +9,9 @@ use crate::{
 use fragile::Fragile;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{errno, errors::Errno, ownership::Releasable};
 use std::{
     future::Future,

@@ -8,8 +8,8 @@ use fuchsia_zircon::{
     AsHandleRef, ClockTransformation, {self as zx},
 };
 use once_cell::sync::Lazy;
-use starnix_lock::Mutex;
 use starnix_logging::log_warn;
+use starnix_sync::Mutex;
 
 // Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
 // UTC clock in Zircon starts up (fxb/131200), Starnix provides a synthetic utc clock initially,

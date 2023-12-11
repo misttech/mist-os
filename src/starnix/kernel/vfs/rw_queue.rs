@@ -6,8 +6,8 @@ use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 
 use fuchsia_zircon as zx;
-use starnix_lock::Mutex;
 use starnix_sync::InterruptibleEvent;
+use starnix_sync::Mutex;
 use std::{collections::VecDeque, sync::Arc};
 
 use lock_api as _;

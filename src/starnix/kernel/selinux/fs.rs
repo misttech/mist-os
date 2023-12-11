@@ -15,8 +15,8 @@ use crate::{
 };
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;
-use starnix_lock::Mutex;
 use starnix_logging::{log_debug, not_implemented};
+use starnix_sync::Mutex;
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,

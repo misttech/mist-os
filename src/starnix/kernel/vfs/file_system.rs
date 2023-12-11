@@ -14,7 +14,7 @@ use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     arc_key::ArcKey, as_any::AsAny, device_type::DeviceType, error, errors::Errno, ino_t,
     mount_flags::MountFlags, statfs,

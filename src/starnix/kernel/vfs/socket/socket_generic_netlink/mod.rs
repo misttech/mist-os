@@ -18,7 +18,7 @@ use netlink_packet_generic::{
     },
     GenlMessage,
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,

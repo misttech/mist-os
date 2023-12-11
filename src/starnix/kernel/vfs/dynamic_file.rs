@@ -10,7 +10,7 @@ use crate::{
         SeekTarget, SimpleFileNode,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{errno, error, errors::Errno, off_t};
 use std::collections::VecDeque;
 
@@ -329,7 +329,7 @@ mod tests {
             SequenceFileSource, VecOutputBuffer,
         },
     };
-    use starnix_lock::Mutex;
+    use starnix_sync::Mutex;
     use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
     use std::sync::Arc;
 

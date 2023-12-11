@@ -13,8 +13,8 @@ use crate::{
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::stream::AbortHandle;
-use starnix_lock::Mutex;
 use starnix_logging::{log_warn, not_implemented};
+use starnix_sync::Mutex;
 use starnix_uapi::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER};
 use std::sync::{Arc, Weak};
 

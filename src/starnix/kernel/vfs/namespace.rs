@@ -27,8 +27,8 @@ use crate::{
 };
 use fidl_fuchsia_io as fio;
 use ref_cast::RefCast;
-use starnix_lock::{Mutex, RwLock};
 use starnix_logging::log_warn;
+use starnix_sync::{Mutex, RwLock};
 use starnix_uapi::{
     arc_key::{ArcKey, PtrKey, WeakKey},
     device_type::DeviceType,

@@ -17,8 +17,8 @@ use crate::{
     vfs::{FdFlags, FdNumber},
 };
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
 use starnix_logging::not_implemented;
+use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,

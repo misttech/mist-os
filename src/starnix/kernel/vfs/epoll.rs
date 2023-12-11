@@ -14,8 +14,8 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
-use starnix_lock::Mutex;
 use starnix_logging::log_warn;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     epoll_event, errno, error,
     errors::{Errno, EBADF, EINTR, ETIMEDOUT},

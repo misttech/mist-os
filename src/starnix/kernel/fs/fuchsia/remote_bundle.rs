@@ -22,8 +22,8 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
-use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_logging::log_warn;
+use starnix_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,

@@ -9,7 +9,7 @@ use fidl_fuchsia_process as fprocess;
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use std::{convert::TryFrom, sync::Arc};
 
 use crate::{

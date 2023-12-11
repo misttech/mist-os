@@ -2,13 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assert_matches::assert_matches;
-use starnix_lock::Mutex;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
-
 use crate::{
     device::DeviceMode,
     fs::sysfs::SysFsDirectory,
@@ -19,7 +12,13 @@ use crate::{
         FsString, PathBuilder,
     },
 };
+use assert_matches::assert_matches;
+use starnix_sync::Mutex;
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+};
 
 /// ktype is the type of object that embeds a `kobject`.
 #[derive(Debug, PartialEq)]

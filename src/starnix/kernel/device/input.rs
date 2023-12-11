@@ -51,7 +51,7 @@ use futures::{
     },
     StreamExt as _,
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::{
     collections::VecDeque,
     sync::{

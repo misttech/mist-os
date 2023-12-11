@@ -12,7 +12,7 @@ use crate::{
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     error,
     errors::Errno,

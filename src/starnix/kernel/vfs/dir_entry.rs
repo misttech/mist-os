@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use bitflags::bitflags;
-use starnix_lock::{RwLock, RwLockWriteGuard};
+use starnix_sync::{RwLock, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,

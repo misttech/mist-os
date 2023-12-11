@@ -17,7 +17,7 @@ use netlink::{
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
 use netlink_packet_utils::Emitable as _;
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -385,7 +385,7 @@ impl BaseNetlinkSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> starnix_lock::MutexGuard<'_, NetlinkSocketInner> {
+    fn lock(&self) -> starnix_sync::MutexGuard<'_, NetlinkSocketInner> {
         self.inner.lock()
     }
 }
@@ -560,11 +560,11 @@ impl UEventNetlinkSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> starnix_lock::MutexGuard<'_, NetlinkSocketInner> {
+    fn lock(&self) -> starnix_sync::MutexGuard<'_, NetlinkSocketInner> {
         self.inner.lock()
     }
 
-    fn register_listener(&self, state: starnix_lock::MutexGuard<'_, NetlinkSocketInner>) {
+    fn register_listener(&self, state: starnix_sync::MutexGuard<'_, NetlinkSocketInner>) {
         if state.address.is_none() {
             return;
         }
@@ -1031,7 +1031,7 @@ impl GenericNetlinkSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> starnix_lock::MutexGuard<'_, NetlinkSocketInner> {
+    fn lock(&self) -> starnix_sync::MutexGuard<'_, NetlinkSocketInner> {
         self.inner.lock()
     }
 }

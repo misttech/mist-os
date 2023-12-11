@@ -38,7 +38,7 @@ use futures::{
     FutureExt, StreamExt, TryStreamExt,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::{
     ops::{Deref, DerefMut},
     sync::{mpsc::channel, Arc},

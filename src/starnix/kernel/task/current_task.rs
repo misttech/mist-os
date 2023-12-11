@@ -7,9 +7,9 @@ use fuchsia_zircon::{
     sys::zx_thread_state_general_regs_t,
     {self as zx},
 };
-use lock_sequence::{LockBefore, Locked};
-use starnix_lock::{RwLock, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
+use starnix_sync::{LockBefore, Locked};
+use starnix_sync::{RwLock, RwLockWriteGuard};
 use starnix_uapi::signals::SIGCHLD;
 use std::{ffi::CString, fmt, marker::PhantomData, mem::MaybeUninit, sync::Arc};
 
@@ -20,7 +20,6 @@ use crate::{
     },
     execution::{create_zircon_process, TaskInfo},
     loader::{load_executable, resolve_executable, ResolvedElf},
-    lock_ordering::MmDumpable,
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
@@ -33,6 +32,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name};
+use starnix_sync::MmDumpable;
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN},

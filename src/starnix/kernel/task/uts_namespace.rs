@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::RwLock;
+use starnix_sync::RwLock;
 use std::sync::Arc;
 
 const DEFAULT_HOST_NAME: &[u8] = b"localhost";

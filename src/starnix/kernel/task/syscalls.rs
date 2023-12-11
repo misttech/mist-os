@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use lock_sequence::{LockBefore, Locked, Unlocked};
 use once_cell::sync::Lazy;
-use starnix_lock::RwLock;
+use starnix_sync::RwLock;
+use starnix_sync::{LockBefore, Locked, Unlocked};
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     execution::execute_task,
-    lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
@@ -23,6 +22,7 @@ use crate::{
     vfs::{FdNumber, FileHandle, MountNamespaceFile},
 };
 use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
+use starnix_sync::MmDumpable;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,

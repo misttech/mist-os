@@ -9,7 +9,7 @@ use crate::{
         FsString, SeekTarget,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{error, errors::Errno, off_t};
 use std::ops::Bound;
 

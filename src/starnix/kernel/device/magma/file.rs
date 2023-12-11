@@ -147,8 +147,8 @@ use magma::{
     MAGMA_STATUS_OK,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_lock::Mutex;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name};
+use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,

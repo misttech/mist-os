@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    lock_ordering::MmDumpable,
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
     signals::{SignalDetail, SignalInfo},
     task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
@@ -18,14 +17,13 @@ use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
-use lock_sequence::{LockBefore, Locked};
 use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
-use starnix_lock::{OrderedMutex, RwLock};
 use starnix_logging::{
     impossible_error, log_warn, not_implemented, set_zx_name, trace_category_starnix_mm,
     trace_duration,
 };
+use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_uapi::{
     errno, error,
     errors::Errno,

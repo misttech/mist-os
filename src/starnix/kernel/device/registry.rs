@@ -25,7 +25,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
 };
 
-use starnix_lock::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
+use starnix_sync::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     marker::{Send, Sync},

@@ -12,8 +12,8 @@ use crate::{
     vfs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
 };
 use bit_vec::BitVec;
-use starnix_lock::Mutex;
 use starnix_logging::{log_info, log_warn};
+use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, error,

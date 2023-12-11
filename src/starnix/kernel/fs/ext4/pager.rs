@@ -12,8 +12,8 @@ use fuchsia_zircon::{
     sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ},
     {self as zx},
 };
-use starnix_lock::Mutex;
 use starnix_logging::{log_debug, log_error, log_warn};
+use starnix_sync::Mutex;
 use starnix_uapi::{errno, error, errors::Errno};
 use std::{
     collections::{hash_map::Entry, HashMap},

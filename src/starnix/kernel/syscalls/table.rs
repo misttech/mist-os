@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_sequence::{Locked, Unlocked};
 use paste::paste;
+use starnix_sync::{Locked, Unlocked};
 
 use crate::{arch::syscalls::sys_clone, task::CurrentTask};
 use starnix_syscalls::{decls::Syscall, SyscallResult};

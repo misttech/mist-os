@@ -34,7 +34,7 @@ use starnix_uapi::{
 };
 use zerocopy::AsBytes;
 
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::sync::Arc;
 
 // From unix.go in gVisor.
@@ -264,7 +264,7 @@ impl UnixSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> starnix_lock::MutexGuard<'_, UnixSocketInner> {
+    fn lock(&self) -> starnix_sync::MutexGuard<'_, UnixSocketInner> {
         self.inner.lock()
     }
 

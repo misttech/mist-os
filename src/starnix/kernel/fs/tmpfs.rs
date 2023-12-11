@@ -12,8 +12,8 @@ use crate::{
         MemoryXattrStorage, SymlinkNode, VmoFileNode,
     },
 };
-use starnix_lock::{Mutex, MutexGuard};
 use starnix_logging::{log_warn, not_implemented};
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,

@@ -14,7 +14,7 @@ use crate::{
         FdEvents, FileHandle,
     },
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred};
 
 // An implementation of AF_VSOCK.
@@ -69,7 +69,7 @@ impl VsockSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> starnix_lock::MutexGuard<'_, VsockSocketInner> {
+    fn lock(&self) -> starnix_sync::MutexGuard<'_, VsockSocketInner> {
         self.inner.lock()
     }
 }

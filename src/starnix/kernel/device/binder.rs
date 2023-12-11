@@ -30,11 +30,11 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_logging::{
     log_error, log_trace, log_warn, not_implemented, trace_category_starnix, trace_duration,
 };
 use starnix_sync::InterruptibleEvent;
+use starnix_sync::{Mutex, MutexGuard, RwLock};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::ArcKey,
@@ -4442,8 +4442,8 @@ pub mod tests {
             Self { driver: Arc::downgrade(&test_fixture.driver), proc, thread, task }
         }
 
-        fn lock_shared_memory(&self) -> starnix_lock::MappedMutexGuard<'_, SharedMemory> {
-            starnix_lock::MutexGuard::map(self.proc.shared_memory.lock(), |value| {
+        fn lock_shared_memory(&self) -> starnix_sync::MappedMutexGuard<'_, SharedMemory> {
+            starnix_sync::MutexGuard::map(self.proc.shared_memory.lock(), |value| {
                 value.as_mut().unwrap()
             })
         }

@@ -4,7 +4,7 @@
 
 use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 
 use crate::{
     execution::notify_debugger_of_module_list,

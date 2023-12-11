@@ -6,7 +6,7 @@ use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
     AccessVector, ObjectClass, SecurityContext, SecurityId,
 };
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
 /// Specifies whether the implementation should be fully functional, or provide

@@ -5,7 +5,7 @@
 use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::AsBytes;
 

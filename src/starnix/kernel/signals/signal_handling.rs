@@ -15,9 +15,9 @@ use crate::{
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
 };
 use extended_pstate::ExtendedPstateState;
-use lock_sequence::{Locked, Unlocked};
-use starnix_lock::RwLockWriteGuard;
 use starnix_logging::{log_trace, log_warn};
+use starnix_sync::RwLockWriteGuard;
+use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,

@@ -15,8 +15,8 @@ use crate::{
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;
-use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_logging::{log_error, log_warn, not_implemented};
+use starnix_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,

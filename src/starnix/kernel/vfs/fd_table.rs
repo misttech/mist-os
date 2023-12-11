@@ -7,7 +7,7 @@ use crate::{
     vfs::{FdNumber, FileHandle},
 };
 use bitflags::bitflags;
-use starnix_lock::Mutex;
+use starnix_sync::Mutex;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef,

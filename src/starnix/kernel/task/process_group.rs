@@ -7,7 +7,7 @@ use crate::{
     signals::{send_standard_signal, SignalInfo},
     task::{Session, ThreadGroup},
 };
-use starnix_lock::RwLock;
+use starnix_sync::RwLock;
 use starnix_uapi::{
     ownership::TempRef,
     pid_t,
