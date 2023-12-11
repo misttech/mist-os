@@ -458,6 +458,10 @@ func copyPathsToDir(paths []string, dir string) error {
 		}
 		defer dst.Close()
 
+		if err = dst.Chmod(os.FileMode(int(0600))); err != nil {
+			return err
+		}
+
 		src, err := os.Open(path)
 		if err != nil {
 			return err
