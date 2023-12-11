@@ -42,12 +42,6 @@ void LlvmProfdata::UseLiveData(LiveData data) {}
 #include <cstdint>
 #include <cstring>
 
-// TODO(fxbug.dev/131696): names changed in the .inc file Handle both old and
-// new names by defining the old names as macros for the new ones. Remove these
-// after the toolchain rolls in the new .inc file version.
-#define DataSize NumData
-#define CountersSize NumCounters
-
 #include <profile/InstrProfData.inc>
 
 namespace {
@@ -115,40 +109,34 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 // Do not merge .lprfn and .lcovmap into .rdata.
 // `llvm-cov` must be able to find them after the fact.
 
-// Allocate read-only section bounds.
-#pragma section(".lprfn$A", read)
-#pragma section(".lprfn$Z", read)
-
-// Allocate read-write section bounds.
-#pragma section(".lprfd$A", read, write)
-#pragma section(".lprfd$Z", read, write)
-#pragma section(".lprfc$A", read, write)
-#pragma section(".lprfc$Z", read, write)
-
 // The ".blah$A" and ".blah$Z" placeholder sections get magically sorted with
 // ".blah$M" in between them, so these symbols identify the bounds of the
-// compiler-emitted data at link time.  The compiler seems to accept emitting
-// a zero-length array if it has an explicit initializer.
+// compiler-emitted data at link time.  Empty sections don't work in PE-COFF
+// the way they do in ELF and Mach-O, so these need to waste space in the
+// placeholder sections and then compensate in the pointer calculations.
+#define PECOFF_SECTION_RO(section_prefix, name, type) \
+  PECOFF_SECTION_IMPL(section_prefix, name, const type)
+#define PECOFF_SECTION_RW(section_prefix, name, type) \
+  PECOFF_SECTION_IMPL(section_prefix, name, type, write)
+#define PECOFF_SECTION_IMPL(section_prefix, name, type, ...)                        \
+  PECOFF_SECTION_IMPL_EDGE(section_prefix##$A, name##Begin, type, 1, ##__VA_ARGS__) \
+  PECOFF_SECTION_IMPL_EDGE(section_prefix##$Z, name##End, type, 0, ##__VA_ARGS__)
+#define PECOFF_SECTION_IMPL_EDGE(section_name, symbol, type, n, ...) \
+  PECOFF_SECTION_PRAGMA(section(#section_name, read, ##__VA_ARGS__)) \
+  [[gnu::section(#section_name)]] type symbol##_placeholder[1] = {}; \
+  constexpr type* symbol = &symbol##_placeholder[n];
+#define PECOFF_SECTION_PRAGMA(x) _Pragma(#x)
 
 // This data is morally `const`, i.e. it's a RELRO case in the ELF world.  But
 // there is no RELRO in PE-COFF (?) so it's just a writable section and the
 // compiler wants the declaration's constness to match #pragma section above.
-[[gnu::section(".lprfd$A")]] static __llvm_profile_data DataBegin[0] = {};
-[[gnu::section(".lprfd$Z")]] static __llvm_profile_data DataEnd[0] = {};
+PECOFF_SECTION_RW(.lprfd, Data, __llvm_profile_data)
 
-[[gnu::section(".lprfn$A")]] static const char NamesBegin[0] = {};
-[[gnu::section(".lprfn$Z")]] static const char NamesEnd[0] = {};
+PECOFF_SECTION_RO(.lprfn, Names, char)
 
-[[gnu::section(".lprfc$A")]] static uint64_t CountersBegin[0] = {};
-[[gnu::section(".lprfc$Z")]] static uint64_t CountersEnd[0] = {};
+PECOFF_SECTION_RW(.lprfc, Counters, uint64_t)
 
-#ifdef INSTR_PROF_BITS_SECT_NAME
-[[gnu::section(".lprfb$A")]] static char BitmapBegin[0] = {};
-[[gnu::section(".lprfb$Z")]] static char BitmapEnd[0] = {};
-#else
-static char BitmapBegin[1] = {};
-constexpr char* BitmapEnd = BitmapBegin;
-#endif
+PECOFF_SECTION_RW(.lprfb, Bitmap, char)
 
 #elif defined(__APPLE__)
 
@@ -169,15 +157,10 @@ extern "C" {
 [[gnu::visibility("hidden")]] extern uint64_t CountersEnd[] __asm__(
     "section$end$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
 
-#ifdef INSTR_PROF_BITS_SECT_NAME
 [[gnu::visibility("hidden")]] extern char BitmapBegin[] __asm__(
     "section$start$__DATA$" INSTR_PROF_BITS_SECT_NAME);
 [[gnu::visibility("hidden")]] extern char BitmapEnd[] __asm__(
     "section$end$__DATA$" INSTR_PROF_BITS_SECT_NAME);
-#else
-static char BitmapBegin[1] = {};
-constexpr char* BitmapEnd = BitmapBegin;
-#endif
 
 }  // extern "C"
 
@@ -267,11 +250,11 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
 // This is the .bss data that gets updated live by instrumented code when the
 // bias is set to zero.
 [[gnu::const]] cpp20::span<uint64_t> ProfCountersData() {
-  return cpp20::span<uint64_t>(CountersBegin, CountersEnd - CountersBegin);
+  return cpp20::span<uint64_t>(&CountersBegin[0], CountersEnd - CountersBegin);
 }
 
 [[gnu::const]] cpp20::span<char> ProfBitmapData() {
-  return cpp20::span<char>(BitmapBegin, BitmapEnd - BitmapBegin);
+  return cpp20::span<char>(&BitmapBegin[0], BitmapEnd - BitmapBegin);
 }
 
 [[gnu::const]] ProfRawHeader GetHeader(cpp20::span<const std::byte> build_id) {
@@ -280,11 +263,8 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
   const uint64_t PaddingBytesBeforeCounters = 0;
   const uint64_t NumCounters = ProfCountersData().size();
   const uint64_t PaddingBytesAfterCounters = 0;
-  // TODO(fxbug.dev/133950): These are not used by older InstrProfData.inc
-  // versions but are used by newer ones.  Remove the [[maybe_unused]]
-  // attributes after a new version has rolled and stuck.
-  [[maybe_unused]] const uint64_t NumBitmapBytes = ProfBitmapData().size();
-  [[maybe_unused]] const uint64_t PaddingBytesAfterBitmapBytes = 0;
+  const uint64_t NumBitmapBytes = ProfBitmapData().size();
+  const uint64_t PaddingBytesAfterBitmapBytes = 0;
   const uint64_t NamesSize = NamesEnd - NamesBegin;
   auto __llvm_profile_get_magic = []() -> uint64_t { return kMagic; };
   auto __llvm_profile_get_version = []() -> uint64_t { return INSTR_PROF_RAW_VERSION_VAR; };
