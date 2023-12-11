@@ -283,27 +283,27 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
       info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
       info.priority = std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
     } else {
-      FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, result.error_value().c_str(), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
   } else if (!has_priority && has_complete_deadline) {
     auto capacity_result = ParseDuration(profile.value["capacity"]);
     if (capacity_result.is_error()) {
-      FX_SLOG(WARNING, capacity_result.error_value().c_str(), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, capacity_result.error_value().c_str(), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
     auto deadline_result = ParseDuration(profile.value["deadline"]);
     if (deadline_result.is_error()) {
-      FX_SLOG(WARNING, deadline_result.error_value().c_str(), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, deadline_result.error_value().c_str(), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
     auto period_result = ParseDuration(profile.value["period"]);
     if (period_result.is_error()) {
-      FX_SLOG(WARNING, period_result.error_value().c_str(), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, period_result.error_value().c_str(), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
     info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
@@ -312,13 +312,13 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
                                                       .period = period_result->get()};
   } else if (has_priority && has_some_deadline) {
     FX_SLOG(WARNING, "Priority and deadline parameters are mutually exclusive!",
-            KV("filename", filename), KV("profile_name", profile_name),
-            KV("tag", "ProfileProvider"));
+            FX_KV("filename", filename), FX_KV("profile_name", profile_name),
+            FX_KV("tag", "ProfileProvider"));
     return std::nullopt;
   } else if (!has_priority && !has_complete_deadline && has_some_deadline) {
     FX_SLOG(WARNING, "Deadline profiles must specify \"capacity\", \"deadline\", and \"period\"!",
-            KV("filename", filename), KV("profile_name", profile_name),
-            KV("tag", "ProfileProvider"));
+            FX_KV("filename", filename), FX_KV("profile_name", profile_name),
+            FX_KV("tag", "ProfileProvider"));
     return std::nullopt;
   }
 
@@ -341,8 +341,8 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
           FX_SLOG(WARNING,
                   "Array element of profile member \"affinity\" must be an "
                   "unsigned integer!",
-                  KV("element_count", element_count), KV("filename", filename),
-                  KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
+                  FX_KV("element_count", element_count), FX_KV("filename", filename),
+                  FX_KV("profile_name", profile_name), FX_KV("tag", "ProfileProvider"));
           failed = true;
           break;
         }
@@ -352,8 +352,9 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
 
         if (cpu_number >= ZX_CPU_SET_MAX_CPUS) {
           FX_SLOG(WARNING, "Profile member \"affinity\" must be an integer < ZX_CPU_SET_MAX_CPUS",
-                  KV("filename", filename), KV("profile_name", profile_name),
-                  KV("ZX_CPU_SET_MAX_CPUS", ZX_CPU_SET_MAX_CPUS), KV("tag", "ProfileProvider"));
+                  FX_KV("filename", filename), FX_KV("profile_name", profile_name),
+                  FX_KV("ZX_CPU_SET_MAX_CPUS", ZX_CPU_SET_MAX_CPUS),
+                  FX_KV("tag", "ProfileProvider"));
           failed = true;
           break;
         }
@@ -366,8 +367,8 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
       }
     } else {
       FX_SLOG(WARNING, "Profile member \"affinity\" must be a uint64 or an array of CPU indices!",
-              KV("filename", filename), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+              FX_KV("filename", filename), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
   }  // if (has_affinity)
@@ -387,8 +388,8 @@ std::optional<zx_profile_info_t> ParseMemoryProfile(const std::string& filename,
       info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
       info.priority = std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
     } else {
-      FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, result.error_value().c_str(), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       return std::nullopt;
     }
   }
@@ -402,8 +403,8 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
                    const char* type_name, SingleProfileParser parser,
                    zircon_profile::ProfileMap* profiles) {
   if (!document.IsObject()) {
-    FX_SLOG(WARNING, "The profile config document must be a JSON object!", KV("filename", filename),
-            KV("tag", "ProfileProvider"));
+    FX_SLOG(WARNING, "The profile config document must be a JSON object!",
+            FX_KV("filename", filename), FX_KV("tag", "ProfileProvider"));
     return;
   }
 
@@ -423,19 +424,20 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       } else if (!strcmp(*result, "product")) {
         scope = ProfileScope::Product;
       } else {
-        FX_SLOG(WARNING, "Invalid role scope, defaulting to none!", KV("filename", filename),
-                KV("scope", *result), KV("tag", "ProfileProvider"));
+        FX_SLOG(WARNING, "Invalid role scope, defaulting to none!", FX_KV("filename", filename),
+                FX_KV("scope", *result), FX_KV("tag", "ProfileProvider"));
       }
     }
   } else {
-    FX_SLOG(WARNING, "Missing role scope, defaulting to none!", KV("filename", filename));
+    FX_SLOG(WARNING, "Missing role scope, defaulting to none!", FX_KV("filename", filename));
   }
 
   for (const auto& profile : IterateMembers(profile_member)) {
     const char* profile_name = profile.name.GetString();
     if (!profile.value.IsObject()) {
-      FX_SLOG(WARNING, "Profile value must be a JSON object!", KV("filename", filename),
-              KV("type", type_name), KV("profile", profile_name), KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, "Profile value must be a JSON object!", FX_KV("filename", filename),
+              FX_KV("type", type_name), FX_KV("profile", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -447,8 +449,9 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     zx_profile_info_t& info = *result;
 
     if (info.flags == 0) {
-      FX_SLOG(WARNING, "Ignoring empty profile.", KV("filename", filename), KV("type", type_name),
-              KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, "Ignoring empty profile.", FX_KV("filename", filename),
+              FX_KV("type", type_name), FX_KV("profile_name", profile_name),
+              FX_KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -456,17 +459,18 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     if (!added) {
       const ProfileScope existing_scope = iter->second.scope;
       if (existing_scope >= scope) {
-        FX_SLOG(WARNING, "Profile already exists at scope.", KV("filename", filename),
-                KV("profile_name", profile_name), KV("existing_scope", ToString(existing_scope)),
-                KV("type", type_name), KV("profile_name", profile_name),
-                KV("scope", ToString(scope)), KV("tag", "ProfileProvider"));
+        FX_SLOG(WARNING, "Profile already exists at scope.", FX_KV("filename", filename),
+                FX_KV("profile_name", profile_name),
+                FX_KV("existing_scope", ToString(existing_scope)), FX_KV("type", type_name),
+                FX_KV("profile_name", profile_name), FX_KV("scope", ToString(scope)),
+                FX_KV("tag", "ProfileProvider"));
         continue;
       }
       if (iter->second.scope < scope) {
-        FX_SLOG(INFO, "Profile overridden at scope.", KV("filename", filename),
-                KV("type", type_name), KV("profile_name", profile_name),
-                KV("scope", ToString(scope)), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
+        FX_SLOG(INFO, "Profile overridden at scope.", FX_KV("filename", filename),
+                FX_KV("type", type_name), FX_KV("profile_name", profile_name),
+                FX_KV("scope", ToString(scope)), FX_KV("profile_name", profile_name),
+                FX_KV("tag", "ProfileProvider"));
         iter->second = Profile{scope, info};
       }
     }
@@ -484,8 +488,8 @@ fit::result<fit::failed, Role> ParseRoleSelector(std::string_view role_selector)
   Role role;
   std::string selectors;
   if (!re2::RE2::FullMatch(role_selector, kReRoleParts, &role.name, &selectors)) {
-    FX_SLOG(WARNING, "Bad selector.", KV("role_selector", role_selector),
-            KV("tag", "ProfileProvider"));
+    FX_SLOG(WARNING, "Bad selector.", FX_KV("role_selector", role_selector),
+            FX_KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
@@ -494,8 +498,8 @@ fit::result<fit::failed, Role> ParseRoleSelector(std::string_view role_selector)
   while (re2::RE2::Consume(&input, kSelector, &key, &value)) {
     const auto [iter, added] = role.selectors.emplace(key, value);
     if (!added) {
-      FX_SLOG(WARNING, "Duplicate key in selector.", KV("key", key), KV("value", value),
-              KV("role_selector", role_selector), KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, "Duplicate key in selector.", FX_KV("key", key), FX_KV("value", value),
+              FX_KV("role_selector", role_selector), FX_KV("tag", "ProfileProvider"));
     }
   }
 
@@ -516,15 +520,15 @@ fit::result<fit::failed, MediaRole> MaybeMediaRole(const Role& role) {
 
   int64_t capacity;
   if (!re2::RE2::FullMatch(capacity_iter->second, "(\\d+)", &capacity)) {
-    FX_SLOG(WARNING, "Media role has invalid capacity selector.", KV("role_name", role.name),
-            KV("capacity_selector", capacity_iter->second), KV("tag", "ProfileProvider"));
+    FX_SLOG(WARNING, "Media role has invalid capacity selector.", FX_KV("role_name", role.name),
+            FX_KV("capacity_selector", capacity_iter->second), FX_KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
   int64_t deadline;
   if (!re2::RE2::FullMatch(deadline_iter->second, "(\\d+)", &deadline)) {
-    FX_SLOG(WARNING, "Media role has invalid deadline selector.", KV("role_name", role.name),
-            KV("deadline_selector", deadline_iter->second), KV("tag", "ProfileProvider"));
+    FX_SLOG(WARNING, "Media role has invalid deadline selector.", FX_KV("role_name", role.name),
+            FX_KV("deadline_selector", deadline_iter->second), FX_KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
@@ -535,8 +539,8 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
   fbl::unique_fd dir_fd(openat(AT_FDCWD, config_path.c_str(), O_RDONLY | O_DIRECTORY));
   if (!dir_fd.is_valid()) {
     // A non-existent directory is not an error.
-    FX_SLOG(WARNING, "Failed to open config dir.", KV("config_path", config_path),
-            KV("error", strerror(errno)), KV("tag", "ProfileProvider"));
+    FX_SLOG(WARNING, "Failed to open config dir.", FX_KV("config_path", config_path),
+            FX_KV("error", strerror(errno)), FX_KV("tag", "ProfileProvider"));
     return fit::ok(ConfiguredProfiles{});
   }
 
@@ -576,12 +580,12 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
       continue;
     }
 
-    FX_SLOG(INFO, "Loading config.", KV("config_path", entry), KV("tag", "ProfileProvider"));
+    FX_SLOG(INFO, "Loading config.", FX_KV("config_path", entry), FX_KV("tag", "ProfileProvider"));
 
     std::string data;
     if (!files::ReadFileToStringAt(dir_fd.get(), entry, &data)) {
-      FX_SLOG(WARNING, "Failed to read file.", KV("config_path", entry),
-              KV("error", strerror(errno)), KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, "Failed to read file.", FX_KV("config_path", entry),
+              FX_KV("error", strerror(errno)), FX_KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -591,8 +595,8 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
     document.Parse<kFlags>(data);
 
     if (document.HasParseError()) {
-      FX_SLOG(WARNING, "Failed to parse config.", KV("config_path", entry),
-              KV("error", GetErrorMessage(document, data)), KV("tag", "ProfileProvider"));
+      FX_SLOG(WARNING, "Failed to parse config.", FX_KV("config_path", entry),
+              FX_KV("error", GetErrorMessage(document, data)), FX_KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -602,8 +606,8 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
 
   auto log_profiles = [](ProfileMap& profiles) {
     for (const auto& [key, value] : profiles) {
-      FX_SLOG(INFO, "Loaded profile.", KV("key", key), KV("scope", ToString(value.scope)),
-              KV("info", ToString(value.info)), KV("tag", "ProfileProvider"));
+      FX_SLOG(INFO, "Loaded profile.", FX_KV("key", key), FX_KV("scope", ToString(value.scope)),
+              FX_KV("info", ToString(value.info)), FX_KV("tag", "ProfileProvider"));
     }
   };
   FX_SLOG(INFO, "Loaded thread profiles:");

@@ -65,8 +65,8 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
 void ProfileProvider::GetProfile(GetProfileRequestView request,
                                  GetProfileCompleter::Sync& completer) {
   const std::string_view name{request->name.get()};
-  FX_SLOG(INFO, "Priority requested", KV("name", name), KV("priority", request->priority),
-          KV("tag", "ProfileProvider"));
+  FX_SLOG(INFO, "Priority requested", FX_KV("name", name), FX_KV("priority", request->priority),
+          FX_KV("tag", "ProfileProvider"));
 
   zx_profile_info_t info = {
       .flags = ZX_PROFILE_INFO_FLAG_PRIORITY,
@@ -84,9 +84,9 @@ void ProfileProvider::GetDeadlineProfile(GetDeadlineProfileRequestView request,
   const std::string_view name{request->name.get()};
   const double utilization =
       static_cast<double>(request->capacity) / static_cast<double>(request->deadline);
-  FX_SLOG(INFO, "Deadline requested", KV("name", name), KV("capacity", request->capacity),
-          KV("deadline", request->deadline), KV("period", request->period),
-          KV("utilization", utilization), KV("tag", "ProfileProvider"));
+  FX_SLOG(INFO, "Deadline requested", FX_KV("name", name), FX_KV("capacity", request->capacity),
+          FX_KV("deadline", request->deadline), FX_KV("period", request->period),
+          FX_KV("utilization", utilization), FX_KV("tag", "ProfileProvider"));
 
   zx_profile_info_t info = {
       .flags = ZX_PROFILE_INFO_FLAG_DEADLINE,
@@ -128,7 +128,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
                                                 sizeof(handle_info), nullptr, nullptr);
   if (status != ZX_OK) {
     FX_SLOG(WARNING, "Failed to get info for thread handle",
-            KV("status", zx_status_get_string(status)), KV("tag", "ProfileProvider"));
+            FX_KV("status", zx_status_get_string(status)), FX_KV("tag", "ProfileProvider"));
     handle_info.koid = ZX_KOID_INVALID;
     handle_info.related_koid = ZX_KOID_INVALID;
   }
@@ -138,8 +138,9 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
   }
 
   const std::string_view role_selector{request->role.get()};
-  FX_SLOG(DEBUG, "Role requested:", KV("role", role_selector), KV("pid", handle_info.related_koid),
-          KV("tid", handle_info.koid), KV("tag", "ProfileProvider"));
+  FX_SLOG(DEBUG, "Role requested:", FX_KV("role", role_selector),
+          FX_KV("pid", handle_info.related_koid), FX_KV("tid", handle_info.koid),
+          FX_KV("tag", "ProfileProvider"));
 
   const fit::result role_result = ParseRoleSelector(role_selector);
   if (role_result.is_error()) {
@@ -170,15 +171,15 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     if (media_role->capacity <= 0 || media_role->deadline <= 0 ||
         media_role->capacity > media_role->deadline) {
       FX_SLOG(WARNING, "Skipping media profile with no override and invalid selectors",
-              KV("capacity", media_role->capacity), KV("deadline", media_role->deadline),
-              KV("role", role_result->name), KV("tag", "ProfileProvider"));
+              FX_KV("capacity", media_role->capacity), FX_KV("deadline", media_role->deadline),
+              FX_KV("role", role_result->name), FX_KV("tag", "ProfileProvider"));
       completer.Reply(ZX_OK);
       return;
     }
 
     FX_SLOG(INFO, "Using selector parameters for media profile with no override",
-            KV("capacity", media_role->capacity), KV("deadline", media_role->deadline),
-            KV("role", role_result->name), KV("tag", "ProfileProvider"));
+            FX_KV("capacity", media_role->capacity), FX_KV("deadline", media_role->deadline),
+            FX_KV("role", role_result->name), FX_KV("tag", "ProfileProvider"));
 
     zx_profile_info_t info = {};
     info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
@@ -189,8 +190,9 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     zx::profile profile;
     status = zx::profile::create(*root_job_, 0u, &info, &profile);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to create media profile:", KV("status", zx_status_get_string(status)),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(ERROR,
+              "Failed to create media profile:", FX_KV("status", zx_status_get_string(status)),
+              FX_KV("tag", "ProfileProvider"));
       // Failing to create a profile is likely due to invalid profile parameters.
       completer.Reply(ZX_ERR_INTERNAL);
       return;
@@ -198,8 +200,8 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     status = zx_object_set_profile(request->handle.get(), profile.get(), 0);
     completer.Reply(status);
   } else {
-    FX_SLOG(DEBUG, "Requested role not found", KV("role", role_result->name),
-            KV("tag", "ProfileProvider"));
+    FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role_result->name),
+            FX_KV("tag", "ProfileProvider"));
     completer.Reply(ZX_ERR_NOT_FOUND);
   }
 }
@@ -212,8 +214,8 @@ constexpr const char* profile_svc_names[] = {
 zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
   auto result = zircon_profile::LoadConfigs(kConfigPath);
   if (result.is_error()) {
-    FX_SLOG(ERROR, "Failed to load configs", KV("error", result.error_value()),
-            KV("tag", "ProfileProvider"));
+    FX_SLOG(ERROR, "Failed to load configs", FX_KV("error", result.error_value()),
+            FX_KV("tag", "ProfileProvider"));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -225,7 +227,7 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
           zx::profile::create(root_job, 0, &iter->second.info, &iter->second.profile);
       if (status != ZX_OK) {
         FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
-                KV("role", iter->first), KV("status", zx_status_get_string(status)));
+                FX_KV("role", iter->first), FX_KV("status", zx_status_get_string(status)));
         iter = profiles.erase(iter);
       } else {
         ++iter;
@@ -241,8 +243,8 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
   if (search != result->thread.end()) {
     const zx_status_t status = zx::thread::self()->set_profile(search->second.profile, 0);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to set profile", KV("error", zx_status_get_string(status)),
-              KV("tag", "ProfileProvider"));
+      FX_SLOG(ERROR, "Failed to set profile", FX_KV("error", zx_status_get_string(status)),
+              FX_KV("tag", "ProfileProvider"));
     }
   }
 
