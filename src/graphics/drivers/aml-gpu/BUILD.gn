@@ -40,11 +40,14 @@ source_set("sources") {
   ]
   public_deps = [
     ":aml_gpu_bind",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
+    "//sdk/lib/inspect/component/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
@@ -52,8 +55,6 @@ source_set("sources") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
@@ -83,12 +84,14 @@ executable("aml-gpu-test-bin") {
   sources = [ "aml-gpu-test.cc" ]
   deps = [
     ":sources",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//src/devices/registers/testing/mock-registers",
-    "//src/devices/testing/driver-runtime-main:zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
