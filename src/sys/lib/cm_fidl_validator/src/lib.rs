@@ -1574,7 +1574,7 @@ impl<'a> ValidationContext<'a> {
                 expose_groups.entry(key).or_insert_with(|| vec![]).push(expose.clone());
             }
         }
-        for (p, expose_group) in expose_groups {
+        for expose_group in expose_groups.into_values() {
             if expose_group.len() == 1 {
                 // If there are not multiple exposes for a (target_name, target) pair then there are
                 // no aggregation conditions to check.
@@ -1582,15 +1582,6 @@ impl<'a> ValidationContext<'a> {
             }
 
             self.validate_aggregation_has_same_availability(&expose_group);
-
-            let (target_name, _) = p;
-            if !expose_group.iter().all(|e| matches!(e.source, Some(fdecl::Ref::Collection(_)))) {
-                self.errors.push(Error::service_aggregate_not_collection(
-                    DeclType::ExposeService,
-                    "source",
-                    target_name,
-                ));
-            }
         }
     }
 
@@ -1924,7 +1915,7 @@ impl<'a> ValidationContext<'a> {
                 offer_groups.entry(key).or_insert_with(|| vec![]).push(offer.clone());
             }
         }
-        for (p, offer_group) in offer_groups {
+        for offer_group in offer_groups.into_values() {
             if offer_group.len() == 1 {
                 // If there are not multiple offers for a (target_name, target) pair then there are
                 // no aggregation conditions to check.
@@ -1932,17 +1923,6 @@ impl<'a> ValidationContext<'a> {
             }
 
             self.validate_aggregation_has_same_availability(&offer_group);
-
-            let (target_name, _) = p;
-            if offer_type == OfferType::Static
-                && !offer_group.iter().all(|o| matches!(o.source, Some(fdecl::Ref::Collection(_))))
-            {
-                self.errors.push(Error::service_aggregate_not_collection(
-                    DeclType::OfferService,
-                    "source",
-                    target_name,
-                ));
-            }
 
             let mut source_instance_filter_entries: HashSet<String> = HashSet::new();
             let mut service_source_names: HashSet<String> = HashSet::new();

@@ -785,11 +785,15 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         let capability_ids = CapabilityId::from_offer_expose(expose)?;
         for capability_id in capability_ids {
             if used_ids.insert(capability_id.to_string(), capability_id.clone()).is_some() {
-                return Err(Error::validate(format!(
-                    "\"{}\" is a duplicate \"expose\" target capability for \"{}\"",
-                    capability_id,
-                    expose.to.as_ref().unwrap_or(&ExposeToRef::Parent)
-                )));
+                if let CapabilityId::Service(_) = capability_id {
+                    // Services may have duplicates (aggregation).
+                } else {
+                    return Err(Error::validate(format!(
+                        "\"{}\" is a duplicate \"expose\" target capability for \"{}\"",
+                        capability_id,
+                        expose.to.as_ref().unwrap_or(&ExposeToRef::Parent)
+                    )));
+                }
             }
         }
 
@@ -1065,10 +1069,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             for target_cap_id in &target_cap_ids {
                 if ids_for_entity.insert(target_cap_id.to_string(), target_cap_id.clone()).is_some()
                 {
-                    return Err(Error::validate(format!(
-                        "\"{}\" is a duplicate \"offer\" target capability for \"{}\"",
-                        target_cap_id, to
-                    )));
+                    if let CapabilityId::Service(_) = target_cap_id {
+                        // Services may have duplicates (aggregation).
+                    } else {
+                        return Err(Error::validate(format!(
+                            "\"{}\" is a duplicate \"offer\" target capability for \"{}\"",
+                            target_cap_id, to
+                        )));
+                    }
                 }
             }
 
@@ -6346,6 +6354,76 @@ mod tests {
             ),
             Ok(())
         ),
+        test_cml_validate_expose_service_multi_source(
+            json!(
+                {
+                    "expose": [
+                        {
+                            "service": "fuchsia.my.Service",
+                            "from": [ "self", "#a" ],
+                        },
+                        {
+                            "service": "fuchsia.my.Service",
+                            "from": "#coll",
+                        },
+                    ],
+                    "capabilities": [
+                        { "service": "fuchsia.my.Service" },
+                    ],
+                    "children": [
+                        {
+                            "name": "a",
+                            "url": "fuchsia-pkg://a",
+                        },
+                    ],
+                    "collections": [
+                        {
+                            "name": "coll",
+                            "durability": "transient",
+                        },
+                    ],
+                }
+            ),
+            Ok(())
+        ),
+        test_cml_validate_offer_service_multi_source(
+            json!(
+                {
+                    "offer": [
+                        {
+                            "service": "fuchsia.my.Service",
+                            "from": [ "self", "parent" ],
+                            "to": "#b",
+                        },
+                        {
+                            "service": "fuchsia.my.Service",
+                            "from": [ "#a", "#coll" ],
+                            "to": "#b",
+                        },
+                    ],
+                    "capabilities": [
+                        { "service": "fuchsia.my.Service" },
+                    ],
+                    "children": [
+                        {
+                            "name": "a",
+                            "url": "fuchsia-pkg://a",
+                        },
+                        {
+                            "name": "b",
+                            "url": "fuchsia-pkg://b",
+                        },
+                    ],
+                    "collections": [
+                        {
+                            "name": "coll",
+                            "durability": "transient",
+                        },
+                    ],
+                }
+            ),
+            Ok(())
+        ),
         test_cml_expose_service_from_self_missing(
             json!({
                 "expose": [
@@ -7169,80 +7247,7 @@ mod tests {
     use {
         crate::translate::test_util::must_parse_cml,
         crate::translate::{compile, CompileOptions},
-        cm_fidl_validator::error::Error as CmFidlError,
-        cm_fidl_validator::error::{DeclType, ErrorList},
     };
-
-    #[test]
-    fn test_cml_offer_service_multiple_from() {
-        let input = must_parse_cml!({
-            "offer": [
-                {
-                    "service": "fuchsia.logger.Log",
-                    "from": [ "#coll", "parent" ],
-                    "to": [ "#logger" ],
-                },
-            ],
-            "children": [
-                {
-                    "name": "logger",
-                    "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                },
-            ],
-            "collections": [
-                {
-                    "name": "coll",
-                    "durability": "transient",
-                },
-            ],
-        });
-        assert_matches!(
-            compile(&input, CompileOptions::default()),
-            Err(Error::FidlValidator  { errs: ErrorList { errs } })
-            if matches!(
-                &errs[..],
-                [CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)]
-                if decl_field.decl == DeclType::OfferService && &decl_field.field == "source" && target_name == "fuchsia.logger.Log"
-            )
-        );
-    }
-
-    #[test]
-    fn test_cml_expose_service_multiple_from() {
-        let input = must_parse_cml!({
-            "expose": [
-                {
-                    "service": "fuchsia.logger.Log",
-                    "from": [ "#logger", "#coll" ],
-                },
-            ],
-            "capabilities": [
-                { "service": "fuchsia.logger.Log" },
-            ],
-            "children": [
-                {
-                    "name": "logger",
-                    "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
-                },
-            ],
-            "collections": [
-                {
-                    "name": "coll",
-                    "durability": "transient",
-                },
-            ],
-        });
-
-        assert_matches!(
-            compile(&input, CompileOptions::default()),
-            Err(Error::FidlValidator  { errs: ErrorList { errs } })
-            if matches!(
-                &errs[..],
-                [CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)]
-                if decl_field.decl == DeclType::ExposeService && &decl_field.field == "source" && target_name == "fuchsia.logger.Log"
-            )
-        );
-    }
 
     #[test]
     fn test_cml_use_bad_config_from_self() {

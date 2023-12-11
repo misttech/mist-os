@@ -3126,6 +3126,10 @@ mod tests {
                         "as": "E",
                     },
                     {
+                        "service": "svc",
+                        "from": [ "#logger", "#coll", "self" ],
+                    },
+                    {
                         "directory": "blob",
                         "from": "self",
                         "to": "framework",
@@ -3146,6 +3150,7 @@ mod tests {
                 "capabilities": [
                     { "protocol": "A" },
                     { "protocol": "B" },
+                    { "service": "svc" },
                     {
                         "directory": "blob",
                         "path": "/volumes/blobfs/blob",
@@ -3166,6 +3171,12 @@ mod tests {
                     {
                         "name": "logger",
                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                    },
+                ],
+                "collections": [
+                    {
+                        "name": "coll",
+                        "durability": "transient",
                     },
                 ],
             }),
@@ -3226,6 +3237,41 @@ mod tests {
                             source_name: Some("D".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("E".to_string()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".into(),
+                                collection: None,
+                            })),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("svc".into()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                                name: "coll".into(),
+                            })),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("svc".into()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
@@ -3403,6 +3449,13 @@ mod tests {
                             ..Default::default()
                         }
                     ),
+                    fdecl::Capability::Service (
+                        fdecl::Service {
+                            name: Some("svc".to_string()),
+                            source_path: Some("/svc/svc".to_string()),
+                            ..Default::default()
+                        }
+                    ),
                     fdecl::Capability::Directory (
                         fdecl::Directory {
                             name: Some("blob".to_string()),
@@ -3435,8 +3488,13 @@ mod tests {
                         name: Some("logger".to_string()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        environment: None,
-                        on_terminate: None,
+                        ..Default::default()
+                    }
+                ]),
+                collections: Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
                         ..Default::default()
                     }
                 ]),
@@ -3688,6 +3746,11 @@ mod tests {
                         "to": [ "#modular" ],
                     },
                     {
+                        "service": "svc",
+                        "from": [ "parent", "self", "#logger", "#modular" ],
+                        "to": "#netstack",
+                    },
+                    {
                         "directory": "assets",
                         "from": "parent",
                         "to": [ "#netstack" ],
@@ -3785,6 +3848,9 @@ mod tests {
                     },
                 ],
                 "capabilities": [
+                    {
+                        "service": "svc",
+                    },
                     {
                         "storage": "data",
                         "backing_dir": "minfs",
@@ -3892,6 +3958,63 @@ mod tests {
                             })),
                             target_name: Some("fuchsia.sys2.FromDict".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "netstack".into(),
+                                collection: None,
+                            })),
+                            target_name: Some("svc".into()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "netstack".into(),
+                                collection: None,
+                            })),
+                            target_name: Some("svc".into()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".into(),
+                                collection: None,
+                            })),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "netstack".into(),
+                                collection: None,
+                            })),
+                            target_name: Some("svc".into()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                                name: "modular".into(),
+                            })),
+                            source_name: Some("svc".into()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "netstack".into(),
+                                collection: None,
+                            })),
+                            target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
@@ -4194,6 +4317,13 @@ mod tests {
                     ),
                 ]),
                 capabilities: Some(vec![
+                    fdecl::Capability::Service (
+                        fdecl::Service {
+                            name: Some("svc".into()),
+                            source_path: Some("/svc/svc".into()),
+                            ..Default::default()
+                        },
+                    ),
                     fdecl::Capability::Storage (
                         fdecl::Storage {
                             name: Some("data".to_string()),
@@ -5317,10 +5447,6 @@ mod tests {
                 &errs[..],
                 [
                     CmFidlError::DifferentAvailabilityInAggregation(AvailabilityList(availabilities)),
-                    // There is an additional error because `#non_existent` is translated to
-                    // `void`, and aggregating from `void` is not allowed. But we do not care about
-                    // the specifics.
-                    CmFidlError::ServiceAggregateNotCollection(_, _),
                 ]
                 if matches!(
                     &availabilities[..],
@@ -5393,10 +5519,6 @@ mod tests {
                 &errs[..],
                 [
                     CmFidlError::DifferentAvailabilityInAggregation(AvailabilityList(availabilities)),
-                    // There is an additional error because `#non_existent` is translated to
-                    // `void`, and aggregating from `void` is not allowed. But we do not care about
-                    // the specifics.
-                    CmFidlError::ServiceAggregateNotCollection(_, _),
                 ]
                 if matches!(
                     &availabilities[..],

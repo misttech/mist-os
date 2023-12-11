@@ -79,10 +79,6 @@ pub enum Error {
     #[error("Invalid aggregate offer: {0}")]
     InvalidAggregateOffer(String),
 
-    #[error("{} for {1} is an aggregate, but one of the sources is not a collection. \
-            Aggregation from non-collection sources in not currently supported.", .0.field)]
-    ServiceAggregateNotCollection(DeclField, String),
-
     #[error("All sources that feed into an aggregation operation should have the same availability. Got {0}.")]
     DifferentAvailabilityInAggregation(AvailabilityList),
 
@@ -263,17 +259,6 @@ impl Error {
 
     pub fn invalid_aggregate_offer(info: impl Into<String>) -> Self {
         Error::InvalidAggregateOffer(info.into())
-    }
-
-    pub fn service_aggregate_not_collection(
-        decl_type: DeclType,
-        keyword: impl Into<String>,
-        target_name: impl Into<String>,
-    ) -> Self {
-        Error::ServiceAggregateNotCollection(
-            DeclField { decl: decl_type, field: keyword.into() },
-            target_name.into(),
-        )
     }
 
     pub fn different_availability_in_aggregation(availability: Vec<fdecl::Availability>) -> Self {
