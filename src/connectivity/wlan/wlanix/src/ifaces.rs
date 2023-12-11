@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::TimeoutExt,
     fuchsia_zircon as zx,
-    futures::TryStreamExt,
+    futures::{channel::oneshot, select, TryStreamExt},
     ieee80211::Bssid,
     parking_lot::Mutex,
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
@@ -72,10 +72,7 @@ impl IfaceManager for DeviceMonitorIfaceManager {
         if let Some(iface) = ifaces.get(&iface_id) {
             Ok(iface.clone())
         } else {
-            let iface = Arc::new(SmeClientIface {
-                sme_proxy,
-                last_scan_results: Arc::new(Mutex::new(vec![])),
-            });
+            let iface = Arc::new(SmeClientIface::new(sme_proxy));
             ifaces.insert(iface_id, iface.clone());
             Ok(iface)
         }
@@ -88,9 +85,16 @@ pub(crate) struct ConnectedResult {
     pub bssid: Bssid,
 }
 
+#[derive(Debug)]
+pub(crate) enum ScanEnd {
+    Complete,
+    Cancelled,
+}
+
 #[async_trait]
 pub(crate) trait ClientIface: Sync + Send {
-    async fn trigger_scan(&self) -> Result<(), Error>;
+    async fn trigger_scan(&self) -> Result<ScanEnd, Error>;
+    async fn abort_scan(&self) -> Result<(), Error>;
     fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult>;
     async fn connect_to_network(
         &self,
@@ -103,21 +107,50 @@ pub(crate) trait ClientIface: Sync + Send {
 pub(crate) struct SmeClientIface {
     sme_proxy: fidl_sme::ClientSmeProxy,
     last_scan_results: Arc<Mutex<Vec<fidl_sme::ScanResult>>>,
+    scan_abort_signal: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+}
+
+impl SmeClientIface {
+    fn new(sme_proxy: fidl_sme::ClientSmeProxy) -> Self {
+        SmeClientIface {
+            sme_proxy,
+            last_scan_results: Arc::new(Mutex::new(vec![])),
+            scan_abort_signal: Arc::new(Mutex::new(None)),
+        }
+    }
 }
 
 #[async_trait]
 impl ClientIface for SmeClientIface {
-    async fn trigger_scan(&self) -> Result<(), Error> {
+    async fn trigger_scan(&self) -> Result<ScanEnd, Error> {
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
-        let scan_result_vmo = self
-            .sme_proxy
-            .scan(&scan_request)
-            .await
-            .context("Failed to request scan")?
-            .map_err(|e| format_err!("Scan ended with error: {:?}", e))?;
-        info!("Got scan results from SME.");
-        *self.last_scan_results.lock() = wlan_common::scan::read_vmo(scan_result_vmo)?;
-        Ok(())
+        let (abort_sender, mut abort_receiver) = oneshot::channel();
+        self.scan_abort_signal.lock().replace(abort_sender);
+        let mut fut = self.sme_proxy.scan(&scan_request);
+        select! {
+            scan_results = fut => {
+                let scan_result_vmo = scan_results
+                    .context("Failed to request scan")?
+                    .map_err(|e| format_err!("Scan ended with error: {:?}", e))?;
+                info!("Got scan results from SME.");
+                *self.last_scan_results.lock() = wlan_common::scan::read_vmo(scan_result_vmo)?;
+                self.scan_abort_signal.lock().take();
+                Ok(ScanEnd::Complete)
+            }
+            _ = abort_receiver => {
+                info!("Scan cancelled, ignoring results from SME.");
+                Ok(ScanEnd::Cancelled)
+            }
+        }
+    }
+
+    async fn abort_scan(&self) -> Result<(), Error> {
+        // TODO(fxbug.dev/128604): Actually pipe this call down to SME.
+        if let Some(sender) = self.scan_abort_signal.lock().take() {
+            sender.send(()).map_err(|_| format_err!("Unable to send scan abort signal"))
+        } else {
+            Ok(())
+        }
     }
 
     fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult> {
@@ -268,17 +301,29 @@ pub mod test_utils {
     pub struct TestClientIface {
         pub connected_ssid: Mutex<Option<Vec<u8>>>,
         pub connected_passphrase: Mutex<Option<Vec<u8>>>,
+        scan_end_receiver: Mutex<Option<oneshot::Receiver<Result<ScanEnd, Error>>>>,
     }
 
     impl TestClientIface {
         pub fn new() -> Self {
-            Self { connected_ssid: Mutex::new(None), connected_passphrase: Mutex::new(None) }
+            Self {
+                connected_ssid: Mutex::new(None),
+                connected_passphrase: Mutex::new(None),
+                scan_end_receiver: Mutex::new(None),
+            }
         }
     }
 
     #[async_trait]
     impl ClientIface for TestClientIface {
-        async fn trigger_scan(&self) -> Result<(), Error> {
+        async fn trigger_scan(&self) -> Result<ScanEnd, Error> {
+            let scan_end_receiver = self.scan_end_receiver.lock().take();
+            match scan_end_receiver {
+                Some(receiver) => receiver.await.expect("scan_end_signal failed"),
+                None => Ok(ScanEnd::Complete),
+            }
+        }
+        async fn abort_scan(&self) -> Result<(), Error> {
             Ok(())
         }
         fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult> {
@@ -306,6 +351,20 @@ pub mod test_utils {
 
         pub fn new_with_client() -> Self {
             Self { client_iface: Some(Arc::new(TestClientIface::new())) }
+        }
+
+        pub fn new_with_client_and_scan_end_sender(
+        ) -> (Self, oneshot::Sender<Result<ScanEnd, Error>>) {
+            let (sender, receiver) = oneshot::channel();
+            (
+                Self {
+                    client_iface: Some(Arc::new(TestClientIface {
+                        scan_end_receiver: Mutex::new(Some(receiver)),
+                        ..TestClientIface::new()
+                    })),
+                },
+                sender,
+            )
         }
     }
 
@@ -408,10 +467,7 @@ mod tests {
         let (mut exec, _monitor_stream, manager) = setup_test();
         let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
             .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(
-            1,
-            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
-        );
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
         assert!(iface.get_last_scan_results().is_empty());
@@ -423,8 +479,28 @@ mod tests {
         let result = wlan_common::scan::write_vmo(vec![test_utils::fake_scan_result()])
             .expect("Failed to write scan VMO");
         responder.send(Ok(result)).expect("Failed to send result");
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Complete)));
         assert_eq!(iface.get_last_scan_results().len(), 1);
+    }
+
+    #[test]
+    fn test_abort_scan() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        assert!(iface.get_last_scan_results().is_empty());
+        let mut scan_fut = iface.trigger_scan();
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        let (_req, _responder) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
+
+        // trigger_scan returns after we abort the scan, even though we have no results from SME.
+        assert_variant!(exec.run_until_stalled(&mut iface.abort_scan()), Poll::Ready(Ok(())));
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Cancelled)));
     }
 
     #[test_case(
@@ -459,10 +535,7 @@ mod tests {
         let (mut exec, _monitor_stream, manager) = setup_test();
         let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
             .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(
-            1,
-            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
-        );
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
 
@@ -530,10 +603,7 @@ mod tests {
         let (mut exec, _monitor_stream, manager) = setup_test();
         let (sme_proxy, mut _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
             .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(
-            1,
-            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
-        );
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
 
@@ -560,10 +630,7 @@ mod tests {
         let (mut exec, _monitor_stream, manager) = setup_test();
         let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
             .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(
-            1,
-            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
-        );
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
 

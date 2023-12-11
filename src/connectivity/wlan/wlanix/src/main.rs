@@ -26,7 +26,7 @@ mod nl80211;
 mod security;
 
 use {
-    ifaces::{ClientIface, IfaceManager},
+    ifaces::{ClientIface, IfaceManager, ScanEnd},
     nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
 };
 
@@ -556,6 +556,14 @@ fn build_nl80211_ack() -> fidl_wlanix::Nl80211Message {
     }
 }
 
+fn build_nl80211_err() -> fidl_wlanix::Nl80211Message {
+    fidl_wlanix::Nl80211Message {
+        message_type: Some(fidl_wlanix::Nl80211MessageType::Error),
+        payload: None,
+        ..Default::default()
+    }
+}
+
 fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
     fidl_wlanix::Nl80211Message {
         message_type: Some(fidl_wlanix::Nl80211MessageType::Done),
@@ -676,19 +684,35 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
                         .context("Failed to ack TriggerScan")?;
                     match client_iface.trigger_scan().await {
-                        Ok(()) => info!("Passive scan completed successfully"),
+                        Ok(ScanEnd::Complete) => {
+                            info!("Passive scan completed successfully");
+                            if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
+                                proxy
+                                    .message(fidl_wlanix::Nl80211MulticastMessageRequest {
+                                        message: Some(build_nl80211_message(
+                                            Nl80211Cmd::NewScanResults,
+                                            vec![Nl80211Attr::IfaceIndex(iface_id)],
+                                        )),
+                                        ..Default::default()
+                                    })
+                                    .context("Failed to send NewScanResults")?;
+                            }
+                        }
+                        Ok(ScanEnd::Cancelled) => {
+                            info!("Passive scan terminated");
+                            if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
+                                proxy
+                                    .message(fidl_wlanix::Nl80211MulticastMessageRequest {
+                                        message: Some(build_nl80211_message(
+                                            Nl80211Cmd::ScanAborted,
+                                            vec![Nl80211Attr::IfaceIndex(iface_id)],
+                                        )),
+                                        ..Default::default()
+                                    })
+                                    .context("Failed to send ScanAborted")?;
+                            }
+                        }
                         Err(e) => error!("Failed to run passive scan: {:?}", e),
-                    }
-                    if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
-                        proxy
-                            .message(fidl_wlanix::Nl80211MulticastMessageRequest {
-                                message: Some(build_nl80211_message(
-                                    Nl80211Cmd::NewScanResults,
-                                    vec![Nl80211Attr::IfaceIndex(iface_id)],
-                                )),
-                                ..Default::default()
-                            })
-                            .context("Failed to send NewScanResults")?;
                     }
                 }
                 None => {
@@ -696,6 +720,34 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
                         .context("sending error status due to missing iface id on TriggerScan")?;
                     bail!("TriggerScan did not include an iface id")
+                }
+            }
+        }
+        Nl80211Cmd::AbortScan => {
+            info!("Nl80211Cmd::AbortScan");
+            match find_iface_id(&message.payload.attrs[..]) {
+                Some(iface_id) => {
+                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+                    match client_iface.abort_scan().await {
+                        Ok(()) => {
+                            info!("Aborted scan successfully");
+                            responder
+                                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                                .context("Failed to ack AbortScan")?;
+                        }
+                        Err(e) => {
+                            error!("Failed to abort scan: {:?}", e);
+                            responder
+                                .send(Ok(nl80211_message_resp(vec![build_nl80211_err()])))
+                                .context("Failed to ack AbortScan")?;
+                        }
+                    }
+                }
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("sending error status due to missing iface id on AbortScan")?;
+                    bail!("AbortScan did not include an iface id")
                 }
             }
         }
@@ -1582,6 +1634,44 @@ mod tests {
             exec.run_until_stalled(&mut trigger_scan_fut),
             Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
         );
+    }
+
+    #[test]
+    fn scan_cancelled() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let (iface_manager, scan_end_sender) =
+            TestIfaceManager::new_with_client_and_scan_end_sender();
+        let iface_manager = Arc::new(iface_manager);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+
+        let next_mcast = next_mcast_message(&mut mcast_stream);
+        pin_mut!(next_mcast);
+        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        let trigger_scan_message =
+            build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(0)]);
+        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(trigger_scan_message),
+            ..Default::default()
+        });
+        pin_mut!(trigger_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
+        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        // After ending the scan we expect wlanix to broadcast the scan cancel.
+        scan_end_sender.send(Ok(ScanEnd::Cancelled)).expect("Failed to send scan end");
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let message = assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(message) => message);
+        assert_eq!(message.payload.cmd, Nl80211Cmd::ScanAborted);
     }
 
     #[test]
