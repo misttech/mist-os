@@ -14,7 +14,10 @@ group("tests") {
   deps = []
 
   if (!is_asan) {
-    deps += [ ":starnix_gvisor_tests" ]
+    deps += [
+      ":starnix_gvisor_benchmarks",
+      ":starnix_gvisor_tests",
+    ]
     if (data_filesystem_format == "fxfs") {
       deps += [ ":starnix_gvisor_tests_on_fxfs" ]
     }
