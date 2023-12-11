@@ -5,5 +5,5 @@
 library fuchsia.powermanager.driver;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  ROOT = 0x0001,
+  PLATFORM = 0x0001,
 };

@@ -4,4 +4,4 @@
 
 using fuchsia.powermanager.driver;
 
-fuchsia.BIND_PROTOCOL == fuchsia.powermanager.driver.BIND_PROTOCOL.ROOT;
+fuchsia.BIND_PROTOCOL == fuchsia.powermanager.driver.BIND_PROTOCOL.PLATFORM;

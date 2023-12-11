@@ -81,7 +81,7 @@ class RootDriver : public fdf::DriverBase,
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
     properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */,
-                                      bind_fuchsia_powermanager_driver::BIND_PROTOCOL_ROOT);
+                                      bind_fuchsia_powermanager_driver::BIND_PROTOCOL_PLATFORM);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, child_node_name)

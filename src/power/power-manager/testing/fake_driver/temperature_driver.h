@@ -5,27 +5,48 @@
 #ifndef SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_TEMPERATURE_DRIVER_H_
 #define SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_TEMPERATURE_DRIVER_H_
 
-#include <fidl/fuchsia.hardware.temperature/cpp/wire.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/devfs/cpp/connector.h>
+
+#include "control_server.h"
+#include "temperature_server.h"
 
 namespace fake_driver {
 
-// Protocol served to client components over devfs.
-class TemperatureDeviceProtocolServer
-    : public fidl::WireServer<fuchsia_hardware_temperature::Device> {
+class Driver : public fdf::DriverBase {
  public:
-  explicit TemperatureDeviceProtocolServer(float* temperature);
+  Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
-
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
-
-  void Serve(async_dispatcher_t* dispatcher,
-             fidl::ServerEnd<fuchsia_hardware_temperature::Device> server);
+  zx::result<> Start() override;
 
  private:
-  fidl::ServerBindingGroup<fuchsia_hardware_temperature::Device> bindings_;
+  // Add a child device node and offer the service capabilities.
+  template <typename A, typename B>
+  zx::result<> AddDriverAndControl(fidl::ClientEnd<fuchsia_driver_framework::Node>* parent,
+                                   std::string_view driver_node_name,
+                                   std::string_view driver_class_name,
+                                   driver_devfs::Connector<A>& driver_devfs_connector,
+                                   driver_devfs::Connector<B>& control_devfs_connector);
+  template <typename T>
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> AddChild(
+      fidl::ClientEnd<fuchsia_driver_framework::Node>* parent, std::string_view node_name,
+      std::string_view class_name, driver_devfs::Connector<T>& devfs_connector);
 
-  float* temperature_;
+  // Start serving Protocol (to be called by the devfs connector when a connection is established).
+  void ServeTemperature(fidl::ServerEnd<fuchsia_hardware_temperature::Device> server);
+  void ServeControl(fidl::ServerEnd<fuchsia_powermanager_driver_temperaturecontrol::Device> server);
+
+  driver_devfs::Connector<fuchsia_hardware_temperature::Device> temperature_connector_;
+  driver_devfs::Connector<fuchsia_powermanager_driver_temperaturecontrol::Device>
+      control_connector_;
+
+  std::vector<fidl::ClientEnd<fuchsia_driver_framework::Node>> nodes_;
+  std::vector<fidl::WireSyncClient<fuchsia_driver_framework::NodeController>> controllers_;
+
+  TemperatureDeviceProtocolServer temperature_server_;
+  ControlDeviceProtocolServer control_server_;
+
+  float temperature_ = 0.0f;
 };
 
 }  // namespace fake_driver

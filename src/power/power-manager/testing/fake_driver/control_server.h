@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_H_
-#define SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_H_
+#ifndef SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_SERVER_H_
+#define SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.powermanager.driver.temperaturecontrol/cpp/wire.h>
 
@@ -29,4 +29,4 @@ class ControlDeviceProtocolServer
 
 }  // namespace fake_driver
 
-#endif  // SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_H_
+#endif  // SRC_POWER_POWER_MANAGER_TESTING_FAKE_DRIVER_CONTROL_SERVER_H_

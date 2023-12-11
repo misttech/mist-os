@@ -8,8 +8,8 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
-#include "control.h"
-#include "temperature_driver.h"
+#include "control_server.h"
+#include "temperature_server.h"
 
 namespace fake_driver {
 

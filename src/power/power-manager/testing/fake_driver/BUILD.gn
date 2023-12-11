@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 
 source_set("lib") {
   sources = [
-    "control.cc",
-    "temperature_driver.cc",
+    "control_server.cc",
+    "temperature_server.cc",
   ]
 
   public_deps = [
@@ -20,34 +20,28 @@ source_set("lib") {
   ]
 }
 
-driver_bind_rules("power-manager-fake-bind") {
-  rules = "power-manager-fake-bind.bind"
-  bind_output = "power-manager-fake-bind.bindbc"
+driver_bind_rules("bind-to-platform") {
+  rules = "bind-to-platform.bind"
+  bind_output = "bind-to-platform.bindbc"
   deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
 fuchsia_driver("fake-temperature") {
   output_name = "fake-temperature"
-  sources = [ "driver.cc" ]
+  sources = [ "temperature_driver.cc" ]
 
   deps = [
+    ":bind-to-platform",
     ":lib",
-    ":power-manager-fake-bind",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
 fuchsia_driver_component("component") {
   component_name = "fake-temperature"
-  manifest = "meta/power-manager-fake-driver.cml"
+  manifest = "meta/fake-temperature-driver.cml"
   deps = [ ":fake-temperature" ]
   info = "power-manager-fake-driver.json"
-}
-
-driver_bind_rules("power-manager-nelson-fake-bind") {
-  rules = "power-manager-nelson-fake-bind.bind"
-  bind_output = "power-manager-nelson-fake-bind.bindbc"
-  deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
 fuchsia_driver("power-manager-nelson-fake-driver") {
@@ -55,15 +49,15 @@ fuchsia_driver("power-manager-nelson-fake-driver") {
   sources = [ "nelson_driver.cc" ]
 
   deps = [
+    ":bind-to-platform",
     ":lib",
-    ":power-manager-nelson-fake-bind",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
 fuchsia_driver_component("nelson-component") {
   component_name = "power-manager-nelson-fake-driver"
-  manifest = "meta/power-manager-nelson-fake-driver.cml"
+  manifest = "meta/fake-nelson-driver.cml"
   deps = [ ":power-manager-nelson-fake-driver" ]
   info = "power-manager-fake-driver.json"
 }
