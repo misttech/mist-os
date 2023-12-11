@@ -4,6 +4,9 @@
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
+use assembly_config_schema::assembly_config::{
+    AdditionalPackageContents, CompiledPackageDefinition,
+};
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
@@ -13,6 +16,7 @@ use assembly_tool::SdkToolProvider;
 use assembly_util as util;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
+use std::collections::BTreeMap;
 use tracing::info;
 
 mod assembly_builder;
@@ -140,6 +144,21 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_bundle(&platform_bundle_path).with_context(|| {
             format!("Adding platform bundle {platform_bundle_name} ({platform_bundle_path})")
         })?;
+    }
+
+    // Add the core shards.
+    if !configuration.core_shards.is_empty() {
+        let compiled_package_def =
+            CompiledPackageDefinition::Additional(AdditionalPackageContents {
+                name: "core".to_string(),
+                component_shards: BTreeMap::from([(
+                    "core".to_string(),
+                    configuration.core_shards.clone(),
+                )]),
+            });
+        builder
+            .add_compiled_package(&compiled_package_def, "".into())
+            .context("Adding core shards")?;
     }
 
     // Add the legacy bundle.

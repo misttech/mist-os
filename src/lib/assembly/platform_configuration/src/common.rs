@@ -152,6 +152,9 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Create a new domain config package.
     fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder;
+
+    /// Add a core shard.
+    fn core_shard(&mut self, path: &Utf8PathBuf);
 }
 
 /// The interface for specifying the configuration to provide for bootfs.
@@ -244,6 +247,9 @@ pub(crate) struct ConfigurationBuilderImpl {
     ///
     /// If not set, use the unflavored version of the component.
     icu_config: ICUConfig,
+
+    /// The core shards to add.
+    core_shards: Vec<Utf8PathBuf>,
 }
 
 #[cfg(test)]
@@ -264,14 +270,16 @@ impl ConfigurationBuilderImpl {
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),
             icu_config,
+            core_shards: Vec::new(),
         }
     }
 
     /// Convert the builder into the completed configuration that can be used
     /// to create the configured platform itself.
     pub fn build(self) -> CompletedConfiguration {
-        let Self { bundles, bootfs, package_configs, domain_configs, icu_config: _ } = self;
-        CompletedConfiguration { bundles, bootfs, package_configs, domain_configs }
+        let Self { bundles, bootfs, package_configs, domain_configs, icu_config: _, core_shards } =
+            self;
+        CompletedConfiguration { bundles, bootfs, package_configs, domain_configs, core_shards }
     }
 }
 
@@ -294,6 +302,9 @@ pub struct CompletedConfiguration {
 
     /// The list of domain configs to add.
     pub domain_configs: DomainConfigs,
+
+    // The list of core shards to add.
+    pub core_shards: Vec<Utf8PathBuf>,
 }
 
 /// A map from package names to the configuration to apply to them.
@@ -434,6 +445,10 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         };
         self.platform_bundle(&bundle_name);
         Ok(())
+    }
+
+    fn core_shard(&mut self, path: &Utf8PathBuf) {
+        self.core_shards.push(path.clone());
     }
 }
 
