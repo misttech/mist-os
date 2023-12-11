@@ -466,7 +466,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     capability must be available from the component referenced in `from`.
 - `subdir`: (_optional `string`_) (`storage` only) A subdirectory within `backing_dir` where per-component isolated storage
     directories are created
-- `storage_id`: (_optional `string`_) (`storage only`) The identifier used to isolated storage for a component, one of:
+- `storage_id`: (_optional `string`_) (`storage` only) The identifier used to isolated storage for a component, one of:
     - `static_instance_id`: The instance ID in the component ID index is used
         as the key for a component's storage. Components which are not listed in
         the component ID index will not be able to use this storage capability.
@@ -474,32 +474,40 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
         component ID index, the instance ID is used as the key for a component's
         storage. Otherwise, the component's moniker from the storage
         capability is used.
-- `config_type`: (_optional `string`_) (`configuration only`) The type of configuration, one of:
+- `type`: (_optional `string`_) (`configuration` only) The type of configuration, one of:
     - `bool`: Boolean type.
     - `uint8`: Unsigned 8 bit type.
     - `uint16`: Unsigned 16 bit type.
-    - `uint32`:Unsigned 32 bit type.
-    - `uint64`:Unsigned 64 bit type.
+    - `uint32`: Unsigned 32 bit type.
+    - `uint64`: Unsigned 64 bit type.
     - `int8`: Signed 8 bit type.
     - `int16`: Signed 16 bit type.
     - `int32`: Signed 32 bit type.
     - `int64`: Signed 64 bit type.
     - `string`: ASCII string type.
-    - `vector`: Vector type. See `element_type` for the type of the element within the vector.
-- `config_max_size`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'string'.
+    - `vector`: Vector type. See `element` for the type of the element within the vector.
+- `max_size`: (_optional `non-zero number`_) (`configuration` only) Only supported if this configuration `type` is 'string'.
     This is the max size of the string.
-- `config_max_count`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'vector'.
-    This is the max amount of elements in the vector.
-- `config_element_type`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'vector'.
+- `max_count`: (_optional `non-zero number`_) (`configuration` only) Only supported if this configuration `type` is 'vector'.
+    This is the max number of elements in the vector.
+- `element`: (_optional `object`_) (`configuration` only) Only supported if this configuration `type` is 'vector'.
     This is the type of the elements in the configuration vector.
+
     Example (simple type):
-     { type: "uint8" }
+
+    ```json5
+    { type: "uint8" }
+    ```
+
     Example (string type):
-     {
-       type: "string",
-       max_size: 100,
-     }
-- `value`: (_optional `string`_) (`configuration only`) The value of the configuration.
+
+    ```json5
+    {
+      type: "string",
+      max_size: 100,
+    }
+    ```
+- `value`: (_optional `any`_) (`configuration` only) The value of the configuration.
 
 
 ### `use` {#use}

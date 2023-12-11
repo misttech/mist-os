@@ -236,9 +236,11 @@ struct ReferenceDocFieldAttributes {
     /// "object", "number", "boolean".
     ///
     /// If omitted, a naive type will be derived from the Rust type:
+    ///   serde_json::Value -> any
     ///   String -> string
     ///   bool -> boolean
     ///   u8, u16, i8, ... -> number
+    ///   NonZeroU8, NonZeroU16, NonZeroI8, ... -> non-zero number
     ///   anything with `recursive=true` -> object
     ///   default -> string
     #[darling(default)]
@@ -323,8 +325,23 @@ fn get_json_type_string_from_ty_string(ty_string: &str) -> Option<&str> {
     let number_types = &[
         "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "usize", "f32", "f64",
     ];
+    let non_zero_number_types = &[
+        "NonZeroI8",
+        "NonZeroI16",
+        "NonZeroI32",
+        "NonZeroI64",
+        "NonZeroI128",
+        "NonZeroU8",
+        "NonZeroU16",
+        "NonZeroU32",
+        "NonZeroU64",
+        "NonZeroU128",
+        "NonZeroUsize",
+    ];
     let map_types = &["Map", "BTreeMap", "HashMap", "IndexMap"];
-    if ty_string == "String" {
+    if ty_string == "serde_json::Value" {
+        Some("any")
+    } else if ty_string == "String" {
         Some("string")
     } else if ty_string == "bool" {
         Some("bool")
@@ -334,6 +351,8 @@ fn get_json_type_string_from_ty_string(ty_string: &str) -> Option<&str> {
         Some("object")
     } else if number_types.iter().any(|v| v == &ty_string) {
         Some("number")
+    } else if non_zero_number_types.iter().any(|v| v == &ty_string) {
+        Some("non-zero number")
     } else {
         None
     }
