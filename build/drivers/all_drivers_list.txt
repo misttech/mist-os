@@ -106,6 +106,7 @@
 //src/devices/board/drivers/integration-test:integration-test-driver
 //src/devices/board/drivers/machina:machina-driver
 //src/devices/board/drivers/nelson:nelson-module-driver
+//src/devices/board/drivers/nelson/post-init:post-init-driver
 //src/devices/board/drivers/qemu-arm64:qemu-arm64-driver
 //src/devices/board/drivers/qemu-riscv64:qemu-riscv64-driver
 //src/devices/board/drivers/sherlock:sherlock-driver
