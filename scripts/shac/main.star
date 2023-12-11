@@ -64,7 +64,7 @@ def _gn_format(ctx):
             ).wait()
             if res.retcode == 1:
                 finding = res.stdout
-                fail("%s: %s", f, finding)
+                fail("{}: {}".format(f, finding))
 
 def register_all_checks():
     """Register all checks that should run.
