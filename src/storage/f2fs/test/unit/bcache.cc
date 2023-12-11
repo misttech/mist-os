@@ -434,9 +434,7 @@ TEST_P(F2fsMountedBcacheMapperTest, ReadWrite) {
   }
   w_buf_iter = w_buf;
   for (size_t i = 0; i < total_pages; ++i) {
-    size_t out;
-    ASSERT_EQ(test_file_ptr->Read(r_buf, kPageSize, i * kPageSize, &out), ZX_OK);
-    ASSERT_EQ(out, kPageSize);
+    FileTester::ReadFromFile(test_file_ptr, r_buf, kPageSize, i * kPageSize);
     ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);
     w_buf_iter += kPageSize;
   }

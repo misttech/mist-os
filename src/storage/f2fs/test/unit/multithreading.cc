@@ -34,7 +34,7 @@ TEST_F(MultiThreads, Truncate) {
       });
       for (int i = 0; i < kNTry; ++i) {
         size_t out_actual;
-        ASSERT_EQ(vn->Write(buf, sizeof(buf), 0, &out_actual), ZX_OK);
+        ASSERT_EQ(FileTester::Write(vn.get(), buf, sizeof(buf), 0, &out_actual), ZX_OK);
       }
       run = false;
       truncate.join();
@@ -59,7 +59,8 @@ TEST_F(MultiThreads, Write) {
       std::thread writer1 = std::thread([&]() {
         for (int i = 0; i < kNTry; ++i) {
           size_t out_actual;
-          ASSERT_EQ(vn1->Write(buf, sizeof(buf), static_cast<size_t>(i * kBlockSize), &out_actual),
+          ASSERT_EQ(FileTester::Write(vn1.get(), buf, sizeof(buf),
+                                      static_cast<size_t>(i * kBlockSize), &out_actual),
                     ZX_OK);
           ASSERT_EQ(out_actual, sizeof(buf));
         }
@@ -68,7 +69,8 @@ TEST_F(MultiThreads, Write) {
       std::thread writer2 = std::thread([&]() {
         for (int i = 0; i < kNTry; ++i) {
           size_t out_actual;
-          ASSERT_EQ(vn2->Write(buf, sizeof(buf), static_cast<size_t>(i * kBlockSize), &out_actual),
+          ASSERT_EQ(FileTester::Write(vn2.get(), buf, sizeof(buf),
+                                      static_cast<size_t>(i * kBlockSize), &out_actual),
                     ZX_OK);
           ASSERT_EQ(out_actual, sizeof(buf));
         }

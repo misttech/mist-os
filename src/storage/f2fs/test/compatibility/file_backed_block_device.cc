@@ -20,21 +20,20 @@ zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* request
       case BLOCK_OPCODE_READ: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
-        uint8_t buffer[block_size_];
-        memset(buffer, 0, block_size_);
+        auto buffer = std::make_unique<uint8_t[]>(block_size_);
         for (size_t j = 0; j < requests[i].length; ++j) {
           uint64_t offset = (requests[i].dev_offset + j) * block_size_;
           if (lseek(fd_.get(), offset, SEEK_SET) < 0) {
             FX_LOGS(ERROR) << "seek for read failed at " << offset << ". " << errno;
             return ZX_ERR_IO;
           }
-          if (size_t ret = read(fd_.get(), buffer, block_size_); ret != block_size_) {
+          if (size_t ret = read(fd_.get(), buffer.get(), block_size_); ret != block_size_) {
             FX_LOGS(ERROR) << "read failed at " << offset;
             return ZX_ERR_IO;
           }
 
           offset = (requests[i].vmo_offset + j) * block_size_;
-          if (zx_status_t status = target_vmoid.write(buffer, offset, block_size_);
+          if (zx_status_t status = target_vmoid.write(buffer.get(), offset, block_size_);
               status != ZX_OK) {
             FX_LOGS(ERROR) << "Write to buffer failed: offset=" << offset
                            << ", block_size_=" << block_size_;
@@ -46,11 +45,10 @@ zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* request
       case BLOCK_OPCODE_WRITE: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
-        uint8_t buffer[block_size_];
-        memset(buffer, 0, block_size_);
+        auto buffer = std::make_unique<uint8_t[]>(block_size_);
         for (size_t j = 0; j < requests[i].length; j++) {
           uint64_t offset = (requests[i].vmo_offset + j) * block_size_;
-          if (zx_status_t status = target_vmoid.read(buffer, offset, block_size_);
+          if (zx_status_t status = target_vmoid.read(buffer.get(), offset, block_size_);
               status != ZX_OK) {
             FX_LOGS(ERROR) << "Read from buffer failed: offset=" << offset
                            << ", block_size_=" << block_size_;
@@ -62,7 +60,7 @@ zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* request
             FX_LOGS(ERROR) << "seek for write failed at " << offset << ". " << errno;
             return ZX_ERR_IO;
           }
-          if (size_t ret = write(fd_.get(), buffer, block_size_); ret != block_size_) {
+          if (size_t ret = write(fd_.get(), buffer.get(), block_size_); ret != block_size_) {
             FX_LOGS(ERROR) << "write failed at " << offset;
             return ZX_ERR_IO;
           }

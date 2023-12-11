@@ -743,8 +743,9 @@ TEST_F(NodeManagerTest, NodeFooter) {
 
 TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   // Alloc inode
-  fbl::RefPtr<VnodeF2fs> vnode;
-  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
+  fbl::RefPtr<VnodeF2fs> file_vnode;
+  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);
+  auto vnode = fbl::RefPtr<File>::Downcast(std::move(file_vnode));
   ASSERT_TRUE(vnode->NewInodePage().is_ok());
 
   NodeManager &node_manager = fs_->GetNodeManager();
@@ -768,7 +769,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   pgoff_t file_offset = direct_index * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), direct_index, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), direct_index, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(direct_index, 1);
@@ -786,7 +787,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   file_offset = indirect_index_lv1 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv1, 1);
@@ -805,7 +806,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   file_offset = indirect_index_lv2 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv2, 1);
@@ -823,7 +824,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   file_offset = (indirect_index_lv2 + indirect_blks) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv2 + indirect_blks, 1);
@@ -841,7 +842,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   file_offset = indirect_index_lv3 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv3, 1);
@@ -862,8 +863,9 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
 
 TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   // Alloc inode
-  fbl::RefPtr<VnodeF2fs> vnode;
-  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
+  fbl::RefPtr<VnodeF2fs> file_vnode;
+  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);
+  auto vnode = fbl::RefPtr<File>::Downcast(std::move(file_vnode));
   ASSERT_TRUE(vnode->NewInodePage().is_ok());
 
   NodeManager &node_manager = fs_->GetNodeManager();
@@ -887,7 +889,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   pgoff_t file_offset = direct_index * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(direct_index, 2);
@@ -908,7 +910,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   file_offset = indirect_index_lv1 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv1, 2);
@@ -930,7 +932,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   file_offset = indirect_index_lv2 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv2, 2);
@@ -951,7 +953,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   file_offset = (indirect_index_lv2 + indirect_blks) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv2 + indirect_blks, 2);
@@ -972,7 +974,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   file_offset = indirect_index_lv3 * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv3, 2);
@@ -997,8 +999,9 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
 
 TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   // Alloc inode
-  fbl::RefPtr<VnodeF2fs> vnode;
-  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
+  fbl::RefPtr<VnodeF2fs> file_vnode;
+  FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);
+  auto vnode = fbl::RefPtr<File>::Downcast(std::move(file_vnode));
   ASSERT_TRUE(vnode->NewInodePage().is_ok());
 
   NodeManager &node_manager = fs_->GetNodeManager();
@@ -1021,7 +1024,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   pgoff_t file_offset = static_cast<pgoff_t>((kAddrsPerInode - 1)) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(kAddrsPerInode - 1, 2);
@@ -1045,7 +1048,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   file_offset = (indirect_index_lv1 + direct_blks - 1) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv1 + direct_blks - 1, 2);
@@ -1067,7 +1070,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   file_offset = (indirect_index_lv1 + direct_blks * 2 - 1) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or =
@@ -1092,7 +1095,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   file_offset = (indirect_index_lv2 - 1) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv2 - 1, 2);
@@ -1115,7 +1118,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   file_offset = (indirect_index_lv2 + indirect_blks + direct_blks - 1) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or =
@@ -1144,7 +1147,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   file_offset = (indirect_index_lv3 + direct_blks - 1) * kBlockSize;
   {
     vnode->Truncate(file_offset);
-    ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
+    ASSERT_EQ(FileTester::Write(vnode.get(), buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
     auto block_addresses_or = vnode->GetDataBlockAddresses(indirect_index_lv3 + direct_blks - 1, 2);

@@ -319,18 +319,52 @@ void FileTester::AppendToInline(File *file, const void *data, size_t len) {
 }
 
 void FileTester::AppendToFile(File *file, const void *data, size_t len) {
-  size_t end = 0;
-  size_t ret = 0;
-
-  ASSERT_EQ(file->Append(data, len, &end, &ret), ZX_OK);
-  ASSERT_EQ(ret, len);
+  size_t actual;
+  size_t end;
+  ASSERT_EQ(Append(file, data, len, &end, &actual), ZX_OK);
+  ASSERT_EQ(actual, len);
 }
 
 void FileTester::ReadFromFile(File *file, void *data, size_t len, size_t off) {
-  size_t ret = 0;
+  size_t actual;
+  ASSERT_EQ(Read(file, data, len, off, &actual), ZX_OK);
+  ASSERT_EQ(actual, len);
+}
 
-  ASSERT_EQ(file->Read(data, len, off, &ret), ZX_OK);
-  ASSERT_EQ(ret, len);
+zx_status_t FileTester::Read(File *file, void *data, size_t len, size_t off, size_t *out_actual) {
+  zx::stream stream;
+  if (auto ret = file->CreateStream(ZX_STREAM_MODE_READ, &stream); ret != ZX_OK) {
+    return ret;
+  }
+
+  zx_iovec_t iov = {
+      .buffer = data,
+      .capacity = len,
+  };
+  return stream.readv_at(0, off, &iov, 1, out_actual);
+}
+
+zx_status_t FileTester::Write(File *file, const void *data, size_t len, size_t offset,
+                              size_t *out_actual) {
+  zx::stream stream;
+  if (auto ret = file->CreateStream(ZX_STREAM_MODE_WRITE, &stream); ret != ZX_OK) {
+    return ret;
+  }
+
+  // Since zx_iovec_t::buffer is not a const type, we make a copied buffer and use it.
+  auto copied = std::make_unique<uint8_t[]>(len);
+  std::memcpy(copied.get(), data, len);
+  zx_iovec_t iov = {
+      .buffer = copied.get(),
+      .capacity = len,
+  };
+  return stream.writev_at(0, offset, &iov, 1, out_actual);
+}
+
+zx_status_t FileTester::Append(File *file, const void *data, size_t len, size_t *out_end,
+                               size_t *out_actual) {
+  *out_end = file->GetSize();
+  return Write(file, data, len, *out_end, out_actual);
 }
 
 void MapTester::CheckNodeLevel(F2fs *fs, VnodeF2fs *vn, uint32_t level) {

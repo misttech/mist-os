@@ -942,9 +942,6 @@ TEST_F(CheckpointTest, CpError) {
   ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
   // All operations causing dirty pages are not allowed.
-  size_t end = 0, out = 0;
-  ASSERT_EQ(vnode->Append(wbuf, kBlockSize, &end, &out), ZX_ERR_BAD_STATE);
-  ASSERT_EQ(vnode->Write(wbuf, kBlockSize, 0, &out), ZX_ERR_BAD_STATE);
   ASSERT_EQ(vnode->Truncate(0), ZX_ERR_BAD_STATE);
   ASSERT_EQ(root_dir_->Unlink("test", false), ZX_ERR_BAD_STATE);
   ASSERT_EQ(root_dir_->Create("test2", S_IFREG, &test_file), ZX_ERR_BAD_STATE);

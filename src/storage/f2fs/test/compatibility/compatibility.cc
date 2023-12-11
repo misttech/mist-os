@@ -154,7 +154,17 @@ ssize_t FuchsiaTestFile::Read(void* buf, size_t count) {
   File* file = static_cast<File*>(vnode_.get());
   size_t ret = 0;
 
-  if (file->Read(buf, count, offset_, &ret) != ZX_OK) {
+  zx::stream stream;
+  if (auto ret = file->CreateStream(ZX_STREAM_MODE_READ, &stream); ret != ZX_OK) {
+    return 0;
+  }
+
+  zx_iovec_t iov = {
+      .buffer = buf,
+      .capacity = count,
+  };
+
+  if (stream.readv_at(0, offset_, &iov, 1, &ret) != ZX_OK) {
     return 0;
   }
 
@@ -171,7 +181,20 @@ ssize_t FuchsiaTestFile::Write(const void* buf, size_t count) {
   File* file = static_cast<File*>(vnode_.get());
   size_t ret = 0;
 
-  if (file->Write(buf, count, offset_, &ret) != ZX_OK) {
+  zx::stream stream;
+  if (auto ret = file->CreateStream(ZX_STREAM_MODE_WRITE, &stream); ret != ZX_OK) {
+    return 0;
+  }
+
+  // Since zx_iovec_t::buffer is not a const type, we make a copied buffer and use it.
+  auto copied = std::make_unique<uint8_t[]>(count);
+  std::memcpy(copied.get(), buf, count);
+  zx_iovec_t iov = {
+      .buffer = copied.get(),
+      .capacity = count,
+  };
+
+  if (stream.writev_at(0, offset_, &iov, 1, &ret) != ZX_OK) {
     return 0;
   }
 

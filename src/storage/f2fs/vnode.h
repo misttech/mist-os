@@ -461,16 +461,6 @@ class VnodeF2fs : public fs::PagedVnode,
     return paged_vmo().is_valid();
   }
 
-  zx_status_t Read(void *data, size_t len, size_t off, size_t *out_actual) override {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t Write(const void *data, size_t len, size_t offset, size_t *out_actual) override {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t Append(const void *data, size_t len, size_t *out_end, size_t *out_actual) override {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t Truncate(size_t len) override { return ZX_ERR_NOT_SUPPORTED; }
   DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
   VmoManager &GetVmoManager() const { return vmo_manager(); }
 

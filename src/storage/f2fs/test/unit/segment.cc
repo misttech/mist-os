@@ -505,7 +505,8 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
   };
   while (!fs->GetSegmentManager().NeedInplaceUpdate(file.get())) {
     size_t out_end, out_actual;
-    if (auto ret = file->Append(buf, sizeof(buf), &out_end, &out_actual); ret == ZX_ERR_NO_SPACE) {
+    if (auto ret = FileTester::Append(file.get(), buf, sizeof(buf), &out_end, &out_actual);
+        ret == ZX_ERR_NO_SPACE) {
       break;
     } else {
       ASSERT_EQ(ret, ZX_OK);

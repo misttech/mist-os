@@ -127,6 +127,12 @@ class FileTester {
   static void AppendToInline(File *file, const void *data, size_t len);
   static void AppendToFile(File *file, const void *data, size_t len);
   static void ReadFromFile(File *file, void *data, size_t len, size_t off);
+
+  static zx_status_t Read(File *file, void *data, size_t len, size_t off, size_t *out_actual);
+  static zx_status_t Write(File *file, const void *data, size_t len, size_t offset,
+                           size_t *out_actual);
+  static zx_status_t Append(File *file, const void *data, size_t len, size_t *out_end,
+                            size_t *out_actual);
 };
 
 class MapTester {
