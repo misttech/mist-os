@@ -3233,6 +3233,8 @@ assembly_resources_directory("resources") {
 
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
+    "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
+    "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]
   deps = [ "//src/lib/icu/tzdata:revision" ]
 }

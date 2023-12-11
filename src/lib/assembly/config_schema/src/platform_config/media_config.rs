@@ -18,6 +18,9 @@ pub struct PlatformMediaConfig {
 
     #[serde(default)]
     pub camera: CameraConfig,
+
+    #[serde(default)]
+    pub multizone_leader: MultizoneConfig,
 }
 
 /// The audio stack to use in the platform.
@@ -45,4 +48,15 @@ pub struct AudioCoreConfig {
 pub struct CameraConfig {
     #[serde(default)]
     pub enabled: bool,
+}
+
+/// The multizone_leader settings for the platform.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct MultizoneConfig {
+    /// The component url for the multizone leader component.
+    /// The component should expose these capabilities:
+    ///   fuchsia.media.SessionAudioConsumerFactory
+    ///   google.cast.multizone.Leader
+    #[serde(default)]
+    pub component_url: Option<String>,
 }

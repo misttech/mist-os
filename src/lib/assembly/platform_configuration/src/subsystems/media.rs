@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use crate::util;
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct MediaSubsystem;
@@ -48,6 +49,19 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
 
         if media_config.camera.enabled {
             builder.platform_bundle("camera");
+        }
+
+        if let Some(url) = &media_config.multizone_leader.component_url {
+            util::add_platform_declared_product_provided_component(
+                &url,
+                "multizone_leader.core_shard.cml.template",
+                context,
+                builder,
+            )?;
+
+            if *context.build_type == BuildType::Eng {
+                builder.core_shard(&context.get_resource("multizone_leader.core_shard_eng.cml"));
+            }
         }
 
         Ok(())
