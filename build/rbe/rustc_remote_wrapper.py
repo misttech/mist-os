@@ -512,15 +512,28 @@ class RustRemoteAction(object):
         remote_depfile_inputs = [
             target for paths in target_paths for target in paths
         ]
+
+        # Depending on the rustc options used for scanning for dependencies,
+        # the depfile may contain only the .rmeta metadata file for some
+        # entries (because only metadata is needed for fast operations like
+        # dep-scanning).  However, we need to interpret this as the remote
+        # compile/link needing the actual .rlib.
+        def expand_rmetas(paths: Path) -> Iterable[Path]:
+            for path in paths:
+                yield path
+                if path.name.endswith(".rmeta"):
+                    yield path.with_suffix(".rlib")
+
+        expanded_remote_inputs = list(expand_rmetas(remote_depfile_inputs))
+
         # TODO: if needed, transform the rust std lib paths, depending on
         #   Fuchsia directory layout of Rust prebuilt libs.
         #   See remap_remote_rust_lib() in rustc-remote-wrapper.sh
         #   for one possible implementation.
-
         yield from self.yield_verbose(
             "depfile inputs",
             relativize_paths(
-                accompany_rlib_with_so(remote_depfile_inputs), self.working_dir
+                accompany_rlib_with_so(expanded_remote_inputs), self.working_dir
             ),
         )
 
