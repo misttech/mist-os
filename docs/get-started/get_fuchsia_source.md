@@ -16,7 +16,7 @@ The steps are:
 ## 1. Install prerequisite packages {#install-prerequisite-packages}
 
 Fuchsia requires `curl`, `file`, `unzip`, and `git` to be up to date. The version
-of `git` needs to be 2.28 or higher.
+of `git` needs to be 2.31 or higher.
 
 * {Linux}
 
