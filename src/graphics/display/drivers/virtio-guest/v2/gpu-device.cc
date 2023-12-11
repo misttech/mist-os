@@ -11,9 +11,11 @@
 #include <lib/zx/pmt.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -146,6 +148,7 @@ zx_status_t GpuDevice::Init() {
   }
 
   // Allocate the control virtqueue.
+  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
   status = virtio_queue_.Init(0, 16);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to allocate control virtqueue: %s", zx_status_get_string(status));
@@ -161,50 +164,67 @@ zx_status_t GpuDevice::Init() {
 void GpuDevice::IrqRingUpdate() {
   FDF_LOG(TRACE, "IrqRingUpdate()");
 
-  // TODO(costan): `vring` may be used across threads without synchronization.
+  // The lambda passed to virtio::Ring::IrqRingUpdate() should be annotated
+  // __TA_REQUIRES(virtio_queue_mutex_). However, Clang's Thread Safety analysis
+  // cannot prove the correctness of this annotation.
   //
-  // VIRTIO spec Section 2.7.7.1 "Driver Requirements: Used Buffer Notification
-  // Suppression" requires that drivers handle spurious notifications. A data
-  // race can occur if a spurious interrupt is processed as the same time as an
-  // ExchangeRequestResponse() method call.
+  // Clang's static analyzer does not do inter-procedural analysis such as
+  // inlining. Therefore, the analyzer does not know that IrqRingUpdate() only
+  // calls the lambda argument before returning. So, it does not know that the
+  // fbl::AutoLock is alive during the lambda calls, which would satisfy the
+  // __TA_REQUIRES() annotation on the lambda.
+  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
+  virtio_queue_.IrqRingUpdate([&](vring_used_elem* used_buffer_info)
+                                  __TA_NO_THREAD_SAFETY_ANALYSIS {
+                                    const uint32_t used_descriptor_index = used_buffer_info->id;
+                                    VirtioBufferUsedByDevice(used_descriptor_index);
+                                  });
+}
 
-  // Parse our descriptor chain, add back to the free queue
-  auto free_chain = [this](vring_used_elem* used_elem) {
-    uint16_t i = static_cast<uint16_t>(used_elem->id);
-    struct vring_desc* desc = virtio_queue_.DescFromIndex(i);
-    for (;;) {
-      int next;
+void GpuDevice::VirtioBufferUsedByDevice(uint32_t used_descriptor_index) {
+  if (unlikely(used_descriptor_index > std::numeric_limits<uint16_t>::max())) {
+    FDF_LOG(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
+            used_descriptor_index);
+    return;
+  }
+  // The check above ensures that the static_cast below does not lose any
+  // information.
+  uint16_t used_descriptor_index_u16 = static_cast<uint16_t>(used_descriptor_index);
 
-      if (desc->flags & VRING_DESC_F_NEXT) {
-        next = desc->next;
-      } else {
-        // End of chain
-        next = -1;
-      }
+  while (true) {
+    struct vring_desc* buffer_descriptor = virtio_queue_.DescFromIndex(used_descriptor_index_u16);
 
-      virtio_queue_.FreeDesc(i);
+    // Read information before the descriptor is freed.
+    const bool next_descriptor_index_is_valid = (buffer_descriptor->flags & VRING_DESC_F_NEXT) != 0;
+    const uint16_t next_descriptor_index = buffer_descriptor->next;
+    virtio_queue_.FreeDesc(used_descriptor_index_u16);
 
-      if (next < 0) {
-        break;
-      }
-      i = static_cast<uint16_t>(next);
-      desc = virtio_queue_.DescFromIndex(i);
-    }
-
-    // TODO(costan): The signal may be fired prematurely.
-    //
     // VIRTIO spec Section 2.7.7.1 "Driver Requirements: Used Buffer
     // Notification Suppression" requires that drivers handle spurious
-    // notifications. This signal must only be fired when the virtqueue
-    // allocated in ExchangeRequestResponse() is used by the device.
+    // notifications. So, we only notify the request thread when the device
+    // reports having used the specific buffer that populated the request.
+    // buffer has been used by the device.
+    if (virtio_queue_request_index_.has_value() &&
+        virtio_queue_request_index_.value() == used_descriptor_index) {
+      virtio_queue_request_index_.reset();
 
-    // Notify the request thread
-    fbl::AutoLock virtqueue_lock(&virtio_queue_mutex_);
-    virtio_queue_buffer_used_signal_.Signal();
-  };
+      // TODO(costan): Ideally, the variable would be signaled when
+      // `virtio_queue_mutex_` is not locked. This would avoid having the
+      // ExchangeRequestResponse() thread wake up, only to have to wait on the
+      // mutex. Some options are:
+      // * Plumb a (currently 1-element long) list of variables to be signaled
+      //   from VirtioBufferUsedByDevice() to IrqRingUpdate().
+      // * Replace virtio::Ring::IrqRingUpdate() with an iterator abstraction.
+      //   The list of variables to be signaled would not need to be plumbed
+      //   across methods.
+      virtio_queue_buffer_used_signal_.Signal();
+    }
 
-  // Tell the ring to find free chains and hand it back to our lambda
-  virtio_queue_.IrqRingUpdate(free_chain);
+    if (!next_descriptor_index_is_valid) {
+      break;
+    }
+    used_descriptor_index_u16 = next_descriptor_index;
+  }
 }
 
 void GpuDevice::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }

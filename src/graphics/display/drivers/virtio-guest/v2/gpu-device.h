@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
+#include <optional>
 
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
@@ -34,7 +35,7 @@ class GpuDevice : public virtio::Device {
  public:
   // Exposed for testing. Production code must use the Create() factory method.
   //
-  // `bti` is used to obtain phyiscal memory addresses given to the virtio
+  // `bti` is used to obtain physical memory addresses given to the virtio
   // device.
   //
   // `virtio_queue_buffer_pool` must be large enough to store requests and
@@ -72,17 +73,43 @@ class GpuDevice : public virtio::Device {
   //     const auto& response =
   //         device->ExchangeRequestResponse<virtio_abi::EmptyResponse>(
   //             request);
+  //
+  // The current implementation fully serializes request/response exchanges.
+  // More precisely, even if ExchangeRequestResponse() is called concurrently,
+  // the virtio device will never be given a request while another request is
+  // pending. While this behavior is observable, it is not part of the API. The
+  // implementation may be evolved to issue concurrent requests in the future.
   template <typename ResponseType, typename RequestType>
   const ResponseType& ExchangeRequestResponse(const RequestType& request);
 
  private:
+  // Called when the virtio device notifies the driver of having used a buffer.
+  //
+  // `used_descriptor_index` is the virtqueue descriptor table index pointing to
+  // the data that was consumed by the device. The indicated buffer, as well as
+  // all the linked buffers, are now owned by the driver.
+  void VirtioBufferUsedByDevice(uint32_t used_descriptor_index) __TA_REQUIRES(virtio_queue_mutex_);
+
+  // Ensures that a single ExchangeRequestResponse() call is in progress.
+  fbl::Mutex exchange_request_response_mutex_;
+
+  // Protects data members modified by multiple threads.
   fbl::Mutex virtio_queue_mutex_;
+
+  // Signaled when the virtio device consumes a designated virtio queue buffer.
+  //
+  // The buffer is identified by `virtio_queue_request_index_`.
   fbl::ConditionVariable virtio_queue_buffer_used_signal_;
+
+  // Identifies the request buffer allocated in ExchangeRequestResponse().
+  //
+  // nullopt iff no ExchangeRequestResponse() is in progress.
+  std::optional<uint16_t> virtio_queue_request_index_ __TA_GUARDED(virtio_queue_mutex_);
 
   // The GPU device's control virtqueue.
   //
   // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
-  virtio::Ring virtio_queue_;
+  virtio::Ring virtio_queue_ __TA_GUARDED(virtio_queue_mutex_);
 
   // Backs `virtio_queue_buffer_pool_`.
   const zx::vmo virtio_queue_buffer_pool_vmo_;
@@ -108,7 +135,25 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
   FDF_LOG(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
           response_size);
 
-  // Keep this single message at a time
+  // Request/response exchanges are fully serialized.
+  //
+  // Relaxing this implementation constraint would require the following:
+  // * An allocation scheme for `virtual_queue_buffer_pool`. An easy solution is
+  //   to sub-divide the area into equally-sized cells, where each cell can hold
+  //   the largest possible request + response.
+  // * A map of virtio queue descriptor index to condition variable, so multiple
+  //   threads can be waiting on the device notification interrupt.
+  // * Handling the case where `virtual_queue_buffer_pool` is full. Options are
+  //   waiting on a new condition variable signaled whenever a buffer is
+  //   released, and asserting that implies the buffer pool is statically sized
+  //   to handle the maximum possible concurrency.
+  //
+  // Optionally, the locking around `virtio_queue_mutex_` could be more
+  // fine-grained. Allocating the descriptors needs to be serialized, but
+  // populating them can be done concurrently. Last, submitting the descriptors
+  // to the virtio device must be serialized.
+  fbl::AutoLock exhange_request_response_lock(&exchange_request_response_mutex_);
+
   fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
 
   // Allocate two virtqueue descriptors. This is the minimum number of
@@ -124,6 +169,7 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
   vring_desc* const request_descriptor =
       virtio_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
   ZX_ASSERT(request_descriptor);
+  virtio_queue_request_index_ = request_descriptor_index;
 
   cpp20::span<uint8_t> request_span = virtio_queue_buffer_pool_.subspan(0, request_size);
   std::memcpy(request_span.data(), &request, request_size);
