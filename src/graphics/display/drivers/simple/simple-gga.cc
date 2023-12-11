@@ -117,7 +117,7 @@ static zx_status_t gga_disp_setup(zx_device_t* dev, uint16_t width, uint16_t hei
 static zx_status_t gga_disp_bind(void* ctx, zx_device_t* dev) {
   uint32_t format, width, height, stride;
   zx_status_t status =
-      zx_framebuffer_get_info(get_root_resource(dev), &format, &width, &height, &stride);
+      zx_framebuffer_get_info(get_framebuffer_resource(dev), &format, &width, &height, &stride);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to get bootloader dimensions: %d\n", __func__, status);
     return ZX_ERR_NOT_SUPPORTED;

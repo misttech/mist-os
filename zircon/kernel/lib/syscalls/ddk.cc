@@ -170,7 +170,8 @@ zx_status_t sys_framebuffer_get_info(zx_handle_t handle, user_out_ptr<uint32_t> 
                                      user_out_ptr<uint32_t> width, user_out_ptr<uint32_t> height,
                                      user_out_ptr<uint32_t> stride) {
   zx_status_t status;
-  if ((status = validate_resource(handle, ZX_RSRC_KIND_ROOT)) < 0) {
+  if ((status = validate_resource_kind_base(handle, ZX_RSRC_KIND_SYSTEM,
+                                            ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE)) < 0) {
     return status;
   }
 #if ARCH_X86
@@ -204,7 +205,8 @@ zx_status_t sys_framebuffer_set_range(zx_handle_t hrsrc, zx_handle_t vmo_handle,
                                       uint32_t format, uint32_t width, uint32_t height,
                                       uint32_t stride) {
   zx_status_t status;
-  if ((status = validate_resource(hrsrc, ZX_RSRC_KIND_ROOT)) < 0) {
+  if ((status = validate_resource_kind_base(hrsrc, ZX_RSRC_KIND_SYSTEM,
+                                            ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE)) < 0) {
     return status;
   }
 

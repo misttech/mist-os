@@ -13,7 +13,7 @@
         compat: "driver/simple.intel.so",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        { protocol: "fuchsia.kernel.FramebufferResource" },
         { service: "fuchsia.hardware.pci.Service" },
         { service: "fuchsia.hardware.sysmem.Service" },
     ],

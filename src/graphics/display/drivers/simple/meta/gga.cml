@@ -13,6 +13,7 @@
         compat: "driver/simple.gga.so",
     },
     use: [
+        { protocol: "fuchsia.kernel.FramebufferResource" },
         { protocol: "fuchsia.kernel.IoportResource" },
         { service: "fuchsia.hardware.pci.Service" },
     ],

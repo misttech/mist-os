@@ -534,17 +534,15 @@ void SimpleDisplay::OnPeriodicVSync() {
     intf_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
-  async::PostTaskForTime(
-      loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
+  async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar,
                                                bool use_fidl) {
   zbi_pixel_format_t format;
   uint32_t width, height, stride;
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx_status_t status =
-      zx_framebuffer_get_info(get_root_resource(dev), &format, &width, &height, &stride);
+      zx_framebuffer_get_info(get_framebuffer_resource(dev), &format, &width, &height, &stride);
   if (status != ZX_OK) {
     printf("%s: failed to get bootloader dimensions: %d\n", name, status);
     return ZX_ERR_NOT_SUPPORTED;

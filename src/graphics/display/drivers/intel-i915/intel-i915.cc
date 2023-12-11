@@ -166,9 +166,8 @@ struct FramebufferInfo {
 // See fxbug.dev/77501.
 zx::result<FramebufferInfo> GetFramebufferInfo(zx_device_t* parent) {
   FramebufferInfo info;
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_framebuffer_get_info(get_root_resource(parent), &info.format, &info.width,
-                                               &info.height, &info.stride);
+  zx_status_t status = zx_framebuffer_get_info(get_framebuffer_resource(parent), &info.format,
+                                               &info.width, &info.height, &info.stride);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -411,8 +410,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint16_t kSequencerData = 0x3c5;
   constexpr uint8_t kClockingModeIdx = 1;
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_ioports_request(get_root_resource(parent()), kSequencerIdx, 2);
+  zx_status_t status = zx_ioports_request(get_ioport_resource(parent()), kSequencerIdx, 2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vga ports");
     return false;

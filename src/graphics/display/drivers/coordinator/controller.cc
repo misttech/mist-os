@@ -509,8 +509,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   // Release the bootloader framebuffer referenced by the kernel. This only
   // needs to be done once on the first ApplyConfig().
   if (!kernel_framebuffer_released_) {
-    // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    zx_framebuffer_set_range(get_root_resource(parent()), /*vmo=*/ZX_HANDLE_INVALID, /*len=*/0,
+    zx_framebuffer_set_range(get_framebuffer_resource(parent()), /*vmo=*/ZX_HANDLE_INVALID,
+                             /*len=*/0,
                              /*format=*/ZBI_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
                              /*stride=*/0);
     kernel_framebuffer_released_ = true;
