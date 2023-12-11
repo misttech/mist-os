@@ -4,7 +4,8 @@
 
 use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
-    AccessVector, ObjectClass, SecurityContext, SecurityId,
+    security_context::SecurityContext,
+    AccessVector, ObjectClass, SecurityId,
 };
 use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
@@ -141,7 +142,8 @@ mod tests {
 
     #[fuchsia::test]
     fn sid_to_security_context() {
-        let security_context = SecurityContext::from("u:unconfined_r:unconfined_t");
+        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+            .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid = security_server.security_context_to_sid(&security_context);
         assert_eq!(
@@ -152,8 +154,10 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_context1 = SecurityContext::from("u:object_r:file_t");
-        let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
+        let security_context1 = SecurityContext::try_from("u:object_r:file_t")
+            .expect("creating security context should succeed");
+        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+            .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
@@ -163,8 +167,10 @@ mod tests {
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
         let security_context_str = "u:unconfined_r:unconfined_t";
-        let security_context1 = SecurityContext::from(security_context_str);
-        let security_context2 = SecurityContext::from(security_context_str);
+        let security_context1 = SecurityContext::try_from(security_context_str)
+            .expect("creating security context should succeed");
+        let security_context2 = SecurityContext::try_from(security_context_str)
+            .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
@@ -174,8 +180,10 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_access_vector_allows_all() {
-        let security_context1 = SecurityContext::from("u:object_r:file_t");
-        let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
+        let security_context1 = SecurityContext::try_from("u:object_r:file_t")
+            .expect("creating security context should succeed");
+        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+            .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
