@@ -41,5 +41,33 @@
             from: "#bluetooth-core",
             to: "#session-manager",
         },
+        {
+            protocol: "fuchsia.web.ContextProvider",
+            from: "#context_provider",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.media.SessionAudioConsumerFactory",
+                "google.cast.multizone.Leader",
+            ],
+            from: "#multizone_leader",
+            to: "#session-manager",
+        },
+
+        // Route services provided only by physical hardware.
+        {
+            protocol: [ "fuchsia.castauth.CastKeySigner" ],
+            from: "#cast_auth_server",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "google.device.key.encryptor.DeviceKeyEncryptor",
+            from: "#device_key_encryptor",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
     ],
 }
