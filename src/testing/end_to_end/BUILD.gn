@@ -39,7 +39,6 @@ if (is_host) {
   group("stable_emulator_sl4f_tests") {
     testonly = true
     public_deps = [
-      "examples/test_soft_reboot:soft_reboot_test_sl4f($host_toolchain)",
       "honeydew/tests/functional_tests:stable_emulator_sl4f_tests",
       "//src/tests/end_to_end/snapshot:snapshot_test_sl4f($host_toolchain)",
     ]
@@ -48,7 +47,6 @@ if (is_host) {
   group("stable_emulator_tests") {
     testonly = true
     public_deps = [
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
       "honeydew/tests/functional_tests:stable_emulator_tests",
       "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
     ]
@@ -76,12 +74,18 @@ if (is_host) {
 
   group("unstable_emulator_sl4f_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [
+      "examples/test_soft_reboot:soft_reboot_test_sl4f($host_toolchain)",
+      "honeydew/tests/functional_tests:unstable_emulator_sl4f_tests",
+    ]
   }
 
   group("unstable_emulator_tests") {
     testonly = true
-    public_deps = [ "honeydew/tests/functional_tests:unstable_emulator_tests" ]
+    public_deps = [
+      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+      "honeydew/tests/functional_tests:unstable_emulator_tests",
+    ]
   }
 
   group("unstable_vim3_sl4f_tests") {
