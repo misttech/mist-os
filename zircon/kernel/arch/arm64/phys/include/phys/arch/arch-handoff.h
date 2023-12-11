@@ -59,4 +59,7 @@ inline constexpr uint64_t kArchHandoffVirtualAddress = KERNEL_BASE;
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff10000000;
 #endif
 
+// Whether a peripheral range for the UART needs to be synthesized.
+inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = true;
+
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

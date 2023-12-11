@@ -22,4 +22,7 @@ struct ArchPhysHandoff {
 // This is not actually used for real on x86, but needs to be defined.
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0;
 
+// Whether a peripheral range for the UART needs to be synthesized.
+inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
+
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
