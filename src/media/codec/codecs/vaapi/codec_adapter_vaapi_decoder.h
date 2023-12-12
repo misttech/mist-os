@@ -117,10 +117,10 @@ class SurfaceBufferManager {
       FX_SLOG(INFO,
               "Current DPB surfaces are NOT large enough to hold new picture size. Incrementing "
               "surface generation.",
-              KV("new_picture_width", new_picture_size.width()),
-              KV("new_picture_height", new_picture_size.height()),
-              KV("dpb_surface_width", dpb_surface_size_.width()),
-              KV("dpb_surface_height", dpb_surface_size_.height()));
+              FX_KV("new_picture_width", new_picture_size.width()),
+              FX_KV("new_picture_height", new_picture_size.height()),
+              FX_KV("dpb_surface_width", dpb_surface_size_.width()),
+              FX_KV("dpb_surface_height", dpb_surface_size_.height()));
 
       surface_generation_ += 1;
 
@@ -128,10 +128,10 @@ class SurfaceBufferManager {
       OnSurfaceGenerationUpdatedLocked(num_of_surfaces);
     } else {
       FX_SLOG(INFO, "Current DPB surfaces are large enough to hold new picture size",
-              KV("new_picture_width", new_picture_size.width()),
-              KV("new_picture_height", new_picture_size.height()),
-              KV("dpb_surface_width", dpb_surface_size_.width()),
-              KV("dpb_surface_height", dpb_surface_size_.height()));
+              FX_KV("new_picture_width", new_picture_size.width()),
+              FX_KV("new_picture_height", new_picture_size.height()),
+              FX_KV("dpb_surface_width", dpb_surface_size_.width()),
+              FX_KV("dpb_surface_height", dpb_surface_size_.height()));
     }
   }
 
@@ -572,8 +572,8 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
             break;
         }
 
-        FX_SLOG(INFO, "Format modifier has been chosen", KV("format_modifier", format_modifier),
-                KV("format_modifier_str", format_modifier_str.c_str()));
+        FX_SLOG(INFO, "Format modifier has been chosen", FX_KV("format_modifier", format_modifier),
+                FX_KV("format_modifier_str", format_modifier_str.c_str()));
       }
 
       output_buffer_format_modifier_ = format_modifier;

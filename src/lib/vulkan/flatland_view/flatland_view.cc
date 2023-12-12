@@ -67,7 +67,8 @@ void FlatlandView::OnGetLayout(fuchsia::ui::composition::LayoutInfo info) {
 }
 
 void FlatlandView::OnError(fuchsia::ui::composition::FlatlandError error) {
-  FX_SLOG(ERROR, "FlatlandError", KV("tag", "FlatlandView"), KV("error", static_cast<int>(error)));
+  FX_SLOG(ERROR, "FlatlandError", FX_KV("tag", "FlatlandView"),
+          FX_KV("error", static_cast<int>(error)));
 }
 
 void FlatlandView::Present() {

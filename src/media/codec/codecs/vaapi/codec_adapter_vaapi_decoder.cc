@@ -105,7 +105,7 @@ class LinearBufferManager : public SurfaceBufferManager {
             vaDestroySurfaces(VADisplayWrapper::GetSingleton()->display(), &surface_id, 1);
 
         if (status != VA_STATUS_SUCCESS) {
-          FX_SLOG(WARNING, "vaDestroySurfaces failed", KV("error_str", vaErrorStr(status)));
+          FX_SLOG(WARNING, "vaDestroySurfaces failed", FX_KV("error_str", vaErrorStr(status)));
         }
       }
     };
@@ -183,7 +183,8 @@ class LinearBufferManager : public SurfaceBufferManager {
     zx::vmo vmo_dup;
     zx_status_t zx_status = buffer->vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
     if (zx_status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to duplicate vmo", KV("error_str", zx_status_get_string(zx_status)));
+      FX_SLOG(ERROR, "Failed to duplicate vmo",
+              FX_KV("error_str", zx_status_get_string(zx_status)));
       return std::nullopt;
     }
 
@@ -249,12 +250,14 @@ class LinearBufferManager : public SurfaceBufferManager {
 
           while ((decode_mb_errors != nullptr) && (decode_mb_errors->status != -1) &&
                  (mb_error_count < kMaxMBErrors)) {
-            FX_SLOG(ERROR, "SyncSurface a macroblock error",
-                    KV("decode_error", (decode_mb_errors->decode_error_type == VADecodeSliceMissing)
-                                           ? "VADecodeSliceMissing"
-                                           : "VADecodeMBError"),
-                    KV("start_mb", decode_mb_errors->start_mb),
-                    KV("end_mb", decode_mb_errors->end_mb), KV("num_mb", decode_mb_errors->num_mb));
+            FX_SLOG(
+                ERROR, "SyncSurface a macroblock error",
+                FX_KV("decode_error", (decode_mb_errors->decode_error_type == VADecodeSliceMissing)
+                                          ? "VADecodeSliceMissing"
+                                          : "VADecodeMBError"),
+                FX_KV("start_mb", decode_mb_errors->start_mb),
+                FX_KV("end_mb", decode_mb_errors->end_mb),
+                FX_KV("num_mb", decode_mb_errors->num_mb));
             decode_mb_errors++;
             mb_error_count++;
           }
@@ -264,7 +267,7 @@ class LinearBufferManager : public SurfaceBufferManager {
       // If the error was not VA_STATUS_ERROR_DECODING_ERROR or vaQuerySurfaceError returned an
       // error, just log a generic error message.
       if (!detailed_query) {
-        FX_SLOG(ERROR, "SyncSurface failed", KV("error_str", vaErrorStr(status)));
+        FX_SLOG(ERROR, "SyncSurface failed", FX_KV("error_str", vaErrorStr(status)));
       }
 
       return std::nullopt;
@@ -278,7 +281,7 @@ class LinearBufferManager : public SurfaceBufferManager {
         vaCreateSurfaces(VADisplayWrapper::GetSingleton()->display(), VA_RT_FORMAT_YUV420,
                          ext_attrib.width, ext_attrib.height, &processed_surface_id, 1, attrib, 2);
     if (status != VA_STATUS_SUCCESS) {
-      FX_SLOG(WARNING, "vaCreateSurfaces failed", KV("error_str", vaErrorStr(status)));
+      FX_SLOG(WARNING, "vaCreateSurfaces failed", FX_KV("error_str", vaErrorStr(status)));
       return std::nullopt;
     }
 
@@ -289,7 +292,7 @@ class LinearBufferManager : public SurfaceBufferManager {
     status =
         vaDeriveImage(VADisplayWrapper::GetSingleton()->display(), processed_surface.id(), &image);
     if (status != VA_STATUS_SUCCESS) {
-      FX_SLOG(WARNING, "vaDeriveImage failed", KV("error_str", vaErrorStr(status)));
+      FX_SLOG(WARNING, "vaDeriveImage failed", FX_KV("error_str", vaErrorStr(status)));
       return std::nullopt;
     }
 
@@ -302,7 +305,7 @@ class LinearBufferManager : public SurfaceBufferManager {
       status = vaGetImage(VADisplayWrapper::GetSingleton()->display(), va_surface->id(), 0, 0,
                           surface_size.width(), coded_picture_size_.height(), scoped_image.id());
       if (status != VA_STATUS_SUCCESS) {
-        FX_SLOG(WARNING, "vaGetImage failed", KV("error_str", vaErrorStr(status)));
+        FX_SLOG(WARNING, "vaGetImage failed", FX_KV("error_str", vaErrorStr(status)));
         return std::nullopt;
       }
     }
@@ -367,8 +370,9 @@ class LinearBufferManager : public SurfaceBufferManager {
     // Since media-driver does not allow the surfaces to become smaller, ensure that the surface
     // dimensions are always at least equal to what they were before this function call.
     dpb_surface_size_ = GetRequiredSurfaceSizeLocked(coded_picture_size_);
-    FX_SLOG(DEBUG, "Increased DPB surface size", KV("dpb_surface_width", dpb_surface_size_.width()),
-            KV("dpb_surface_height", dpb_surface_size_.height()));
+    FX_SLOG(DEBUG, "Increased DPB surface size",
+            FX_KV("dpb_surface_width", dpb_surface_size_.width()),
+            FX_KV("dpb_surface_height", dpb_surface_size_.height()));
 
     // Create the new number for requested DBP surfaces at the picture size.
     //
@@ -522,7 +526,7 @@ class TiledBufferManager : public SurfaceBufferManager {
       zx_status_t zx_status = buffer->vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
       if (zx_status != ZX_OK) {
         FX_SLOG(WARNING, "Failed to duplicate vmo",
-                KV("error_str", zx_status_get_string(zx_status)));
+                FX_KV("error_str", zx_status_get_string(zx_status)));
         return {};
       }
 
@@ -588,7 +592,7 @@ class TiledBufferManager : public SurfaceBufferManager {
                                          VA_RT_FORMAT_YUV420, dpb_surface_size_.width(),
                                          dpb_surface_size_.height(), &vmo_surface_id, 1, attrib, 2);
       if (status != VA_STATUS_SUCCESS) {
-        FX_SLOG(WARNING, "vaCreateSurfaces failed", KV("error_str", vaErrorStr(status)));
+        FX_SLOG(WARNING, "vaCreateSurfaces failed", FX_KV("error_str", vaErrorStr(status)));
         return {};
       }
     }
@@ -613,7 +617,7 @@ class TiledBufferManager : public SurfaceBufferManager {
               vaDestroySurfaces(VADisplayWrapper::GetSingleton()->display(), &surface_id, 1);
 
           if (status != VA_STATUS_SUCCESS) {
-            FX_SLOG(WARNING, "vaDestroySurfaces failed", KV("error_str", vaErrorStr(status)));
+            FX_SLOG(WARNING, "vaDestroySurfaces failed", FX_KV("error_str", vaErrorStr(status)));
           }
         }
       }
@@ -634,7 +638,7 @@ class TiledBufferManager : public SurfaceBufferManager {
       scoped_refptr<VASurface> va_surface) override {
     VAStatus status = vaSyncSurface(VADisplayWrapper::GetSingleton()->display(), va_surface->id());
     if (status != VA_STATUS_SUCCESS) {
-      FX_SLOG(ERROR, "SyncSurface failed", KV("error_str", vaErrorStr(status)));
+      FX_SLOG(ERROR, "SyncSurface failed", FX_KV("error_str", vaErrorStr(status)));
       return std::nullopt;
     }
 
@@ -742,14 +746,14 @@ class TiledBufferManager : public SurfaceBufferManager {
   // Structure that maps allocated buffers shared with the client. Once the buffer is no longer in
   // use by the client and the decoder it should be removed from this map and marked as free in the
   // output_buffer_pool_.
-  std::unordered_map<VASurfaceID, const CodecBuffer*> surface_to_buffer_
-      FXL_GUARDED_BY(surface_lock_);
+  std::unordered_map<VASurfaceID, const CodecBuffer*> surface_to_buffer_ FXL_GUARDED_BY(
+      surface_lock_);
 
   // Once a surface is allocated it is stored in this map which maps the codec buffer that backs
   // the surface. If a resize event happens this structure will have to be invalidated and the
   // surfaces will have to be regenerated to match the new surface_size_
-  std::unordered_map<const CodecBuffer*, ScopedSurfaceID> allocated_free_surfaces_
-      FXL_GUARDED_BY(surface_lock_);
+  std::unordered_map<const CodecBuffer*, ScopedSurfaceID> allocated_free_surfaces_ FXL_GUARDED_BY(
+      surface_lock_);
 
   // Maps the codec buffer to the VA surface being shared to the client. In addition to the
   // mapping this data structure holds a reference to the surface being used by the client,
@@ -940,11 +944,12 @@ void CodecAdapterVaApiDecoder::DecodeAnnexBBuffer(media::DecoderBuffer buffer) {
       gfx::Rect render_size = media_decoder_->GetVisibleRect();
       std::string profile = GetProfileName(media_decoder_->GetProfile());
       FX_SLOG(INFO, "Detected a configuration change in bitstream",
-              KV("pic_width", pic_size.width()), KV("pic_height", pic_size.height()),
-              KV("render_width", render_size.width()), KV("render_height", render_size.height()),
-              KV("profile", profile.c_str()), KV("bit_depth", media_decoder_->GetBitDepth()),
-              KV("required_num_pics", media_decoder_->GetRequiredNumOfPictures()),
-              KV("num_reference_frames", media_decoder_->GetNumReferenceFrames()));
+              FX_KV("pic_width", pic_size.width()), FX_KV("pic_height", pic_size.height()),
+              FX_KV("render_width", render_size.width()),
+              FX_KV("render_height", render_size.height()), FX_KV("profile", profile.c_str()),
+              FX_KV("bit_depth", media_decoder_->GetBitDepth()),
+              FX_KV("required_num_pics", media_decoder_->GetRequiredNumOfPictures()),
+              FX_KV("num_reference_frames", media_decoder_->GetNumReferenceFrames()));
 
       // We only need to request a output buffer reconfiguration if the current buffers are not able
       // to handle the new picture size. If they are able to handle the new picture size then the
@@ -963,7 +968,7 @@ void CodecAdapterVaApiDecoder::DecodeAnnexBBuffer(media::DecoderBuffer buffer) {
       bool output_re_config_required = output_re_config_required_result.value();
 
       FX_SLOG(INFO, "Are new buffers required for bitstream change?",
-              KV("output_re_config_required", output_re_config_required ? "yes" : "no"));
+              FX_KV("output_re_config_required", output_re_config_required ? "yes" : "no"));
 
       // TODO(fxbug.dev/109108): This is a temporary workaround until the new media APIs are adopted
       if (surface_buffer_manager_ &&
@@ -1172,16 +1177,16 @@ fit::result<std::string, bool> CodecAdapterVaApiDecoder::IsBufferReconfiguration
 
   // Ensure that the new picture size is within the allowed hardware requirements
   if (coded_height > max_picture_height_) {
-    FX_SLOG(ERROR, "coded_height exceeds max_picture_height_", KV("coded_height", coded_height),
-            KV("max_picture_height_", max_picture_height_));
+    FX_SLOG(ERROR, "coded_height exceeds max_picture_height_", FX_KV("coded_height", coded_height),
+            FX_KV("max_picture_height_", max_picture_height_));
     std::ostringstream oss;
     oss << "Requested picture height " << coded_height
         << " exceeds max hardware supported height of " << max_picture_height_;
     return fit::error(oss.str());
   }
   if (coded_width > max_picture_width_) {
-    FX_SLOG(ERROR, "coded_width exceeds max_picture_width_", KV("coded_width", coded_width),
-            KV("max_picture_width_", max_picture_width_));
+    FX_SLOG(ERROR, "coded_width exceeds max_picture_width_", FX_KV("coded_width", coded_width),
+            FX_KV("max_picture_width_", max_picture_width_));
     std::ostringstream oss;
     oss << "Requested picture width " << coded_width << " exceeds max hardware supported width of "
         << max_picture_width_;
@@ -1211,8 +1216,9 @@ fit::result<std::string, bool> CodecAdapterVaApiDecoder::IsBufferReconfiguration
 
   // Ensure the size of the buffers can hold the new plane size
   if (total_plane_size > buffer_settings_[kOutputPort]->buffer_settings.size_bytes) {
-    FX_SLOG(DEBUG, "total_plane_size > buffer_size_bytes", KV("total_plane_size", total_plane_size),
-            KV("buffer_size_bytes", buffer_settings_[kOutputPort]->buffer_settings.size_bytes));
+    FX_SLOG(DEBUG, "total_plane_size > buffer_size_bytes",
+            FX_KV("total_plane_size", total_plane_size),
+            FX_KV("buffer_size_bytes", buffer_settings_[kOutputPort]->buffer_settings.size_bytes));
     return fit::ok(true);
   }
 
@@ -1220,85 +1226,86 @@ fit::result<std::string, bool> CodecAdapterVaApiDecoder::IsBufferReconfiguration
 
   if (display_width % image_constraints.display_width_divisor != 0u) {
     FX_SLOG(DEBUG, "display_width not divisible by display_width_divisor",
-            KV("display_width", display_width),
-            KV("display_width_divisor", image_constraints.display_width_divisor));
+            FX_KV("display_width", display_width),
+            FX_KV("display_width_divisor", image_constraints.display_width_divisor));
     // These will fail, but let them fail when trying to re-negotiate sysmem buffers.
     return fit::ok(true);
   }
 
   if (display_height % image_constraints.display_height_divisor != 0u) {
     FX_SLOG(DEBUG, "display_height not divisible by display_height_divisor",
-            KV("display_height", display_height),
-            KV("display_height_divisor", image_constraints.display_height_divisor));
+            FX_KV("display_height", display_height),
+            FX_KV("display_height_divisor", image_constraints.display_height_divisor));
     // These will fail, but let them fail when trying to re-negotiate sysmem buffers.
     return fit::ok(true);
   }
 
   auto coded_area_checked = safemath::CheckMul(coded_width, coded_height).Cast<uint32_t>();
   if (!coded_area_checked.IsValid()) {
-    FX_SLOG(ERROR, "Surface size exceeds uint32_t", KV("coded_width", coded_width),
-            KV("coded_height", coded_height));
+    FX_SLOG(ERROR, "Surface size exceeds uint32_t", FX_KV("coded_width", coded_width),
+            FX_KV("coded_height", coded_height));
     return fit::error("Surface size exceeds uint32_t");
   }
   uint32_t coded_area = coded_area_checked.ValueOrDie();
   if (coded_area > image_constraints.max_coded_width_times_coded_height) {
-    FX_SLOG(DEBUG, "coded_area > max_coded_width_times_coded_height", KV("coded_area", coded_area),
-            KV("max_coded_width_times_coded_height",
-               image_constraints.max_coded_width_times_coded_height));
+    FX_SLOG(DEBUG, "coded_area > max_coded_width_times_coded_height",
+            FX_KV("coded_area", coded_area),
+            FX_KV("max_coded_width_times_coded_height",
+                  image_constraints.max_coded_width_times_coded_height));
     // These will very likely fail, but let them fail when trying to re-negotiate sysmem buffers.
     return fit::ok(true);
   }
 
   if (coded_width % image_constraints.coded_width_divisor != 0u) {
     FX_SLOG(DEBUG, "coded_width not divisible by coded_width_divisor",
-            KV("coded_width", coded_width),
-            KV("coded_width_divisor", image_constraints.coded_width_divisor));
+            FX_KV("coded_width", coded_width),
+            FX_KV("coded_width_divisor", image_constraints.coded_width_divisor));
     // These will fail, but let them fail when trying to re-negotiate sysmem buffers.
     return fit::ok(true);
   }
 
   if (coded_height % image_constraints.coded_height_divisor != 0u) {
     FX_SLOG(DEBUG, "coded_height not divisible by coded_height_divisor",
-            KV("coded_height", coded_height),
-            KV("coded_height_divisor", image_constraints.coded_height_divisor));
+            FX_KV("coded_height", coded_height),
+            FX_KV("coded_height_divisor", image_constraints.coded_height_divisor));
     // These will fail, but let them fail when trying to re-negotiate sysmem buffers.
     return fit::ok(true);
   }
 
   if (coded_width < image_constraints.min_coded_width) {
-    FX_SLOG(DEBUG, "coded_width < min_coded_width", KV("coded_width", coded_width),
-            KV("min_coded_width", image_constraints.min_coded_width));
+    FX_SLOG(DEBUG, "coded_width < min_coded_width", FX_KV("coded_width", coded_width),
+            FX_KV("min_coded_width", image_constraints.min_coded_width));
     return fit::ok(true);
   }
 
   if (coded_width > image_constraints.max_coded_width) {
-    FX_SLOG(DEBUG, "coded_width > max_coded_width", KV("coded_width", coded_width),
-            KV("max_coded_width", image_constraints.max_coded_width));
+    FX_SLOG(DEBUG, "coded_width > max_coded_width", FX_KV("coded_width", coded_width),
+            FX_KV("max_coded_width", image_constraints.max_coded_width));
     return fit::ok(true);
   }
 
   if (coded_height < image_constraints.min_coded_height) {
-    FX_SLOG(DEBUG, "coded_height < min_coded_height", KV("coded_height", coded_height),
-            KV("min_coded_height", image_constraints.min_coded_height));
+    FX_SLOG(DEBUG, "coded_height < min_coded_height", FX_KV("coded_height", coded_height),
+            FX_KV("min_coded_height", image_constraints.min_coded_height));
     return fit::ok(true);
   }
 
   if (coded_height > image_constraints.max_coded_height) {
-    FX_SLOG(DEBUG, "coded_height > max_coded_height", KV("coded_height", coded_height),
-            KV("max_coded_height", image_constraints.max_coded_height));
+    FX_SLOG(DEBUG, "coded_height > max_coded_height", FX_KV("coded_height", coded_height),
+            FX_KV("max_coded_height", image_constraints.max_coded_height));
     return fit::ok(true);
   }
 
   uint32_t stride = safemath::checked_cast<uint32_t>(surface_size.width());
   if (stride < image_constraints.min_bytes_per_row) {
-    FX_SLOG(DEBUG, "stride < min_bytes_per_row", KV("stride", stride),
-            KV("min_bytes_per_row", image_constraints.min_bytes_per_row));
+    FX_SLOG(DEBUG, "stride < min_bytes_per_row", FX_KV("stride", stride),
+            FX_KV("min_bytes_per_row", image_constraints.min_bytes_per_row));
     return fit::ok(true);
   }
 
   if (stride > image_constraints.max_bytes_per_row) {
-    FX_SLOG(DEBUG, "stride > max_bytes_per_row", KV("stride", stride),
-            KV("max_bytes_per_row", image_constraints.max_bytes_per_row));
+    FX_SLOG(DEBUG, "stride > max_bytes_per_row", FX_KV("stride", stride),
+            FX_KV("max_bytes_per_row", image_constraints.max_bytes_per_row));
     return fit::ok(true);
   }
 
@@ -1306,8 +1313,8 @@ fit::result<std::string, bool> CodecAdapterVaApiDecoder::IsBufferReconfiguration
   // concept of bytes per row divisor
   if (!IsOutputTiled()) {
     if (stride % image_constraints.bytes_per_row_divisor != 0u) {
-      FX_SLOG(DEBUG, "stride not divisible by bytes_per_row_divisor", KV("stride", stride),
-              KV("bytes_per_row_divisor", image_constraints.bytes_per_row_divisor));
+      FX_SLOG(DEBUG, "stride not divisible by bytes_per_row_divisor", FX_KV("stride", stride),
+              FX_KV("bytes_per_row_divisor", image_constraints.bytes_per_row_divisor));
       // These will fail, but let them fail when trying to re-negotiate sysmem buffers.
       return fit::ok(true);
     }

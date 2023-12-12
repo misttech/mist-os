@@ -44,8 +44,8 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
   auto checked_width = safemath::MakeCheckedNum(frame_hdr->frame_width).Cast<uint16_t>();
   auto checked_height = safemath::MakeCheckedNum(frame_hdr->frame_height).Cast<uint16_t>();
   if (!checked_width.IsValid() || !checked_height.IsValid()) {
-    FX_SLOG(ERROR, "Invalid frame dimensions", KV("frame_width", frame_hdr->frame_width),
-            KV("frame_height", frame_hdr->frame_height));
+    FX_SLOG(ERROR, "Invalid frame dimensions", FX_KV("frame_width", frame_hdr->frame_width),
+            FX_KV("frame_height", frame_hdr->frame_height));
     return Status::kFail;
   }
   pic_param.frame_width = checked_width.ValueOrDie();
@@ -143,7 +143,7 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
                           &pic_params_buffer_id);
 
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for pic_param failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "vaCreateBuffer for pic_param failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
@@ -155,7 +155,8 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
                           &slice_params_buffer_id);
 
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for slice_params failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "vaCreateBuffer for slice_params failed",
+            FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
@@ -170,7 +171,8 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
                           1, const_cast<uint8_t*>(frame_hdr->data), &encoded_data_buffer_id);
 
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for encoded_data failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "vaCreateBuffer for encoded_data failed",
+            FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
@@ -181,7 +183,7 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
   status = vaBeginPicture(VADisplayWrapper::GetSingleton()->display(), adapter_->context_id(),
                           va_surface_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "BeginPicture failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "BeginPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   std::vector<VABufferID> buffers{picture_params.id(), slice_params.id(), encoded_data.id()};
@@ -189,13 +191,13 @@ VP9Accelerator::Status VP9Accelerator::SubmitDecode(
   status = vaRenderPicture(VADisplayWrapper::GetSingleton()->display(), adapter_->context_id(),
                            buffers.data(), static_cast<int>(buffers.size()));
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "RenderPicture failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "RenderPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
   status = vaEndPicture(VADisplayWrapper::GetSingleton()->display(), adapter_->context_id());
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "EndPicture failed", KV("error_str", vaErrorStr(status)));
+    FX_SLOG(ERROR, "EndPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
