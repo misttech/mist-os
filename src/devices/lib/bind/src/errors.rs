@@ -396,7 +396,8 @@ impl From<BindRulesEncodeError> for UserError {
             ),
             BindRulesEncodeError::UnsupportedSymbol => UserError::new(
                 "E601",
-                "Symbol is not supported in the old bytecode format. Try adding `disable_fragment_gen = true` to your driver_bind_rules BUILD target.",
+                "Symbol is not supported in the old bytecode format. Add `disable_fragment_gen = true`
+                to your driver_bind_rules BUILD target and migrate to composite node specs.",
                 None,
                 true,
             ),
