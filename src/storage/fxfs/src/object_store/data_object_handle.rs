@@ -40,7 +40,7 @@ use {
         cmp::min,
         ops::{Bound, Range},
         sync::{
-            atomic::{self, AtomicU64},
+            atomic::{self, AtomicU64, Ordering},
             Arc, Mutex,
         },
     },
@@ -646,6 +646,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             }
         }
 
+        self.store().logical_write_ops.fetch_add(1, Ordering::Relaxed);
         // The checksums are being ignored here, but we don't need to know them
         writes.try_collect::<Vec<Checksums>>().await?;
 

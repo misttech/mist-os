@@ -73,7 +73,7 @@ use {
         fmt,
         ops::Bound,
         sync::{
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicU64, Ordering},
             Arc, Mutex, Weak,
         },
     },
@@ -469,6 +469,12 @@ pub struct ObjectStore {
     // Informational counters for events occurring within the store.
     counters: Mutex<ObjectStoreCounters>,
 
+    // These are updated in performance-sensitive code paths so we use atomics instead of counters.
+    device_read_ops: AtomicU64,
+    device_write_ops: AtomicU64,
+    logical_read_ops: AtomicU64,
+    logical_write_ops: AtomicU64,
+
     // Contains the last object ID and, optionally, a cipher to be used when generating new object
     // IDs.
     last_object_id: Mutex<LastObjectId>,
@@ -513,6 +519,10 @@ impl ObjectStore {
             key_manager: KeyManager::new(),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
+            device_read_ops: AtomicU64::new(0),
+            device_write_ops: AtomicU64::new(0),
+            logical_read_ops: AtomicU64::new(0),
+            logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(last_object_id),
         })
     }
@@ -552,6 +562,10 @@ impl ObjectStore {
             key_manager: KeyManager::new(),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
+            device_read_ops: AtomicU64::new(0),
+            device_write_ops: AtomicU64::new(0),
+            logical_read_ops: AtomicU64::new(0),
+            logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(LastObjectId::default()),
         }
     }
@@ -706,6 +720,11 @@ impl ObjectStore {
         for i in 0..counters.persistent_layer_file_sizes.len() {
             sizes.set(i, counters.persistent_layer_file_sizes[i]);
         }
+        root.record_uint("device_read_ops", self.device_read_ops.load(Ordering::Relaxed));
+        root.record_uint("device_write_ops", self.device_write_ops.load(Ordering::Relaxed));
+        root.record_uint("logical_read_ops", self.logical_read_ops.load(Ordering::Relaxed));
+        root.record_uint("logical_write_ops", self.logical_write_ops.load(Ordering::Relaxed));
+
         root.record(sizes);
     }
 

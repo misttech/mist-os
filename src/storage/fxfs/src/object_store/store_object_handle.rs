@@ -39,7 +39,7 @@ use {
         future::Future,
         ops::{Bound, Range},
         sync::{
-            atomic::{self, AtomicBool},
+            atomic::{self, AtomicBool, Ordering},
             Arc,
         },
     },
@@ -298,8 +298,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 "W",
             );
         }
+        let store = self.store();
+        store.device_write_ops.fetch_add(1, Ordering::Relaxed);
         let mut checksums = Vec::new();
-        try_join!(self.store().device.write(device_offset, buf), async {
+        try_join!(store.device.write(device_offset, buf), async {
             if compute_checksum {
                 let block_size = self.block_size();
                 for chunk in buf.as_slice().chunks_exact(block_size as usize) {
@@ -492,6 +494,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         key_id: u64,
     ) -> Result<(), Error> {
         let store = self.store();
+        store.device_read_ops.fetch_add(1, Ordering::Relaxed);
         let ((), keys) = futures::future::try_join(
             store.device.read(device_offset, buffer.reborrow()),
             self.get_keys(),
@@ -661,6 +664,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         if buf.len() == 0 {
             return Ok(());
         }
+
+        self.store().logical_read_ops.fetch_add(1, Ordering::Relaxed);
+
         // Whilst the read offset must be aligned to the filesystem block size, the buffer need only
         // be aligned to the device's block size.
         let block_size = self.block_size() as u64;
@@ -790,6 +796,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             },
             _ => return Ok(None),
         };
+        store.logical_read_ops.fetch_add(1, Ordering::Relaxed);
         let mut last_offset = 0;
         loop {
             iter.advance().await?;
@@ -929,6 +936,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             });
         }
 
+        self.store().logical_write_ops.fetch_add(1, Ordering::Relaxed);
         let ((mutations, checksums), deallocated) = try_join!(
             async {
                 let mut current_range = 0..0;
