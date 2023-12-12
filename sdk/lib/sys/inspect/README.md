@@ -1,4 +1,9 @@
-# sys\_inspect library
+# The Inspect libraries in `sys::*` are deprecated
+
+Please use the
+[`inspect::*` libraries](https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/inspect/component/cpp/).
+
+## sys\_inspect library
 
 This document was last reviewed for accuracy on: 2019-07-16
 
@@ -7,7 +12,7 @@ This library supports creating a default Inspector for a Fuchsia Component.
 Full documentation for the Component Inspection project can be found
 [here](https://fuchsia.dev/fuchsia-src/development/inspect).
 
-## Using
+### Using
 
 sys\_inspect can be used in-tree by depending on the `//sdk/lib/sys/inspect/cpp`
 GN target and using `#include <lib/sys/inspect/cpp/component.h>`.
@@ -19,7 +24,7 @@ Inspect data may be read from components using the
 [iquery](https://fuchsia.dev/fuchsia-src/development/inspect/iquery.md)
 tool.
 
-## Testing
+### Testing
 
 Unit tests for inspect are available in the `sys_inspect_cpp_tests` package.
 
