@@ -33,10 +33,10 @@ use starnix_uapi::{
 };
 use std::sync::Arc;
 use syncio::{
-    zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
-    zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, XattrSetMode, Zxio, ZxioDirent,
+    zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK},
+    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator,
+    XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
-use zerocopy::{AsBytes, FromBytes};
 
 pub struct RemoteFs {
     supports_open2: bool,
@@ -564,6 +564,7 @@ impl FsNodeOps for RemoteNode {
         let node_id;
         let owner;
         let rdev;
+        let fsverity_enabled;
         if fs_ops.supports_open2 {
             let mut attrs = zxio_node_attributes_t {
                 has: zxio_node_attr_has_t {
@@ -573,6 +574,7 @@ impl FsNodeOps for RemoteNode {
                     gid: true,
                     rdev: true,
                     id: true,
+                    fsverity_enabled: true,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -603,6 +605,11 @@ impl FsNodeOps for RemoteNode {
             node_id = attrs.id;
             rdev = DeviceType::from_bits(attrs.rdev);
             owner = FsCred { uid: attrs.uid, gid: attrs.gid };
+            fsverity_enabled = attrs.fsverity_enabled;
+            // fsverity should not be enabled for non-file nodes.
+            if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE != 0) {
+                return error!(EINVAL);
+            }
         } else {
             zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
                 // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
@@ -626,6 +633,7 @@ impl FsNodeOps for RemoteNode {
             mode = get_mode(&attrs)?;
             node_id = attrs.id;
             rdev = DeviceType::from_bits(0);
+            fsverity_enabled = false;
             owner = FsCred::root();
         }
 
@@ -647,15 +655,6 @@ impl FsNodeOps for RemoteNode {
                 } else {
                     Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
                 };
-                // Nb: Special-case here is to avoid the cost of the additional FIDL call.
-                // This will go away when remote filesystems expose fsverity state natively.
-                // TODO(fxbug.dev/926432): When remote filesystems expose fsverity state,
-                // remove this.
-                let fsverity = if name.ends_with("/fsverity") {
-                    ops.get_fsverity_descriptor()
-                } else {
-                    error!(ENOTSUP)
-                };
                 let child = FsNode::new_uncached(
                     current_task,
                     ops,
@@ -663,18 +662,10 @@ impl FsNodeOps for RemoteNode {
                     node_id,
                     FsNodeInfo { rdev: rdev, ..FsNodeInfo::new(node_id, mode, owner) },
                 );
-                // Fsverity is an optional feature.
-                // If a descriptor exists, the file is immutable and descriptor is cached in FsNode.
-                // If the feature is not supported (ENOTSUP), or the file does not use fsverity
-                // (ENODATA), we should continue as normal.
-                match fsverity {
-                    Ok(descriptor) => {
-                        *child.fsverity.lock() = FsVerityState::FsVerity { descriptor };
-                        Ok(child)
-                    }
-                    Err(err) if err == errno!(ENODATA) || err == errno!(ENOTSUP) => Ok(child),
-                    Err(err) => Err(err),
+                if fsverity_enabled {
+                    *child.fsverity.lock() = FsVerityState::FsVerity;
                 }
+                Ok(child)
             },
         )
     }
@@ -894,47 +885,43 @@ impl FsNodeOps for RemoteNode {
         }
     }
 
-    fn begin_enable_fsverity(&self) -> Result<(), Errno> {
-        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
-        // Test for existence of xattr.
-        match self.zxio.xattr_set(b".fsverity", b"", XattrSetMode::Set) {
-            Err(zx::Status::NOT_SUPPORTED) => error!(ENOTSUP),
-            _ => Ok(()),
-        }
+    fn enable_fsverity(&self, descriptor: &fsverity_descriptor) -> Result<(), Errno> {
+        let descr = zxio_fsverity_descriptor_t {
+            hash_algorithm: descriptor.hash_algorithm,
+            salt_size: descriptor.salt_size,
+            salt: descriptor.salt,
+        };
+        self.zxio.enable_verity(&descr).map_err(|status| from_status_like_fdio!(status))
     }
 
-    fn end_enable_fsverity(
-        &self,
-        descriptor: &fsverity_descriptor,
-        _merkle_data_size: usize,
-    ) -> Result<(), Errno> {
-        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
-        self.zxio.xattr_set(b".fsverity", descriptor.as_bytes(), XattrSetMode::Set).map_err(
-            |status| match status {
-                zx::Status::NOT_FOUND => errno!(ENODATA),
-                status => from_status_like_fdio!(status),
-            },
-        )
-    }
-
-    fn get_fsverity_descriptor(&self) -> Result<fsverity_descriptor, Errno> {
-        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
-        let value = self.zxio.xattr_get(b".fsverity").map_err(|status| match status {
-            zx::Status::NOT_FOUND => errno!(ENODATA),
-            // It's possible that a remotefs doesn't support xattr.
-            zx::Status::NOT_SUPPORTED => errno!(ENODATA),
-            status => from_status_like_fdio!(status),
-        })?;
-        fsverity_descriptor::read_from(&value[..]).ok_or_else(|| errno!(EFAULT))
-    }
-
-    fn get_fsverity_merkle_data(&self) -> Result<Box<[u8]>, Errno> {
-        // TODO(fxbug.dev/296162627): Implement me. Lie for now for tests.
-        Ok(Box::new([]))
-    }
-    fn set_fsverity_merkle_data(&self, _data: &[u8]) -> Result<(), Errno> {
-        // TODO(fxbug.dev/296162627): Implement me. Lie for now for tests.
-        Ok(())
+    fn get_fsverity_descriptor(&self, log_blocksize: u8) -> Result<fsverity_descriptor, Errno> {
+        let mut root_hash = [0; ZXIO_ROOT_HASH_LENGTH];
+        let attrs = self
+            .zxio
+            .attr_get_with_root_hash(
+                zxio_node_attr_has_t {
+                    content_size: true,
+                    fsverity_options: true,
+                    fsverity_root_hash: true,
+                    ..Default::default()
+                },
+                &mut root_hash,
+            )
+            .map_err(|status| match status {
+                zx::Status::INVALID_ARGS => errno!(ENODATA),
+                _ => from_status_like_fdio!(status),
+            })?;
+        return Ok(fsverity_descriptor {
+            version: 1,
+            hash_algorithm: attrs.fsverity_options.hash_alg,
+            log_blocksize,
+            salt_size: attrs.fsverity_options.salt_size as u8,
+            __reserved_0x04: 0u32,
+            data_size: attrs.content_size,
+            root_hash,
+            salt: attrs.fsverity_options.salt,
+            __reserved: [0u8; 144],
+        });
     }
 }
 

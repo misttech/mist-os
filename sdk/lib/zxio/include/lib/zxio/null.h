@@ -112,6 +112,7 @@ zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_
                                zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
 zx_status_t zxio_default_allocate(zxio_t* io, uint64_t offset, uint64_t len,
                                   zxio_allocate_mode_t mode);
+zx_status_t zxio_default_enable_verity(zxio_t* io, const zxio_fsverity_descriptor_t* descriptor);
 
 // An ops table filled with the default implementations.
 //
@@ -175,6 +176,7 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .xattr_remove = zxio_default_xattr_remove,
     .open2 = zxio_default_open2,
     .allocate = zxio_default_allocate,
+    .enable_verity = zxio_default_enable_verity,
 };
 
 // Default implementations of the ZXIO operations.

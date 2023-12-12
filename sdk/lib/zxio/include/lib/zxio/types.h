@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -101,6 +102,15 @@ typedef uint32_t zxio_signals_t;
 typedef struct zxio_tag {
   uint64_t reserved[4];
 } zxio_t;
+
+#define ZXIO_MAX_SALT_SIZE 32
+#define ZXIO_ROOT_HASH_LENGTH 64
+
+typedef struct zxio_fsverity_descriptor {
+  uint8_t hash_algorithm;
+  uint8_t salt_size;
+  uint8_t salt[ZXIO_MAX_SALT_SIZE];
+} zxio_fsverity_descriptor_t;
 
 // Storage for the |zxio_ops_t| implementation.
 // All |zxio_t| implementations must fit within this space.
@@ -198,6 +208,17 @@ typedef uint64_t zxio_operations_t;
 typedef zxio_operations_t zxio_rights_t;
 typedef zxio_operations_t zxio_abilities_t;
 
+typedef uint8_t zxio_hash_algorithm_t;
+
+#define ZXIO_SHA256 ((zxio_hash_algorithm_t)1u)
+#define ZXIO_SHA512 ((zxio_hash_algorithm_t)2u)
+
+typedef struct zxio_verification_options {
+  uint8_t salt[ZXIO_MAX_SALT_SIZE];
+  size_t salt_size;
+  zxio_hash_algorithm_t hash_alg;
+} zxio_verification_options_t;
+
 // Objective information about a node.
 //
 // Each field has a corresponding presence indicator. When creating
@@ -240,6 +261,15 @@ typedef struct zxio_node_attr {
   uint32_t gid;
   uint64_t rdev;
 
+  // Fsverity attributes.
+  zxio_verification_options_t fsverity_options;
+  // If |has.fsverity_root_hash| is true, the caller is required to initialize |fsverity_root_hash|
+  // to point at an array of ZXIO_ROOT_HASH_LENGTH bytes. If |has.fsverity_root_hash| is true and
+  // |fsverity_root_hash| is a nullptr, zxio_attr_get fails with ZX_ERR_INVALID_ARGS. If
+  // |has.fsverity_root_hash| is false, |fsverity_root_hash| is ignored.
+  uint8_t* fsverity_root_hash;
+  bool fsverity_enabled;
+
   // Presence indicator for these fields.
   //
   // If a particular field is absent, it should be set to zero/none,
@@ -261,6 +291,9 @@ typedef struct zxio_node_attr {
     bool uid;
     bool gid;
     bool rdev;
+    bool fsverity_options;
+    bool fsverity_root_hash;
+    bool fsverity_enabled;
 
 #ifdef __cplusplus
     constexpr bool operator==(const zxio_node_attr_has_t& other) const {
@@ -269,7 +302,9 @@ typedef struct zxio_node_attr {
              link_count == other.link_count && creation_time == other.creation_time &&
              modification_time == other.modification_time && change_time == other.change_time &&
              access_time == other.access_time && mode == other.mode && uid == other.uid &&
-             gid == other.gid && rdev == other.rdev;
+             gid == other.gid && rdev == other.rdev && fsverity_options == other.fsverity_options &&
+             fsverity_root_hash == other.fsverity_root_hash &&
+             fsverity_enabled == other.fsverity_enabled;
     }
     constexpr bool operator!=(const zxio_node_attr_has_t& other) const { return !(*this == other); }
 #endif  // _cplusplus
@@ -320,6 +355,21 @@ typedef struct zxio_node_attr {
       return false;
     }
     if (has.rdev && (rdev != other.rdev)) {
+      return false;
+    }
+    if (has.fsverity_options && (fsverity_options.salt_size != other.fsverity_options.salt_size ||
+                                 memcmp(fsverity_options.salt, other.fsverity_options.salt,
+                                        fsverity_options.salt_size) != 0 ||
+                                 fsverity_options.hash_alg != other.fsverity_options.hash_alg)) {
+      return false;
+    }
+    if (has.fsverity_root_hash) {
+      if (other.fsverity_root_hash == nullptr ||
+          memcmp(fsverity_root_hash, other.fsverity_root_hash, ZXIO_ROOT_HASH_LENGTH) != 0) {
+        return false;
+      }
+    }
+    if (has.fsverity_enabled && (fsverity_enabled != other.fsverity_enabled)) {
       return false;
     }
     return true;

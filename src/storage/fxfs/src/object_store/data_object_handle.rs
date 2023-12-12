@@ -199,14 +199,19 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let fsverity_descriptor = self.fsverity_descriptor.lock().unwrap();
         if let Some(metadata) = fsverity_descriptor.clone() {
             let (options, root_hash) = match metadata.root_digest {
-                RootDigest::Sha256(root_hash) => (
-                    fio::VerificationOptions {
-                        hash_algorithm: Some(fio::HashAlgorithm::Sha256),
-                        salt: Some(metadata.salt),
-                        ..Default::default()
-                    },
-                    root_hash.to_vec(),
-                ),
+                RootDigest::Sha256(root_hash) => {
+                    let mut root_vec = root_hash.to_vec();
+                    // Need to zero out the rest of the vector so that there's no garbage.
+                    root_vec.extend_from_slice(&[0; 32]);
+                    (
+                        fio::VerificationOptions {
+                            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                            salt: Some(metadata.salt),
+                            ..Default::default()
+                        },
+                        root_vec,
+                    )
+                }
                 RootDigest::Sha512(root_hash) => (
                     fio::VerificationOptions {
                         hash_algorithm: Some(fio::HashAlgorithm::Sha512),
@@ -216,7 +221,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     root_hash,
                 ),
             };
-
             Ok(Some((options, root_hash)))
         } else {
             Ok(None)

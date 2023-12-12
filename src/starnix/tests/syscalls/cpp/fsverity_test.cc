@@ -13,6 +13,7 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 
+#include <cerrno>
 #include <cstdint>
 
 #include <gtest/gtest.h>
@@ -187,6 +188,16 @@ TEST_F(FsverityTest, EnableVerity) {
     is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
   }
 
+  // Enabling when there is an open write handle should fail with ETXTBSY
+  {
+    int fd = open(fname(), O_RDWR);
+    fsverity_enable_arg arg = {
+        .version = 1, .hash_algorithm = FS_VERITY_HASH_ALG_SHA256, .block_size = 4096};
+    ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1) << errno;
+    ASSERT_EQ(errno, ETXTBSY);
+    close(fd);
+  }
+
   // Valid enable request, no salt, no sig.
   {
     fsverity_enable_arg arg = {
@@ -255,8 +266,18 @@ TEST_F(FsverityTest, EnableVerity) {
     ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1);
     ASSERT_EQ(errno, EEXIST);
   }
-  // TODO(fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree
-
+  // TODO(fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree (not supported)
+  {
+    uint8_t buf[64];
+    fsverity_read_metadata_arg arg = {
+        .metadata_type = FS_VERITY_METADATA_TYPE_MERKLE_TREE,
+        .offset = 0,
+        .length = sizeof(buf),
+        .buf_ptr = reinterpret_cast<__u64>(&buf),
+    };
+    ASSERT_EQ(ioctl(fd, FS_IOC_READ_VERITY_METADATA, &arg), -1);
+    ASSERT_EQ(errno, ENOTSUP);
+  }
   // Test FS_IOC_READ_VERITY_METADATA -- Descriptor
   {
     fsverity_descriptor descriptor = {};

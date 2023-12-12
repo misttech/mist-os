@@ -135,6 +135,7 @@ impl Node for FxSymlink {
                 storage_size: props.allocated_size,
                 link_count: props.refs,
                 id: self.object_id(),
+                verity_enabled: false,
             }
         ))
     }

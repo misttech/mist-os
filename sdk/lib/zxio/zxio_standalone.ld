@@ -66,6 +66,7 @@
 		zxio_xattr_list;
 		zxio_xattr_remove;
 		zxio_xattr_set;
+		zxio_enable_verity;
 	local:
 		*;
 };

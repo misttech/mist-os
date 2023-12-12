@@ -26,8 +26,9 @@ use zxio::{
 pub mod zxio;
 
 pub use zxio::{
-    zxio_dirent_t, zxio_node_attr_zxio_node_attr_has_t as zxio_node_attr_has_t,
-    zxio_node_attributes_t, zxio_signals_t,
+    zxio_dirent_t, zxio_fsverity_descriptor, zxio_fsverity_descriptor_t,
+    zxio_node_attr_zxio_node_attr_has_t as zxio_node_attr_has_t, zxio_node_attributes_t,
+    zxio_signals_t,
 };
 
 // The inner mod is required because bitflags cannot pass the attribute through to the single
@@ -523,6 +524,8 @@ unsafe extern "C" fn storage_allocator(
     status.into_raw()
 }
 
+pub const ZXIO_ROOT_HASH_LENGTH: usize = 64;
+
 impl Zxio {
     pub fn new_socket<S: ServiceConnector>(
         domain: c_int,
@@ -791,11 +794,39 @@ impl Zxio {
         Ok(zx::Vmo::from(handle))
     }
 
+    fn node_attributes_from_query(
+        &self,
+        query: zxio_node_attr_has_t,
+        fsverity_root_hash: Option<&mut [u8; ZXIO_ROOT_HASH_LENGTH]>,
+    ) -> zxio_node_attributes_t {
+        if let Some(fsverity_root_hash) = fsverity_root_hash {
+            zxio_node_attributes_t {
+                has: query,
+                fsverity_root_hash: fsverity_root_hash as *mut u8,
+                ..Default::default()
+            }
+        } else {
+            zxio_node_attributes_t { has: query, ..Default::default() }
+        }
+    }
+
     pub fn attr_get(
         &self,
         query: zxio_node_attr_has_t,
     ) -> Result<zxio_node_attributes_t, zx::Status> {
-        let mut attributes = zxio_node_attributes_t { has: query, ..Default::default() };
+        let mut attributes = self.node_attributes_from_query(query, None);
+        let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
+        zx::ok(status)?;
+        Ok(attributes)
+    }
+
+    /// Assumes that the caller has set `query.fsverity_root_hash` to true.
+    pub fn attr_get_with_root_hash(
+        &self,
+        query: zxio_node_attr_has_t,
+        fsverity_root_hash: &mut [u8; ZXIO_ROOT_HASH_LENGTH],
+    ) -> Result<zxio_node_attributes_t, zx::Status> {
+        let mut attributes = self.node_attributes_from_query(query, Some(fsverity_root_hash));
         let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
         zx::ok(status)?;
         Ok(attributes)
@@ -803,6 +834,12 @@ impl Zxio {
 
     pub fn attr_set(&self, attributes: &zxio_node_attributes_t) -> Result<(), zx::Status> {
         let status = unsafe { zxio::zxio_attr_set(self.as_ptr(), attributes) };
+        zx::ok(status)?;
+        Ok(())
+    }
+
+    pub fn enable_verity(&self, descriptor: &zxio_fsverity_descriptor_t) -> Result<(), zx::Status> {
+        let status = unsafe { zxio::zxio_enable_verity(self.as_ptr(), descriptor) };
         zx::ok(status)?;
         Ok(())
     }

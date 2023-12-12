@@ -6,7 +6,11 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
@@ -641,6 +645,12 @@ zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
     query |= fio::NodeAttributesQuery::kGid;
   if (inout_attr->has.rdev)
     query |= fio::NodeAttributesQuery::kRdev;
+  if (inout_attr->has.fsverity_options)
+    query |= fio::NodeAttributesQuery::kOptions;
+  if (inout_attr->has.fsverity_root_hash)
+    query |= fio::NodeAttributesQuery::kRootHash;
+  if (inout_attr->has.fsverity_enabled)
+    query |= fio::NodeAttributesQuery::kVerityEnabled;
 
   const fidl::WireResult result = client->GetAttributes(query);
   if (!result.ok()) {
@@ -743,7 +753,9 @@ template <typename Protocol>
 zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
   // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
   if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid || inout_attr->has.rdev ||
-      inout_attr->has.access_time || inout_attr->has.change_time) {
+      inout_attr->has.access_time || inout_attr->has.change_time ||
+      inout_attr->has.fsverity_options || inout_attr->has.fsverity_root_hash ||
+      inout_attr->has.fsverity_enabled) {
     return AttributesGetCommon(client(), inout_attr);
   }
   return AttrGetCommon(client(), ToZxioAbilitiesForFile(), inout_attr);
@@ -1166,6 +1178,12 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
         attributes |= fio::NodeAttributesQuery::kGid;
       if (inout_attr->has.rdev)
         attributes |= fio::NodeAttributesQuery::kRdev;
+      if (inout_attr->has.fsverity_options)
+        attributes |= fio::NodeAttributesQuery::kOptions;
+      if (inout_attr->has.fsverity_root_hash)
+        attributes |= fio::NodeAttributesQuery::kRootHash;
+      if (inout_attr->has.fsverity_enabled)
+        attributes |= fio::NodeAttributesQuery::kVerityEnabled;
 
       if (attributes) {
         node_options_builder.attributes(
@@ -1857,6 +1875,33 @@ class File : public Remote<fio::File> {
     return status;
   }
 
+  zx_status_t EnableVerity(const zxio_fsverity_descriptor_t* descriptor) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    fidl::WireTableFrame<fio::wire::VerificationOptions> verification_options_frame;
+    fio::wire::VerificationOptions verification_options;
+    auto builder = fio::wire::VerificationOptions::ExternalBuilder(
+        fidl::ObjectView<fidl::WireTableFrame<fio::wire::VerificationOptions>>::FromExternal(
+            &verification_options_frame));
+    builder.hash_algorithm(static_cast<fio::wire::HashAlgorithm>(descriptor->hash_algorithm));
+    fidl::VectorView<uint8_t> vec = fidl::VectorView<uint8_t>::FromExternal(
+        const_cast<uint8_t*>(std::begin(descriptor->salt)), descriptor->salt_size);
+    builder.salt(fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec));
+    verification_options = builder.Build();
+
+    const fidl::WireResult result = client()->EnableVerity(verification_options);
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
+#else
+    return ZX_ERR_NOT_SUPPORTED;
+#endif
+  }
+
   void WaitBegin(zxio_signals_t zxio_signals, zx_handle_t* out_handle,
                  zx_signals_t* out_zx_signals) {
     *out_handle = event_.get();
@@ -1960,6 +2005,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
   ops.seek = Adaptor::From<&File::Seek>;
   ops.truncate = Adaptor::From<&File::Truncate>;
   ops.vmo_get = Adaptor::From<&File::VmoGet>;
+  ops.enable_verity = Adaptor::From<&File::EnableVerity>;
 
   ops.sync = Adaptor::From<&File::Sync>;
   ops.attr_get = Adaptor::From<&File::AttrGet>;
@@ -2071,6 +2117,8 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
 }
 
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+// TODO(b/309561887): Clear the flag in `out` for attributes not provided in `in` instead of
+// returning ZX_ERR_INVALID_ARGS.
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
   if (out->has.protocols) {
     if (!in.immutable_attributes.has_protocols())
@@ -2101,6 +2149,31 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     if (!in.immutable_attributes.has_link_count())
       return ZX_ERR_INVALID_ARGS;
     out->link_count = in.immutable_attributes.link_count();
+  }
+  if (out->has.fsverity_options) {
+    if (!in.immutable_attributes.has_options()) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    zxio_verification_options_t out_options{};
+    fio::wire::VerificationOptions in_options = in.immutable_attributes.options();
+    size_t salt_size = in_options.salt().count();
+    if (salt_size > ZXIO_MAX_SALT_SIZE)
+      return ZX_ERR_INVALID_ARGS;
+    out_options.salt_size = salt_size;
+    memcpy(out_options.salt, in_options.salt().data(), salt_size);
+    out_options.hash_alg = static_cast<zxio_hash_algorithm_t>(in_options.hash_algorithm());
+    out->fsverity_options = out_options;
+  }
+  if (out->has.fsverity_root_hash) {
+    if (!in.immutable_attributes.has_root_hash())
+      return ZX_ERR_INVALID_ARGS;
+    memcpy(out->fsverity_root_hash, in.immutable_attributes.root_hash().data(),
+           ZXIO_ROOT_HASH_LENGTH);
+  }
+  if (out->has.fsverity_enabled) {
+    if (!in.immutable_attributes.has_verity_enabled())
+      return ZX_ERR_INVALID_ARGS;
+    out->fsverity_enabled = in.immutable_attributes.verity_enabled();
   }
   if (out->has.creation_time) {
     if (!in.mutable_attributes.has_creation_time())

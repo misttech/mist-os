@@ -6,13 +6,16 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio,
+    fsverity_merkle::{MerkleTreeBuilder, Sha256Struct},
+    fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased, Status},
-    fxfs_testing::TestFixture,
+    fxfs_testing::{close_file_checked, open_file_checked, TestFixture},
+    mundane::hash::Digest,
     std::sync::Arc,
     syncio::{
-        zxio, zxio_node_attr_has_t, zxio_node_attributes_t, OpenOptions, SeekOrigin, XattrSetMode,
-        Zxio,
+        zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t,
+        OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
     },
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
@@ -62,6 +65,154 @@ async fn test_symlink() {
         let symlink_zxio =
             dir_zxio.open(fio::OpenFlags::RIGHT_READABLE, "symlink").expect("open failed");
         assert_eq!(symlink_zxio.read_link().expect("read_link failed"), b"target");
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_fsverity_enabled() {
+    let fixture = TestFixture::new().await;
+    let root = fixture.root();
+    let file = open_file_checked(
+        &root,
+        fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::NOT_DIRECTORY,
+        "foo",
+    )
+    .await;
+    let data = vec![0xFF; 8192];
+    file.write(&data).await.expect("FIDL call failed").expect("write failed");
+
+    close_file_checked(file).await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+
+    fasync::unblock(move || {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { fsverity_enabled: true, ..Default::default() },
+            ..Default::default()
+        };
+        let foo_zxio = Arc::new(
+            dir_zxio
+                .open2(
+                    "foo",
+                    syncio::OpenOptions {
+                        node_protocols: Some(fio::NodeProtocols {
+                            file: Some(Default::default()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    Some(&mut attrs),
+                )
+                .expect("open failed"),
+        );
+        assert!(!attrs.fsverity_enabled);
+        let mut builder = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
+        builder.write(data.as_slice());
+        let tree = builder.finish();
+        let mut expected_root: [u8; 64] = [0u8; 64];
+        expected_root[0..32].copy_from_slice(&tree.root().bytes());
+
+        // NOTE: The root hash will be calculated and set by the filesystem.
+        let expected_descriptor =
+            zxio_fsverity_descriptor_t { hash_algorithm: 1, salt_size: 8, salt: [0xFF; 32] };
+        let () = foo_zxio
+            .enable_verity(&expected_descriptor)
+            .expect("failed to set verified file metadata");
+        let query = zxio_node_attr_has_t {
+            content_size: true,
+            fsverity_options: true,
+            fsverity_root_hash: true,
+            fsverity_enabled: true,
+            ..Default::default()
+        };
+
+        let mut fsverity_root_hash = [0; ZXIO_ROOT_HASH_LENGTH];
+        let attrs = foo_zxio
+            .attr_get_with_root_hash(query, &mut fsverity_root_hash)
+            .expect("attr_get failed");
+        assert!(attrs.fsverity_enabled);
+        assert_eq!(attrs.fsverity_options.hash_alg, 1);
+        assert_eq!(attrs.fsverity_options.salt_size, 8);
+        assert_eq!(attrs.content_size, data.len() as u64);
+        assert_eq!(fsverity_root_hash, expected_root);
+        let mut buf = [0; 32];
+        buf[0..8].copy_from_slice(&[0xFF; 8]);
+        assert_eq!(attrs.fsverity_options.salt, buf);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_not_fsverity_enabled() {
+    let fixture = TestFixture::new().await;
+    let root = fixture.root();
+    let file = open_file_checked(
+        &root,
+        fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::NOT_DIRECTORY,
+        "foo",
+    )
+    .await;
+    let data = vec![0xFF; 8192];
+    file.write(&data).await.expect("FIDL call failed").expect("write failed");
+
+    close_file_checked(file).await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+
+    fasync::unblock(move || {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { fsverity_enabled: true, ..Default::default() },
+            ..Default::default()
+        };
+        let foo_zxio = Arc::new(
+            dir_zxio
+                .open2(
+                    "foo",
+                    syncio::OpenOptions {
+                        node_protocols: Some(fio::NodeProtocols {
+                            file: Some(Default::default()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    Some(&mut attrs),
+                )
+                .expect("open failed"),
+        );
+        assert!(!attrs.fsverity_enabled);
+        let query = zxio_node_attr_has_t { fsverity_enabled: true, ..Default::default() };
+        let attrs = foo_zxio.attr_get(query).expect("attr_get failed");
+        assert!(!attrs.fsverity_enabled);
+
+        let query = zxio_node_attr_has_t { fsverity_options: true, ..Default::default() };
+        assert_eq!(
+            foo_zxio.attr_get(query).expect_err("attr_get succeeded for the 'options' attribute"),
+            zx::Status::INVALID_ARGS
+        );
+
+        let mut fsverity_root_hash = [0; ZXIO_ROOT_HASH_LENGTH];
+        let query = zxio_node_attr_has_t { fsverity_root_hash: true, ..Default::default() };
+        assert_eq!(
+            foo_zxio
+                .attr_get_with_root_hash(query, &mut fsverity_root_hash)
+                .expect_err("attr_get succeeded for the 'root_hash' attribute"),
+            zx::Status::INVALID_ARGS
+        );
     })
     .await;
 

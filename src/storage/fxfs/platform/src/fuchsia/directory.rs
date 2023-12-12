@@ -806,6 +806,7 @@ impl vfs::node::Node for FxDirectory {
                 link_count: props.refs + 1 + props.sub_dirs,
                 id: self.directory.object_id(),
                 change_time: props.change_time.as_nanos(),
+                verity_enabled: false,
             }
         ))
     }

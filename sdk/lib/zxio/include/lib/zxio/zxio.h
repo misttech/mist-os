@@ -593,6 +593,8 @@ ZXIO_EXPORT zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_
 // types.
 ZXIO_EXPORT zx_status_t zxio_allocate(zxio_t* io, uint64_t offset, uint64_t len,
                                       zxio_allocate_mode_t mode);
+ZXIO_EXPORT zx_status_t zxio_enable_verity(zxio_t* io,
+                                           const zxio_fsverity_descriptor_t* descriptor);
 
 __END_CDECLS
 

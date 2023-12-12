@@ -309,6 +309,7 @@ impl vfs::node::Node for FxFile {
                 change_time: props.change_time.as_nanos(),
                 options: descriptor.clone().map(|a| a.0),
                 root_hash: descriptor.clone().map(|a| a.1),
+                verity_enabled: self.verified_file(),
             }
         ))
     }
@@ -1676,7 +1677,8 @@ mod tests {
         let mut builder = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
         builder.write(data.as_slice());
         let tree = builder.finish();
-        let expected_root = tree.root().bytes().to_vec();
+        let mut expected_root = tree.root().bytes().to_vec();
+        expected_root.extend_from_slice(&[0; 32]);
 
         let expected_descriptor = fio::VerificationOptions {
             hash_algorithm: Some(fio::HashAlgorithm::Sha256),

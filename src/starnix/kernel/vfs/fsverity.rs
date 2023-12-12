@@ -116,11 +116,11 @@ pub enum FsVerityState {
     /// ENABLE_VERITY will fail with EBUSY. It is possible for merkle-tree building to fail
     /// (e.g. if the file is too large) but it is not possible to cancel this state manually.
     Building,
-    /// This file uses fsverity. Descriptor is attached.
+    /// This file uses fsverity.
     ///
     /// Files in this mode can never be opened as writable.
     /// There is no way to disable fsverity once enabled outside of deleting the file.
-    FsVerity { descriptor: fsverity_descriptor },
+    FsVerity,
 }
 
 impl FsVerityState {
@@ -129,7 +129,7 @@ impl FsVerityState {
         match self {
             FsVerityState::None => Ok(()),
             FsVerityState::Building => error!(ETXTBSY),
-            FsVerityState::FsVerity { .. } => error!(EACCES),
+            FsVerityState::FsVerity => error!(EACCES),
         }
     }
 }
@@ -149,7 +149,6 @@ pub mod ioctl {
         },
     };
     use num_traits::FromPrimitive;
-    use starnix_logging::log_warn;
     use starnix_syscalls::{SyscallResult, SUCCESS};
     use starnix_uapi::{
         errno, error,
@@ -173,49 +172,15 @@ pub mod ioctl {
         let mut descriptor = fsverity_descriptor_from_enable_arg(task, block_size, &args)?;
         descriptor.data_size = file.node().refresh_info(task)?.size as u64;
         // The "Exec" writeguard mode means 'no writers'.
-        let guard = file.node().create_write_guard(FileWriteGuardMode::Exec)?;
-        let entry = &file.name.entry;
-        let mut fsverity = entry.node.fsverity.lock();
+        let _guard = file.node().create_write_guard(FileWriteGuardMode::Exec)?;
+        let mut fsverity = file.node().fsverity.lock();
         match *fsverity {
             FsVerityState::Building => error!(EBUSY),
-            FsVerityState::FsVerity { .. } => error!(EEXIST),
+            FsVerityState::FsVerity => error!(EEXIST),
             FsVerityState::None => {
-                // Notify the filesystem that we are going to enable verity on this node.
-                // Note that this cannot be cancelled, but it may fail. In all cases we
-                // require end_enable_verity() to be called.
-                file.node().ops().begin_enable_fsverity()?;
-
-                let node = file.node().clone();
                 *fsverity = FsVerityState::Building;
-                task.kernel().kthreads.spawn(move |_, _| {
-                    // Explicitly move write guard into this thread.
-                    let _guard = guard;
-                    // TODO(fxbug.dev/302620512): Generate merkle data, write to vmo.
-                    let merkle_data: [u8; 0] = [];
-                    let merkle_tree_size = match node.ops().set_fsverity_merkle_data(&merkle_data) {
-                        Ok(()) => merkle_data.len(),
-                        Err(error) => {
-                            log_warn!("set_fsverity_merkle_data failed: {:?}", error);
-                            0
-                        }
-                    };
-                    // TODO(fxbug.dev/302620512): Set descriptor.root_hash.
-                    //   This hash is based on the contents "foo"
-                    descriptor.root_hash[..32].copy_from_slice(&[
-                        0xdf, 0xfd, 0xd9, 0x7c, 0xfb, 0xf2, 0x88, 0xa7, 0x29, 0xf6, 0xaf, 0x66,
-                        0xf1, 0x2a, 0xc8, 0x88, 0x4f, 0xd7, 0x8d, 0xf3, 0xf1, 0x87, 0x6d, 0xcc,
-                        0xc5, 0x8b, 0x5a, 0xb2, 0x36, 0x83, 0x9b, 0x49,
-                    ]);
-                    let mut fsverity_state = node.fsverity.lock();
-                    match node.ops().end_enable_fsverity(&descriptor, merkle_tree_size) {
-                        Ok(()) => {
-                            *fsverity_state = FsVerityState::FsVerity { descriptor };
-                        }
-                        Err(error) => {
-                            log_warn!("enable_fsverity failed: {:?}", error);
-                        }
-                    }
-                });
+                file.node().ops().enable_fsverity(&descriptor)?;
+                *fsverity = FsVerityState::FsVerity;
                 Ok(SUCCESS)
             }
         }
@@ -231,7 +196,9 @@ pub mod ioctl {
         let digest_addr = header_ref.next().addr();
         let header = task.mm().read_object(header_ref)?;
         match &*file.node().fsverity.lock() {
-            FsVerityState::FsVerity { descriptor } => {
+            FsVerityState::FsVerity => {
+                // TODO(b/314182708): Remove hardcoding of blocksize
+                let descriptor = file.node().ops().get_fsverity_descriptor(12)?;
                 let digest_algorithm = HashAlgorithm::from_u8(descriptor.hash_algorithm)
                     .ok_or_else(|| errno!(EINVAL))?;
                 if descriptor.hash_algorithm as u16 != header.digest_algorithm {
@@ -259,13 +226,14 @@ pub mod ioctl {
     ) -> Result<SyscallResult, Errno> {
         let arg: fsverity_read_metadata_arg = task.mm().read_object(arg.into())?;
         match &*file.node().fsverity.lock() {
-            FsVerityState::FsVerity { descriptor } => {
+            FsVerityState::FsVerity => {
                 match MetadataType::from_u64(arg.metadata_type).ok_or_else(|| errno!(EINVAL))? {
                     MetadataType::MerkleTree => {
-                        // TODO(fxbug.dev/302620512): Add support for reading back merkle data.
                         error!(EOPNOTSUPP)
                     }
                     MetadataType::Descriptor => {
+                        // TODO(b/314182708): Remove hardcoding of blocksize
+                        let descriptor = file.node().ops().get_fsverity_descriptor(12)?;
                         task.mm().write_memory(
                             UserAddress::from(arg.buf_ptr).into(),
                             &descriptor.as_bytes()

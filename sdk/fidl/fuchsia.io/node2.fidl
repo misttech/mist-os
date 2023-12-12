@@ -73,11 +73,13 @@ type NodeAttributesQuery = strict bits : uint64 {
     @available(added=HEAD)
     CHANGE_TIME = 0x2000;
 
-    /// Fsverity attributes.
+    /// Verity attributes.
     @available(added=HEAD)
     OPTIONS = 0x4000;
     @available(added=HEAD)
     ROOT_HASH = 0x8000;
+    @available(added=HEAD)
+    VERITY_ENABLED = 0x10000;
 };
 
 type MutableNodeAttributes = table {
@@ -148,13 +150,17 @@ type NodeAttributes2 = struct {
         @available(added=HEAD)
         7: change_time uint64;
 
-        /// Contains the verification options for fsverity-enabled files.
+        /// Contains the verification options for verity-enabled files.
         @available(added=HEAD)
         8: options VerificationOptions;
 
         /// The root hash for the file. Not all filesystems support this across all files.
         @available(added=HEAD)
         9: root_hash vector<uint8>:64;
+
+        /// True if this file is verity-enabled.
+        @available(added=HEAD)
+       10: verity_enabled bool;
     };
 };
 

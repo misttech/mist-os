@@ -720,43 +720,16 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ////////////////////
     // FS-Verity operations
 
-    /// Marks that FS-Verity is being built.
-    /// This should ensure there are no writable file handles and return EBUSY if called already.
-    fn begin_enable_fsverity(&self) -> Result<(), Errno> {
+    /// Marks that FS-Verity is being built. Writes fsverity descriptor and merkle tree, the latter
+    /// computed by the filesystem.
+    /// This should ensure there are no writable file handles. Returns EEXIST if the file was
+    /// already fsverity-enabled. Returns EBUSY if this ioctl was already running on this file.
+    fn enable_fsverity(&self, _descriptor: &fsverity_descriptor) -> Result<(), Errno> {
         error!(ENOTSUP)
     }
 
-    /// Writes fsverity descriptor and merkle data in a filesystem-specific format.
-    fn end_enable_fsverity(
-        &self,
-        _descriptor: &fsverity_descriptor,
-        _merkle_tree_size: usize,
-    ) -> Result<(), Errno> {
-        error!(ENOTSUP)
-    }
-
-    /// Read fsverity descriptor, if supported.
-    fn get_fsverity_descriptor(&self) -> Result<fsverity_descriptor, Errno> {
-        error!(ENOTSUP)
-    }
-
-    /// Get a VMO for reading fsverity merkle data, if supported.
-    ///
-    /// Nb: Linux provides read page method for this, but because we will most likely be
-    /// producing this data outside of the filesystem component, the call overheads would be too
-    /// high to adopt the same approach.
-    /// TODO(fxbug.dev/302620512): Use a VMO, not a boxed array.
-    fn get_fsverity_merkle_data(&self) -> Result<Box<[u8]>, Errno> {
-        error!(ENOTSUP)
-    }
-
-    /// Set a VMO for reading/writing fsverity merkle data, if supported.
-    ///
-    /// Nb: Linux provides write page method for this, but because we will most likely be
-    /// producing this data outside of the filesystem component, the call overheads would be too
-    /// high to adopt the same approach.
-    /// TODO(fxbug.dev/302620512): Use a VMO, not an array.
-    fn set_fsverity_merkle_data(&self, _data: &[u8]) -> Result<(), Errno> {
+    /// Read fsverity descriptor, if the node is fsverity-enabled. Else returns ENODATA.
+    fn get_fsverity_descriptor(&self, _log_blocksize: u8) -> Result<fsverity_descriptor, Errno> {
         error!(ENOTSUP)
     }
 }
@@ -1717,7 +1690,7 @@ impl FsNode {
         let mut stx_attributes = 0; // TODO(fxbug.dev/302594110)
         let stx_attributes_mask = STATX_ATTR_VERITY as u64;
 
-        if matches!(*self.fsverity.lock(), FsVerityState::FsVerity { .. }) {
+        if matches!(*self.fsverity.lock(), FsVerityState::FsVerity) {
             stx_attributes |= STATX_ATTR_VERITY as u64;
         }
 

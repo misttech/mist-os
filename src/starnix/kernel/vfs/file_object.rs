@@ -619,7 +619,7 @@ pub fn default_ioctl(
             not_implemented!("FS_IOC_GETFLAGS");
             let arg = UserAddress::from(arg).into();
             let mut flags: u32 = 0;
-            if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity { .. }) {
+            if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
             }
             current_task.write_object(arg, &flags)?;
