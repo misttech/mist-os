@@ -116,6 +116,7 @@ default_args = {
 
   pw_unit_test_MAIN = "//src/lib/fxl/test:gtest_main"
   pw_unit_test_GOOGLETEST_BACKEND = "//third_party/googletest:gmock_no_testonly"
+  pw_unit_test_BACKEND = "//third_party/pigweed/src/pw_unit_test:googletest"
   pw_unit_test_TESTONLY = true
 
   # This is a Pigweed build configuration argument that removes default configs
