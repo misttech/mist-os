@@ -4,50 +4,54 @@
 
 #ifndef SRC_GRAPHICS_BIN_OPENCL_LOADER_LOADER_H_
 #define SRC_GRAPHICS_BIN_OPENCL_LOADER_LOADER_H_
-#include <fuchsia/opencl/loader/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/fidl/cpp/interface_handle.h>
+#include <fidl/fuchsia.opencl.loader/cpp/fidl.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
+#include <list>
 #include <string>
+#include <vector>
 
 #include "src/graphics/bin/opencl_loader/app.h"
 
 // Implements the opencl loader's Loader service which provides the client
 // driver portion to the loader as a VMO.
-class LoaderImpl final : public fuchsia::opencl::loader::Loader, public LoaderApp::Observer {
+class LoaderImpl final : public fidl::Server<fuchsia_opencl_loader::Loader>,
+                         public LoaderApp::Observer {
  public:
-  explicit LoaderImpl(LoaderApp* app) : app_(app) {}
+  // Add a handler for this protocol to |outgoing_dir|. Any connections made to the protocol will
+  // create a new loader instance, which keeps a reference to |app|. The loader instance will be
+  // alive as long as |dispatcher| has tasks with active connections.
+  static zx::result<> Add(component::OutgoingDirectory& outgoing_dir, LoaderApp* app,
+                          async_dispatcher_t* dispatcher);
+
   ~LoaderImpl() final;
 
-  // Adds a binding for fuchsia::opencl::loader::Loader to |outgoing|. Will create a new loader for
-  // every connection.
-  static void Add(LoaderApp* app, const std::shared_ptr<sys::OutgoingDirectory>& outgoing);
+ private:
+  static fidl::ProtocolHandler<fuchsia_opencl_loader::Loader> GetHandler(
+      LoaderApp* app, async_dispatcher_t* dispatcher);
+
+  explicit LoaderImpl(LoaderApp* app) : app_(app) {}
 
   // LoaderApp::Observer implementation.
   void OnIcdListChanged(LoaderApp* app) override;
 
- private:
-  // fuchsia::opencl::loader::Loader impl
-  void Get(std::string name, GetCallback callback) override;
-  void ConnectToDeviceFs(zx::channel channel) override;
-  void ConnectToManifestFs(fuchsia::opencl::loader::ConnectToManifestOptions options,
-                           zx::channel channel) override;
-  void GetSupportedFeatures(GetSupportedFeaturesCallback callback) override;
+  // fidl::Server<fuchsia_opencl_loader::Loader> implementation.
+  void Get(GetRequest& request, GetCompleter::Sync& completer) override;
+  void ConnectToDeviceFs(ConnectToDeviceFsRequest& request,
+                         ConnectToDeviceFsCompleter::Sync& completer) override;
+  void ConnectToManifestFs(ConnectToManifestFsRequest& request,
+                           ConnectToManifestFsCompleter::Sync& completer) override;
+  void GetSupportedFeatures(GetSupportedFeaturesCompleter::Sync& completer) override;
 
-  void AddCallback(std::string name, fit::function<void(zx::vmo)> callback);
+  void AddCallback(std::string name, GetCompleter::Async completer);
 
   bool waiting_for_callbacks() const {
     return !callbacks_.empty() || !connect_manifest_handles_.empty();
   }
 
   LoaderApp* app_;
-
-  fidl::BindingSet<fuchsia::opencl::loader::Loader,
-                   std::unique_ptr<fuchsia::opencl::loader::Loader>>
-      bindings_;
-
-  std::list<std::pair<std::string, fit::function<void(zx::vmo)>>> callbacks_;
-  std::vector<zx::channel> connect_manifest_handles_;
+  std::list<std::pair<std::string, GetCompleter::Async>> callbacks_;
+  std::vector<fidl::ServerEnd<fuchsia_io::Directory>> connect_manifest_handles_;
 };
 
 #endif  // SRC_GRAPHICS_BIN_OPENCL_LOADER_LOADER_H_

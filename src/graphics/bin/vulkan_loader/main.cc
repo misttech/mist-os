@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/fidl/cpp/interface_handle.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <zircon/processargs.h>
 
 #include "src/graphics/bin/vulkan_loader/app.h"
@@ -33,7 +31,6 @@ zx::result<fidl::ClientEnd<fuchsia_memorypressure::Provider>> GetMemoryPressureP
   }
   return zx::ok(std::move(endpoints->client));
 }
-}  // namespace
 
 class LifecycleHandler : public fidl::Server<fuchsia_process_lifecycle::Lifecycle> {
  public:
@@ -57,6 +54,7 @@ class LifecycleHandler : public fidl::Server<fuchsia_process_lifecycle::Lifecycl
   async::Loop* loop_;
   fidl::ServerBinding<fuchsia_process_lifecycle::Lifecycle> binding_;
 };
+}  // namespace
 
 int main(int argc, const char* const* argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

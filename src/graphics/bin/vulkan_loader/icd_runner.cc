@@ -5,14 +5,11 @@
 #include "icd_runner.h"
 
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
-#include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"

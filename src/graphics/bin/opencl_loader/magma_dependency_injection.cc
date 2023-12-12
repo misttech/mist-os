@@ -4,29 +4,39 @@
 
 #include "src/graphics/bin/opencl_loader/magma_dependency_injection.h"
 
-#include <fuchsia/gpu/magma/cpp/fidl.h>
-#include <lib/fdio/directory.h>
+#include <fidl/fuchsia.gpu.magma/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
-zx_status_t MagmaDependencyInjection::Initialize() {
-  gpu_dependency_injection_watcher_ = fsl::DeviceWatcher::Create(
+zx::result<MagmaDependencyInjection> MagmaDependencyInjection::Create(
+    fidl::ClientEnd<fuchsia_memorypressure::Provider> provider) {
+  std::unique_ptr watcher = fsl::DeviceWatcher::Create(
       "/dev/class/gpu-dependency-injection",
-      [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
+      [provider = std::move(provider)](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                       const std::string& filename) mutable {
         if (filename == ".") {
           return;
         }
-        fuchsia::gpu::magma::DependencyInjectionSyncPtr dependency_injection;
-        zx_status_t status =
-            fdio_service_connect_at(dir.channel().get(), filename.c_str(),
-                                    dependency_injection.NewRequest().TakeChannel().release());
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to connect to " << filename;
+        auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::DependencyInjection>();
+        if (endpoints.is_error()) {
+          FX_LOGS(ERROR) << "Failed to create endpoints: " << endpoints.status_string();
+          return;
+        }
+        if (auto result = component::ConnectAt(dir, std::move(endpoints->server), filename);
+            result.is_error()) {
+          FX_LOGS(ERROR) << "Failed to connect to " << filename << ": " << result.status_string();
           return;
         }
 
-        dependency_injection->SetMemoryPressureProvider(
-            context_->svc()->Connect<fuchsia::memorypressure::Provider>());
+        if (auto result =
+                fidl::WireCall(endpoints->client)->SetMemoryPressureProvider(std::move(provider));
+            !result.ok()) {
+          FX_LOGS(ERROR) << "Failed to set memory pressure provider: " << result.status_string();
+          return;
+        }
       });
-  if (!gpu_dependency_injection_watcher_)
-    return ZX_ERR_INTERNAL;
-  return ZX_OK;
+  if (!watcher) {
+    FX_LOGS(ERROR) << "Failed to create device watcher!";
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(MagmaDependencyInjection(std::move(watcher)));
 }

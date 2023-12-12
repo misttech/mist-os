@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.component/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/component/incoming/cpp/service.h>
 #include <lib/fit/defer.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>

@@ -63,12 +63,13 @@ TEST_F(VulkanLoader, ManifestLoad) {
   ASSERT_TRUE(icd.is_ok()) << icd.status_string();
   ASSERT_TRUE(icd->is_valid());
   zx_info_handle_basic_t handle_info;
-  EXPECT_EQ(ZX_OK, icd->get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
-                                 nullptr));
+  ASSERT_EQ(
+      icd->get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr, nullptr),
+      ZX_OK);
   EXPECT_TRUE(handle_info.rights & ZX_RIGHT_EXECUTE);
   EXPECT_FALSE(handle_info.rights & ZX_RIGHT_WRITE);
 
-  zx::result not_present = GetIcd("-present");
+  zx::result not_present = GetIcd("not-present");
   ASSERT_TRUE(not_present.is_ok()) << not_present.status_string();
   EXPECT_FALSE(not_present->is_valid());
 }
@@ -82,8 +83,8 @@ TEST_F(VulkanLoader, VmosIndependent) {
   ASSERT_TRUE(icd->is_valid());
 
   fzl::VmoMapper mapper;
-  EXPECT_EQ(ZX_OK,
-            mapper.Map(*icd, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
+  ASSERT_EQ(mapper.Map(*icd, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS),
+            ZX_OK);
   uint8_t original_value = *static_cast<uint8_t*>(mapper.start());
   uint8_t byte_to_write = original_value + 1;
   size_t actual;
@@ -107,8 +108,8 @@ TEST_F(VulkanLoader, VmosIndependent) {
   ASSERT_TRUE(icd2->is_valid());
 
   fzl::VmoMapper mapper2;
-  EXPECT_EQ(ZX_OK,
-            mapper2.Map(*icd2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
+  ASSERT_EQ(mapper2.Map(*icd2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS),
+            ZX_OK);
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 

@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fuchsia/gpu/magma/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/opencl/loader/cpp/fidl.h>
-#include <fuchsia/sys2/cpp/fidl.h>
+#include <fidl/fuchsia.gpu.magma/cpp/test_base.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.opencl.loader/cpp/wire.h>
+#include <fidl/fuchsia.sys2/cpp/wire.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
@@ -17,50 +17,74 @@
 
 #include <filesystem>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 // This is the first and only ICD loaded, so it should have a "0-" prepended.
-const char* kIcdFilename = "0-libopencl_fake.so";
+const char kIcdFilename[] = "0-libopencl_fake.so";
+const char kLoaderSvcPath[] = "/svc/fuchsia.opencl.loader.Loader";
 
-zx_status_t ForceWaitForIdle(fuchsia::opencl::loader::LoaderSyncPtr& loader) {
-  zx::vmo vmo;
-  // manifest.json remaps this to bin/opencl-server.
-  return loader->Get(kIcdFilename, &vmo);
-}
+class OpenclLoader : public testing::Test {
+ protected:
+  void SetUp() override {
+    auto loader = ConnectToLoaderService();
+    ASSERT_TRUE(loader.is_ok()) << loader.status_string();
+    loader_ = std::move(*loader);
+  }
 
-TEST(OpenclLoader, ManifestLoad) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+  const auto& loader() const { return *loader_; }
 
-  zx::vmo vmo_out;
-  // manifest.json remaps this to bin/opencl-server.
-  EXPECT_EQ(ZX_OK, loader->Get(kIcdFilename, &vmo_out));
-  EXPECT_TRUE(vmo_out.is_valid());
+  zx::result<zx::vmo> GetIcd(std::string_view icd_filename) {
+    auto response = loader()->Get(fidl::StringView::FromExternal(icd_filename));
+    if (!response.ok()) {
+      return zx::error(response.status());
+    }
+    return zx::ok(std::move(response->lib));
+  }
+
+ private:
+  static zx::result<fidl::WireSyncClient<fuchsia_opencl_loader::Loader>> ConnectToLoaderService() {
+    zx::result loader_endpoints = fidl::CreateEndpoints<fuchsia_opencl_loader::Loader>();
+    if (loader_endpoints.is_error()) {
+      return loader_endpoints.take_error();
+    }
+    if (zx_status_t status =
+            fdio_service_connect(kLoaderSvcPath, loader_endpoints->server.TakeHandle().release());
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(loader_endpoints->client));
+  }
+
+  std::optional<fidl::WireSyncClient<fuchsia_opencl_loader::Loader>> loader_;
+};
+
+TEST_F(OpenclLoader, ManifestLoad) {
+  zx::result icd = GetIcd(kIcdFilename);
+  ASSERT_TRUE(icd.is_ok()) << icd.status_string();
+  ASSERT_TRUE(icd->is_valid());
   zx_info_handle_basic_t handle_info;
-  EXPECT_EQ(ZX_OK, vmo_out.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info),
-                                    nullptr, nullptr));
+  ASSERT_EQ(ZX_OK, icd->get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
+                                 nullptr));
   EXPECT_TRUE(handle_info.rights & ZX_RIGHT_EXECUTE);
   EXPECT_FALSE(handle_info.rights & ZX_RIGHT_WRITE);
-  EXPECT_EQ(ZX_OK, loader->Get("not-present", &vmo_out));
-  EXPECT_FALSE(vmo_out.is_valid());
+
+  zx::result not_present = GetIcd("not-present");
+  ASSERT_TRUE(not_present.is_ok()) << not_present.status_string();
+  EXPECT_FALSE(not_present->is_valid());
 }
 
 // Check that writes to one VMO returned by the server will not modify a separate VMO returned by
 // the service.
-TEST(OpenclLoader, VmosIndependent) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
-
-  zx::vmo vmo_out;
+TEST_F(OpenclLoader, VmosIndependent) {
   // manifest.json remaps this to bin/opencl-server.
-  EXPECT_EQ(ZX_OK, loader->Get(kIcdFilename, &vmo_out));
-  ASSERT_TRUE(vmo_out.is_valid());
+  zx::result icd = GetIcd(kIcdFilename);
+  ASSERT_TRUE(icd.is_ok()) << icd.status_string();
+  ASSERT_TRUE(icd->is_valid());
 
   fzl::VmoMapper mapper;
-  EXPECT_EQ(ZX_OK,
-            mapper.Map(vmo_out, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
+  ASSERT_EQ(mapper.Map(*icd, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS),
+            ZX_OK);
   uint8_t original_value = *static_cast<uint8_t*>(mapper.start());
   uint8_t byte_to_write = original_value + 1;
   size_t actual;
@@ -79,98 +103,97 @@ TEST(OpenclLoader, VmosIndependent) {
   }
 
   // Ensure that the new clone is unaffected.
-  zx::vmo vmo2;
-  EXPECT_EQ(ZX_OK, loader->Get(kIcdFilename, &vmo2));
-  EXPECT_TRUE(vmo2.is_valid());
+  zx::result icd2 = GetIcd(kIcdFilename);
+  ASSERT_TRUE(icd2.is_ok()) << icd.status_string();
+  ASSERT_TRUE(icd2->is_valid());
 
   fzl::VmoMapper mapper2;
-  EXPECT_EQ(ZX_OK,
-            mapper2.Map(vmo2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
+  ASSERT_EQ(mapper2.Map(*icd2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS),
+            ZX_OK);
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 
-TEST(OpenclLoader, DeviceFs) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(OpenclLoader, DeviceFs) {
+  zx::result dir = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(dir.is_ok()) << dir.status_string();
+  auto connect_result = loader()->ConnectToDeviceFs(dir->server.TakeChannel());
+  ASSERT_TRUE(connect_result.ok()) << connect_result.status_string();
 
-  fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  EXPECT_EQ(ZX_OK, loader->ConnectToDeviceFs(dir.NewRequest().TakeChannel()));
+  ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
-  ForceWaitForIdle(loader);
+  zx::result device = fidl::CreateEndpoints<fuchsia_gpu_magma::Device>();
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
+  ASSERT_EQ(fdio_service_connect_at(dir->client.handle()->get(), "class/gpu/000",
+                                    device->server.TakeHandle().release()),
+            ZX_OK);
 
-  fuchsia::gpu::magma::DeviceSyncPtr device_ptr;
-  EXPECT_EQ(ZX_OK, fdio_service_connect_at(dir.channel().get(), "class/gpu/000",
-                                           device_ptr.NewRequest().TakeChannel().release()));
-  fuchsia::gpu::magma::Device_Query_Result query_result;
-  ASSERT_EQ(ZX_OK, device_ptr->Query(fuchsia::gpu::magma::QueryId(0), &query_result));
-  ASSERT_TRUE(query_result.is_response()) << zx_status_get_string(query_result.err());
-  ASSERT_TRUE(query_result.response().is_simple_result());
-  EXPECT_EQ(5u, query_result.response().simple_result());
+  auto response =
+      fidl::WireCall(device->client)->Query(::fuchsia_gpu_magma::wire::QueryId::kVendorId);
+  ASSERT_TRUE(response.ok()) << response.error();
+  ASSERT_TRUE(response->is_ok()) << zx_status_get_string(response->error_value());
+  ASSERT_TRUE(response->value()->is_simple_result());
+  EXPECT_EQ(response->value()->simple_result(), 5u);
 }
 
-TEST(OpenclLoader, Features) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
-
-  fuchsia::opencl::loader::Features features;
-  EXPECT_EQ(ZX_OK, loader->GetSupportedFeatures(&features));
-  constexpr fuchsia::opencl::loader::Features kExpectedFeatures =
-      fuchsia::opencl::loader::Features::CONNECT_TO_DEVICE_FS |
-      fuchsia::opencl::loader::Features::GET;
-  EXPECT_EQ(kExpectedFeatures, features);
+TEST_F(OpenclLoader, Features) {
+  auto response = loader()->GetSupportedFeatures();
+  ASSERT_TRUE(response.ok()) << response.error();
+  constexpr fuchsia_opencl_loader::Features kExpectedFeatures =
+      fuchsia_opencl_loader::Features::kConnectToDeviceFs | fuchsia_opencl_loader::Features::kGet;
+  EXPECT_EQ(response.value().features, kExpectedFeatures);
 }
 
-TEST(OpenclLoader, ManifestFs) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(OpenclLoader, ManifestFs) {
+  auto manifest_fs = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(manifest_fs.is_ok()) << manifest_fs.status_string();
+  {
+    auto response =
+        loader()->ConnectToManifestFs(fuchsia_opencl_loader::ConnectToManifestOptions::kWaitForIdle,
+                                      manifest_fs->server.TakeChannel());
+    ASSERT_TRUE(response.ok()) << response;
+  }
 
-  fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  EXPECT_EQ(ZX_OK, loader->ConnectToManifestFs(
-                       fuchsia::opencl::loader::ConnectToManifestOptions::WAIT_FOR_IDLE,
-                       dir.NewRequest().TakeChannel()));
+  fbl::unique_fd dir_fd;
+  zx_status_t status =
+      fdio_fd_create(manifest_fs->client.TakeChannel().release(), dir_fd.reset_and_get_address());
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
-  int dir_fd;
-  EXPECT_EQ(ZX_OK, fdio_fd_create(dir.TakeChannel().release(), &dir_fd));
-
-  int manifest_fd = openat(dir_fd, (std::string(kIcdFilename) + ".json").c_str(), O_RDONLY);
-
-  EXPECT_LE(0, manifest_fd);
+  fbl::unique_fd manifest_fd(
+      openat(dir_fd.get(), (std::string(kIcdFilename) + ".json").c_str(), O_RDONLY));
+  ASSERT_TRUE(manifest_fd.is_valid()) << strerror(errno);
 
   constexpr int kManifestFileSize = 135;
   char manifest_data[kManifestFileSize + 1];
-  ssize_t read_size = read(manifest_fd, manifest_data, sizeof(manifest_data) - 1);
+  ssize_t read_size = read(manifest_fd.get(), manifest_data, sizeof(manifest_data) - 1);
   EXPECT_EQ(kManifestFileSize, read_size);
-
-  close(manifest_fd);
-  close(dir_fd);
 }
 
-TEST(OpenclLoader, DebugFilesystems) {
-  fuchsia::opencl::loader::LoaderSyncPtr loader;
-  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
-  ForceWaitForIdle(loader);
+TEST_F(OpenclLoader, DebugFilesystems) {
+  ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
-  fuchsia::sys2::RealmQuerySyncPtr query;
-  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.sys2.RealmQuery",
-                                        query.NewRequest().TakeChannel().release()));
+  zx::result realm = fidl::CreateEndpoints<fuchsia_sys2::RealmQuery>();
+  ASSERT_TRUE(realm.is_ok()) << realm.status_string();
+  ASSERT_EQ(
+      fdio_service_connect("/svc/fuchsia.sys2.RealmQuery", realm->server.TakeChannel().release()),
+      ZX_OK);
 
-  fuchsia::sys2::RealmQuery_Open_Result result;
-  fidl::InterfaceHandle<fuchsia::io::Node> dir;
-  EXPECT_EQ(ZX_OK, query->Open("./opencl_loader", fuchsia::sys2::OpenDirType::OUTGOING_DIR,
-                               fuchsia::io::OpenFlags::RIGHT_READABLE, fuchsia::io::ModeType(), ".",
-                               dir.NewRequest(), &result));
-  ASSERT_TRUE(result.is_response()) << result.err();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+
+  auto response = fidl::WireCall(realm->client)
+                      ->Open("./opencl_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
+                             fuchsia_io::OpenFlags::kRightReadable, /*mode=*/{}, /*path=*/".",
+                             std::move(endpoints->server));
+  ASSERT_TRUE(response.ok()) << response;
+  ASSERT_TRUE(response->is_ok()) << static_cast<uint32_t>(response->error_value());
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", dir.TakeChannel().release()));
+  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", endpoints->client.TakeChannel().release()));
   auto cleanup_binding = fit::defer([&]() { fdio_ns_unbind(ns, "/loader_out"); });
 
   const std::string debug_path("/loader_out/debug/");
 
   EXPECT_TRUE(std::filesystem::exists(debug_path + "device-fs/class/gpu/000"));
+  EXPECT_TRUE(std::filesystem::exists(debug_path + "manifest-fs/" + kIcdFilename + ".json"));
 }

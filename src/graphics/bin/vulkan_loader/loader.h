@@ -7,10 +7,10 @@
 
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/fidl/cpp/binding_set.h>
 
 #include <list>
 #include <string>
+#include <vector>
 
 #include "src/graphics/bin/vulkan_loader/app.h"
 

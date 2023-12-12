@@ -4,90 +4,90 @@
 
 #include "icd_runner.h"
 
-#include <fuchsia/component/runner/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.component.runner/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
-class ComponentControllerImpl : public fuchsia::component::runner::ComponentController {
- public:
-  ComponentControllerImpl() : vfs_(async_get_default_dispatcher()) {}
+ComponentControllerImpl::ComponentControllerImpl(async_dispatcher_t* dispatcher)
+    : vfs_(dispatcher) {}
 
-  zx_status_t Initialize(fidl::InterfaceRequest<fuchsia::io::Directory> directory_request,
-                         fidl::InterfaceHandle<fuchsia::io::Directory> pkg_directory) {
-    auto root = fbl::MakeRefCounted<fs::PseudoDir>();
-    auto remote = fbl::MakeRefCounted<fs::RemoteDir>(
-        fidl::ClientEnd<fuchsia_io::Directory>(pkg_directory.TakeChannel()));
-    root->AddEntry("pkg", remote);
+zx::result<std::unique_ptr<fidl::Server<fuchsia_component_runner::ComponentController>>>
+ComponentControllerImpl::Bind(
+    async_dispatcher_t* dispatcher,
+    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+    fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
+    fidl::ClientEnd<fuchsia_io::Directory> pkg_directory) {
+  std::unique_ptr<ComponentControllerImpl> server(new ComponentControllerImpl(dispatcher));
 
-    fidl::ServerEnd<fuchsia_io::Directory> dir_request{directory_request.TakeChannel()};
-    return vfs_.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadExec());
+  auto root = fbl::MakeRefCounted<fs::PseudoDir>();
+  auto remote = fbl::MakeRefCounted<fs::RemoteDir>(std::move(pkg_directory));
+  root->AddEntry("pkg", remote);
+  zx_status_t status =
+      server->vfs_.ServeDirectory(root, std::move(outgoing_dir), fs::Rights::ReadExec());
+  if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to serve package directory!";
+    return zx::error(status);
   }
-
-  void Add(std::unique_ptr<ComponentControllerImpl> controller,
-           fidl::InterfaceRequest<fuchsia::component::runner::ComponentController> request) {
-    controller_.AddBinding(std::move(controller), std::move(request));
-  }
-
- private:
-  void Kill() override { controller_.CloseAll(); }
-  void Stop() override { controller_.CloseAll(); }
-
-  fs::SynchronousVfs vfs_;
-  // This BindingSet should have at most one member.
-  fidl::BindingSet<fuchsia::component::runner::ComponentController,
-                   std::unique_ptr<ComponentControllerImpl>>
-      controller_;
-};
-
-void IcdRunnerImpl::Add(const std::shared_ptr<sys::OutgoingDirectory>& outgoing,
-                        async_dispatcher_t* dispatcher) {
-  outgoing->AddPublicService(
-      fidl::InterfaceRequestHandler<fuchsia::component::runner::ComponentRunner>(
-          [this, dispatcher](
-              fidl::InterfaceRequest<fuchsia::component::runner::ComponentRunner> request) {
-            bindings_.AddBinding(this, std::move(request), dispatcher);
-          }));
+  server->binding_ = fidl::BindServer(dispatcher, std::move(controller), server.get());
+  return zx::ok(std::move(server));
 }
 
-void IcdRunnerImpl::Start(
-    fuchsia::component::runner::ComponentStartInfo start_info,
-    fidl::InterfaceRequest<fuchsia::component::runner::ComponentController> controller) {
-  fidl::InterfaceHandle<fuchsia::io::Directory> pkg_directory;
-  for (auto& ns_entry : *start_info.mutable_ns()) {
-    if (!ns_entry.has_path() || !ns_entry.has_directory()) {
-      controller.Close(static_cast<zx_status_t>(fuchsia::component::Error::INVALID_ARGUMENTS));
-      return;
+zx::result<> IcdRunnerImpl::Add(std::unique_ptr<IcdRunnerImpl> component_runner,
+                                component::OutgoingDirectory& outgoing_dir) {
+  return outgoing_dir.AddProtocol<fuchsia_component_runner::ComponentRunner>(
+      std::move(component_runner));
+}
+
+void IcdRunnerImpl::Start(StartRequest& request, StartCompleter::Sync& completer) {
+  fidl::ServerEnd controller = std::move(request.controller());
+  if (!controller.is_valid()) {
+    FX_LOGS(ERROR) << "Invalid controller handle in start request!";
+    controller.Close(ZX_ERR_BAD_HANDLE);
+    return;
+  }
+
+  if (!request.start_info().outgoing_dir()) {
+    FX_LOGS(ERROR) << "Missing outgoing directory handle in start request!";
+    controller.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  fidl::ServerEnd outgoing_dir = *std::move(request.start_info().outgoing_dir());
+  if (!outgoing_dir.is_valid()) {
+    FX_LOGS(ERROR) << "Invalid outgoing directory handle in start request!";
+    controller.Close(ZX_ERR_BAD_HANDLE);
+    return;
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> pkg_directory;
+  for (auto& ns_entry : *request.start_info().ns()) {
+    if (ns_entry.path() == std::nullopt || ns_entry.directory() == std::nullopt) {
+      break;
     }
     if (ns_entry.path() != "/pkg") {
       continue;
     }
-    pkg_directory = std::move(*ns_entry.mutable_directory());
+    pkg_directory = std::move(*ns_entry.directory());
     break;
   }
-  if (!pkg_directory) {
-    FX_LOGS(ERROR) << "No package directory found for " << start_info.resolved_url();
-    controller.Close(static_cast<zx_status_t>(fuchsia::component::Error::INVALID_ARGUMENTS));
+  if (!pkg_directory.is_valid()) {
+    FX_LOGS(ERROR) << "No package directory found for " << *request.start_info().resolved_url();
+    request.controller().Close(ZX_ERR_INVALID_ARGS);
     return;
   }
-  auto impl = std::make_unique<ComponentControllerImpl>();
-  zx_status_t status =
-      impl->Initialize(std::move(*start_info.mutable_outgoing_dir()), std::move(pkg_directory));
-  if (status != ZX_OK) {
-    controller.Close(status);
-    return;
+
+  zx::result controller_server = ComponentControllerImpl::Bind(
+      dispatcher_, std::move(controller), std::move(outgoing_dir), std::move(pkg_directory));
+  if (controller_server.is_ok()) {
+    controller_server_ = *std::move(controller_server);
+  } else {
+    FX_LOGS(ERROR) << "Failed to bind controller: " << controller_server.status_string();
   }
-  auto impl_ptr = impl.get();
-  impl_ptr->Add(std::move(impl), std::move(controller));
 }

@@ -5,21 +5,42 @@
 #ifndef SRC_GRAPHICS_BIN_OPENCL_LOADER_ICD_RUNNER_H_
 #define SRC_GRAPHICS_BIN_OPENCL_LOADER_ICD_RUNNER_H_
 
-#include <fuchsia/component/runner/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
+#include <fidl/fuchsia.component.runner/cpp/fidl.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
-// This implements the icd_runner interface.
-class IcdRunnerImpl : public fuchsia::component::runner::ComponentRunner {
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+
+class ComponentControllerImpl : public fidl::Server<fuchsia_component_runner::ComponentController> {
  public:
-  void Add(const std::shared_ptr<sys::OutgoingDirectory>& outgoing, async_dispatcher_t* dispatcher);
+  // Binds `controller` to a new component controller using the given `outgoing_dir` and
+  // `pkg_directory`. On error, `controller` will be closed with an epitaph.
+  static zx::result<std::unique_ptr<fidl::Server<fuchsia_component_runner::ComponentController>>>
+  Bind(async_dispatcher_t* dispatcher,
+       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+       fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
+       fidl::ClientEnd<fuchsia_io::Directory> pkg_directory);
 
  private:
-  void Start(
-      fuchsia::component::runner::ComponentStartInfo start_info,
-      fidl::InterfaceRequest<fuchsia::component::runner::ComponentController> controller) override;
+  explicit ComponentControllerImpl(async_dispatcher_t* dispatcher);
+  void Stop(StopCompleter::Sync& completer) override { binding_->Close(ZX_OK); }
+  void Kill(KillCompleter::Sync& completer) override { binding_->Close(ZX_OK); }
 
-  fidl::BindingSet<fuchsia::component::runner::ComponentRunner> bindings_;
+  fs::SynchronousVfs vfs_;
+  std::optional<fidl::ServerBindingRef<fuchsia_component_runner::ComponentController>> binding_;
+};
+
+// This implements the icd_runner interface.
+class IcdRunnerImpl : public fidl::Server<fuchsia_component_runner::ComponentRunner> {
+ public:
+  explicit IcdRunnerImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  static zx::result<> Add(std::unique_ptr<IcdRunnerImpl> component_runner,
+                          component::OutgoingDirectory& outgoing);
+
+  void Start(StartRequest& request, StartCompleter::Sync& completer) override;
+
+ private:
+  async_dispatcher_t* const dispatcher_;
+  std::unique_ptr<fidl::Server<fuchsia_component_runner::ComponentController>> controller_server_;
 };
 
 #endif  // SRC_GRAPHICS_BIN_OPENCL_LOADER_ICD_RUNNER_H_

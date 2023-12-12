@@ -9,6 +9,7 @@
     program: {
         runner: "elf",
         binary: "bin/opencl_loader",
+        lifecycle: { stop_event: "notify" },
     },
     collections: [
         {

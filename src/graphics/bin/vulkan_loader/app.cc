@@ -4,9 +4,11 @@
 
 #include "src/graphics/bin/vulkan_loader/app.h"
 
+#include <fidl/fuchsia.component/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 
 #include "src/graphics/bin/vulkan_loader/goldfish_device.h"

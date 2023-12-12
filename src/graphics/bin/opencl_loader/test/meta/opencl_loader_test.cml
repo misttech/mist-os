@@ -15,6 +15,7 @@
         {
             name: "test_lib_provider",
             url: "fuchsia-pkg://fuchsia.com/opencl_loader_tests#meta/opencl_loader_test_lib_provider.cm",
+            startup: "eager",
         },
     ],
     offer: [

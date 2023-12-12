@@ -4,7 +4,6 @@
 
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
 
-#include <dirent.h>
 #include <fidl/fuchsia.component.decl/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>

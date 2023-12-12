@@ -30,24 +30,23 @@ source_set("app") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_hlcpp",
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_hlcpp",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
-    "//sdk/lib/sys/inspect/cpp",
-    "//src/lib/json_parser",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.opencl.loader:fuchsia.opencl.loader_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/storage/lib/vfs/cpp",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.opencl.loader:fuchsia.opencl.loader_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/vfs/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//src/lib/json_parser",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -62,14 +61,10 @@ executable("bin") {
 
   deps = [
     ":app",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.opencl.loader:fuchsia.opencl.loader_hlcpp",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
-    "//src/lib/fsl",
+    "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

@@ -10,6 +10,12 @@
     program: {
         binary: "bin/opencl_loader_unittest",
     },
+    collections: [
+        {
+            name: "icd-loaders",
+            durability: "transient",
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.sys2.Realm",

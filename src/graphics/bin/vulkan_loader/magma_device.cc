@@ -4,6 +4,7 @@
 
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
 
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/syslog/cpp/macros.h>
 

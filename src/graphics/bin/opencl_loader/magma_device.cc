@@ -4,63 +4,74 @@
 
 #include "src/graphics/bin/opencl_loader/magma_device.h"
 
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/graphics/bin/opencl_loader/app.h"
 
 // static
-std::unique_ptr<MagmaDevice> MagmaDevice::Create(LoaderApp* app,
-                                                 const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                                                 const std::string& name, inspect::Node* parent) {
+zx::result<std::unique_ptr<MagmaDevice>> MagmaDevice::Create(
+    LoaderApp* app, const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
+    inspect::Node* parent) {
   std::unique_ptr<MagmaDevice> device(new MagmaDevice(app));
-  if (!device->Initialize(dir, name, parent))
-    return nullptr;
-  return device;
+  if (zx::result status = device->Initialize(dir, name, parent); status.is_error()) {
+    return status.take_error();
+  }
+  return zx::ok(std::move(device));
 }
 
-bool MagmaDevice::Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                             const std::string& name, inspect::Node* parent) {
+zx::result<> MagmaDevice::Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                     const std::string& name, inspect::Node* parent) {
   FIT_DCHECK_IS_THREAD_VALID(main_thread_);
   node() = parent->CreateChild("magma-" + name);
   icd_list_.Initialize(&node());
   auto pending_action_token = app()->GetPendingActionToken();
 
-  zx_status_t status = fdio_service_connect_at(dir.channel().get(), name.c_str(),
-                                               device_.NewRequest().TakeChannel().release());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to connect to service";
-    return false;
+  zx::result client_end = component::ConnectAt<fuchsia_gpu_magma::IcdLoaderDevice>(dir, name);
+  if (client_end.is_error()) {
+    FX_LOGS(ERROR) << "Failed to connect to ICD loader device: " << client_end.status_string();
+    return client_end.take_error();
   }
-  device_.set_error_handler([this](zx_status_t status) {
-    // Deletes |this|.
-    app()->RemoveDevice(this);
-  });
 
-  device_->GetIcdList([this, pending_action_token = std::move(pending_action_token)](
-                          const std::vector<fuchsia::gpu::magma::IcdInfo>& icd_info) mutable {
-    FIT_DCHECK_IS_THREAD_VALID(main_thread_);
-    uint32_t i = 0;
-    for (auto& icd : icd_info) {
-      if (!icd.has_component_url()) {
-        FX_LOGS(ERROR) << "ICD missing component URL";
-        continue;
-      }
-      if (!icd.has_flags()) {
-        FX_LOGS(ERROR) << "ICD missing flags";
-        continue;
-      }
-      IcdData data;
-      data.node = node().CreateChild(std::to_string(i++));
-      data.node.RecordString("component_url", icd.component_url());
-      data.node.RecordUint("flags", static_cast<uint32_t>(icd.flags()));
-      if (icd.flags() & fuchsia::gpu::magma::IcdFlags::SUPPORTS_OPENCL) {
-        icd_list_.Add(app()->CreateIcdComponent(icd.component_url()));
-      }
+  device_ = fidl::WireClient(std::move(*client_end), app()->dispatcher(), this);
 
-      icds().push_back(std::move(data));
-    }
-  });
-  return true;
+  device_->GetIcdList().Then(
+      [this, pending_action_token = std::move(pending_action_token)](
+          fidl::WireUnownedResult<fuchsia_gpu_magma::IcdLoaderDevice::GetIcdList>& result) {
+        FIT_DCHECK_IS_THREAD_VALID(main_thread_);
+        if (!result.ok()) {
+          FX_LOGS(ERROR) << "GetIcdList transport error: " << result;
+          app()->RemoveDevice(this);
+          return;
+        }
+        uint32_t i = 0;
+        for (auto& icd : result->icd_list) {
+          if (!icd.has_component_url()) {
+            FX_LOGS(ERROR) << "ICD missing component URL";
+            continue;
+          }
+          if (!icd.has_flags()) {
+            FX_LOGS(ERROR) << "ICD missing flags";
+            continue;
+          }
+          auto data = node().CreateChild(std::to_string(i++));
+          data.RecordString("component_url", icd.component_url().data());
+          data.RecordUint("flags", static_cast<uint32_t>(icd.flags()));
+          if (icd.flags() & fuchsia_gpu_magma::wire::IcdFlags::kSupportsOpencl) {
+            zx::result icd_component = app()->CreateIcdComponent(icd.component_url().data());
+            if (icd_component.is_error()) {
+              FX_LOGS(ERROR) << "Failed to create ICD component: " << icd_component.status_string();
+              continue;
+            }
+            icd_list_.Add(std::move(*icd_component));
+          }
+
+          icds().push_back(std::move(data));
+        }
+      });
+
+  return zx::ok();
 }
+
+void MagmaDevice::on_fidl_error(fidl::UnbindInfo unbind_info) { app()->RemoveDevice(this); }

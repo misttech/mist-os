@@ -4,16 +4,20 @@
 
 #include "src/graphics/bin/opencl_loader/loader.h"
 
+fidl::ProtocolHandler<fuchsia_opencl_loader::Loader> LoaderImpl::GetHandler(
+    LoaderApp* app, async_dispatcher_t* dispatcher) {
+  return [=](fidl::ServerEnd<fuchsia_opencl_loader::Loader> server_end) {
+    std::unique_ptr<LoaderImpl> impl(new LoaderImpl(app));
+    auto binding = fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
+  };
+}
+
 LoaderImpl::~LoaderImpl() { app_->RemoveObserver(this); }
 
-// static
-void LoaderImpl::Add(LoaderApp* app, const std::shared_ptr<sys::OutgoingDirectory>& outgoing) {
-  outgoing->AddPublicService(fidl::InterfaceRequestHandler<fuchsia::opencl::loader::Loader>(
-      [app](fidl::InterfaceRequest<fuchsia::opencl::loader::Loader> request) {
-        auto impl = std::make_unique<LoaderImpl>(app);
-        LoaderImpl* impl_ptr = impl.get();
-        impl_ptr->bindings_.AddBinding(std::move(impl), std::move(request), nullptr);
-      }));
+zx::result<> LoaderImpl::Add(component::OutgoingDirectory& outgoing_dir, LoaderApp* app,
+                             async_dispatcher_t* dispatcher) {
+  return outgoing_dir.AddUnmanagedProtocol<fuchsia_opencl_loader::Loader>(
+      GetHandler(app, dispatcher));
 }
 
 // LoaderApp::Observer implementation.
@@ -24,7 +28,7 @@ void LoaderImpl::OnIcdListChanged(LoaderApp* app) {
     if (!vmo) {
       ++it;
     } else {
-      it->second(*std::move(vmo));
+      it->second.Reply(*std::move(vmo));
       it = callbacks_.erase(it);
     }
   }
@@ -34,42 +38,45 @@ void LoaderImpl::OnIcdListChanged(LoaderApp* app) {
 }
 
 // fuchsia::opencl::loader::Loader impl
-void LoaderImpl::Get(std::string name, GetCallback callback) {
-  AddCallback(std::move(name), std::move(callback));
+void LoaderImpl::Get(GetRequest& request, GetCompleter::Sync& completer) {
+  AddCallback(std::move(request.name()), completer.ToAsync());
 }
 
-void LoaderImpl::ConnectToDeviceFs(zx::channel channel) { app_->ServeDeviceFs(std::move(channel)); }
+void LoaderImpl::ConnectToDeviceFs(ConnectToDeviceFsRequest& request,
+                                   ConnectToDeviceFsCompleter::Sync& completer) {
+  app_->ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory>{std::move(request.channel())});
+}
 
-void LoaderImpl::ConnectToManifestFs(fuchsia::opencl::loader::ConnectToManifestOptions options,
-                                     zx::channel channel) {
-  if (!(options & fuchsia::opencl::loader::ConnectToManifestOptions::WAIT_FOR_IDLE) ||
+void LoaderImpl::ConnectToManifestFs(ConnectToManifestFsRequest& request,
+                                     ConnectToManifestFsCompleter::Sync& completer) {
+  auto server_end = fidl::ServerEnd<fuchsia_io::Directory>{std::move(request.channel())};
+  if (!(request.options() & fuchsia_opencl_loader::ConnectToManifestOptions::kWaitForIdle) ||
       !app_->HavePendingActions()) {
-    app_->ServeManifestFs(std::move(channel));
+    app_->ServeManifestFs(std::move(server_end));
     return;
   }
 
   bool was_waiting_for_callbacks = waiting_for_callbacks();
-  connect_manifest_handles_.push_back(std::move(channel));
+  connect_manifest_handles_.push_back(std::move(server_end));
   if (waiting_for_callbacks() && !was_waiting_for_callbacks) {
     app_->AddObserver(this);
   }
 }
 
-void LoaderImpl::GetSupportedFeatures(GetSupportedFeaturesCallback callback) {
-  fuchsia::opencl::loader::Features features =
-      fuchsia::opencl::loader::Features::CONNECT_TO_DEVICE_FS |
-      fuchsia::opencl::loader::Features::GET;
-  callback(features);
+void LoaderImpl::GetSupportedFeatures(GetSupportedFeaturesCompleter::Sync& completer) {
+  constexpr fuchsia_opencl_loader::Features kFeatures =
+      fuchsia_opencl_loader::Features::kConnectToDeviceFs | fuchsia_opencl_loader::Features::kGet;
+  completer.Reply(kFeatures);
 }
 
-void LoaderImpl::AddCallback(std::string name, fit::function<void(zx::vmo)> callback) {
+void LoaderImpl::AddCallback(std::string name, GetCompleter::Async completer) {
   bool was_waiting_for_callbacks = waiting_for_callbacks();
   std::optional<zx::vmo> vmo = app_->GetMatchingIcd(name);
   if (vmo) {
-    callback(*std::move(vmo));
+    completer.Reply(*std::move(vmo));
     return;
   }
-  callbacks_.emplace_back(std::make_pair(std::move(name), std::move(callback)));
+  callbacks_.emplace_back(std::move(name), std::move(completer));
   if (waiting_for_callbacks() && !was_waiting_for_callbacks) {
     app_->AddObserver(this);
   }

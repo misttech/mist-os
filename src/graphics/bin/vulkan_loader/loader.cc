@@ -4,9 +4,6 @@
 
 #include "src/graphics/bin/vulkan_loader/loader.h"
 
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
-
 fidl::ProtocolHandler<fuchsia_vulkan_loader::Loader> LoaderImpl::GetHandler(
     LoaderApp* app, async_dispatcher_t* dispatcher) {
   return [=](fidl::ServerEnd<fuchsia_vulkan_loader::Loader> server_end) {

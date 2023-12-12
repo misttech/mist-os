@@ -6,6 +6,7 @@
     program: {
         runner: "elf",
         binary: "bin/opencl-server",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {
