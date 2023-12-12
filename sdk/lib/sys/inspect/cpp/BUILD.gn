@@ -4,6 +4,98 @@
 
 import("//build/cpp/sdk_source_set.gni")
 
+#  ________  _________  ________  ________
+# |\   ____\|\___   ___\\   __  \|\   __  \
+# \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+#  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+#   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+#     ____\_\  \   \ \__\ \ \_______\ \__\
+#    |\_________\   \|__|  \|_______|\|__|
+#    \|_________|
+#
+# This is an allowlist of targets that use the deprecated `inspect` C++ library which relies
+# on the diagnostics directory (instead of InspectSink) as well as the deprecated HLCPP bindings.
+#
+# Developers are encouraged to migrate to use the `//sdk/lib/inspect/component/cpp` library instead.
+#
+# The policy at this time is:
+# 1. Pre-existing use of this library in fuchsia.git is allowlisted.
+# 2. Use of this library in new libraries and binaries is strongly discouraged and only allowed
+#    under special circumstances under which the new library isn't covering the needs.
+#
+# To add items to the allowlist, please send a change to one of the OWNERS of
+# this file to add an element to the visibility list below.
+# Please allowlist entire directories rather than individual targets as it
+# requires less allowlist churn over time.
+#
+# To regenerate:
+# fx gn refs $(fx get-build-dir) //sdk/lib/sys/inspect/cpp //sdk/lib/sys/inspect/cpp:cpp | sed 's|\(.*:\).*|"\1*",|' | sort | uniq
+inspect_hlcpp_allowlist = [
+  "//build/sdk:*",
+  "//examples/components/config/cpp:*",
+  "//examples/components/config_from_parent/cpp:*",
+  "//examples/components/routing/cpp/echo_server:*",
+  "//examples/diagnostics/inspect/codelab/cpp/fizzbuzz:*",
+  "//examples/diagnostics/inspect/codelab/cpp/part_2:*",
+  "//examples/diagnostics/inspect/codelab/cpp/part_3:*",
+  "//examples/diagnostics/inspect/codelab/cpp/part_4:*",
+  "//examples/diagnostics/inspect/codelab/cpp/part_5:*",
+  "//examples/diagnostics/inspect/cpp:*",
+  "//sdk/ctf/tests/fidl/fuchsia.diagnostics:*",
+  "//sdk/lib/diagnostics/reader/cpp/tests:*",
+  "//sdk/lib/sys/inspect/cpp/tests:*",
+  "//src/camera/bin/device:*",
+  "//src/camera/bin/usb_device:*",
+  "//src/camera/drivers/usb_video/uvc-tester:*",
+  "//src/cobalt/bin/app/fuzzer:*",
+  "//src/cobalt/bin/app:*",
+  "//src/cobalt/bin/system-metrics:*",
+  "//src/cobalt/bin/utils:*",
+  "//src/connectivity/bluetooth/core/bt-host/common:*",
+  "//src/connectivity/weave/adaptation:*",
+  "//src/developer/forensics/crash_reports/info:*",
+  "//src/developer/forensics/exceptions:*",
+  "//src/developer/forensics/feedback/attachments:*",
+  "//src/developer/forensics/feedback:*",
+  "//src/developer/forensics/feedback_data:*",
+  "//src/developer/forensics/utils/component:*",
+  "//src/developer/forensics/utils/redact:*",
+  "//src/developer/forensics/utils:*",
+  "//src/developer/memory/monitor:*",
+  "//src/devices/block/drivers/zxcrypt:*",
+  "//src/devices/nand/drivers/nand:*",
+  "//src/diagnostics/validator/inspect/lib/cpp:*",
+  "//src/graphics/bin/opencl_loader:*",
+  "//src/media/audio/audio_core/shared:*",
+  "//src/media/audio/audio_core/testing/integration:*",
+  "//src/media/audio/audio_core/v1:*",
+  "//src/media/audio/drivers/codecs/tas5720:*",
+  "//src/media/audio/drivers/codecs/tas58xx:*",
+  "//src/media/codec/codecs/sw:*",
+  "//src/media/codec/factory:*",
+  "//src/storage/blobfs/test/integration:*",
+  "//src/storage/f2fs/bin:*",
+  "//src/storage/f2fs/test/compatibility:*",
+  "//src/storage/f2fs/test:*",
+  "//src/storage/fs_test:*",
+  "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf:*",
+  "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf_hlcpp:*",
+  "//src/ui/a11y/lib/screen_reader/focus:*",
+  "//src/ui/a11y/lib/semantics/tests/mocks:*",
+  "//src/ui/a11y/lib/semantics:*",
+  "//src/ui/scenic/bin:*",
+  "//src/ui/scenic/lib/flatland/engine:*",
+  "//src/ui/scenic/lib/image-compression:*",
+  "//src/ui/scenic/lib/input:*",
+  "//tools/create/goldens/my-component-v2-cpp:*",
+]
+
+# vendor and third party are currently allowed.
+inspect_hlcpp_allowlist += [
+  "//vendor/*",
+  "//third_party/*",
+]
+
 sdk_source_set("cpp") {
   category = "partner"
 
@@ -27,6 +119,8 @@ sdk_source_set("cpp") {
   data_deps = [ "//sdk/lib/inspect:client_includes" ]
 
   public_configs = [ "//sdk/config" ]
+
+  #visibility = inspect_hlcpp_allowlist
 }
 
 group("tests") {
