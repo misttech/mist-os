@@ -35,15 +35,14 @@
 //
 // :: Read Transaction ::
 // 1) while ((before = Seq) & 0x1) {};    // Acquire semantics
-// 2) ReadPayload()                       // Relaxed semantics for all members
-// 3) Fence(Acquire)
+// 2) ReadPayload()                       // Acquire semantics for all members
 // 4) after = Seq;                        // Relaxed semantics
 // 5) if (before != after) goto 1;
 //
 // :: Write Transaction ::
 // 1) while ((before = Seq) & 0x1) {};    // Relaxed semantics
 // 2) if (!CMPX(Seq, before + 1)) goto 1; // Acquire semantics
-// 2) WritePayload()                      // Relaxed semantics for all members
+// 2) WritePayload()                      // Release semantics for all members
 // 3) Seq += 1;                           // Release semantics
 //
 constexpr uint32_t kPayloadWords = 2;
