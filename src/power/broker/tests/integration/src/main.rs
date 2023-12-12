@@ -7,6 +7,7 @@ use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LessorMarker,
     LevelDependency, Permissions, PowerLevel, StatusMarker, TopologyMarker, UserDefinedPowerLevel,
 };
+use fpb::LeaseStatus;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
 
@@ -109,29 +110,30 @@ async fn test_direct() -> Result<()> {
     assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
 
     // Acquire lease for C, P should now have required level ON
-    let lease_id = lessor
+    let lease = lessor
         .lease(
             child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
             &PowerLevel::Binary(BinaryPowerLevel::On),
         )
         .await?
-        .expect("Lease response not ok");
+        .expect("Lease response not ok")
+        .into_proxy()?;
     let parent_req_level = parent_control
         .watch_required_level(Some(&parent_req_level))
         .await?
         .expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
-    // TODO(b/302717376): Check Lease status here. Lease should be pending.
+    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
 
     // Update P's current level to ON. Lease should now be active.
     parent_control
         .update_current_power_level(&PowerLevel::Binary(BinaryPowerLevel::On))
         .await?
         .expect("update_current_power_level failed");
-    // TODO(b/302717376): Check Lease status here. Lease should be active.
+    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Drop lease, P should now have required level OFF
-    lessor.drop_lease(&lease_id).expect("drop failed");
+    drop(lease);
     let parent_req_level = parent_control
         .watch_required_level(Some(&parent_req_level))
         .await?
@@ -250,13 +252,14 @@ async fn test_transitive() -> Result<()> {
     // and B should have required level OFF because C has a dependency on B
     // and B has a dependency on A.
     // D should still have required level OFF.
-    let lease_id = lessor
+    let lease = lessor
         .lease(
             element_c_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
             &PowerLevel::Binary(BinaryPowerLevel::On),
         )
         .await?
-        .expect("Lease response not ok");
+        .expect("Lease response not ok")
+        .into_proxy()?;
     let a_req_level =
         element_a_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(a_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
@@ -266,7 +269,7 @@ async fn test_transitive() -> Result<()> {
     let d_req_level =
         element_d_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(d_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-    // TODO(b/302717376): Check Lease status here. Lease should be pending.
+    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
 
     // Update A's current level to ON. Now B's required level should become ON
     // because its dependency on A is unblocked.
@@ -286,7 +289,7 @@ async fn test_transitive() -> Result<()> {
     let d_req_level =
         element_d_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(d_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-    // TODO(b/302717376): Check Lease status here. Lease should be pending.
+    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
 
     // Update B's current level to ON.
     // Both A and B should have required_level ON.
@@ -306,12 +309,12 @@ async fn test_transitive() -> Result<()> {
     let d_req_level =
         element_d_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(d_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-    // TODO(b/302717376): Check Lease status here. Lease should be active.
+    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Drop lease for C with PB, B should have required level OFF.
     // A should still have required level ON.
     // D should still have required level OFF.
-    lessor.drop_lease(&lease_id).expect("drop failed");
+    drop(lease);
     let a_req_level =
         element_a_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(a_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
@@ -494,7 +497,8 @@ async fn test_shared() -> Result<()> {
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
         )
         .await?
-        .expect("Lease response not ok");
+        .expect("Lease response not ok")
+        .into_proxy()?;
     let grandparent_req_level = grandparent_control
         .watch_required_level(Some(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 })))
         .await?
@@ -506,7 +510,7 @@ async fn test_shared() -> Result<()> {
     let parent_req_level =
         parent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }));
-    // TODO(b/302717376): Check Lease status here. Lease should be pending.
+    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
 
     // Raise Grandparent's current level to 200. Now Parent claim should
     // be active, because its dependency on Grandparent is unblocked
@@ -526,7 +530,7 @@ async fn test_shared() -> Result<()> {
         .await?
         .expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
-    // TODO(b/302717376): Check Lease status here. Lease should be pending.
+    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
 
     // Update Parent's current level to 50.
     // Parent and Grandparent should have required levels of 50 and 200.
@@ -543,7 +547,7 @@ async fn test_shared() -> Result<()> {
     let parent_req_level =
         parent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
-    // TODO(b/302717376): Check Lease status here. Lease should now be active.
+    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Acquire lease for Child 2, Though Child 2 has nominal
     // requirements of Parent at 30 and Grandparent at 100, they are
@@ -554,7 +558,8 @@ async fn test_shared() -> Result<()> {
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
         )
         .await?
-        .expect("Lease response not ok");
+        .expect("Lease response not ok")
+        .into_proxy()?;
     let grandparent_req_level =
         grandparent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(
@@ -564,11 +569,12 @@ async fn test_shared() -> Result<()> {
     let parent_req_level =
         parent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
-    // TODO(b/302717376): Check Lease status here. Lease should immediately be active.
+    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
+    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Drop lease for Child 1. Parent's required level should immediately
     // drop to 30. Grandparent's required level will remain at 200 for now.
-    lessor.drop_lease(&lease_child_1).expect("drop failed");
+    drop(lease_child_1);
     let grandparent_req_level =
         grandparent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(
@@ -578,7 +584,7 @@ async fn test_shared() -> Result<()> {
     let parent_req_level =
         parent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }));
-    // TODO(b/302717376): Check Lease status here. Lease 2 should still be active.
+    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Lower Parent's current level to 30. Now Grandparent's required level
     // should drop to 90.
@@ -592,10 +598,11 @@ async fn test_shared() -> Result<()> {
     let parent_req_level =
         parent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }));
+    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Drop lease for Child 2, Parent should have required level 0.
     // Grandparent should still have required level 90.
-    lessor.drop_lease(&lease_child_2).expect("drop failed");
+    drop(lease_child_2);
     let grandparent_req_level =
         grandparent_control.watch_required_level(None).await?.expect("watch_required_level failed");
     assert_eq!(grandparent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }));

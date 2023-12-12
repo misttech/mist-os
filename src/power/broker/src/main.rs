@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
+use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_broker::{
-    self as fpb, LessorRequest, LessorRequestStream, LevelControlMarker, LevelControlRequest,
-    LevelControlRequestStream, StatusRequest, StatusRequestStream, TopologyRequest,
-    TopologyRequestStream,
+    self as fpb, LeaseControlRequest, LessorRequest, LessorRequestStream, LevelControlMarker,
+    LevelControlRequest, LevelControlRequestStream, StatusRequest, StatusRequestStream,
+    TopologyRequest, TopologyRequestStream,
 };
+use fpb::{LeaseControlMarker, LeaseControlRequestStream, LeaseStatus};
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
@@ -15,7 +17,7 @@ use futures::lock::Mutex;
 use futures::prelude::*;
 use std::rc::Rc;
 
-use crate::broker::Broker;
+use crate::broker::{Broker, LeaseID};
 use crate::topology::ElementID;
 
 mod broker;
@@ -84,30 +86,94 @@ impl BrokerSvc {
             .await
     }
 
-    async fn run_lessor(&self, stream: LessorRequestStream) -> Result<(), Error> {
+    async fn run_lessor(self: Rc<Self>, stream: LessorRequestStream) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
                     LessorRequest::Lease { token, level, responder } => {
                         tracing::debug!("Lease({:?}, {:?})", &token, &level);
-                        let mut broker = self.broker.lock().await;
-                        let resp = broker.acquire_lease(token.into(), level);
+                        let resp = {
+                            let mut broker = self.broker.lock().await;
+                            broker.acquire_lease(token.into(), level)
+                        };
                         match resp {
                             Ok(lease) => {
                                 tracing::debug!("responder.send({:?})", &lease);
-                                responder.send(Ok(&lease.id)).context("send failed")
+                                let (client, stream) =
+                                    create_request_stream::<LeaseControlMarker>()?;
+                                tracing::debug!("Spawning lease control task for {:?}", &lease.id);
+                                Task::local({
+                                    let svc = self.clone();
+                                    async move {
+                                        if let Err(err) =
+                                            svc.run_lease_control(&lease.id, stream).await
+                                        {
+                                            tracing::debug!("run_lease_control err: {:?}", err);
+                                        }
+                                        // When the channel is closed, drop the lease.
+                                        let mut broker = svc.broker.lock().await;
+                                        if let Err(err) = broker.drop_lease(&lease.id) {
+                                            tracing::error!("Lease: drop_lease failed: {:?}", err);
+                                        }
+                                    }
+                                })
+                                .detach();
+                                responder.send(Ok(client)).context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }
-                    LessorRequest::DropLease { lease_id, .. } => {
-                        tracing::debug!("DropLease({:?})", &lease_id);
-                        let mut broker = self.broker.lock().await;
-                        broker.drop_lease(&lease_id.into()).expect("drop_lease failed");
-                        Ok(())
-                    }
                     LessorRequest::_UnknownMethod { .. } => todo!(),
+                }
+            })
+            .await
+    }
+
+    async fn run_lease_control(
+        &self,
+        lease_id: &LeaseID,
+        stream: LeaseControlRequestStream,
+    ) -> Result<(), Error> {
+        stream
+            .map(|result| result.context("failed request"))
+            .try_for_each(|request| async {
+                match request {
+                    LeaseControlRequest::WatchStatus {
+                        last_status,
+                        responder,
+                    } => {
+                        tracing::debug!(
+                            "WatchStatus({:?}, {:?})",
+                            lease_id,
+                            &last_status
+                        );
+                        let mut receiver = {
+                            let mut broker = self.broker.lock().await;
+                            broker.watch_lease_status(lease_id)
+                        };
+                        while let Some(next) = receiver.next().await {
+                            tracing::debug!(
+                                "receiver.next = {:?}, last_status = {:?}",
+                                &next,
+                                last_status
+                            );
+                            let status = next.unwrap_or(LeaseStatus::Unknown);
+                            if last_status != LeaseStatus::Unknown && last_status == status {
+                                tracing::debug!(
+                                    "WatchStatus: status has not changed, watching for next update...",
+                                );
+                                continue;
+                            } else {
+                                tracing::debug!(
+                                    "WatchStatus: sending new status: {:?}", &status,
+                                );
+                                return responder.send(status).context("send failed");
+                            }
+                        }
+                        Err(anyhow::anyhow!("receiver closed unexpectedly"))
+                    }
+                    LeaseControlRequest::_UnknownMethod { .. } => todo!(),
                 }
             })
             .await
@@ -216,8 +282,8 @@ impl BrokerSvc {
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
-                                let (client, server) =
-                                    fidl::endpoints::create_request_stream::<LevelControlMarker>()?;
+                                let (client, stream) =
+                                    create_request_stream::<LevelControlMarker>()?;
                                 tracing::debug!(
                                     "Spawning level control task for {:?}",
                                     &element_id
@@ -226,7 +292,7 @@ impl BrokerSvc {
                                     let svc = self.clone();
                                     async move {
                                         if let Err(err) =
-                                            svc.run_level_control(element_id, server).await
+                                            svc.run_level_control(element_id, stream).await
                                         {
                                             tracing::debug!("run_level_control err: {:?}", err);
                                         }
@@ -361,7 +427,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
                 IncomingRequest::Lessor(stream) => {
-                    svc.run_lessor(stream).await.expect("run_lessor failed");
+                    svc.clone().run_lessor(stream).await.expect("run_lessor failed");
                 }
                 IncomingRequest::Status(stream) => {
                     svc.run_status(stream).await.expect("run_status failed");

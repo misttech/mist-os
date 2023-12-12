@@ -3,9 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_power_broker::{self as fpb, BinaryPowerLevel, Permissions, PowerLevel};
+use fidl_fuchsia_power_broker::{
+    self as fpb, BinaryPowerLevel, LeaseStatus, Permissions, PowerLevel,
+};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use itertools::Itertools;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::hash::Hash;
 use uuid::Uuid;
 
 use crate::credentials::*;
@@ -15,9 +20,9 @@ pub struct Broker {
     catalog: Catalog,
     credentials: Registry,
     // The current level for each element, as reported to the broker.
-    current: Levels,
+    current: SubscribeMap<ElementID, PowerLevel>,
     // The level for each element required by the topology.
-    required: Levels,
+    required: SubscribeMap<ElementID, PowerLevel>,
 }
 
 impl Broker {
@@ -25,8 +30,8 @@ impl Broker {
         Broker {
             catalog: Catalog::new(),
             credentials: Registry::new(),
-            current: Levels::new(),
-            required: Levels::new(),
+            current: SubscribeMap::new(),
+            required: SubscribeMap::new(),
         }
     }
 
@@ -123,6 +128,13 @@ impl Broker {
         }
     }
 
+    fn current_level_satisfies(&self, required: &ElementLevel) -> bool {
+        self.current
+            .get(&required.element_id)
+            // If current level is unknown, required is not satisfied.
+            .is_some_and(|current| current.satisfies(required.level))
+    }
+
     pub fn update_current_level(
         &mut self,
         element_id: &ElementID,
@@ -130,36 +142,41 @@ impl Broker {
     ) -> Result<(), fpb::UpdateCurrentPowerLevelError> {
         tracing::debug!("update_current_level({:?}, {:?})", element_id, level);
         self.current.update(element_id, level);
-        // Some previously pending claims may now be ready to be activated:
+        // Some previously pending claims may now be ready to be activated,
+        // because the active claims upon which they depend may now be
+        // satisfied.
+        // Find active claims that are now satisfied by the new current level:
         let active_claims_for_required_element =
             self.catalog.active_claims.for_required_element(element_id);
-        // Find the active claims requiring this element level.
         let claims_satisfied: Vec<&Claim> = active_claims_for_required_element
             .iter()
-            .filter(|c| level.satisfies(c.dependency.requires.level))
+            .filter(|c| level.satisfies(c.requires().level))
             .collect();
         tracing::debug!("claims_satisfied = {:?})", &claims_satisfied);
+        let mut leases_to_check_if_satisfied = HashSet::new();
         for claim in claims_satisfied {
+            leases_to_check_if_satisfied.insert(&claim.lease_id);
             // Look for pending claims that were (at least partially) blocked
             // by a claim on this element level that is now satisfied.
             // (They may still have other blockers, though.)
-            let pending_claims = self
-                .catalog
-                .pending_claims
-                .for_required_element(&claim.dependency.dependent.element_id);
+            let pending_claims =
+                self.catalog.pending_claims.for_required_element(&claim.dependent().element_id);
             tracing::debug!(
                 "pending_claims.for_required_element({:?}) = {:?})",
-                &claim.dependency.dependent.element_id,
+                &claim.dependent().element_id,
                 &pending_claims
             );
-            let claims_activated = self.check_claims_to_activate(&pending_claims);
+            let claims_activated = self.activate_claims_if_dependencies_satisfied(pending_claims);
             tracing::debug!("claims_activated = {:?})", &claims_activated);
-            self.update_required_levels(&claims_activated);
+            self.update_required_levels(element_ids_required_by_claims(&claims_activated));
+        }
+        for lease_id in leases_to_check_if_satisfied {
+            self.update_lease_status(lease_id);
         }
         // Find claims to drop
         let claims_to_drop_for_element = self.catalog.active_claims.to_drop_for_element(element_id);
-        let claims_dropped = self.check_claims_to_drop(&claims_to_drop_for_element);
-        self.update_required_levels(&claims_dropped);
+        let claims_dropped = self.drop_claims_with_no_dependents(&claims_to_drop_for_element);
+        self.update_required_levels(element_ids_required_by_claims(&claims_dropped));
         Ok(())
     }
 
@@ -194,85 +211,116 @@ impl Broker {
         if !credential.contains(Permissions::ACQUIRE_LEASE) {
             return Err(fpb::LeaseError::NotAuthorized);
         }
-        let (original_lease, claims) =
-            self.catalog.create_lease_and_claims(credential.get_element(), level);
-        let activated_claims = self.check_claims_to_activate(&claims);
-        self.update_required_levels(&activated_claims);
-        Ok(original_lease)
+        let (lease, claims) = self.catalog.create_lease_and_claims(credential.get_element(), level);
+        let claims_activated = self.activate_claims_if_dependencies_satisfied(claims);
+        self.update_required_levels(element_ids_required_by_claims(&claims_activated));
+        self.update_lease_status(&lease.id);
+        Ok(lease)
     }
 
     pub fn drop_lease(&mut self, lease_id: &LeaseID) -> Result<(), Error> {
         let (_, claims) = self.catalog.drop(lease_id)?;
-        let dropped_claims = self.check_claims_to_drop(&claims);
-        self.update_required_levels(&dropped_claims);
+        let claims_dropped = self.drop_claims_with_no_dependents(&claims);
+        self.update_required_levels(element_ids_required_by_claims(&claims_dropped));
+        self.catalog.lease_status.remove(lease_id);
         Ok(())
     }
 
-    fn update_required_levels(&mut self, claims: &Vec<Claim>) {
-        for claim in claims {
-            let new_required_level =
-                self.catalog.calculate_required_level(&claim.dependency.requires.element_id);
-            tracing::debug!(
-                "update required level({:?}, {:?})",
-                &claim.dependency.requires.element_id,
-                new_required_level
-            );
-            self.required.update(&claim.dependency.requires.element_id, new_required_level);
+    fn calculate_lease_status(&self, lease_id: &LeaseID) -> LeaseStatus {
+        // If a lease has any Pending claims, it is Pending.
+        if !self.catalog.pending_claims.for_lease(lease_id).is_empty() {
+            return LeaseStatus::Pending;
+        }
+        // If a lease has any active claims that have not been satisfied
+        // it is still Pending.
+        for claim in self.catalog.active_claims.for_lease(lease_id) {
+            if !self.current_level_satisfies(claim.requires()) {
+                return LeaseStatus::Pending;
+            }
+        }
+        // All claims are active and satisfied, so the lease is Satisfied.
+        LeaseStatus::Satisfied
+    }
+
+    pub fn update_lease_status(&mut self, lease_id: &LeaseID) {
+        let status = self.calculate_lease_status(lease_id);
+        self.catalog.lease_status.update(lease_id, status);
+    }
+
+    pub fn watch_lease_status(
+        &mut self,
+        lease_id: &LeaseID,
+    ) -> UnboundedReceiver<Option<LeaseStatus>> {
+        self.catalog.watch_lease_status(lease_id)
+    }
+
+    fn update_required_levels(&mut self, element_ids: Vec<&ElementID>) {
+        for element_id in element_ids {
+            let new_required_level = self.catalog.calculate_required_level(element_id);
+            tracing::debug!("update required level({:?}, {:?})", element_id, new_required_level);
+            self.required.update(element_id, new_required_level);
         }
     }
 
-    /// Examines a Vec of claims and activates any claim for which all the
-    /// dependencies of its required elements are met.
+    /// Examines a Vec of pending claims and activates each claim for which the
+    /// required element is already at the required level (and thus the claim
+    /// is already satisfied), or all of the dependencies of its required
+    /// ElementLevel are met.
+    /// For example, let us imagine elements A, B, C and D where A depends on B
+    /// and B depends on C and D. In order to activate the A->B claim, all
+    /// dependencies of B (i.e. B->C and B->D) must first be satisfied.
     /// Returns a Vec of activated claims.
-    fn check_claims_to_activate(&mut self, claims: &Vec<Claim>) -> Vec<Claim> {
-        tracing::debug!("check_claims_to_activate: {:?}", claims);
-        let mut claims_to_activate = Vec::new();
-        for claim in claims {
-            let active_dependencies =
-                self.catalog.topology.direct_active_dependencies(&claim.dependency.requires);
-            let check_deps = active_dependencies.into_iter().try_for_each(|dep: Dependency| {
-                match self.current.get(&dep.requires.element_id) {
-                    Some(current) => {
-                        if !current.satisfies(dep.requires.level) {
-                            Err(anyhow!(
-                                "element {:?} at {:?}, requires {:?}",
-                                &dep.requires.element_id,
-                                &current,
-                                &dep.requires.level
-                            ))
-                        } else {
-                            tracing::debug!("dep {:?} satisfied", dep);
-                            Ok(())
-                        }
-                    }
-                    None => Err(anyhow!("no current level for element")),
-                }
-            });
-            // If there were any errors, some dependencies are not satisfied,
-            // so we can't activate this claim.
-            if let Err(err) = check_deps {
-                tracing::debug!("claim {:?} cannot be activated: {:?}", claim, err);
-                continue;
-            }
-            tracing::debug!("will activate claim: {:?}", claim);
-            claims_to_activate.push(claim.clone());
-        }
+    fn activate_claims_if_dependencies_satisfied(&mut self, claims: Vec<Claim>) -> Vec<Claim> {
+        tracing::debug!("activate_claims_if_dependencies_satisfied: {:?}", claims);
+        let claims_to_activate: Vec<Claim> = claims
+            .into_iter()
+            .filter(|c| {
+                // If the required element is already at the required level,
+                // then the claim can immediately be activated (and is
+                // already satisfied).
+                self.current_level_satisfies(c.requires())
+                // Otherwise, it can only be activated if all of its
+                // dependencies are satisfied.
+                    || self.all_dependencies_satisfied(&c.requires())
+            })
+            .collect();
         for claim in &claims_to_activate {
             self.catalog.activate_pending_claim(&claim.id);
         }
         claims_to_activate
     }
 
+    /// Examines the direct active and passive dependencies of an element level
+    /// and returns true if they are all satisfied (current level >= required).
+    fn all_dependencies_satisfied(&self, element_level: &ElementLevel) -> bool {
+        let active_dependencies = self.catalog.topology.direct_active_dependencies(&element_level);
+        let passive_dependencies =
+            self.catalog.topology.direct_passive_dependencies(&element_level);
+        active_dependencies.into_iter().chain(passive_dependencies).all(|dep| {
+            if !self.current_level_satisfies(&dep.requires) {
+                tracing::debug!(
+                    "dependency {dep:?} of element_level {element_level:?} is not satisfied: \
+                    current level of {:?} = {:?}, {:?} required",
+                    &dep.requires.element_id,
+                    self.current.get(&dep.requires.element_id),
+                    &dep.requires.level
+                );
+                return false;
+            }
+            return true;
+        })
+    }
+
     /// Examines a Vec of claims and drops any that no longer have any
     /// dependents. Returns a Vec of dropped claims.
-    fn check_claims_to_drop(&mut self, claims: &Vec<Claim>) -> Vec<Claim> {
+    fn drop_claims_with_no_dependents(&mut self, claims: &Vec<Claim>) -> Vec<Claim> {
         tracing::debug!("check_claims_to_drop: {:?}", claims);
         let mut claims_to_drop = Vec::new();
         for claim_to_check in claims {
             let mut has_dependents = false;
             // Only claims belonging to the same lease can be a dependent.
             for related_claim in self.catalog.active_claims.for_lease(&claim_to_check.lease_id) {
-                if related_claim.dependency.requires == claim_to_check.dependency.dependent {
+                if related_claim.requires() == claim_to_check.dependent() {
                     has_dependents = true;
                     break;
                 }
@@ -358,8 +406,11 @@ impl Broker {
         if !credential.contains(Permissions::REMOVE_ELEMENT) {
             return Err(RemoveElementError::NotAuthorized);
         }
-        self.catalog.topology.remove_element(credential.get_element())?;
-        self.unregister_all_credentials_for_element(credential.get_element());
+        let element_id = credential.get_element();
+        self.catalog.topology.remove_element(element_id)?;
+        self.unregister_all_credentials_for_element(element_id);
+        self.current.remove(element_id);
+        self.required.remove(element_id);
         Ok(())
     }
 
@@ -428,7 +479,7 @@ impl Broker {
     }
 }
 
-type LeaseID = String;
+pub type LeaseID = String;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
@@ -449,7 +500,7 @@ type ClaimID = String;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct Claim {
     pub id: ClaimID,
-    pub dependency: Dependency,
+    dependency: Dependency,
     pub lease_id: LeaseID,
 }
 
@@ -461,12 +512,26 @@ impl Claim {
             lease_id: lease_id.clone(),
         }
     }
+
+    fn dependent(&self) -> &ElementLevel {
+        &self.dependency.dependent
+    }
+
+    fn requires(&self) -> &ElementLevel {
+        &self.dependency.requires
+    }
+}
+
+/// Returns a Vec of unique ElementIDs required by claims.
+fn element_ids_required_by_claims(claims: &Vec<Claim>) -> Vec<&ElementID> {
+    claims.into_iter().map(|c| &c.requires().element_id).unique().collect()
 }
 
 #[derive(Debug)]
 struct Catalog {
     topology: Topology,
     leases: HashMap<LeaseID, Lease>,
+    lease_status: SubscribeMap<LeaseID, LeaseStatus>,
     /// Active claims affect the required level communicated by Power Broker.
     /// All dependencies of their required element are met.
     active_claims: ClaimTracker,
@@ -487,6 +552,7 @@ impl Catalog {
         Catalog {
             topology: Topology::new(),
             leases: HashMap::new(),
+            lease_status: SubscribeMap::new(),
             active_claims: ClaimTracker::new(),
             pending_claims: ClaimTracker::new(),
             passive_claims: ClaimTracker::new(),
@@ -506,7 +572,7 @@ impl Catalog {
             .iter()
             .filter_map(|id| self.active_claims.claims.get(id));
         // Return the maximum of all active claims:
-        if let Some(required_level) = element_claims.map(|x| x.dependency.requires.level).max() {
+        if let Some(required_level) = element_claims.map(|x| x.requires().level).max() {
             required_level
         } else {
             // No claims, return default level:
@@ -600,6 +666,10 @@ impl Catalog {
         tracing::debug!("drop_claim: {:?}", claim_id);
         self.active_claims.remove(&claim_id);
     }
+
+    fn watch_lease_status(&mut self, lease_id: &LeaseID) -> UnboundedReceiver<Option<LeaseStatus>> {
+        self.lease_status.subscribe(lease_id)
+    }
 }
 
 #[derive(Debug)]
@@ -622,7 +692,7 @@ impl ClaimTracker {
 
     fn add(&mut self, claim: Claim) {
         self.claims_by_required_element_id
-            .entry(claim.dependency.requires.element_id.clone())
+            .entry(claim.requires().element_id.clone())
             .or_insert(Vec::new())
             .push(claim.id.clone());
         self.claims_by_lease
@@ -637,11 +707,11 @@ impl ClaimTracker {
             return None;
         };
         if let Some(claim_ids) =
-            self.claims_by_required_element_id.get_mut(&claim.dependency.requires.element_id)
+            self.claims_by_required_element_id.get_mut(&claim.requires().element_id)
         {
             claim_ids.retain(|x| x != id);
             if claim_ids.is_empty() {
-                self.claims_by_required_element_id.remove(&claim.dependency.requires.element_id);
+                self.claims_by_required_element_id.remove(&claim.requires().element_id);
             }
         }
         if let Some(claim_ids) = self.claims_by_lease.get_mut(&claim.lease_id) {
@@ -651,11 +721,11 @@ impl ClaimTracker {
             }
         }
         if let Some(claim_ids) =
-            self.claims_to_drop_by_element_id.get_mut(&claim.dependency.dependent.element_id)
+            self.claims_to_drop_by_element_id.get_mut(&claim.dependent().element_id)
         {
             claim_ids.retain(|x| x != id);
             if claim_ids.is_empty() {
-                self.claims_to_drop_by_element_id.remove(&claim.dependency.dependent.element_id);
+                self.claims_to_drop_by_element_id.remove(&claim.dependent().element_id);
             }
         }
         Some(claim)
@@ -669,7 +739,7 @@ impl ClaimTracker {
         let claims_marked = self.for_lease(lease_id);
         for claim in &claims_marked {
             self.claims_to_drop_by_element_id
-                .entry(claim.dependency.dependent.element_id.clone())
+                .entry(claim.dependent().element_id.clone())
                 .or_insert(Vec::new())
                 .push(claim.id.clone());
         }
@@ -709,51 +779,57 @@ impl ClaimTracker {
     }
 }
 
-/// Holds PowerLevels for each element and publishes updates to subscribers.
+/// SubscribeMap is a wrapper around a HashMap that stores values V by key K
+/// and allows subscribers to register a channel on which they will receive
+/// updates whenever the value stored changes.
 #[derive(Debug)]
-struct Levels {
-    level_map: HashMap<ElementID, PowerLevel>,
-    channels: HashMap<ElementID, Vec<UnboundedSender<Option<PowerLevel>>>>,
+struct SubscribeMap<K: Clone + Hash + Eq, V: Clone + PartialEq> {
+    values: HashMap<K, V>,
+    senders: HashMap<K, Vec<UnboundedSender<Option<V>>>>,
 }
 
-impl Levels {
+impl<K: Clone + Hash + Eq, V: Clone + PartialEq> SubscribeMap<K, V> {
     fn new() -> Self {
-        Levels { level_map: HashMap::new(), channels: HashMap::new() }
+        SubscribeMap { values: HashMap::new(), senders: HashMap::new() }
     }
 
-    fn get(&self, id: &ElementID) -> Option<PowerLevel> {
-        self.level_map.get(id).cloned()
+    fn get(&self, key: &K) -> Option<V> {
+        self.values.get(key).cloned()
     }
 
-    fn update(&mut self, id: &ElementID, level: PowerLevel) {
-        tracing::debug!("Levels.update({:?}): {:?}", &id, &level);
-        self.level_map.insert(id.clone(), level.clone());
+    fn update(&mut self, key: &K, value: V) {
+        // If the value hasn't changed, this is a no-op.
+        if let Some(current) = self.get(key) {
+            if current == value {
+                return;
+            }
+        }
+        self.values.insert(key.clone(), value.clone());
         let mut senders_to_retain = Vec::new();
-        if let Some(senders) = self.channels.remove(id) {
+        if let Some(senders) = self.senders.remove(&key) {
             for sender in senders {
-                tracing::debug!("Levels.update send: {:?}", level.clone());
-                if let Err(err) = sender.unbounded_send(Some(level.clone())) {
+                if let Err(err) = sender.unbounded_send(Some(value.clone())) {
                     if err.is_disconnected() {
-                        tracing::debug!(
-                            "Levels.update sender disconnected, will be pruned: {:?}",
-                            &sender
-                        );
                         continue;
                     }
-                    tracing::error!("Levels.update send failed: {:?}", err)
                 }
                 senders_to_retain.push(sender);
             }
         }
         // Prune invalid senders.
-        self.channels.insert(id.clone(), senders_to_retain);
+        self.senders.insert(key.clone(), senders_to_retain);
     }
 
-    fn subscribe(&mut self, id: &ElementID) -> UnboundedReceiver<Option<PowerLevel>> {
-        let (sender, receiver) = unbounded::<Option<PowerLevel>>();
-        sender.unbounded_send(self.get(id)).expect("initial send failed");
-        self.channels.entry(id.clone()).or_insert(Vec::new()).push(sender);
+    fn subscribe(&mut self, key: &K) -> UnboundedReceiver<Option<V>> {
+        let (sender, receiver) = unbounded::<Option<V>>();
+        sender.unbounded_send(self.get(key)).expect("initial send failed");
+        self.senders.entry(key.clone()).or_insert(Vec::new()).push(sender);
         receiver
+    }
+
+    fn remove(&mut self, key: &K) {
+        self.values.remove(key);
+        self.senders.remove(key);
     }
 }
 
@@ -833,7 +909,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_levels() {
-        let mut levels = Levels::new();
+        let mut levels = SubscribeMap::<ElementID, PowerLevel>::new();
 
         levels.update(&"A".into(), PowerLevel::Binary(BinaryPowerLevel::On));
         assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
@@ -854,7 +930,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_levels_subscribe() {
-        let mut levels = Levels::new();
+        let mut levels = SubscribeMap::<ElementID, PowerLevel>::new();
 
         let mut receiver_a = levels.subscribe(&"A".into());
         let mut receiver_b = levels.subscribe(&"B".into());

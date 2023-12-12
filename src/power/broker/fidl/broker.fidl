@@ -64,7 +64,8 @@ open protocol LevelControl {
 };
 
 type LeaseError = flexible enum {
-    NOT_AUTHORIZED = 1;
+    INTERNAL = 1;
+    NOT_AUTHORIZED = 2;
 };
 
 /// Offered by the Power Broker to consumer Power Element owners (elements
@@ -81,12 +82,28 @@ open protocol Lessor {
         /// Power level of this element to be raised to.
         level PowerLevel;
     }) -> (resource struct {
-        lease_id LeaseId;
+        /// Channel for actions to be taken on the lease.
+        /// When this channel is closed, the lease will be dropped.
+        lease_control client_end:LeaseControl;
     }) error LeaseError;
+};
 
-    /// Request made to drop a previously acquired lease.
-    flexible DropLease(resource struct {
-        lease_id LeaseId;
+type LeaseStatus = flexible enum {
+    UNKNOWN = 0;
+    PENDING = 1;
+    SATISFIED = 2;
+};
+
+/// Actions that can be taken on a previously acquired lease.
+open protocol LeaseControl {
+    /// Get the current status of the lease.
+    /// If last_status is UNKNOWN, the call will return immediately
+    /// with the current status. Otherwise, the call will block
+    /// until the current status differs from last_status.
+    flexible WatchStatus(struct {
+        last_status LeaseStatus;
+    }) -> (struct {
+        status LeaseStatus;
     });
 };
 
