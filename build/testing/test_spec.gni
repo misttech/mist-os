@@ -511,6 +511,13 @@ template("test_spec") {
         !defined(invoker.image_overrides) && !defined(invoker.product_bundle)) {
       deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
     }
+    if (defined(invoker.timeout_secs) &&
+        # Tests that use image overrides/product bundles, primarily boot tests,
+        # are known to run slower, so they need not be explicitly included in
+        # the allowlist.
+        !defined(invoker.image_overrides) && !defined(invoker.product_bundle)) {
+      deps += [ "//build/testing/timeouts:per_test_timeout_allowlist" ]
+    }
   }
 
   # When an unreferenced board_name is used, the allowed_device_types

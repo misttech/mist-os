@@ -1,0 +1,34 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+group("per_test_timeout_allowlist") {
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of test targets that are allowed to set `timeout_secs`
+  # to override the infrastructure-enforced per-test timeout.
+  #
+  # Tests that run so slowly that they need an increased timeout should be
+  # consider other options, such as optimizing the test, splitting it into
+  # separate test executables, or running the test only in postsubmit on a
+  # builder that supports running slower tests.
+  visibility = [
+    "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-no-err-logs_test_netstack-multicast-forwarding-integration-test",
+    "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-with-err-logs_test_netstack-multicast-forwarding-integration-test",
+    "//src/starnix/tests/gvisor:*",
+    "//src/storage/lib/paver/test:paver-test_test_paver-test_component",
+    "//src/virtualization/tests:termina_container_tests_pkg_test_termina_container_tests_cmp",
+    "//third_party/gvisor_syscall_tests:netstack2_syncudp_tcp_syscall_test_netstack2_syncudp_tcp_syscall_tests",
+    "//third_party/gvisor_syscall_tests:netstack3_tcp_syscall_test_netstack3_tcp_syscall_tests",
+
+    # TODO(olivernewman): Vendor repos should also have their own allowlists.
+    "//vendor/*",
+  ]
+}
