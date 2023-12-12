@@ -61,6 +61,7 @@ pw_source_set("fake_dispatcher_fixture") {
   public = [ "$dir_pw_async/public/pw_async/fake_dispatcher_fixture.h" ]
   public_deps = [
     ":fake_dispatcher",
+    "$dir_pw_unit_test",
     "//third_party/googletest:gtest",
   ]
   visibility = [
