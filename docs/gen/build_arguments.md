@@ -8383,12 +8383,15 @@ From //build/toolchain/ccache.gni:9
 
 ### use_chromium_canary
 
-TODO(crbug.com/1065707): Revert to declaring this in the BUILD.gn file once
-the use in here is removed.
+Whether to use the most recent (canary) version of prebuilt Chromium
+components. Otherwise, the qualified "release" version is used.
+For scenarios where CastRunner is used,
+[`use_cast_runner_canary`](#use_cast_runner_canary) must be set to the same
+value.
 
 **Current value (from the default):** `false`
 
-From //src/chromium/generate_chromium_targets.gni:15
+From //src/chromium/BUILD.gn:33
 
 ### use_dbus
 
