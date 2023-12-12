@@ -4,8 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/ui/scenic/lib/image-compression/image_compression.h"
@@ -20,7 +20,7 @@ int main(int argc, const char** argv) {
   auto component_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   // Initialize inspect
-  sys::ComponentInspector inspector(component_context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), inspect::PublishOptions{});
   inspector.Health().StartingUp();
 
   // Serve a protocol using:
