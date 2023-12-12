@@ -16,7 +16,6 @@
 
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/pave-logging.h"
-#include "src/storage/lib/paver/sysconfig.h"
 #include "src/storage/lib/paver/utils.h"
 
 namespace paver {

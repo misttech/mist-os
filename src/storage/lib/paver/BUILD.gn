@@ -93,20 +93,11 @@ source_set("skip-block") {
   ]
 }
 
-source_set("sysconfig") {
-  sources = [ "sysconfig.cc" ]
-  public_deps = [
-    ":paver-core",
-    "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
-  ]
-}
-
 # Board specific paver implementations.
 source_set("astro") {
   sources = [ "astro.cc" ]
   deps = [
     ":paver-core",
-    ":sysconfig",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
@@ -124,7 +115,6 @@ source_set("sherlock") {
   deps = [
     ":gpt",
     ":paver-core",
-    ":sysconfig",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
@@ -136,7 +126,6 @@ source_set("nelson") {
   deps = [
     ":gpt",
     ":paver-core",
-    ":sysconfig",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
@@ -148,7 +137,6 @@ source_set("luis") {
   deps = [
     ":gpt",
     ":paver-core",
-    ":sysconfig",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
@@ -160,7 +148,6 @@ source_set("vim3") {
   deps = [
     ":gpt",
     ":paver-core",
-    ":sysconfig",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
