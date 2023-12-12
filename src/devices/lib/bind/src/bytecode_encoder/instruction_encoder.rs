@@ -34,6 +34,15 @@ fn is_symbol_key(key: &Symbol) -> bool {
     }
 }
 
+fn is_matching_types(lhs: &ValueType, rhs: &ValueType) -> bool {
+    let is_lhs_string_based = lhs == &ValueType::Str || lhs == &ValueType::Enum;
+    let is_rhs_string_based = rhs == &ValueType::Str || rhs == &ValueType::Enum;
+    if is_lhs_string_based && is_rhs_string_based {
+        return true;
+    }
+    return lhs == rhs;
+}
+
 pub struct InstructionEncoder<'a> {
     inst_iter: std::vec::IntoIter<SymbolicInstructionInfo<'a>>,
     label_map: HashMap<u32, LabelInfo>,
@@ -242,7 +251,7 @@ impl<'a> InstructionEncoder<'a> {
         // If the LHS key contains a value type, compare it to the RHS value to ensure that the
         // types match.
         if let Symbol::Key(_, lhs_val_type) = lhs {
-            if lhs_val_type != rhs_val_type {
+            if !is_matching_types(&lhs_val_type, &rhs_val_type) {
                 return Err(BindRulesEncodeError::MismatchValueTypes(lhs_val_type, rhs_val_type));
             }
         }

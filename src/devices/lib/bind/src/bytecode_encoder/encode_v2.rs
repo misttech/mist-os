@@ -905,6 +905,34 @@ mod test {
     }
 
     #[test]
+    fn test_string_enum_match_value_types() {
+        let instructions = vec![SymbolicInstruction::AbortIfNotEqual {
+            lhs: Symbol::Key("waxwing".to_string(), ValueType::Enum),
+            rhs: Symbol::StringValue("bohemian".to_string()),
+        }];
+
+        let bind_rules = BindRules {
+            instructions: to_symbolic_inst_info(instructions),
+            symbol_table: HashMap::new(),
+            use_new_bytecode: true,
+            enable_debug: false,
+        };
+
+        let mut checker = BytecodeChecker::new(encode_to_bytecode_v2(bind_rules).unwrap());
+
+        checker.verify_bind_rules_header(false);
+        checker.verify_sym_table_header(25);
+        checker.verify_symbol_table(&["waxwing", "bohemian"]);
+
+        checker.verify_instructions_header(COND_ABORT_BYTES);
+        checker.verify_abort_not_equal(
+            EncodedValue { value_type: RawValueType::Key, value: 1 },
+            EncodedValue { value_type: RawValueType::StringValue, value: 2 },
+        );
+        checker.verify_end();
+    }
+
+    #[test]
     fn test_invalid_lhs_symbol() {
         let instructions = vec![SymbolicInstruction::AbortIfNotEqual {
             lhs: Symbol::NumberValue(5),
