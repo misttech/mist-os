@@ -52,6 +52,8 @@ source_set("common_srcs") {
     "hdmi-transmitter.h",
     "hdmitx-clk.cc",
     "hhi-regs.h",
+    "hot-plug-detection.cc",
+    "hot-plug-detection.h",
     "initcodes-inl.h",
     "lcd.cc",
     "lcd.h",

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -35,6 +34,7 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
@@ -166,8 +166,9 @@ class AmlogicDisplay
  private:
   void VSyncThreadEntryPoint();
   void CaptureThreadEntryPoint();
-  void HpdThreadEntryPoint();
   void PopulatePanelType() TA_REQ(display_mutex_);
+
+  void OnHotPlugStateChange(HotPlugDetectionState current_state);
 
   // TODO(fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
   // initialization procedure when the device manager binds the driver to the
@@ -325,10 +326,7 @@ class AmlogicDisplay
   // DisplayMode is ignored.
   display::DisplayTiming current_display_timing_ TA_GUARDED(display_mutex_) = {};
 
-  // Hot Plug Detection
-  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> hpd_gpio_;
-  zx::interrupt hpd_irq_;
-  std::optional<thrd_t> hpd_thread_;
+  std::unique_ptr<HotPlugDetection> hot_plug_detection_;
 
   fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
 };

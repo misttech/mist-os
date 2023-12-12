@@ -16,6 +16,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/function.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -36,6 +37,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -668,19 +670,7 @@ void AmlogicDisplay::DdkRelease() {
     }
   }
 
-  if (hpd_irq_.is_valid()) {
-    zx_status_t status = hpd_irq_.destroy();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Hot-plug IRQ destroy failed: %s", zx_status_get_string(status));
-    }
-  }
-  if (hpd_thread_.has_value()) {
-    int status = thrd_join(*hpd_thread_, nullptr);
-    if (status != thrd_success) {
-      zxlogf(ERROR, "Hot-plug thread join failed: %s",
-             zx_status_get_string(thrd_status_to_zx_status(status)));
-    }
-  }
+  hot_plug_detection_.reset();
   delete this;
 }
 
@@ -1097,167 +1087,65 @@ void AmlogicDisplay::VSyncThreadEntryPoint() {
   }
 }
 
-void AmlogicDisplay::HpdThreadEntryPoint() {
-  while (true) {
-    zx_status_t status = hpd_irq_.wait(nullptr);
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Hotplug interrupt wait is cancelled. Stopping hotplug thread.");
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Hotplug interrupt wait failed: %s", zx_status_get_string(status));
-      break;
-    }
-    usleep(500000);
-    fidl::WireResult<fuchsia_hardware_gpio::Gpio::Read> hpd_result = hpd_gpio_->Read();
-    if (!hpd_result.ok()) {
-      zxlogf(ERROR, "Failed to send Read request to hpd gpio: %s", hpd_result.status_string());
-      continue;
-    }
-    fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::Read>& hpd_response =
-        hpd_result.value();
-    if (hpd_response.is_error()) {
-      zxlogf(ERROR, "Failed to read hpd gpio: %s",
-             zx_status_get_string(hpd_response.error_value()));
-      continue;
-    }
-    uint8_t has_hotplug_display = hpd_response.value()->value;
+void AmlogicDisplay::OnHotPlugStateChange(HotPlugDetectionState current_state) {
+  fbl::AutoLock lock(&display_mutex_);
 
-    fbl::AutoLock lock(&display_mutex_);
+  bool display_added = false;
+  added_display_args_t added_display_args;
+  added_display_info_t added_display_info;
 
-    bool display_added = false;
-    added_display_args_t added_display_args;
-    added_display_info_t added_display_info;
+  bool display_removed = false;
+  display::DisplayId removed_display_id;
 
-    bool display_removed = false;
-    display::DisplayId removed_display_id;
+  if (current_state == HotPlugDetectionState::kDetected && !display_attached_) {
+    zxlogf(INFO, "Display is connected");
 
-    if (has_hotplug_display && !display_attached_) {
-      zxlogf(INFO, "Display is connected");
+    display_attached_ = true;
 
-      display_attached_ = true;
+    // When the new display is attached to the display engine, it's not set
+    // up with any DisplayMode. This clears the display mode set previously
+    // to force a Vout modeset to be performed on the next
+    // ApplyConfiguration().
+    current_display_timing_ = {};
 
-      // When the new display is attached to the display engine, it's not set
-      // up with any DisplayMode. This clears the display mode set previously
-      // to force a Vout modeset to be performed on the next
-      // ApplyConfiguration().
-      current_display_timing_ = {};
+    vout_->DisplayConnected();
+    vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_, kSupportedBanjoPixelFormats);
+    display_added = true;
+  } else if (current_state == HotPlugDetectionState::kNotDetected && display_attached_) {
+    zxlogf(INFO, "Display Disconnected!");
+    vout_->DisplayDisconnected();
 
-      vout_->DisplayConnected();
-      vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_,
-                                      kSupportedBanjoPixelFormats);
-      display_added = true;
-      fidl::WireResult result = hpd_gpio_->SetPolarity(fuchsia_hardware_gpio::GpioPolarity::kLow);
-      if (!result.ok()) {
-        zxlogf(ERROR, "Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
-        break;
-      }
-      fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::SetPolarity>& response =
-          result.value();
-      if (response.is_error()) {
-        zxlogf(ERROR, "Failed to set polarity of hpd gpio: %s",
-               zx_status_get_string(response.error_value()));
-        break;
-      }
-    } else if (!has_hotplug_display && display_attached_) {
-      zxlogf(INFO, "Display Disconnected!");
-      vout_->DisplayDisconnected();
+    display_removed = true;
+    removed_display_id = display_id_;
+    display_id_++;
+    display_attached_ = false;
+  }
 
-      display_removed = true;
-      removed_display_id = display_id_;
-      display_id_++;
-      display_attached_ = false;
+  if (dc_intf_.is_valid() && (display_removed || display_added)) {
+    const size_t added_display_count = display_added ? 1 : 0;
+    const uint64_t banjo_removed_display_id = display::ToBanjoDisplayId(removed_display_id);
+    const size_t removed_display_count = display_removed ? 1 : 0;
 
-      fidl::WireResult result = hpd_gpio_->SetPolarity(fuchsia_hardware_gpio::GpioPolarity::kHigh);
-      if (!result.ok()) {
-        zxlogf(ERROR, "Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
-        break;
-      }
-      fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::SetPolarity>& response =
-          result.value();
-      if (response.is_error()) {
-        zxlogf(ERROR, "Failed to set polarity of hpd gpio: %s",
-               zx_status_get_string(response.error_value()));
-        break;
-      }
-    }
-
-    if (dc_intf_.is_valid() && (display_removed || display_added)) {
-      const size_t added_display_count = display_added ? 1 : 0;
-      const uint64_t banjo_removed_display_id = display::ToBanjoDisplayId(removed_display_id);
-      const size_t removed_display_count = display_removed ? 1 : 0;
-
-      dc_intf_.OnDisplaysChanged(
-          /*added_display_list=*/&added_display_args, added_display_count,
-          /*removed_display_list=*/&banjo_removed_display_id, removed_display_count,
-          /*out_display_info_list=*/&added_display_info,
-          /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
-    }
+    dc_intf_.OnDisplaysChanged(
+        /*added_display_list=*/&added_display_args, added_display_count,
+        /*removed_display_list=*/&banjo_removed_display_id, removed_display_count,
+        /*out_display_info_list=*/&added_display_info,
+        /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
   }
 }
 
 zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
-  ZX_ASSERT(!hpd_gpio_.is_valid());
-  ZX_ASSERT(!hpd_irq_.is_valid());
-  ZX_ASSERT(!hpd_thread_.has_value());
+  ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
-  const char* kHpdGpioFragmentName = "gpio-hdmi-hotplug-detect";
-  zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> hpd_gpio =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent_,
-                                                                             kHpdGpioFragmentName);
-  if (hpd_gpio.is_error()) {
-    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kHpdGpioFragmentName,
-           hpd_gpio.status_string());
-    return hpd_gpio.status_value();
-  }
-  hpd_gpio_.Bind(std::move(hpd_gpio.value()));
+  zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
+      HotPlugDetection::Create(parent_,
+                               fit::bind_member<&AmlogicDisplay::OnHotPlugStateChange>(this));
 
-  fidl::WireResult config_in_result =
-      hpd_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
-  if (!config_in_result.ok()) {
-    zxlogf(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
-           config_in_result.status_string());
-    return config_in_result.status();
+  if (hot_plug_detection_result.is_error()) {
+    // HotPlugDetection::Create() logged the error.
+    return hot_plug_detection_result.status_value();
   }
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigIn>& config_in_response =
-      config_in_result.value();
-  if (config_in_response.is_error()) {
-    zxlogf(ERROR, "Failed to configure hpd gpio to input: %s",
-           zx_status_get_string(config_in_response.error_value()));
-    return config_in_response.error_value();
-  }
-
-  fidl::WireResult interrupt_result = hpd_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH);
-  if (!interrupt_result.ok()) {
-    zxlogf(ERROR, "Failed to send GetInterrupt request to hpd gpio: %s",
-           interrupt_result.status_string());
-    return interrupt_result.status();
-  }
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt>& interrupt_response =
-      interrupt_result.value();
-  if (interrupt_response.is_error()) {
-    zxlogf(ERROR, "Failed to get interrupt from hpd gpio: %s",
-           zx_status_get_string(interrupt_response.error_value()));
-    return interrupt_response.error_value();
-  }
-  hpd_irq_ = std::move(interrupt_result.value()->irq);
-
-  thrd_t hpd_thread;
-  int status = thrd_create_with_name(
-      &hpd_thread,
-      [](void* arg) {
-        reinterpret_cast<AmlogicDisplay*>(arg)->HpdThreadEntryPoint();
-        return 0;
-      },
-      /*arg=*/this,
-      /*name=*/"hpd_thread");
-  if (status != thrd_success) {
-    zx_status_t zx_status = thrd_status_to_zx_status(status);
-    zxlogf(ERROR, "Failed to create hotplug detection thread: %s", zx_status_get_string(zx_status));
-    return zx_status;
-  }
-  hpd_thread_.emplace(hpd_thread);
-
+  hot_plug_detection_ = std::move(hot_plug_detection_result).value();
   return ZX_OK;
 }
 
