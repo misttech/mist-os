@@ -6,9 +6,10 @@ use anyhow::{Context as _, Error};
 use fidl::endpoints::{create_request_stream, ControlHandle, Responder};
 use fidl_fuchsia_power_broker::{
     self as fpb, ElementControlMarker, ElementControlRequest, ElementControlRequestStream,
-    LeaseControlMarker, LeaseControlRequest, LeaseControlRequestStream, LeaseStatus, LessorRequest,
-    LessorRequestStream, LevelControlMarker, LevelControlRequest, LevelControlRequestStream,
-    StatusRequest, StatusRequestStream, TopologyRequest, TopologyRequestStream,
+    LeaseControlMarker, LeaseControlRequest, LeaseControlRequestStream, LeaseStatus, LessorMarker,
+    LessorRequest, LessorRequestStream, LevelControlMarker, LevelControlRequest,
+    LevelControlRequestStream, StatusRequest, StatusRequestStream, TopologyRequest,
+    TopologyRequestStream,
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
@@ -27,7 +28,6 @@ mod topology;
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
 enum IncomingRequest {
-    Lessor(LessorRequestStream),
     Topology(TopologyRequestStream),
 }
 
@@ -79,16 +79,20 @@ impl BrokerSvc {
             .await
     }
 
-    async fn run_lessor(self: Rc<Self>, stream: LessorRequestStream) -> Result<(), Error> {
+    async fn run_lessor(
+        self: Rc<Self>,
+        element_id: ElementID,
+        stream: LessorRequestStream,
+    ) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
-                    LessorRequest::Lease { token, level, responder } => {
-                        tracing::debug!("Lease({:?}, {:?})", &token, &level);
+                    LessorRequest::Lease { level, responder } => {
+                        tracing::debug!("Lease({:?}, {:?})", &element_id, &level);
                         let resp = {
                             let mut broker = self.broker.lock().await;
-                            broker.acquire_lease(token.into(), level)
+                            broker.acquire_lease(&element_id, level)
                         };
                         match resp {
                             Ok(lease) => {
@@ -345,6 +349,25 @@ impl BrokerSvc {
                                     }
                                 })
                                 .detach();
+                                tracing::debug!("Spawning lessor task for {:?}", &element_id);
+                                let (lessor_client, lessor_stream) =
+                                    create_request_stream::<LessorMarker>()?;
+                                Task::local({
+                                    let svc = self.clone();
+                                    let element_id = element_id.clone();
+                                    async move {
+                                        if let Err(err) =
+                                            svc.run_lessor(element_id, lessor_stream).await
+                                        {
+                                            tracing::debug!("run_lessor err: {:?}", err);
+                                        }
+                                    }
+                                })
+                                .detach();
+                                tracing::debug!(
+                                    "Spawning level control task for {:?}",
+                                    &element_id
+                                );
                                 let (level_control_client, level_control_stream) =
                                     create_request_stream::<LevelControlMarker>()?;
                                 Task::local({
@@ -361,7 +384,11 @@ impl BrokerSvc {
                                 })
                                 .detach();
                                 responder
-                                    .send(Ok((element_control_client, level_control_client)))
+                                    .send(Ok((
+                                        element_control_client,
+                                        lessor_client,
+                                        level_control_client,
+                                    )))
                                     .context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
@@ -468,7 +495,6 @@ async fn main() -> Result<(), anyhow::Error> {
     // ```
     // service_fs.dir("svc").add_fidl_service(IncomingRequest::MyProtocol);
     // ```
-    service_fs.dir("svc").add_fidl_service(IncomingRequest::Lessor);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);
 
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
@@ -480,9 +506,6 @@ async fn main() -> Result<(), anyhow::Error> {
     service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
-                IncomingRequest::Lessor(stream) => {
-                    svc.clone().run_lessor(stream).await.expect("run_lessor failed");
-                }
                 IncomingRequest::Topology(stream) => {
                     svc.clone().run_topology(stream).await.expect("run_topology failed");
                 }

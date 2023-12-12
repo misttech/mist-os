@@ -5,8 +5,8 @@
 use anyhow::{Error, Result};
 use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_broker::{
-    self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LessorMarker,
-    LevelDependency, Permissions, PowerLevel, StatusMarker, TopologyMarker, UserDefinedPowerLevel,
+    self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LevelDependency,
+    Permissions, PowerLevel, StatusMarker, TopologyMarker, UserDefinedPowerLevel,
 };
 use fpb::LeaseStatus;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
@@ -16,14 +16,6 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
     let power_broker = builder
         .add_child("power_broker", "power-broker#meta/power-broker.cm", ChildOptions::new())
-        .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<LessorMarker>())
-                .from(&power_broker)
-                .to(Ref::parent()),
-        )
         .await?;
     builder
         .add_route(
@@ -51,7 +43,7 @@ async fn test_direct() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    let (parent_element_control, parent_level_control) = topology
+    let (parent_element_control, _, parent_level_control) = topology
         .add_element("P", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![parent_cred])
         .await?
         .expect("add_element failed");
@@ -61,14 +53,7 @@ async fn test_direct() -> Result<()> {
         client.into_proxy()?
     };
     let parent_level_control = parent_level_control.into_proxy()?;
-    let (child_token, child_broker_token) = zx::EventPair::create();
-    let child_cred = Credential {
-        broker_token: child_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL
-            | Permissions::MODIFY_DEPENDENCY
-            | Permissions::ACQUIRE_LEASE,
-    };
-    topology
+    let (_, child_lessor, _) = topology
         .add_element(
             "C",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -81,12 +66,11 @@ async fn test_direct() -> Result<()> {
                     level: PowerLevel::Binary(BinaryPowerLevel::On),
                 },
             }],
-            vec![child_cred],
+            vec![],
         )
         .await?
         .expect("add_element failed");
-
-    let lessor = realm.root.connect_to_protocol_at_exposed_dir::<LessorMarker>()?;
+    let child_lessor = child_lessor.into_proxy()?;
 
     // Initial required level for P should be OFF.
     // Update P's current level to OFF with PowerBroker.
@@ -103,11 +87,8 @@ async fn test_direct() -> Result<()> {
     assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
 
     // Acquire lease for C, P should now have required level ON
-    let lease = lessor
-        .lease(
-            child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-        )
+    let lease = child_lessor
+        .lease(&PowerLevel::Binary(BinaryPowerLevel::On))
         .await?
         .expect("Lease response not ok")
         .into_proxy()?;
@@ -152,7 +133,7 @@ async fn test_transitive() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    let (element_a_element_control, element_a_level_control) = topology
+    let (element_a_element_control, _, element_a_level_control) = topology
         .add_element("A", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![element_a_cred])
         .await?
         .expect("add_element failed");
@@ -170,7 +151,7 @@ async fn test_transitive() -> Result<()> {
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    let (element_b_element_control, element_b_level_control) = topology
+    let (element_b_element_control, _, element_b_level_control) = topology
         .add_element(
             "B",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -193,12 +174,7 @@ async fn test_transitive() -> Result<()> {
         element_b_element_control.into_proxy()?.open_status_channel(server)?;
         client.into_proxy()?
     };
-    let (element_c_token, element_c_broker_token) = zx::EventPair::create();
-    let element_c_cred = Credential {
-        broker_token: element_c_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
-    };
-    topology
+    let (_, element_c_lessor, _) = topology
         .add_element(
             "C",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -211,11 +187,12 @@ async fn test_transitive() -> Result<()> {
                     level: PowerLevel::Binary(BinaryPowerLevel::On),
                 },
             }],
-            vec![element_c_cred],
+            vec![],
         )
         .await?
         .expect("add_element failed");
-    let (element_d_element_control, element_d_level_control) = topology
+    let element_c_lessor = element_c_lessor.into_proxy()?;
+    let (element_d_element_control, _, element_d_level_control) = topology
         .add_element("D", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![])
         .await?
         .expect("add_element failed");
@@ -225,8 +202,6 @@ async fn test_transitive() -> Result<()> {
         element_d_element_control.into_proxy()?.open_status_channel(server)?;
         client.into_proxy()?
     };
-
-    let lessor = realm.root.connect_to_protocol_at_exposed_dir::<LessorMarker>()?;
 
     // Initial required level for each element should be OFF.
     // Update managed elements' current level to OFF with PowerBroker.
@@ -250,11 +225,8 @@ async fn test_transitive() -> Result<()> {
     // and B should have required level OFF because C has a dependency on B
     // and B has a dependency on A.
     // D should still have required level OFF.
-    let lease = lessor
-        .lease(
-            element_c_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-        )
+    let lease = element_c_lessor
+        .lease(&PowerLevel::Binary(BinaryPowerLevel::On))
         .await?
         .expect("Lease response not ok")
         .into_proxy()?;
@@ -395,7 +367,7 @@ async fn test_shared() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    let (_, grandparent_control) = topology
+    let (_, _, grandparent_control) = topology
         .add_element(
             "GP",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
@@ -413,7 +385,7 @@ async fn test_shared() -> Result<()> {
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    let (_, parent_control) = topology
+    let (_, _, parent_control) = topology
         .add_element(
             "P",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
@@ -442,12 +414,7 @@ async fn test_shared() -> Result<()> {
         .await?
         .expect("add_element failed");
     let parent_control = parent_control.into_proxy()?;
-    let (child1_token, child1_broker_token) = zx::EventPair::create();
-    let child1_cred = Credential {
-        broker_token: child1_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
-    };
-    topology
+    let (_, child1_lessor, _) = topology
         .add_element(
             "C1",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
@@ -460,16 +427,12 @@ async fn test_shared() -> Result<()> {
                     level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
                 },
             }],
-            vec![child1_cred],
+            vec![],
         )
         .await?
         .expect("add_element failed");
-    let (child2_token, child2_broker_token) = zx::EventPair::create();
-    let child2_cred = Credential {
-        broker_token: child2_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
-    };
-    topology
+    let child1_lessor = child1_lessor.into_proxy()?;
+    let (_, child2_lessor, _) = topology
         .add_element(
             "C2",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
@@ -482,12 +445,11 @@ async fn test_shared() -> Result<()> {
                     level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
                 },
             }],
-            vec![child2_cred],
+            vec![],
         )
         .await?
         .expect("add_element failed");
-
-    let lessor = realm.root.connect_to_protocol_at_exposed_dir::<LessorMarker>()?;
+    let child2_lessor = child2_lessor.into_proxy()?;
 
     // Initially, Grandparent should have a default required level of 10
     // and Parent should have a default required level of 0.
@@ -511,11 +473,8 @@ async fn test_shared() -> Result<()> {
     // because Child 1 has a dependency on Parent and Parent has a
     // dependency on Grandparent. Grandparent has no dependencies so its
     // level should be raised first.
-    let lease_child_1 = lessor
-        .lease(
-            child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
-        )
+    let lease_child_1 = child1_lessor
+        .lease(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }))
         .await?
         .expect("Lease response not ok")
         .into_proxy()?;
@@ -572,11 +531,8 @@ async fn test_shared() -> Result<()> {
     // Acquire lease for Child 2, Though Child 2 has nominal
     // requirements of Parent at 30 and Grandparent at 100, they are
     // superseded by Child 1's requirements of 50 and 200.
-    let lease_child_2 = lessor
-        .lease(
-            child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
-        )
+    let lease_child_2 = child2_lessor
+        .lease(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }))
         .await?
         .expect("Lease response not ok")
         .into_proxy()?;
@@ -688,14 +644,14 @@ async fn test_topology() -> Result<()> {
     let (fire_token, fire_broker_token) = zx::EventPair::create();
     let fire_cred =
         Credential { broker_token: fire_broker_token, permissions: Permissions::REMOVE_ELEMENT };
-    let (fire_element_control, _) = topology
+    let (fire_element_control, _, _) = topology
         .add_element("Fire", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![fire_cred])
         .await?
         .expect("add_element failed");
     let fire_element_control = fire_element_control.into_proxy()?;
     let (air_token, air_broker_token) = zx::EventPair::create();
     let air_cred = Credential { broker_token: air_broker_token, permissions: Permissions::all() };
-    let (air_element_control, _) = topology
+    let (air_element_control, _, _) = topology
         .add_element("Air", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![air_cred])
         .await?
         .expect("add_element failed");
