@@ -3492,6 +3492,12 @@ extern "C" {
     pub fn otBorderRoutingDhcp6PdSetEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
+    #[doc = " Gets the current state of DHCPv6 Prefix Delegation.\n\n Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` to be enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current state of DHCPv6 Prefix Delegation.\n"]
+    pub fn otBorderRoutingDhcp6PdGetState(
+        aInstance: *mut otInstance,
+    ) -> otBorderRoutingDhcp6PdState;
+}
+extern "C" {
     #[doc = " Provides a full or stable copy of the local Thread Network Data.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version.\n @param[out]     aData        A pointer to the data buffer.\n @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData.\n                              On exit, number of copied bytes."]
     pub fn otBorderRouterGetNetData(
         aInstance: *mut otInstance,
@@ -8699,6 +8705,14 @@ extern "C" {
 extern "C" {
     #[doc = " Signal diagnostics module that the alarm has fired.\n\n @param[in] aInstance  The OpenThread instance structure."]
     pub fn otPlatDiagAlarmFired(aInstance: *mut otInstance);
+}
+extern "C" {
+    #[doc = " Handles ICMP6 RA messages received on the Thread interface on the platform.\n\n The `aMessage` should point to a buffer of a valid ICMPv6 message (without IP headers) with router advertisement as\n the value of type field of the message.\n\n When DHCPv6 PD is disabled, the message will be dropped silently.\n\n Note: RA messages will not be forwarded into Thread networks, while for many platforms, RA messages is the way of\n distributing a prefix and other infomations to the downstream network. The typical usecase of this function is to\n handle the router advertisement messages sent by the platform as a result of DHCPv6 Prefix Delegation.\n\n Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE`.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aMessage  A pointer to an ICMPv6 RouterAdvertisement message.\n @param[in] aLength   The length of ICMPv6 RouterAdvertisement message.\n"]
+    pub fn otPlatBorderRoutingProcessIcmp6Ra(
+        aInstance: *mut otInstance,
+        aMessage: *const u8,
+        aLength: u16,
+    );
 }
 extern "C" {
     #[doc = " Standard printf() to the debug uart with no log decoration.\n\n @param[in]   fmt   printf formatter text\n\n This is a debug convenience function that is not intended to be\n used in anything other then \"debug scenarios\" by a developer.\n\n lf -> cr/lf mapping is automatically handled via otPlatDebugUart_putchar()\n\n @sa otPlatDebugUart_vprintf() for limitations\n\n This is a WEAK symbol that can easily be overridden as needed."]

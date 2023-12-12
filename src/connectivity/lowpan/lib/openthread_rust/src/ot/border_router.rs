@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ot::WrongSize;
 use crate::prelude_internal::*;
 
 /// Iterator type for external routes.
@@ -63,6 +64,30 @@ pub trait BorderRouter {
     /// Functional equivalent of
     /// [`otsys::otBorderRoutingSetEnabled`](crate::otsys::otBorderRoutingSetEnabled).
     fn border_routing_set_enabled(&self, enabled: bool) -> Result;
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingDhcp6PdSetEnabled`](crate::otsys::otBorderRoutingDhcp6PdSetEnabled).
+    fn border_routing_dhcp6_pd_set_enabled(&self, enabled: bool);
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingDhcp6PdGetState`](crate::otsys::otBorderRoutingDhcp6PdGetState).
+    fn border_routing_dhcp6_pd_get_state(&self) -> BorderRoutingDhcp6PdState;
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingGetPdOmrPrefix`](crate::otsys::otBorderRoutingGetPdOmrPrefix).
+    fn border_routing_get_pd_omr_prefix(&self) -> Result<ot::BorderRoutingPrefixTableEntry>;
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingGetOmrPrefix`](crate::otsys::otBorderRoutingGetOmrPrefix).
+    fn border_routing_get_omr_prefix(&self) -> Result<ot::Ip6Prefix>;
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingGetOnLinkPrefix`](crate::otsys::otBorderRoutingGetOnLinkPrefix).
+    fn border_routing_get_on_link_prefix(&self) -> Result<ot::Ip6Prefix>;
+
+    /// Functional equivalent of
+    /// [`otsys::otPlatBorderRoutingProcessIcmp6Ra`](crate::otsys::otPlatBorderRoutingProcessIcmp6Ra).
+    fn border_routing_process_icmp6_ra(&self, message: &[u8]) -> Result<(), WrongSize>;
 
     /// Functional equivalent of
     /// [`otsys::otBorderRouterGetNextRoute`](crate::otsys::otBorderRouterGetNextRoute).
@@ -128,6 +153,30 @@ impl<T: BorderRouter + Boxable> BorderRouter for ot::Box<T> {
         self.as_ref().border_routing_set_enabled(enabled)
     }
 
+    fn border_routing_dhcp6_pd_set_enabled(&self, enabled: bool) {
+        self.as_ref().border_routing_dhcp6_pd_set_enabled(enabled)
+    }
+
+    fn border_routing_dhcp6_pd_get_state(&self) -> BorderRoutingDhcp6PdState {
+        self.as_ref().border_routing_dhcp6_pd_get_state()
+    }
+
+    fn border_routing_get_pd_omr_prefix(&self) -> Result<ot::BorderRoutingPrefixTableEntry> {
+        self.as_ref().border_routing_get_pd_omr_prefix()
+    }
+
+    fn border_routing_get_omr_prefix(&self) -> Result<ot::Ip6Prefix> {
+        self.as_ref().border_routing_get_omr_prefix()
+    }
+
+    fn border_routing_get_on_link_prefix(&self) -> Result<ot::Ip6Prefix> {
+        self.as_ref().border_routing_get_on_link_prefix()
+    }
+
+    fn border_routing_process_icmp6_ra(&self, message: &[u8]) -> Result<(), WrongSize> {
+        self.as_ref().border_routing_process_icmp6_ra(message)
+    }
+
     fn iter_next_local_external_route(
         &self,
         ot_iter: &mut otNetworkDataIterator,
@@ -176,6 +225,53 @@ impl BorderRouter for Instance {
 
     fn border_routing_set_enabled(&self, enabled: bool) -> Result {
         Error::from(unsafe { otBorderRoutingSetEnabled(self.as_ot_ptr(), enabled) }).into()
+    }
+
+    fn border_routing_dhcp6_pd_set_enabled(&self, enabled: bool) {
+        unsafe { otBorderRoutingDhcp6PdSetEnabled(self.as_ot_ptr(), enabled) }
+    }
+
+    fn border_routing_dhcp6_pd_get_state(&self) -> BorderRoutingDhcp6PdState {
+        BorderRoutingDhcp6PdState::from_isize(unsafe {
+            otBorderRoutingDhcp6PdGetState(self.as_ot_ptr())
+        } as isize)
+        .unwrap_or(BorderRoutingDhcp6PdState::Disabled)
+    }
+
+    fn border_routing_get_pd_omr_prefix(&self) -> Result<ot::BorderRoutingPrefixTableEntry> {
+        let mut ret: BorderRoutingPrefixTableEntry = Default::default();
+        Error::from(unsafe {
+            otBorderRoutingGetPdOmrPrefix(self.as_ot_ptr(), ret.as_ot_mut_ptr())
+        })
+        .into_result()?;
+        Ok(ret)
+    }
+
+    fn border_routing_get_omr_prefix(&self) -> Result<ot::Ip6Prefix> {
+        let mut ret: Ip6Prefix = Default::default();
+        Error::from(unsafe { otBorderRoutingGetOmrPrefix(self.as_ot_ptr(), ret.as_ot_mut_ptr()) })
+            .into_result()?;
+        Ok(ret)
+    }
+
+    fn border_routing_get_on_link_prefix(&self) -> Result<ot::Ip6Prefix> {
+        let mut ret: Ip6Prefix = Default::default();
+        Error::from(unsafe {
+            otBorderRoutingGetOnLinkPrefix(self.as_ot_ptr(), ret.as_ot_mut_ptr())
+        })
+        .into_result()?;
+        Ok(ret)
+    }
+
+    fn border_routing_process_icmp6_ra(&self, message: &[u8]) -> Result<(), WrongSize> {
+        unsafe {
+            otPlatBorderRoutingProcessIcmp6Ra(
+                self.as_ot_ptr(),
+                message.as_ptr(),
+                message.len().try_into().map_err(|_| WrongSize)?,
+            )
+        }
+        Ok(())
     }
 
     fn iter_next_local_external_route(

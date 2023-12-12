@@ -545,3 +545,78 @@ impl From<NetifIdentifier> for otNetifIdentifier {
         x as otNetifIdentifier
     }
 }
+
+/// Represents an entry from the discovered prefix table.
+/// Functional equivalent of [`otsys::otBorderRoutingPrefixTableEntry`](crate::otsys::otBorderRoutingPrefixTableEntry).
+#[derive(Default, Clone, Copy)]
+#[repr(transparent)]
+pub struct BorderRoutingPrefixTableEntry(pub otBorderRoutingPrefixTableEntry);
+
+impl_ot_castable!(BorderRoutingPrefixTableEntry, otBorderRoutingPrefixTableEntry);
+
+impl Debug for BorderRoutingPrefixTableEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("otBorderRoutingPrefixTableEntry")
+            .field("router_address", &self.router_address())
+            .field("prefix", &self.prefix())
+            .field("is_on_link", &self.is_on_link())
+            .field("msec_since_last_update", &self.msec_since_last_update())
+            .field("valid_lifetime", &self.valid_lifetime())
+            .field("preferred_lifetime", &self.preferred_lifetime())
+            .field("route_preference", &self.route_preference())
+            .finish()
+    }
+}
+
+impl std::fmt::Display for BorderRoutingPrefixTableEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl BorderRoutingPrefixTableEntry {
+    /// Returns a reference to the IPv6 address.
+    pub fn router_address(&self) -> &Ip6Address {
+        Ip6Address::ref_from_ot_ref(&self.0.mRouterAddress)
+    }
+
+    /// Returns the prefix.
+    pub fn prefix(&self) -> &Ip6Prefix {
+        Ip6Prefix::ref_from_ot_ref(&self.0.mPrefix)
+    }
+
+    /// Returns true if this prefix is on-link.
+    pub fn is_on_link(&self) -> bool {
+        self.0.mIsOnLink
+    }
+
+    /// Returns the number of milliseconds since the last update
+    pub fn msec_since_last_update(&self) -> u32 {
+        self.0.mMsecSinceLastUpdate
+    }
+
+    /// Returns the valid lifetime of the prefix (in seconds)
+    pub fn valid_lifetime(&self) -> u32 {
+        self.0.mValidLifetime
+    }
+
+    /// Returns the preferred lifetime of the prefix (in seconds)
+    pub fn preferred_lifetime(&self) -> u32 {
+        self.0.mPreferredLifetime
+    }
+
+    /// Returns the route preference
+    pub fn route_preference(&self) -> RoutePreference {
+        RoutePreference::from_isize(self.0.mPreferredLifetime as isize)
+            .unwrap_or(RoutePreference::Medium)
+    }
+}
+
+/// This enumeration represents the state of DHCPv6 Prefix Delegation State.
+#[derive(Debug, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive)]
+#[allow(missing_docs)]
+pub enum BorderRoutingDhcp6PdState {
+    Disabled = OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED as isize,
+    Stopped = OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED as isize,
+    Running = OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING as isize,
+}

@@ -48,6 +48,7 @@
 #include <openthread/ping_sender.h>
 #include <openthread/platform/alarm-micro.h>
 #include <openthread/platform/alarm-milli.h>
+#include <openthread/platform/border_routing.h>
 #include <openthread/platform/debug_uart.h>
 #include <openthread/platform/diag.h>
 #include <openthread/platform/entropy.h>
