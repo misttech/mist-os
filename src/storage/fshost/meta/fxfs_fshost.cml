@@ -59,5 +59,10 @@
             from: "void",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "void",
+            availability: "optional",
+        },
     ],
 }
