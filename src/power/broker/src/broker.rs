@@ -114,20 +114,6 @@ impl Broker {
         Ok(())
     }
 
-    pub fn get_current_level(&self, token: Token) -> Result<PowerLevel, fpb::PowerLevelError> {
-        let Some(credential) = self.lookup_credentials(token) else {
-            return Err(fpb::PowerLevelError::NotAuthorized);
-        };
-        if !credential.contains(Permissions::READ_POWER_LEVEL) {
-            return Err(fpb::PowerLevelError::NotAuthorized);
-        }
-        if let Some(level) = self.current.get(credential.get_element()) {
-            Ok(level)
-        } else {
-            Err(fpb::PowerLevelError::NotFound)
-        }
-    }
-
     fn current_level_satisfies(&self, required: &ElementLevel) -> bool {
         self.current
             .get(&required.element_id)
@@ -182,22 +168,16 @@ impl Broker {
 
     pub fn watch_current_level(
         &mut self,
-        token: Token,
-    ) -> Result<UnboundedReceiver<Option<PowerLevel>>, fpb::PowerLevelError> {
-        let Some(credential) = self.lookup_credentials(token) else {
-            return Err(fpb::PowerLevelError::NotAuthorized);
-        };
-        if !credential.contains(Permissions::READ_POWER_LEVEL) {
-            return Err(fpb::PowerLevelError::NotAuthorized);
-        }
-        Ok(self.current.subscribe(credential.get_element()))
+        element_id: &ElementID,
+    ) -> UnboundedReceiver<Option<PowerLevel>> {
+        self.current.subscribe(element_id)
     }
 
     pub fn watch_required_level(
         &mut self,
         element_id: &ElementID,
-    ) -> Result<UnboundedReceiver<Option<PowerLevel>>, fpb::WatchRequiredLevelError> {
-        Ok(self.required.subscribe(element_id))
+    ) -> UnboundedReceiver<Option<PowerLevel>> {
+        self.required.subscribe(element_id)
     }
 
     pub fn acquire_lease(
@@ -1900,96 +1880,5 @@ mod tests {
                 PowerLevel::Binary(BinaryPowerLevel::On),
             )
             .expect("remove_dependency with extra permissions failed");
-    }
-
-    #[fuchsia::test]
-    fn test_get_current_level_credentials() {
-        let mut broker = Broker::new();
-        let (dilithium_modify_only_token, dilithium_modify_only_broker_token) =
-            zx::EventPair::create();
-        let dilithium_modify_only_cred = CredentialToRegister {
-            broker_token: dilithium_modify_only_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL,
-        };
-        let (dilithium_read_only_token, dilithium_broker_read_only_token) = zx::EventPair::create();
-        let dilithium_read_only_cred = CredentialToRegister {
-            broker_token: dilithium_broker_read_only_token.into(),
-            permissions: Permissions::READ_POWER_LEVEL,
-        };
-        let dilithium = broker
-            .add_element(
-                "Dilithium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                vec![],
-                vec![dilithium_modify_only_cred, dilithium_read_only_cred],
-            )
-            .expect("add_element failed");
-
-        // Set the current level so it can be read.
-        broker
-            .update_current_level(&dilithium, PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("update_current_level failed");
-
-        assert_eq!(
-            broker
-                .get_current_level(dilithium_read_only_token.into())
-                .expect("get_current_level failed"),
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-
-        let (missing_token, _) = zx::EventPair::create();
-        let missing_token_res = broker.get_current_level(missing_token.into());
-        assert!(matches!(missing_token_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
-
-        let missing_permissions_res = broker.get_current_level(dilithium_modify_only_token.into());
-        assert!(matches!(missing_permissions_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
-    }
-
-    #[fuchsia::test]
-    async fn test_watch_current_level_credentials() {
-        let mut broker = Broker::new();
-        let (dilithium_modify_only_token, dilithium_modify_only_broker_token) =
-            zx::EventPair::create();
-        let dilithium_modify_only_cred = CredentialToRegister {
-            broker_token: dilithium_modify_only_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL,
-        };
-        let (dilithium_read_only_token, dilithium_broker_read_only_token) = zx::EventPair::create();
-        let dilithium_read_only_cred = CredentialToRegister {
-            broker_token: dilithium_broker_read_only_token.into(),
-            permissions: Permissions::READ_POWER_LEVEL,
-        };
-        let dilithium = broker
-            .add_element(
-                "Dilithium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                vec![],
-                vec![dilithium_modify_only_cred, dilithium_read_only_cred],
-            )
-            .expect("add_element failed");
-
-        // Set the current level so it can be read.
-        broker
-            .update_current_level(&dilithium, PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("update_current_level failed");
-
-        use futures::StreamExt;
-        assert_eq!(
-            broker
-                .watch_current_level(dilithium_read_only_token.into())
-                .expect("watch_current_level failed")
-                .next()
-                .await
-                .unwrap(),
-            Some(PowerLevel::Binary(BinaryPowerLevel::On))
-        );
-
-        let (missing_token, _) = zx::EventPair::create();
-        let missing_token_res = broker.watch_current_level(missing_token.into());
-        assert!(matches!(missing_token_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
-
-        let missing_permissions_res =
-            broker.watch_current_level(dilithium_modify_only_token.into());
-        assert!(matches!(missing_permissions_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
     }
 }

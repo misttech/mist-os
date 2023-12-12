@@ -5,11 +5,11 @@
 use anyhow::{Context as _, Error};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_broker::{
-    self as fpb, LeaseControlRequest, LessorRequest, LessorRequestStream, LevelControlMarker,
-    LevelControlRequest, LevelControlRequestStream, StatusRequest, StatusRequestStream,
-    TopologyRequest, TopologyRequestStream,
+    self as fpb, ElementControlMarker, ElementControlRequest, ElementControlRequestStream,
+    LeaseControlMarker, LeaseControlRequest, LeaseControlRequestStream, LeaseStatus, LessorRequest,
+    LessorRequestStream, LevelControlMarker, LevelControlRequest, LevelControlRequestStream,
+    StatusRequest, StatusRequestStream, TopologyRequest, TopologyRequestStream,
 };
-use fpb::{LeaseControlMarker, LeaseControlRequestStream, LeaseStatus};
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
@@ -28,7 +28,6 @@ mod topology;
 /// and dispatched.
 enum IncomingRequest {
     Lessor(LessorRequestStream),
-    Status(StatusRequestStream),
     Topology(TopologyRequestStream),
 }
 
@@ -37,35 +36,21 @@ struct BrokerSvc {
 }
 
 impl BrokerSvc {
-    async fn run_status(&self, stream: StatusRequestStream) -> Result<(), Error> {
+    async fn run_status(
+        self: Rc<Self>,
+        element_id: ElementID,
+        stream: StatusRequestStream,
+    ) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
-                    StatusRequest::GetPowerLevel { token, responder } => {
-                        tracing::debug!("GetPowerLevel({:?})", &token);
-                        let broker = self.broker.lock().await;
-                        let result = broker.get_current_level(token.into());
-                        tracing::debug!("get_current_level = {:?}", &result);
-                        if let Ok(power_level) = result {
-                            tracing::debug!("GetPowerLevel responder.send({:?})", &power_level);
-                            responder.send(Ok(&power_level)).context("response failed")
-                        } else {
-                            tracing::debug!("GetPowerLevel responder.send err({:?})", &result);
-                            responder.send(Err(result.unwrap_err())).context("response failed")
-                        }
-                    }
-                    StatusRequest::WatchPowerLevel { token, last_level, responder } => {
-                        tracing::debug!("WatchPowerLevel({:?}, {:?})", &token, last_level);
-                        let watch_res = {
+                    StatusRequest::WatchPowerLevel { last_level, responder } => {
+                        tracing::debug!("WatchPowerLevel({:?}, {:?})", &element_id, last_level);
+                        let mut receiver = {
                             let mut broker = self.broker.lock().await;
-                            tracing::debug!("subscribe_current_level({:?})", &token);
-                            broker.watch_current_level(token.into())
-                        };
-                        let Ok(mut receiver) = watch_res else {
-                            return responder
-                                .send(Err(watch_res.unwrap_err()))
-                                .context("send failed");
+                            tracing::debug!("subscribe_current_level({:?})", &element_id);
+                            broker.watch_current_level(&element_id)
                         };
                         while let Some(Some(power_level)) = receiver.next().await {
                             tracing::debug!(
@@ -73,14 +58,22 @@ impl BrokerSvc {
                                 &power_level,
                                 &last_level
                             );
-                            if power_level != last_level {
+                            if last_level.is_some() && last_level.clone().unwrap().as_ref() == &power_level {
+                                tracing::debug!(
+                                    "WatchPowerLevel: level has not changed, watching for next update...",
+                                );
+                                continue;
+                            } else {
                                 tracing::debug!("responder.send({:?})", &power_level);
-                                return responder.send(Ok(&power_level)).context("response failed");
+                                return responder.send(&power_level).context("response failed");
                             }
                         }
-                        Err(anyhow::anyhow!("Not found."))
+                        Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
                     }
-                    StatusRequest::_UnknownMethod { .. } => todo!(),
+                    StatusRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown StatusRequest: {ordinal}");
+                        todo!()
+                    }
                 }
             })
             .await
@@ -124,7 +117,10 @@ impl BrokerSvc {
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }
-                    LessorRequest::_UnknownMethod { .. } => todo!(),
+                    LessorRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown LessorRequest: {ordinal}");
+                        todo!()
+                    }
                 }
             })
             .await
@@ -171,9 +167,48 @@ impl BrokerSvc {
                                 return responder.send(status).context("send failed");
                             }
                         }
-                        Err(anyhow::anyhow!("receiver closed unexpectedly"))
+                        Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
                     }
-                    LeaseControlRequest::_UnknownMethod { .. } => todo!(),
+                    LeaseControlRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown LeaseControlRequest: {ordinal}");
+                        todo!()
+                    }
+                }
+            })
+            .await
+    }
+
+    async fn run_element_control(
+        self: Rc<Self>,
+        element_id: ElementID,
+        stream: ElementControlRequestStream,
+    ) -> Result<(), Error> {
+        stream
+            .map(|result| result.context("failed request"))
+            .try_for_each(|request| async {
+                match request {
+                    ElementControlRequest::OpenStatusChannel { status_channel, .. } => {
+                        tracing::debug!("OpenStatus({:?})", &element_id);
+                        let Ok(stream) = status_channel.into_stream() else {
+                            return Err(anyhow::anyhow!("OpenStatus: into_stream failed"));
+                        };
+                        tracing::debug!("Spawning new status task for {:?}", &element_id);
+                        Task::local({
+                            let svc = self.clone();
+                            let element_id = element_id.clone();
+                            async move {
+                                if let Err(err) = svc.run_status(element_id, stream).await {
+                                    tracing::debug!("run_status err: {:?}", err);
+                                }
+                            }
+                        })
+                        .detach();
+                        Ok(())
+                    }
+                    ElementControlRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
+                        todo!()
+                    }
                 }
             })
             .await
@@ -197,12 +232,9 @@ impl BrokerSvc {
                             &element_id,
                             &last_required_level
                         );
-                        let watch_res = {
+                        let mut receiver = {
                             let mut broker = self.broker.lock().await;
                             broker.watch_required_level(&element_id)
-                        };
-                        let Ok(mut receiver) = watch_res else {
-                            return responder.send(Err(watch_res.unwrap_err())).context("send failed");
                         };
                         while let Some(next) = receiver.next().await {
                             tracing::debug!(
@@ -224,7 +256,7 @@ impl BrokerSvc {
                                 "WatchRequiredLevel: level has not changed, watching for next update...",
                             );
                         }
-                        Err(anyhow::anyhow!("receiver closed unexpectedly"))
+                        Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
                     }
                     LevelControlRequest::UpdateCurrentPowerLevel {
                         current_level,
@@ -247,7 +279,10 @@ impl BrokerSvc {
                             },
                         }
                     }
-                    LevelControlRequest::_UnknownMethod { .. } => todo!(),
+                    LevelControlRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown LevelControlRequest: {ordinal}");
+                        todo!()
+                    }
                 }
             })
             .await
@@ -282,24 +317,43 @@ impl BrokerSvc {
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
-                                let (client, stream) =
-                                    create_request_stream::<LevelControlMarker>()?;
+                                let (element_control_client, element_control_stream) =
+                                    create_request_stream::<ElementControlMarker>()?;
                                 tracing::debug!(
-                                    "Spawning level control task for {:?}",
+                                    "Spawning element control task for {:?}",
                                     &element_id
                                 );
                                 Task::local({
                                     let svc = self.clone();
+                                    let element_id = element_id.clone();
                                     async move {
-                                        if let Err(err) =
-                                            svc.run_level_control(element_id, stream).await
+                                        if let Err(err) = svc
+                                            .run_element_control(element_id, element_control_stream)
+                                            .await
+                                        {
+                                            tracing::debug!("run_element_control err: {:?}", err);
+                                        }
+                                    }
+                                })
+                                .detach();
+                                let (level_control_client, level_control_stream) =
+                                    create_request_stream::<LevelControlMarker>()?;
+                                Task::local({
+                                    let svc = self.clone();
+                                    let element_id = element_id.clone();
+                                    async move {
+                                        if let Err(err) = svc
+                                            .run_level_control(element_id, level_control_stream)
+                                            .await
                                         {
                                             tracing::debug!("run_level_control err: {:?}", err);
                                         }
                                     }
                                 })
                                 .detach();
-                                responder.send(Ok(client)).context("send failed")
+                                responder
+                                    .send(Ok((element_control_client, level_control_client)))
+                                    .context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
@@ -391,7 +445,10 @@ impl BrokerSvc {
                             responder.send(Ok(())).context("send failed")
                         }
                     }
-                    TopologyRequest::_UnknownMethod { .. } => todo!(),
+                    TopologyRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown TopologyRequest: {ordinal}");
+                        todo!()
+                    }
                 }
             })
             .await
@@ -414,7 +471,6 @@ async fn main() -> Result<(), anyhow::Error> {
     // service_fs.dir("svc").add_fidl_service(IncomingRequest::MyProtocol);
     // ```
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Lessor);
-    service_fs.dir("svc").add_fidl_service(IncomingRequest::Status);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);
 
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
@@ -428,9 +484,6 @@ async fn main() -> Result<(), anyhow::Error> {
             match request {
                 IncomingRequest::Lessor(stream) => {
                     svc.clone().run_lessor(stream).await.expect("run_lessor failed");
-                }
-                IncomingRequest::Status(stream) => {
-                    svc.run_status(stream).await.expect("run_status failed");
                 }
                 IncomingRequest::Topology(stream) => {
                     svc.clone().run_topology(stream).await.expect("run_topology failed");

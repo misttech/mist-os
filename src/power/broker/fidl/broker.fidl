@@ -107,36 +107,6 @@ open protocol LeaseControl {
     });
 };
 
-type PowerLevelError = flexible enum {
-    NOT_AUTHORIZED = 1;
-    NOT_FOUND = 2;
-};
-
-/// Offered by the Power Broker to components (including drivers).
-@discoverable
-open protocol Status {
-    /// Made by a component to get the current power level of an element.
-    flexible GetPowerLevel(resource struct {
-        /// Must supply a token to a previously registered Credential with
-        /// Permissions.READ_POWER_LEVEL.
-        token zx.Handle:EVENTPAIR;
-    }) -> (resource struct {
-        cur_level PowerLevel;
-    }) error PowerLevelError;
-
-    /// Made by a component to listen for changes to element power levels.
-    /// Request is made as a hanging GET which only returns if the new level
-    /// has changed from the previous cur_level.
-    flexible WatchPowerLevel(resource struct {
-        /// Must supply a token to a previously registered Credential with
-        /// Permissions.READ_POWER_LEVEL.
-        token zx.Handle:EVENTPAIR;
-        last_level PowerLevel;
-    }) -> (resource struct {
-        new_level PowerLevel;
-    }) error PowerLevelError;
-};
-
 type AddElementError = flexible enum {
     INTERNAL = 1;
     INVALID = 2;
@@ -211,6 +181,8 @@ open protocol Topology {
         /// You may not register credentials for other elements here.
         credentials_to_register vector<Credential>:128;
     }) -> (resource struct {
+        /// ElementControl channel for this element.
+        element_control_channel client_end:ElementControl;
         /// LevelControl channel for this element.
         level_control_channel client_end:LevelControl;
     }) error AddElementError;
@@ -260,6 +232,35 @@ open protocol Topology {
         /// Pair tokens of the credentials to unregister.
         tokens_to_unregister vector<zx.Handle:EVENTPAIR>:128;
     }) -> () error UnregisterCredentialsError;
+};
+
+/// Provides element-scoped access to a previously added element.
+/// Obtained via Topology.AddElement.
+open protocol ElementControl {
+    /// Register a new Status channel on which Power Broker will send
+    /// read-only updates of the element's current power level. This method
+    /// is intended to allow element owners to give read-only access to the
+    /// element's current power level to clients by opening and transferring
+    /// this channel.
+    OpenStatusChannel(resource struct {
+        status_channel server_end:Status;
+    });
+};
+
+/// This protocol can be used to get the current PowerLevel of an element or
+/// watch changes to an element's power level. A new channel to this protocol
+/// can be obtained by calling OpenStatus on the element's ElementControl
+/// channel.
+open protocol Status {
+    /// Listen for changes to the element's current power level.
+    /// If last_level is passed, it will block until the current level is
+    /// different than last_level. Otherwise, it will return immediately
+    /// with the current level.
+    flexible WatchPowerLevel(resource struct {
+        last_level PowerLevel:optional;
+    }) -> (resource struct {
+        current_level PowerLevel;
+    });
 };
 
 /// Element Permissions
