@@ -21,7 +21,7 @@ use {
     cm_types::Name,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Dict, Receiver},
-    std::{collections::HashMap, sync::Arc},
+    std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
 
@@ -83,9 +83,10 @@ pub fn build_component_sandbox(
                 cm_rust::CapabilityDecl::Protocol(_) => (),
                 _ => continue,
             }
-            program_output_dict
-                .get_or_insert_protocol_mut(capability.name())
-                .insert_receiver(Receiver::new());
+            program_output_dict.insert_capability(
+                iter::once(capability.name().as_str()),
+                Receiver::<Message>::new(),
+            );
         }
     }
 
@@ -192,13 +193,19 @@ fn extend_dict_with_use(
     };
     let router = match use_.source() {
         cm_rust::UseSource::Parent => {
-            let Some(cap_dict) = component_input_dict.get_protocol(source_name) else { return };
-            let Some(parent_router) = cap_dict.get_router() else { return };
+            let Some(parent_router) =
+                component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
+            else {
+                return;
+            };
             parent_router.clone()
         }
         cm_rust::UseSource::Self_ => {
-            let Some(cap_dict) = program_output_dict.get_protocol(source_name) else { return };
-            let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) else { return };
+            let Some(receiver) = program_output_dict
+                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+            else {
+                return;
+            };
             new_terminating_router(receiver.new_sender())
         }
         cm_rust::UseSource::Child(child_name) => {
@@ -245,7 +252,7 @@ fn extend_dict_with_use(
         }
         _ => return, // unsupported
     };
-    program_input_dict.insert_router(target_path.split(), router);
+    program_input_dict.insert_capability(target_path.iter_segments(), router);
 }
 
 fn extend_dict_with_offer(
@@ -264,32 +271,30 @@ fn extend_dict_with_offer(
     }
     let source_name = offer.source_name();
     let target_name = offer.target_name();
-    if let Some(cap_dict) = target_dict.get_protocol_mut(target_name) {
-        if cap_dict.get_router().is_some() {
-            warn!(
-                "duplicate sources for protocol {} in a dict, unable to populate dict entry",
-                target_name
-            );
-            cap_dict.remove_router();
-            return;
-        }
+    if target_dict.get_capability::<Router>(iter::once(target_name.as_str())).is_some() {
+        warn!(
+            "duplicate sources for protocol {} in a dict, unable to populate dict entry",
+            target_name
+        );
+        target_dict.remove_capability(iter::once(target_name.as_str()));
+        return;
     }
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
-            let Some(source_cap_dict) = component_input_dict.get_protocol(source_name) else {
-                return;
-            };
-            let Some(parent_router) = source_cap_dict.get_router() else { return };
-            parent_router.clone().availability(*offer.availability())
-        }
-        cm_rust::OfferSource::Self_ => {
-            let Some(receiver) = program_output_dict
-                .get_protocol(source_name)
-                .and_then(|c| c.get_receiver().map(|r| r.clone()))
+            let Some(parent_router) =
+                component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            new_router_for_receiver(receiver, *offer.availability())
+            parent_router.clone()
+        }
+        cm_rust::OfferSource::Self_ => {
+            let Some(receiver) = program_output_dict
+                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+            else {
+                return;
+            };
+            new_terminating_router(receiver.new_sender())
         }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -305,12 +310,10 @@ fn extend_dict_with_offer(
                     source_name.clone(),
                 ),
             )
-            .availability(*offer.availability())
         }
         cm_rust::OfferSource::Framework => {
             let source_name = source_name.clone();
             new_router_for_cm_hosted_receiver(
-                *offer.availability(),
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name.clone()),
@@ -321,7 +324,6 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Capability(_) => {
             let offer = offer.clone();
             new_router_for_cm_hosted_receiver(
-                *offer.availability(),
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Offer(offer.clone()),
@@ -331,7 +333,10 @@ fn extend_dict_with_offer(
         }
         _ => return, // unsupported
     };
-    target_dict.get_or_insert_protocol_mut(target_name).insert_router(router);
+    target_dict.insert_capability(
+        iter::once(target_name.as_str()),
+        router.availability(*offer.availability()),
+    );
 }
 
 fn extend_dict_with_expose(
@@ -356,14 +361,12 @@ fn extend_dict_with_expose(
 
     let router = match expose.source() {
         cm_rust::ExposeSource::Self_ => {
-            if let Some(receiver) = program_output_dict
-                .get_protocol(source_name)
-                .and_then(|c| c.get_receiver().map(|r| r.clone()))
-            {
-                new_router_for_receiver(receiver, *expose.availability())
-            } else {
+            let Some(receiver) = program_output_dict
+                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+            else {
                 return;
-            }
+            };
+            new_terminating_router(receiver.new_sender())
         }
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
@@ -379,7 +382,6 @@ fn extend_dict_with_expose(
                         source_name.clone(),
                     ),
                 )
-                .availability(*expose.availability())
             } else {
                 return;
             }
@@ -387,7 +389,6 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Framework => {
             let source_name = source_name.clone();
             new_router_for_cm_hosted_receiver(
-                *expose.availability(),
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name.clone()),
@@ -398,7 +399,6 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Capability(_) => {
             let expose = expose.clone();
             new_router_for_cm_hosted_receiver(
-                *expose.availability(),
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Expose(expose.clone()),
@@ -408,24 +408,19 @@ fn extend_dict_with_expose(
         }
         _ => return, // unsupported
     };
-    target_dict.get_or_insert_protocol_mut(target_name).insert_router(router);
+    target_dict.insert_capability(
+        iter::once(target_name.as_str()),
+        router.availability(*expose.availability()),
+    );
 }
 
 fn new_router_for_cm_hosted_receiver(
-    availability: cm_rust::Availability,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
     cap_source_factory: CapabilitySourceFactory,
 ) -> Router {
     let receiver = Receiver::new();
     sources_and_receivers.push((cap_source_factory, receiver.clone()));
-    new_router_for_receiver(receiver, availability)
-}
-
-fn new_router_for_receiver(
-    receiver: Receiver<Message>,
-    availability: cm_rust::Availability,
-) -> Router {
-    new_terminating_router(receiver.new_sender()).availability(availability)
+    new_terminating_router(receiver.new_sender())
 }
 
 fn new_forwarding_router_to_child(
@@ -457,11 +452,13 @@ async fn forward_request_to_child(
     let res: Result<(), ModelError> = async {
         let child = weak_child.upgrade()?;
         let child_state = child.lock_resolved_state().await?;
-        if let Some(cap_dict) = child_state.component_output_dict.get_protocol(&capability_name) {
-            if let Some(router) = cap_dict.get_router() {
-                router.route(request, completer.take().unwrap());
-                return Ok(());
-            }
+
+        if let Some(router) = child_state
+            .component_output_dict
+            .get_capability::<Router>(iter::once(capability_name.as_str()))
+        {
+            router.route(request, completer.take().unwrap());
+            return Ok(());
         }
         return Err(expose_not_found_error.clone().into());
     }

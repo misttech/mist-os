@@ -296,7 +296,9 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         let task = async move {
             if let UseDecl::Protocol(use_protocol_decl) = &use_ {
                 if let Some(router) = target.lock_resolved_state().await.ok().and_then(|state| {
-                    state.program_input_dict.get_router(use_protocol_decl.target_path.split())
+                    state
+                        .program_input_dict
+                        .get_capability(use_protocol_decl.target_path.iter_segments())
                 }) {
                     let result = ::routing::route(
                         &router,

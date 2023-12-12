@@ -106,7 +106,7 @@ use {
     futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
     sandbox::{Dict, Receiver},
-    std::sync::Arc,
+    std::{iter, sync::Arc},
     tracing::info,
 };
 
@@ -413,7 +413,7 @@ impl BuiltinDictBuilder {
         }
         let receiver = Receiver::new();
         let router = new_terminating_router(receiver.new_sender());
-        self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
+        self.dict.insert_capability(iter::once(P::PROTOCOL_NAME), router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
@@ -1228,7 +1228,7 @@ impl BuiltinEnvironment {
     {
         let receiver = Receiver::new();
         let router = new_terminating_router(receiver.new_sender());
-        self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
+        self.dict.insert_capability(iter::once(name.as_str()), router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),

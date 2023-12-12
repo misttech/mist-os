@@ -305,6 +305,10 @@ impl Path {
         self.0.split()
     }
 
+    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+        self.0.iter_segments()
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0.as_str()
     }
