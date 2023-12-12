@@ -40,3 +40,5 @@ per-file doc-checker.fx,mdlint.fx       = file: /tools/doc_checker/OWNERS
 per-file contrib/publish,contrib/publish.py,contrib/terminal.py,tests/subcommands/fx_publish_test.py=chandarren@google.com,aaronwood@google.com,etryzelaar@google.com
 
 per-file metrics,lib/metrics.sh,lib/metrics_custom_report.sh,tests/fx-internal/metrics_test = file: /src/lib/analytics/OWNERS
+
+per-file create-pb-zip = lijiaming@google.com,awolter@google.com

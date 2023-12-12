@@ -5,9 +5,10 @@
 
 #### CATEGORY=Other
 ### Create pb.zip based on product_bundles.json file. The created zip file will
-## be located in $(fx get-build-dir)/pb.zip
+## default to ${pwd}/pb.zip
 
-## usage: fx create-pb-zip
+## usage: fx create-pb-zip [-o <output>]
+##   -o     Output location of built zip file
 
 set -o errexit
 
@@ -15,6 +16,21 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 fx-config-read
 
 main() {
+    local output="$(pwd)"
+    while [[ $# -ge 1 ]]; do
+        case "$1" in
+        -o)
+            shift
+            output="$1"
+            ;;
+        esac
+        shift
+    done
+
+    if [[ -d $output ]]; then
+        output="${output}/pb.zip"
+    fi
+
     local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
 
     # Determine the name of main product
@@ -25,7 +41,7 @@ main() {
 
     local product_bundle_path=$(fx-command-run jq ".[] | select(.name==${product_name}) | .path" ${product_bundles_path})
 
-    fx-info "Start creating pb.zip..."
+    fx-info "Start creating ${output} ..."
     (
         cd "${FUCHSIA_BUILD_DIR}/${product_bundle_path//\"}/.."
         local tmpfile_path="${FUCHSIA_BUILD_DIR}/tmp-pb-zip-$$"
@@ -36,10 +52,12 @@ main() {
 
         zip pb.zip -@ < "$tmpfile_path"
         rm -rf "$tmpfile_path"
-        mv -f pb.zip "${FUCHSIA_BUILD_DIR}"
+        if [[ $output != "$(pwd)/pb.zip" ]]; then
+            mv -f pb.zip "${output}"
+        fi
     )
 
-    fx-info "Done! Output: ${FUCHSIA_BUILD_DIR}/pb.zip"
+    fx-info "Done! Output: ${output}"
 }
 
 main "$@"
