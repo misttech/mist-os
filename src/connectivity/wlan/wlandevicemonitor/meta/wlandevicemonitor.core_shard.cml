@@ -19,13 +19,6 @@
             subdir: "wlanphy",
         },
         {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-wlanif",
-            to: "#wlandevicemonitor",
-            subdir: "wlanif",
-        },
-        {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: "#wlandevicemonitor",
