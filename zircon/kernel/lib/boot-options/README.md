@@ -20,9 +20,8 @@ accessing `gBootOptions->my_option` is all that's required.
 In ['physboot`](../../phys) startup, each `ZBI_TYPE_CMDLINE` item is fed to
 `BootOptions::Set` to parse any recognized options and update the members.
 
-[**TODO(53594):**](https://fxbug.dev/53594) Currently only `physboot` makes use of
-these options.  Eventually, `physboot` will hand off the `BootOptions`
-structure to the kernel proper and that will be the only means of accessing
+`physboot` hands off the `BootOptions`
+structure to the kernel proper and that is the only means of accessing
 boot options inside the kernel.
 
 To support this hand-off between `physboot` and the kernel proper, all data
