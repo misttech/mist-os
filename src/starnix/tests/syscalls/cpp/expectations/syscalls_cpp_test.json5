@@ -22,6 +22,9 @@
 
                 // fxbug.dev/135691
                 "PtraceTest.SetSigInfo*",
+
+                // TODO(http://fxbug.dev/136515)
+                "PtraceTest.InterruptAfterListen",
             ],
         },
         {
