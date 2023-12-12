@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{AnyCapability, Dict, OneShotHandle, Receiver},
+    sandbox::{AnyCapability, Dict, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -98,7 +98,7 @@ impl FactoryCapabilityHost {
         sender_server: ServerEnd<fsandbox::SenderMarker>,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
     ) {
-        let receiver = Receiver::<OneShotHandle>::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
@@ -160,8 +160,9 @@ mod tests {
     use super::*;
     use {
         fidl::endpoints,
-        fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+        sandbox::OneShotHandle,
     };
 
     async fn get_handle_from_fidl_capability(capability: fsandbox::Capability) -> zx::Handle {
@@ -193,16 +194,16 @@ mod tests {
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
         factory_proxy.create_connector(sender_server_end, receiver_client_end).unwrap();
 
-        let event = zx::Event::create();
-        let expected_koid = event.get_koid().unwrap();
-        sender_proxy.send_(OneShotHandle::from(event.into_handle()).into()).unwrap();
+        let (ch1, _ch2) = zx::Channel::create();
+        let expected_koid = ch1.get_koid().unwrap();
+        sender_proxy.send_(ch1, fio::OpenFlags::empty()).unwrap();
 
         let request = receiver_stream.try_next().await.unwrap().unwrap();
-        let fsandbox::ReceiverRequest::Receive { capability, .. } = request else {
-            panic!("unexpected ReceiverRequest");
-        };
-        let handle = get_handle_from_fidl_capability(capability).await;
-        assert_eq!(handle.get_koid().unwrap(), expected_koid);
+        if let fsandbox::ReceiverRequest::Receive { channel, .. } = request {
+            assert_eq!(channel.get_koid().unwrap(), expected_koid);
+        } else {
+            panic!("unexpected request");
+        }
     }
 
     #[fuchsia::test]

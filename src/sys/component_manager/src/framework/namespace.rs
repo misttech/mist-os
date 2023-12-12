@@ -170,7 +170,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_component::client,
         futures::TryStreamExt,
-        sandbox::{Dict, OneShotHandle, Receiver},
+        sandbox::{Dict, Receiver},
     };
 
     async fn handle_echo_request_stream(response: &str, mut stream: fecho::EchoRequestStream) {
@@ -197,16 +197,17 @@ mod tests {
         let mut namespace_pairs = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<OneShotHandle>::new();
+            let receiver = Receiver::<()>::new();
             let sender = receiver.new_sender();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
                 loop {
-                    let one_shot = receiver.receive().await;
-                    let handle = one_shot.get_handle().unwrap();
+                    let msg = receiver.receive().await;
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(handle).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
+                            .into_stream()
+                            .unwrap();
                     handle_echo_request_stream(response, stream).await;
                 }
             }));
@@ -264,16 +265,17 @@ mod tests {
         let mut namespace_pairs = vec![];
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<OneShotHandle>::new();
+            let receiver = Receiver::<()>::new();
             let sender = receiver.new_sender();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
                 loop {
-                    let one_shot = receiver.receive().await;
-                    let handle = one_shot.get_handle().unwrap();
+                    let msg = receiver.receive().await;
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(handle).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
+                            .into_stream()
+                            .unwrap();
                     handle_echo_request_stream("hello", stream).await;
                 }
             }));

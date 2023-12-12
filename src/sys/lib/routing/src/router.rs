@@ -323,8 +323,7 @@ pub async fn route(router: &Router, request: Request) -> Result<AnyCapability> {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use sandbox::{Data, Receiver, Sender, OneShotHandle};
-    use fuchsia_zircon::HandleBased;
+    use sandbox::{Data, Message, Receiver, Sender};
 
     #[fuchsia::test]
     async fn availability_good() {
@@ -371,19 +370,32 @@ mod tests {
     async fn route_and_use_sender_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
-        let receiver: Receiver<OneShotHandle> = Receiver::new();
+        let receiver: Receiver<()> = Receiver::new();
         let sender = receiver.new_sender();
-        let router = Router::new(move |_request, completer| completer.complete(Ok(Box::new(sender.clone()))));
+        let router = Router::new(move |_request, completer| {
+            completer.complete(Ok(Box::new(sender.clone())))
+        });
 
-        let capability = route(&router, Request {
-            rights: None,
-            relative_path: Path::default(),
-            availability: Availability::Required,
-            target: AnyWeakComponentInstance::invalid_for_tests(),
-        }).await.unwrap();
-        let sender: Sender<OneShotHandle> = capability.try_into().unwrap();
-        
+        let capability = route(
+            &router,
+            Request {
+                rights: None,
+                relative_path: Path::default(),
+                availability: Availability::Required,
+                target: AnyWeakComponentInstance::invalid_for_tests(),
+            },
+        )
+        .await
+        .unwrap();
+        let sender: Sender<()> = capability.try_into().unwrap();
+
         drop(receiver);
-        assert!(sender.send(OneShotHandle::from(zx::Event::create().into_handle())).is_err());
+        let (ch1, _ch2) = zx::Channel::create();
+        assert!(sender
+            .send(Message {
+                payload: fsandbox::ProtocolPayload { channel: ch1, flags: fio::OpenFlags::empty() },
+                target: (),
+            })
+            .is_err());
     }
 }

@@ -9,7 +9,7 @@ use {
             component::{ComponentInstance, WeakComponentInstance},
             error::ModelError,
         },
-        sandbox_util::{new_terminating_router, DictExt, Message},
+        sandbox_util::{new_terminating_router, DictExt},
     },
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
@@ -49,7 +49,7 @@ pub struct ComponentSandbox {
     pub child_dicts: HashMap<Name, Dict>,
     /// Capability source factories and receivers for capabilities that are dispatched through the
     /// hook system.
-    pub sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    pub sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 }
 
 /// Once a component has been resolved and its manifest becomes known, this function produces the
@@ -85,7 +85,7 @@ pub fn build_component_sandbox(
             }
             program_output_dict.insert_capability(
                 iter::once(capability.name().as_str()),
-                Receiver::<Message>::new(),
+                Receiver::<WeakComponentInstance>::new(),
             );
         }
     }
@@ -156,7 +156,7 @@ pub fn extend_dict_with_offers(
     program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_dict: &mut Dict,
-) -> Vec<(CapabilitySourceFactory, Receiver<Message>)> {
+) -> Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)> {
     let mut sources_and_receivers = vec![];
     for offer in dynamic_offers {
         extend_dict_with_offer(
@@ -179,7 +179,7 @@ fn extend_dict_with_use(
     program_input_dict: &mut Dict,
     program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol capabilities right now
     match &use_ {
@@ -202,7 +202,9 @@ fn extend_dict_with_use(
         }
         cm_rust::UseSource::Self_ => {
             let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
+                    source_name.as_str(),
+                ))
             else {
                 return;
             };
@@ -262,7 +264,7 @@ fn extend_dict_with_offer(
     program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol capabilities right now
     match &offer {
@@ -290,7 +292,9 @@ fn extend_dict_with_offer(
         }
         cm_rust::OfferSource::Self_ => {
             let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
+                    source_name.as_str(),
+                ))
             else {
                 return;
             };
@@ -345,7 +349,7 @@ fn extend_dict_with_expose(
     program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &mut Dict,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol capabilities right now
     match &expose {
@@ -362,7 +366,9 @@ fn extend_dict_with_expose(
     let router = match expose.source() {
         cm_rust::ExposeSource::Self_ => {
             let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<Message>>(iter::once(source_name.as_str()))
+                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
+                    source_name.as_str(),
+                ))
             else {
                 return;
             };
@@ -415,7 +421,7 @@ fn extend_dict_with_expose(
 }
 
 fn new_router_for_cm_hosted_receiver(
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
     cap_source_factory: CapabilitySourceFactory,
 ) -> Router {
     let receiver = Receiver::new();

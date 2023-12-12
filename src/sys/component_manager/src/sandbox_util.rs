@@ -17,14 +17,14 @@ use {
         AsyncChannel,
     },
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon::{self as zx},
     futures::{
         future::BoxFuture,
         stream::{FuturesUnordered, StreamExt},
     },
     lazy_static::lazy_static,
     moniker::Moniker,
-    sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Open, Receiver, Sender},
+    sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
     std::sync::Arc,
     tracing::{info, warn},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
@@ -36,53 +36,12 @@ lazy_static! {
     static ref SENDER: Name = "sender".parse().unwrap();
 }
 
-#[derive(Debug)]
-pub struct Message {
-    pub handle: zx::Handle,
-    pub flags: fio::OpenFlags,
-    pub target: WeakComponentInstance,
-}
-
-impl Capability for Message {}
-
-impl Message {
-    pub fn take_handle_as_stream<P: ProtocolMarker>(self) -> P::RequestStream {
-        let channel = AsyncChannel::from_channel(zx::Channel::from(self.handle))
-            .expect("failed to convert handle into async channel");
-        P::RequestStream::from_channel(channel)
-    }
-}
-
-impl Clone for Message {
-    fn clone(&self) -> Self {
-        panic!("TODO: unimplemented");
-    }
-}
-
-impl From<zx::Handle> for Message {
-    fn from(handle: zx::Handle) -> Self {
-        Self {
-            handle,
-            // TODO
-            flags: fio::OpenFlags::empty(),
-            // TODO
-            target: WeakComponentInstance::invalid(),
-        }
-    }
-}
-
-impl Into<fsandbox::Capability> for Message {
-    fn into(self) -> fsandbox::Capability {
-        unimplemented!()
-    }
-}
-
-impl TryFrom<AnyCapability> for Message {
-    type Error = ();
-
-    fn try_from(_from: AnyCapability) -> Result<Self, Self::Error> {
-        panic!("TODO: unimplemented");
-    }
+pub fn take_handle_as_stream<P: ProtocolMarker>(
+    msg: Message<WeakComponentInstance>,
+) -> P::RequestStream {
+    let channel = AsyncChannel::from_channel(msg.payload.channel)
+        .expect("failed to convert handle into async channel");
+    P::RequestStream::from_channel(channel)
 }
 
 // TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
@@ -112,7 +71,7 @@ pub trait DictExt {
     /// Reads a message from any of the receivers in the top-level dictionary, and returns the name
     /// of the receiver that was read from along with the message. Returns `None` if there are no
     /// receivers in this dictionary.
-    async fn read_receivers(&self) -> Option<(Name, Message)>;
+    async fn read_receivers(&self) -> Option<(Name, Message<WeakComponentInstance>)>;
 }
 
 #[async_trait]
@@ -226,7 +185,9 @@ impl DictExt for Dict {
         {
             let entries = self.lock_entries();
             for (cap_name, cap) in entries.iter() {
-                if let Ok(receiver) = TryInto::<Receiver<Message>>::try_into(cap.clone()) {
+                if let Ok(receiver) =
+                    TryInto::<Receiver<WeakComponentInstance>>::try_into(cap.clone())
+                {
                     let cap_name = cap_name.clone();
                     futures_unordered.push(async move {
                         // It would be great if we could return the value from the `peek` call here,
@@ -253,7 +214,7 @@ impl DictExt for Dict {
     ///
     /// Once a message is received, returns the name of the Dict that the Receiver was in and the
     /// message that was received. Returns `None` if there are no Receivers in this Dict.
-    async fn read_receivers(&self) -> Option<(Name, Message)> {
+    async fn read_receivers(&self) -> Option<(Name, Message<WeakComponentInstance>)> {
         let mut futures_unordered = FuturesUnordered::new();
         // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
         {
@@ -285,7 +246,7 @@ impl DictExt for Dict {
 // capability request to two-steps (route and open). At the end of the transition,
 // `Sender<Message>` and `Receiver<Message>` would disappear. We'll only be left
 // with `Open`, which may represent a protocol capability.
-pub fn new_terminating_router(sender: Sender<Message>) -> Router {
+pub fn new_terminating_router(sender: Sender<WeakComponentInstance>) -> Router {
     Router::new(move |request: Request, completer: Completer| {
         let sender = sender.clone();
         let target = request.target.unwrap();
@@ -312,8 +273,7 @@ pub fn new_terminating_router(sender: Sender<Message>) -> Router {
                 return;
             }
             if let Err(_e) = sender.send(Message {
-                handle: server_end.into_handle(),
-                flags,
+                payload: fsandbox::ProtocolPayload { channel: server_end.into(), flags },
                 target: target.clone(),
             }) {
                 info!("failed to send capability: receiver has been destroyed");
@@ -350,9 +310,12 @@ impl DictWaiter {
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
-    receiver: Receiver<Message>,
+    receiver: Receiver<WeakComponentInstance>,
     task_to_launch: Arc<
-        dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>> + Sync + Send + 'static,
+        dyn Fn(Message<WeakComponentInstance>) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            + Sync
+            + Send
+            + 'static,
     >,
     // Note that we explicitly need a `WeakTaskGroup` because if our `run` call is scheduled on the
     // same task group as we'll be launching tasks on then if we held a strong reference we would
@@ -366,10 +329,10 @@ impl LaunchTaskOnReceive {
     pub fn new(
         task_group: WeakTaskGroup,
         task_name: impl Into<String>,
-        receiver: Receiver<Message>,
+        receiver: Receiver<WeakComponentInstance>,
         policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
         task_to_launch: Arc<
-            dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            dyn Fn(Message<WeakComponentInstance>) -> BoxFuture<'static, Result<(), anyhow::Error>>
                 + Sync
                 + Send
                 + 'static,
@@ -387,26 +350,28 @@ impl LaunchTaskOnReceive {
                 {
                     // The `can_route_capability` function above will log an error, so we don't
                     // have to.
-                    let _ = zx::Channel::from(message.handle)
-                        .close_with_epitaph(zx::Status::ACCESS_DENIED);
+                    let _ = message.payload.channel.close_with_epitaph(zx::Status::ACCESS_DENIED);
                     continue;
                 }
             }
+
             // The open must be wrapped in a [vfs] to correctly implement the full
             // contract of `fuchsia.io`, including OPEN_FLAGS_DESCRIBE, etc.
             //
             // The path is checked in the [`Open`] returned within [`new_terminating_router`],
             // and the request is dropped in case of non-empty paths.
-            let flags = message.flags;
+            let flags = message.payload.flags;
             let target = message.target;
-            let server_end = zx::Channel::from(message.handle).into();
+            let server_end = message.payload.channel.into();
             let task_to_launch = self.task_to_launch.clone();
             let task_group = self.task_group.clone();
             let task_name = self.task_name.clone();
             let service = vfs::service::endpoint(
                 move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
-                    let handle = server_end.into_zx_channel().into_handle();
-                    let message = Message { handle, flags, target: target.clone() };
+                    let message = Message {
+                        payload: fsandbox::ProtocolPayload { channel: server_end.into(), flags },
+                        target: target.clone(),
+                    };
                     let fut = (task_to_launch)(message);
                     let task_name = task_name.clone();
                     task_group.spawn(async move {
@@ -429,7 +394,7 @@ pub mod tests {
     async fn get_capability() {
         let sub_dict = Dict::new();
         sub_dict.lock_entries().insert("bar".to_string(), Box::new(Dict::new()));
-        let receiver: Receiver<Message> = Receiver::new();
+        let receiver: Receiver<()> = Receiver::new();
         sub_dict.lock_entries().insert("baz".to_string(), Box::new(receiver));
 
         let test_dict = Dict::new();
@@ -442,9 +407,7 @@ pub mod tests {
         assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
         assert!(test_dict.get_capability::<Dict>(["foo", "nonexistent"].into_iter()).is_none());
         assert!(test_dict.get_capability::<Dict>(["foo", "baz"].into_iter()).is_none());
-        assert!(test_dict
-            .get_capability::<Receiver<Message>>(["foo", "baz"].into_iter())
-            .is_some());
+        assert!(test_dict.get_capability::<Receiver<()>>(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]
@@ -453,11 +416,9 @@ pub mod tests {
         test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new());
         assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
 
-        let receiver: Receiver<Message> = Receiver::new();
+        let receiver: Receiver<()> = Receiver::new();
         test_dict.insert_capability(["foo", "baz"].into_iter(), receiver);
-        assert!(test_dict
-            .get_capability::<Receiver<Message>>(["foo", "baz"].into_iter())
-            .is_some());
+        assert!(test_dict.get_capability::<Receiver<()>>(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]

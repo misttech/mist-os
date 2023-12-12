@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 use anyhow::{anyhow, Context};
 use core::fmt;
-use fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd};
+use fidl::{
+    endpoints::{create_endpoints, ClientEnd, ServerEnd},
+    epitaph::ChannelEpitaphExt,
+};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
-use fuchsia_zircon::HandleBased;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt, TryStreamExt};
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::sync::{Arc, OnceLock};
-use vfs::{
-    common::send_on_open_with_error, directory::entry::DirectoryEntry,
-    execution_scope::ExecutionScope, service,
-};
+use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
 
 use crate::{registry, AnyCast, Capability, ConversionError, Directory, OneShotHandle, Sender};
 
@@ -220,18 +220,18 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Open {
     }
 }
 
-impl<M: Capability + From<zx::Handle>> From<Sender<M>> for Open {
-    fn from(value: Sender<M>) -> Open {
-        let connect_fn = move |_scope: ExecutionScope, channel: fasync::Channel| {
-            let _ = value.send_handle(channel.into_zx_channel().into_handle());
-        };
-        let service = service::endpoint(connect_fn);
-
-        let open_fn = move |scope: ExecutionScope,
+impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for Open {
+    fn from(value: Sender<T>) -> Open {
+        let open_fn = move |_scope: ExecutionScope,
                             flags: fio::OpenFlags,
                             path: vfs::path::Path,
                             server_end: zx::Channel| {
-            service.clone().open(scope, flags, path, server_end.into());
+            if !path.is_empty() {
+                // Only an empty path is valid.
+                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
+                return;
+            }
+            let _ = value.send_channel(server_end.into(), flags);
         };
         Open::new(open_fn, fio::DirentType::Service)
     }
@@ -661,17 +661,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_sender_into_open() {
-        let receiver = Receiver::<OneShotHandle>::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
-        let one_shot = receiver.receive().await;
-        let server_end = one_shot.get_handle().unwrap();
+        let msg = receiver.receive().await;
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
-            server_end.basic_info().unwrap().koid
+            msg.payload.channel.basic_info().unwrap().koid
         );
     }
 
@@ -679,7 +678,7 @@ mod tests {
     fn test_sender_into_open_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let receiver = Receiver::<OneShotHandle>::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
@@ -702,7 +701,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_sender_into_open_via_dict() {
         let dict = Dict::new();
-        let receiver = Receiver::<OneShotHandle>::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
@@ -711,11 +710,10 @@ mod tests {
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
-        let one_shot = receiver.receive().await;
-        let server_end = one_shot.get_handle().unwrap();
+        let msg = receiver.receive().await;
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
-            server_end.basic_info().unwrap().koid
+            msg.payload.channel.basic_info().unwrap().koid
         );
     }
 
@@ -724,7 +722,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let dict = Dict::new();
-        let receiver = Receiver::<OneShotHandle>::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 

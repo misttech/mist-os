@@ -35,5 +35,5 @@ pub use self::opaque::Opaque;
 pub use self::open::{Open, Path};
 pub use self::optional::Optional;
 pub use self::receiver::Receiver;
-pub use self::sender::Sender;
+pub use self::sender::{Message, Sender};
 pub use self::unit::Unit;

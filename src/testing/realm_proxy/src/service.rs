@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context, Error, Result},
+    anyhow::{Context, Error, Result},
     fidl::endpoints,
-    fidl::endpoints::ControlHandle,
     fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream},
     fuchsia_async as fasync,
     fuchsia_component_test::RealmInstance,
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx},
     futures::{Future, StreamExt, TryStreamExt},
+    std::sync::Mutex,
     tracing::{error, info},
+    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -159,7 +160,18 @@ where
     Fut: Future<Output = ()> + Send,
     F: Fn(T::RequestStream) -> Fut + Send + Sync + Copy + 'static,
 {
-    let mut receive_tasks = fasync::TaskGroup::new();
+    let task_group = Mutex::new(fasync::TaskGroup::new());
+    // Alternatively, we could handle the flags directly. That would avoid linking
+    // in vfs
+    let service =
+        vfs::service::endpoint(move |_scope: ExecutionScope, channel: fuchsia_async::Channel| {
+            let mut task_group = task_group.lock().unwrap();
+            task_group.spawn(async move {
+                let server_end = endpoints::ServerEnd::<T>::new(channel.into());
+                let stream: T::RequestStream = server_end.into_stream().unwrap();
+                request_stream_handler(stream).await;
+            });
+        });
     while let Some(request) =
         receiver_stream.try_next().await.context("failed to read request from stream")?
     {
@@ -167,34 +179,13 @@ where
             fsandbox::ReceiverRequest::Clone2 { .. } => {
                 unimplemented!()
             }
-            fsandbox::ReceiverRequest::Receive { capability, control_handle } => {
-                let fsandbox::Capability::Handle(handle_cap_client_end) = capability else {
-                    control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
-                    return Err(anyhow!("capability is not a HandleCapability"));
-                };
-                let handle_cap_proxy = handle_cap_client_end.into_proxy().unwrap();
-                receive_tasks.spawn(async move {
-                    // This assumes the HandleCapability vends only a single handle, so it does
-                    // not call GetHandle in a loop, as that would return Unavailable after
-                    // the first handle.
-                    let result = match handle_cap_proxy.get_handle().await {
-                        Ok(result) => result,
-                        Err(err) => {
-                            error!("failed to call GetHandle: {:?}", err);
-                            return;
-                        }
-                    };
-                    let handle = match result {
-                        Ok(handle) => handle,
-                        Err(err) => {
-                            error!("failed to get handle: {:?}", err);
-                            return;
-                        }
-                    };
-                    let server_end = endpoints::ServerEnd::<T>::new(fidl::Channel::from(handle));
-                    let stream: T::RequestStream = server_end.into_stream().unwrap();
-                    request_stream_handler(stream).await;
-                });
+            fsandbox::ReceiverRequest::Receive { channel, flags, control_handle: _ } => {
+                service.clone().open(
+                    ExecutionScope::new(),
+                    flags,
+                    vfs::path::Path::dot(),
+                    channel.into(),
+                );
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
                 unimplemented!()

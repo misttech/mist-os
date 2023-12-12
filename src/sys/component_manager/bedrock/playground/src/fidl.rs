@@ -21,7 +21,7 @@ mod test {
         channel::mpsc::{unbounded, UnboundedSender},
         prelude::*,
     };
-    use sandbox::{AnyCapability, Dict, OneShotHandle, Receiver};
+    use sandbox::{AnyCapability, Dict, Receiver};
     use serve_processargs::NamespaceBuilder;
 
     fn ignore_not_found() -> UnboundedSender<String> {
@@ -76,16 +76,17 @@ mod test {
         let response = "first";
 
         // Initialize the host and sender/receiver pair.
-        let receiver: Receiver<OneShotHandle> = Receiver::new();
+        let receiver = Receiver::<()>::new();
         let sender = receiver.new_sender();
 
         // Serve an Echo request handler on the Receiver.
         fasync::Task::spawn(async move {
             loop {
-                let one_shot = receiver.receive().await;
-                let handle = one_shot.get_handle().unwrap();
+                let msg = receiver.receive().await;
                 let stream: fecho::EchoRequestStream =
-                    ServerEnd::<fecho::EchoMarker>::from(handle).into_stream().unwrap();
+                    ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
+                        .into_stream()
+                        .unwrap();
                 handle_echo_request_stream(response, stream).await;
             }
         })

@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::{registry, AnyCast, Capability, Message, Sender};
 use derivative::Derivative;
 use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -12,17 +13,16 @@ use futures::{
     lock::{MappedMutexGuard, Mutex, MutexGuard},
     StreamExt,
 };
+use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
-
-use crate::{registry, AnyCast, Capability, Sender};
 
 /// A capability that transfers another capability to a [Sender].
 #[derive(Capability, Derivative)]
 #[derivative(Debug)]
-pub struct Receiver<T: Capability + From<zx::Handle>> {
+pub struct Receiver<T: Default + Debug + Send + Sync + 'static> {
     inner: Arc<Mutex<PeekableReceiver<T>>>,
-    sender: mpsc::UnboundedSender<T>,
+    sender: mpsc::UnboundedSender<Message<T>>,
 
     /// The FIDL representation of this `Receiver`.
     ///
@@ -31,17 +31,17 @@ pub struct Receiver<T: Capability + From<zx::Handle>> {
     server_end: Option<ServerEnd<fsandbox::ReceiverMarker>>,
 }
 
-impl<T: Capability + From<zx::Handle>> Clone for Receiver<T> {
+impl<T: Default + Debug + Send + Sync + 'static> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone(), sender: self.sender.clone(), server_end: None }
     }
 }
 
-impl<T: Capability + From<zx::Handle>> Receiver<T> {
+impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::unbounded();
         Self {
-            inner: Arc::new(Mutex::new(PeekableReceiver::new(receiver))),
+            inner: Arc::new(Mutex::new(PeekableReceiver::<T>::new(receiver))),
             sender,
             server_end: None,
         }
@@ -51,12 +51,12 @@ impl<T: Capability + From<zx::Handle>> Receiver<T> {
         Sender::new(self.sender.clone())
     }
 
-    pub async fn receive(&self) -> T {
+    pub async fn receive(&self) -> Message<T> {
         let mut receiver_guard = self.inner.lock().await;
         receiver_guard.read().await
     }
 
-    pub async fn peek<'a>(&'a self) -> MappedMutexGuard<'a, PeekableReceiver<T>, T> {
+    pub async fn peek<'a>(&'a self) -> MappedMutexGuard<'a, PeekableReceiver<T>, Message<T>> {
         let mut receiver_guard = self.inner.lock().await;
         receiver_guard.load_peek_value().await;
         MutexGuard::map(receiver_guard, |receiver: &mut PeekableReceiver<T>| {
@@ -68,10 +68,10 @@ impl<T: Capability + From<zx::Handle>> Receiver<T> {
         let mut on_closed = receiver_proxy.on_closed();
         loop {
             match future::select(pin!(self.receive()), on_closed).await {
-                Either::Left((capability, fut)) => {
+                Either::Left((msg, fut)) => {
                     on_closed = fut;
-                    let capability = capability.into_fidl();
-                    if let Err(_) = receiver_proxy.receive(capability) {
+                    let p = msg.payload;
+                    if let Err(_) = receiver_proxy.receive(p.channel, p.flags) {
                         return;
                     }
                 }
@@ -104,9 +104,11 @@ impl<T: Capability + From<zx::Handle>> Receiver<T> {
     }
 }
 
-impl<T: Capability + From<zx::Handle>> Capability for Receiver<T> {}
+impl<T: Default + Debug + Send + Sync + 'static> Capability for Receiver<T> {}
 
-impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for ServerEnd<fsandbox::ReceiverMarker> {
+impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>>
+    for ServerEnd<fsandbox::ReceiverMarker>
+{
     fn from(mut receiver: Receiver<T>) -> Self {
         receiver.server_end.take().unwrap_or_else(|| {
             let (receiver_proxy, server_end) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
@@ -116,7 +118,7 @@ impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for ServerEnd<fsandbox:
     }
 }
 
-impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for fsandbox::Capability {
+impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>> for fsandbox::Capability {
     fn from(receiver: Receiver<T>) -> Self {
         fsandbox::Capability::Receiver(receiver.into())
     }
@@ -125,18 +127,18 @@ impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for fsandbox::Capabilit
 /// This provides very similar functionality to `futures::stream::Peekable`, but allows a reference
 /// to a peeked value to be acquired outside of an async block, which is necessary to provide a
 /// `MappedMutexGuard` of the peeked value.
-pub struct PeekableReceiver<T: Capability + From<zx::Handle>> {
-    receiver: mpsc::UnboundedReceiver<T>,
-    peeked_value: Option<T>,
+pub struct PeekableReceiver<T: Default + Debug + Send + Sync + 'static> {
+    receiver: mpsc::UnboundedReceiver<Message<T>>,
+    peeked_value: Option<Message<T>>,
 }
 
-impl<T: Capability + From<zx::Handle>> PeekableReceiver<T> {
-    fn new(receiver: mpsc::UnboundedReceiver<T>) -> Self {
+impl<T: Default + Debug + Send + Sync + 'static> PeekableReceiver<T> {
+    fn new(receiver: mpsc::UnboundedReceiver<Message<T>>) -> Self {
         Self { receiver, peeked_value: None }
     }
 
     /// Returns the peeked value, if any.
-    fn peek_value_mut(&mut self) -> Option<&mut T> {
+    fn peek_value_mut(&mut self) -> Option<&mut Message<T>> {
         self.peeked_value.as_mut()
     }
 
@@ -151,7 +153,7 @@ impl<T: Capability + From<zx::Handle>> PeekableReceiver<T> {
     }
 
     /// Reads a new value from the receiver, and returns the value.
-    async fn read(&mut self) -> T {
+    async fn read(&mut self) -> Message<T> {
         if let Some(value) = self.peeked_value.take() {
             value
         } else {

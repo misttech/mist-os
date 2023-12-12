@@ -15,7 +15,6 @@ const MAX_DICT_ITEMS_CHUNK uint32 = 128;
 
 closed protocol HandleCapability {
     compose fuchsia.unknown.Cloneable;
-
     strict GetHandle() -> (resource struct {
         handle zx.Handle;
     }) error @generated_name("HandleCapabilityError") strict enum {
@@ -146,13 +145,10 @@ open protocol DictIterator {
 
 @discoverable
 open protocol Sender {
-    compose fuchsia.io.Openable;
     compose fuchsia.unknown.Cloneable;
 
     /// Sends a Capability over this sender.
-    strict Send(resource struct {
-        capability Capability;
-    });
+    strict Send(ProtocolPayload);
 };
 
 @discoverable
@@ -160,9 +156,14 @@ open protocol Receiver {
     compose fuchsia.unknown.Cloneable;
 
     /// Receives a Capability.
-    strict Receive(resource struct {
-        capability Capability;
-    });
+    strict Receive(ProtocolPayload);
+};
+
+/// Contains a protocol open request.
+type ProtocolPayload = resource struct {
+    channel zx.Handle:CHANNEL;
+    // TODO(fxbug.dev/313998675): Decide whether to replace this with a more specific type
+    flags fuchsia.io.OpenFlags;
 };
 
 /// Entrypoint for instantiation of sandbox types.

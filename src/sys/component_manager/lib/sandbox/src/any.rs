@@ -1,18 +1,17 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::{
+    registry, Capability, ConversionError, Data, Dict, Directory, Optional, Receiver, RemoteError,
+    Sender, Unit,
+};
+use crate_local::ObjectSafeCapability;
 use dyn_clone::{clone_trait_object, DynClone};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon::{AsHandleRef, HandleRef};
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::ops::DerefMut;
-
-use crate::{
-    registry, Capability, ConversionError, Data, Dict, Directory, OneShotHandle, Optional,
-    Receiver, RemoteError, Sender, Unit,
-};
-use crate_local::ObjectSafeCapability;
 
 /// An object-safe version of [Capability] that represents a type-erased capability.
 ///
@@ -121,10 +120,10 @@ impl TryFrom<fsandbox::Capability> for AnyCapability {
                 // Cache the client end so it can be reused in future conversions to FIDL.
                 {
                     // FIXME: We need a concrete Sender type here but don't know the generic
-                    // type, so assume OneShotHandle. This should be fixed by making Sender
+                    // type, so use (). This should be fixed by making Sender
                     // non-generic.
-                    let sender: &mut Sender<OneShotHandle> = any.deref_mut().try_into().expect(
-                        "BUG: registry has a non-Sender<OneShotHandle> capability under a Sender koid",
+                    let sender: &mut Sender<()> = any.deref_mut().try_into().expect(
+                        "BUG: registry has a non-Sender<()> capability under a Sender koid",
                     );
                     sender.set_client_end(client_end);
                 }
@@ -135,10 +134,10 @@ impl TryFrom<fsandbox::Capability> for AnyCapability {
                 // Cache the client end so it can be reused in future conversions to FIDL.
                 {
                     // FIXME: We need a concrete Receiver type here but don't know the generic
-                    // type, so assume OneShotHandle. This should be fixed by making Receiver
+                    // type, so use (). This should be fixed by making Receiver
                     // non-generic.
-                    let receiver: &mut Receiver<OneShotHandle> = any.deref_mut().try_into().expect(
-                        "BUG: registry has a non-Receiver<OneShotHandle> capability under a Receiver koid",
+                    let receiver: &mut Receiver<()> = any.deref_mut().try_into().expect(
+                        "BUG: registry has a non-Receiver<()> capability under a Receiver koid",
                     );
                     receiver.set_server_end(server_end);
                 }

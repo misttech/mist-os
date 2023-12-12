@@ -24,7 +24,8 @@ use vfs::execution_scope::ExecutionScope;
 use zx::{AsHandleRef, HandleBased, Task};
 
 use crate::{
-    bedrock::program, builtin::runner::BuiltinRunnerFactory, sandbox_util::LaunchTaskOnReceive,
+    bedrock::program, builtin::runner::BuiltinRunnerFactory, sandbox_util,
+    sandbox_util::LaunchTaskOnReceive,
 };
 
 const TYPE: &str = "type";
@@ -237,9 +238,9 @@ impl ElfRunnerProgram {
             Arc::new(move |message| {
                 inner
                     .clone()
-                    .serve_component_runner(
-                        message.take_handle_as_stream::<fcrunner::ComponentRunnerMarker>(),
-                    )
+                    .serve_component_runner(sandbox_util::take_handle_as_stream::<
+                        fcrunner::ComponentRunnerMarker,
+                    >(message))
                     .boxed()
             }),
         );
@@ -252,7 +253,7 @@ impl ElfRunnerProgram {
             None,
             Arc::new(move |message| {
                 inner.clone().elf_runner.serve_memory_reporter(
-                    message.take_handle_as_stream::<freport::SnapshotProviderMarker>(),
+                    sandbox_util::take_handle_as_stream::<freport::SnapshotProviderMarker>(message),
                 );
                 std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),

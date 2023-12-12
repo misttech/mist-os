@@ -30,7 +30,7 @@ use {
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
     },
-    crate::sandbox_util::{DictExt, DictWaiter, LaunchTaskOnReceive, Message},
+    crate::sandbox_util::{DictExt, DictWaiter, LaunchTaskOnReceive},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -69,7 +69,7 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+    fuchsia_zircon::{self as zx},
     futures::{
         future::{join_all, BoxFuture, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
@@ -1433,7 +1433,7 @@ impl ResolvedInstanceState {
     fn dispatch_receivers_to_providers(
         &self,
         component: &Arc<ComponentInstance>,
-        sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+        sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
     ) {
         for (cap_source_factory, receiver) in sources_and_receivers {
             let weak_component = WeakComponentInstance::new(component);
@@ -1448,12 +1448,7 @@ impl ResolvedInstanceState {
                         let weak_component = weak_component.clone();
                         let capability_source = capability_source.clone();
                         async move {
-                            if message.handle.basic_info().unwrap().object_type
-                                != zx::ObjectType::CHANNEL
-                            {
-                                return Ok(());
-                            }
-                            let mut chan = Channel::from_handle(message.handle);
+                            let mut channel: Channel = message.payload.channel.into();
                             if let Ok(target) = message.target.upgrade() {
                                 if let Ok(component) = weak_component.upgrade() {
                                     if let Some(provider) = target
@@ -1467,16 +1462,16 @@ impl ResolvedInstanceState {
                                         provider
                                             .open(
                                                 component.nonblocking_task_group(),
-                                                message.flags,
+                                                message.payload.flags,
                                                 PathBuf::from(""),
-                                                &mut chan,
+                                                &mut channel,
                                             )
                                             .await?;
                                         return Ok(());
                                     }
                                 }
 
-                                let _ = chan.close_with_epitaph(zx::Status::UNAVAILABLE);
+                                let _ = channel.close_with_epitaph(zx::Status::UNAVAILABLE);
                             }
                             Ok(())
                         }
@@ -2095,17 +2090,17 @@ impl DictDispatcher {
                     ) {
                         // The `can_route_capability` function above will log an error, so we don't
                         // have to.
-                        let _ = zx::Channel::from(message.handle)
-                            .close_with_epitaph(zx::Status::ACCESS_DENIED);
+                        let _ =
+                            message.payload.channel.close_with_epitaph(zx::Status::ACCESS_DENIED);
                         continue;
                     }
                     // Check if the hooks system wants to claim the handle.
                     if let Some(channel) = Self::dispatch_capability_routed_hook(
                         &component,
                         name.to_string(),
-                        message.handle,
+                        message.payload.channel,
                         message.target,
-                        message.flags,
+                        message.payload.flags,
                         "".into(),
                     )
                     .await
@@ -2121,8 +2116,12 @@ impl DictDispatcher {
                         // There's not much we can do if the open fails. The component's probably
                         // crashed, and the stop action should be initiated momentarily or already
                         // have started.
-                        let _ =
-                            directory.open(message.flags, fio::ModeType::empty(), path, server_end);
+                        let _ = directory.open(
+                            message.payload.flags,
+                            fio::ModeType::empty(),
+                            path,
+                            server_end,
+                        );
                     }
                 }
             }),
@@ -2154,12 +2153,12 @@ impl DictDispatcher {
     async fn dispatch_capability_routed_hook(
         source_component: &WeakComponentInstance,
         name: String,
-        handle: zx::Handle,
+        channel: zx::Channel,
         target_component: WeakComponentInstance,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
     ) -> Option<zx::Channel> {
-        let capability = Arc::new(Mutex::new(Some(Channel::from(handle))));
+        let capability = Arc::new(Mutex::new(Some(channel)));
         let source_component = match source_component.upgrade() {
             Ok(component) => component,
             Err(_) => {
