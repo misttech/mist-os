@@ -46,12 +46,12 @@ class OpenAccount : public fuchsia::examples::services::ReadWriteAccount {
     } else {
       callback(false);
     }
-    FX_SLOG(INFO, "Account balance updated: ", KV("balance", account_.balance));
+    FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
   void Credit(int64_t amount, CreditCallback callback) override {
     account_.balance += amount;
     callback();
-    FX_SLOG(INFO, "Account balance updated: ", KV("balance", account_.balance));
+    FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
 
  private:
@@ -70,8 +70,8 @@ int main(int argc, const char* argv[], char* envp[]) {
   auto name = argv[1];
   auto balance = atoi(argv[2]);
   Account user_account = {.name = name, .balance = balance};
-  FX_SLOG(INFO, "Starting bank account provider", KV("name", user_account.name.c_str()),
-          KV("balance", user_account.balance));
+  FX_SLOG(INFO, "Starting bank account provider", FX_KV("name", user_account.name.c_str()),
+          FX_KV("balance", user_account.balance));
 
   // Set up handler for BankAccount service
   sys::ServiceHandler handler;

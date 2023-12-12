@@ -34,7 +34,7 @@ int main(int argc, const char* argv[], char* envp[]) {
     if (!response.has_value()) {
       FX_SLOG(INFO, "echo_string got empty result");
     } else {
-      FX_SLOG(INFO, "Server response", KV("response", response->c_str()));
+      FX_SLOG(INFO, "Server response", FX_KV("response", response->c_str()));
     }
   }
 
