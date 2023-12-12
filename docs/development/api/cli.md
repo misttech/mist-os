@@ -237,8 +237,8 @@ authoritative on which platforms are supported.
 
 We currently support
 
-- Linux
-- macOS
+- Debian-based Linux distributions (other Linux distributions may work but are not officially supported)
+- macOS (on x86, M1 is currently not officially supported)
 
 Tools written for developers must run on those platforms. There are other
 platforms to consider, and while these are not required at this time, it's good
