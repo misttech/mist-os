@@ -1,8 +1,7 @@
 # Debug the kernel using QEMU
 
-Zircon can [run under emulation](/docs/development/debugging/qemu.md)
-using QEMU. QEMU can either be installed via prebuilt binaries, or built
-locally.
+Zircon can run under emulation using QEMU. QEMU can either be installed via
+prebuilt binaries, or built locally.
 
 ## Prebuilt QEMU
 
