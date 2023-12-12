@@ -827,10 +827,10 @@ impl CurrentTask {
                 return;
             }
 
-            let futex_ref = UserRef::<u32>::new(UserAddress::from(futex_base));
+            let futex_addr = UserAddress::from(futex_base);
+            // TODO - What if this isn't 4 byte aligned?
 
-            // TODO(b/299096230): Futex modification should be atomic.
-            let futex = if let Ok(futex) = self.mm().read_object(futex_ref) {
+            let futex = if let Ok(futex) = self.mm().atomic_load_u32_acquire(futex_addr) {
                 futex
             } else {
                 return;
@@ -838,7 +838,7 @@ impl CurrentTask {
 
             if (futex & FUTEX_TID_MASK) as i32 == self.id {
                 let owner_died = FUTEX_OWNER_DIED | futex;
-                if self.write_object(futex_ref, &owner_died).is_err() {
+                if self.mm().atomic_store_u32_release(futex_addr, owner_died).is_err() {
                     return;
                 }
             }

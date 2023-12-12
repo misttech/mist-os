@@ -2853,6 +2853,25 @@ impl MemoryManager {
         result.vm_stack = state.stack_size;
         Ok(result)
     }
+
+    pub fn atomic_load_u32_acquire(&self, addr: UserAddress) -> Result<u32, Errno> {
+        if let Some(usercopy) = usercopy(self).as_ref() {
+            usercopy.atomic_load_u32_acquire(addr.ptr()).map_err(|_| errno!(EFAULT))
+        } else {
+            let buf = self.read_memory_to_array(addr)?;
+            Ok(u32::from_ne_bytes(buf))
+        }
+    }
+
+    pub fn atomic_store_u32_release(&self, addr: UserAddress, value: u32) -> Result<(), Errno> {
+        if let Some(usercopy) = usercopy(self).as_ref() {
+            usercopy.atomic_store_u32_release(addr.ptr(), value).map_err(|_| errno!(EFAULT))
+        } else {
+            let value_ref = UserRef::<u32>::new(addr);
+            self.write_object(value_ref, &value)?;
+            Ok(())
+        }
+    }
 }
 
 /// The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].

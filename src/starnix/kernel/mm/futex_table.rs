@@ -58,9 +58,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
-        let (FutexOperand { vmo, offset }, key) =
-            Key::get_operand_and_key(current_task, addr, ProtectionFlags::READ)?;
-        Self::check_futex_value(&vmo, offset, value)?;
+        let (loaded_value, key) = Key::load_futex_value(current_task, addr)?;
+        if value != loaded_value {
+            return Err(errno!(EAGAIN));
+        }
 
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
@@ -395,6 +396,8 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         addr: UserAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
+
+    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -422,6 +425,11 @@ impl FutexKey for PrivateFutexKey {
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { vmo, offset }, key))
     }
+
+    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno> {
+        let key = Self::get_key(task, addr)?;
+        Ok((task.mm().atomic_load_u32_acquire(addr)?, key))
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -448,6 +456,15 @@ impl FutexKey for SharedFutexKey {
         let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = SharedFutexKey::new(&vmo, offset)?;
         Ok((FutexOperand { vmo, offset }, key))
+    }
+
+    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno> {
+        let (FutexOperand { vmo, offset }, key) =
+            Self::get_operand_and_key(task, addr, ProtectionFlags::READ)?;
+        // TODO: This should be an atomic load from mapped memory.
+        let mut buf = [0u8; 4];
+        vmo.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
+        Ok((u32::from_ne_bytes(buf), key))
     }
 }
 
