@@ -156,8 +156,8 @@ bool IsValidBufferImage(const allocation::ImageMetadata& metadata) {
   }
 
   if (metadata.width == 0 || metadata.height == 0) {
-    FX_LOGS(ERROR) << "ImageMetadata has a null dimension: "
-                   << "(" << metadata.width << ", " << metadata.height << ").";
+    FX_LOGS(ERROR) << "ImageMetadata has a null dimension: " << "(" << metadata.width << ", "
+                   << metadata.height << ").";
     return false;
   }
 
@@ -206,12 +206,13 @@ DisplayCompositor::DisplayCompositor(
     async_dispatcher_t* main_dispatcher,
     std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-    const bool enable_display_composition)
+    const bool enable_display_composition, uint32_t max_display_layers)
     : display_coordinator_(std::move(display_coordinator)),
       renderer_(renderer),
       release_fence_manager_(main_dispatcher),
       sysmem_allocator_(std::move(sysmem_allocator)),
       enable_display_composition_(enable_display_composition),
+      max_display_layers_(max_display_layers),
       main_dispatcher_(main_dispatcher) {
   FX_CHECK(main_dispatcher_);
   FX_DCHECK(renderer_);
@@ -925,7 +926,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
     // used when we directly composite render data in hardware via the display coordinator.
     // TODO(fxbug.dev/77873): per-display layer lists are probably a bad idea; this approach doesn't
     // reflect the constraints of the underlying display hardware.
-    for (uint32_t i = 0; i < 2; i++) {
+    for (uint32_t i = 0; i < max_display_layers_; i++) {
       display_engine_data.layers.push_back(CreateDisplayLayer());
     }
   }

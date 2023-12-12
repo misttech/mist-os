@@ -129,7 +129,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         dispatcher(), std::move(shared_display_coordinator), renderer_,
         utils::CreateSysmemAllocatorSyncPtr("display_compositor_unittest"),
-        /*enable_display_composition*/ true);
+        /*enable_display_composition*/ true, /*max_display_layers=*/2);
   }
 
   void TearDown() override {

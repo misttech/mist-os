@@ -77,7 +77,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       async_dispatcher_t* main_dispatcher,
       std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
       const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-      bool enable_display_composition);
+      bool enable_display_composition, uint32_t max_display_layers);
 
   ~DisplayCompositor() override;
 
@@ -282,15 +282,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_GUARDED_BY(lock_);
 
   // Maps the flatland global image id to the events used by the display coordinator.
-  std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_
-      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_ FXL_GUARDED_BY(
+      lock_);
 
   // Maps a buffer collection ID to a BufferCollectionSyncPtr in the same domain as the token with
   // display constraints set. This is used as a bridge between ImportBufferCollection() and
   // ImportBufferImage() calls, so that we can check if the existing allocation is
   // display-compatible.
-  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::BufferCollectionSyncPtr>
-      display_buffer_collection_ptrs_ FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId,
+                     fuchsia::sysmem::BufferCollectionSyncPtr> display_buffer_collection_ptrs_
+      FXL_GUARDED_BY(lock_);
 
   // Maps a buffer collection ID to a boolean indicating if it can be imported into display.
   std::unordered_map<allocation::GlobalBufferCollectionId, bool> buffer_collection_supports_display_
@@ -301,8 +302,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Maps a buffer collection ID to a collection pixel format struct.
   // TODO(fxbug.dev/71344): Delete after we don't need the pixel format anymore.
-  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::PixelFormat>
-      buffer_collection_pixel_format_ FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId,
+                     fuchsia::sysmem::PixelFormat> buffer_collection_pixel_format_
+      FXL_GUARDED_BY(lock_);
 
   /// The below members are either thread-safe or only manipulated from the main thread and
   /// therefore don't need locks.
@@ -346,6 +348,11 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Whether to attempt display composition at all. If false we always fall back to GPU-compositing.
   // Constant except for in tests.
   bool enable_display_composition_ = true;
+
+  // TODO(fxbug.dev/127675): Display controller currently doesn't allow flipping one image on one
+  // layer, but keeping the image on another layer the same in consecutive configs. As a result,
+  // using multiple layers is broken. This field is used to limit it.
+  uint32_t max_display_layers_ = 1;
 
   ColorConversionStateMachine cc_state_machine_;
 
