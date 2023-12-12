@@ -113,11 +113,6 @@ type AddElementError = flexible enum {
     NOT_AUTHORIZED = 3;
 };
 
-type RemoveElementError = flexible enum {
-    NOT_AUTHORIZED = 1;
-    NOT_FOUND = 2;
-};
-
 type AddDependencyError = flexible enum {
     ALREADY_EXISTS = 1;
     ELEMENT_NOT_FOUND = 2;
@@ -187,14 +182,6 @@ open protocol Topology {
         level_control_channel client_end:LevelControl;
     }) error AddElementError;
 
-    /// Made by a Power Element owner to remove their Power Element.
-    /// Removing a Power Element also removes all associated Dependencies.
-    flexible RemoveElement(resource struct {
-        /// Must supply a token to a previously registered Credential with
-        /// Permissions.REMOVE_ELEMENT for the element to be removed.
-        token zx.Handle:EVENTPAIR;
-    }) -> () error RemoveElementError;
-
     /// Made by a Power Element owner to register a dependency on or for an
     /// existing Power Element.
     flexible AddDependency(resource struct {
@@ -245,6 +232,14 @@ open protocol ElementControl {
     OpenStatusChannel(resource struct {
         status_channel server_end:Status;
     });
+
+    /// Called by a Power Element owner to remove their Power Element.
+    /// Removing a Power Element also removes dependencies on other elements,
+    /// but dependencies on this element will remain permanently unsatisfied.
+    /// The level control channel and open status channels will be closed and
+    /// all tokens registered to this element will be unregistered.
+    /// TODO(b/314814975): Make the above actually true.
+    flexible RemoveElement() -> ();
 };
 
 /// This protocol can be used to get the current PowerLevel of an element or

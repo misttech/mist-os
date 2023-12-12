@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
-use fidl::endpoints::create_endpoints;
+use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LessorMarker,
     LevelDependency, Permissions, PowerLevel, StatusMarker, TopologyMarker, UserDefinedPowerLevel,
@@ -688,24 +688,18 @@ async fn test_topology() -> Result<()> {
     let (fire_token, fire_broker_token) = zx::EventPair::create();
     let fire_cred =
         Credential { broker_token: fire_broker_token, permissions: Permissions::REMOVE_ELEMENT };
-    topology
+    let (fire_element_control, _) = topology
         .add_element("Fire", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![fire_cred])
         .await?
         .expect("add_element failed");
+    let fire_element_control = fire_element_control.into_proxy()?;
     let (air_token, air_broker_token) = zx::EventPair::create();
     let air_cred = Credential { broker_token: air_broker_token, permissions: Permissions::all() };
-    let (air_token_no_perms, air_broker_token_no_perms) = zx::EventPair::create();
-    let air_cred_no_perms =
-        Credential { broker_token: air_broker_token_no_perms, permissions: Permissions::empty() };
-    topology
-        .add_element(
-            "Air",
-            &PowerLevel::Binary(BinaryPowerLevel::Off),
-            vec![],
-            vec![air_cred, air_cred_no_perms],
-        )
+    let (air_element_control, _) = topology
+        .add_element("Air", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![air_cred])
         .await?
         .expect("add_element failed");
+    let air_element_control = air_element_control.into_proxy()?;
 
     let extra_add_dep_res = topology
         .add_dependency(Dependency {
@@ -749,23 +743,10 @@ async fn test_topology() -> Result<()> {
         .await?;
     assert!(matches!(extra_remove_dep_res, Err(fpb::RemoveDependencyError::NotFound { .. })));
 
-    topology
-        .remove_element(fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"))
-        .await?
-        .expect("remove_element failed");
-    let remove_element_not_authorized_res = topology
-        .remove_element(
-            air_token_no_perms.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-        )
-        .await?;
-    assert!(matches!(
-        remove_element_not_authorized_res,
-        Err(fpb::RemoveElementError::NotAuthorized)
-    ));
-    topology
-        .remove_element(air_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"))
-        .await?
-        .expect("remove_element failed");
+    fire_element_control.remove_element().await.expect("remove_element failed");
+    fire_element_control.on_closed().await?;
+    air_element_control.remove_element().await.expect("remove_element failed");
+    air_element_control.on_closed().await?;
 
     let add_dep_element_not_found_res = topology
         .add_dependency(Dependency {

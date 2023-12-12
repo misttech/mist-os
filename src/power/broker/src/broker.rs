@@ -344,10 +344,7 @@ impl Broker {
                 },
             }) {
                 // Clean up by removing the element we just added.
-                if let Err(err) = self.catalog.topology.remove_element(&id) {
-                    tracing::error!("clean up call to remove_element failed: {:?}", err);
-                    return Err(AddElementError::Internal);
-                }
+                self.remove_element(&id);
                 return Err(match err {
                     AddDependencyError::AlreadyExists => AddElementError::Invalid,
                     AddDependencyError::ElementNotFound(_) => AddElementError::Invalid,
@@ -379,19 +376,16 @@ impl Broker {
         Ok(id)
     }
 
-    pub fn remove_element(&mut self, token: Token) -> Result<(), RemoveElementError> {
-        let Some(credential) = self.lookup_credentials(token) else {
-            return Err(RemoveElementError::NotAuthorized);
-        };
-        if !credential.contains(Permissions::REMOVE_ELEMENT) {
-            return Err(RemoveElementError::NotAuthorized);
-        }
-        let element_id = credential.get_element();
-        self.catalog.topology.remove_element(element_id)?;
+    #[cfg(test)]
+    fn element_exists(&self, element_id: &ElementID) -> bool {
+        self.catalog.topology.element_exists(element_id)
+    }
+
+    pub fn remove_element(&mut self, element_id: &ElementID) {
+        self.catalog.topology.remove_element(element_id);
         self.unregister_all_credentials_for_element(element_id);
         self.current.remove(element_id);
         self.required.remove(element_id);
-        Ok(())
     }
 
     /// Checks authorization from tokens, and if valid, adds a dependency to the Topology.
@@ -956,7 +950,7 @@ mod tests {
             broker_token: token_mithril_read_only_broker.into(),
             permissions: Permissions::READ_POWER_LEVEL,
         };
-        let (token_silver, token_silver_broker) = zx::EventPair::create();
+        let (_, token_silver_broker) = zx::EventPair::create();
         let credential_silver = CredentialToRegister {
             broker_token: token_silver_broker.into(),
             permissions: Permissions::all(),
@@ -988,18 +982,8 @@ mod tests {
         );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
 
-        // This remove call should fail, because the element should not have
-        // been added and thus this token is not valid.
-        let remove_element_not_authorized_res = broker.remove_element(
-            token_silver.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-        );
-        assert!(matches!(
-            remove_element_not_authorized_res,
-            Err(RemoveElementError::NotAuthorized)
-        ));
-
-        // The same actions with a valid dependency should succeed.
-        let (token_silver, token_silver_broker) = zx::EventPair::create();
+        // Add element with a valid dependency should succeed.
+        let (_, token_silver_broker) = zx::EventPair::create();
         let credential_silver = CredentialToRegister {
             broker_token: token_silver_broker.into(),
             permissions: Permissions::all(),
@@ -1020,47 +1004,18 @@ mod tests {
                 vec![credential_silver],
             )
             .expect("add_element failed");
-        broker
-            .remove_element(
-                token_silver.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-            )
-            .expect("remove_element failed");
     }
 
     #[fuchsia::test]
     fn test_remove_element() {
         let mut broker = Broker::new();
-        let (token_all, token_all_broker) = zx::EventPair::create();
-        let credential_all = CredentialToRegister {
-            broker_token: token_all_broker.into(),
-            permissions: Permissions::all(),
-        };
-        let (token_none, token_none_broker) = zx::EventPair::create();
-        let credential_none = CredentialToRegister {
-            broker_token: token_none_broker.into(),
-            permissions: Permissions::empty(),
-        };
-        broker
-            .add_element(
-                "Unobtainium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                vec![],
-                vec![credential_all, credential_none],
-            )
+        let unobtanium = broker
+            .add_element("Unobtainium", PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![])
             .expect("add_element failed");
-        let remove_element_not_authorized_res = broker.remove_element(
-            token_none.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-        );
-        assert!(matches!(
-            remove_element_not_authorized_res,
-            Err(RemoveElementError::NotAuthorized)
-        ));
+        assert_eq!(broker.element_exists(&unobtanium), true);
 
-        broker
-            .remove_element(
-                token_all.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-            )
-            .expect("remove_element failed");
+        broker.remove_element(&unobtanium);
+        assert_eq!(broker.element_exists(&unobtanium), false);
     }
 
     #[fuchsia::test]

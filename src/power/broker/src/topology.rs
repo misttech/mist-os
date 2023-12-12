@@ -74,21 +74,6 @@ impl Into<fpb::AddElementError> for AddElementError {
 }
 
 #[derive(Debug)]
-pub enum RemoveElementError {
-    NotFound(ElementID),
-    NotAuthorized,
-}
-
-impl Into<fpb::RemoveElementError> for RemoveElementError {
-    fn into(self) -> fpb::RemoveElementError {
-        match self {
-            RemoveElementError::NotFound(_) => fpb::RemoveElementError::NotFound,
-            RemoveElementError::NotAuthorized => fpb::RemoveElementError::NotAuthorized,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub enum AddDependencyError {
     AlreadyExists,
     ElementNotFound(ElementID),
@@ -155,11 +140,13 @@ impl Topology {
         Ok(id)
     }
 
-    pub fn remove_element(&mut self, element_id: &ElementID) -> Result<(), RemoveElementError> {
-        if self.elements.remove(element_id).is_none() {
-            return Err(RemoveElementError::NotFound(element_id.clone()));
-        }
-        Ok(())
+    #[cfg(test)]
+    pub fn element_exists(&self, element_id: &ElementID) -> bool {
+        self.elements.contains_key(element_id)
+    }
+
+    pub fn remove_element(&mut self, element_id: &ElementID) {
+        self.elements.remove(element_id);
     }
 
     pub fn get_default_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
@@ -374,8 +361,12 @@ mod tests {
         });
         assert!(matches!(extra_remove_dep_res, Err(RemoveDependencyError::NotFound { .. })));
 
-        t.remove_element(&fire).expect("remove_element failed");
-        t.remove_element(&air).expect("remove_element failed");
+        assert_eq!(t.element_exists(&fire), true);
+        t.remove_element(&fire);
+        assert_eq!(t.element_exists(&fire), false);
+        assert_eq!(t.element_exists(&air), true);
+        t.remove_element(&air);
+        assert_eq!(t.element_exists(&air), false);
 
         let element_not_found_res = t.add_active_dependency(&Dependency {
             dependent: ElementLevel {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl::endpoints::create_request_stream;
+use fidl::endpoints::{create_request_stream, ControlHandle, Responder};
 use fidl_fuchsia_power_broker::{
     self as fpb, ElementControlMarker, ElementControlRequest, ElementControlRequestStream,
     LeaseControlMarker, LeaseControlRequest, LeaseControlRequestStream, LeaseStatus, LessorRequest,
@@ -205,6 +205,15 @@ impl BrokerSvc {
                         .detach();
                         Ok(())
                     }
+                    ElementControlRequest::RemoveElement { responder } => {
+                        tracing::debug!("RemoveElement({:?})", &element_id);
+                        let mut broker = self.broker.lock().await;
+                        broker.remove_element(&element_id);
+                        let control_handle = responder.control_handle().clone();
+                        let res = responder.send().context("send failed");
+                        control_handle.shutdown();
+                        res
+                    }
                     ElementControlRequest::_UnknownMethod { ordinal, .. } => {
                         tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
                         todo!()
@@ -356,17 +365,6 @@ impl BrokerSvc {
                                     .context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
-                        }
-                    }
-                    TopologyRequest::RemoveElement { token, responder } => {
-                        tracing::debug!("RemoveElement({:?})", &token);
-                        let mut broker = self.broker.lock().await;
-                        let res = broker.remove_element(token.into());
-                        tracing::debug!("RemoveElement remove_element = {:?}", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
                         }
                     }
                     TopologyRequest::AddDependency { dependency, responder } => {
