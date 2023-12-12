@@ -5,7 +5,7 @@
 use {
     std::mem::size_of,
     thiserror::Error,
-    zerocopy::{AsBytes, FromBytes, Ref, Unaligned},
+    zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned},
 };
 
 #[derive(Error, Debug)]
@@ -23,7 +23,7 @@ pub trait Appendable {
 
     fn append_value<T>(&mut self, value: &T) -> Result<(), BufferTooSmall>
     where
-        T: AsBytes + ?Sized,
+        T: AsBytes + NoCell + ?Sized,
     {
         self.append_bytes(value.as_bytes())
     }

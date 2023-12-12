@@ -17,7 +17,7 @@ from bindgen import Bindgen
 bindgen = Bindgen()
 
 bindgen.raw_lines = """
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros};
 """
 
 bindgen.include_dirs = [
@@ -48,11 +48,11 @@ bindgen.type_allowlist = [
 
 bindgen.set_auto_derive_traits(
     [
-        (r"cmsghdr", ["AsBytes, FromBytes", "FromZeroes"]),
-        (r"in6_pktinfo", ["AsBytes, FromBytes", "FromZeroes"]),
-        (r"in6_addr*", ["AsBytes, FromBytes", "FromZeroes"]),
-        (r"timespec", ["AsBytes, FromBytes", "FromZeroes"]),
-        (r"timeval", ["AsBytes, FromBytes", "FromZeroes"]),
+        (r"cmsghdr", ["AsBytes, FromBytes", "FromZeros"]),
+        (r"in6_pktinfo", ["AsBytes, FromBytes", "FromZeros"]),
+        (r"in6_addr*", ["AsBytes, FromBytes", "FromZeros"]),
+        (r"timespec", ["AsBytes, FromBytes", "FromZeros"]),
+        (r"timeval", ["AsBytes, FromBytes", "FromZeros"]),
     ]
 )
 

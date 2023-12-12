@@ -4,13 +4,13 @@
 
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Watch descriptor returned by inotify_add_watch(2).
 ///
 /// See inotify(7) for details.
 #[derive(
-    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
+    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell,
 )]
 #[repr(transparent)]
 pub struct WdNumber(i32);

@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 #[repr(C, packed)]
-#[derive(Eq, PartialEq, Hash, AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(
+    Eq, PartialEq, Hash, AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Copy, Clone, Debug,
+)]
 pub struct Id(pub [u8; 2]);
 
 /// WSC Technical Specification v2.0.7, Section 12, Table 28

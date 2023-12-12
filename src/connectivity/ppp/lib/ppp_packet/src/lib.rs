@@ -23,7 +23,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
+        AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
     },
 };
 
@@ -41,7 +41,7 @@ pub enum ParseError {
     ExcessBodyBytes,
 }
 
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct PppHeader {
     protocol: U16,
@@ -104,7 +104,7 @@ impl PacketBuilder for PppPacketBuilder {
     }
 }
 
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct ControlProtocolHeader {
     code: u8,
@@ -319,7 +319,7 @@ impl PacketBuilder for CodeRejectPacketBuilder {
     fn serialize(&self, _target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {}
 }
 
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct ProtocolRejectHeader {
     rejected_protocol: U16,
@@ -388,7 +388,7 @@ impl PacketBuilder for ProtocolRejectPacketBuilder {
     }
 }
 
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct EchoDiscardHeader {
     magic_number: U32,

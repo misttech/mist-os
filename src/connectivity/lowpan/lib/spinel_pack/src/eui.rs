@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::fmt::{Debug, Display, Error, Formatter};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 /// Error type indicating that the given slice was not the expected size.
 #[derive(Debug, Eq, PartialEq, Hash, thiserror::Error)]
@@ -16,7 +16,9 @@ impl Display for WrongSize {
 }
 
 /// Data type representing a EUI64 address.
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(
+    Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+)]
 #[repr(C)]
 #[derive(Default)]
 pub struct EUI64(pub [u8; 8]);
@@ -39,7 +41,9 @@ impl<'a> std::convert::TryInto<&'a EUI64> for &'a [u8] {
 }
 
 /// Data type representing a EUI48 address.
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(
+    Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+)]
 #[repr(C)]
 #[derive(Default)]
 pub struct EUI48(pub [u8; 6]);

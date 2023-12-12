@@ -10,9 +10,11 @@ use super::{
 };
 use fuchsia_zircon::sys::zx_vaddr_t;
 use std::{fmt, marker::PhantomData, mem, ops};
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeroes, FromBytes)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeros, FromBytes, NoCell,
+)]
 #[repr(transparent)]
 pub struct UserAddress(u64);
 
@@ -256,8 +258,9 @@ impl<T> fmt::Display for UserRef<T> {
     Ord,
     PartialOrd,
     AsBytes,
-    FromZeroes,
+    FromZeros,
     FromBytes,
+    NoCell,
 )]
 #[repr(transparent)]
 pub struct UserCString(UserAddress);

@@ -652,7 +652,7 @@ mod tests {
         signals::{SIGCHLD, SIGTTOU},
     };
 
-    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(
+    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
         current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,

@@ -21,7 +21,7 @@ use {
     },
     static_assertions::assert_cfg,
     std::convert::TryInto,
-    zerocopy::{AsBytes, FromBytes, FromZeroes},
+    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 
 pub mod ff1;
@@ -294,7 +294,7 @@ pub trait Crypt: Send + Sync {
 
 // This assumes little-endianness which is likely to always be the case.
 assert_cfg!(target_endian = "little");
-#[derive(AsBytes, FromBytes, FromZeroes)]
+#[derive(AsBytes, FromBytes, FromZeros, NoCell)]
 #[repr(C)]
 struct Tweak(u128);
 

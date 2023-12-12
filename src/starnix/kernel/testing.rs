@@ -7,7 +7,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use starnix_sync::{Locked, Unlocked};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
-use zerocopy::AsBytes;
+use zerocopy::{AsBytes, NoCell};
 
 use crate::{
     device::{init_common_devices, Features},
@@ -134,7 +134,10 @@ pub fn map_memory_anywhere(current_task: &CurrentTask, len: u64) -> UserAddress 
 /// `MAP_ANONYMOUS | MAP_PRIVATE` and writes the object to it, returning the mapped address.
 ///
 /// Useful for syscall in-pointer parameters.
-pub fn map_object_anywhere<T: AsBytes>(current_task: &CurrentTask, object: &T) -> UserAddress {
+pub fn map_object_anywhere<T: AsBytes + NoCell>(
+    current_task: &CurrentTask,
+    object: &T,
+) -> UserAddress {
     let addr = map_memory_anywhere(current_task, std::mem::size_of::<T>() as u64);
     current_task.mm().write_object(addr.into(), object).expect("could not write object");
     addr
@@ -342,7 +345,7 @@ impl<'a> UserMemoryWriter<'a> {
     /// Writes `object` to the current address in the task's address space, incrementing the
     /// current address by the size of `object`. Returns the address at which the data starts.
     /// Panics on failure.
-    pub fn write_object<T: AsBytes>(&mut self, object: &T) -> UserAddress {
+    pub fn write_object<T: AsBytes + NoCell>(&mut self, object: &T) -> UserAddress {
         self.write(object.as_bytes())
     }
 

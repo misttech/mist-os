@@ -34,7 +34,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
@@ -1661,7 +1661,7 @@ impl FuseOperation {
         matches!(self, Self::Init)
     }
 
-    fn to_response<T: FromBytes + AsBytes>(buffer: &[u8]) -> T {
+    fn to_response<T: FromBytes + AsBytes + NoCell>(buffer: &[u8]) -> T {
         let mut result = T::new_zeroed();
         let length_to_copy = std::cmp::min(buffer.len(), std::mem::size_of::<T>());
         result.as_bytes_mut()[..length_to_copy].copy_from_slice(&buffer[..length_to_copy]);

@@ -4,7 +4,7 @@
 
 use zerocopy::{
     byteorder::network_endian::{U32, U64},
-    AsBytes, FromBytes, FromZeroes,
+    AsBytes, FromBytes, FromZeros, NoCell,
 };
 
 // Supported minimum platform AVB version.
@@ -22,7 +22,7 @@ fn get_release_string() -> String {
     format!("avbtool {}.{}.{}", AVB_VERSION_MAJOR, AVB_VERSION_MINOR, AVB_VERSION_SUB)
 }
 
-#[derive(AsBytes, FromZeroes, FromBytes, Debug, PartialEq)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, PartialEq)]
 #[repr(C, packed)]
 #[allow(missing_docs)]
 pub struct Header {

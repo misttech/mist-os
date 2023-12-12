@@ -11,7 +11,7 @@ use core::time::Duration;
 use net_types::ip::{Ipv6, Ipv6Addr};
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeroes, Unaligned,
+    AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
 };
 
 use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpUnusedCode};
@@ -97,7 +97,9 @@ pub type OptionSequenceBuilder<'a, I> =
     packet::records::options::OptionSequenceBuilder<options::NdpOptionBuilder<'a>, I>;
 
 /// An NDP Router Solicitation.
-#[derive(Copy, Clone, Default, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq)]
+#[derive(
+    Copy, Clone, Default, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq,
+)]
 #[repr(C)]
 pub struct RouterSolicitation {
     _reserved: [u8; 4],
@@ -178,7 +180,7 @@ impl TryFrom<u8> for RoutePreference {
 }
 
 /// An NDP Router Advertisement.
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
 #[repr(C)]
 pub struct RouterAdvertisement {
     current_hop_limit: u8,
@@ -324,7 +326,7 @@ impl RouterAdvertisement {
 }
 
 /// An NDP Neighbor Solicitation.
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
 #[repr(C)]
 pub struct NeighborSolicitation {
     _reserved: [u8; 4],
@@ -347,7 +349,7 @@ impl NeighborSolicitation {
 }
 
 /// An NDP Neighbor Advertisement.
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
 #[repr(C)]
 pub struct NeighborAdvertisement {
     flags_rso: u8,
@@ -433,7 +435,7 @@ impl NeighborAdvertisement {
 }
 
 /// An ICMPv6 Redirect Message.
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
 #[repr(C)]
 pub struct Redirect {
     _reserved: [u8; 4],
@@ -457,7 +459,7 @@ pub mod options {
     };
     use packet::BufferView as _;
     use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     use super::NonZeroNdpLifetime;
     use crate::utils::NonZeroDuration;
@@ -584,7 +586,7 @@ pub mod options {
     /// ```
     ///
     /// [RFC 4191 section 2.3]: https://datatracker.ietf.org/doc/html/rfc4191#section-2.3
-    #[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+    #[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
     #[repr(C)]
     struct RouteInformationHeader {
         prefix_length: u8,
@@ -713,7 +715,7 @@ pub mod options {
     /// See [RFC 4861 section 4.6.2].
     ///
     /// [RFC 4861 section 4.6.2]: https://tools.ietf.org/html/rfc4861#section-4.6.2
-    #[derive(Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq, Clone)]
+    #[derive(Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone)]
     #[repr(C)]
     pub struct PrefixInformation {
         prefix_length: u8,
@@ -932,7 +934,7 @@ pub mod options {
                 NdpOptionType::RouteInformation => {
                     // RouteInfoFixed represents the part of the RouteInformation option
                     // with a known and fixed length. See RFC 4191 section 2.3.
-                    #[derive(FromZeroes, FromBytes, Unaligned)]
+                    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
                     #[repr(C)]
                     struct RouteInfoFixed {
                         prefix_length: u8,

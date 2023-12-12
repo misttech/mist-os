@@ -5,7 +5,9 @@
 use super::{error::ParseError, Array, Counted, Validate};
 
 use std::{cmp::Ordering, fmt::Debug, mem, ops::Deref as _};
-use zerocopy::{little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{
+    little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
+};
 
 /// Maximum number of [`MapItem`] objects in a single [`ExtensibleBitmap`].
 pub(crate) const MAX_BITMAP_ITEMS: u32 = 0x40;
@@ -112,7 +114,7 @@ impl Validate for Metadata {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct Metadata {
     /// How many bits on each `MapItem`.
@@ -131,7 +133,7 @@ impl Counted for Metadata {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct MapItem {
     /// The first bit that this [`MapItem`] stores, relative to its [`ExtensibleBitmap`] range:

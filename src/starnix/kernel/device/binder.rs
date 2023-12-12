@@ -86,7 +86,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Weak},
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 // The name used to track the duration of a local binder ioctl.
 fuchsia_trace::string_name_macro!(trace_name_binder_ioctl, "binder_ioctl");
@@ -1951,7 +1951,7 @@ impl Command {
             | Self::IncRef(obj)
             | Self::DecRef(obj) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes)]
+                #[derive(AsBytes, NoCell)]
                 struct AcquireRefData {
                     command: binder_driver_return_protocol,
                     weak_ref_addr: u64,
@@ -1971,7 +1971,7 @@ impl Command {
             }
             Self::Error(error_val) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes)]
+                #[derive(AsBytes, NoCell)]
                 struct ErrorData {
                     command: binder_driver_return_protocol,
                     error_val: i32,
@@ -1987,7 +1987,7 @@ impl Command {
             Self::OnewayTransaction(data) | Self::Transaction { data, .. } | Self::Reply(data) => {
                 if let Some(security_context_buffer) = data.buffers.security_context.as_ref() {
                     #[repr(C, packed)]
-                    #[derive(AsBytes)]
+                    #[derive(AsBytes, NoCell)]
                     struct TransactionData {
                         command: binder_driver_return_protocol,
                         data: [u8; std::mem::size_of::<binder_transaction_data>()],
@@ -2007,7 +2007,7 @@ impl Command {
                     )
                 } else {
                     #[repr(C, packed)]
-                    #[derive(AsBytes)]
+                    #[derive(AsBytes, NoCell)]
                     struct TransactionData {
                         command: binder_driver_return_protocol,
                         data: [u8; std::mem::size_of::<binder_transaction_data>()],
@@ -2038,7 +2038,7 @@ impl Command {
             }
             Self::DeadBinder(cookie) | Self::ClearDeathNotificationDone(cookie) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes)]
+                #[derive(AsBytes, NoCell)]
                 struct DeadBinderData {
                     command: binder_driver_return_protocol,
                     cookie: binder_uintptr_t,
@@ -4395,7 +4395,7 @@ pub mod tests {
         BINDER_TYPE_WEAK_HANDLE,
     };
     use std::ops::Deref;
-    use zerocopy::FromZeroes;
+    use zerocopy::FromZeros;
 
     const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
@@ -5922,7 +5922,7 @@ pub mod tests {
 
         // Serialize a C struct that points to the above string.
         #[repr(C)]
-        #[derive(AsBytes)]
+        #[derive(AsBytes, NoCell)]
         struct Bar {
             foo_str: UserAddress,
             len: i32,
@@ -6228,7 +6228,7 @@ pub mod tests {
 
         // Serialize a C struct with an fd array.
         #[repr(C)]
-        #[derive(AsBytes, FromZeroes, FromBytes)]
+        #[derive(AsBytes, FromZeros, FromBytes, NoCell)]
         struct Bar {
             len: u32,
             fds: [u32; 2],
@@ -6422,7 +6422,7 @@ pub mod tests {
 
             // Serialize a C struct with an fd array.
             #[repr(C)]
-            #[derive(AsBytes, FromBytes, FromZeroes)]
+            #[derive(AsBytes, FromBytes, FromZeros, NoCell)]
             struct Bar {
                 len: u32,
                 fds: [u32; 2],
@@ -6542,7 +6542,7 @@ pub mod tests {
 
         // Serialize a C struct with an fd array.
         #[repr(C)]
-        #[derive(AsBytes, FromBytes, FromZeroes)]
+        #[derive(AsBytes, FromBytes, FromZeros, NoCell)]
         struct Bar {
             len: u32,
             fds: [u32; 2],

@@ -23,7 +23,7 @@ use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
 use test_case::test_case;
-use zerocopy::{byteorder::native_endian::U32, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{byteorder::native_endian::U32, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 const NETSVC_URL: &str = "#meta/netsvc.cm";
 const NETSVC_NAME: &str = "netsvc";
@@ -788,7 +788,7 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
     const TIMEOUT_OPTION_SECS: u8 = std::u8::MAX;
 
     #[repr(C)]
-    #[derive(FromZeroes, FromBytes, Unaligned)]
+    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
     // Defined in zircon/system/public/zircon/boot/netboot.h.
     struct BoardInfo {
         board_name: [u8; 32],

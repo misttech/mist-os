@@ -8,10 +8,10 @@ use super::{
     PAGE_SIZE,
 };
 use once_cell::sync::Lazy;
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Matches iovec_t.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeros, FromBytes, NoCell)]
 #[repr(C)]
 pub struct UserBuffer {
     pub address: UserAddress,

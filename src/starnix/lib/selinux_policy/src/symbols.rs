@@ -9,7 +9,9 @@ use super::{
 
 use anyhow::Context as _;
 use std::{fmt::Debug, ops::Deref as _};
-use zerocopy::{little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{
+    little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
+};
 
 /// [`SymbolList`] is an [`Array`] of items with the count of items determined by [`Metadata`] as
 /// [`Counted`].
@@ -27,7 +29,7 @@ impl<B: ByteSlice + Debug + PartialEq, T: Debug + ParseSlice<B> + PartialEq + Va
 }
 
 /// Binary metadata prefix to [`SymbolList`] objects.
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct Metadata {
     /// The number of primary names referred to in the associated [`SymbolList`].
@@ -115,7 +117,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for CommonSymbolMetadata<B> {
 }
 
 /// Static (that is, fixed-sized) metadata for a common symbol.
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct CommonSymbolStaticMetadata {
     /// The length of the `[u8]` key stored in the associated [`CommonSymbolMetadata`].
@@ -171,7 +173,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Permission<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct PermissionMetadata {
     /// The length of the `[u8]` in the associated [`Permission`].
@@ -254,7 +256,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ConstraintList<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConstraintCount(le::U32);
 
@@ -326,7 +328,7 @@ impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Constraint<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConstraintMetadata {
     constraint_type: le::U32,
@@ -422,7 +424,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Class<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassDefaults {
     default_user: le::U32,
@@ -452,7 +454,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ClassValidateTransitions<B> 
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassValidateTransitionsCount(le::U32);
 
@@ -536,7 +538,7 @@ impl<B: ByteSlice + Debug + PartialEq> Counted for ClassKey<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassMetadata {
     key_length: le::U32,
@@ -618,7 +620,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for RoleMetadata<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct RoleStaticMetadata {
     length: le::U32,
@@ -664,7 +666,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Type<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct TypeMetadata {
     length: le::U32,
@@ -746,7 +748,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for UserData<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct UserMetadata {
     length: le::U32,
@@ -844,7 +846,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for MlsRange<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct MLSRangeMetadata {
     count: le::U32,
@@ -920,7 +922,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ConditionalBoolean<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConditionalBooleanMetadata {
     value: le::U32,
@@ -997,7 +999,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for SensitivityMetadata<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct SensitivityStaticMetadata {
     length: le::U32,
@@ -1043,7 +1045,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Category<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct CategoryMetadata {
     length: le::U32,

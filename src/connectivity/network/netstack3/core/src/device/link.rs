@@ -10,13 +10,13 @@
 use core::fmt::Debug;
 
 use net_types::{ethernet::Mac, UnicastAddress};
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, NoCell, Unaligned};
 
 use crate::device::Device;
 
 /// The type of address used by a link device.
 pub trait LinkAddress:
-    'static + FromBytes + AsBytes + Unaligned + Copy + Clone + Debug + Eq + Send
+    'static + FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Debug + Eq + Send
 {
     /// The length of the address in bytes.
     const BYTES_LENGTH: usize;
@@ -67,7 +67,7 @@ pub trait LinkDevice: Device + Debug {
 pub(crate) mod testutil {
     use core::convert::TryInto;
 
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
     use super::*;
     use crate::{
@@ -85,7 +85,7 @@ pub(crate) mod testutil {
     ///
     /// The value 0xFF is the broadcast address.
     #[derive(
-        FromZeroes, FromBytes, AsBytes, Unaligned, Copy, Clone, Debug, Hash, PartialEq, Eq,
+        FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Copy, Clone, Debug, Hash, PartialEq, Eq,
     )]
     #[repr(transparent)]
     pub(crate) struct FakeLinkAddress(pub(crate) [u8; FAKE_LINK_ADDRESS_LEN]);

@@ -15,7 +15,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::{LE, U16, U32, U64},
-        AsBytes, FromBytes, FromZeroes, Ref, Unaligned,
+        AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned,
     },
 };
 
@@ -87,7 +87,7 @@ impl ChunkInfo {
 }
 
 /// Chunked archive header.
-#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct ChunkedArchiveHeader {
     magic: [u8; 8],
@@ -100,7 +100,7 @@ struct ChunkedArchiveHeader {
 }
 
 /// Chunked archive seek table entry.
-#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct SeekTableEntry {
     decompressed_offset: U64<LE>,
@@ -160,8 +160,8 @@ impl ChunkedArchiveHeader {
         // Deserialize seek table.
         let num_entries = self.num_entries.get() as usize;
         let Some((entries, chunk_data)) =
-            Ref::<_, [SeekTableEntry]>::new_slice_unaligned_from_prefix(data, num_entries
-        ) else {
+            Ref::<_, [SeekTableEntry]>::new_slice_unaligned_from_prefix(data, num_entries)
+        else {
             return Ok(None);
         };
         let entries: &[SeekTableEntry] = entries.into_slice();

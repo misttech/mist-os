@@ -5,12 +5,12 @@
 //! These are structures for creating the binary data for ZBI Items.
 
 use anyhow::{bail, Result};
-use zerocopy::AsBytes;
+use zerocopy::{AsBytes, NoCell};
 
 // LINT.IfChange
 
 /// This is the structure for the payload for ZBI_TYPE_PLATFORM_ID items.
-#[derive(AsBytes, Debug, PartialEq)]
+#[derive(AsBytes, NoCell, Debug, PartialEq)]
 #[repr(C, packed)]
 pub(crate) struct ZbiPlatformId {
     pub vid: u32,
@@ -19,7 +19,7 @@ pub(crate) struct ZbiPlatformId {
 }
 
 /// This is the structure for the payload for ZBI_TYPE_DRV_BOARD_INFO items.
-#[derive(AsBytes, Debug, PartialEq)]
+#[derive(AsBytes, NoCell, Debug, PartialEq)]
 #[repr(C, packed)]
 pub(crate) struct ZbiBoardInfo {
     /// This is a value chosen by hardware/factory developers and is provided to

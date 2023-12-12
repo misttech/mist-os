@@ -18,7 +18,7 @@ use starnix_uapi::{
     SI_MAX_SIZE,
 };
 use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.
 #[derive(Debug)]
@@ -248,7 +248,7 @@ impl SignalState {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeroes, FromBytes)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeros, FromBytes, NoCell)]
 #[repr(C)]
 pub struct SignalInfoHeader {
     pub signo: u32,

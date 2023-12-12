@@ -10,7 +10,7 @@ use core::fmt;
 use net_types::ip::{Ipv6, Ipv6Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Unaligned,
+    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -202,7 +202,7 @@ impl_icmp_message!(
 );
 
 /// An ICMPv6 Packet Too Big message.
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct Icmpv6PacketTooBig {
     mtu: U32,
@@ -244,7 +244,7 @@ create_protocol_enum!(
 );
 
 /// An ICMPv6 Parameter Problem message.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 pub struct Icmpv6ParameterProblem {
     pointer: U32,

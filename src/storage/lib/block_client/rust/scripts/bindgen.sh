@@ -38,12 +38,12 @@ readonly RAW_LINES="${copyright_line}
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};"
+use zerocopy::{AsBytes, FromBytes, FromZeros};"
 
 "${BINDGEN}" \
   --raw-line "${RAW_LINES}" \
   --with-derive-default \
-  --with-derive-custom-struct=${ZEROCOPY_SYMS_REGEX}={AsBytes,FromBytes,FromZeroes} \
+  --with-derive-custom-struct=${ZEROCOPY_SYMS_REGEX}={AsBytes,FromBytes,FromZeros} \
   --impl-debug \
   --allowlist-type=${ZEROCOPY_SYMS_REGEX} \
   "${source_file}" | \

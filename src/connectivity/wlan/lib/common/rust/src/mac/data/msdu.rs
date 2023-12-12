@@ -8,7 +8,7 @@ use {
         buffer_reader::BufferReader,
         mac::{data::*, DataFrame, MacAddr, MacFrame},
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
 };
 
 // RFC 1042
@@ -18,7 +18,7 @@ pub const LLC_SNAP_OUI: [u8; 3] = [0, 0, 0];
 
 // IEEE Std 802.2-1998, 3.2
 // IETF RFC 1042
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C, packed)]
 pub struct LlcHdr {
     pub dsap: u8,

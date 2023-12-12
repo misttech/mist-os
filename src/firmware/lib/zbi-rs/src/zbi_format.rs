@@ -9,7 +9,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = "macos")]
@@ -99,7 +99,7 @@ pub const ZBI_FLAGS_VERSION: zbi_flags_t = 65536;
 pub const ZBI_FLAGS_CRC32: zbi_flags_t = 131072;
 pub const ZBI_ITEM_NO_CRC32: u32 = 1250420950;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
 pub struct zbi_header_t {
     pub type_: zbi_type_t,
     pub length: u32,

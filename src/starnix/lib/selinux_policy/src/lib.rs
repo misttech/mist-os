@@ -14,7 +14,7 @@ use {arrays::*, error::*, extensible_bitmap::*, metadata::*, symbols::*};
 use anyhow::Context as _;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
-use zerocopy::{ByteSlice, FromBytes, Ref, Unaligned};
+use zerocopy::{ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 /// Binary policy SIDs that may be referenced in the policy without be explicitly introduced in the
 /// policy because they are hard-coded in the Linux kernel.
@@ -361,7 +361,7 @@ impl Validate for [u8] {
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq, T: Validate + FromBytes> Validate for Ref<B, T> {
+impl<B: ByteSlice + Debug + PartialEq, T: Validate + FromBytes + NoCell> Validate for Ref<B, T> {
     type Error = <T as Validate>::Error;
 
     /// A [`Ref`] of `T` that implements [`FromBytes`] delegates to `T::validate()` via
@@ -371,7 +371,7 @@ impl<B: ByteSlice + Debug + PartialEq, T: Validate + FromBytes> Validate for Ref
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq, T: Validate + FromBytes> Validate for Ref<B, [T]> {
+impl<B: ByteSlice + Debug + PartialEq, T: Validate + FromBytes + NoCell> Validate for Ref<B, [T]> {
     type Error = <T as Validate>::Error;
 
     /// A [`Ref`] of `[T]` that implements [`FromBytes`] delegates to `T::validate()` via
@@ -390,7 +390,7 @@ pub(crate) trait Counted {
     fn count(&self) -> u32;
 }
 
-impl<B: ByteSlice + Debug + PartialEq, T: Counted + FromBytes> Counted for Ref<B, T> {
+impl<B: ByteSlice + Debug + PartialEq, T: Counted + FromBytes + NoCell> Counted for Ref<B, T> {
     fn count(&self) -> u32 {
         self.deref().count()
     }
@@ -441,7 +441,9 @@ where
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq, T: FromBytes + Unaligned + Validate> Parse<B> for Ref<B, T> {
+impl<B: ByteSlice + Debug + PartialEq, T: FromBytes + NoCell + Unaligned + Validate> Parse<B>
+    for Ref<B, T>
+{
     /// [`Ref`] may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error return
     /// type via [`anyhow::Error`].
     type Error = anyhow::Error;
@@ -461,7 +463,8 @@ impl<B: ByteSlice + Debug + PartialEq, T: FromBytes + Unaligned + Validate> Pars
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq, T: FromBytes + Unaligned> ParseSlice<B> for Ref<B, [T]>
+impl<B: ByteSlice + Debug + PartialEq, T: FromBytes + NoCell + Unaligned> ParseSlice<B>
+    for Ref<B, [T]>
 where
     [T]: Validate,
 {

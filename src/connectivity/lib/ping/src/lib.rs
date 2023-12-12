@@ -30,14 +30,14 @@ use std::{
     task::{Context, Poll},
 };
 use thiserror::Error;
-use zerocopy::{byteorder::network_endian::U16, AsBytes, FromBytes, FromZeroes, Unaligned};
+use zerocopy::{byteorder::network_endian::U16, AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 /// The number of bytes of an ICMP (v4 or v6) header.
 pub const ICMP_HEADER_LEN: usize = std::mem::size_of::<IcmpHeader>();
 
 /// ICMP header representation.
 #[repr(C)]
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Eq, Clone)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Eq, Clone)]
 struct IcmpHeader {
     r#type: u8,
     code: u8,

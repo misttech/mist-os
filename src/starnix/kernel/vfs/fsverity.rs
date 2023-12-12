@@ -12,7 +12,7 @@ use starnix_uapi::{
     fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
     FS_VERITY_HASH_ALG_SHA512,
 };
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 #[derive(Copy, Clone, Debug, Eq, FromPrimitive, PartialEq)]
 enum HashAlgorithm {
@@ -92,7 +92,7 @@ fn fsverity_measurement(descriptor: &fsverity_descriptor) -> Result<Box<[u8]>, E
     }
 }
 
-#[derive(FromBytes, FromZeroes)]
+#[derive(FromBytes, FromZeros, NoCell)]
 struct FsVerityDigestHeader {
     digest_algorithm: u16,
     digest_size: u16,

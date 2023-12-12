@@ -5,7 +5,7 @@
 use {
     std::marker::PhantomData,
     wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, FromBytes, FromZeroes},
+    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 
 // IEEE Std 802.11-2016, 9.2.4.1.3
@@ -120,7 +120,7 @@ impl PowerState {
     14      protected,
     15      htc_order
 )]
-#[derive(AsBytes, FromZeroes, FromBytes, PartialEq, Eq, Clone, Copy)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
 pub struct FrameControl(pub u16);
 
@@ -141,7 +141,7 @@ impl FrameControl {
     0..=3   frag_num,
     4..=15  seq_num,
 )]
-#[derive(AsBytes, FromZeroes, FromBytes, PartialEq, Eq, Clone, Copy)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
 pub struct SequenceControl(pub u16);
 
@@ -153,7 +153,7 @@ pub struct SequenceControl(pub u16);
     31      rdg_more_ppdu,
 )]
 #[repr(C)]
-#[derive(AsBytes, FromZeroes, FromBytes, Copy, Clone, PartialEq, Eq)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Copy, Clone, PartialEq, Eq)]
 pub struct HtControl(pub u32);
 
 #[derive(PartialEq, Eq)]

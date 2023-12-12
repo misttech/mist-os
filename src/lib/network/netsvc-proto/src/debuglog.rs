@@ -14,7 +14,7 @@ use packet::{
 };
 use std::num::NonZeroU16;
 use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
+    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
 };
 
 pub const MULTICAST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33337));
@@ -27,7 +27,7 @@ const MAX_NODENAME_LENGTH: usize = 64;
 pub const ACK_SIZE: usize = std::mem::size_of::<PacketHead>();
 
 #[repr(C)]
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 pub struct PacketHead {
     magic: U32,
     seqno: U32,

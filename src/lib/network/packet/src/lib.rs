@@ -404,7 +404,7 @@ use std::convert::Infallible as Never;
 use std::mem;
 use std::ops::{Bound, Range, RangeBounds};
 
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, Ref, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned};
 
 /// A buffer that may be fragmented in multiple parts which are discontiguous in
 /// memory.
@@ -1255,7 +1255,7 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `size_of::<T>()` bytes in length, `peek_obj_front` returns `None`.
     fn peek_obj_front<T>(&mut self) -> Option<&T>
     where
-        T: FromBytes + Unaligned,
+        T: FromBytes + NoCell + Unaligned,
     {
         Some(Ref::<_, T>::new_unaligned_from_prefix((&*self).as_ref())?.0.into_ref())
     }
@@ -1307,7 +1307,7 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `size_of::<T>()` bytes in length, `peek_obj_back` returns `None`.
     fn peek_obj_back<T>(&mut self) -> Option<&T>
     where
-        T: FromBytes + Unaligned,
+        T: FromBytes + NoCell + Unaligned,
     {
         Some(Ref::<_, T>::new_unaligned_from_suffix((&*self).as_ref())?.1.into_ref())
     }
@@ -1461,7 +1461,7 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// length, `write_obj_front` returns `None`.
     fn write_obj_front<T>(&mut self, obj: &T) -> Option<()>
     where
-        T: ?Sized + AsBytes,
+        T: ?Sized + AsBytes + NoCell,
     {
         let mut bytes = self.take_front(mem::size_of_val(obj))?;
         bytes.copy_from_slice(obj.as_bytes());
@@ -1478,7 +1478,7 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// `write_obj_back` returns `None`.
     fn write_obj_back<T>(&mut self, obj: &T) -> Option<()>
     where
-        T: ?Sized + AsBytes,
+        T: ?Sized + AsBytes + NoCell,
     {
         let mut bytes = self.take_back(mem::size_of_val(obj))?;
         bytes.copy_from_slice(obj.as_bytes());

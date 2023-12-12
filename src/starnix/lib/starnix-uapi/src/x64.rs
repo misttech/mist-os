@@ -5,12 +5,12 @@
 #![allow(non_camel_case_types)]
 
 use crate::{signals::SigSet, uapi::sigset_t};
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// The type used by the kernel for the time in seconds in the stat struct.
 pub type stat_time_t = u64;
 
-#[derive(Default, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Default, Debug, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
 #[repr(packed)]
 #[non_exhaustive]
 pub struct epoll_event {

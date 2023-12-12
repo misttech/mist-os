@@ -25,7 +25,7 @@ use {
     uuid::Uuid,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
+        AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
     },
 };
 
@@ -61,7 +61,7 @@ impl From<Never> for ParseError {
 ///
 /// [RFC 8415, Section 7.3]: https://tools.ietf.org/html/rfc8415#section-7.3
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, FromPrimitive, AsBytes, Copy, Clone)]
+#[derive(Debug, PartialEq, FromPrimitive, AsBytes, NoCell, Copy, Clone)]
 #[repr(u8)]
 pub enum MessageType {
     Solicit = 1,
@@ -141,7 +141,7 @@ impl StatusCode {
 ///
 /// [RFC 8415, Section 21.13]: https://tools.ietf.org/html/rfc8415#section-21.13
 #[allow(missing_docs)]
-#[derive(thiserror::Error, Debug, PartialEq, FromPrimitive, AsBytes, Copy, Clone)]
+#[derive(thiserror::Error, Debug, PartialEq, FromPrimitive, AsBytes, NoCell, Copy, Clone)]
 #[repr(u16)]
 pub enum ErrorStatusCode {
     #[error("unspecified failure")]
@@ -397,7 +397,7 @@ impl<'a, B: ByteSlice> IanaData<B> {
 }
 
 /// An overlay for the fixed fields of an IA_NA option.
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IanaHeader {
     iaid: U32,
@@ -454,7 +454,7 @@ impl<'a, B: ByteSlice> IaAddrData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Address option.
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaAddrHeader {
     addr: Ipv6Addr,
@@ -463,7 +463,7 @@ struct IaAddrHeader {
 }
 
 /// An overlay for the fixed fields of an IA_PD option.
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaPdHeader {
     iaid: U32,
@@ -522,7 +522,7 @@ impl<'a, B: ByteSlice> IaPdData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Prefix option.
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaPrefixHeader {
     preferred_lifetime_secs: U32,

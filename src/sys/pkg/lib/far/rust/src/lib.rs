@@ -86,8 +86,9 @@ pub const DIR_NAMES_CHUNK_TYPE: ChunkType = *b"DIRNAMES";
     Copy,
     Default,
     zerocopy::AsBytes,
-    zerocopy::FromZeroes,
+    zerocopy::FromZeros,
     zerocopy::FromBytes,
+    zerocopy::NoCell,
 )]
 #[repr(C)]
 struct Index {
@@ -105,8 +106,9 @@ const INDEX_LEN: u64 = std::mem::size_of::<Index>() as u64;
     Copy,
     Default,
     zerocopy::AsBytes,
-    zerocopy::FromZeroes,
+    zerocopy::FromZeros,
     zerocopy::FromBytes,
+    zerocopy::NoCell,
 )]
 #[repr(C)]
 struct IndexEntry {
@@ -125,8 +127,9 @@ const INDEX_ENTRY_LEN: u64 = std::mem::size_of::<IndexEntry>() as u64;
     Copy,
     Default,
     zerocopy::AsBytes,
-    zerocopy::FromZeroes,
+    zerocopy::FromZeros,
     zerocopy::FromBytes,
+    zerocopy::NoCell,
 )]
 #[repr(C)]
 struct DirectoryEntry {

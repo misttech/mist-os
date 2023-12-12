@@ -43,14 +43,14 @@ use packet::{
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 use crate::ipv4::{self, Ipv4PacketRaw};
 use crate::ipv6::Ipv6PacketRaw;
 
-#[derive(Copy, Clone, Default, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Default, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct HeaderPrefix {
     msg_type: u8,
@@ -288,7 +288,9 @@ impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
 }
 
 /// An ICMP message.
-pub trait IcmpMessage<I: IcmpIpExt>: Sized + Copy + FromBytes + AsBytes + Unaligned {
+pub trait IcmpMessage<I: IcmpIpExt>:
+    Sized + Copy + FromBytes + AsBytes + NoCell + Unaligned
+{
     /// Whether or not a message body is expected in an ICMP packet.
     const EXPECTS_BODY: bool = true;
 
@@ -331,7 +333,7 @@ pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy {
     fn is_err(self) -> bool;
 }
 
-#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct Header<M> {
     prefix: HeaderPrefix,
@@ -678,7 +680,7 @@ impl From<IcmpUnusedCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct IdAndSeq {
     id: U16,

@@ -14,7 +14,7 @@ use {
     futures::stream::{self, BoxStream, StreamExt},
     std::{collections::VecDeque, str::Utf8Error},
     thiserror::Error,
-    zerocopy::{FromBytes, FromZeroes, Ref, Unaligned},
+    zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned},
 };
 
 mod watcher;
@@ -593,7 +593,7 @@ pub async fn dir_contains_with_timeout(
 /// Returns either an error or a parsed entry for each entry in the supplied buffer (see
 /// read_dirents for the format of this buffer).
 pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentError>> {
-    #[derive(FromZeroes, FromBytes, Unaligned)]
+    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
     #[repr(C, packed)]
     struct Dirent {
         /// The inode number of the entry.

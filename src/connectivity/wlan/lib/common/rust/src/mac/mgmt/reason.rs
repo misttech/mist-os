@@ -4,11 +4,11 @@
 
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    zerocopy::{AsBytes, FromBytes, FromZeroes},
+    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 
 #[repr(C)]
-#[derive(AsBytes, FromZeroes, FromBytes, PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Debug, Default)]
 pub struct ReasonCode(pub u16);
 
 impl From<fidl_ieee80211::ReasonCode> for ReasonCode {

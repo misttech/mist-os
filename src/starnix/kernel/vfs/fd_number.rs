@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 use crate::vfs::FsStr;
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -11,7 +11,7 @@ use starnix_uapi::{errno, errors::Errno, AT_FDCWD};
 
 // NB: We believe deriving Default (i.e., have a default FdNumber of 0) will be error-prone.
 #[derive(
-    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
+    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell,
 )]
 #[repr(transparent)]
 pub struct FdNumber(i32);

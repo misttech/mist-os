@@ -42,7 +42,7 @@ use core::{
     ops::DerefMut,
 };
 use zbi_format::*;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, Ref};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, NoCell, Ref};
 
 type ZbiResult<T> = Result<T, ZbiError>;
 
@@ -682,7 +682,7 @@ impl<B: ByteSlice + PartialEq + Default + Debug> Iterator for ZbiContainerIterat
 }
 
 #[repr(u32)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(AsBytes, NoCell, Clone, Copy, Debug, Eq, PartialEq)]
 /// All possible [`ZbiHeader`]`.type` values.
 pub enum ZbiType {
     /// Each ZBI starts with a container header.
@@ -1205,7 +1205,7 @@ mod tests {
         pub fn new(buffer: &'a mut [u8]) -> TestZbiBuilder<'a> {
             TestZbiBuilder { buffer, tail_offset: 0 }
         }
-        pub fn add<T: AsBytes>(mut self, t: T) -> Self {
+        pub fn add<T: AsBytes + NoCell>(mut self, t: T) -> Self {
             t.write_to_prefix(&mut self.buffer[self.tail_offset..]).unwrap();
             self.tail_offset += size_of::<T>();
             self

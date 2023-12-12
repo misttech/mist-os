@@ -8,7 +8,7 @@ use starnix_sync::RwLock;
 use starnix_sync::{LockBefore, Locked, Unlocked};
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 use crate::{
     execution::execute_task,
@@ -1568,7 +1568,7 @@ pub fn sys_unshare(
     Ok(())
 }
 
-#[derive(Default, Debug, AsBytes, FromBytes, FromZeroes)]
+#[derive(Default, Debug, AsBytes, FromBytes, FromZeros, NoCell)]
 #[repr(C)]
 struct KcmpParams {
     mask: usize,

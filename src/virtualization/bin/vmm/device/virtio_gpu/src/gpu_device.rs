@@ -18,7 +18,7 @@ use {
     virtio_device::chain::{ReadableChain, Remaining, WritableChain},
     virtio_device::mem::{DriverMem, DriverRange},
     virtio_device::queue::DriverNotify,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, NoCell},
 };
 
 /// This is a (somewhat arbitrary) upper bound to the number of entries in a
@@ -29,7 +29,7 @@ const ATTACH_BACKING_MAX_ENTRIES: u32 = 1024;
 ///
 /// Will fail if there is an error walking the chain, or if there is insufficient space left in
 /// `chain`.
-fn write_to_chain<'a, 'b, N: DriverNotify, M: DriverMem, T: AsBytes>(
+fn write_to_chain<'a, 'b, N: DriverNotify, M: DriverMem, T: AsBytes + NoCell>(
     mut chain: WritableChain<'a, 'b, N, M>,
     message: T,
 ) -> Result<(), Error> {

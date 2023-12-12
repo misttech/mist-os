@@ -900,7 +900,7 @@ impl<'a> BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     use super::*;
 
@@ -915,7 +915,7 @@ mod tests {
         zerocopy::Ref::<_, ()>::new_unaligned(bytes).unwrap().into_mut()
     }
 
-    #[derive(Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
+    #[derive(Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
     #[repr(C)]
     struct DummyRecord {
         a: [u8; 2],
@@ -1335,7 +1335,7 @@ pub mod options {
     use core::num::{NonZeroUsize, TryFromIntError};
 
     use const_unwrap::const_unwrap_option;
-    use zerocopy::{byteorder::ByteOrder, AsBytes, FromBytes, Unaligned};
+    use zerocopy::{byteorder::ByteOrder, AsBytes, FromBytes, NoCell, Unaligned};
 
     use super::*;
 
@@ -1543,6 +1543,7 @@ pub mod options {
     pub trait KindLenField:
         FromBytes
         + AsBytes
+        + NoCell
         + Unaligned
         + Into<usize>
         + TryFrom<usize, Error = TryFromIntError>

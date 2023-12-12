@@ -30,7 +30,7 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 #![allow(non_snake_case)]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = \"macos\")]
@@ -67,7 +67,7 @@ echo ${tmp}
     --with-derive-default \
     --with-derive-partialeq \
     --impl-debug \
-    --with-derive-custom-struct zbi_header_t=FromBytes,AsBytes,FromZeroes \
+    --with-derive-custom-struct zbi_header_t=FromBytes,AsBytes,FromZeros \
     --output ${OUTPUT} \
     --allowlist-type '(zbi_type_t|zbi_flags_t|zbi_header_t|zbi_kernel_t)' \
     --allowlist-var 'ZBI_.+' \

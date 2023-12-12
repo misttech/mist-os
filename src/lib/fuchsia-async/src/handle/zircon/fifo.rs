@@ -14,17 +14,17 @@ use {
         pin::Pin,
         task::{Context, Poll},
     },
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, NoCell},
 };
 
 /// Marker trait for types that can be read/written with a `Fifo`. Unsafe
 /// because not all types may be represented by arbitrary bit patterns.
 ///
 /// An implementation is provided for all types that implement
-/// [`AsBytes`] and [`FromBytes`].
-pub trait FifoEntry: AsBytes + FromBytes {}
+/// [`AsBytes`], [`FromBytes`], and [`NoCell`].
+pub trait FifoEntry: AsBytes + FromBytes + NoCell {}
 
-impl<O: AsBytes + FromBytes> FifoEntry for O {}
+impl<O: AsBytes + FromBytes + NoCell> FifoEntry for O {}
 
 /// A buffer used to write `T` into [`Fifo`] objects.
 ///
@@ -478,16 +478,16 @@ mod tests {
     use fuchsia_zircon::prelude::*;
     use futures::future::try_join;
     use futures::prelude::*;
-    use zerocopy::FromZeroes;
+    use zerocopy::{FromZeros, NoCell};
 
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeroes, FromBytes)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeros, FromBytes, NoCell)]
     #[repr(C)]
     struct entry {
         a: u32,
         b: u32,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeroes, FromBytes)]
+    #[derive(Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeros, FromBytes, NoCell)]
     #[repr(C)]
     struct wrong_entry {
         a: u16,

@@ -14,7 +14,7 @@ use {
         big_endian::{BigEndianU16, BigEndianU64},
         buffer_reader::BufferReader,
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
 };
 
 #[derive(Debug, Error)]
@@ -257,7 +257,9 @@ impl From<KeyFrameBuf> for Vec<u8> {
 }
 
 // IEEE Std 802.1X-2010, 11.9, Table 11-5
-#[derive(AsBytes, FromZeroes, FromBytes, Debug, Clone, Copy, PartialEq, Eq, Unaligned, Default)]
+#[derive(
+    AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Copy, PartialEq, Eq, Unaligned, Default,
+)]
 #[repr(C)]
 pub struct KeyDescriptor(u8);
 
@@ -282,7 +284,18 @@ impl KeyType {
 
 // IEEE Std 802.1X-2010, 11.3.1
 #[derive(
-    AsBytes, FromZeroes, FromBytes, Debug, Clone, Copy, Unaligned, PartialEq, Eq, PartialOrd, Ord,
+    AsBytes,
+    FromZeros,
+    FromBytes,
+    NoCell,
+    Debug,
+    Clone,
+    Copy,
+    Unaligned,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 #[repr(C)]
 pub struct ProtocolVersion(u8);
@@ -294,7 +307,7 @@ impl ProtocolVersion {
 }
 
 // IEEE Std 802.1X-2010, 11.3.2, Table 11-3
-#[derive(AsBytes, FromZeroes, FromBytes, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct PacketType(u8);
 
@@ -327,11 +340,11 @@ impl PacketType {
     13      smk_message,
     14..=15 _, // reserved
 )]
-#[derive(AsBytes, FromZeroes, FromBytes, PartialEq, Clone, Default)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Clone, Default)]
 #[repr(C)]
 pub struct KeyInformation(pub u16);
 
-#[derive(AsBytes, FromZeroes, FromBytes, Debug, Clone, Unaligned)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Unaligned)]
 #[repr(C, packed)]
 pub struct EapolFields {
     pub version: ProtocolVersion,
@@ -340,7 +353,7 @@ pub struct EapolFields {
 }
 
 // IEEE Std 802.11-2016, 12.7.2, Figure 12-32
-#[derive(AsBytes, FromZeroes, FromBytes, Default, Debug, Clone, Unaligned)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Default, Debug, Clone, Unaligned)]
 #[repr(C, packed)]
 pub struct KeyFrameFields {
     pub descriptor_type: KeyDescriptor,

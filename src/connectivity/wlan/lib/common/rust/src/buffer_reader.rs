@@ -5,7 +5,7 @@
 use {
     crate::UnalignedView,
     core::mem::size_of,
-    zerocopy::{ByteSlice, ByteSliceMut, FromBytes, Ref, Unaligned},
+    zerocopy::{ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned},
 };
 
 pub struct BufferReader<B> {
@@ -80,14 +80,14 @@ impl<B: ByteSlice> BufferReader<B> {
     /// ```
     pub fn read_value<T>(&mut self) -> Option<T>
     where
-        T: FromBytes + Copy,
+        T: FromBytes + NoCell + Copy,
     {
         self.read_unaligned::<T>().map(|view| view.get())
     }
 
     pub fn peek_value<T>(&self) -> Option<T>
     where
-        T: FromBytes + Copy,
+        T: FromBytes + NoCell + Copy,
     {
         self.peek_unaligned::<T>().map(|view| view.get())
     }
@@ -171,11 +171,11 @@ impl<B: ByteSliceMut> BufferReader<B> {
 mod tests {
     use {
         super::*,
-        zerocopy::{AsBytes, FromZeroes},
+        zerocopy::{AsBytes, FromZeros, NoCell},
     };
 
     #[repr(C, packed)]
-    #[derive(AsBytes, FromZeroes, FromBytes, Unaligned)]
+    #[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
     struct Foo {
         x: u8,
         y: u16,

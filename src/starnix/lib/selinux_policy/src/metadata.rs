@@ -5,7 +5,9 @@
 use super::{Array, Counted, Parse, ParseError, Validate};
 
 use std::{fmt::Debug, ops::Deref as _};
-use zerocopy::{little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{
+    little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
+};
 
 pub(crate) const SELINUX_MAGIC: u32 = 0xf97cff8c;
 
@@ -21,7 +23,7 @@ pub(crate) const CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG: u32 = 1 << 2;
 pub(crate) const CONFIG_HANDLE_UNKNOWN_MASK: u32 =
     CONFIG_HANDLE_UNKNOWN_REJECT_FLAG | CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG;
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct Magic(le::U32);
 
@@ -40,7 +42,7 @@ impl Validate for Magic {
 
 pub(crate) type Signature<B> = Array<B, Ref<B, SignatureMetadata>, Ref<B, [u8]>>;
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct SignatureMetadata(le::U32);
 
@@ -79,7 +81,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Signature<B> {
     }
 }
 
-#[derive(Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, FromZeros, FromBytes, NoCell, AsBytes, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct PolicyVersion(le::U32);
 
@@ -158,7 +160,7 @@ fn try_handle_unknown_fom_config(config: u32) -> Result<HandleUnknown, ParseErro
     }
 }
 
-#[derive(Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, FromZeros, FromBytes, NoCell, AsBytes, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct Counts {
     symbols_count: le::U32,

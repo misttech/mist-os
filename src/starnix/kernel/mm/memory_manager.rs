@@ -42,7 +42,7 @@ use std::{
     collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
 };
 use usercopy::slice_to_maybe_uninit_mut;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 fn usercopy(mm: &MemoryManager) -> &Option<usercopy::Usercopy> {
     static USERCOPY: OnceCell<Option<usercopy::Usercopy>> = OnceCell::new();
@@ -1946,15 +1946,27 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         error!(ENAMETOOLONG)
     }
 
-    fn write_object<T: AsBytes>(&self, user: UserRef<T>, object: &T) -> Result<usize, Errno> {
+    fn write_object<T: AsBytes + NoCell>(
+        &self,
+        user: UserRef<T>,
+        object: &T,
+    ) -> Result<usize, Errno> {
         self.write_memory(user.addr(), object.as_bytes())
     }
 
-    fn vmo_write_object<T: AsBytes>(&self, user: UserRef<T>, object: &T) -> Result<usize, Errno> {
+    fn vmo_write_object<T: AsBytes + NoCell>(
+        &self,
+        user: UserRef<T>,
+        object: &T,
+    ) -> Result<usize, Errno> {
         self.vmo_write_memory(user.addr(), object.as_bytes())
     }
 
-    fn write_objects<T: AsBytes>(&self, user: UserRef<T>, objects: &[T]) -> Result<usize, Errno> {
+    fn write_objects<T: AsBytes + NoCell>(
+        &self,
+        user: UserRef<T>,
+        objects: &[T],
+    ) -> Result<usize, Errno> {
         self.write_memory(user.addr(), objects.as_bytes())
     }
 }
@@ -3114,7 +3126,7 @@ mod tests {
         PR_SET_VMA_ANON_NAME,
     };
     use std::ffi::CString;
-    use zerocopy::FromZeroes;
+    use zerocopy::FromZeros;
 
     #[::fuchsia::test]
     async fn test_brk() {
@@ -3730,7 +3742,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_object_partial() {
-        #[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, PartialEq)]
+        #[derive(Debug, Default, Copy, Clone, FromZeros, FromBytes, NoCell, PartialEq)]
         struct Items {
             val: [i32; 4],
         }

@@ -14,7 +14,7 @@ use std::net::IpAddr;
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref, Unaligned,
+    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned,
 };
 
 const IPV4_SIZE: usize = 4;
@@ -189,7 +189,7 @@ impl TryFrom<u16> for Class {
 
 /// Represents an mDNS packet header.
 #[repr(C)]
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 pub struct Header {
     id: U16,
     flags: U16,
@@ -296,11 +296,11 @@ impl EmbeddedPacketBuilder for QuestionBuilder {
 }
 
 /// A parsed AAAA type record.
-#[derive(FromZeroes, FromBytes)]
+#[derive(FromZeros, FromBytes, NoCell)]
 pub struct Aaaa([u8; IPV6_SIZE]);
 
 /// A parsed A type record.
-#[derive(FromZeroes, FromBytes)]
+#[derive(FromZeros, FromBytes, NoCell)]
 pub struct A([u8; IPV4_SIZE]);
 
 /// A parsed SRV type record.

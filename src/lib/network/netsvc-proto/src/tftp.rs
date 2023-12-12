@@ -30,8 +30,8 @@ use std::{convert::TryFrom, io::Write as _, num::NonZeroU16, str::FromStr};
 use thiserror::Error;
 use witness::NonEmptyValidStr;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
+    Ref, Unaligned,
 };
 
 /// The port netsvc uses to send TFTP traffic from.
@@ -787,7 +787,7 @@ where
 }
 
 #[repr(C)]
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 struct MessageHead {
     opcode: U16,
 }

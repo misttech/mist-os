@@ -27,7 +27,7 @@ use {
         process::Command,
         str::FromStr,
     },
-    zerocopy::AsBytes,
+    zerocopy::{AsBytes, NoCell},
 };
 
 const fn part_type(guid: &'static str) -> PartType {
@@ -878,7 +878,7 @@ fn part_range(disk: &GptDisk<'_>, part_id: u32) -> Range<u64> {
 const MAX_TRIES: u8 = 7;
 const MAX_PRIORITY: u8 = 15;
 
-#[derive(AsBytes)]
+#[derive(AsBytes, NoCell)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrData {
@@ -892,7 +892,7 @@ struct AbrData {
     // A CRC32 comes next.
 }
 
-#[derive(AsBytes)]
+#[derive(AsBytes, NoCell)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrSlotData {

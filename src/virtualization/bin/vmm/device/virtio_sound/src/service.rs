@@ -15,7 +15,7 @@ use {
     std::io::{Read, Write},
     std::vec::Vec,
     tracing,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, NoCell},
 };
 
 /// Wraps a request parsed from a virtqueue.
@@ -426,7 +426,7 @@ impl<'s> PcmStream<'s> {
 /// This trait enables a generic implementation of VIRTIO_SND_R_*_INFO requests.
 /// See 5.14.6.1 Item Information Request
 trait Info {
-    type WireT: AsBytes + std::fmt::Debug;
+    type WireT: AsBytes + NoCell + std::fmt::Debug;
     fn get_info(&self) -> &Self::WireT;
 }
 

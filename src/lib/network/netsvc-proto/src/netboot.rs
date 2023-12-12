@@ -20,7 +20,7 @@ use std::{
     num::NonZeroU16,
 };
 use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
+    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
 };
 
 // Re-export witness type.
@@ -203,7 +203,7 @@ pub enum ParseError {
 }
 
 #[repr(C)]
-#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug)]
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug)]
 struct MessageHead {
     magic: U32,
     cookie: U32,

@@ -12,7 +12,9 @@ use super::{
 
 use anyhow::Context as _;
 use std::{fmt::Debug, ops::Deref as _};
-use zerocopy::{little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{
+    little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
+};
 
 pub(crate) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
 pub(crate) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
@@ -116,7 +118,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ConditionalNode<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConditionalNodeMetadata {
     state: le::U32,
@@ -138,7 +140,7 @@ impl Validate for ConditionalNodeMetadata {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConditionalNodeDatum {
     node_type: le::U32,
@@ -223,7 +225,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for AccessVector<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct AccessVectorMetadata {
     source_type: le::U16,
@@ -262,7 +264,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ExtendedPermissions<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct SpecifiedDriverPermissions {
     specified: u8,
@@ -279,7 +281,7 @@ impl Validate for SpecifiedDriverPermissions {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct RoleTransition {
     role: le::U32,
@@ -306,7 +308,7 @@ impl Validate for [RoleTransition] {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct RoleAllow {
     role: le::U32,
@@ -486,7 +488,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for DeprecatedFilenameTransition
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct DeprecatedFilenameTransitionMetadata {
     bit: le::U32,
@@ -580,7 +582,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Context<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ContextMetadata {
     user: le::U32,
@@ -686,7 +688,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Port<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct PortMetadata {
     protocol: le::U32,
@@ -809,7 +811,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Array<B, Ref<B, FsUseMetadat
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct FsUseMetadata {
     behavior: le::U32,
@@ -998,7 +1000,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct InfinitiBandEndPortMetadata {
     length: le::U32,
@@ -1154,7 +1156,7 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for RangeTranslation<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeroes, FromBytes, PartialEq, Unaligned)]
+#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct RangeTranslationMetadata {
     source_type: le::U32,

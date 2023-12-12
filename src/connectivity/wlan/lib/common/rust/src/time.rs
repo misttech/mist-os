@@ -4,7 +4,7 @@
 
 use {
     std::ops,
-    zerocopy::{AsBytes, FromBytes, FromZeroes},
+    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 
 /// Representation of N IEEE 802.11 TimeUnits.
@@ -14,8 +14,9 @@ use {
 #[repr(C)]
 #[derive(
     AsBytes,
-    FromZeroes,
+    FromZeros,
     FromBytes,
+    NoCell,
     Copy,
     Clone,
     Debug,

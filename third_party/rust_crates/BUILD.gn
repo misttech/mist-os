@@ -1127,7 +1127,7 @@ group("xml-rs") {
 }
 
 group("zerocopy") {
-  public_deps = [ ":zerocopy-v0_7_15" ]
+  public_deps = [ ":zerocopy-v0_8_0-alpha_1" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -17726,8 +17726,6 @@ rust_library("zerocopy-v0_7_15") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":zerocopy-derive-v0_7_15($host_toolchain)" ]
   if (true) {
     deps += [ ":zerocopy-derive-v0_7_15($host_toolchain)" ]
   }
@@ -17739,6 +17737,46 @@ rust_library("zerocopy-v0_7_15") {
     "--edition=2021",
     "-Cmetadata=774bd0e59e4cce60",
     "-Cextra-filename=-774bd0e59e4cce60",
+    "--cfg=feature=\"simd\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":zerocopy-v0_7_15.license" ]
+}
+
+license("zerocopy-v0_8_0-alpha_1.license") {
+  public_package_name = "zerocopy"
+  license_files = [
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/src/third_party/rust/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/src/third_party/rust/LICENSE-MIT",
+  ]
+}
+
+rust_library("zerocopy-v0_8_0-alpha_1") {
+  crate_name = "zerocopy"
+  crate_root =
+      "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/src/lib.rs"
+  output_name = "zerocopy-bac2c7f6d7cfcf1c"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":zerocopy-derive-v0_8_0-alpha_1($host_toolchain)" ]
+  if (true) {
+    deps += [ ":zerocopy-derive-v0_8_0-alpha_1($host_toolchain)" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=bac2c7f6d7cfcf1c",
+    "-Cextra-filename=-bac2c7f6d7cfcf1c",
     "--cfg=feature=\"byteorder\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -17748,7 +17786,7 @@ rust_library("zerocopy-v0_7_15") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-v0_7_15.license" ]
+  applicable_licenses = [ ":zerocopy-v0_8_0-alpha_1.license" ]
 }
 
 license("zerocopy-derive-v0_7_15.license") {
@@ -17784,6 +17822,40 @@ rust_proc_macro("zerocopy-derive-v0_7_15") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":zerocopy-derive-v0_7_15.license" ]
+}
+
+license("zerocopy-derive-v0_8_0-alpha_1.license") {
+  public_package_name = "zerocopy_derive"
+  license_files = [
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.1/LICENSE-MIT",
+  ]
+}
+
+rust_proc_macro("zerocopy-derive-v0_8_0-alpha_1") {
+  crate_name = "zerocopy_derive"
+  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.1/src/lib.rs"
+  output_name = "zerocopy_derive-670ee2a0a8a1851d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_63" ]
+  deps += [ ":quote-v1_0_29" ]
+  deps += [ ":syn-v2_0_32" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=670ee2a0a8a1851d",
+    "-Cextra-filename=-670ee2a0a8a1851d",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":zerocopy-derive-v0_8_0-alpha_1.license" ]
 }
 
 license("zeroize-v1_6_0.license") {

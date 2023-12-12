@@ -42,7 +42,7 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
 };
 use vk_sys as vk;
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Reads a magma command and its type from user space.
 ///
@@ -362,7 +362,7 @@ pub fn get_image_info(
 }
 
 #[repr(C)]
-#[derive(AsBytes, FromZeroes, FromBytes, Copy, Clone, Default, Debug)]
+#[derive(AsBytes, FromZeros, FromBytes, NoCell, Copy, Clone, Default, Debug)]
 /// `StarnixPollItem` exists to be able to `AsBytes` and `FromBytes` the union that exists in
 /// `magma_poll_item_t`.
 pub struct StarnixPollItem {

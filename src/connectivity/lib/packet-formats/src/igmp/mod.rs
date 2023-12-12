@@ -32,7 +32,7 @@ use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, InnerPacketBuilder,
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use self::messages::IgmpMessageType;
 use crate::error::ParseError;
@@ -52,7 +52,7 @@ pub trait MessageType<B> {
     ///
     /// These are the bytes immediately following the checksum bytes in an IGMP
     /// message. Most IGMP messages' `FixedHeader` is an IPv4 address.
-    type FixedHeader: Sized + Copy + Clone + FromBytes + AsBytes + Unaligned + Debug;
+    type FixedHeader: Sized + Copy + Clone + FromBytes + AsBytes + NoCell + Unaligned + Debug;
 
     /// The variable-length body for the message type.
     type VariableBody: Sized;
@@ -220,7 +220,7 @@ where
 ///
 /// Note that even though `max_rsp_time` is part of `HeaderPrefix`, it is not
 /// meaningful or used in every message.
-#[derive(Default, Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
+#[derive(Default, Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
 #[repr(C)]
 pub struct HeaderPrefix {
     msg_type: u8,

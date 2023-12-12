@@ -6,7 +6,7 @@ use crate::Bssid;
 use anyhow::{format_err, Error};
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use std::{fmt, str::FromStr};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 // Strictly speaking, the MAC address is not defined in 802.11, but it's defined
 // here for convenience.
@@ -17,7 +17,18 @@ pub const NULL_ADDR: MacAddr = MacAddr([0x00; fidl_ieee80211::MAC_ADDR_LEN as us
 
 #[repr(transparent)]
 #[derive(
-    FromZeroes, FromBytes, AsBytes, Unaligned, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+    FromZeros,
+    FromBytes,
+    AsBytes,
+    NoCell,
+    Unaligned,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 pub struct MacAddr(pub(crate) MacAddrByteArray);
 

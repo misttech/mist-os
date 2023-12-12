@@ -379,7 +379,7 @@ mod tests {
     };
     use cm_rust_testing::ComponentDeclBuilder;
     use moniker::MonikerBase;
-    use zerocopy::AsBytes;
+    use zerocopy::{AsBytes, NoCell};
 
     #[fuchsia::test]
     async fn verify_get_event_retry() {
@@ -436,7 +436,7 @@ mod tests {
                 }
                 fio::DirectoryRequest::ReadDirents { responder, .. } => {
                     const SIZE: usize = 3;
-                    #[derive(AsBytes)]
+                    #[derive(AsBytes, NoCell)]
                     #[repr(C, packed)]
                     struct Dirent {
                         ino: u64,

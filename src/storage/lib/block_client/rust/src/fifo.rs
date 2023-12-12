@@ -13,14 +13,14 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub type zx_status_t = i32;
 pub type reqid_t = u32;
 pub type groupid_t = u16;
 pub type vmoid_t = u16;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
 pub struct BlockFifoCommand {
     pub opcode: u8,
     pub padding_to_satisfy_zerocopy: [u8; 3usize],
@@ -63,7 +63,7 @@ fn bindgen_test_layout_BlockFifoCommand() {
 }
 pub type block_fifo_command_t = BlockFifoCommand;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
 pub struct BlockFifoRequest {
     pub command: block_fifo_command_t,
     pub reqid: reqid_t,
@@ -141,7 +141,7 @@ fn bindgen_test_layout_BlockFifoRequest() {
     );
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
 pub struct BlockFifoResponse {
     pub status: zx_status_t,
     pub reqid: reqid_t,

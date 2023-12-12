@@ -27,7 +27,7 @@ use starnix_uapi::{
     statfs, SELINUX_MAGIC,
 };
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
-use zerocopy::AsBytes;
+use zerocopy::{AsBytes, NoCell};
 
 /// The version of selinux_status_t this kernel implements.
 const SELINUX_STATUS_VERSION: u32 = 1;
@@ -146,7 +146,7 @@ impl SeLinuxFs {
 /// The C-style struct exposed to userspace by the /sys/fs/selinux/status file.
 /// Defined here (instead of imported through bindgen) as selinux headers are not exposed through
 /// kernel uapi headers.
-#[derive(Debug, Copy, Clone, AsBytes, Default)]
+#[derive(Debug, Copy, Clone, AsBytes, NoCell, Default)]
 #[repr(C, packed)]
 struct selinux_status_t {
     /// Version number of this structure (1).

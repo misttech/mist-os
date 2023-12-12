@@ -4,14 +4,24 @@
 
 use {
     byteorder::{BigEndian, ByteOrder},
-    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
+    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
 };
 
 macro_rules! big_endian_inttype {
     ($struct_name:ident, $inttype:ty, $read_fn:ident, $write_fn:ident, $width:expr) => {
         #[repr(C)]
         #[derive(
-            Clone, Copy, Debug, Default, AsBytes, FromZeroes, FromBytes, Unaligned, PartialEq, Eq,
+            Clone,
+            Copy,
+            Debug,
+            Default,
+            AsBytes,
+            FromZeros,
+            FromBytes,
+            NoCell,
+            Unaligned,
+            PartialEq,
+            Eq,
         )]
         pub struct $struct_name(pub [u8; $width]);
         impl $struct_name {

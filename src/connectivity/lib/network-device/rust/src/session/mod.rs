@@ -625,7 +625,7 @@ mod tests {
     use fuchsia_async::Fifo;
     use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use test_case::test_case;
-    use zerocopy::{AsBytes, FromBytes};
+    use zerocopy::{AsBytes, FromBytes, NoCell};
 
     use super::{
         buffer::{
@@ -778,7 +778,7 @@ mod tests {
         (Fifo::from_fifo(handle).unwrap(), other_end)
     }
 
-    fn remove_rights<T: FromBytes + AsBytes>(
+    fn remove_rights<T: FromBytes + AsBytes + NoCell>(
         fifo: Fifo<T>,
         rights_to_remove: fuchsia_zircon::Rights,
     ) -> Fifo<T> {

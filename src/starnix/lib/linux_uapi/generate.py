@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 from bindgen import Bindgen
 
 RAW_LINES = """
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes, FromZeros};
 
 unsafe impl<Storage> AsBytes for __BindgenBitfieldUnit<Storage>
 where
@@ -31,20 +31,20 @@ where
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
-unsafe impl<Storage> FromZeroes for __BindgenBitfieldUnit<Storage>
+unsafe impl<Storage> FromZeros for __BindgenBitfieldUnit<Storage>
 where
-    Storage: FromZeroes,
+    Storage: FromZeros,
 {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
 #[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeros)]
 pub struct uaddr {
     pub addr: u64,
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeros)]
 #[repr(transparent)]
 pub struct uref<T> {
     pub addr: uaddr,
@@ -76,40 +76,40 @@ INCLUDE_DIRS = [
 
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
-    (r"__IncompleteArrayField", ["Clone", "AsBytes, FromBytes", "FromZeroes"]),
-    (r"__sifields__bindgen_ty_(2|3|7)", ["AsBytes, FromBytes", "FromZeroes"]),
+    (r"__IncompleteArrayField", ["Clone", "AsBytes, FromBytes", "FromZeros"]),
+    (r"__sifields__bindgen_ty_(2|3|7)", ["AsBytes, FromBytes", "FromZeros"]),
     (
         r"binder_transaction_data__bindgen_ty_2__bindgen_ty_1",
-        ["AsBytes", "FromBytes", "FromZeroes"],
+        ["AsBytes", "FromBytes", "FromZeros"],
     ),
-    (r"binder_transaction_data.*", ["FromBytes", "FromZeroes"]),
+    (r"binder_transaction_data.*", ["FromBytes", "FromZeros"]),
     (
         r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|15|16|17|18|19)$",
-        ["AsBytes", "FromBytes", "FromZeroes"],
+        ["AsBytes", "FromBytes", "FromZeros"],
     ),
-    (r"bpf_attr.*", ["FromBytes", "FromZeroes"]),
-    (r"flat_binder_object.*", ["FromBytes", "FromZeroes"]),
-    (r"fuse_dirent", ["Clone", "AsBytes", "FromBytes", "FromZeroes"]),
-    (r"ifreq.*", ["FromBytes", "FromZeroes"]),
-    (r"if_settings.*", ["FromBytes", "FromZeroes"]),
-    (r"ip6?t_entry", ["FromBytes", "FromZeroes"]),
-    (r"ip6?t_get_entries", ["FromBytes", "FromZeroes"]),
-    (r"ip6?t_replace", ["FromBytes", "FromZeroes"]),
-    (r"in6_addr", ["AsBytes", "FromBytes", "FromZeroes"]),
-    (r"in6_pktinfo", ["AsBytes", "FromBytes", "FromZeroes"]),
+    (r"bpf_attr.*", ["FromBytes", "FromZeros"]),
+    (r"flat_binder_object.*", ["FromBytes", "FromZeros"]),
+    (r"fuse_dirent", ["Clone", "AsBytes", "FromBytes", "FromZeros"]),
+    (r"ifreq.*", ["FromBytes", "FromZeros"]),
+    (r"if_settings.*", ["FromBytes", "FromZeros"]),
+    (r"ip6?t_entry", ["FromBytes", "FromZeros"]),
+    (r"ip6?t_get_entries", ["FromBytes", "FromZeros"]),
+    (r"ip6?t_replace", ["FromBytes", "FromZeros"]),
+    (r"in6_addr", ["AsBytes", "FromBytes", "FromZeros"]),
+    (r"in6_pktinfo", ["AsBytes", "FromBytes", "FromZeros"]),
     (r"inotify_event", ["AsBytes"]),
-    (r"input_event", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
-    (r"input_id", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
-    (r"ip6t_ip6", ["FromBytes", "FromZeroes"]),
-    (r"robust_list_head", ["FromBytes", "FromZeroes"]),
-    (r"robust_list", ["FromBytes", "FromZeroes"]),
-    (r"sigevent", ["FromBytes", "FromZeroes"]),
-    (r"sigval", ["AsBytes", "FromBytes", "FromZeroes"]),
-    (r"sockaddr_in*", ["AsBytes", "FromBytes", "FromZeroes"]),
-    (r"sock_fprog", ["FromBytes", "FromZeroes"]),
+    (r"input_event", ["AsBytes", "FromBytes", "FromZeros", "PartialEq"]),
+    (r"input_id", ["AsBytes", "FromBytes", "FromZeros", "PartialEq"]),
+    (r"ip6t_ip6", ["FromBytes", "FromZeros"]),
+    (r"robust_list_head", ["FromBytes", "FromZeros"]),
+    (r"robust_list", ["FromBytes", "FromZeros"]),
+    (r"sigevent", ["FromBytes", "FromZeros"]),
+    (r"sigval", ["AsBytes", "FromBytes", "FromZeros"]),
+    (r"sockaddr_in*", ["AsBytes", "FromBytes", "FromZeros"]),
+    (r"sock_fprog", ["FromBytes", "FromZeros"]),
     (r"sysinfo", ["AsBytes"]),
-    (r"timeval", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
-    (r"xt_counters_info", ["FromBytes", "FromZeroes"]),
+    (r"timeval", ["AsBytes", "FromBytes", "FromZeros", "PartialEq"]),
+    (r"xt_counters_info", ["FromBytes", "FromZeros"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -134,17 +134,17 @@ REPLACEMENTS = [
         "#[derive(\\1)]\n"
         "pub struct __IncompleteArrayField",
     ),
-    # Add AsBytes/FromBytes/FromZeroes to every copyable struct regardless of
+    # Add AsBytes/FromBytes/FromZeros to every copyable struct regardless of
     # name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n",
+        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros)]\n",
     ),
     (
         r"\n#\[derive\(Debug, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n",
+        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeros)]\n",
     ),
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque

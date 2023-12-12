@@ -14,7 +14,8 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -36,7 +37,7 @@ create_protocol_enum!(
 );
 
 /// A trait to represent an ARP hardware type.
-pub trait HType: FromBytes + AsBytes + Unaligned + Copy + Clone + Hash + Eq {
+pub trait HType: FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Hash + Eq {
     /// The hardware type.
     const HTYPE: ArpHardwareType;
     /// The in-memory size of an instance of the type.
@@ -46,7 +47,7 @@ pub trait HType: FromBytes + AsBytes + Unaligned + Copy + Clone + Hash + Eq {
 }
 
 /// A trait to represent an ARP protocol type.
-pub trait PType: FromBytes + AsBytes + Unaligned + Copy + Clone + Hash + Eq {
+pub trait PType: FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Hash + Eq {
     /// The protocol type.
     const PTYPE: ArpNetworkType;
     /// The in-memory size of an instance of the type.
@@ -82,7 +83,7 @@ create_protocol_enum!(
     }
 );
 
-#[derive(Default, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct Header {
     htype: U16, // Hardware (e.g. Ethernet)
@@ -158,7 +159,7 @@ pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, A
 //   padding so long as each field also has no alignment requirement that would
 //   cause the layout algorithm to produce padding. Thus, we use an AsBytes +
 //   Unaligned bound for our type parameters.
-#[derive(FromZeroes, FromBytes, Unaligned)]
+#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct Body<HwAddr, ProtoAddr> {
     sha: HwAddr,
@@ -231,8 +232,8 @@ where
 
 impl<B: ByteSlice, HwAddr, ProtoAddr> ArpPacket<B, HwAddr, ProtoAddr>
 where
-    HwAddr: Copy + HType + FromBytes + Unaligned,
-    ProtoAddr: Copy + PType + FromBytes + Unaligned,
+    HwAddr: Copy + HType + FromBytes + NoCell + Unaligned,
+    ProtoAddr: Copy + PType + FromBytes + NoCell + Unaligned,
 {
     /// The type of ARP packet
     pub fn operation(&self) -> ArpOp {
@@ -302,8 +303,8 @@ impl<HwAddr, ProtoAddr> ArpPacketBuilder<HwAddr, ProtoAddr> {
 
 impl<HwAddr, ProtoAddr> InnerPacketBuilder for ArpPacketBuilder<HwAddr, ProtoAddr>
 where
-    HwAddr: Copy + HType + FromBytes + AsBytes + Unaligned,
-    ProtoAddr: Copy + PType + FromBytes + AsBytes + Unaligned,
+    HwAddr: Copy + HType + FromBytes + AsBytes + NoCell + Unaligned,
+    ProtoAddr: Copy + PType + FromBytes + AsBytes + NoCell + Unaligned,
 {
     fn bytes_len(&self) -> usize {
         mem::size_of::<Header>() + mem::size_of::<Body<HwAddr, ProtoAddr>>()

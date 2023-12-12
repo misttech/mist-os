@@ -36,7 +36,7 @@ use {
         zxcrypt,
     },
     uuid::Uuid,
-    zerocopy::AsBytes,
+    zerocopy::{AsBytes, NoCell},
 };
 
 const GPT_DRIVER_PATH: &str = "gpt.cm";
@@ -748,7 +748,7 @@ impl DiskBuilder {
         const ZBI_FLAGS_STORAGE_COMPRESSED: u32 = 0x00000001;
 
         #[repr(C)]
-        #[derive(AsBytes)]
+        #[derive(AsBytes, NoCell)]
         struct ZbiHeader {
             type_: u32,
             length: u32,

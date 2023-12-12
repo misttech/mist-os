@@ -9,7 +9,7 @@ use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
 use zerocopy::{
     byteorder::big_endian::{U32 as BigEndianU32, U64 as BigEndianU64},
-    AsBytes,
+    AsBytes, NoCell,
 };
 
 pub mod builder;
@@ -111,7 +111,7 @@ impl HashDescriptor {
     }
 }
 
-#[derive(AsBytes, Debug, PartialEq)]
+#[derive(AsBytes, NoCell, Debug, PartialEq)]
 #[repr(C, packed)]
 struct HashDescriptorHeader {
     tag: BigEndianU64,

@@ -65,7 +65,7 @@ use core::ops::{Deref, DerefMut};
 use std::net;
 
 pub use net_types_macros::GenericOverIp;
-use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::{
     sealed, LinkLocalAddr, LinkLocalAddress, LinkLocalMulticastAddr, LinkLocalUnicastAddr,
@@ -1553,9 +1553,10 @@ impl Ipv4AddressClass {
     PartialOrd,
     Ord,
     Hash,
-    FromZeroes,
+    FromZeros,
     FromBytes,
     AsBytes,
+    NoCell,
     Unaligned,
 )]
 #[repr(transparent)]
@@ -1812,9 +1813,10 @@ impl Debug for Ipv4Addr {
     PartialOrd,
     Ord,
     Hash,
-    FromZeroes,
+    FromZeros,
     FromBytes,
     AsBytes,
+    NoCell,
     Unaligned,
 )]
 #[repr(transparent)]
