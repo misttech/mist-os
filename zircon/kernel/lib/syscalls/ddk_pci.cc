@@ -119,10 +119,14 @@ zx_status_t sys_pci_add_subtract_io_range(zx_handle_t handle, uint32_t mmio, uin
   LTRACEF("handle %x mmio %d base %#" PRIx64 " len %#" PRIx64 " add %d\n", handle, is_mmio, base,
           len, is_add);
 
-  // TODO(fxbug.dev/30918): finer grained validation
-  // TODO(security): Add additional access checks
   zx_status_t status;
-  if ((status = validate_resource(handle, ZX_RSRC_KIND_ROOT)) < 0) {
+  if (is_mmio) {
+    status = validate_resource_mmio(handle, base, len);
+  } else {
+    status = validate_resource_ioport(handle, base, len);
+  }
+
+  if (status < 0) {
     return status;
   }
 
