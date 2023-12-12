@@ -51,7 +51,6 @@ if (use_bringup_assembly) {
     public_deps = [
       "//:developer_universe_packages",
       "//:discoverable_packages",
-      "//:legacy_universe_packages",
     ]
   }
 

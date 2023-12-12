@@ -71,4 +71,4 @@ zedboot_product_assembly_config_label = "//products/zedboot"
 # Include the session framework
 core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]
 
-legacy_universe_package_labels = [ "//bundles/tools" ]
+discoverable_package_labels = [ "//bundles/tools" ]

@@ -19,7 +19,7 @@ legacy_cache_package_labels += [
   "//src/media/sessions/bundles:services",
 ]
 
-legacy_universe_package_labels = [ "//bundles/tools" ]
+discoverable_package_labels = [ "//bundles/tools" ]
 
 # Use the product assembly config target to specify the product configuration.
 #

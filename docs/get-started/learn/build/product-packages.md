@@ -53,7 +53,7 @@ legacy_cache_package_labels += [
   "//src/media/playback/bundles:services",
 ]
 
-legacy_universe_package_labels += [
+discoverable_package_labels += [
   "//src/ui/examples:bouncing_ball",
 ]
 ```
@@ -285,7 +285,7 @@ Add the following lines to `//vendor/fuchsia-codelab/products/fuchsialab.gni`
 to include the Hello World example in your custom product:
 
 ```gn
-legacy_universe_package_labels += [
+discoverable_package_labels += [
     "//examples/hello_world",
 ]
 ```

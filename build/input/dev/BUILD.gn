@@ -20,11 +20,6 @@ group("recovery_bootfs_labels") {
   deps = [ ":recovery_kernel_cmdline_args" ] + dev_recovery_bootfs_labels
 }
 
-group("system_image_deps") {
-  testonly = fuchsia_zbi_testonly
-  deps = dev_system_image_deps
-}
-
 group("zedboot_bootfs_labels") {
   testonly = true
   deps = [ ":zedboot_kernel_cmdline_args" ] + dev_zedboot_bootfs_labels

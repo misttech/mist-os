@@ -37,7 +37,6 @@ declare_args() {
   # be visible to Driver Manager. These package labels are also considered to be in the
   # 'base' package set (for more info see 'base_package_labels').
   base_driver_package_labels = []
-  legacy_base_driver_package_labels = []
 
   # If you add package labels to this variable, the packages will be included in
   # the 'base' package set, which represents the set of packages that are part
@@ -63,7 +62,6 @@ declare_args() {
   # the base and cache package sets, which means you do not need to redundantly
   # include those labels in this variable.
   universe_package_labels = []
-  legacy_universe_package_labels = []
 
   # If you add package labels to this variable, the packages will be included in
   # the 'discoverable' package set, as defined by RFC-0212 "Package Sets":
@@ -76,14 +74,6 @@ declare_args() {
   # As these cannot be part of the legacy AIB for a product, there is no
   # "legacy" version of this argument.
   discoverable_package_labels = []
-
-  # A list of binary labels to include in ZBIs built for this product.
-  # product_bootfs_labels = []  (defined in product.gni)
-  legacy_product_bootfs_labels = []
-
-  # A list of binary labels to include in the system_image package.
-  # product_system_image_deps = []  (defined in product.gni)
-  legacy_product_system_image_deps = []
 
   # These are arguments used by Infra (and 'fx set') to add tests to a build
   # configuration without necessarily adding them to the assembled product, and
@@ -117,7 +107,6 @@ declare_args() {
   #
   # These will be added to the build using the host toolchain.
   host_labels = []
-  legacy_host_labels = []
 
   # A file containing historical test duration data for this build
   # configuration, used used by testsharder to evenly split tests across
@@ -1661,7 +1650,7 @@ group("developer_universe_packages") {
 group("legacy_base_driver_packages") {
   testonly = base_cache_packages_testonly
   visibility = [ "//build/images/*" ]
-  public_deps = legacy_base_driver_package_labels + board_driver_package_labels
+  public_deps = board_driver_package_labels
 }
 
 # Product+Board base packages
@@ -1683,14 +1672,6 @@ group("legacy_cache_packages") {
     "//build/images/*",
   ]
   public_deps = legacy_cache_package_labels
-  assert_no_deps = [ "//build/validate:shell_command_tag" ]
-}
-
-# Product+Board universe packages
-group("legacy_universe_packages") {
-  testonly = fuchsia_zbi_testonly
-  visibility = [ "//build/images/*" ]
-  public_deps = legacy_universe_package_labels
   assert_no_deps = [ "//build/validate:shell_command_tag" ]
 }
 

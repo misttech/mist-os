@@ -101,21 +101,6 @@ bringup_base = {
     "//build/input:bootfs",
     "//:developer_base_packages",
   ]
-
-  _ignored = {
-    import("//build/dev.gni")
-    import("//build/product.gni")
-    all_empty = true
-    if (dev_system_image_deps != []) {
-      print("dev_system_image_deps not empty: ${dev_system_image_deps}")
-      all_empty = false
-    }
-    if (product_system_image_deps != []) {
-      print("product_system_image_deps not empty: ${product_system_image_deps}")
-      all_empty = false
-    }
-    assert(all_empty)
-  }
 }
 
 assembled_system("bringup_assembly") {

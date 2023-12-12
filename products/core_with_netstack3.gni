@@ -10,7 +10,7 @@ legacy_base_package_labels = []
 legacy_base_package_labels +=
     [ "//src/connectivity/network/netcfg:config-default" ]
 
-legacy_universe_package_labels = [ "//bundles/tools" ]
+discoverable_package_labels = [ "//bundles/tools" ]
 
 # Use the product assembly config target to specify the product configuration.
 #
