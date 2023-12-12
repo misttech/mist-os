@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <sdk/lib/driver/component/cpp/composite_node_spec.h>
 #include <sdk/lib/driver/component/cpp/node_add_args.h>
@@ -95,6 +96,15 @@ zx_status_t Vim3::BluetoothInit() {
       fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
   };
 
+  fuchsia_driver_framework::wire::BindRule kGpioBindRules[] = {
+      fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                                  bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)),
+  };
+
+  fuchsia_driver_framework::wire::NodeProperty kGpioProperties[] = {
+      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
   auto parents = std::vector{
       fuchsia_driver_framework::wire::ParentSpec{
           .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
@@ -102,6 +112,13 @@ zx_status_t Vim3::BluetoothInit() {
           .properties =
               fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
                   kPwmProperties, 1),
+      },
+      fuchsia_driver_framework::wire::ParentSpec{
+          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
+              kGpioBindRules, 1),
+          .properties =
+              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
+                  kGpioProperties, 1),
       },
   };
 

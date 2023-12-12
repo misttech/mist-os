@@ -26,7 +26,11 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:12:4/audio-i2s-in-composite-spec/vim3-audio-tdm1-in",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
 
+      // bt-transport-uart is not included in bootfs on vim3.
+      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart",
       // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.
+      // "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
+
       // TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
       // netdevice migration.
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
