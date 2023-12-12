@@ -41,7 +41,14 @@ zx::result<> Vim3::ButtonsInit() {
   std::vector<fuchsia_buttons::Button> buttons;
   buttons.emplace_back(std::move(func_button));
 
-  auto metadata = fuchsia_buttons::Metadata().polling_rate_usec(1'000).buttons(std::move(buttons));
+  // How long to wait between polling attempts.  This value should be large enough to ensure
+  // polling does not overly impact system performance while being small enough to debounce and
+  // ensure button presses are correctly registered.
+  //
+  // TODO(b/315366570): Change the driver to use an IRQ instead of polling.
+  constexpr uint32_t kPollingPeriodUSec = 20'000;
+  auto metadata =
+      fuchsia_buttons::Metadata().polling_rate_usec(kPollingPeriodUSec).buttons(std::move(buttons));
 
   fit::result metadata_bytes = fidl::Persist(std::move(metadata));
   if (!metadata_bytes.is_ok()) {
