@@ -44,6 +44,7 @@ group("tests") {
     "fidl/testing",
     "power-manager:tests",
     "shutdown-shim/tests",
+    "system-activity-governor:tests",
     "testing:tests",
     "thermd:tests",
   ]
