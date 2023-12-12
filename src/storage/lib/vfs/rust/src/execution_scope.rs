@@ -152,10 +152,11 @@ impl ExecutionScope {
         // down the executor before the task has been dropped which would deny it the opportunity to
         // correctly spawn a task in its drop function.
         self.executor.inner.lock().unwrap().active_count += 1;
-        fuchsia_async::EHandle::local().spawn_detached(TaskRunner {
+        fuchsia_async::Task::spawn(TaskRunner {
             task,
             task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
-        });
+        })
+        .detach();
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -334,16 +335,17 @@ mod tests {
     use crate::directory::mutable::entry_constructor::EntryConstructor;
 
     use {
-        fuchsia_async::{Task, TestExecutor, Time, Timer},
-        fuchsia_zircon::prelude::*,
+        fuchsia_async::{Task, TestExecutor, Timer},
         futures::{channel::oneshot, task::Poll, Future},
         pin_utils::pin_mut,
         std::sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
         },
+        std::time::Duration,
     };
 
+    #[cfg(target_os = "fuchsia")]
     fn run_test<GetTest, GetTestRes>(get_test: GetTest)
     where
         GetTest: FnOnce(ExecutionScope) -> GetTestRes,
@@ -357,6 +359,27 @@ mod tests {
 
         pin_mut!(test);
         assert_eq!(exec.run_until_stalled(&mut test), Poll::Ready(()), "Test did not complete");
+    }
+
+    #[cfg(not(target_os = "fuchsia"))]
+    fn run_test<GetTest, GetTestRes>(get_test: GetTest)
+    where
+        GetTest: FnOnce(ExecutionScope) -> GetTestRes,
+        GetTestRes: Future<Output = ()>,
+    {
+        use fuchsia_async::TimeoutExt;
+        let mut exec = TestExecutor::new();
+
+        let scope = ExecutionScope::new();
+
+        // This isn't a perfect equivalent to the target version, but Tokio
+        // doesn't have run_until_stalled and it sounds like it's
+        // architecturally impossible.
+        let test =
+            get_test(scope).on_stalled(Duration::from_secs(30), || panic!("Test did not complete"));
+
+        pin_mut!(test);
+        exec.run_singlethreaded(&mut test);
     }
 
     #[test]
@@ -432,7 +455,7 @@ mod tests {
                 },
                 async {
                     // This is a Turing halting problem so the sleep is justified.
-                    Timer::new(Time::after(100.millis())).await;
+                    Timer::new(Duration::from_millis(100)).await;
                     *done.lock().unwrap() = true;
                     processing_done_sender.send(()).unwrap();
                 }
@@ -525,7 +548,7 @@ mod tests {
         };
 
         use {
-            fuchsia_zircon::Status,
+            fuchsia_zircon_status::Status,
             futures::{
                 channel::oneshot,
                 task::{Context, Poll},

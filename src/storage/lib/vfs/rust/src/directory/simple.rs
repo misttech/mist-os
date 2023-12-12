@@ -33,7 +33,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     std::{
         boxed::Box,
         clone::Clone,
@@ -512,7 +512,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_event, file::vmo::read_only};
+    use crate::{assert_event, test_utils::test_file::TestFile};
     use fidl::endpoints::create_proxy;
     use std::sync::{Arc, Mutex};
 
@@ -520,7 +520,7 @@ mod tests {
     fn add_entry_success() {
         let dir = crate::directory::mutable::simple();
         assert_eq!(
-            dir.add_entry("path_without_separators", read_only(b"test")),
+            dir.add_entry("path_without_separators", TestFile::read_only(b"test")),
             Ok(()),
             "add entry with valid filename should succeed"
         );
@@ -530,7 +530,7 @@ mod tests {
     fn add_entry_error_name_with_path_separator() {
         let dir = crate::directory::mutable::simple();
         let status = dir
-            .add_entry("path/with/separators", read_only(b"test"))
+            .add_entry("path/with/separators", TestFile::read_only(b"test"))
             .expect_err("add entry with path separator should fail");
         assert_eq!(status, Status::INVALID_ARGS);
     }
@@ -539,7 +539,7 @@ mod tests {
     fn add_entry_error_name_too_long() {
         let dir = crate::directory::mutable::simple();
         let status = dir
-            .add_entry("a".repeat(10000), read_only(b"test"))
+            .add_entry("a".repeat(10000), TestFile::read_only(b"test"))
             .expect_err("add entry whose name is too long should fail");
         assert_eq!(status, Status::BAD_PATH);
     }
@@ -560,7 +560,7 @@ mod tests {
         }));
         dir.add_entry("dir", sub_dir).expect("add entry with valid filename should succeed");
 
-        dir.add_entry("file", read_only(b"test"))
+        dir.add_entry("file", TestFile::read_only(b"test"))
             .expect("add entry with valid filename should succeed");
 
         let scope = ExecutionScope::new();

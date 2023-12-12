@@ -21,14 +21,14 @@ use crate::{
         traversal_position::TraversalPosition::{self, End, Name, Start},
     },
     execution_scope::ExecutionScope,
-    file::vmo::read_only,
+    test_utils::test_file::TestFile,
 };
 
 use {
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
     fuchsia_async::TestExecutor,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     futures::{channel::mpsc, lock::Mutex},
     std::{
         marker::{Send, Sync},
@@ -186,7 +186,7 @@ fn static_entries() {
 
     let get_entry = |name: &str| {
         let content = format!("File {} content", name);
-        Ok(read_only(content) as Arc<dyn DirectoryEntry>)
+        Ok(TestFile::read_only(content) as Arc<dyn DirectoryEntry>)
     };
 
     run_server_client(
@@ -210,14 +210,14 @@ fn static_entries_with_traversal() {
     let get_entry = |name: &str| match name {
         "etc" => {
             let etc = pseudo_directory! {
-                "fstab" => read_only(b"/dev/fs /"),
+                "fstab" => TestFile::read_only(b"/dev/fs /"),
                 "ssh" => pseudo_directory! {
-                    "sshd_config" => read_only(b"# Empty"),
+                    "sshd_config" => TestFile::read_only(b"# Empty"),
                 },
             };
             Ok(etc as Arc<dyn DirectoryEntry>)
         }
-        "files" => Ok(read_only(b"Content") as Arc<dyn DirectoryEntry>),
+        "files" => Ok(TestFile::read_only(b"Content") as Arc<dyn DirectoryEntry>),
         _ => Err(Status::NOT_FOUND),
     };
 
@@ -355,7 +355,7 @@ fn dynamic_entries() {
         let entry = |count: u8| {
             let content = format!("Content: {}", count);
 
-            Ok(read_only(content) as Arc<dyn DirectoryEntry>)
+            Ok(TestFile::read_only(content) as Arc<dyn DirectoryEntry>)
         };
 
         match name {

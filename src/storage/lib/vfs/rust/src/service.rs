@@ -28,11 +28,14 @@ use {
     },
     fidl_fuchsia_io as fio,
     fuchsia_async::Channel,
-    fuchsia_zircon as zx,
+    fuchsia_zircon_status::Status,
     futures::future::Future,
-    libc::{S_IRUSR, S_IWUSR},
     std::sync::Arc,
 };
+
+// Redefine these constants as a u32 as in macos they are u16
+const S_IRUSR: u32 = libc::S_IRUSR as u32;
+const S_IWUSR: u32 = libc::S_IWUSR as u32;
 
 /// Constructs a node in your file system that will host a service that implements a statically
 /// specified FIDL protocol.  `ServerRequestStream` specifies the type of the server side of this
@@ -107,7 +110,7 @@ impl DirectoryEntry for Service {
         };
         flags.to_object_request(server_end).handle(|object_request| {
             if !path.is_empty() {
-                return Err(zx::Status::NOT_DIR);
+                return Err(Status::NOT_DIR);
             }
             if flags.is_node() {
                 scope.spawn(node::Connection::create(scope.clone(), self, flags, object_request)?);
@@ -140,7 +143,7 @@ impl DirectoryEntry for Service {
 
 #[async_trait]
 impl Node for Service {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_SERVICE | S_IRUSR | S_IWUSR,
             id: fio::INO_UNKNOWN,
@@ -155,7 +158,7 @@ impl Node for Service {
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
+    ) -> Result<fio::NodeAttributes2, Status> {
         Ok(attributes!(
             requested_attributes,
             Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },

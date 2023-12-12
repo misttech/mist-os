@@ -9,12 +9,10 @@ use crate::{
     test_utils::run::{self, AsyncServerClientTestParams},
 };
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{Status, Vmo},
-    futures::Future,
-    std::{convert::Infallible, sync::Arc},
-};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, futures::Future, std::sync::Arc};
+
+#[cfg(target_os = "fuchsia")]
+use std::convert::Infallible;
 
 pub use run::{run_client, test_client};
 
@@ -54,7 +52,8 @@ pub enum AssertVmoContentError {
 }
 
 /// Reads the VMO content and matches it against the expectation.
-pub fn assert_vmo_content(vmo: &Vmo, expected: &[u8]) -> Result<(), AssertVmoContentError> {
+#[cfg(target_os = "fuchsia")]
+pub fn assert_vmo_content(vmo: &fidl::Vmo, expected: &[u8]) -> Result<(), AssertVmoContentError> {
     let mut buffer = Vec::with_capacity(expected.len());
     buffer.resize(expected.len(), 0);
     vmo.read(&mut buffer, 0).map_err(AssertVmoContentError::VmoReadFailed)?;
@@ -101,8 +100,9 @@ pub enum ReportInvalidVmoContentError {
 
 /// A helper function to panic with a message that includes the VMO content and a specified
 /// `context` message.
+#[cfg(target_os = "fuchsia")]
 pub fn report_invalid_vmo_content(
-    vmo: &Vmo,
+    vmo: &fidl::Vmo,
     context: &str,
 ) -> Result<Infallible, ReportInvalidVmoContentError> {
     // For debugging purposes we print the first 100 bytes.  This is an arbitrary choice.

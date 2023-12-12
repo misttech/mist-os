@@ -10,7 +10,8 @@ use {
         node::NodeOptions,
         symlink::SymlinkOptions,
     },
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
 };
 
 /// Extends fio::ConnectionProtocols and fio::OpenFlags
@@ -36,16 +37,16 @@ pub trait ProtocolsExt: Sync + 'static {
     fn rights(&self) -> Option<fio::Operations>;
 
     /// Convert to directory options.  Returns an error if the request does not permit a directory.
-    fn to_directory_options(&self) -> Result<DirectoryOptions, zx::Status>;
+    fn to_directory_options(&self) -> Result<DirectoryOptions, Status>;
 
     /// Convert to file options.  Returns an error if the request does not permit a file.
-    fn to_file_options(&self) -> Result<FileOptions, zx::Status>;
+    fn to_file_options(&self) -> Result<FileOptions, Status>;
 
     /// Convert to symlink options.  Returns an error if the request does not permit a symlink.
-    fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status>;
+    fn to_symlink_options(&self) -> Result<SymlinkOptions, Status>;
 
     /// Convert to node options.  Returns an error if the request does not permit a node.
-    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status>;
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, Status>;
 
     /// True if REPRESENTATION is desired.
     fn get_representation(&self) -> bool;
@@ -118,12 +119,12 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         }
     }
 
-    fn to_directory_options(&self) -> Result<DirectoryOptions, zx::Status> {
+    fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
         if !self.is_dir_allowed() {
             if self.is_file_allowed() && !self.is_symlink_allowed() {
-                return Err(zx::Status::NOT_FILE);
+                return Err(Status::NOT_FILE);
             } else {
-                return Err(zx::Status::WRONG_TYPE);
+                return Err(Status::WRONG_TYPE);
             }
         }
         let optional_rights = match self {
@@ -144,12 +145,12 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         Ok(DirectoryOptions { rights: self.rights().unwrap() | optional_rights })
     }
 
-    fn to_file_options(&self) -> Result<FileOptions, zx::Status> {
+    fn to_file_options(&self) -> Result<FileOptions, Status> {
         if !self.is_file_allowed() {
             if self.is_dir_allowed() && !self.is_symlink_allowed() {
-                return Err(zx::Status::NOT_DIR);
+                return Err(Status::NOT_DIR);
             } else {
-                return Err(zx::Status::WRONG_TYPE);
+                return Err(Status::WRONG_TYPE);
             }
         }
         Ok(FileOptions {
@@ -159,18 +160,18 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         })
     }
 
-    fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status> {
+    fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
         if !self.is_symlink_allowed() {
-            return Err(zx::Status::WRONG_TYPE);
+            return Err(Status::WRONG_TYPE);
         }
         // If is_symlink_allowed() returned true, there must be rights.
         if !self.rights().unwrap().contains(fio::Operations::GET_ATTRIBUTES) {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
         Ok(SymlinkOptions)
     }
 
-    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, Status> {
         let must_be_directory = match self {
             fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols { node: Some(flags), .. }),
@@ -179,7 +180,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
             _ => false,
         };
         if must_be_directory && entry_info.type_() != fio::DirentType::Directory {
-            Err(zx::Status::NOT_DIR)
+            Err(Status::NOT_DIR)
         } else {
             Ok(NodeOptions { rights: self.rights().unwrap() & fio::Operations::GET_ATTRIBUTES })
         }
@@ -305,7 +306,7 @@ impl ProtocolsExt for fio::OpenFlags {
     /// connection to be opened.
     ///
     /// Changing this function can be dangerous!  Flags operations may have security implications.
-    fn to_directory_options(&self) -> Result<DirectoryOptions, zx::Status> {
+    fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
         assert!(!self.intersects(fio::OpenFlags::NODE_REFERENCE));
 
         let mut flags = *self;
@@ -315,7 +316,7 @@ impl ProtocolsExt for fio::OpenFlags {
         }
 
         if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-            return Err(zx::Status::NOT_FILE);
+            return Err(Status::NOT_FILE);
         }
 
         // Parent connection must check the POSIX flags in `check_child_connection_flags`, so if any
@@ -339,21 +340,21 @@ impl ProtocolsExt for fio::OpenFlags {
         let prohibited_flags = fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE;
 
         if flags.intersects(prohibited_flags) {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
 
         if flags.intersects(!allowed_flags) {
-            return Err(zx::Status::NOT_SUPPORTED);
+            return Err(Status::NOT_SUPPORTED);
         }
 
         Ok(DirectoryOptions { rights: io2_conversions::io1_to_io2(flags) })
     }
 
-    fn to_file_options(&self) -> Result<FileOptions, zx::Status> {
+    fn to_file_options(&self) -> Result<FileOptions, Status> {
         assert!(!self.intersects(fio::OpenFlags::NODE_REFERENCE));
 
         if self.contains(fio::OpenFlags::DIRECTORY) {
-            return Err(zx::Status::NOT_DIR);
+            return Err(Status::NOT_DIR);
         }
 
         // Verify allowed operations/flags this node supports.
@@ -371,7 +372,7 @@ impl ProtocolsExt for fio::OpenFlags {
             .union(fio::OpenFlags::POSIX_EXECUTABLE)
             .union(fio::OpenFlags::NOT_DIRECTORY);
         if flags_without_rights.intersects(!ALLOWED_FLAGS) {
-            return Err(zx::Status::NOT_SUPPORTED);
+            return Err(Status::NOT_SUPPORTED);
         }
 
         // Disallow invalid flag combinations.
@@ -380,7 +381,7 @@ impl ProtocolsExt for fio::OpenFlags {
             prohibited_flags |= fio::OpenFlags::TRUNCATE
         }
         if self.intersects(prohibited_flags) {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
 
         Ok(FileOptions {
@@ -401,9 +402,9 @@ impl ProtocolsExt for fio::OpenFlags {
         })
     }
 
-    fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status> {
+    fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
         if self.intersects(fio::OpenFlags::DIRECTORY) {
-            return Err(zx::Status::NOT_DIR);
+            return Err(Status::NOT_DIR);
         }
 
         // We allow write and executable access because the client might not know this is a symbolic
@@ -414,24 +415,24 @@ impl ProtocolsExt for fio::OpenFlags {
             | fio::OpenFlags::RIGHT_EXECUTABLE;
 
         if *self & !optional != fio::OpenFlags::RIGHT_READABLE {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
 
         Ok(SymlinkOptions)
     }
 
-    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, Status> {
         // Strictly, we shouldn't allow rights to be specified with NODE_REFERENCE, but there's a
         // CTS pkgdir test that asserts these flags work and fixing that is painful so we preserve
         // old behaviour (which permitted these flags).
         let allowed_rights =
             fio::OPEN_RIGHTS | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE;
         if self.intersects(!(fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE | allowed_rights)) {
-            Err(zx::Status::INVALID_ARGS)
+            Err(Status::INVALID_ARGS)
         } else if self.contains(fio::OpenFlags::DIRECTORY)
             && entry_info.type_() != fio::DirentType::Directory
         {
-            Err(zx::Status::NOT_DIR)
+            Err(Status::NOT_DIR)
         } else {
             Ok(NodeOptions { rights: fio::Operations::GET_ATTRIBUTES })
         }

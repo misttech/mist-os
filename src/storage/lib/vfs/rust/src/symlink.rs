@@ -20,32 +20,33 @@ use {
     },
     async_trait::async_trait,
     fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     futures::StreamExt,
     std::{future::Future, sync::Arc},
 };
 
 #[async_trait]
 pub trait Symlink: Node {
-    async fn read_target(&self) -> Result<Vec<u8>, zx::Status>;
+    async fn read_target(&self) -> Result<Vec<u8>, Status>;
 
     // Extended attributes for symlinks.
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
+        Err(Status::NOT_SUPPORTED)
     }
-    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, Status> {
+        Err(Status::NOT_SUPPORTED)
     }
     async fn set_extended_attribute(
         &self,
         _name: Vec<u8>,
         _value: Vec<u8>,
         _mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
-    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 }
 
@@ -81,7 +82,7 @@ impl<T: Symlink> Connection<T> {
         symlink: Arc<T>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
-    ) -> Result<impl Future<Output = ()>, zx::Status> {
+    ) -> Result<impl Future<Output = ()>, Status> {
         let _options = protocols.to_symlink_options()?;
         Ok(Connection::new(scope, symlink).run(object_request.take()))
     }
@@ -112,7 +113,7 @@ impl<T: Symlink> Connection<T> {
             } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::SymlinkRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -133,18 +134,18 @@ impl<T: Symlink> Connection<T> {
                 responder.send(Ok(()))?;
             }
             fio::SymlinkRequest::GetAttr { responder } => match self.symlink.get_attrs().await {
-                Ok(attrs) => responder.send(zx::Status::OK.into_raw(), &attrs)?,
+                Ok(attrs) => responder.send(Status::OK.into_raw(), &attrs)?,
                 Err(status) => responder.send(status.into_raw(), &null_node_attributes())?,
             },
             fio::SymlinkRequest::SetAttr { responder, .. } => {
-                responder.send(zx::Status::ACCESS_DENIED.into_raw())?;
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
             fio::SymlinkRequest::GetAttributes { query: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
                 self.handle_list_extended_attribute(iterator).await;
@@ -174,10 +175,10 @@ impl<T: Symlink> Connection<T> {
                 }
             },
             fio::SymlinkRequest::GetFlags { responder } => {
-                responder.send(zx::Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
+                responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
             fio::SymlinkRequest::SetFlags { responder, .. } => {
-                responder.send(zx::Status::ACCESS_DENIED.into_raw())?;
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
             fio::SymlinkRequest::Query { responder } => {
                 responder.send(fio::SYMLINK_PROTOCOL_NAME.as_bytes())?;
@@ -217,16 +218,16 @@ impl<T: Symlink> Connection<T> {
 
     async fn handle_link_into(
         &mut self,
-        target_parent_token: zx::Event,
+        target_parent_token: fidl::Event,
         target_name: String,
-    ) -> Result<(), zx::Status> {
-        let target_name = parse_name(target_name).map_err(|_| zx::Status::INVALID_ARGS)?;
+    ) -> Result<(), Status> {
+        let target_name = parse_name(target_name).map_err(|_| Status::INVALID_ARGS)?;
 
         let (target_parent, _flags) = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?
-            .ok_or(Err(zx::Status::NOT_FOUND))?;
+            .ok_or(Err(Status::NOT_FOUND))?;
 
         self.symlink.clone().link_into(target_parent, target_name).await
     }
@@ -251,7 +252,7 @@ impl<T: Symlink> Connection<T> {
     async fn handle_get_extended_attribute(
         &self,
         name: Vec<u8>,
-    ) -> Result<fio::ExtendedAttributeValue, zx::Status> {
+    ) -> Result<fio::ExtendedAttributeValue, Status> {
         let value = self.symlink.get_extended_attribute(name).await?;
         encode_extended_attribute_value(value)
     }
@@ -261,15 +262,15 @@ impl<T: Symlink> Connection<T> {
         name: Vec<u8>,
         value: fio::ExtendedAttributeValue,
         mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), zx::Status> {
+    ) -> Result<(), Status> {
         if name.iter().any(|c| *c == 0) {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
         let val = decode_extended_attribute_value(value)?;
         self.symlink.set_extended_attribute(name, val, mode).await
     }
 
-    async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {
+    async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.symlink.remove_extended_attribute(name).await
     }
 }
@@ -284,7 +285,7 @@ impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
     ) {
         flags.to_object_request(server_end).handle(|object_request| {
             if !path.is_empty() {
-                return Err(zx::Status::NOT_DIR);
+                return Err(Status::NOT_DIR);
             }
             scope.spawn(Connection::create(scope.clone(), self, flags, object_request)?);
             Ok(())
@@ -303,7 +304,7 @@ impl<T: Symlink> Representation for Connection<T> {
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::Representation, zx::Status> {
+    ) -> Result<fio::Representation, Status> {
         Ok(fio::Representation::Symlink(fio::SymlinkInfo {
             attributes: Some(self.symlink.get_attributes(requested_attributes).await?),
             target: Some(self.symlink.read_target().await?),
@@ -311,7 +312,7 @@ impl<T: Symlink> Representation for Connection<T> {
         }))
     }
 
-    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status> {
+    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
         Ok(fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject {
             target: self.symlink.read_target().await?,
         }))
@@ -329,7 +330,8 @@ mod tests {
         assert_matches::assert_matches,
         async_trait::async_trait,
         fidl::endpoints::create_proxy,
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        fidl_fuchsia_io as fio,
+        fuchsia_zircon_status::Status,
         futures::StreamExt,
         std::{
             collections::HashMap,
@@ -351,30 +353,30 @@ mod tests {
 
     #[async_trait]
     impl Symlink for TestSymlink {
-        async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
+        async fn read_target(&self) -> Result<Vec<u8>, Status> {
             Ok(TARGET.to_vec())
         }
-        async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, zx::Status> {
+        async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
             let map = self.xattrs.lock().unwrap();
             Ok(map.values().map(|x| x.clone()).collect())
         }
-        async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, zx::Status> {
+        async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
             let map = self.xattrs.lock().unwrap();
-            map.get(&name).map(|x| x.clone()).ok_or(zx::Status::NOT_FOUND)
+            map.get(&name).map(|x| x.clone()).ok_or(Status::NOT_FOUND)
         }
         async fn set_extended_attribute(
             &self,
             name: Vec<u8>,
             value: Vec<u8>,
             _mode: fio::SetExtendedAttributeMode,
-        ) -> Result<(), zx::Status> {
+        ) -> Result<(), Status> {
             let mut map = self.xattrs.lock().unwrap();
             // Don't bother replicating the mode behavior, we just care that this method is hooked
             // up at all.
             map.insert(name, value);
             Ok(())
         }
-        async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {
+        async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
             let mut map = self.xattrs.lock().unwrap();
             map.remove(&name);
             Ok(())
@@ -386,11 +388,11 @@ mod tests {
         async fn get_attributes(
             &self,
             _requested_attributes: fio::NodeAttributesQuery,
-        ) -> Result<fio::NodeAttributes2, zx::Status> {
+        ) -> Result<fio::NodeAttributes2, Status> {
             unreachable!();
         }
 
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_SYMLINK
                     | rights_to_posix_mode_bits(
@@ -440,7 +442,7 @@ mod tests {
                 )
             });
             async move {
-                zx::Status::from_raw(
+                Status::from_raw(
                     client_end
                         .take_event_stream()
                         .next()
@@ -466,12 +468,12 @@ mod tests {
             fio::OpenFlags::CLONE_SAME_RIGHTS,
             fio::OpenFlags::BLOCK_DEVICE,
         ] {
-            assert_eq!(check(flags).await, zx::Status::INVALID_ARGS, "{flags:?}");
+            assert_eq!(check(flags).await, Status::INVALID_ARGS, "{flags:?}");
         }
 
         assert_eq!(
             check(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY).await,
-            zx::Status::OK
+            Status::OK
         );
     }
 
@@ -558,7 +560,7 @@ mod tests {
         client_end.remove_extended_attribute(b"foo").await.unwrap().unwrap();
         assert_eq!(
             client_end.get_extended_attribute(b"foo").await.unwrap().unwrap_err(),
-            zx::Status::NOT_FOUND.into_raw(),
+            Status::NOT_FOUND.into_raw(),
         );
     }
 }

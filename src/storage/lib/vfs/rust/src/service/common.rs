@@ -4,7 +4,7 @@
 
 //! Code shared between several modules of the service implementation.
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
 
 /// Validate that the requested flags for a new connection are valid.  It is a bit tricky as
 /// depending on the presence of the `OPEN_FLAG_NODE_REFERENCE` flag we are effectively validating
@@ -46,7 +46,7 @@ pub fn new_connection_validate_flags(mut flags: fio::OpenFlags) -> Result<fio::O
 mod tests {
     use super::new_connection_validate_flags;
 
-    use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
+    use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
 
     /// Assertion for when `new_connection_validate_flags` should succeed => `ncvf_ok`.
     #[track_caller]

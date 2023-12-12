@@ -12,7 +12,6 @@ use crate::{
 use {
     fidl_fuchsia_io as fio,
     fuchsia_async::Channel,
-    fuchsia_zircon::MessageBuf,
     futures::{
         channel::mpsc::{self, UnboundedSender},
         select,
@@ -22,6 +21,11 @@ use {
     pin_utils::unsafe_pinned,
     std::{ops::Drop, pin::Pin},
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+pub use fuchsia_async::emulated_handle::MessageBuf;
+#[cfg(target_os = "fuchsia")]
+pub use fuchsia_zircon::MessageBuf;
 
 /// `done` is not guaranteed to be called if the task failed to start.  It should only happen
 /// in case the return value is an `Err`.  Unfortunately, there is no way to return the `done`

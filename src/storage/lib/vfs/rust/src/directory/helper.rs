@@ -13,7 +13,7 @@ use {
     },
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     std::sync::Arc,
     thiserror::Error,
 };

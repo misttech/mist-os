@@ -14,8 +14,8 @@ use crate::{
         test_utils::{run_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
-    file::vmo::read_only,
     path::Path,
+    test_utils::test_file::TestFile,
 };
 
 use {
@@ -25,9 +25,9 @@ use {
 
 fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {
     let r = pseudo_directory! {
-        "a" => read_only("a content"),
+        "a" => TestFile::read_only("a content"),
         "dir" => pseudo_directory! {
-            "b" => read_only("b content"),
+            "b" => TestFile::read_only("b content"),
         }
     };
 

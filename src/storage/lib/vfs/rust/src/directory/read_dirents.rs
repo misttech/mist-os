@@ -12,7 +12,10 @@ use crate::directory::{
     traversal_position::TraversalPosition,
 };
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, std::any::Any, std::convert::TryInto as _};
+use {
+    fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, std::any::Any,
+    std::convert::TryInto as _,
+};
 
 /// An instance of this type represents a sink that may still accept additional entries.  Depending
 /// on the entry size it may turn itself into a [`Done`] value, indicating that the internal buffer

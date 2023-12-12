@@ -7,7 +7,7 @@
 //! approach is used to allow passing the path string, from one `open()` method to the next,
 //! without the need to copy the path itself.
 
-use fuchsia_zircon::Status;
+use fuchsia_zircon_status::Status;
 
 #[derive(Clone, Debug)]
 pub struct Path {
@@ -549,11 +549,16 @@ mod tests {
 
     #[test]
     fn long_path() {
-        let mut path = "a/".repeat((fio::MAX_PATH_LENGTH as usize) / 2);
-        if path.len() < fio::MAX_PATH_LENGTH as usize {
+        #[cfg(not(target_os = "macos"))]
+        let max_path_len = fio::MAX_PATH_LENGTH as usize;
+        #[cfg(target_os = "macos")]
+        let max_path_len = libc::PATH_MAX as usize - 1;
+
+        let mut path = "a/".repeat(max_path_len / 2);
+        if path.len() < max_path_len {
             path.push('a');
         }
-        assert_eq!(path.len(), fio::MAX_PATH_LENGTH as usize);
+        assert_eq!(path.len(), max_path_len);
         simple_construction_test! {
             path: &path,
             mut path => {

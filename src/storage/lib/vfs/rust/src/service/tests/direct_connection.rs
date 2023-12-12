@@ -16,7 +16,7 @@ use {
     },
     fidl_fuchsia_io as fio,
     fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream},
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     futures::{
         channel::{mpsc, oneshot},
         stream::StreamExt,

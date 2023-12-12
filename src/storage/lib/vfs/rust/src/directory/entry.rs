@@ -10,7 +10,8 @@ use crate::{common::IntoAny, execution_scope::ExecutionScope, path::Path, Object
 
 use {
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     std::{fmt, sync::Arc},
 };
 
@@ -88,8 +89,8 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
         _path: Path,
         _protocols: fio::ConnectionProtocols,
         _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 
     /// This method is used to populate ReadDirents() output.

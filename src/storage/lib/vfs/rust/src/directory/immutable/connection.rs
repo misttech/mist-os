@@ -21,7 +21,7 @@ use crate::{
 
 use {
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     futures::TryStreamExt as _,
     std::{future::Future, sync::Arc},
 };

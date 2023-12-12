@@ -7,7 +7,8 @@
 use {
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     futures::StreamExt as _,
     libc,
     std::{convert::TryFrom, sync::Arc},
@@ -39,9 +40,9 @@ pub fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFla
 pub fn inherit_rights_for_clone(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
-) -> Result<fio::OpenFlags, zx::Status> {
+) -> Result<fio::OpenFlags, Status> {
     if flags.intersects(fio::OpenFlags::CLONE_SAME_RIGHTS) && flags.intersects(FS_RIGHTS) {
-        return Err(zx::Status::INVALID_ARGS);
+        return Err(Status::INVALID_ARGS);
     }
 
     // We preserve OPEN_FLAG_APPEND as this is what is the most convenient for the POSIX emulation.
@@ -58,7 +59,7 @@ pub fn inherit_rights_for_clone(
     }
 
     if !stricter_or_same_rights(parent_flags, flags) {
-        return Err(zx::Status::ACCESS_DENIED);
+        return Err(Status::ACCESS_DENIED);
     }
 
     // Ignore the POSIX flags for clone.
@@ -99,14 +100,14 @@ pub fn node_attributes() -> fio::NodeAttributes {
 /// issue.
 ///
 /// # Panics
-/// If `status` is `zx::Status::OK`.  In this case `OnOpen` may need to contain a description of the
+/// If `status` is `Status::OK`.  In this case `OnOpen` may need to contain a description of the
 /// object, and server_end should not be dropped.
 pub fn send_on_open_with_error(
     describe: bool,
     server_end: ServerEnd<fio::NodeMarker>,
-    status: zx::Status,
+    status: Status,
 ) {
-    if status == zx::Status::OK {
+    if status == Status::OK {
         panic!("send_on_open_with_error() should not be used to respond with Status::OK");
     }
 
@@ -149,9 +150,10 @@ impl<T: 'static + Send + Sync> IntoAny for T {
 /// Returns equivalent POSIX mode/permission bits based on the specified rights.
 /// Note that these only set the user bits.
 pub fn rights_to_posix_mode_bits(readable: bool, writable: bool, executable: bool) -> u32 {
-    return if readable { libc::S_IRUSR } else { 0 }
+    return (if readable { libc::S_IRUSR } else { 0 }
         | if writable { libc::S_IWUSR } else { 0 }
-        | if executable { libc::S_IXUSR } else { 0 };
+        | if executable { libc::S_IXUSR } else { 0 })
+    .into();
 }
 
 pub async fn extended_attributes_sender(
@@ -189,12 +191,17 @@ pub async fn extended_attributes_sender(
 
 pub fn encode_extended_attribute_value(
     value: Vec<u8>,
-) -> Result<fio::ExtendedAttributeValue, zx::Status> {
+) -> Result<fio::ExtendedAttributeValue, Status> {
     let size = value.len() as u64;
     if size > fio::MAX_INLINE_ATTRIBUTE_VALUE {
-        let vmo = zx::Vmo::create(size)?;
-        vmo.write(&value, 0)?;
-        Ok(fio::ExtendedAttributeValue::Buffer(vmo))
+        #[cfg(target_os = "fuchsia")]
+        {
+            let vmo = fidl::Vmo::create(size)?;
+            vmo.write(&value, 0)?;
+            Ok(fio::ExtendedAttributeValue::Buffer(vmo))
+        }
+        #[cfg(not(target_os = "fuchsia"))]
+        Err(Status::NOT_SUPPORTED)
     } else {
         Ok(fio::ExtendedAttributeValue::Bytes(value))
     }
@@ -202,13 +209,16 @@ pub fn encode_extended_attribute_value(
 
 pub fn decode_extended_attribute_value(
     value: fio::ExtendedAttributeValue,
-) -> Result<Vec<u8>, zx::Status> {
+) -> Result<Vec<u8>, Status> {
     match value {
         fio::ExtendedAttributeValue::Bytes(val) => Ok(val),
+        #[cfg(target_os = "fuchsia")]
         fio::ExtendedAttributeValue::Buffer(vmo) => {
             let length = vmo.get_content_size()?;
             vmo.read_to_vec(0, length)
         }
+        #[cfg(not(target_os = "fuchsia"))]
+        fio::ExtendedAttributeValue::Buffer(_) => Err(Status::NOT_SUPPORTED),
     }
 }
 

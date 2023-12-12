@@ -13,7 +13,8 @@ use {
         endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
         epitaph::ChannelEpitaphExt,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon_status::Status,
     futures::future::BoxFuture,
     std::{
         future::Future,
@@ -27,7 +28,7 @@ use {
 /// such as truncating file objects.
 pub struct ObjectRequest {
     // The channel.
-    object_request: zx::Channel,
+    object_request: fidl::Channel,
 
     // What should be sent first.
     what_to_send: ObjectRequestSend,
@@ -41,7 +42,7 @@ pub struct ObjectRequest {
 
 impl ObjectRequest {
     pub(crate) fn new(
-        object_request: zx::Channel,
+        object_request: fidl::Channel,
         what_to_send: ObjectRequestSend,
         attributes: fio::NodeAttributesQuery,
         truncate: bool,
@@ -61,7 +62,7 @@ impl ObjectRequest {
     pub async fn into_request_stream<T: Representation>(
         self,
         connection: &T,
-    ) -> Result<<T::Protocol as ProtocolMarker>::RequestStream, zx::Status> {
+    ) -> Result<<T::Protocol as ProtocolMarker>::RequestStream, Status> {
         let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
             self.object_request,
         )?);
@@ -83,7 +84,7 @@ impl ObjectRequest {
                     })?;
                 control_handle
                     .send_on_representation(representation)
-                    .map_err(|_| zx::Status::PEER_CLOSED)?;
+                    .map_err(|_| Status::PEER_CLOSED)?;
             }
             ObjectRequestSend::Nothing => {}
         }
@@ -96,7 +97,7 @@ impl ObjectRequest {
     }
 
     /// Extracts the channel (without sending on_open).
-    pub fn into_channel(self) -> zx::Channel {
+    pub fn into_channel(self) -> fidl::Channel {
         self.object_request
     }
 
@@ -104,7 +105,7 @@ impl ObjectRequest {
     pub fn into_channel_after_sending_on_open(
         self,
         node_info: fio::NodeInfoDeprecated,
-    ) -> Result<zx::Channel, zx::Status> {
+    ) -> Result<fidl::Channel, Status> {
         let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
             self.object_request,
         )?);
@@ -115,7 +116,7 @@ impl ObjectRequest {
     }
 
     /// Terminates the object request with the given status.
-    pub fn shutdown(self, status: zx::Status) {
+    pub fn shutdown(self, status: Status) {
         if let ObjectRequestSend::OnOpen = self.what_to_send {
             if let Ok((_, control_handle)) = ServerEnd::<fio::NodeMarker>::new(self.object_request)
                 .into_stream_and_control_handle()
@@ -129,7 +130,7 @@ impl ObjectRequest {
     }
 
     /// Calls `f` and sends an error on the object request channel upon failure.
-    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, zx::Status>) -> Option<T> {
+    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, Status>) -> Option<T> {
         let mut request = Some(self);
         match f(ObjectRequestRef(&mut request)) {
             Ok(o) => Some(o),
@@ -143,7 +144,7 @@ impl ObjectRequest {
     }
 
     /// Spawn a task for the object request.  The callback returns a future that can return a
-    /// zx::Status which will be handled appropriately.  If the future succeeds it should return
+    /// Status which will be handled appropriately.  If the future succeeds it should return
     /// another future that is responsible for the long term servicing of the object request.  This
     /// is done to avoid paying the stack cost of the object request for the lifetime of the
     /// connection.
@@ -155,7 +156,7 @@ impl ObjectRequest {
     ///       move |object_request| Box::pin(async move {
     ///           // Perform checks on the new connection
     ///           if !valid(...) {
-    ///               return Err(zx::Status::INVALID_ARGS);
+    ///               return Err(Status::INVALID_ARGS);
     ///           }
     ///           // Upon success, return a future that handles the connection.
     ///           let requests = object_request.take().into_request_stream();
@@ -169,7 +170,7 @@ impl ObjectRequest {
     pub fn spawn<F, Fut>(self, scope: &ExecutionScope, f: F)
     where
         for<'a> F:
-            FnOnce(ObjectRequestRef<'a>) -> BoxFuture<'a, Result<Fut, zx::Status>> + Send + 'static,
+            FnOnce(ObjectRequestRef<'a>) -> BoxFuture<'a, Result<Fut, Status>> + Send + 'static,
         Fut: Future<Output = ()> + Send,
     {
         scope.spawn(async {
@@ -210,8 +211,8 @@ impl ObjectRequestRef<'_> {
         scope: ExecutionScope,
         node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, zx::Status>,
-    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, Status>,
+    ) -> Result<BoxFuture<'static, ()>, Status> {
         if protocols.is_node() {
             Ok(Box::pin(node::Connection::create(scope.clone(), node, protocols, self)?))
         } else {
@@ -225,8 +226,8 @@ impl ObjectRequestRef<'_> {
         scope: ExecutionScope,
         node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, zx::Status>,
-    ) -> Result<(), zx::Status> {
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, Status>,
+    ) -> Result<(), Status> {
         if protocols.is_node() {
             scope.spawn(node::Connection::create(scope.clone(), node, protocols, self)?);
         } else {
@@ -268,19 +269,19 @@ pub trait Representation {
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::Representation, zx::Status>;
+    ) -> Result<fio::Representation, Status>;
 
     /// Returns io1's NodeInfoDeprecated.
-    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status>;
+    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status>;
 }
 
 /// Trait for converting fio::ConnectionProtocols and fio::OpenFlags into ObjectRequest.
 pub trait ToObjectRequest: ProtocolsExt {
-    fn to_object_request(&self, object_request: impl Into<zx::Handle>) -> ObjectRequest;
+    fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest;
 }
 
 impl ToObjectRequest for fio::ConnectionProtocols {
-    fn to_object_request(&self, object_request: impl Into<zx::Handle>) -> ObjectRequest {
+    fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
         ObjectRequest::new(
             object_request.into().into(),
             if self.get_representation() {
@@ -295,7 +296,7 @@ impl ToObjectRequest for fio::ConnectionProtocols {
 }
 
 impl ToObjectRequest for fio::OpenFlags {
-    fn to_object_request(&self, object_request: impl Into<zx::Handle>) -> ObjectRequest {
+    fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
         ObjectRequest::new(
             object_request.into().into(),
             if self.contains(fio::OpenFlags::DESCRIBE) {
@@ -312,8 +313,8 @@ impl ToObjectRequest for fio::OpenFlags {
 fn send_on_open(
     control_handle: &fio::NodeControlHandle,
     node_info: fio::NodeInfoDeprecated,
-) -> Result<(), zx::Status> {
+) -> Result<(), Status> {
     control_handle
-        .send_on_open_(zx::Status::OK.into_raw(), Some(node_info))
-        .map_err(|_| zx::Status::PEER_CLOSED)
+        .send_on_open_(Status::OK.into_raw(), Some(node_info))
+        .map_err(|_| Status::PEER_CLOSED)
 }

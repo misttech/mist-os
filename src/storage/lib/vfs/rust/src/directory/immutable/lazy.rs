@@ -28,7 +28,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     futures::{
         channel::mpsc::{self, UnboundedSender},
         stream::Stream,

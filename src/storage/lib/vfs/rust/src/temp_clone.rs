@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_zircon::{self as zx, HandleBased},
+    fidl::HandleBased,
     std::{
         cell::UnsafeCell,
         collections::{hash_map::Entry, HashMap, VecDeque},
@@ -13,6 +13,11 @@ use {
         sync::{Arc, Condvar, Mutex, OnceLock, Weak},
     },
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use fuchsia_async::emulated_handle::zx_handle_t;
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon::sys::zx_handle_t;
 
 /// A wrapper around zircon handles that allows them to be temporarily cloned. These temporary
 /// clones can be used with `unblock` below which requires callbacks with static lifetime.  This is
@@ -95,7 +100,7 @@ impl<T: HandleBased> Drop for TempClonable<T> {
     }
 }
 
-type Clones = Mutex<HashMap<zx::sys::zx_handle_t, Weak<TempHandle>>>;
+type Clones = Mutex<HashMap<zx_handle_t, Weak<TempHandle>>>;
 
 /// Returns the global instance which keeps track of temporary clones.
 fn clones() -> &'static Clones {
@@ -112,13 +117,13 @@ impl<T> Deref for TempClone<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        // SAFETY: T is repr(transparent) and stores zx::sys::zx_handle_t.
-        unsafe { std::mem::transmute::<&zx::sys::zx_handle_t, &T>(&self.handle.raw_handle) }
+        // SAFETY: T is repr(transparent) and stores zx_handle_t.
+        unsafe { std::mem::transmute::<&zx_handle_t, &T>(&self.handle.raw_handle) }
     }
 }
 
 struct TempHandle {
-    raw_handle: zx::sys::zx_handle_t,
+    raw_handle: zx_handle_t,
     tombstone: UnsafeCell<bool>,
 }
 
@@ -130,7 +135,7 @@ impl Drop for TempHandle {
         if *self.tombstone.get_mut() {
             // SAFETY: The primary handle has been dropped and it is our job to clean up the
             // handle. There are no memory safety issues here.
-            unsafe { zx::Handle::from_raw(self.raw_handle) };
+            unsafe { fidl::Handle::from_raw(self.raw_handle) };
         } else {
             if let Entry::Occupied(o) = clones().lock().unwrap().entry(self.raw_handle) {
                 // There's a small window where another TempHandle could have been inserted, so
@@ -188,6 +193,7 @@ pub async fn unblock<T: 'static + Send>(f: impl FnOnce() -> T + Send + 'static) 
     rx.await.unwrap()
 }
 
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use {

@@ -10,7 +10,7 @@
 //! These should be aligned with the library comments in sdk/fidl/fuchsia.io/io.fidl.
 
 use {
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx, static_assertions::const_assert_eq,
+    fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, static_assertions::const_assert_eq,
     std::borrow::Borrow, std::fmt::Display, std::ops::Deref, thiserror::Error,
 };
 
@@ -54,11 +54,11 @@ pub enum ParseNameError {
     EmbeddedNul,
 }
 
-impl From<ParseNameError> for zx::Status {
+impl From<ParseNameError> for Status {
     fn from(value: ParseNameError) -> Self {
         match value {
-            ParseNameError::TooLong(_) => zx::Status::BAD_PATH,
-            _ => zx::Status::INVALID_ARGS,
+            ParseNameError::TooLong(_) => Status::BAD_PATH,
+            _ => Status::INVALID_ARGS,
         }
     }
 }

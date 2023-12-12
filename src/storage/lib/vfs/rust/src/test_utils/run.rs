@@ -14,8 +14,11 @@ use {
     fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fuchsia_io as fio,
     fuchsia_async::TestExecutor,
-    std::{future::Future, pin::Pin, sync::Arc, task::Poll},
+    std::{future::Future, pin::Pin, sync::Arc},
 };
+
+#[cfg(target_os = "fuchsia")]
+use std::task::Poll;
 
 /// A helper to connect a pseudo fs server to a client and the run the client on a single threaded
 /// executor. Execution is run until the executor reports the execution has stalled. The client
@@ -77,6 +80,7 @@ impl<'test_refs> TestController<'test_refs> {
 
     /// Runs the client test code until it is stalled.  Will panic if the test code runs to
     /// completion.
+    #[cfg(target_os = "fuchsia")]
     pub fn run_until_stalled(&mut self) {
         // TODO: How to limit the execution time?  run_until_stalled() does not trigger timers, so
         // I can not do this:
@@ -98,11 +102,19 @@ impl<'test_refs> TestController<'test_refs> {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl<'test_refs> Drop for TestController<'test_refs> {
     fn drop(&mut self) {
         // See `run_until_stalled` above the a comment about timeouts.
         let res = self.exec.run_until_stalled(&mut self.client);
         assert_eq!(res, Poll::Ready(()), "Test did not complete");
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl<'test_refs> Drop for TestController<'test_refs> {
+    fn drop(&mut self) {
+        self.exec.run_singlethreaded(&mut self.client);
     }
 }
 

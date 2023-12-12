@@ -19,17 +19,17 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{
-        self as zx,
-        sys::{ZX_ERR_BAD_HANDLE, ZX_ERR_NOT_SUPPORTED, ZX_OK},
-    },
+    fuchsia_zircon_status::Status,
     futures::stream::StreamExt,
     libc::{S_IRUSR, S_IWUSR},
     std::{future::Future, sync::Arc},
 };
 
 /// POSIX emulation layer access attributes for all services created with service().
+#[cfg(not(target_os = "macos"))]
 pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u32 = S_IRUSR | S_IWUSR;
+#[cfg(target_os = "macos")]
+pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u16 = S_IRUSR | S_IWUSR;
 
 pub struct NodeOptions {
     pub rights: fio::Operations,
@@ -42,10 +42,10 @@ pub trait Node: DirectoryEntry {
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status>;
+    ) -> Result<fio::NodeAttributes2, Status>;
 
     /// Get this node's attributes.
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status>;
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
 
     /// Called when the node is closed.
     fn close(self: Arc<Self>) {}
@@ -54,13 +54,13 @@ pub trait Node: DirectoryEntry {
         self: Arc<Self>,
         _destination_dir: Arc<dyn MutableDirectory>,
         _name: Name,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 
     /// Returns information about the filesystem.
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 }
 
@@ -93,7 +93,7 @@ impl<N: Node> Connection<N> {
         node: Arc<N>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
-    ) -> Result<impl Future<Output = ()>, zx::Status> {
+    ) -> Result<impl Future<Output = ()>, Status> {
         let node = OpenNode::new(node);
         let options = protocols.to_node_options(&node.entry_info())?;
         let object_request = object_request.take();
@@ -137,7 +137,7 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::NodeRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -150,16 +150,16 @@ impl<N: Node> Connection<N> {
                 })?;
             }
             fio::NodeRequest::Sync { responder } => {
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::GetAttr { responder } => match {
                 if !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES) {
-                    Err(zx::Status::BAD_HANDLE)
+                    Err(Status::BAD_HANDLE)
                 } else {
                     self.node.get_attrs().await
                 }
             } {
-                Ok(attr) => responder.send(ZX_OK, &attr)?,
+                Ok(attr) => responder.send(Status::OK.into_raw(), &attr)?,
                 Err(status) => {
                     responder.send(
                         status.into_raw(),
@@ -176,7 +176,7 @@ impl<N: Node> Connection<N> {
                 }
             },
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
-                responder.send(ZX_ERR_BAD_HANDLE)?;
+                responder.send(Status::BAD_HANDLE.into_raw())?;
             }
             fio::NodeRequest::GetAttributes { query, responder } => {
                 let result = self.node.get_attributes(query).await;
@@ -190,35 +190,35 @@ impl<N: Node> Connection<N> {
                             } = a;
                             (m, i)
                         })
-                        .map_err(|status| zx::Status::into_raw(*status)),
+                        .map_err(|status| Status::into_raw(*status)),
                 )?;
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(Err(ZX_ERR_BAD_HANDLE))?;
+                responder.send(Err(Status::BAD_HANDLE.into_raw()))?;
             }
             fio::NodeRequest::ListExtendedAttributes { iterator, .. } => {
-                iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
+                iterator.close_with_epitaph(Status::NOT_SUPPORTED)?;
             }
             fio::NodeRequest::GetExtendedAttribute { responder, .. } => {
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::SetExtendedAttribute { responder, .. } => {
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::GetFlags { responder } => {
-                responder.send(ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;
+                responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
             }
             fio::NodeRequest::SetFlags { flags: _, responder } => {
-                responder.send(ZX_ERR_BAD_HANDLE)?;
+                responder.send(Status::BAD_HANDLE.into_raw())?;
             }
             fio::NodeRequest::Query { responder } => {
                 responder.send(fio::NODE_PROTOCOL_NAME.as_bytes())?;
             }
             fio::NodeRequest::QueryFilesystem { responder } => {
-                responder.send(ZX_ERR_NOT_SUPPORTED, None)?;
+                responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
             }
         }
         Ok(ConnectionState::Alive)
@@ -245,7 +245,7 @@ impl<N: Node> Representation for Connection<N> {
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::Representation, zx::Status> {
+    ) -> Result<fio::Representation, Status> {
         Ok(fio::Representation::Connector(fio::ConnectorInfo {
             attributes: if requested_attributes.is_empty() {
                 None
@@ -256,7 +256,7 @@ impl<N: Node> Representation for Connection<N> {
         }))
     }
 
-    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status> {
+    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
         Ok(fio::NodeInfoDeprecated::Service(fio::Service))
     }
 }

@@ -20,7 +20,7 @@ use crate::{
     path::Path,
 };
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, std::sync::Arc};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, std::sync::Arc};
 
 pub type Connection = connection::MutableConnection;
 pub type Simple = simple::Simple<Connection>;

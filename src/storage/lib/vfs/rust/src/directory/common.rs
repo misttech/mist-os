@@ -8,7 +8,8 @@ use crate::{common::stricter_or_same_rights, directory::entry::EntryInfo};
 
 use {
     byteorder::{LittleEndian, WriteBytesExt as _},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     static_assertions::assert_eq_size,
     std::{io::Write as _, mem::size_of},
 };
@@ -20,23 +21,23 @@ use {
 pub(crate) fn check_child_connection_flags(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
-) -> Result<fio::OpenFlags, zx::Status> {
+) -> Result<fio::OpenFlags, Status> {
     if flags & (fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DIRECTORY)
         == fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DIRECTORY
     {
-        return Err(zx::Status::INVALID_ARGS);
+        return Err(Status::INVALID_ARGS);
     }
 
     // Can only specify OPEN_FLAG_CREATE_IF_ABSENT if OPEN_FLAG_CREATE is also specified.
     if flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT)
         && !flags.intersects(fio::OpenFlags::CREATE)
     {
-        return Err(zx::Status::INVALID_ARGS);
+        return Err(Status::INVALID_ARGS);
     }
 
     // Can only use CLONE_FLAG_SAME_RIGHTS when calling Clone.
     if flags.intersects(fio::OpenFlags::CLONE_SAME_RIGHTS) {
-        return Err(zx::Status::INVALID_ARGS);
+        return Err(Status::INVALID_ARGS);
     }
 
     // Remove POSIX flags when the respective rights are not available ("soft fail").
@@ -51,13 +52,13 @@ pub(crate) fn check_child_connection_flags(
     if flags.intersects(fio::OpenFlags::CREATE)
         && !parent_flags.intersects(fio::OpenFlags::RIGHT_WRITABLE)
     {
-        return Err(zx::Status::ACCESS_DENIED);
+        return Err(Status::ACCESS_DENIED);
     }
 
     if stricter_or_same_rights(parent_flags, flags) {
         Ok(flags)
     } else {
-        Err(zx::Status::ACCESS_DENIED)
+        Err(Status::ACCESS_DENIED)
     }
 }
 
@@ -110,9 +111,9 @@ mod tests {
     use super::check_child_connection_flags;
     use crate::{test_utils::build_flag_combinations, ProtocolsExt};
 
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
 
-    fn new_connection_validate_flags(flags: fio::OpenFlags) -> Result<fio::OpenFlags, zx::Status> {
+    fn new_connection_validate_flags(flags: fio::OpenFlags) -> Result<fio::OpenFlags, Status> {
         flags
             .to_directory_options()
             .map(|options| options.to_io1() | (flags & fio::OpenFlags::DESCRIBE))
@@ -134,7 +135,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn ncvf_err(flags: fio::OpenFlags, expected_status: zx::Status) {
+    fn ncvf_err(flags: fio::OpenFlags, expected_status: Status) {
         let res = new_connection_validate_flags(flags);
         match res {
             Ok(new_flags) => panic!(
@@ -169,15 +170,12 @@ mod tests {
 
     #[test]
     fn new_connection_validate_flags_append() {
-        ncvf_err(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND, zx::Status::INVALID_ARGS);
+        ncvf_err(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND, Status::INVALID_ARGS);
     }
 
     #[test]
     fn new_connection_validate_flags_truncate() {
-        ncvf_err(
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
-            zx::Status::INVALID_ARGS,
-        );
+        ncvf_err(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE, Status::INVALID_ARGS);
     }
 
     #[test]
@@ -196,14 +194,14 @@ mod tests {
 
         assert_eq!(
             check_child_connection_flags(fio::OpenFlags::empty(), fio::OpenFlags::CREATE),
-            Err(zx::Status::ACCESS_DENIED),
+            Err(Status::ACCESS_DENIED),
         );
         assert_eq!(
             check_child_connection_flags(
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT,
             ),
-            Err(zx::Status::ACCESS_DENIED),
+            Err(Status::ACCESS_DENIED),
         );
 
         // Need to specify OPEN_FLAG_CREATE if passing OPEN_FLAG_CREATE_IF_ABSENT.
@@ -212,7 +210,7 @@ mod tests {
                 fio::OpenFlags::RIGHT_WRITABLE,
                 fio::OpenFlags::CREATE_IF_ABSENT,
             ),
-            Err(zx::Status::INVALID_ARGS),
+            Err(Status::INVALID_ARGS),
         );
     }
 
@@ -224,7 +222,7 @@ mod tests {
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::DIRECTORY | fio::OpenFlags::NOT_DIRECTORY,
             ),
-            Err(zx::Status::INVALID_ARGS),
+            Err(Status::INVALID_ARGS),
         );
 
         // Cannot specify CLONE_FLAG_SAME_RIGHTS when opening a resource (only permitted via clone).
@@ -233,7 +231,7 @@ mod tests {
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::CLONE_SAME_RIGHTS,
             ),
-            Err(zx::Status::INVALID_ARGS),
+            Err(Status::INVALID_ARGS),
         );
     }
 }

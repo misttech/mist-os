@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon_status::Status,
     std::{any::Any, sync::Arc},
 };
 
@@ -38,7 +38,7 @@ mod private {
     }
 
     impl TryFrom<fidl::endpoints::ServerEnd<fio::DirectoryWatcherMarker>> for DirectoryWatcher {
-        type Error = fuchsia_zircon::Status;
+        type Error = fuchsia_zircon_status::Status;
 
         fn try_from(
             server_end: fidl::endpoints::ServerEnd<fio::DirectoryWatcherMarker>,

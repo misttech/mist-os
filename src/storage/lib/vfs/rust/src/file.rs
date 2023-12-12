@@ -5,13 +5,15 @@
 //! Module holding different kinds of files and their building blocks.
 
 use {
-    crate::node::Node,
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, Status},
+    crate::node::Node, async_trait::async_trait, fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
 };
 
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
+
 /// File nodes backed by VMOs.
+#[cfg(target_os = "fuchsia")]
 pub mod vmo;
 
 pub mod test_utils;
@@ -20,7 +22,10 @@ mod common;
 
 pub mod connection;
 
-pub use connection::{FidlIoConnection, GetVmo, RawIoConnection, StreamIoConnection};
+pub use connection::{FidlIoConnection, RawIoConnection};
+
+#[cfg(target_os = "fuchsia")]
+pub use connection::{GetVmo, StreamIoConnection};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FileOptions {
@@ -30,6 +35,7 @@ pub struct FileOptions {
 
 impl FileOptions {
     /// Converts to `StreamOptions`.
+    #[cfg(target_os = "fuchsia")]
     pub fn to_stream_options(&self) -> zx::StreamOptions {
         let mut options = zx::StreamOptions::empty();
         if self.rights.contains(fio::Operations::READ_BYTES) {
@@ -111,6 +117,7 @@ pub trait File: Node {
 
     /// Get a VMO representing this file.
     /// If not supported by the underlying filesystem, should return Err(NOT_SUPPORTED).
+    #[cfg(target_os = "fuchsia")]
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status>;
 
     /// Get the size of this file.
@@ -176,7 +183,7 @@ pub trait File: Node {
 
     /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
     /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
-    fn event(&self) -> Result<Option<zx::Event>, Status> {
+    fn event(&self) -> Result<Option<fidl::Event>, Status> {
         Ok(None)
     }
 }
@@ -214,22 +221,22 @@ pub trait FileIo: Send + Sync {
 pub trait RawFileIoConnection: Send + Sync {
     /// Reads at most `count` bytes from the file starting at the connection's seek offset and
     /// advances the seek offset.
-    async fn read(&self, count: u64) -> Result<Vec<u8>, zx::Status>;
+    async fn read(&self, count: u64) -> Result<Vec<u8>, Status>;
 
     /// Reads `count` bytes from the file starting at `offset`.
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status>;
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status>;
 
     /// Writes `data` to the file starting at the connect's seek offset and advances the seek
     /// offset. If the connection is in append mode then the seek offset is moved to the end of the
     /// file before writing. Returns the number of bytes written.
-    async fn write(&self, data: &[u8]) -> Result<u64, zx::Status>;
+    async fn write(&self, data: &[u8]) -> Result<u64, Status>;
 
     /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
-    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status>;
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, Status>;
 
     /// Modifies the connection's seek offset. Returns the connections new seek offset.
-    async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status>;
+    async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status>;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
-    fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status;
+    fn update_flags(&self, flags: fio::OpenFlags) -> Status;
 }

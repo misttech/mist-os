@@ -16,7 +16,8 @@ use crate::{
 
 use {
     fidl::{self, endpoints::ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     std::sync::Arc,
 };
 
@@ -70,7 +71,7 @@ pub fn remote_node(node: fio::NodeProxy) -> Arc<Remote> {
     remote_boxed(Box::new(move |_scope, flags, path, server_end| {
         if !path.is_empty() {
             let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-            send_on_open_with_error(describe, server_end, zx::Status::NOT_DIR);
+            send_on_open_with_error(describe, server_end, Status::NOT_DIR);
             return;
         }
         let _ = node.clone(flags, server_end);

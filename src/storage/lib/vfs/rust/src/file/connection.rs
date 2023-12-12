@@ -11,35 +11,37 @@ use {
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
         file::{
-            common::{get_backing_memory_validate_flags, new_connection_validate_options},
-            File, FileIo, FileOptions, RawFileIoConnection, SyncMode,
+            common::new_connection_validate_options, File, FileIo, FileOptions,
+            RawFileIoConnection, SyncMode,
         },
         name::parse_name,
         node::OpenNode,
         object_request::Representation,
         path::Path,
-        temp_clone::{unblock, TempClonable},
-        ObjectRequestRef, ProtocolsExt,
+        trace, ObjectRequestRef, ProtocolsExt,
     },
     anyhow::Error,
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{
-        self as zx,
-        sys::{ZX_ERR_NOT_SUPPORTED, ZX_OK},
-        HandleBased, Status,
-    },
+    fuchsia_zircon_status::Status,
     futures::stream::StreamExt,
     static_assertions::assert_eq_size,
     std::{
         convert::TryInto as _,
         future::Future,
-        io::SeekFrom,
         marker::{Send, Sync},
         ops::{Deref, DerefMut},
         sync::Arc,
     },
+};
+
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::file::common::get_backing_memory_validate_flags,
+    crate::temp_clone::{unblock, TempClonable},
+    fuchsia_zircon::{self as zx, HandleBased},
+    std::io::SeekFrom,
 };
 
 /// Initializes a file connection and returns a future which will process the connection.
@@ -48,7 +50,7 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
     file: U,
     options: FileOptions,
     object_request: ObjectRequestRef,
-) -> Result<impl Future<Output = ()>, zx::Status> {
+) -> Result<impl Future<Output = ()>, Status> {
     new_connection_validate_options(&options, file.readable(), file.writable(), file.executable())?;
 
     let object_request = object_request.take();
@@ -80,28 +82,29 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
 trait IoOpHandler: Send + Sync {
     /// Reads at most `count` bytes from the file starting at the connection's seek offset and
     /// advances the seek offset.
-    async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status>;
+    async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status>;
 
     /// Reads `count` bytes from the file starting at `offset`.
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status>;
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status>;
 
     /// Writes `data` to the file starting at the connect's seek offset and advances the seek
     /// offset. If the connection is in append mode then the seek offset is moved to the end of the
     /// file before writing. Returns the number of bytes written.
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status>;
+    async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status>;
 
     /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status>;
+    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status>;
 
     /// Modifies the connection's seek offset. Returns the connections new seek offset.
-    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status>;
+    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status>;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> zx::Status;
+    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status;
 
     /// Duplicates the stream backing this connection if this connection is backed by a stream.
     /// Returns `None` if the connection is not backed by a stream.
-    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status>;
+    #[cfg(target_os = "fuchsia")]
+    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status>;
 }
 
 /// Wrapper around a file that manages the seek offset of the connection and transforms `IoOpHandler`
@@ -148,7 +151,7 @@ impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
         file: Arc<T>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
-    ) -> Result<impl Future<Output = ()>, zx::Status> {
+    ) -> Result<impl Future<Output = ()>, Status> {
         let file = OpenNode::new(file);
         let options = protocols.to_file_options()?;
         create_connection(
@@ -162,21 +165,21 @@ impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
 
 #[async_trait]
 impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
-    async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         let buffer = self.read_at(self.seek, count).await?;
         let count: u64 = buffer.len().try_into().unwrap();
         self.seek += count;
         Ok(buffer)
     }
 
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
         let mut buffer = vec![0u8; count as usize];
         let count = self.file.read_at(offset, &mut buffer[..]).await?;
         buffer.truncate(count.try_into().unwrap());
         Ok(buffer)
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status> {
         if self.is_append {
             let (bytes, offset) = self.file.append(&data).await?;
             self.seek = offset;
@@ -188,11 +191,11 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
         }
     }
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status> {
         self.file.write_at(offset, &data).await
     }
 
-    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
+    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
         // TODO(fxbug.dev/109832) Use mixed_integer_ops when available.
         let new_seek = match origin {
             fio::SeekOrigin::Start => offset as i128,
@@ -214,16 +217,17 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
             self.seek = new_seek;
             Ok(self.seek)
         } else {
-            Err(zx::Status::OUT_OF_RANGE)
+            Err(Status::OUT_OF_RANGE)
         }
     }
 
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> zx::Status {
+    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
         self.is_append = flags.intersects(fio::OpenFlags::APPEND);
-        zx::Status::OK
+        Status::OK
     }
 
-    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status> {
+    #[cfg(target_os = "fuchsia")]
+    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
         Ok(None)
     }
 }
@@ -238,7 +242,7 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T
         file: Arc<T>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
-    ) -> Result<impl Future<Output = ()>, zx::Status> {
+    ) -> Result<impl Future<Output = ()>, Status> {
         let file = OpenNode::new(file);
         create_connection(
             scope,
@@ -265,153 +269,166 @@ impl<T: 'static + File> DerefMut for RawIoConnection<T> {
 
 #[async_trait]
 impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoConnection<T> {
-    async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         self.file.read(count).await
     }
 
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
         self.file.read_at(offset, count).await
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status> {
         self.file.write(&data).await
     }
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status> {
         self.file.write_at(offset, &data).await
     }
 
-    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
+    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
         self.file.seek(offset, origin).await
     }
 
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> zx::Status {
+    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
         self.file.update_flags(flags)
     }
 
-    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status> {
+    #[cfg(target_os = "fuchsia")]
+    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
         Ok(None)
     }
 }
 
-pub trait GetVmo {
-    /// Returns the underlying VMO for the node.
-    fn get_vmo(&self) -> &zx::Vmo;
-}
-
-/// Wrapper around a file that forwards `File` requests to `file` and `FileIo` requests to `stream`.
-pub struct StreamIoConnection<T: 'static + File> {
-    /// File that requests will be forwarded to.
-    file: OpenNode<T>,
-
-    /// The stream backing the connection that all read, write, and seek calls are forwarded to.
-    stream: TempClonable<zx::Stream>,
-}
-
-impl<T: 'static + File> Deref for StreamIoConnection<T> {
-    type Target = OpenNode<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.file
-    }
-}
-
-impl<T: 'static + File> DerefMut for StreamIoConnection<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.file
-    }
-}
-
-impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
-    /// Creates a stream-based file connection. A stream based file connection sends a zx::stream to
-    /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
-    /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
-    /// to `file`.
-    pub fn create(
-        scope: ExecutionScope,
-        file: Arc<T>,
-        protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef,
-    ) -> Result<impl Future<Output = ()>, zx::Status>
-    where
-        T: GetVmo,
-    {
-        let file = OpenNode::new(file);
-        let options = protocols.to_file_options()?;
-        let stream =
-            TempClonable::new(zx::Stream::create(options.to_stream_options(), file.get_vmo(), 0)?);
-        create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
-    }
-}
-
-#[async_trait]
-impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
-    async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let stream = self.stream.temp_clone();
-        unblock(move || {
-            let mut data = vec![0u8; count as usize];
-            let actual = stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
-            data.truncate(actual);
-            Ok(data)
-        })
-        .await
+#[cfg(target_os = "fuchsia")]
+mod stream_io {
+    use super::*;
+    pub trait GetVmo {
+        /// Returns the underlying VMO for the node.
+        fn get_vmo(&self) -> &zx::Vmo;
     }
 
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let stream = self.stream.temp_clone();
-        unblock(move || {
-            let mut data = vec![0u8; count as usize];
-            let actual = stream.readv_at(zx::StreamReadOptions::empty(), offset, &[&mut data])?;
-            data.truncate(actual);
-            Ok(data)
-        })
-        .await
+    /// Wrapper around a file that forwards `File` requests to `file` and
+    /// `FileIo` requests to `stream`.
+    pub struct StreamIoConnection<T: 'static + File> {
+        /// File that requests will be forwarded to.
+        file: OpenNode<T>,
+
+        /// The stream backing the connection that all read, write, and seek calls are forwarded to.
+        stream: TempClonable<zx::Stream>,
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
-        let stream = self.stream.temp_clone();
-        unblock(move || {
-            let actual = stream.writev(zx::StreamWriteOptions::empty(), &[&data])?;
-            Ok(actual as u64)
-        })
-        .await
-    }
+    impl<T: 'static + File> Deref for StreamIoConnection<T> {
+        type Target = OpenNode<T>;
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
-        let stream = self.stream.temp_clone();
-        unblock(move || {
-            let actual = stream.writev_at(zx::StreamWriteOptions::empty(), offset, &[&data])?;
-            Ok(actual as u64)
-        })
-        .await
-    }
-
-    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
-        let position = match origin {
-            fio::SeekOrigin::Start => {
-                if offset < 0 {
-                    return Err(zx::Status::INVALID_ARGS);
-                }
-                SeekFrom::Start(offset as u64)
-            }
-            fio::SeekOrigin::Current => SeekFrom::Current(offset),
-            fio::SeekOrigin::End => SeekFrom::End(offset),
-        };
-        self.stream.seek(position)
-    }
-
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> zx::Status {
-        let append_mode = flags.contains(fio::OpenFlags::APPEND) as u8;
-        match self.stream.set_mode_append(&append_mode) {
-            Ok(()) => zx::Status::OK,
-            Err(status) => status,
+        fn deref(&self) -> &Self::Target {
+            &self.file
         }
     }
 
-    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status> {
-        self.stream.duplicate_handle(zx::Rights::SAME_RIGHTS).map(|s| Some(s))
+    impl<T: 'static + File> DerefMut for StreamIoConnection<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.file
+        }
+    }
+
+    impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
+        /// Creates a stream-based file connection. A stream based file connection sends a zx::stream to
+        /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
+        /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
+        /// to `file`.
+        pub fn create(
+            scope: ExecutionScope,
+            file: Arc<T>,
+            protocols: impl ProtocolsExt,
+            object_request: ObjectRequestRef,
+        ) -> Result<impl Future<Output = ()>, Status>
+        where
+            T: GetVmo,
+        {
+            let file = OpenNode::new(file);
+            let options = protocols.to_file_options()?;
+            let stream = TempClonable::new(zx::Stream::create(
+                options.to_stream_options(),
+                file.get_vmo(),
+                0,
+            )?);
+            create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
+        }
+    }
+
+    #[async_trait]
+    impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
+        async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
+            let stream = self.stream.temp_clone();
+            unblock(move || {
+                let mut data = vec![0u8; count as usize];
+                let actual = stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
+                data.truncate(actual);
+                Ok(data)
+            })
+            .await
+        }
+
+        async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
+            let stream = self.stream.temp_clone();
+            unblock(move || {
+                let mut data = vec![0u8; count as usize];
+                let actual =
+                    stream.readv_at(zx::StreamReadOptions::empty(), offset, &[&mut data])?;
+                data.truncate(actual);
+                Ok(data)
+            })
+            .await
+        }
+
+        async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status> {
+            let stream = self.stream.temp_clone();
+            unblock(move || {
+                let actual = stream.writev(zx::StreamWriteOptions::empty(), &[&data])?;
+                Ok(actual as u64)
+            })
+            .await
+        }
+
+        async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status> {
+            let stream = self.stream.temp_clone();
+            unblock(move || {
+                let actual = stream.writev_at(zx::StreamWriteOptions::empty(), offset, &[&data])?;
+                Ok(actual as u64)
+            })
+            .await
+        }
+
+        async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
+            let position = match origin {
+                fio::SeekOrigin::Start => {
+                    if offset < 0 {
+                        return Err(Status::INVALID_ARGS);
+                    }
+                    SeekFrom::Start(offset as u64)
+                }
+                fio::SeekOrigin::Current => SeekFrom::Current(offset),
+                fio::SeekOrigin::End => SeekFrom::End(offset),
+            };
+            self.stream.seek(position)
+        }
+
+        fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
+            let append_mode = flags.contains(fio::OpenFlags::APPEND) as u8;
+            match self.stream.set_mode_append(&append_mode) {
+                Ok(()) => Status::OK,
+                Err(status) => status,
+            }
+        }
+
+        fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
+            self.stream.duplicate_handle(zx::Rights::SAME_RIGHTS).map(|s| Some(s))
+        }
     }
 }
+
+#[cfg(target_os = "fuchsia")]
+pub use stream_io::*;
 
 /// Return type for [`handle_request()`] functions.
 enum ConnectionState {
@@ -481,17 +498,17 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
         match req {
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
-                fuchsia_trace::duration!("storage", "File::Clone");
+                trace::duration!("storage", "File::Clone");
                 self.handle_clone(flags, object);
             }
             fio::FileRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
-                fuchsia_trace::duration!("storage", "File::Reopen");
+                trace::duration!("storage", "File::Reopen");
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::FileRequest::Close { responder } => {
-                fuchsia_trace::duration!("storage", "File::Close");
+                trace::duration!("storage", "File::Close");
                 responder.send(
                     if self.options.rights.intersects(
                         fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
@@ -503,8 +520,17 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 )?;
                 return Ok(ConnectionState::Closed);
             }
+            #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::Describe { responder } => {
-                fuchsia_trace::duration!("storage", "File::Describe");
+                responder.send(fio::FileInfo {
+                    stream: None,
+                    observer: self.file.event()?,
+                    ..Default::default()
+                })?;
+            }
+            #[cfg(target_os = "fuchsia")]
+            fio::FileRequest::Describe { responder } => {
+                trace::duration!("storage", "File::Describe");
                 let stream = self.file.duplicate_stream()?;
                 responder.send(fio::FileInfo {
                     stream,
@@ -518,7 +544,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 )?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
-                fuchsia_trace::duration!("storage", "File::GetConnectionInfo");
+                trace::duration!("storage", "File::GetConnectionInfo");
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
@@ -526,23 +552,23 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 })?;
             }
             fio::FileRequest::Sync { responder } => {
-                fuchsia_trace::duration!("storage", "File::Sync");
+                trace::duration!("storage", "File::Sync");
                 responder.send(
                     self.file.sync(SyncMode::Normal).await.map_err(|status| status.into_raw()),
                 )?;
             }
             fio::FileRequest::GetAttr { responder } => {
-                fuchsia_trace::duration!("storage", "File::GetAttr");
+                trace::duration!("storage", "File::GetAttr");
                 let (status, attrs) = self.handle_get_attr().await;
                 responder.send(status.into_raw(), &attrs)?;
             }
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
-                fuchsia_trace::duration!("storage", "File::SetAttr");
+                trace::duration!("storage", "File::SetAttr");
                 let status = self.handle_set_attr(flags, attributes).await;
                 responder.send(status.into_raw())?;
             }
             fio::FileRequest::GetAttributes { query, responder } => {
-                fuchsia_trace::duration!("storage", "File::GetAttributes");
+                trace::duration!("storage", "File::GetAttributes");
                 let result = self.handle_get_attributes(query).await;
                 responder.send(
                     result
@@ -554,25 +580,25 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                             } = a;
                             (m, i)
                         })
-                        .map_err(|status| zx::Status::into_raw(*status)),
+                        .map_err(|status| Status::into_raw(*status)),
                 )?;
             }
             fio::FileRequest::UpdateAttributes { payload, responder } => {
-                fuchsia_trace::duration!("storage", "File::UpdateAttributes");
+                trace::duration!("storage", "File::UpdateAttributes");
                 let result = self.handle_update_attributes(payload).await.map_err(|s| s.into_raw());
                 responder.send(result)?;
             }
             fio::FileRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
-                fuchsia_trace::duration!("storage", "File::ListExtendedAttributes");
+                trace::duration!("storage", "File::ListExtendedAttributes");
                 self.handle_list_extended_attribute(iterator).await;
             }
             fio::FileRequest::GetExtendedAttribute { name, responder } => {
-                fuchsia_trace::duration!("storage", "File::GetExtendedAttribute");
+                trace::duration!("storage", "File::GetExtendedAttribute");
                 let res = self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
             fio::FileRequest::SetExtendedAttribute { name, value, mode, responder } => {
-                fuchsia_trace::duration!("storage", "File::SetExtendedAttribute");
+                trace::duration!("storage", "File::SetExtendedAttribute");
                 let res = self
                     .handle_set_extended_attribute(name, value, mode)
                     .await
@@ -580,23 +606,23 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 responder.send(res)?;
             }
             fio::FileRequest::RemoveExtendedAttribute { name, responder } => {
-                fuchsia_trace::duration!("storage", "File::RemoveExtendedAttribute");
+                trace::duration!("storage", "File::RemoveExtendedAttribute");
                 let res =
                     self.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
             fio::FileRequest::EnableVerity { options, responder } => {
-                fuchsia_trace::duration!("storage", "File::EnableVerity");
+                trace::duration!("storage", "File::EnableVerity");
                 let res = self.handle_enable_verity(options).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
             fio::FileRequest::Read { count, responder } => {
-                fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
+                trace::duration!("storage", "File::Read", "bytes" => count);
                 let result = self.handle_read(count).await;
                 let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
             }
             fio::FileRequest::ReadAt { offset, count, responder } => {
-                fuchsia_trace::duration!(
+                trace::duration!(
                     "storage",
                     "File::ReadAt",
                     "offset" => offset,
@@ -606,62 +632,67 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
             }
             fio::FileRequest::Write { data, responder } => {
-                fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len());
+                trace::duration!("storage", "File::Write", "bytes" => data.len());
                 let result = self.handle_write(data).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
             }
             fio::FileRequest::WriteAt { offset, data, responder } => {
-                fuchsia_trace::duration!(
+                trace::duration!(
                     "storage",
                     "File::WriteAt",
                     "offset" => offset,
                     "bytes" => data.len()
                 );
                 let result = self.handle_write_at(offset, data).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
             }
             fio::FileRequest::Seek { origin, offset, responder } => {
-                fuchsia_trace::duration!("storage", "File::Seek");
+                trace::duration!("storage", "File::Seek");
                 let result = self.handle_seek(offset, origin).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
             }
             fio::FileRequest::Resize { length, responder } => {
-                fuchsia_trace::duration!("storage", "File::Resize", "length" => length);
+                trace::duration!("storage", "File::Resize", "length" => length);
                 let result = self.handle_truncate(length).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
             }
             fio::FileRequest::GetFlags { responder } => {
-                fuchsia_trace::duration!("storage", "File::GetFlags");
-                responder.send(ZX_OK, self.options.to_io1())?;
+                trace::duration!("storage", "File::GetFlags");
+                responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
             fio::FileRequest::SetFlags { flags, responder } => {
-                fuchsia_trace::duration!("storage", "File::SetFlags");
+                trace::duration!("storage", "File::SetFlags");
                 self.options.is_append = flags.contains(fio::OpenFlags::APPEND);
                 responder.send(self.file.update_flags(self.options.to_io1()).into_raw())?;
             }
+            #[cfg(target_os = "fuchsia")]
             fio::FileRequest::GetBackingMemory { flags, responder } => {
-                fuchsia_trace::duration!("storage", "File::GetBackingMemory");
+                trace::duration!("storage", "File::GetBackingMemory");
                 let result = self.handle_get_backing_memory(flags).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
+            }
+            #[cfg(not(target_os = "fuchsia"))]
+            fio::FileRequest::GetBackingMemory { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::AdvisoryLock { request: _, responder } => {
-                fuchsia_trace::duration!("storage", "File::AdvisoryLock");
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                trace::duration!("storage", "File::AdvisoryLock");
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::Query { responder } => {
                 responder.send(fio::FILE_PROTOCOL_NAME.as_bytes())?;
             }
             fio::FileRequest::QueryFilesystem { responder } => {
-                fuchsia_trace::duration!("storage", "File::QueryFilesystem");
+                trace::duration!("storage", "File::QueryFilesystem");
                 match self.file.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
             fio::FileRequest::Allocate { offset, length, mode, responder } => {
-                fuchsia_trace::duration!("storage", "File::Allocate");
+                trace::duration!("storage", "File::Allocate");
                 let result = self.handle_allocate(offset, length, mode).await;
-                responder.send(result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(Status::into_raw))?;
             }
         }
         Ok(ConnectionState::Alive)
@@ -680,7 +711,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         self.file.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
-    async fn handle_get_attr(&mut self) -> (zx::Status, fio::NodeAttributes) {
+    async fn handle_get_attr(&mut self) -> (Status, fio::NodeAttributes) {
         let attributes = match self.file.get_attrs().await {
             Ok(attr) => attr,
             Err(status) => {
@@ -698,58 +729,54 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 )
             }
         };
-        (zx::Status::OK, attributes)
+        (Status::OK, attributes)
     }
 
     async fn handle_get_attributes(
         &mut self,
         query: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
+    ) -> Result<fio::NodeAttributes2, Status> {
         self.file.get_attributes(query).await
     }
 
-    async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         if !self.options.rights.intersects(fio::Operations::READ_BYTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
 
         if count > fio::MAX_TRANSFER_SIZE {
-            return Err(zx::Status::OUT_OF_RANGE);
+            return Err(Status::OUT_OF_RANGE);
         }
         self.file.read(count).await
     }
 
-    async fn handle_read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
+    async fn handle_read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
         if !self.options.rights.intersects(fio::Operations::READ_BYTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
         if count > fio::MAX_TRANSFER_SIZE {
-            return Err(zx::Status::OUT_OF_RANGE);
+            return Err(Status::OUT_OF_RANGE);
         }
         self.file.read_at(offset, count).await
     }
 
-    async fn handle_write(&mut self, content: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn handle_write(&mut self, content: Vec<u8>) -> Result<u64, Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
         self.file.write(content).await
     }
 
-    async fn handle_write_at(&self, offset: u64, content: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn handle_write_at(&self, offset: u64, content: Vec<u8>) -> Result<u64, Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
 
         self.file.write_at(offset, content).await
     }
 
     /// Move seek position to byte `offset` relative to the origin specified by `start`.
-    async fn handle_seek(
-        &mut self,
-        offset: i64,
-        origin: fio::SeekOrigin,
-    ) -> Result<u64, zx::Status> {
+    async fn handle_seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
         self.file.seek(offset, origin).await
     }
 
@@ -757,13 +784,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         &mut self,
         flags: fio::NodeAttributeFlags,
         attrs: fio::NodeAttributes,
-    ) -> zx::Status {
+    ) -> Status {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
-            return zx::Status::BAD_HANDLE;
+            return Status::BAD_HANDLE;
         }
 
         match self.file.set_attrs(flags, attrs).await {
-            Ok(()) => zx::Status::OK,
+            Ok(()) => Status::OK,
             Err(status) => status,
         }
     }
@@ -771,9 +798,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     async fn handle_update_attributes(
         &mut self,
         attributes: fio::MutableNodeAttributes,
-    ) -> Result<(), zx::Status> {
+    ) -> Result<(), Status> {
         if !self.options.rights.intersects(fio::Operations::UPDATE_ATTRIBUTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
 
         self.file.update_attributes(attributes).await
@@ -782,25 +809,23 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     async fn handle_enable_verity(
         &mut self,
         options: fio::VerificationOptions,
-    ) -> Result<(), zx::Status> {
+    ) -> Result<(), Status> {
         if !self.options.rights.intersects(fio::Operations::UPDATE_ATTRIBUTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
         self.file.enable_verity(options).await
     }
 
-    async fn handle_truncate(&mut self, length: u64) -> Result<(), zx::Status> {
+    async fn handle_truncate(&mut self, length: u64) -> Result<(), Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
-            return Err(zx::Status::BAD_HANDLE);
+            return Err(Status::BAD_HANDLE);
         }
 
         self.file.truncate(length).await
     }
 
-    async fn handle_get_backing_memory(
-        &mut self,
-        flags: fio::VmoFlags,
-    ) -> Result<zx::Vmo, zx::Status> {
+    #[cfg(target_os = "fuchsia")]
+    async fn handle_get_backing_memory(&mut self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
         get_backing_memory_validate_flags(flags, self.options.to_io1())?;
         self.file.get_backing_memory(flags).await
     }
@@ -825,7 +850,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     async fn handle_get_extended_attribute(
         &mut self,
         name: Vec<u8>,
-    ) -> Result<fio::ExtendedAttributeValue, zx::Status> {
+    ) -> Result<fio::ExtendedAttributeValue, Status> {
         let value = self.file.get_extended_attribute(name).await?;
         encode_extended_attribute_value(value)
     }
@@ -835,24 +860,24 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         name: Vec<u8>,
         value: fio::ExtendedAttributeValue,
         mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), zx::Status> {
+    ) -> Result<(), Status> {
         if name.iter().any(|c| *c == 0) {
-            return Err(zx::Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS);
         }
         let val = decode_extended_attribute_value(value)?;
         self.file.set_extended_attribute(name, val, mode).await
     }
 
-    async fn handle_remove_extended_attribute(&mut self, name: Vec<u8>) -> Result<(), zx::Status> {
+    async fn handle_remove_extended_attribute(&mut self, name: Vec<u8>) -> Result<(), Status> {
         self.file.remove_extended_attribute(name).await
     }
 
     async fn handle_link_into(
         &mut self,
-        target_parent_token: zx::Event,
+        target_parent_token: fidl::Event,
         target_name: String,
-    ) -> Result<(), zx::Status> {
-        let target_name = parse_name(target_name).map_err(|_| zx::Status::INVALID_ARGS)?;
+    ) -> Result<(), Status> {
+        let target_name = parse_name(target_name).map_err(|_| Status::INVALID_ARGS)?;
 
         if !self.options.rights.contains(
             fio::Operations::READ_BYTES
@@ -860,14 +885,14 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 | fio::Operations::GET_ATTRIBUTES
                 | fio::Operations::UPDATE_ATTRIBUTES,
         ) {
-            return Err(zx::Status::ACCESS_DENIED);
+            return Err(Status::ACCESS_DENIED);
         }
 
         let (target_parent, _flags) = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?
-            .ok_or(Err(zx::Status::NOT_FOUND))?;
+            .ok_or(Err(Status::NOT_FOUND))?;
 
         self.file.clone().link_into(target_parent, target_name).await
     }
@@ -877,7 +902,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         offset: u64,
         length: u64,
         mode: fio::AllocateMode,
-    ) -> Result<(), zx::Status> {
+    ) -> Result<(), Status> {
         self.file.allocate(offset, length, mode).await
     }
 }
@@ -891,12 +916,15 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::Representation, zx::Status> {
+    ) -> Result<fio::Representation, Status> {
         // TODO(fxbug.dev/77623): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
             observer: self.file.event()?,
+            #[cfg(target_os = "fuchsia")]
             stream: self.file.duplicate_stream()?,
+            #[cfg(not(target_os = "fuchsia"))]
+            stream: None,
             attributes: if requested_attributes.is_empty() {
                 None
             } else {
@@ -907,7 +935,10 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
     }
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
+        #[cfg(target_os = "fuchsia")]
         let stream = self.file.duplicate_stream()?;
+        #[cfg(not(target_os = "fuchsia"))]
+        let stream = None;
         Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
     }
 }
@@ -919,10 +950,12 @@ mod tests {
         crate::{file::FileOptions, node::Node, ToObjectRequest},
         assert_matches::assert_matches,
         async_trait::async_trait,
-        fuchsia_zircon::{self as zx, HandleBased},
         futures::prelude::*,
         std::sync::Mutex,
     };
+
+    #[cfg(target_os = "fuchsia")]
+    use fuchsia_zircon::{self as zx, HandleBased};
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);
@@ -936,22 +969,44 @@ mod tests {
 
     #[derive(Debug, PartialEq)]
     enum FileOperation {
-        Init { options: FileOptions },
-        ReadAt { offset: u64, count: u64 },
-        WriteAt { offset: u64, content: Vec<u8> },
-        Append { content: Vec<u8> },
-        Truncate { length: u64 },
-        GetBackingMemory { flags: fio::VmoFlags },
+        Init {
+            options: FileOptions,
+        },
+        ReadAt {
+            offset: u64,
+            count: u64,
+        },
+        WriteAt {
+            offset: u64,
+            content: Vec<u8>,
+        },
+        Append {
+            content: Vec<u8>,
+        },
+        Truncate {
+            length: u64,
+        },
+        #[cfg(target_os = "fuchsia")]
+        GetBackingMemory {
+            flags: fio::VmoFlags,
+        },
         GetSize,
         GetAttrs,
-        GetAttributes { query: fio::NodeAttributesQuery },
-        SetAttrs { flags: fio::NodeAttributeFlags, attrs: fio::NodeAttributes },
-        UpdateAttributes { attrs: fio::MutableNodeAttributes },
+        GetAttributes {
+            query: fio::NodeAttributesQuery,
+        },
+        SetAttrs {
+            flags: fio::NodeAttributeFlags,
+            attrs: fio::NodeAttributes,
+        },
+        UpdateAttributes {
+            attrs: fio::MutableNodeAttributes,
+        },
         Close,
         Sync,
     }
 
-    type MockCallbackType = Box<dyn Fn(&FileOperation) -> zx::Status + Sync + Send>;
+    type MockCallbackType = Box<dyn Fn(&FileOperation) -> Status + Sync + Send>;
     /// A fake file that just tracks what calls `FileConnection` makes on it.
     struct MockFile {
         /// The list of operations that have been called.
@@ -960,6 +1015,7 @@ mod tests {
         callback: MockCallbackType,
         /// Only used for get_size/get_attributes
         file_size: u64,
+        #[cfg(target_os = "fuchsia")]
         /// VMO if using streams.
         vmo: zx::Vmo,
     }
@@ -971,9 +1027,16 @@ mod tests {
     const MOCK_FILE_MODIFICATION_TIME: u64 = 100;
     impl MockFile {
         fn new(callback: MockCallbackType) -> Arc<Self> {
-            Self::new_with_vmo(callback, zx::Handle::invalid().into())
+            Arc::new(MockFile {
+                operations: Mutex::new(Vec::new()),
+                callback,
+                file_size: MOCK_FILE_SIZE,
+                #[cfg(target_os = "fuchsia")]
+                vmo: zx::Handle::invalid().into(),
+            })
         }
 
+        #[cfg(target_os = "fuchsia")]
         fn new_with_vmo(callback: MockCallbackType, vmo: zx::Vmo) -> Arc<Self> {
             Arc::new(MockFile {
                 operations: Mutex::new(Vec::new()),
@@ -983,11 +1046,11 @@ mod tests {
             })
         }
 
-        fn handle_operation(&self, operation: FileOperation) -> Result<(), zx::Status> {
+        fn handle_operation(&self, operation: FileOperation) -> Result<(), Status> {
             let result = (self.callback)(&operation);
             self.operations.lock().unwrap().push(operation);
             match result {
-                zx::Status::OK => Ok(()),
+                Status::OK => Ok(()),
                 err => Err(err),
             }
         }
@@ -995,7 +1058,7 @@ mod tests {
 
     #[async_trait]
     impl Node for MockFile {
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             self.handle_operation(FileOperation::GetAttrs)?;
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_FILE,
@@ -1011,7 +1074,7 @@ mod tests {
         async fn get_attributes(
             &self,
             query: fio::NodeAttributesQuery,
-        ) -> Result<fio::NodeAttributes2, zx::Status> {
+        ) -> Result<fio::NodeAttributes2, Status> {
             self.handle_operation(FileOperation::GetAttributes { query })?;
             Ok(attributes!(
                 query,
@@ -1048,21 +1111,22 @@ mod tests {
             true
         }
 
-        async fn open_file(&self, options: &FileOptions) -> Result<(), zx::Status> {
+        async fn open_file(&self, options: &FileOptions) -> Result<(), Status> {
             self.handle_operation(FileOperation::Init { options: *options })?;
             Ok(())
         }
 
-        async fn truncate(&self, length: u64) -> Result<(), zx::Status> {
+        async fn truncate(&self, length: u64) -> Result<(), Status> {
             self.handle_operation(FileOperation::Truncate { length })
         }
 
-        async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
+        #[cfg(target_os = "fuchsia")]
+        async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
             self.handle_operation(FileOperation::GetBackingMemory { flags })?;
-            Err(zx::Status::NOT_SUPPORTED)
+            Err(Status::NOT_SUPPORTED)
         }
 
-        async fn get_size(&self) -> Result<u64, zx::Status> {
+        async fn get_size(&self) -> Result<u64, Status> {
             self.handle_operation(FileOperation::GetSize)?;
             Ok(self.file_size)
         }
@@ -1071,27 +1135,24 @@ mod tests {
             &self,
             flags: fio::NodeAttributeFlags,
             attrs: fio::NodeAttributes,
-        ) -> Result<(), zx::Status> {
+        ) -> Result<(), Status> {
             self.handle_operation(FileOperation::SetAttrs { flags, attrs })?;
             Ok(())
         }
 
-        async fn update_attributes(
-            &self,
-            attrs: fio::MutableNodeAttributes,
-        ) -> Result<(), zx::Status> {
+        async fn update_attributes(&self, attrs: fio::MutableNodeAttributes) -> Result<(), Status> {
             self.handle_operation(FileOperation::UpdateAttributes { attrs })?;
             Ok(())
         }
 
-        async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
+        async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
             self.handle_operation(FileOperation::Sync)
         }
     }
 
     #[async_trait]
     impl FileIo for MockFile {
-        async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, zx::Status> {
+        async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
             let count = buffer.len() as u64;
             self.handle_operation(FileOperation::ReadAt { offset, count })?;
 
@@ -1105,12 +1166,12 @@ mod tests {
             Ok(count)
         }
 
-        async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, zx::Status> {
+        async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
             self.handle_operation(FileOperation::WriteAt { offset, content: content.to_vec() })?;
             Ok(content.len() as u64)
         }
 
-        async fn append(&self, content: &[u8]) -> Result<(u64, u64), zx::Status> {
+        async fn append(&self, content: &[u8]) -> Result<(u64, u64), Status> {
             self.handle_operation(FileOperation::Append { content: content.to_vec() })?;
             Ok((content.len() as u64, self.file_size + content.len() as u64))
         }
@@ -1141,6 +1202,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "fuchsia")]
     impl GetVmo for MockFile {
         fn get_vmo(&self) -> &zx::Vmo {
             &self.vmo
@@ -1148,16 +1210,16 @@ mod tests {
     }
 
     /// Only the init operation will succeed, all others fail.
-    fn only_allow_init(op: &FileOperation) -> zx::Status {
+    fn only_allow_init(op: &FileOperation) -> Status {
         match op {
-            FileOperation::Init { .. } => zx::Status::OK,
-            _ => zx::Status::IO,
+            FileOperation::Init { .. } => Status::OK,
+            _ => Status::IO,
         }
     }
 
     /// All operations succeed.
-    fn always_succeed_callback(_op: &FileOperation) -> zx::Status {
-        zx::Status::OK
+    fn always_succeed_callback(_op: &FileOperation) -> Status {
+        Status::OK
     }
 
     struct TestEnv {
@@ -1192,7 +1254,7 @@ mod tests {
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
         );
         // Do a no-op sync() to make sure that the open has finished.
-        let () = env.proxy.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1211,7 +1273,7 @@ mod tests {
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         );
         // Read from original proxy.
-        let _: Vec<u8> = env.proxy.read(6).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let _: Vec<u8> = env.proxy.read(6).await.unwrap().map_err(Status::from_raw).unwrap();
         let (clone_proxy, remote) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         env.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into()).unwrap();
         // Seek and read from clone_proxy.
@@ -1219,12 +1281,12 @@ mod tests {
             .seek(fio::SeekOrigin::Start, 100)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
-        let _: Vec<u8> = clone_proxy.read(5).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let _: Vec<u8> = clone_proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
 
         // Read from original proxy.
-        let _: Vec<u8> = env.proxy.read(5).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let _: Vec<u8> = env.proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
 
         let events = env.file.operations.lock().unwrap();
         // Each connection should have an independent seek.
@@ -1247,7 +1309,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_close_succeeds() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
-        let () = env.proxy.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let () = env.proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
 
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
@@ -1265,8 +1327,8 @@ mod tests {
             Box::new(only_allow_init),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         );
-        let status = env.proxy.close().await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(status, Err(zx::Status::IO));
+        let status = env.proxy.close().await.unwrap().map_err(Status::from_raw);
+        assert_eq!(status, Err(Status::IO));
 
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
@@ -1310,7 +1372,7 @@ mod tests {
     async fn test_getattr() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
         let (status, attributes) = env.proxy.get_attr().await.unwrap();
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(Status::from_raw(status), Status::OK);
         assert_eq!(
             attributes,
             fio::NodeAttributes {
@@ -1346,7 +1408,7 @@ mod tests {
             .get_attributes(fio::NodeAttributesQuery::all())
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         let expected = attributes!(
             fio::NodeAttributesQuery::all(),
@@ -1396,13 +1458,14 @@ mod tests {
             .get_backing_memory(fio::VmoFlags::READ)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::NOT_SUPPORTED));
+            .map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::NOT_SUPPORTED));
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
             vec![
                 FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                #[cfg(target_os = "fuchsia")]
                 FileOperation::GetBackingMemory { flags: fio::VmoFlags::READ },
             ]
         );
@@ -1416,8 +1479,12 @@ mod tests {
             .get_backing_memory(fio::VmoFlags::READ)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::ACCESS_DENIED));
+            .map_err(Status::from_raw);
+        // On Target this is ACCESS_DENIED, on host this is NOT_SUPPORTED
+        #[cfg(target_os = "fuchsia")]
+        assert_eq!(result, Err(Status::ACCESS_DENIED));
+        #[cfg(not(target_os = "fuchsia"))]
+        assert_eq!(result, Err(Status::NOT_SUPPORTED));
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1435,8 +1502,12 @@ mod tests {
             .get_backing_memory(fio::VmoFlags::EXECUTE)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::ACCESS_DENIED));
+            .map_err(Status::from_raw);
+        // On Target this is ACCESS_DENIED, on host this is NOT_SUPPORTED
+        #[cfg(target_os = "fuchsia")]
+        assert_eq!(result, Err(Status::ACCESS_DENIED));
+        #[cfg(not(target_os = "fuchsia"))]
+        assert_eq!(result, Err(Status::NOT_SUPPORTED));
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1455,7 +1526,7 @@ mod tests {
                 | fio::OpenFlags::TRUNCATE,
         );
         let (status, flags) = env.proxy.get_flags().await.unwrap();
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(Status::from_raw(status), Status::OK);
         // OPEN_FLAG_TRUNCATE should get stripped because it only applies at open time.
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let events = env.file.operations.lock().unwrap();
@@ -1481,7 +1552,7 @@ mod tests {
         let event = env.proxy.take_event_stream().try_next().await.unwrap();
         match event {
             Some(fio::FileEvent::OnOpen_ { s, info: Some(boxed) }) => {
-                assert_eq!(zx::Status::from_raw(s), zx::Status::OK);
+                assert_eq!(Status::from_raw(s), Status::OK);
                 assert_eq!(
                     *boxed,
                     fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream: None })
@@ -1504,7 +1575,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_succeeds() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
-        let data = env.proxy.read(10).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = env.proxy.read(10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
         let events = env.file.operations.lock().unwrap();
@@ -1520,22 +1591,22 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_not_readable() {
         let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_WRITABLE);
-        let result = env.proxy.read(10).await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::BAD_HANDLE));
+        let result = env.proxy.read(10).await.unwrap().map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::BAD_HANDLE));
     }
 
     #[fuchsia::test]
     async fn test_read_validates_count() {
         let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_READABLE);
         let result =
-            env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
+            env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::OUT_OF_RANGE));
     }
 
     #[fuchsia::test]
     async fn test_read_at_succeeds() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
-        let data = env.proxy.read_at(5, 10).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = env.proxy.read_at(5, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10, 11, 12, 13, 14]);
 
         let events = env.file.operations.lock().unwrap();
@@ -1556,8 +1627,8 @@ mod tests {
             .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
+            .map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::OUT_OF_RANGE));
     }
 
     #[fuchsia::test]
@@ -1568,11 +1639,11 @@ mod tests {
             .seek(fio::SeekOrigin::Start, 10)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, 10);
 
-        let data = env.proxy.read(1).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10]);
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
@@ -1592,7 +1663,7 @@ mod tests {
             .seek(fio::SeekOrigin::Start, 10)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, 10);
 
@@ -1601,11 +1672,11 @@ mod tests {
             .seek(fio::SeekOrigin::Current, -2)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, 8);
 
-        let data = env.proxy.read(1).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![8]);
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
@@ -1620,13 +1691,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_seek_before_start() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
-        let result = env
-            .proxy
-            .seek(fio::SeekOrigin::Current, -4)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
+        let result =
+            env.proxy.seek(fio::SeekOrigin::Current, -4).await.unwrap().map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::OUT_OF_RANGE));
     }
 
     #[fuchsia::test]
@@ -1637,11 +1704,11 @@ mod tests {
             .seek(fio::SeekOrigin::End, -4)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, MOCK_FILE_SIZE - 4);
 
-        let data = env.proxy.read(1).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![(offset % 256) as u8]);
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
@@ -1674,7 +1741,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(Status::from_raw(status), Status::OK);
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1703,7 +1770,7 @@ mod tests {
             .update_attributes(&attributes)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
 
         let events = env.file.operations.lock().unwrap();
@@ -1720,16 +1787,16 @@ mod tests {
     async fn test_set_flags() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
         let status = env.proxy.set_flags(fio::OpenFlags::APPEND).await.unwrap();
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(Status::from_raw(status), Status::OK);
         let (status, flags) = env.proxy.get_flags().await.unwrap();
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(Status::from_raw(status), Status::OK);
         assert_eq!(flags, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND);
     }
 
     #[fuchsia::test]
     async fn test_sync() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
-        let () = env.proxy.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1748,7 +1815,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_resize() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
-        let () = env.proxy.resize(10).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let () = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw).unwrap();
         let events = env.file.operations.lock().unwrap();
         assert_matches!(
             &events[..],
@@ -1762,8 +1829,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_resize_no_perms() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
-        let result = env.proxy.resize(10).await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::BAD_HANDLE));
+        let result = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::BAD_HANDLE));
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1777,7 +1844,7 @@ mod tests {
     async fn test_write() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
         let data = "Hello, world!".as_bytes();
-        let count = env.proxy.write(data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
         let events = env.file.operations.lock().unwrap();
         assert_matches!(
@@ -1798,8 +1865,8 @@ mod tests {
     async fn test_write_no_perms() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
         let data = "Hello, world!".as_bytes();
-        let result = env.proxy.write(data).await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::BAD_HANDLE));
+        let result = env.proxy.write(data).await.unwrap().map_err(Status::from_raw);
+        assert_eq!(result, Err(Status::BAD_HANDLE));
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
@@ -1813,8 +1880,7 @@ mod tests {
     async fn test_write_at() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
         let data = "Hello, world!".as_bytes();
-        let count =
-            env.proxy.write_at(data, 10).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let count = env.proxy.write_at(data, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
         let events = env.file.operations.lock().unwrap();
         assert_matches!(
@@ -1838,14 +1904,14 @@ mod tests {
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
         );
         let data = "Hello, world!".as_bytes();
-        let count = env.proxy.write(data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
         let offset = env
             .proxy
             .seek(fio::SeekOrigin::Current, 0)
             .await
             .unwrap()
-            .map_err(zx::Status::from_raw)
+            .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, MOCK_FILE_SIZE + data.len() as u64);
         let events = env.file.operations.lock().unwrap();
@@ -1865,254 +1931,274 @@ mod tests {
         }
     }
 
-    fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::OpenFlags) -> TestEnv {
-        let file = MockFile::new_with_vmo(Box::new(always_succeed_callback), vmo);
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::FileMarker>().expect("Create proxy to succeed");
+    #[cfg(target_os = "fuchsia")]
+    mod stream_tests {
+        use super::*;
 
-        let scope = ExecutionScope::new();
+        fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::OpenFlags) -> TestEnv {
+            let file = MockFile::new_with_vmo(Box::new(always_succeed_callback), vmo);
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()
+                .expect("Create proxy to succeed");
 
-        let cloned_file = file.clone();
-        let cloned_scope = scope.clone();
-        flags.to_object_request(server_end).handle(|object_request| {
-            object_request.spawn_connection(
-                cloned_scope,
-                cloned_file,
+            let scope = ExecutionScope::new();
+
+            let cloned_file = file.clone();
+            let cloned_scope = scope.clone();
+            flags.to_object_request(server_end).handle(|object_request| {
+                object_request.spawn_connection(
+                    cloned_scope,
+                    cloned_file,
+                    flags,
+                    StreamIoConnection::create,
+                )
+            });
+
+            TestEnv { file, proxy, scope }
+        }
+
+        #[fuchsia::test]
+        async fn test_stream_describe() {
+            const VMO_CONTENTS: &[u8] = b"hello there";
+            let vmo = zx::Vmo::create(VMO_CONTENTS.len() as u64).unwrap();
+            vmo.write(VMO_CONTENTS, 0).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let env = init_mock_stream_file(vmo, flags);
+
+            let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap()
+            else {
+                panic!("Missing stream")
+            };
+            let mut buf = [0; 20];
+            assert_eq!(
+                stream.readv(zx::StreamReadOptions::empty(), &[&mut buf]).expect("readv failed"),
+                VMO_CONTENTS.len()
+            );
+            assert_eq!(&buf[..VMO_CONTENTS.len()], &VMO_CONTENTS[..]);
+        }
+
+        #[fuchsia::test]
+        async fn test_stream_read() {
+            let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+            let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
+            vmo.write(&vmo_contents, 0).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let env = init_mock_stream_file(vmo, flags);
+
+            let data = env
+                .proxy
+                .read(vmo_contents.len() as u64)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            assert_eq!(data, vmo_contents);
+
+            let events = env.file.operations.lock().unwrap();
+            assert_eq!(
+                *events,
+                [FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false }
+                },]
+            );
+        }
+
+        #[fuchsia::test]
+        async fn test_stream_read_at() {
+            let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+            let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
+            vmo.write(&vmo_contents, 0).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let env = init_mock_stream_file(vmo, flags);
+
+            const OFFSET: u64 = 4;
+            let data = env
+                .proxy
+                .read_at((vmo_contents.len() as u64) - OFFSET, OFFSET)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            assert_eq!(data, vmo_contents[OFFSET as usize..]);
+
+            let events = env.file.operations.lock().unwrap();
+            assert_eq!(
+                *events,
+                [FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false }
+                },]
+            );
+        }
+
+        #[fuchsia::test]
+        async fn test_stream_write() {
+            const DATA_SIZE: u64 = 10;
+            let vmo = zx::Vmo::create(DATA_SIZE).unwrap();
+            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let env = init_mock_stream_file(
+                vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 flags,
-                StreamIoConnection::create,
-            )
-        });
+            );
 
-        TestEnv { file, proxy, scope }
-    }
+            let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+            let written = env.proxy.write(&data).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(written, DATA_SIZE);
+            let mut vmo_contents = [0; DATA_SIZE as usize];
+            vmo.read(&mut vmo_contents, 0).unwrap();
+            assert_eq!(vmo_contents, data);
 
-    #[fuchsia::test]
-    async fn test_stream_describe() {
-        const VMO_CONTENTS: &[u8] = b"hello there";
-        let vmo = zx::Vmo::create(VMO_CONTENTS.len() as u64).unwrap();
-        vmo.write(VMO_CONTENTS, 0).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-        let env = init_mock_stream_file(vmo, flags);
+            let events = env.file.operations.lock().unwrap();
+            assert_eq!(
+                *events,
+                [FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false }
+                },]
+            );
+        }
 
-        let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap() else {
-            panic!("Missing stream")
-        };
-        let mut buf = [0; 20];
-        assert_eq!(
-            stream.readv(zx::StreamReadOptions::empty(), &[&mut buf]).expect("readv failed"),
-            VMO_CONTENTS.len()
-        );
-        assert_eq!(&buf[..VMO_CONTENTS.len()], &VMO_CONTENTS[..]);
-    }
+        #[fuchsia::test]
+        async fn test_stream_write_at() {
+            const OFFSET: u64 = 4;
+            const DATA_SIZE: u64 = 10;
+            let vmo = zx::Vmo::create(DATA_SIZE + OFFSET).unwrap();
+            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let env = init_mock_stream_file(
+                vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                flags,
+            );
 
-    #[fuchsia::test]
-    async fn test_stream_read() {
-        let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
-        vmo.write(&vmo_contents, 0).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        let env = init_mock_stream_file(vmo, flags);
+            let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+            let written =
+                env.proxy.write_at(&data, OFFSET).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(written, DATA_SIZE);
+            let mut vmo_contents = [0; DATA_SIZE as usize];
+            vmo.read(&mut vmo_contents, OFFSET).unwrap();
+            assert_eq!(vmo_contents, data);
 
-        let data = env
-            .proxy
-            .read(vmo_contents.len() as u64)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        assert_eq!(data, vmo_contents);
+            let events = env.file.operations.lock().unwrap();
+            assert_eq!(
+                *events,
+                [FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false }
+                }]
+            );
+        }
 
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            [FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },]
-        );
-    }
+        #[fuchsia::test]
+        async fn test_stream_seek() {
+            let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+            let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
+            vmo.write(&vmo_contents, 0).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let env = init_mock_stream_file(vmo, flags);
 
-    #[fuchsia::test]
-    async fn test_stream_read_at() {
-        let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
-        vmo.write(&vmo_contents, 0).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        let env = init_mock_stream_file(vmo, flags);
+            let position = env
+                .proxy
+                .seek(fio::SeekOrigin::Start, 8)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            assert_eq!(position, 8);
+            let data = env.proxy.read(2).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(data, [1, 0]);
 
-        const OFFSET: u64 = 4;
-        let data = env
-            .proxy
-            .read_at((vmo_contents.len() as u64) - OFFSET, OFFSET)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        assert_eq!(data, vmo_contents[OFFSET as usize..]);
+            let position = env
+                .proxy
+                .seek(fio::SeekOrigin::Current, -4)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            // Seeked to 8, read 2, seeked backwards 4. 8 + 2 - 4 = 6.
+            assert_eq!(position, 6);
+            let data = env.proxy.read(2).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(data, [3, 2]);
 
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            [FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },]
-        );
-    }
+            let position = env
+                .proxy
+                .seek(fio::SeekOrigin::End, -6)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            assert_eq!(position, 4);
+            let data = env.proxy.read(2).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(data, [5, 4]);
 
-    #[fuchsia::test]
-    async fn test_stream_write() {
-        const DATA_SIZE: u64 = 10;
-        let vmo = zx::Vmo::create(DATA_SIZE).unwrap();
-        let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let env =
-            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
+            let e = env
+                .proxy
+                .seek(fio::SeekOrigin::Start, -1)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .expect_err("Seeking before the start of a file should be an error");
+            assert_eq!(e, Status::INVALID_ARGS);
+        }
 
-        let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(written, DATA_SIZE);
-        let mut vmo_contents = [0; DATA_SIZE as usize];
-        vmo.read(&mut vmo_contents, 0).unwrap();
-        assert_eq!(vmo_contents, data);
+        #[fuchsia::test]
+        async fn test_stream_set_flags() {
+            let data = [0, 1, 2, 3, 4];
+            let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 100).unwrap();
+            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let env = init_mock_stream_file(
+                vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                flags,
+            );
 
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            [FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },]
-        );
-    }
+            let written = env.proxy.write(&data).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(written, data.len() as u64);
+            // Data was not appended.
+            assert_eq!(vmo.get_content_size().unwrap(), 100);
 
-    #[fuchsia::test]
-    async fn test_stream_write_at() {
-        const OFFSET: u64 = 4;
-        const DATA_SIZE: u64 = 10;
-        let vmo = zx::Vmo::create(DATA_SIZE + OFFSET).unwrap();
-        let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let env =
-            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
+            // Switch to append mode.
+            zx::ok(env.proxy.set_flags(fio::OpenFlags::APPEND).await.unwrap()).unwrap();
+            env.proxy
+                .seek(fio::SeekOrigin::Start, 0)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            let written = env.proxy.write(&data).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(written, data.len() as u64);
+            // Data was appended.
+            assert_eq!(vmo.get_content_size().unwrap(), 105);
 
-        let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let written =
-            env.proxy.write_at(&data, OFFSET).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(written, DATA_SIZE);
-        let mut vmo_contents = [0; DATA_SIZE as usize];
-        vmo.read(&mut vmo_contents, OFFSET).unwrap();
-        assert_eq!(vmo_contents, data);
+            // Switch out of append mode.
+            zx::ok(env.proxy.set_flags(fio::OpenFlags::empty()).await.unwrap()).unwrap();
+            env.proxy
+                .seek(fio::SeekOrigin::Start, 0)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
+            let written = env.proxy.write(&data).await.unwrap().map_err(Status::from_raw).unwrap();
+            assert_eq!(written, data.len() as u64);
+            // Data was not appended.
+            assert_eq!(vmo.get_content_size().unwrap(), 105);
+        }
 
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            [FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } }]
-        );
-    }
+        #[fuchsia::test]
+        async fn test_stream_read_validates_count() {
+            let vmo = zx::Vmo::create(10).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let env = init_mock_stream_file(vmo, flags);
+            let result =
+                env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(Status::from_raw);
+            assert_eq!(result, Err(Status::OUT_OF_RANGE));
+        }
 
-    #[fuchsia::test]
-    async fn test_stream_seek() {
-        let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
-        vmo.write(&vmo_contents, 0).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        let env = init_mock_stream_file(vmo, flags);
-
-        let position = env
-            .proxy
-            .seek(fio::SeekOrigin::Start, 8)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        assert_eq!(position, 8);
-        let data = env.proxy.read(2).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(data, [1, 0]);
-
-        let position = env
-            .proxy
-            .seek(fio::SeekOrigin::Current, -4)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        // Seeked to 8, read 2, seeked backwards 4. 8 + 2 - 4 = 6.
-        assert_eq!(position, 6);
-        let data = env.proxy.read(2).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(data, [3, 2]);
-
-        let position = env
-            .proxy
-            .seek(fio::SeekOrigin::End, -6)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        assert_eq!(position, 4);
-        let data = env.proxy.read(2).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(data, [5, 4]);
-
-        let e = env
-            .proxy
-            .seek(fio::SeekOrigin::Start, -1)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .expect_err("Seeking before the start of a file should be an error");
-        assert_eq!(e, zx::Status::INVALID_ARGS);
-    }
-
-    #[fuchsia::test]
-    async fn test_stream_set_flags() {
-        let data = [0, 1, 2, 3, 4];
-        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 100).unwrap();
-        let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let env =
-            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
-
-        let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(written, data.len() as u64);
-        // Data was not appended.
-        assert_eq!(vmo.get_content_size().unwrap(), 100);
-
-        // Switch to append mode.
-        zx::ok(env.proxy.set_flags(fio::OpenFlags::APPEND).await.unwrap()).unwrap();
-        env.proxy
-            .seek(fio::SeekOrigin::Start, 0)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(written, data.len() as u64);
-        // Data was appended.
-        assert_eq!(vmo.get_content_size().unwrap(), 105);
-
-        // Switch out of append mode.
-        zx::ok(env.proxy.set_flags(fio::OpenFlags::empty()).await.unwrap()).unwrap();
-        env.proxy
-            .seek(fio::SeekOrigin::Start, 0)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
-        let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(written, data.len() as u64);
-        // Data was not appended.
-        assert_eq!(vmo.get_content_size().unwrap(), 105);
-    }
-
-    #[fuchsia::test]
-    async fn test_stream_read_validates_count() {
-        let vmo = zx::Vmo::create(10).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        let env = init_mock_stream_file(vmo, flags);
-        let result =
-            env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
-    }
-
-    #[fuchsia::test]
-    async fn test_stream_read_at_validates_count() {
-        let vmo = zx::Vmo::create(10).unwrap();
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        let env = init_mock_stream_file(vmo, flags);
-        let result = env
-            .proxy
-            .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw);
-        assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
+        #[fuchsia::test]
+        async fn test_stream_read_at_validates_count() {
+            let vmo = zx::Vmo::create(10).unwrap();
+            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let env = init_mock_stream_file(vmo, flags);
+            let result = env
+                .proxy
+                .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw);
+            assert_eq!(result, Err(Status::OUT_OF_RANGE));
+        }
     }
 }

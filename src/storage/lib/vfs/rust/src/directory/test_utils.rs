@@ -10,11 +10,12 @@
 
 #[doc(hidden)]
 pub mod reexport {
-    pub use {
-        fidl, fidl_fuchsia_io as fio,
-        fuchsia_async::Channel,
-        fuchsia_zircon::{MessageBuf, Status},
-    };
+    pub use {fidl, fidl_fuchsia_io as fio, fuchsia_async::Channel, fuchsia_zircon_status::Status};
+
+    #[cfg(not(target_os = "fuchsia"))]
+    pub use fuchsia_async::emulated_handle::MessageBuf;
+    #[cfg(target_os = "fuchsia")]
+    pub use fuchsia_zircon::MessageBuf;
 }
 
 use crate::{

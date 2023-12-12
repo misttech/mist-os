@@ -7,7 +7,7 @@
 
 use crate::{directory::entry::DirectoryEntry, path::Path};
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, std::sync::Arc};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, std::sync::Arc};
 
 /// Defines the type of the new entry to be created via the [`EntryConstructor::create_entry()`]
 /// call.
@@ -100,7 +100,7 @@ mod tests {
     use super::NewEntryType;
     use test_case::test_case;
 
-    use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
+    use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
 
     #[test_case(fio::OpenFlags::empty(), false, Ok((NewEntryType::File, false)))]
     #[test_case(fio::OpenFlags::NOT_DIRECTORY, false, Ok((NewEntryType::File, false)))]

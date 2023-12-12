@@ -20,14 +20,13 @@ use crate::{
 };
 
 use {
-    assert_matches::assert_matches,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor,
-    fuchsia_zircon::Status,
-    futures::StreamExt,
-    libc::{S_IRUSR, S_IWUSR},
+    assert_matches::assert_matches, fidl::endpoints::create_proxy, fidl_fuchsia_io as fio,
+    fuchsia_async::TestExecutor, fuchsia_zircon_status::Status, futures::StreamExt,
 };
+
+// Redefine these constants as a u32 as in macos they are u16
+const S_IRUSR: u32 = libc::S_IRUSR as u32;
+const S_IWUSR: u32 = libc::S_IWUSR as u32;
 
 #[test]
 fn construction() {

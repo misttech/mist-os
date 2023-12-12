@@ -13,8 +13,7 @@ rustc_library("vfs") {
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/trace/rust:trace",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/storage/lib/vfs/rust/macros",
     "//src/storage/lib/vfs/rust/name",
     "//third_party/rust_crates:anyhow",
@@ -30,6 +29,23 @@ rustc_library("vfs") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
+
+  if (is_fuchsia) {
+    deps += [
+      "//src/lib/trace/rust:trace",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+    ]
+  }
+
+  if (is_host) {
+    # Avoid proliferation from where it is used already
+    visibility = [
+      "../*",
+      "//sdk/lib/device-watcher/rust:*",
+      "//src/lib/fuchsia-fs:*",
+      "//src/sys/pkg/lib/update-package:*",
+    ]
+  }
 
   with_unit_tests = true
   sources = [
@@ -86,6 +102,7 @@ rustc_library("vfs") {
     "src/test_utils/assertions.rs",
     "src/test_utils/node.rs",
     "src/test_utils/run.rs",
+    "src/test_utils/test_file.rs",
     "src/token_registry.rs",
     "src/tree_builder.rs",
   ]
@@ -111,6 +128,7 @@ group("tests") {
   testonly = true
   deps = [
     ":vfs-tests",
+    ":vfs_test($host_toolchain)",
     "macros:tests",
     "name:tests",
   ]

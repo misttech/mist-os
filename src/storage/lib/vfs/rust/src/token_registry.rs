@@ -7,8 +7,9 @@
 use {
     crate::directory::entry_container::MutableDirectory,
     fidl::Handle,
+    fidl::{Event, HandleBased, Rights},
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{AsHandleRef, Event, HandleBased, Koid, Rights, Status},
+    fuchsia_zircon_status::Status,
     pin_project::{pin_project, pinned_drop},
     std::{
         collections::hash_map::{Entry, HashMap},
@@ -17,6 +18,11 @@ use {
         sync::{Arc, Mutex},
     },
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use fuchsia_async::emulated_handle::{AsHandleRef, Koid};
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon::{AsHandleRef, Koid};
 
 const DEFAULT_TOKEN_RIGHTS: Rights = Rights::BASIC;
 
@@ -155,7 +161,7 @@ mod tests {
     use {
         self::mocks::{MockChannel, MockDirectory},
         super::{TokenRegistry, Tokenizable, DEFAULT_TOKEN_RIGHTS},
-        fuchsia_zircon::{AsHandleRef, HandleBased, Rights},
+        fidl::{AsHandleRef, HandleBased, Rights},
         futures::pin_mut,
         std::sync::Arc,
     };
@@ -264,7 +270,7 @@ mod tests {
 
         use {
             async_trait::async_trait, fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio,
-            fuchsia_zircon::Status, std::sync::Arc,
+            fuchsia_zircon_status::Status, std::sync::Arc,
         };
 
         pub(super) struct MockChannel(pub Arc<TokenRegistry>, pub Arc<MockDirectory>);
