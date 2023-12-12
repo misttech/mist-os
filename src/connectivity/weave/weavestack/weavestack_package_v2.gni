@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//tools/cmc/build/cmc.gni")
 
 template("_weavestack_package_v2") {
@@ -55,14 +54,6 @@ template("_weavestack_package_v2") {
       deps += [ applets.target ]
     }
   }
-
-  # TODO(b/295033962): Remove once all products use assembly to provide
-  # weavestack.
-  if (defined(invoker.component_shard_file)) {
-    core_shard("weavestack-core-shard") {
-      shard_file = invoker.component_shard_file
-    }
-  }
 }
 
 # Creates a 'weavestack' package. All packages created with this template will be identical, except
@@ -79,7 +70,6 @@ template("_weavestack_package_v2") {
 #     extra_cml = [
 #       "meta/manifest.cml",
 #     ]
-#     component_shard_file = "meta/core_shard.cml"
 #   }
 # ```
 #
@@ -107,18 +97,11 @@ template("_weavestack_package_v2") {
 #       weave applets.
 #       Type: list(path)
 #
-#     component_shard_file (required)
-#       Manifest shards that will be merged with weavestack_common.core_shard.cml. One of the
-#       manifest shard should define this component as child to be included in core's manifest.
-#       This can also be used to add additional offer declaration that may be needed by different
-#       weave applets.
-#       Type: path
 template("weavestack_package_v2") {
   _weavestack_package_v2(target_name) {
     forward_variables_from(invoker,
                            [
                              "applets",
-                             "component_shard_file",
                              "extra_cml",
                              "package_name",
                            ])
