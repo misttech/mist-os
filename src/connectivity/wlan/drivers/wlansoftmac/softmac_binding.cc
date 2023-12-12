@@ -12,6 +12,7 @@
 #include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
@@ -337,127 +338,8 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device) : device_(device) {
 zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(zx_device_t* device)
     __TA_NO_THREAD_SAFETY_ANALYSIS {
   ldebug(0, nullptr, "Entering.");
-  linfo("Binding our new WLAN softmac device.");
+  linfo("Binding...");
   auto softmac_binding = std::unique_ptr<SoftmacBinding>(new SoftmacBinding(device));
-
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
-  if (endpoints.is_error()) {
-    lerror("Failed to create FDF endpoints: %s", zx_status_get_string(endpoints.status_value()));
-    return fit::error(endpoints.status_value());
-  }
-
-  auto status = device_connect_runtime_protocol(
-      softmac_binding->device_, fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
-      fuchsia_wlan_softmac::Service::WlanSoftmac::Name, endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    lerror("Failed to connect to WlanSoftmac service: %s", zx_status_get_string(status));
-    return fit::error(status);
-  }
-
-  softmac_binding->client_ = fdf::WireSharedClient(std::move(endpoints->client),
-                                                   softmac_binding->client_dispatcher_.get());
-
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto query_result = softmac_binding->client_.sync().buffer(*std::move(arena))->Query();
-  if (!query_result.ok()) {
-    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
-    return fit::error(query_result.status());
-  }
-  if (query_result->is_error()) {
-    lerror("Failed getting query result (status %s)",
-           zx_status_get_string(query_result->error_value()));
-    return fit::error(query_result->error_value());
-  }
-  // Take ownership of the data in the wire representation's arena.
-  if (!query_result->value()->has_sta_addr()) {
-    lerror("Query result missing sta_addr.");
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto discovery_arena = fdf::Arena::Create(0, 0);
-  if (discovery_arena.is_error()) {
-    lerror("Arena creation failed: %s", discovery_arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto discovery_result =
-      softmac_binding->client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
-  if (!discovery_result.ok()) {
-    lerror("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
-    return fit::error(discovery_result.status());
-  }
-
-  ConvertDiscoverySuppport(discovery_result->value()->resp, &softmac_binding->discovery_support_);
-
-  auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
-  if (mac_sublayer_arena.is_error()) {
-    lerror("Arena creation failed: %s", mac_sublayer_arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto mac_sublayer_result = softmac_binding->client_.sync()
-                                 .buffer(*std::move(mac_sublayer_arena))
-                                 ->QueryMacSublayerSupport();
-  if (!mac_sublayer_result.ok()) {
-    lerror("Failed getting mac sublayer result (FIDL error %s)",
-           mac_sublayer_result.status_string());
-    return fit::error(mac_sublayer_result.status());
-  }
-
-  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp,
-                                     &softmac_binding->mac_sublayer_support_);
-  if (status != ZX_OK) {
-    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
-    return fit::error(status);
-  }
-
-  auto security_arena = fdf::Arena::Create(0, 0);
-  if (security_arena.is_error()) {
-    lerror("Arena creation failed: %s", security_arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto security_result =
-      softmac_binding->client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
-  if (!security_result.ok()) {
-    lerror("Failed getting security result (FIDL error %s)", security_result.status_string());
-    return fit::error(security_result.status());
-  }
-
-  ConvertSecuritySupport(security_result->value()->resp, &softmac_binding->security_support_);
-
-  auto spectrum_management_arena = fdf::Arena::Create(0, 0);
-  if (spectrum_management_arena.is_error()) {
-    lerror("Arena creation failed: %s", spectrum_management_arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto spectrum_management_result = softmac_binding->client_.sync()
-                                        .buffer(*std::move(spectrum_management_arena))
-                                        ->QuerySpectrumManagementSupport();
-
-  if (!spectrum_management_result.ok()) {
-    lerror("Failed getting spectrum management result (FIDL error %s)",
-           spectrum_management_result.status_string());
-    return fit::error(spectrum_management_result.status());
-  }
-
-  ConvertSpectrumManagementSupport(spectrum_management_result->value()->resp,
-                                   &softmac_binding->spectrum_management_support_);
-
-  /* End of data type conversion. */
-
-  softmac_binding->softmac_handle_ = std::make_unique<WlanSoftmacHandle>(softmac_binding.get());
-  status = softmac_binding->softmac_handle_->Init(softmac_binding->client_.Clone());
-  if (status != ZX_OK) {
-    lerror("could not initialize Rust WlanSoftmac: %d", status);
-    return fit::error(status);
-  }
 
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
@@ -467,11 +349,9 @@ zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(zx_device_t* dev
       .proto_id = ZX_PROTOCOL_ETHERNET_IMPL,
       .proto_ops = &softmac_binding->ethernet_impl_ops_,
   };
-  status = device_add(softmac_binding->device_, &args, &softmac_binding->child_device_);
-
+  auto status = device_add(softmac_binding->device_, &args, &softmac_binding->child_device_);
   if (status != ZX_OK) {
     lerror("could not add eth device: %s", zx_status_get_string(status));
-    softmac_binding->softmac_handle_->StopMainLoop();
     return fit::error(status);
   }
 
@@ -488,6 +368,152 @@ void SoftmacBinding::ShutdownMainLoop() {
 }
 
 // ddk ethernet_impl_protocol_ops methods
+
+void SoftmacBinding::Init() {
+  ldebug(0, nullptr, "Entering.");
+  linfo("Initializing...");
+
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
+  if (endpoints.is_error()) {
+    lerror("Failed to create FDF endpoints: %s", endpoints.status_string());
+    device_init_reply(child_device_, endpoints.status_value(), nullptr);
+    return;
+  }
+
+  auto status = device_connect_runtime_protocol(
+      device_, fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
+      fuchsia_wlan_softmac::Service::WlanSoftmac::Name, endpoints->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    lerror("Failed to connect to WlanSoftmac service: %s", zx_status_get_string(status));
+    device_init_reply(child_device_, status, nullptr);
+    return;
+  }
+
+  linfo("Connected to WlanSoftmac service.");
+
+  client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
+
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    lerror("Failed to create arena: %s", arena.status_string());
+    device_init_reply(child_device_, arena.status_value(), nullptr);
+    return;
+  }
+
+  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
+  if (!query_result.ok()) {
+    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
+    device_init_reply(child_device_, query_result.status(), nullptr);
+    return;
+  }
+  if (query_result->is_error()) {
+    zx_status_t status = query_result->error_value();
+    lerror("Failed getting query result (status %s)", zx_status_get_string(status));
+    device_init_reply(child_device_, status, nullptr);
+    return;
+  }
+  // Take ownership of the data in the wire representation's arena.
+  if (!query_result->value()->has_sta_addr()) {
+    lerror("Query result missing sta_addr.");
+    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
+    return;
+  }
+
+  auto discovery_arena = fdf::Arena::Create(0, 0);
+  if (discovery_arena.is_error()) {
+    lerror("Failed to create arena: %s", discovery_arena.status_string());
+    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
+    return;
+  }
+
+  auto discovery_result =
+      client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
+  if (!discovery_result.ok()) {
+    lerror("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
+    device_init_reply(child_device_, discovery_result.status(), nullptr);
+    return;
+  }
+
+  ConvertDiscoverySuppport(discovery_result->value()->resp, &discovery_support_);
+
+  auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
+  if (mac_sublayer_arena.is_error()) {
+    lerror("Failed to create arena: %s", mac_sublayer_arena.status_string());
+    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
+    return;
+  }
+
+  auto mac_sublayer_result =
+      client_.sync().buffer(*std::move(mac_sublayer_arena))->QueryMacSublayerSupport();
+  if (!mac_sublayer_result.ok()) {
+    lerror("Failed getting mac sublayer result (FIDL error %s)",
+           mac_sublayer_result.status_string());
+    device_init_reply(child_device_, mac_sublayer_result.status(), nullptr);
+    return;
+  }
+
+  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer_support_);
+  if (status != ZX_OK) {
+    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
+    device_init_reply(child_device_, status, nullptr);
+    return;
+  }
+
+  auto security_arena = fdf::Arena::Create(0, 0);
+  if (security_arena.is_error()) {
+    lerror("Failed to create arena: %s", security_arena.status_string());
+    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
+    return;
+  }
+
+  auto security_result = client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
+  if (!security_result.ok()) {
+    lerror("Failed getting security result (FIDL error %s)", security_result.status_string());
+    device_init_reply(child_device_, security_result.status(), nullptr);
+    return;
+  }
+
+  ConvertSecuritySupport(security_result->value()->resp, &security_support_);
+
+  auto spectrum_management_arena = fdf::Arena::Create(0, 0);
+  if (spectrum_management_arena.is_error()) {
+    lerror("Failed to create arena: %s", spectrum_management_arena.status_string());
+    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
+    return;
+  }
+
+  auto spectrum_management_result = client_.sync()
+                                        .buffer(*std::move(spectrum_management_arena))
+                                        ->QuerySpectrumManagementSupport();
+
+  if (!spectrum_management_result.ok()) {
+    lerror("Failed getting spectrum management result (FIDL error %s)",
+           spectrum_management_result.status_string());
+    device_init_reply(child_device_, spectrum_management_result.status(), nullptr);
+    return;
+  }
+
+  ConvertSpectrumManagementSupport(spectrum_management_result->value()->resp,
+                                   &spectrum_management_support_);
+
+  /* End of data type conversion. */
+
+  linfo("Initializing Rust WlanSoftmac...");
+  softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
+  status = softmac_handle_->Init(client_.Clone());
+  if (status != ZX_OK) {
+    lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
+    device_init_reply(child_device_, status, nullptr);
+    return;
+  }
+  linfo("Initialized Rust WlanSoftmac.");
+
+  // Specify empty device_init_reply_args_t since SoftmacBinding
+  // does not currently support power or performance state
+  // information.
+  device_init_reply_args_t args = {};
+  device_init_reply(child_device_, ZX_OK, &args);
+}
 
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
@@ -638,7 +664,7 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
     return result.status();
   }
   if (result->is_error()) {
-    lerror("change channel failed (status %d)", result->error_value());
+    lerror("change channel failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   *out_sme_channel = std::move(result->value()->sme_channel);

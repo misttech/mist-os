@@ -96,6 +96,7 @@ class SoftmacBinding : public DeviceInterface,
   // Member variables and methods to implement a child device
   // supporting the ZX_PROTOCOL_ETHERNET_IMPL custom protocol.
   zx_device_t* child_device_ = nullptr;
+  void Init();
   void Unbind();
   void Release();
 
@@ -111,11 +112,7 @@ class SoftmacBinding : public DeviceInterface,
 
   const zx_protocol_device_t eth_device_ops_ = {
       .version = DEVICE_OPS_VERSION,
-      .init =
-          [](void* ctx) {
-            device_init_reply_args_t args = {};
-            device_init_reply(AsSoftmacBinding(ctx)->child_device_, ZX_OK, &args);
-          },
+      .init = [](void* ctx) { AsSoftmacBinding(ctx)->Init(); },
       .unbind = [](void* ctx) { AsSoftmacBinding(ctx)->Unbind(); },
       .release = [](void* ctx) { AsSoftmacBinding(ctx)->Release(); },
   };
