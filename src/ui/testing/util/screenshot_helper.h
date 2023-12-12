@@ -99,6 +99,13 @@ class Screenshot {
   // the screenshots do not match.
   float ComputeSimilarity(const Screenshot& other) const;
 
+  // Returns percentage of pixels that match by comparing the histograms of two screenshots,
+  // allowing for pixel movement (e.g. shift, rotation) in the image. The comparison is
+  // performed by measuring the percentage of the area of the histograms that overlaps,
+  // i.e. the number of pixels that are both histograms.
+  // Returns 0 if the sizes of the screenshots do not match.
+  float ComputeHistogramSimilarity(const Screenshot& other) const;
+
   // Returns a 2D vector of size |height_ * width_|. Each value in the vector corresponds to a pixel
   // in the screenshot.
   std::vector<std::vector<Pixel>> screenshot() const { return screenshot_; }

@@ -47,8 +47,7 @@ Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t h
 }
 
 std::ostream& operator<<(std::ostream& stream, const Pixel& pixel) {
-  return stream << "{Pixel:"
-                << " r:" << static_cast<unsigned int>(pixel.red)
+  return stream << "{Pixel:" << " r:" << static_cast<unsigned int>(pixel.red)
                 << " g:" << static_cast<unsigned int>(pixel.green)
                 << " b:" << static_cast<unsigned int>(pixel.blue)
                 << " a:" << static_cast<unsigned int>(pixel.alpha) << "}";
@@ -81,6 +80,23 @@ float Screenshot::ComputeSimilarity(const Screenshot& other) const {
     for (uint64_t y = 0; y < height(); ++y) {
       if (GetPixelAt(x, y) == other.GetPixelAt(x, y))
         ++num_matching_pixels;
+    }
+  }
+  return 100.f * static_cast<float>(num_matching_pixels) / static_cast<float>((width() * height()));
+}
+
+float Screenshot::ComputeHistogramSimilarity(const Screenshot& other) const {
+  if (width() != other.width() || height() != other.height())
+    return 0;
+
+  auto histogram = this->Histogram();
+  auto other_histogram = other.Histogram();
+
+  uint64_t num_matching_pixels = 0;
+
+  for (auto it = histogram.begin(); it != histogram.end(); ++it) {
+    if (other_histogram.find(it->first) != other_histogram.end()) {
+      num_matching_pixels += std::min(it->second, other_histogram[it->first]);
     }
   }
   return 100.f * static_cast<float>(num_matching_pixels) / static_cast<float>((width() * height()));
