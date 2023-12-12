@@ -184,7 +184,7 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
     zx_status_t status =
         GetBootItem(entries, request->type, board_name_, request->extra, &vmo, &length);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to get boot items", KV("status", status));
+      FX_SLOG(ERROR, "Failed to get boot items", FX_KV("status", status));
     }
     completer.Reply(std::move(vmo), length);
   }
@@ -216,7 +216,7 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
     zx::job job;
     zx_status_t status = zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &job);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to duplicate job", KV("status", status));
+      FX_SLOG(ERROR, "Failed to duplicate job", FX_KV("status", status));
     }
     completer.Reply(std::move(job));
   }
@@ -287,7 +287,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       }
       zx::result result = outgoing_->AddDirectory(std::move(client_end.value()), dir);
       if (result.is_error()) {
-        FX_SLOG(ERROR, "Failed to add directory to outgoing directory", KV("directory", dir));
+        FX_SLOG(ERROR, "Failed to add directory to outgoing directory", FX_KV("directory", dir));
         return result.take_error();
       }
     }
@@ -314,7 +314,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           protocol);
       if (result.is_error()) {
         FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
-                KV("protocol", protocol.c_str()));
+                FX_KV("protocol", protocol.c_str()));
         return result.take_error();
       }
     }
@@ -325,7 +325,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
     if (result.is_error()) {
       FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
-              KV("protocol", "fuchsia.driver.test/Realm"));
+              FX_KV("protocol", "fuchsia.driver.test/Realm"));
       return result.take_error();
     }
 
@@ -348,16 +348,16 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     for (std::pair<std::string, std::string> boot_arg : boot_args) {
       if (boot_arg.first.size() > fuchsia_boot::wire::kMaxArgsNameLength) {
         FX_SLOG(ERROR, "The length of the name of the boot argument is too long",
-                KV("arg", boot_arg.first.data()),
-                KV("maximum_length", fuchsia_boot::wire::kMaxArgsNameLength));
+                FX_KV("arg", boot_arg.first.data()),
+                FX_KV("maximum_length", fuchsia_boot::wire::kMaxArgsNameLength));
         completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
         return;
       }
 
       if (boot_arg.second.size() > fuchsia_boot::wire::kMaxArgsValueLength) {
         FX_SLOG(ERROR, "The length of the value of the boot argument is too long",
-                KV("arg", boot_arg.first.data()), KV("value", boot_arg.second.data()),
-                KV("maximum_length", fuchsia_boot::wire::kMaxArgsValueLength));
+                FX_KV("arg", boot_arg.first.data()), FX_KV("value", boot_arg.second.data()),
+                FX_KV("maximum_length", fuchsia_boot::wire::kMaxArgsValueLength));
         completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
         return;
       }
@@ -595,10 +595,10 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
                              completer = completer.ToAsync()]() mutable {
           // Register all urls
           for (auto& driver_url : driver_urls) {
-            FX_SLOG(INFO, "Registering ephemeral driver", KV("url", driver_url));
+            FX_SLOG(INFO, "Registering ephemeral driver", FX_KV("url", driver_url));
             auto result = driver_registrar->Register(fidl::StringView::FromExternal(driver_url));
             if (!result.ok()) {
-              FX_SLOG(ERROR, "Could not register driver", KV("url", driver_url));
+              FX_SLOG(ERROR, "Could not register driver", FX_KV("url", driver_url));
               completer.Reply(zx::error(result.status()));
               return;
             }
@@ -629,7 +629,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     };
 
     FX_SLOG(WARNING, "DriverDevelopmentService received unknown method.",
-            KV("Direction", method_type.c_str()), KV("Ordinal", metadata.method_ordinal));
+            FX_KV("Direction", method_type.c_str()), FX_KV("Ordinal", metadata.method_ordinal));
   }
 
  private:

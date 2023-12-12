@@ -36,11 +36,11 @@ void StartDriverTestRealm() {
   fuchsia::driver::test::Realm_Start_Result result;
   auto call_result = client->Start(std::move(args), &result);
   if (call_result != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to call to Realm:Start", KV("call_result", call_result));
+    FX_SLOG(ERROR, "Failed to call to Realm:Start", FX_KV("call_result", call_result));
     return;
   }
   if (result.is_err()) {
-    FX_SLOG(ERROR, "Realm:Start failed", KV("error", result.err()));
+    FX_SLOG(ERROR, "Realm:Start failed", FX_KV("error", result.err()));
     return;
   }
 }

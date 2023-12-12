@@ -135,7 +135,7 @@ Service::Socket Service::MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip
     FX_LOGS(FATAL) << "Failed to bind to " << port << ": " << strerror(errno);
   }
 
-  FX_SLOG(INFO, "listen() for inbound SSH connections", KV("port", (int)port));
+  FX_SLOG(INFO, "listen() for inbound SSH connections", FX_KV("port", (int)port));
   if (listen(sock.get(), 10) < 0) {
     FX_LOGS(FATAL) << "Failed to listen: " << strerror(errno);
   }
@@ -200,7 +200,7 @@ void Service::Wait(std::optional<IpVersion> ip_version) {
                 << "Error from getnameinfo(.., NI_NUMERICHOST | NI_NUMERICSERV) for peer address: "
                 << gai_strerror(res);
           }
-          FX_SLOG(INFO, "Accepted connection", KV("remote", peer_name.c_str()));
+          FX_SLOG(INFO, "Accepted connection", FX_KV("remote", peer_name.c_str()));
 
           Launch(std::move(conn));
           Wait(ip_version);

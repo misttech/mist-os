@@ -12,7 +12,7 @@ int main() {
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
-    FX_SLOG(ERROR, "Failed to connect to Realm FIDL", KV("error", client_end.error_value()));
+    FX_SLOG(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
     return 1;
   }
   fidl::WireSyncClient client{std::move(*client_end)};
@@ -20,11 +20,11 @@ int main() {
   fidl::Arena arena;
   auto wire_result = client->Start(fuchsia_driver_test::wire::RealmArgs(arena));
   if (wire_result.status() != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to connect to Realm:Start", KV("error", wire_result.status()));
+    FX_SLOG(ERROR, "Failed to connect to Realm:Start", FX_KV("error", wire_result.status()));
     return 1;
   }
   if (wire_result.value().is_error()) {
-    FX_SLOG(ERROR, "Realm:Start failed", KV("error", wire_result.value().error_value()));
+    FX_SLOG(ERROR, "Realm:Start failed", FX_KV("error", wire_result.value().error_value()));
     return 1;
   }
 
