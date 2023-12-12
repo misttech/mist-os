@@ -192,6 +192,8 @@ fx build
 Open another terminal window and run the following command to print the details
 of your device target:
 
+Note: See the full [`ffx` reference documentation](/reference/tools/sdk/ffx.md).
+
 ```posix-terminal
 ffx target show
 ```

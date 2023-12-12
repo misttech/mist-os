@@ -16,6 +16,8 @@ and host platforms.
 
 The following are some of `ffx` command examples:
 
+Note: See the full [`ffx` reference documentation](/reference/tools/sdk/ffx.md).
+
 *   Display the list of devices:
 
     ```posix-terminal
