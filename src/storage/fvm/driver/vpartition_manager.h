@@ -214,9 +214,9 @@ class VPartitionManager : public ManagerDeviceType {
   // period of time when the entry is clear but the device hasn't been removed yet.
   bool device_bound_at_entry_[fvm::kMaxVPartitions] TA_GUARDED(lock_) = {};
 
-  // std::nullopt when all FVM entries have their child devices bound. Before then, we queue all
-  // GetInfo requests which allows us to use GetInfo() as a barrier for child partition device
-  // enumeration.
+  // **IMPORTANT**: GetInfo() is used to synchronize visibility of partitions in devfs with clients.
+  // Before partitions have been made visible, we must wait to respond to any outstanding GetInfo()
+  // requests to ensure safe partition enumeration. See http://fxbug.dev/126961 for details.
   std::optional<std::vector<GetInfoCompleter::Async>> get_info_requests_ TA_GUARDED(lock_) =
       std::vector<GetInfoCompleter::Async>();
 

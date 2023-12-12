@@ -596,10 +596,9 @@ impl Environment for FshostEnvironment {
             recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
                 .await
                 .context("failed to connect to the VolumeManager")?;
-        // Call VolumeManager::GetInfo in order to ensure all partition entries are visible.
-        // TODO(https://fxbug.dev/126961): Right now, we rely on get_info() completing to ensure
-        // that fvm child partitions are visible in devfs. This should be revised when DF supports
-        // another way of safely enumerating child partitions.
+
+        // **NOTE**: We must call VolumeManager::GetInfo() to ensure all partitions are visible when
+        // we enumerate them below. See https://fxbug.dev/126961 for more information.
         zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
             .context("get_info failed")?;
 

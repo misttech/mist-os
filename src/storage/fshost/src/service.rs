@@ -79,17 +79,14 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
         .map_err(zx::Status::from_raw)
         .context("fvm get_topo_path returned error")?;
 
-    // Call VolumeManager::GetInfo in order to ensure all partition entries are visible. This
-    // allows us to enumerate the partitions without needing a timeout.
-    //
-    // TODO(https://fxbug.dev/126961): Right now, we rely on get_info() completing to ensure that
-    // fvm child partitions are visible in devfs. This should be revised when DF supports another
-    // way of safely enumerating child partitions.
     let fvm_dir =
         fuchsia_fs::directory::open_in_namespace(&fvm_path, fuchsia_fs::OpenFlags::empty())?;
     let fvm_volume_manager_proxy = recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
         .await
         .context("failed to connect to the VolumeManager")?;
+
+    // **NOTE**: We must call VolumeManager::GetInfo() to ensure all partitions are visible when
+    // we enumerate them below. See https://fxbug.dev/126961 for more information.
     zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
         .context("get_info failed")?;
 

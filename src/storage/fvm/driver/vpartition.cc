@@ -528,8 +528,8 @@ zx_status_t VPartition::AddSignalVisible(std::unique_ptr<VPartition> vp, const s
 void VPartition::DdkMadeVisible() {
   if (on_visible_) {
     sync_completion_signal(on_visible_);
-    // TODO(fxbug.dev/126961): DdkMadeVisible gets called multiple times in DFv1 currently, so make
-    // sure we don't signal twice.
+    // **NOTE**: The DdkMadeVisible hook gets called multiple times in DFv1, so we have to guard
+    // against signaling twice. See http://fxbug.dev/126961 for more information.
     on_visible_ = nullptr;
   }
 }

@@ -882,9 +882,9 @@ void VPartitionManager::AllocatePartition(AllocatePartitionRequestView request,
 }
 
 void VPartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/126961): GetInfo() waits for all initial child volumes of the
-  // VPartitionManager to be initialized before responding to any requests. This is used to
-  // synchronize access to the child devices in devfs when they can be enumerated.
+  // **IMPORTANT**: GetInfo() is used to synchronize visibility of partitions in devfs with clients.
+  // Responses to GetInfo() must only be sent once *all* child partitions have been bound and have
+  // been made visible. See http://fxbug.dev/126961 for more information.
   {
     fbl::AutoLock lock(&lock_);
     if (get_info_requests_) {
