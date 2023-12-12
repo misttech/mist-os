@@ -83,8 +83,16 @@ template("_hermetic_code_blob") {
 _usercopy_non_rust_deps = []
 
 if (target_cpu == "x64" || target_cpu == "arm64") {
-  static_library("hermetic_copy_error") {
-    sources = [ "hermetic_copy_error_${target_cpu}.S" ]
+  static_library("usercopy_assembly_routines") {
+    arch_dir = "arch/${target_cpu}"
+    sources = rebase_path([
+                            "hermetic_copy_error.S",
+                            "atomic_load.S",
+                            "atomic_store.S",
+                            "atomic_error.S",
+                          ],
+                          ".",
+                          arch_dir)
   }
   _hermetic_code_blob("hermetic_copy") {
   }
@@ -93,8 +101,8 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
 
   _usercopy_non_rust_deps = [
     ":hermetic_copy_bin.basic",
-    ":hermetic_copy_error",
     ":hermetic_copy_until_null_byte_bin.basic",
+    ":usercopy_assembly_routines",
   ]
 }
 
