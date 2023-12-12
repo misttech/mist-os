@@ -30,7 +30,7 @@ use {
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
     },
-    crate::sandbox_util::{DictExt, DictWaiter, LaunchTaskOnReceive},
+    crate::sandbox_util::{new_terminating_router, DictExt, DictWaiter, LaunchTaskOnReceive},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -52,8 +52,8 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        self, CapabilityDecl, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
-        NativeIntoFidl, OfferDeclCommon, UseDecl,
+        self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
+        OfferDeclCommon, UseDecl,
     },
     cm_types::Name,
     cm_util::channel,
@@ -76,7 +76,7 @@ use {
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{Dict, Receiver},
-    std::iter::Iterator,
+    std::iter::{self, Iterator},
     std::{
         boxed::Box,
         clone::Clone,
@@ -738,7 +738,7 @@ impl ComponentInstance {
             // dict so a new start action can be kicked off on the next capability access.
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.wait_on_program_output_dict(&self);
+                resolved_state.wait_on_program_receivers_dict(&self);
             }
         }
         if let ExtendedInstance::Component(parent) =
@@ -946,7 +946,7 @@ impl ComponentInstance {
         {
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.stop_waiting_on_program_output_dict();
+                resolved_state.stop_waiting_on_program_receivers_dict();
             }
         }
 
@@ -1327,8 +1327,11 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that we use.
     pub program_input_dict: Dict,
 
-    /// The dict containing all capabilities that we declare.
+    /// The dict containing routers for all capabilities that we declare.
     pub program_output_dict: Dict,
+
+    /// The dict containing receivers for all capabilities that we declare.
+    program_receivers_dict: Dict,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these dicts (which is potentially extended by
@@ -1337,7 +1340,7 @@ pub struct ResolvedInstanceState {
 
     /// This waiter holds the component dict, and invokes a start command if any receiver
     /// becomes available. The stop command sets this to a new DictWaiter.
-    pub dict_waiter: Option<DictWaiter>,
+    dict_waiter: Option<DictWaiter>,
 }
 
 impl ResolvedInstanceState {
@@ -1376,10 +1379,30 @@ impl ResolvedInstanceState {
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
+            program_receivers_dict: Dict::new(),
             collection_dicts: HashMap::new(),
             dict_waiter: None,
         };
         state.add_static_children(component).await?;
+
+        // All declared capabilities must have a router, unless we are non-executable.
+        if decl.program.is_some() {
+            for capability in &decl.capabilities {
+                // We only support protocol capabilities right now
+                match &capability {
+                    cm_rust::CapabilityDecl::Protocol(_) => (),
+                    _ => continue,
+                }
+                let receiver = Receiver::new();
+                state.program_output_dict.insert_capability(
+                    iter::once(capability.name().as_str()),
+                    new_terminating_router(receiver.new_sender()),
+                );
+                state
+                    .program_receivers_dict
+                    .insert_capability(iter::once(capability.name().as_str()), receiver);
+            }
+        }
 
         let component_sandbox = build_component_sandbox(
             component,
@@ -1388,21 +1411,22 @@ impl ResolvedInstanceState {
             &state.component_input_dict,
             &mut state.component_output_dict,
             &mut state.program_input_dict,
-            &mut state.program_output_dict,
+            &state.program_output_dict,
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_dicts).await;
 
-        state.wait_on_program_output_dict(component);
+        state.wait_on_program_receivers_dict(component);
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
     // Waits for any receiver in our program dict to become readable.
-    pub fn wait_on_program_output_dict(&mut self, component: &Arc<ComponentInstance>) {
+    pub fn wait_on_program_receivers_dict(&mut self, component: &Arc<ComponentInstance>) {
         let weak_component = WeakComponentInstance::new(component);
-        self.dict_waiter =
-            Some(DictWaiter::new(self.program_output_dict.clone(), move |name, target_moniker| {
+        self.dict_waiter = Some(DictWaiter::new(
+            self.program_receivers_dict.clone(),
+            move |name, target_moniker| {
                 let name = name.clone();
                 async move {
                     if let Ok(component) = weak_component.upgrade() {
@@ -1427,7 +1451,8 @@ impl ResolvedInstanceState {
                     }
                 }
                 .boxed()
-            }));
+            },
+        ));
     }
 
     fn dispatch_receivers_to_providers(
@@ -1484,7 +1509,7 @@ impl ResolvedInstanceState {
     }
 
     // Causes this component to stop watching the receivers in our program dict.
-    pub fn stop_waiting_on_program_output_dict(&mut self) {
+    pub fn stop_waiting_on_program_receivers_dict(&mut self) {
         self.dict_waiter = None;
     }
 
@@ -1936,12 +1961,7 @@ struct ProgramRuntime {
 }
 
 impl ProgramRuntime {
-    pub fn new(
-        program: Program,
-        dict: Dict,
-        capability_decls: Vec<CapabilityDecl>,
-        component: WeakComponentInstance,
-    ) -> Self {
+    pub fn new(program: Program, component: WeakComponentInstance) -> Self {
         let terminated_fut = program.on_terminate();
         let component_clone = component.clone();
         let exit_listener = fasync::Task::spawn(async move {
@@ -1958,8 +1978,6 @@ impl ProgramRuntime {
             }
         });
         let dict_dispatcher = DictDispatcher::new(
-            dict,
-            capability_decls,
             <fio::DirectoryProxy as Clone>::clone(program.outgoing()),
             component_clone,
         );
@@ -2011,21 +2029,15 @@ impl ComponentRuntime {
         self.program.as_ref().map(|program_runtime| program_runtime.program.outgoing())
     }
 
-    /// Associates the [Runtime] with a running [Program].
+    /// Associates the [ComponentRuntime] with a running [Program].
     ///
     /// Creates a background task waiting for the program to terminate. When that happens, use the
     /// [WeakComponentInstance] to stop the component.
     ///
-    /// Creates a background task that watches for incoming requests in `dict`, and dispatches
-    /// them to the outgoing directory of the program.
-    pub fn set_program(
-        &mut self,
-        program: Program,
-        dict: Dict,
-        capability_decls: Vec<CapabilityDecl>,
-        component: WeakComponentInstance,
-    ) {
-        self.program = Some(ProgramRuntime::new(program, dict, capability_decls, component));
+    /// Creates a background task that watches for incoming requests directed to the program, and
+    /// dispatches them to the outgoing directory of the program.
+    pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
+        self.program = Some(ProgramRuntime::new(program, component));
     }
 
     /// Stop the program, if any. The timer defines how long the runner is given to stop the
@@ -2069,14 +2081,20 @@ pub struct DictDispatcher {
 }
 
 impl DictDispatcher {
-    pub fn new(
-        dict: Dict,
-        capability_decls: Vec<cm_rust::CapabilityDecl>,
-        directory: fio::DirectoryProxy,
-        component: WeakComponentInstance,
-    ) -> Self {
+    pub fn new(directory: fio::DirectoryProxy, component: WeakComponentInstance) -> Self {
         Self {
             _task: fasync::Task::spawn(async move {
+                // Obtain the receivers dict and capability declarations.
+                let (dict, capability_decls) = {
+                    let Some(component) = component.upgrade().ok() else {
+                        return;
+                    };
+                    let Some(resolved) = component.lock_resolved_state().await.ok() else {
+                        return;
+                    };
+                    (resolved.program_receivers_dict.clone(), resolved.capabilities().clone())
+                };
+
                 while let Some((name, message)) = dict.read_receivers().await {
                     let capability_decl = capability_decls
                         .iter()

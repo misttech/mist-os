@@ -61,7 +61,7 @@ pub fn build_component_sandbox(
     component_input_dict: &Dict,
     component_output_dict: &mut Dict,
     program_input_dict: &mut Dict,
-    program_output_dict: &mut Dict,
+    program_output_dict: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
@@ -73,21 +73,6 @@ pub fn build_component_sandbox(
 
     for collection in &decl.collections {
         collection_dicts.insert(collection.name.clone(), Dict::new());
-    }
-
-    // All declared capabilities must have a receiver, unless we are non-executable.
-    if decl.program.is_some() {
-        for capability in &decl.capabilities {
-            // We only support protocol capabilities right now
-            match &capability {
-                cm_rust::CapabilityDecl::Protocol(_) => (),
-                _ => continue,
-            }
-            program_output_dict.insert_capability(
-                iter::once(capability.name().as_str()),
-                Receiver::<WeakComponentInstance>::new(),
-            );
-        }
     }
 
     for use_ in &decl.uses {
@@ -193,22 +178,20 @@ fn extend_dict_with_use(
     };
     let router = match use_.source() {
         cm_rust::UseSource::Parent => {
-            let Some(parent_router) =
+            let Some(router) =
                 component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            parent_router.clone()
+            router
         }
         cm_rust::UseSource::Self_ => {
-            let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
-                    source_name.as_str(),
-                ))
+            let Some(router) =
+                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            new_terminating_router(receiver.new_sender())
+            router
         }
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
@@ -283,22 +266,20 @@ fn extend_dict_with_offer(
     }
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
-            let Some(parent_router) =
+            let Some(router) =
                 component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            parent_router.clone()
+            router
         }
         cm_rust::OfferSource::Self_ => {
-            let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
-                    source_name.as_str(),
-                ))
+            let Some(router) =
+                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            new_terminating_router(receiver.new_sender())
+            router
         }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -365,14 +346,12 @@ fn extend_dict_with_expose(
 
     let router = match expose.source() {
         cm_rust::ExposeSource::Self_ => {
-            let Some(receiver) = program_output_dict
-                .get_capability::<Receiver<WeakComponentInstance>>(iter::once(
-                    source_name.as_str(),
-                ))
+            let Some(router) =
+                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
             else {
                 return;
             };
-            new_terminating_router(receiver.new_sender())
+            router
         }
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");

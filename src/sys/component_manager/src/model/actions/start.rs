@@ -36,7 +36,6 @@ use {
     fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
-    sandbox::Dict,
     std::string::ToString,
     std::sync::Arc,
     tracing::warn,
@@ -136,19 +135,8 @@ async fn do_start(
 
     let start_context = StartContext { runner, start_info };
 
-    let program_output_dict = component
-        .lock_resolved_state()
-        .await
-        .map_err(|err| StartActionError::ResolveActionError {
-            moniker: component.moniker.clone(),
-            err,
-        })?
-        .program_output_dict
-        .clone();
-
     start_component(
         &component,
-        program_output_dict,
         resolved_component.decl,
         pending_runtime,
         start_context,
@@ -164,7 +152,6 @@ async fn do_start(
 /// `Component`.
 async fn start_component(
     component: &Arc<ComponentInstance>,
-    program_output_dict: Dict,
     decl: ComponentDecl,
     mut pending_runtime: ComponentRuntime,
     start_context: StartContext,
@@ -188,8 +175,6 @@ async fn start_component(
                     moniker: component.moniker.clone(),
                     err,
                 })?,
-            program_output_dict,
-            decl.capabilities.clone(),
             component.as_weak(),
         );
     }
