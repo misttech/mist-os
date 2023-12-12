@@ -79,17 +79,17 @@ void WlanPhyImplDevice::Init(
       FDF_LOG(INFO, "%s: phy node unbound: %s", device_->name_.c_str(),
               error.FormatDescription().c_str());
 
-      // If an iface exists, then iface destruction will call ShutdownComplete().
-      if (device_->IfaceExists()) {
-        auto status = device_->iface_controller_->Remove();
-        if (status.is_error()) {
+      auto result = device_->DestroyIface();
+      if (result.is_error()) {
+        if (result.status_value() != ZX_ERR_NOT_FOUND) {
           FDF_LOG(ERROR, "%s: Could not remove iface: %s", device_->name_.c_str(),
-                  status.error_value().status_string());
-          device_->ShutdownComplete();
+                  result.status_string());
         }
-      } else {
+        // Complete the shutdown since iface teardown is unlikely to,
+        // or will not, occur in the future.
         device_->ShutdownComplete();
       }
+
       delete this;
     }
     void handle_unknown_event(
@@ -164,7 +164,7 @@ bool WlanPhyImplDevice::IfaceExists() {
   return this->iface_controller_.is_valid() && this->wlantap_mac_;
 }
 
-fit::result<zx_status_t> WlanPhyImplDevice::DestroyIface() {
+zx::result<> WlanPhyImplDevice::DestroyIface() {
   if (!IfaceExists()) {
     FDF_LOG(ERROR, "%s: Iface doesn't exist", name_.c_str());
     return fit::error(ZX_ERR_NOT_FOUND);
