@@ -822,13 +822,16 @@
   area: ["System", "Zircon"]
 
 - term: "fdio"
-  short_description: "The Zircon IO library."
-  full_description: "The Zircon IO library. It provides the implementation of
-  posix-style open(), close(), read(), write(), select(), poll(), etc, against the RemoteIO
+  short_description: "The core Fuchsia method for talking about files and other
+  I/O primitives are FIDL protocols over Zircon channels."
+  full_description: "It provides the implementation of posix-style open(),
+  close(), read(), write(), select(), poll(), etc, against the RemoteIO
   RPC protocol. These APIs are return- not-supported stubs in libc, and linking
   against libfdio overrides these stubs with functional implementations. Sometimes referred to as
   \"POSIX Lite\"."
-  see_also: ["<a href=\"/sdk/lib/fdio/\">fdio source code</a>", "<a href=\"/docs/contribute/governance/rfcs/0082_starnix\">RFC-0082</a>"]
+  see_also: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/fdio/\">fdio source code</a>",
+  "<a href=\"/docs/contribute/governance/rfcs/0082_starnix\">RFC-0082</a>",
+  "<a href=\"/docs/concepts/filesystems/life_of_an_open.md\">Life of an Open</a>"]
   related_guides: [""]
   area: ["Zircon"]
 
