@@ -51,16 +51,14 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
 }
 
 void AmlUartV1::DdkUnbind(ddk::UnbindTxn txn) {
-  unbind_txn_.emplace(std::move(txn));
-
   if (irq_dispatcher_.has_value()) {
     // The shutdown is async. When it is done, the dispatcher's shutdown callback will complete
     // the unbind txn.
+    unbind_txn_.emplace(std::move(txn));
     irq_dispatcher_->ShutdownAsync();
   } else {
     // No inner aml_uart, just reply to the unbind txn.
-    unbind_txn_->Reply();
-    unbind_txn_.reset();
+    txn.Reply();
   }
 }
 
@@ -91,9 +89,10 @@ zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev, const serial_port_info_t& serial
                             fdf::MmioBuffer mmio) {
   zx::result irq_dispatcher_result =
       fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
-        if (unbind_txn_) {
-          unbind_txn_->Reply();
+        if (unbind_txn_.has_value()) {
+          ddk::UnbindTxn txn = std::move(unbind_txn_.value());
           unbind_txn_.reset();
+          txn.Reply();
         }
       });
   if (irq_dispatcher_result.is_error()) {

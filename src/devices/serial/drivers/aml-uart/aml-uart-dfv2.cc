@@ -41,8 +41,6 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
-  prepare_stop_completer_.emplace(std::move(completer));
-
   if (aml_uart_.has_value()) {
     aml_uart_->SerialImplAsyncEnable(false);
   }
@@ -50,11 +48,11 @@ void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
   if (irq_dispatcher_.has_value()) {
     // The shutdown is async. When it is done, the dispatcher's shutdown callback will complete
     // the PrepareStopCompleter.
+    prepare_stop_completer_.emplace(std::move(completer));
     irq_dispatcher_->ShutdownAsync();
   } else {
     // No irq_dispatcher_, just reply to the PrepareStopCompleter.
-    prepare_stop_completer_.value()(zx::ok());
-    prepare_stop_completer_.reset();
+    completer(zx::ok());
   }
 }
 
@@ -137,8 +135,9 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   zx::result irq_dispatcher_result =
       fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
         if (prepare_stop_completer_.has_value()) {
-          prepare_stop_completer_.value()(zx::ok());
+          fdf::PrepareStopCompleter completer = std::move(prepare_stop_completer_.value());
           prepare_stop_completer_.reset();
+          completer(zx::ok());
         }
       });
   if (irq_dispatcher_result.is_error()) {
