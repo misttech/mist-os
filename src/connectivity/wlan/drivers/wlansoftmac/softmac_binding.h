@@ -111,6 +111,11 @@ class SoftmacBinding : public DeviceInterface,
 
   const zx_protocol_device_t eth_device_ops_ = {
       .version = DEVICE_OPS_VERSION,
+      .init =
+          [](void* ctx) {
+            device_init_reply_args_t args = {};
+            device_init_reply(AsSoftmacBinding(ctx)->child_device_, ZX_OK, &args);
+          },
       .unbind = [](void* ctx) { AsSoftmacBinding(ctx)->Unbind(); },
       .release = [](void* ctx) { AsSoftmacBinding(ctx)->Release(); },
   };
