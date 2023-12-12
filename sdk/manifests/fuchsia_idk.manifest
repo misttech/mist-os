@@ -97,6 +97,7 @@ documentation://docs/open_source.json
 documentation://docs/ref_docs.json
 documentation://docs/sdk_notice.json
 documentation://docs/vulkan_license.json
+ffx_tool://tools/arm64/ffx_tools/ffx-agis
 ffx_tool://tools/arm64/ffx_tools/ffx-assembly
 ffx_tool://tools/arm64/ffx_tools/ffx-audio
 ffx_tool://tools/arm64/ffx_tools/ffx-coverage
@@ -105,6 +106,7 @@ ffx_tool://tools/arm64/ffx_tools/ffx-package
 ffx_tool://tools/arm64/ffx_tools/ffx-product
 ffx_tool://tools/arm64/ffx_tools/ffx-scrutiny
 ffx_tool://tools/arm64/ffx_tools/ffx-test
+ffx_tool://tools/x64/ffx_tools/ffx-agis
 ffx_tool://tools/x64/ffx_tools/ffx-assembly
 ffx_tool://tools/x64/ffx_tools/ffx-audio
 ffx_tool://tools/x64/ffx_tools/ffx-coverage
