@@ -36,7 +36,7 @@ void DumpLog(const char* log_tag, const char* str) {
   std::istringstream stream(str);
   std::string line;
   while (std::getline(stream, line)) {
-    FX_SLOG(INFO, line.c_str(), KV("tag", log_tag));
+    FX_SLOG(INFO, line.c_str(), FX_KV("tag", log_tag));
   }
 }
 
