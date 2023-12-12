@@ -317,6 +317,7 @@
                 "mmap08",
                 "readlinkat01",
                 "recvmsg01",
+                "cve-2022-23222",
             ],
         },
     ],
