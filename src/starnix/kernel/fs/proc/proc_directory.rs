@@ -19,14 +19,13 @@ use crate::{
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
+use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{log_error, not_implemented};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
     pid_t, time::duration_to_scheduler_clock,
 };
-
-use maplit::btreemap;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},
@@ -74,6 +73,9 @@ impl ProcDirectory {
                 fs.create_node(current_task, UptimeFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"loadavg"[..] =>
                 fs.create_node(current_task, LoadavgFile::new_node(kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+            &b"config.gz"[..] => {
+                fs.create_node(current_task, ConfigFile::new_node(),  FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
+            }
         };
 
         Arc::new(ProcDirectory { nodes })
@@ -398,6 +400,24 @@ impl DynamicFileSource for CpuinfoFile {
 
             writeln!(sink)?;
         }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ConfigFile;
+impl ConfigFile {
+    pub fn new_node() -> impl FsNodeOps {
+        DynamicFile::new_node(Self)
+    }
+}
+impl DynamicFileSource for ConfigFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let contents = std::fs::read("/pkg/data/config.gz").map_err(|e| {
+            log_error!("Error reading /pkg/data/config.gz: {e}");
+            errno!(EIO)
+        })?;
+        sink.write(&contents);
         Ok(())
     }
 }

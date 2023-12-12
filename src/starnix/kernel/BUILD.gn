@@ -7,6 +7,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/lib/gzip/gzip.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
 declare_args() {
@@ -64,6 +65,7 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
+    ":android_5.10_kernel_config",
     ":perfetto_consumer_proto",
     ":starnix_kernel_config",
     ":starnix_lifecycle",
@@ -612,6 +614,17 @@ fuchsia_component_manifest("starnix_kernel_manifest") {
 # The starnix kernel configuration library, used by the Rust binary to parse configuration.
 fuchsia_structured_config_rust_lib("starnix_kernel_config") {
   cm_label = ":starnix_kernel_manifest"
+}
+
+gzip("gzip_android_5.10_kernel_config") {
+  input = "data/config"
+  output = "$target_gen_dir/config.gz"
+}
+
+resource("android_5.10_kernel_config") {
+  sources = [ "$target_gen_dir/config.gz" ]
+  outputs = [ "data/config.gz" ]
+  deps = [ ":gzip_android_5.10_kernel_config" ]
 }
 
 fuchsia_component("starnix_kernel") {
