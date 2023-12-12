@@ -28,6 +28,7 @@ use derivative::Derivative;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
+use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{

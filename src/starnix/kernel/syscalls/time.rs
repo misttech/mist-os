@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{
-    Task, {self as zx},
-};
-use starnix_sync::{InterruptibleEvent, WakeReason};
-use starnix_sync::{Locked, Unlocked};
-
 use crate::{
     mm::MemoryAccessorExt,
     signals::{RunState, SignalEvent},
     task::{ClockId, CurrentTask, TimerId},
     time::utc::utc_now,
 };
+use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_zircon::{
+    Task, {self as zx},
+};
 use starnix_logging::{log_trace, not_implemented};
+use starnix_sync::{InterruptibleEvent, WakeReason};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     errno, error,
     errors::{Errno, EINTR},

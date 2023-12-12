@@ -4,7 +4,6 @@
 
 use crate::{
     fs::fuchsia::update_info_from_attrs,
-    impossible_error,
     mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vfs::{
@@ -22,7 +21,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
-use starnix_logging::log_warn;
+use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,

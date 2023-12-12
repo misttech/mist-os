@@ -2,17 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use extended_pstate::ExtendedPstateState;
-use fuchsia_zircon::{
-    sys::zx_thread_state_general_regs_t,
-    {self as zx},
-};
-use starnix_sync::{EventWaitGuard, WakeReason};
-use starnix_sync::{LockBefore, Locked};
-use starnix_sync::{RwLock, RwLockWriteGuard};
-use starnix_uapi::signals::SIGCHLD;
-use std::{ffi::CString, fmt, marker::PhantomData, mem::MaybeUninit, sync::Arc};
-
 use crate::{
     arch::{
         registers::RegisterState,
@@ -31,9 +20,18 @@ use crate::{
         SymlinkTarget,
     },
 };
+use extended_pstate::ExtendedPstateState;
+use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_zircon::{
+    sys::zx_thread_state_general_regs_t,
+    {self as zx},
+};
 use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name};
-use starnix_sync::MmDumpable;
+use starnix_sync::{
+    EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, WakeReason,
+};
 use starnix_syscalls::{decls::Syscall, SyscallResult};
+use starnix_uapi::signals::SIGCHLD;
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN},
     device_type::DeviceType,
@@ -53,6 +51,8 @@ use starnix_uapi::{
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
+use std::marker::PhantomData;
+use std::{ffi::CString, fmt, mem::MaybeUninit, sync::Arc};
 
 pub struct TaskBuilder {
     /// The underlying task object.

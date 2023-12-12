@@ -160,11 +160,11 @@ macro_rules! state_accessor {
         paste::paste! {
         #[allow(dead_code)]
         pub fn read<'a>(self: &'a std::sync::Arc<$base_name>) -> [<$base_name ReadGuard>]<'a> {
-            crate::mutable_state::ReadGuard::new(self, self.$field_name.read())
+            $crate::mutable_state::ReadGuard::new(self, self.$field_name.read())
         }
         #[allow(dead_code)]
         pub fn write<'a>(self: &'a std::sync::Arc<$base_name>) -> [<$base_name WriteGuard>]<'a> {
-            crate::mutable_state::WriteGuard::new(self, self.$field_name.write())
+            $crate::mutable_state::WriteGuard::new(self, self.$field_name.write())
         }
         }
     };
@@ -179,19 +179,19 @@ macro_rules! state_implementation {
     }) => {
         paste::paste! {
         #[allow(dead_code)]
-        pub type [<$base_name ReadGuard>]<'guard_lifetime> = crate::mutable_state::ReadGuard<'guard_lifetime, std::sync::Arc<$base_name>,  $mutable_name>;
+        pub type [<$base_name ReadGuard>]<'guard_lifetime> = $crate::mutable_state::ReadGuard<'guard_lifetime, std::sync::Arc<$base_name>,  $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name WriteGuard>]<'guard_lifetime> = crate::mutable_state::WriteGuard<'guard_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
+        pub type [<$base_name WriteGuard>]<'guard_lifetime> = $crate::mutable_state::WriteGuard<'guard_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name StateRef>]<'ref_lifetime> = crate::mutable_state::StateRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
+        pub type [<$base_name StateRef>]<'ref_lifetime> = $crate::mutable_state::StateRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name StateMutRef>]<'ref_lifetime> = crate::mutable_state::StateMutRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
+        pub type [<$base_name StateMutRef>]<'ref_lifetime> = $crate::mutable_state::StateMutRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
 
-        impl<'guard, G: 'guard + std::ops::Deref<Target=$mutable_name>> crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
+        impl<'guard, G: 'guard + std::ops::Deref<Target=$mutable_name>> $crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
             filter_methods_macro::filter_methods!(RoMethod, $($tt)*);
         }
 
-        impl<'guard, G: 'guard + std::ops::DerefMut<Target=$mutable_name>> crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
+        impl<'guard, G: 'guard + std::ops::DerefMut<Target=$mutable_name>> $crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
             filter_methods_macro::filter_methods!(RwMethod, $($tt)*);
         }
         }

@@ -26,6 +26,7 @@ use crate::{
     },
 };
 use fidl_fuchsia_io as fio;
+use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{Mutex, RwLock};

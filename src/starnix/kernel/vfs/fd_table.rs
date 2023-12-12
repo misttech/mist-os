@@ -7,6 +7,7 @@ use crate::{
     vfs::{FdNumber, FileHandle},
 };
 use bitflags::bitflags;
+use fuchsia_inspect_contrib::profile_duration;
 use starnix_sync::Mutex;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{

@@ -10,14 +10,9 @@
 
 // Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
 // unconditional dependency for rustdoc generation.
+use extended_pstate as _;
 use tracing_mutex as _;
 
-#[macro_use]
-extern crate fuchsia_inspect_contrib;
-#[macro_use]
-extern crate macro_rules_attribute;
-
-use crate::execution::{Container, ContainerServiceConfig};
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
@@ -28,29 +23,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use starnix_logging::{
-    impossible_error, log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel,
-};
-
-mod arch;
-mod device;
-mod dynamic_thread_spawner;
-mod execution;
-mod fs;
-mod loader;
-mod mm;
-mod mutable_state;
-mod power;
-mod selinux;
-mod signals;
-mod syscalls;
-mod task;
-mod time;
-mod vdso;
-mod vfs;
-
-#[cfg(test)]
-mod testing;
+use starnix_core::execution::{Container, ContainerServiceConfig};
+use starnix_logging::{log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel};
 
 fn maybe_serve_lifecycle() {
     if let Some(lifecycle) =
@@ -105,7 +79,7 @@ async fn build_container(
     stream: frunner::ComponentRunnerRequestStream,
     returned_config: &mut Option<ContainerServiceConfig>,
 ) -> Result<Container, Error> {
-    let (container, config) = execution::create_component_from_stream(stream).await?;
+    let (container, config) = starnix_core::execution::create_component_from_stream(stream).await?;
     *returned_config = Some(config);
     Ok(container)
 }
@@ -172,12 +146,15 @@ async fn main() -> Result<(), Error> {
                 }
             }
             KernelServices::ComponentRunner(stream) => {
-                execution::serve_component_runner(stream, &container.wait().await.system_task())
-                    .await
-                    .expect("failed to start component runner");
+                starnix_core::execution::serve_component_runner(
+                    stream,
+                    &container.wait().await.system_task(),
+                )
+                .await
+                .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                execution::serve_container_controller(
+                starnix_core::execution::serve_container_controller(
                     stream,
                     &container.wait().await.system_task(),
                 )

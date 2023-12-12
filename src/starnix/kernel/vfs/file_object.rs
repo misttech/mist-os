@@ -20,6 +20,7 @@ use crate::{
     },
 };
 use fidl::HandleBased;
+use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{
     impossible_error, not_implemented, trace_category_starnix_mm, trace_duration,

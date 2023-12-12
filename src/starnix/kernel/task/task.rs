@@ -14,6 +14,7 @@ use crate::{
     vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
 };
 use bitflags::bitflags;
+use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };

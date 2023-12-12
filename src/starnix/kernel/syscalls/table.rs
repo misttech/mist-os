@@ -6,6 +6,7 @@ use paste::paste;
 use starnix_sync::{Locked, Unlocked};
 
 use crate::{arch::syscalls::sys_clone, task::CurrentTask};
+use fuchsia_inspect_contrib::profile_duration;
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::errors::Errno;
 

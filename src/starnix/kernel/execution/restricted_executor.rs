@@ -15,7 +15,7 @@ use crate::{
     },
 };
 use anyhow::{format_err, Error};
-use fuchsia_inspect_contrib::ProfileDuration;
+use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
