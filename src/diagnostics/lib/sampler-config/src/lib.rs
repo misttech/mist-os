@@ -169,10 +169,10 @@ pub fn parse_selector_for_test(selector_str: &str) -> Option<ParsedSelector> {
 // unlike StringList and SelectorList, it's not OK to have just a ComponentIdInfo in a config
 // file - the file should always be a list even if there's just one (or zero) items.
 #[derive(Deserialize, Debug)]
-struct ComponentIdInfoList(Vec<ComponentIdInfo>);
+pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
 
 #[derive(Deserialize, Debug)]
-struct ComponentIdInfo {
+pub struct ComponentIdInfo {
     moniker: String,
     id: u32,
     /// Not used by Sampler, but we need to validate it

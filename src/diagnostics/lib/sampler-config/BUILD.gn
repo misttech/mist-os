@@ -13,6 +13,7 @@ rustc_library("sampler-config") {
     "//src/connectivity/network/tests/integration/inspect/*",
     "//src/diagnostics/lib/sampler-config/*",
     "//src/diagnostics/sampler/*",
+    "//src/lib/assembly/platform_configuration/*",
   ]
 
   deps = [

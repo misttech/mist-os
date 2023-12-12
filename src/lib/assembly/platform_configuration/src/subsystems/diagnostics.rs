@@ -8,6 +8,8 @@ use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
 };
 use assembly_config_schema::FileEntry;
+use assembly_util::read_config;
+use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
 const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
@@ -132,6 +134,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 .context(format!("Adding metrics config to sampler: {}", &metrics_config))?;
         }
         for fire_config in &sampler.fire_configs {
+            // Ensure that the fire_config is the correct format.
+            let _ = read_config::<ComponentIdInfoList>(&fire_config)
+                .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
             let filename = fire_config
                 .file_name()
                 .ok_or(anyhow!("Failed to get filename for fire config: {}", &fire_config))?;
@@ -152,8 +157,11 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
+    use assembly_config_schema::platform_config::diagnostics_config::SamplerConfig;
     use assembly_config_schema::BuildType;
-    use serde_json::{Number, Value};
+    use camino::Utf8PathBuf;
+    use serde_json::{json, Number, Value};
+    use tempfile::TempDir;
 
     #[test]
     fn test_define_configuration_default() {
@@ -322,5 +330,65 @@ mod tests {
                 "fuchsia.component.SamplerBinder".into(),
             ]))
         );
+    }
+
+    #[test]
+    fn test_fire_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let fire_config_path =
+            Utf8PathBuf::from_path_buf(temp_dir.path().join("fire_config.json")).unwrap();
+        let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
+        serde_json::to_writer(
+            &mut fire_config,
+            &json!([
+                {
+                    "id": 1234,
+                    "label": "my_label",
+                    "moniker": "my_moniker",
+                }
+            ]),
+        )
+        .unwrap();
+
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let diagnostics = DiagnosticsConfig {
+            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
+            ..Default::default()
+        };
+        let mut builder = ConfigurationBuilderImpl::default();
+        assert!(DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_invalid_fire_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let fire_config_path =
+            Utf8PathBuf::from_path_buf(temp_dir.path().join("fire_config.json")).unwrap();
+        let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
+        serde_json::to_writer(
+            &mut fire_config,
+            &json!({
+                "invalid": [],
+            }),
+        )
+        .unwrap();
+
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let diagnostics = DiagnosticsConfig {
+            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
+            ..Default::default()
+        };
+        let mut builder = ConfigurationBuilderImpl::default();
+        assert!(DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder)
+            .is_err());
     }
 }
