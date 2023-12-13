@@ -1409,8 +1409,8 @@ impl ResolvedInstanceState {
             &state.children,
             &decl,
             &state.component_input_dict,
-            &mut state.component_output_dict,
-            &mut state.program_input_dict,
+            &state.component_output_dict,
+            &state.program_input_dict,
             &state.program_output_dict,
             &mut state.collection_dicts,
         );

@@ -59,8 +59,8 @@ pub fn build_component_sandbox(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     component_input_dict: &Dict,
-    component_output_dict: &mut Dict,
-    program_input_dict: &mut Dict,
+    component_output_dict: &Dict,
+    program_input_dict: &Dict,
     program_output_dict: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
@@ -161,7 +161,7 @@ fn extend_dict_with_use(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input_dict: &Dict,
-    program_input_dict: &mut Dict,
+    program_input_dict: &Dict,
     program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
@@ -329,7 +329,7 @@ fn extend_dict_with_expose(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
-    target_dict: &mut Dict,
+    target_dict: &Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol capabilities right now
