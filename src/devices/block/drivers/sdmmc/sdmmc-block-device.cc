@@ -567,7 +567,7 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
   switch (btxn->command.opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
-      if (zx_status_t status = block::CheckIoRange(btxn->rw, max); status != ZX_OK) {
+      if (zx_status_t status = block::CheckIoRange(btxn->rw, max, logger()); status != ZX_OK) {
         BlockComplete(txn, status);
         return;
       }
@@ -578,7 +578,7 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
       }
       break;
     case BLOCK_OPCODE_TRIM:
-      if (zx_status_t status = block::CheckIoRange(btxn->trim, max); status != ZX_OK) {
+      if (zx_status_t status = block::CheckIoRange(btxn->trim, max, logger()); status != ZX_OK) {
         BlockComplete(txn, status);
         return;
       }
