@@ -4,6 +4,7 @@
 
 # WARNING: Known to infrastructure
 group("hardware_encoders") {
+  testonly = true
   if (target_cpu == "arm64") {
     deps = [
       "//src/media/codec/factory:codec_detect_hw_encode_test",
