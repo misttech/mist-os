@@ -96,7 +96,6 @@ if (is_host) {
       # time this visibility list was established, and they should eventually be
       # moved to use the appropriate shared host_test_data.
       "//build/assembly/update_package:*",
-      "//build/testing/run_target_test_and_host_script:*",
       "//sdk/ctf/tests/examples/host_tool:*",
       "//src/devices/bin/driver_tools/tests:*",
       "//src/tests/end_to_end/*",
