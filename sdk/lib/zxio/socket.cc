@@ -2134,7 +2134,7 @@ struct socket_with_event {
     }
     const typename T::FidlSendControlData& cdata = cmsg_result.value();
 
-    std::vector<uint8_t> data;
+    std::unique_ptr<uint8_t[]> data;
     auto vec = fidl::VectorView<uint8_t>();
     switch (msg->msg_iovlen) {
       case 0: {
@@ -2148,13 +2148,14 @@ struct socket_with_event {
       }
       default: {
         // TODO(https://fxbug.dev/84965): avoid this copy.
-        data.reserve(total);
+        data = std::unique_ptr<uint8_t[]>(new uint8_t[total]);
+        uint8_t* dest = data.get();
         for (int i = 0; i < msg->msg_iovlen; ++i) {
           const iovec& iov = msg->msg_iov[i];
-          std::copy_n(static_cast<const uint8_t*>(iov.iov_base), iov.iov_len,
-                      std::back_inserter(data));
+          memcpy(dest, iov.iov_base, iov.iov_len);
+          dest += iov.iov_len;
         }
-        vec = fidl::VectorView<uint8_t>::FromExternal(data);
+        vec = fidl::VectorView<uint8_t>::FromExternal(data.get(), total);
       }
     }
 
