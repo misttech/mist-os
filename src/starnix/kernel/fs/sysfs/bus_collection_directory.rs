@@ -145,7 +145,7 @@ mod tests {
     #[::fuchsia::test]
     async fn bus_collection_directory_contains_expected_files() {
         let (kernel, current_task) = create_kernel_and_task();
-        let root_kobject = KObject::new_root();
+        let root_kobject = KObject::new_root(Default::default());
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
         lookup_node(&current_task, &test_fs, b"devices").expect("devices");
@@ -156,7 +156,7 @@ mod tests {
     #[::fuchsia::test]
     async fn bus_devices_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
-        let root_kobject = KObject::new_root();
+        let root_kobject = KObject::new_root(Default::default());
         root_kobject.get_or_create_child(b"0", KType::Test, SysFsDirectory::new);
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));

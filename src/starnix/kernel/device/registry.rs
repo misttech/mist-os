@@ -10,7 +10,7 @@ use crate::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         sysfs::{
             BlockDeviceDirectory, BusCollectionDirectory, ClassCollectionDirectory,
-            DeviceDirectory, SysFsDirectory,
+            DeviceDirectory, SysFsDirectory, SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
         },
     },
     task::CurrentTask,
@@ -197,6 +197,7 @@ impl MajorDevices {
 pub struct DeviceRegistry {
     root_kobject: KObjectHandle,
     class_subsystem_kobject: KObjectHandle,
+    block_subsystem_kobject: KObjectHandle,
     bus_subsystem_kobject: KObjectHandle,
     state: Mutex<DeviceRegistryState>,
 }
@@ -229,12 +230,8 @@ impl DeviceRegistry {
         self.class_subsystem_kobject.clone()
     }
 
-    pub fn block_collection(&self) -> KObjectHandle {
-        self.class_subsystem_kobject.get_or_create_child(
-            b"block",
-            KType::Collection,
-            ClassCollectionDirectory::new,
-        )
+    pub fn block_subsystem_kobject(&self) -> KObjectHandle {
+        self.block_subsystem_kobject.clone()
     }
 
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
@@ -294,6 +291,9 @@ impl DeviceRegistry {
             .get_child(&dev_attr.class.name())
             .expect("no associated collection exists")
             .insert_child(kobj_device.clone());
+        if dev_attr.metadata.mode == DeviceMode::Block {
+            self.block_subsystem_kobject.insert_child(kobj_device.clone());
+        }
         if let Some(bus) = dev_attr.bus {
             self.bus_subsystem_kobject
                 .get_child(&bus.name())
@@ -465,9 +465,10 @@ impl Default for DeviceRegistry {
             .register_major(DYN_MAJOR, Arc::clone(&state.dyn_devices))
             .expect("Failed to register DYN_MAJOR");
         Self {
-            root_kobject: KObject::new_root(),
-            class_subsystem_kobject: KObject::new_root(),
-            bus_subsystem_kobject: KObject::new_root(),
+            root_kobject: KObject::new_root(SYSFS_DEVICES),
+            class_subsystem_kobject: KObject::new_root(SYSFS_CLASS),
+            block_subsystem_kobject: KObject::new_root(SYSFS_BLOCK),
+            bus_subsystem_kobject: KObject::new_root(SYSFS_BUS),
             state: Mutex::new(state),
         }
     }

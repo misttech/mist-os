@@ -143,9 +143,9 @@ pub type KObjectHandle = Arc<KObject>;
 type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + Sync>;
 
 impl KObject {
-    pub fn new_root() -> KObjectHandle {
+    pub fn new_root(name: &FsStr) -> KObjectHandle {
         Arc::new(Self {
-            name: Default::default(),
+            name: name.to_vec(),
             parent: None,
             children: Default::default(),
             ktype: KType::Collection,
@@ -196,7 +196,7 @@ impl KObject {
         self.create_fs_node_ops.as_ref()(Arc::downgrade(self))
     }
 
-    /// Get the full path from the root.
+    /// Get the path to the current kobject, relative to the root.
     pub fn path(self: &KObjectHandle) -> FsString {
         let mut current = Some(self.clone());
         let mut path = PathBuilder::new();
@@ -205,11 +205,10 @@ impl KObject {
             current = n.parent();
         }
 
-        // Dedup root directory slash.
-        path.build()[1..].to_vec()
+        path.build_relative()
     }
 
-    /// Get the relative path to the root.
+    /// Get the path to the root, relative to the current kobject.
     pub fn path_to_root(self: &KObjectHandle) -> FsString {
         let mut parent = self.parent();
         let mut path = PathBuilder::new();
@@ -218,8 +217,7 @@ impl KObject {
             parent = n.parent();
         }
 
-        // Get the relative path.
-        path.build()[1..].to_vec()
+        path.build_relative()
     }
 
     /// Checks if there is any child holding the `name`.
@@ -434,7 +432,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn kobject_create_child() {
-        let root = KObject::new_root();
+        let root = KObject::new_root(Default::default());
         assert!(root.parent().is_none());
 
         assert!(!root.has_child(b"virtual"));
@@ -444,17 +442,17 @@ mod tests {
 
     #[::fuchsia::test]
     fn kobject_path() {
-        let root = KObject::new_root();
+        let root = KObject::new_root(b"devices");
         let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
         let device = bus
             .get_or_create_child(b"mem", KType::Test, SysFsDirectory::new)
             .get_or_create_child(b"null", KType::Test, DeviceDirectory::new);
-        assert_eq!(device.path(), b"/virtual/mem/null".to_vec());
+        assert_eq!(device.path(), b"/devices/virtual/mem/null".to_vec());
     }
 
     #[::fuchsia::test]
     fn kobject_path_to_root() {
-        let root = KObject::new_root();
+        let root = KObject::new_root(Default::default());
         let bus = root.get_or_create_child(b"bus", KType::Test, SysFsDirectory::new);
         let device = bus.get_or_create_child(b"device", KType::Test, SysFsDirectory::new);
         assert_eq!(device.path_to_root(), b"../..".to_vec());
@@ -462,7 +460,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn kobject_get_children_names() {
-        let root = KObject::new_root();
+        let root = KObject::new_root(Default::default());
         root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
         root.get_or_create_child(b"cpu", KType::Test, SysFsDirectory::new);
         root.get_or_create_child(b"power", KType::Test, SysFsDirectory::new);
@@ -476,7 +474,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn kobject_remove() {
-        let root = KObject::new_root();
+        let root = KObject::new_root(Default::default());
         let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
         let class = bus.get_or_create_child(b"mem", KType::Test, SysFsDirectory::new);
         assert!(bus.has_child(b"mem"));

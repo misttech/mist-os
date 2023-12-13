@@ -15,7 +15,11 @@ use crate::{
     },
 };
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
-use std::sync::Arc;
+
+pub const SYSFS_DEVICES: &'static FsStr = b"devices";
+pub const SYSFS_BUS: &'static FsStr = b"bus";
+pub const SYSFS_CLASS: &'static FsStr = b"class";
+pub const SYSFS_BLOCK: &'static FsStr = b"block";
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -49,45 +53,23 @@ impl SysFs {
             });
         });
 
-        dir.entry(
-            current_task,
-            b"devices",
-            SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.root_kobject())),
-            dir_mode,
-        );
-        dir.entry(
-            current_task,
-            b"bus",
-            kernel.device_registry.bus_subsystem_kobject().ops(),
-            dir_mode,
-        );
-        dir.entry(
-            current_task,
-            b"block",
-            kernel.device_registry.block_collection().ops(),
-            dir_mode,
-        );
-        dir.entry(
-            current_task,
-            b"class",
-            kernel.device_registry.class_subsystem_kobject().ops(),
-            dir_mode,
-        );
+        let registry = &kernel.device_registry;
+        dir.entry(current_task, SYSFS_DEVICES, registry.root_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BUS, registry.bus_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BLOCK, registry.block_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
-        kernel.device_registry.class_subsystem_kobject().get_or_create_child(
-            b"net",
-            KType::Collection,
-            |_| NetstackDevicesDirectory::new_sys_class_net(),
-        );
+        registry.class_subsystem_kobject().get_or_create_child(b"net", KType::Collection, |_| {
+            NetstackDevicesDirectory::new_sys_class_net()
+        });
 
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
 
         // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
-        kernel
-            .device_registry
+        registry
             .root_kobject()
             .get_or_create_child(b"system", KType::Bus, SysFsDirectory::new)
             .get_or_create_child(b"cpu", KType::Class, CpuClassDirectory::new);
@@ -105,13 +87,14 @@ pub trait SysFsOps: FsNodeOps {
     fn kobject(&self) -> KObjectHandle;
 }
 
-/// Creates a relative path from a subsystem kobject to the kobject in the devices tree.
+/// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
+/// a subsystem.
 pub fn sysfs_create_link(from: KObjectHandle, to: KObjectHandle) -> SymlinkNode {
     let mut path = PathBuilder::new();
     path.prepend_element(&to.path());
-    // "../devices" is the relative path from subsystem root to the devices tree.
-    path.prepend_element(b"../devices");
+    // Escape one more level from its subsystem to the root of sysfs.
+    path.prepend_element(b"..");
     path.prepend_element(&from.path_to_root());
     // Build a symlink with the relative path.
-    SymlinkNode::new(&path.build()[1..])
+    SymlinkNode::new(&path.build_relative())
 }

@@ -4,7 +4,7 @@
 
 use crate::{
     device::kobject::{KObject, KObjectHandle},
-    fs::sysfs::SysFsOps,
+    fs::sysfs::{sysfs_create_link, SysFsOps},
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -58,13 +58,48 @@ impl FsNodeOps for ClassCollectionDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match self.kobject().get_child(name) {
+        let kobject = self.kobject();
+        match kobject.get_child(name) {
             Some(child_kobject) => Ok(node.fs().create_node(
                 current_task,
-                child_kobject.ops(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o777), FsCred::root()),
+                sysfs_create_link(kobject.clone(), child_kobject),
+                FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
             )),
             None => error!(ENOENT),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        device::kobject::{KObject, KType},
+        fs::sysfs::{ClassCollectionDirectory, SysFsDirectory},
+        task::CurrentTask,
+        testing::{create_fs, create_kernel_and_task},
+        vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode},
+    };
+    use starnix_uapi::errors::Errno;
+    use std::sync::Arc;
+
+    fn lookup_node(
+        task: &CurrentTask,
+        fs: &FileSystemHandle,
+        name: &FsStr,
+    ) -> Result<NamespaceNode, Errno> {
+        let root = NamespaceNode::new_anonymous(fs.root().clone());
+        task.lookup_path(&mut LookupContext::new(SymlinkMode::NoFollow), root, name)
+    }
+
+    #[::fuchsia::test]
+    async fn class_collection_directory_contains_device_links() {
+        let (kernel, current_task) = create_kernel_and_task();
+        let root_kobject = KObject::new_root(Default::default());
+        root_kobject.get_or_create_child(b"0", KType::Test, SysFsDirectory::new);
+        let test_fs =
+            create_fs(&kernel, ClassCollectionDirectory::new(Arc::downgrade(&root_kobject)));
+
+        let device_entry = lookup_node(&current_task, &test_fs, b"0").expect("device 0 directory");
+        assert!(device_entry.entry.node.is_lnk());
     }
 }

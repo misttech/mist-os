@@ -704,9 +704,9 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                 // TODO(fxb/127713): Pass the synthetic UUID when available.
                 // Otherwise, default as "0".
                 let message = format!(
-                    "{action}@/devices{path}\0\
+                    "{action}@/{path}\0\
                             ACTION={action}\0\
-                            DEVPATH=/devices{path}\0\
+                            DEVPATH=/{path}\0\
                             DEVNAME={name}\0\
                             SUBSYSTEM={subsystem}\0\
                             SYNTH_UUID=0\0\

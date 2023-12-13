@@ -27,12 +27,21 @@ impl PathBuilder {
         self.data[self.pos] = b'/';
     }
 
-    pub fn build(mut self) -> FsString {
+    /// Build the absolute path string.
+    pub fn build_absolute(mut self) -> FsString {
         if self.pos == self.data.len() {
             return b"/".to_vec();
         }
         self.data.drain(..self.pos);
         self.data
+    }
+
+    /// Build the relative path string.
+    pub fn build_relative(self) -> FsString {
+        let mut absolute = self.build_absolute();
+        // Remove the prefix slash.
+        absolute.remove(0);
+        absolute
     }
 
     fn ensure_capacity(&mut self, capacity_needed: usize) {
@@ -59,21 +68,28 @@ mod test {
     #[::fuchsia::test]
     fn test_path_builder() {
         let p = PathBuilder::new();
-        assert_eq!(p.build(), b"/");
+        assert_eq!(p.build_absolute(), b"/");
+
+        let p = PathBuilder::new();
+        assert_eq!(p.build_relative(), b"");
 
         let mut p = PathBuilder::new();
         p.prepend_element(b"foo");
-        assert_eq!(p.build(), b"/foo");
+        assert_eq!(p.build_absolute(), b"/foo");
+
+        let mut p = PathBuilder::new();
+        p.prepend_element(b"foo");
+        assert_eq!(p.build_relative(), b"foo");
 
         let mut p = PathBuilder::new();
         p.prepend_element(b"foo");
         p.prepend_element(b"bar");
-        assert_eq!(p.build(), b"/bar/foo");
+        assert_eq!(p.build_absolute(), b"/bar/foo");
 
         let mut p = PathBuilder::new();
         p.prepend_element(b"foo");
         p.prepend_element(b"1234567890123456789012345678901234567890");
         p.prepend_element(b"bar");
-        assert_eq!(p.build(), b"/bar/1234567890123456789012345678901234567890/foo");
+        assert_eq!(p.build_absolute(), b"/bar/1234567890123456789012345678901234567890/foo");
     }
 }

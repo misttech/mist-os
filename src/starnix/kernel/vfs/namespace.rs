@@ -826,7 +826,7 @@ impl DynamicFileSource for ProcMountinfoFile {
                 path.prepend_element(&current.local_name());
                 current = next
             }
-            path.build()
+            path.build_absolute()
         }
 
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
@@ -1357,7 +1357,7 @@ impl NamespaceNode {
                     current = parent.escape_mount();
                 } else {
                     // This node hasn't intersected with the custom root and has reached the namespace root.
-                    return PathWithReachability::Unreachable(path.build());
+                    return PathWithReachability::Unreachable(path.build_absolute());
                 }
             }
         } else {
@@ -1368,7 +1368,7 @@ impl NamespaceNode {
             }
         }
 
-        PathWithReachability::Reachable(path.build())
+        PathWithReachability::Reachable(path.build_absolute())
     }
 
     pub fn mount(&self, what: WhatToMount, flags: MountFlags) -> Result<(), Errno> {
