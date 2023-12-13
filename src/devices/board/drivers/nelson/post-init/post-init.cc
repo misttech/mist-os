@@ -91,6 +91,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = SetBoardInfo(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
@@ -113,6 +117,9 @@ zx::result<> PostInit::InitBoardInfo() {
   if (board_build.is_error()) {
     return board_build.take_error();
   }
+
+  FDF_LOG(INFO, "Detected board rev 0x%x", *board_build);
+
   if (*board_build >= kMaxSupportedBuild) {
     // We have detected a new board rev. Print this warning just in case the
     // new board rev requires additional support that we were not aware of
@@ -202,6 +209,25 @@ zx::result<uint32_t> PostInit::ReadGpios(cpp20::span<const char* const> node_nam
   }
 
   return zx::ok(value);
+}
+
+zx::result<> PostInit::SetBoardInfo() {
+  fdf::Arena arena('PBUS');
+  auto board_info = fuchsia_hardware_platform_bus::wire::BoardInfo::Builder(arena)
+                        .board_revision(board_build_)
+                        .Build();
+
+  auto result = pbus_.buffer(arena)->SetBoardInfo(board_info);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to SetBoardInfo failed: %s", result.FormatDescription().c_str());
+    return zx::error(result.error().status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "SetBoardInfo failed: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  return zx::ok();
 }
 
 }  // namespace nelson

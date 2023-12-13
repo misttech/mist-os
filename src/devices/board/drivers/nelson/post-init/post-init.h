@@ -25,6 +25,7 @@ class PostInit : public fdf::DriverBase {
   zx::result<> InitBoardInfo();
   zx::result<> SetInspectProperties();
   zx::result<> InitDisplay();
+  zx::result<> SetBoardInfo();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
   // node_names determines the bits set in the result from LSB to MSB.

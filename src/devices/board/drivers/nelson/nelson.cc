@@ -153,31 +153,6 @@ int Nelson::Thread() {
     return status;
   }
 
-  // Once gpio is up and running, let's populate board revision
-  fpbus::BoardInfo info = {};
-  info.board_revision() = GetBoardRev();
-  fidl::Arena<> fidl_arena;
-  auto result = pbus_.buffer(fdf::Arena('INFO'))->SetBoardInfo(fidl::ToWire(fidl_arena, info));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: SetBoardInfo request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: SetBoardInfo failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  zxlogf(INFO, "Detected board rev 0x%x", info.board_revision().value_or(-1));
-
-  if ((info.board_revision() != BOARD_REV_P1) && (info.board_revision() != BOARD_REV_P2) &&
-      (info.board_revision() != BOARD_REV_EVT) && (info.board_revision() != BOARD_REV_DVT) &&
-      (info.board_revision() != BOARD_REV_DVT2)) {
-    zxlogf(ERROR, "Unsupported board revision %u. Booting will not continue",
-           info.board_revision().value_or(-1));
-    return -1;
-  }
-
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit failed: %d", status);
   }
