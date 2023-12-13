@@ -27,20 +27,20 @@ closed protocol Exception {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_EXCEPTION**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_EXCEPTION`.
     ///
     /// ## Return value
     ///
-    /// `zx_exception_get_thread()` returns **ZX_OK** on success.
+    /// `zx_exception_get_thread()` returns `ZX_OK` on success.
     /// In the event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failed to allocate memory for a new handle.
+    /// `ZX_ERR_NO_MEMORY`  Failed to allocate memory for a new handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *handle* is not an exception.
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not an exception.
     ///
     /// ## See also
     ///
@@ -81,22 +81,22 @@ closed protocol Exception {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_EXCEPTION**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_EXCEPTION`.
     ///
     /// ## Return value
     ///
-    /// `zx_exception_get_process()` returns **ZX_OK** on success.
+    /// `zx_exception_get_process()` returns `ZX_OK` on success.
     /// In the event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *handle* was received via a thread exception channel.
+    /// `ZX_ERR_ACCESS_DENIED` *handle* was received via a thread exception channel.
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failed to allocate memory for a new handle.
+    /// `ZX_ERR_NO_MEMORY`  Failed to allocate memory for a new handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *handle* is not an exception.
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not an exception.
     ///
     /// ## See also
     ///

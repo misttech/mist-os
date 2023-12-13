@@ -40,7 +40,7 @@ closed protocol Object {
     /// until either the *deadline* passes or the object to which *handle* refers
     /// asserts at least one [signal][signals] specified by the bitmask *signals*. If
     /// the object is already asserting at least one of the specified *signals*, the
-    /// wait ends immediately with **ZX_OK**.
+    /// wait ends immediately with `ZX_OK`.
     ///
     /// Upon return, if non-NULL, *observed* is a bitmap of *all* of the signals
     /// asserted on the object. If one of the specified *signals* was asserted,
@@ -50,45 +50,45 @@ closed protocol Object {
     /// the `zx_object_wait_one` syscall completed.
     ///
     /// The *deadline* parameter specifies a deadline with respect to
-    /// **ZX_CLOCK_MONOTONIC** and will be automatically adjusted according to the job's
+    /// `ZX_CLOCK_MONOTONIC` and will be automatically adjusted according to the job's
     /// [timer slack] policy.
     ///
-    ///   * **ZX_TIME_INFINITE** is a special value meaning wait forever.
-    ///   * **ZX_TIME_INFINITE_PAST** (or any value before the current time in
-    ///     **ZX_CLOCK_MONOTONIC**) will query the current value of the signal(s).
+    ///   * `ZX_TIME_INFINITE` is a special value meaning wait forever.
+    ///   * `ZX_TIME_INFINITE_PAST` (or any value before the current time in
+    ///     `ZX_CLOCK_MONOTONIC`) will query the current value of the signal(s).
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_WAIT**.
+    /// *handle* must have `ZX_RIGHT_WAIT`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_wait_one()` returns **ZX_OK** if any of *signals* were active when
+    /// `zx_object_wait_one()` returns `ZX_OK` if any of *signals* were active when
     /// the call was made, or observed on the object before *deadline* passes.
     ///
-    /// In the event of **ZX_ERR_TIMED_OUT**, *observed* may reflect state changes
+    /// In the event of `ZX_ERR_TIMED_OUT`, *observed* may reflect state changes
     /// that occurred after the deadline passed, but before the syscall returned.
     ///
-    /// In the event of **ZX_ERR_CANCELED**, *handle* has been closed,
-    /// and *observed* will have the **ZX_SIGNAL_HANDLE_CLOSED** bit set.
+    /// In the event of `ZX_ERR_CANCELED`, *handle* has been closed,
+    /// and *observed* will have the `ZX_SIGNAL_HANDLE_CLOSED` bit set.
     ///
     /// For any other return value, *observed* is undefined.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *observed* is an invalid pointer.
+    /// `ZX_ERR_INVALID_ARGS`  *observed* is an invalid pointer.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have **ZX_RIGHT_WAIT** and may
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have `ZX_RIGHT_WAIT` and may
     /// not be waited upon.
     ///
-    /// **ZX_ERR_CANCELED**  *handle* was invalidated (e.g., closed) during the wait.
+    /// `ZX_ERR_CANCELED`  *handle* was invalidated (e.g., closed) during the wait.
     ///
-    /// **ZX_ERR_TIMED_OUT**  The specified deadline passed before any of the specified
+    /// `ZX_ERR_TIMED_OUT`  The specified deadline passed before any of the specified
     /// *signals* are observed on *handle*.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  *handle* is a handle that cannot be waited on
+    /// `ZX_ERR_NOT_SUPPORTED`  *handle* is a handle that cannot be waited on
     /// (for example, a Port handle).
     ///
     /// ## Notes
@@ -135,7 +135,7 @@ closed protocol Object {
     /// until either the *deadline* passes or at least one object referred to in
     /// *items* has a specified [signal][signals] asserted. If an object is already
     /// asserting at least one of the specified signals, the wait ends immediately with
-    /// **ZX_OK**.
+    /// `ZX_OK`.
     ///
     /// ```
     /// typedef struct {
@@ -152,57 +152,57 @@ closed protocol Object {
     /// the calling thread.
     ///
     /// The *deadline* parameter specifies a deadline with respect to
-    /// **ZX_CLOCK_MONOTONIC** and will be automatically adjusted according to the job's
-    /// [timer slack] policy.  **ZX_TIME_INFINITE** is a special value meaning wait
+    /// `ZX_CLOCK_MONOTONIC` and will be automatically adjusted according to the job's
+    /// [timer slack] policy.  `ZX_TIME_INFINITE` is a special value meaning wait
     /// forever.
     ///
     /// Upon return, the *pending* field of *items* is filled with bitmaps indicating
     /// which signals are pending for each item.
     ///
-    /// The maximum number of items that may be waited upon is **ZX_WAIT_MANY_MAX_ITEMS**,
+    /// The maximum number of items that may be waited upon is `ZX_WAIT_MANY_MAX_ITEMS`,
     /// which is 64.  To wait on more objects at once use [Ports](/docs/reference/kernel_objects/port.md).
     ///
     /// ## Rights
     ///
-    /// Every entry of *items* must have a *handle* field with **ZX_RIGHT_WAIT**.
+    /// Every entry of *items* must have a *handle* field with `ZX_RIGHT_WAIT`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_wait_many()` returns **ZX_OK** if any of *waitfor* signals were
+    /// `zx_object_wait_many()` returns `ZX_OK` if any of *waitfor* signals were
     /// active when the call was made, or observed on their respective object before
     /// *deadline* passed.
     ///
-    /// In the event of **ZX_ERR_TIMED_OUT**, *items* may reflect state changes
+    /// In the event of `ZX_ERR_TIMED_OUT`, *items* may reflect state changes
     /// that occurred after the deadline passed, but before the syscall returned.
     ///
-    /// In the event of **ZX_ERR_CANCELED**, one or more of the items being waited
+    /// In the event of `ZX_ERR_CANCELED`, one or more of the items being waited
     /// upon have had their handles closed, and the *pending* field for those items
-    /// will have the **ZX_SIGNAL_HANDLE_CLOSED** bit set.
+    /// will have the `ZX_SIGNAL_HANDLE_CLOSED` bit set.
     ///
     /// For any other return value, the *pending* fields of *items* are undefined.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *items* isn't a valid pointer.
+    /// `ZX_ERR_INVALID_ARGS`  *items* isn't a valid pointer.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE**  *count* is greater than **ZX_WAIT_MANY_MAX_ITEMS**.
+    /// `ZX_ERR_OUT_OF_RANGE`  *count* is greater than `ZX_WAIT_MANY_MAX_ITEMS`.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  one of *items* contains an invalid handle.
+    /// `ZX_ERR_BAD_HANDLE`  one of *items* contains an invalid handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  One or more of the provided *handles* does not
-    /// have **ZX_RIGHT_WAIT** and may not be waited upon.
+    /// `ZX_ERR_ACCESS_DENIED`  One or more of the provided *handles* does not
+    /// have `ZX_RIGHT_WAIT` and may not be waited upon.
     ///
-    /// **ZX_ERR_CANCELED**  One or more of the provided *handles* was invalidated
+    /// `ZX_ERR_CANCELED`  One or more of the provided *handles* was invalidated
     /// (e.g., closed) during the wait.
     ///
-    /// **ZX_ERR_TIMED_OUT**  The specified deadline passed before any of the specified
+    /// `ZX_ERR_TIMED_OUT`  The specified deadline passed before any of the specified
     /// signals are observed on any of the specified handles. Note that calls with a
     /// *count* of 0 will still wait until *deadline* has passed before returning.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  One of the *items* contains a handle that cannot
+    /// `ZX_ERR_NOT_SUPPORTED`  One of the *items* contains a handle that cannot
     /// be waited one (for example, a Port handle).
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
@@ -266,11 +266,11 @@ closed protocol Object {
     /// The *signals* argument is a bitmask indicating which [signals] on the object
     /// specified by *handle* will cause a packet to be enqueued.
     ///
-    /// Without **ZX_WAIT_ASYNC_EDGE**, if **any** of the signals in *signals* are active
+    /// Without `ZX_WAIT_ASYNC_EDGE`, if `any` of the signals in *signals* are active
     /// when `zx_object_wait_async()` is called or become active afterwards, a packet will
     /// be enqueued on *port*.
     ///
-    /// With **ZX_WAIT_ASYNC_EDGE**, a packet will be enqueued on *port* only after one or more
+    /// With `ZX_WAIT_ASYNC_EDGE`, a packet will be enqueued on *port* only after one or more
     /// signals in *signals* have transitioned from inactive to active. When using this option,
     /// care should be taken that an inactive signal becomes unexpectedly active before
     /// the call `zx_object_wait_async()` has completed. In such cases the transition can be missed
@@ -291,7 +291,7 @@ closed protocol Object {
     /// will be enqueued, one for each operation.
     ///
     /// There is a limit to the number of operations each port may have. When the limit
-    /// is exceeded, a job policy exception (**ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_OBSERVERS**)
+    /// is exceeded, a job policy exception (`ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_OBSERVERS`)
     /// is raised by the process that crossed the limit.
     ///
     /// [`zx_port_cancel()`] will terminate all asynchronous wait operations with
@@ -301,7 +301,7 @@ closed protocol Object {
     /// If *handle* is closed, the operations associated with it will also be
     /// terminated, but packets already in the queue are not affected.
     ///
-    /// Packets generated via this syscall will have *type* set to **ZX_PKT_TYPE_SIGNAL_ONE**
+    /// Packets generated via this syscall will have *type* set to `ZX_PKT_TYPE_SIGNAL_ONE`
     /// and the union is of type `zx_packet_signal_t`:
     ///
     /// ```
@@ -323,29 +323,29 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_WAIT**.
+    /// *handle* must have `ZX_RIGHT_WAIT`.
     ///
-    /// *port* must be of type **ZX_OBJ_TYPE_PORT** and have **ZX_RIGHT_WRITE**.
+    /// *port* must be of type `ZX_OBJ_TYPE_PORT` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_wait_async()` returns **ZX_OK** if the subscription succeeded.
+    /// `zx_object_wait_async()` returns `ZX_OK` if the subscription succeeded.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *options* has bits other than **ZX_WAIT_ASYNC_TIMESTAMP**
-    /// and **ZX_WAIT_ASYNC_EDGE** set.
+    /// `ZX_ERR_INVALID_ARGS`  *options* has bits other than `ZX_WAIT_ASYNC_TIMESTAMP`
+    /// and `ZX_WAIT_ASYNC_EDGE` set.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle or *port* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle or *port* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *port* is not a Port handle.
+    /// `ZX_ERR_WRONG_TYPE`  *port* is not a Port handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have **ZX_RIGHT_WAIT** or *port*
-    /// does not have **ZX_RIGHT_WRITE**.
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have `ZX_RIGHT_WAIT` or *port*
+    /// does not have `ZX_RIGHT_WRITE`.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  *handle* is a handle that cannot be waited on.
+    /// `ZX_ERR_NOT_SUPPORTED`  *handle* is a handle that cannot be waited on.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
@@ -396,33 +396,33 @@ closed protocol Object {
     /// bits on an object.
     ///
     /// Most of the 32 signals are reserved for system use and are assigned to
-    /// per-object functions, like **ZX_CHANNEL_READABLE** or **ZX_TASK_TERMINATED**. There
+    /// per-object functions, like `ZX_CHANNEL_READABLE` or `ZX_TASK_TERMINATED`. There
     /// are 8 signal bits available for userspace processes to use as they see fit:
-    /// **ZX_USER_SIGNAL_0** through **ZX_USER_SIGNAL_7**.
+    /// `ZX_USER_SIGNAL_0` through `ZX_USER_SIGNAL_7`.
     ///
-    /// *Event* objects also allow control over the **ZX_EVENT_SIGNALED** bit.
+    /// *Event* objects also allow control over the `ZX_EVENT_SIGNALED` bit.
     ///
-    /// *Eventpair* objects also allow control over the **ZX_EVENTPAIR_SIGNALED** bit.
+    /// *Eventpair* objects also allow control over the `ZX_EVENTPAIR_SIGNALED` bit.
     ///
     /// The *clear_mask* is first used to clear any bits indicated, and then the
     /// *set_mask* is used to set any bits indicated.
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_SIGNAL**.
+    /// *handle* must have `ZX_RIGHT_SIGNAL`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_signal()` returns **ZX_OK** on success. In the event of failure, a
+    /// `zx_object_signal()` returns `ZX_OK` on success. In the event of failure, a
     /// negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* lacks the right **ZX_RIGHT_SIGNAL**.
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* lacks the right `ZX_RIGHT_SIGNAL`.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *clear_mask* or *set_mask* contain bits that are not allowed.
+    /// `ZX_ERR_INVALID_ARGS`  *clear_mask* or *set_mask* contain bits that are not allowed.
     ///
     /// ## See also
     ///
@@ -460,35 +460,35 @@ closed protocol Object {
     /// *channel*, *socket*, *fifo*, or *eventpair*.
     ///
     /// Most of the 32 signals are reserved for system use and are assigned to
-    /// per-object functions, like **ZX_CHANNEL_READABLE** or **ZX_TASK_TERMINATED**. There
+    /// per-object functions, like `ZX_CHANNEL_READABLE` or `ZX_TASK_TERMINATED`. There
     /// are 8 signal bits available for userspace processes to use as they see fit:
-    /// **ZX_USER_SIGNAL_0** through **ZX_USER_SIGNAL_7**.
+    /// `ZX_USER_SIGNAL_0` through `ZX_USER_SIGNAL_7`.
     ///
-    /// *Eventpair* objects also allow control over the **ZX_EVENTPAIR_SIGNALED** bit.
+    /// *Eventpair* objects also allow control over the `ZX_EVENTPAIR_SIGNALED` bit.
     ///
     /// The *clear_mask* is first used to clear any bits indicated, and then the
     /// *set_mask* is used to set any bits indicated.
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_SIGNAL_PEER**.
+    /// *handle* must have `ZX_RIGHT_SIGNAL_PEER`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_signal_peer()` returns **ZX_OK** on success. In the event of
+    /// `zx_object_signal_peer()` returns `ZX_OK` on success. In the event of
     /// failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* lacks the right **ZX_RIGHT_SIGNAL_PEER**.
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* lacks the right `ZX_RIGHT_SIGNAL_PEER`.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *clear_mask* or *set_mask* contain bits that are not allowed.
+    /// `ZX_ERR_INVALID_ARGS`  *clear_mask* or *set_mask* contain bits that are not allowed.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  Used on an object lacking a peer.
+    /// `ZX_ERR_NOT_SUPPORTED`  Used on an object lacking a peer.
     ///
-    /// **ZX_ERR_PEER_CLOSED**  Called on an object with a closed peer.
+    /// `ZX_ERR_PEER_CLOSED`  Called on an object with a closed peer.
     ///
     /// ## See also
     ///
@@ -522,13 +522,13 @@ closed protocol Object {
     /// ## Description
     ///
     /// `zx_object_get_property()` requests the value of a kernel object's property.
-    /// Getting a property requires **ZX_RIGHT_GET_PROPERTY** rights on the handle.
+    /// Getting a property requires `ZX_RIGHT_GET_PROPERTY` rights on the handle.
     ///
     /// The *handle* parameter indicates the target kernel object. Different properties
     /// only work on certain types of kernel objects, as described below.
     ///
     /// The *property* parameter indicates which property to get/set. Property values
-    /// have the prefix **ZX_PROP_**, and are described below.
+    /// have the prefix `ZX_PROP_`, and are described below.
     ///
     /// The *value* parameter holds the property value, and must be a pointer to a
     /// buffer of *value_size* bytes. Different properties expect different value
@@ -536,7 +536,7 @@ closed protocol Object {
     ///
     /// ## PROPERTIES
     ///
-    /// Property values have the prefix **ZX_PROP_**, and are defined in
+    /// Property values have the prefix `ZX_PROP_`, and are defined in
     ///
     /// ```
     /// #include <zircon/syscalls/object.h>
@@ -544,7 +544,7 @@ closed protocol Object {
     ///
     /// ### ZX_PROP_NAME
     ///
-    /// *handle* type: **Any of the following**
+    /// *handle* type: `Any of the following`
     /// - Job
     /// - Process
     /// - Thread
@@ -554,23 +554,23 @@ closed protocol Object {
     ///
     /// *value* type: `char[ZX_MAX_NAME_LEN]`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// The name of the object, as a NUL-terminated string.
     ///
-    /// Attempting to get or set the name of a thread that has exited will fail with **ZX_ERR_BAD_STATE**.
+    /// Attempting to get or set the name of a thread that has exited will fail with `ZX_ERR_BAD_STATE`.
     ///
     /// ### ZX_PROP_REGISTER_FS and ZX_PROP_REGISTER_GS
     ///
-    /// *handle* type: **Thread**
+    /// *handle* type: `Thread`
     ///
     /// *value* type: `uintptr_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// The value of the x86 FS.BASE or GS.BASE register, respectively. `value` must
     /// be a canonical address. Attempting to set a noncanonical address will fail with
-    /// **ZX_ERR_INVALID_ARGS**.
+    /// `ZX_ERR_INVALID_ARGS`.
     ///
     /// This is a software substitute for the `rdfsbase`, `wrfsbase` and `rdgsbase`,
     /// `wrgsbase` instruction pairs supported on newer x86-64 CPUs, and should behave
@@ -580,27 +580,27 @@ closed protocol Object {
     /// supports these instructions (as reported by the `cpuid` instruction), it's
     /// more efficient and simpler to use the machine instructions directly.
     ///
-    /// Only defined for x86-64. Returns **ZX_ERR_NOT_SUPPORTED** on other architectures.
-    /// Returns **ZX_ERR_ACCESS_DENIED** if not invoked from the current thread.
+    /// Only defined for x86-64. Returns `ZX_ERR_NOT_SUPPORTED` on other architectures.
+    /// Returns `ZX_ERR_ACCESS_DENIED` if not invoked from the current thread.
     ///
     /// ### ZX_PROP_PROCESS_DEBUG_ADDR
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *value* type: `uintptr_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// The value of ld.so's `_dl_debug_addr`. This can be used by debuggers to
     /// interrogate the state of the dynamic loader.
     ///
     /// ### ZX_PROP_PROCESS_BREAK_ON_LOAD
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *value* type: `uintptr_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// Determines whether the dynamic loader will issue a debug trap on every load of a
     /// shared library. If set before the first thread of a process runs, it will also
@@ -626,38 +626,38 @@ closed protocol Object {
     ///
     /// ### ZX_PROP_PROCESS_VDSO_BASE_ADDRESS
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *value* type: `uintptr_t`
     ///
-    /// Allowed operations: **get**
+    /// Allowed operations: `get`
     ///
     /// The base address of the vDSO mapping, or zero.
     ///
     /// ### ZX_PROP_PROCESS_HW_TRACE_CONTEXT_ID
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *value* type: `uintptr_t`
     ///
-    /// Allowed operations: **get**
+    /// Allowed operations: `get`
     ///
     /// The context ID distinguishes different processes in hardware instruction tracing.
     /// On Intel X86-64 this is the value of register CR3.
     ///
     /// To obtain `ZX_PROP_PROCESS_HW_TRACE_CONTEXT_ID`, you must specify
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
-    /// the function returns **ZX_ERR_NOT_SUPPORTED**.
+    /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
     /// Currently only defined for X86.
     ///
     /// ### ZX_PROP_SOCKET_RX_THRESHOLD
     ///
-    /// *handle* type: **Socket**
+    /// *handle* type: `Socket`
     ///
     /// *value* type: `size_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// The size of the read threshold of a socket, in bytes. Setting this will
     /// assert `ZX_SOCKET_READ_THRESHOLD` if the amount of data that can be read
@@ -665,46 +665,46 @@ closed protocol Object {
     /// will result in the deasserting of `ZX_SOCKET_READ_THRESHOLD`.
     ///
     /// Setting to a value larger than the maximum permissible size supported by
-    /// sockets will fail with **ZX_ERR_INVALID_ARGS**.
+    /// sockets will fail with `ZX_ERR_INVALID_ARGS`.
     ///
     /// ### ZX_PROP_SOCKET_TX_THRESHOLD
     ///
-    /// *handle* type: **Socket**
+    /// *handle* type: `Socket`
     ///
     /// *value* type: `size_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// The size of the write threshold of a socket, in bytes. Setting this will
     /// assert `ZX_SOCKET_WRITE_THRESHOLD` if the amount of space available for writing
     /// is greater than or equal to the threshold. Setting this property to zero
     /// will result in the deasserting of `ZX_SOCKET_WRITE_THRESHOLD`. Setting the
     /// write threshold after the peer has closed is an error, and results in a
-    /// **ZX_ERR_PEER_CLOSED** error being returned.
+    /// `ZX_ERR_PEER_CLOSED` error being returned.
     ///
     /// Setting to a value larger than the maximum permissible size supported by
-    /// sockets will fail with **ZX_ERR_INVALID_ARGS**.
+    /// sockets will fail with `ZX_ERR_INVALID_ARGS`.
     ///
     /// ### ZX_PROP_JOB_KILL_ON_OOM
     ///
-    /// *handle* type: **Job**
+    /// *handle* type: `Job`
     ///
     /// *value* type: `size_t`
     ///
-    /// Allowed operations: **set**
+    /// Allowed operations: `set`
     ///
     /// The value of 1 means the Job and its children will be terminated if the
     /// system finds itself in a system-wide low memory situation. Called with 0
     /// (which is the default) opts out the job from being terminated in this
-    /// scenario. Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
+    /// scenario. Setting to any other value will fail with `ZX_ERR_INVALID_ARGS`.
     ///
     /// ### ZX_PROP_EXCEPTION_STATE
     ///
-    /// *handle* type: **Exception**
+    /// *handle* type: `Exception`
     ///
     /// *value* type: `uint32_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// When set to `ZX_EXCEPTION_STATE_HANDLED`, closing the exception handle will
     /// finish exception processing and resume the underlying thread.
@@ -712,33 +712,33 @@ closed protocol Object {
     /// continue exception processing by trying the next handler in order.
     /// When set to `ZX_EXCEPTION_STATE_THREAD_EXIT`, closing the exception handle will
     /// cause the thread that generated the exception to exit.
-    /// Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
+    /// Setting to any other value will fail with `ZX_ERR_INVALID_ARGS`.
     ///
     /// ### ZX_PROP_EXCEPTION_STRATEGY
     ///
-    /// *handle* type: **Exception**
+    /// *handle* type: `Exception`
     ///
     /// *value* type: `uint32_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// If `ZX_EXCEPTION_STRATEGY_SECOND_CHANCE` is set, then the debugger gets a 'second
     /// chance' at handling the exception if the process-level handler fails to do so.
     /// If `ZX_EXCEPTION_STRATEGY_FIRST_CHANCE` is set, then the debugger does not get a
     /// second chance at handling the exception.
-    /// Setting to any other value will fail with **ZX_ERR_INVALID_ARGS**.
+    /// Setting to any other value will fail with `ZX_ERR_INVALID_ARGS`.
     ///
     /// This property can only be set when the handle corresponds to a debugger process
     /// exception channel. Attempting to set this property when the exception channel
-    /// is any other type will result in **ZX_ERR_BAD_STATE**.
+    /// is any other type will result in `ZX_ERR_BAD_STATE`.
     ///
     /// ### ZX_PROP_STREAM_MODE_APPEND
     ///
-    /// *handle* type: **Stream**
+    /// *handle* type: `Stream`
     ///
     /// *value* type: `uint8_t`
     ///
-    /// Allowed operations: **get**, **set**
+    /// Allowed operations: `get`, `set`
     ///
     /// This property will have a value of `1` when the Stream is in append mode and a
     /// value of `0` the Stream is not in append mode. A stream in append mode will
@@ -747,12 +747,12 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_GET_PROPERTY**, and must be of a supported **ZX_OBJ_TYPE_**
+    /// *handle* must have `ZX_RIGHT_GET_PROPERTY`, and must be of a supported `ZX_OBJ_TYPE_`
     /// for the *property*, as documented above in the description of individual properties.
     ///
     /// ## Return value
     ///
-    /// `zx_object_get_property()` returns **ZX_OK** on success. In the event of
+    /// `zx_object_get_property()` returns `ZX_OK` on success. In the event of
     /// failure, a negative error value is returned.
     ///
     /// ## Errors
@@ -760,22 +760,22 @@ closed protocol Object {
     /// Specific errors for individual *property* values are documented in their description above.
     /// Common errors are listed below:
     ///
-    /// **ZX_ERR_BAD_HANDLE**: *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`: *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**: *handle* is not an appropriate type for *property*.
+    /// `ZX_ERR_WRONG_TYPE`: *handle* is not an appropriate type for *property*.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**: *handle* does not have the necessary rights for the
+    /// `ZX_ERR_ACCESS_DENIED`: *handle* does not have the necessary rights for the
     /// operation.
     ///
-    /// **ZX_ERR_INVALID_ARGS**: *value* is an invalid pointer.
+    /// `ZX_ERR_INVALID_ARGS`: *value* is an invalid pointer.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
-    /// **ZX_ERR_BUFFER_TOO_SMALL**: *value_size* is too small for *property*.
+    /// `ZX_ERR_BUFFER_TOO_SMALL`: *value_size* is too small for *property*.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**: *property* does not exist.
+    /// `ZX_ERR_NOT_SUPPORTED`: *property* does not exist.
     ///
     /// ## See also
     ///
@@ -808,13 +808,13 @@ closed protocol Object {
     /// ## Description
     ///
     /// `zx_object_set_property()` modifies the value of a kernel object's property.
-    /// Setting a property requires **ZX_RIGHT_SET_PROPERTY** rights on the handle.
+    /// Setting a property requires `ZX_RIGHT_SET_PROPERTY` rights on the handle.
     ///
     /// See [`zx_object_get_property()`] for a full description.
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_SET_PROPERTY**, and must be of a supported **ZX_OBJ_TYPE_**
+    /// *handle* must have `ZX_RIGHT_SET_PROPERTY`, and must be of a supported `ZX_OBJ_TYPE_`
     /// for the *property*, as documented in [`zx_object_get_property()`].
     ///
     /// ## See also
@@ -869,16 +869,16 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_HANDLE_VALID
     ///
-    /// *handle* type: **Any**
+    /// *handle* type: `Any`
     ///
-    /// *buffer* type: **n/a**
+    /// *buffer* type: `n/a`
     ///
-    /// Returns **ZX_OK** if *handle* is valid, or **ZX_ERR_BAD_HANDLE** otherwise. No
+    /// Returns `ZX_OK` if *handle* is valid, or `ZX_ERR_BAD_HANDLE` otherwise. No
     /// records are returned and *buffer* may be NULL.
     ///
     /// ### ZX_INFO_HANDLE_BASIC
     ///
-    /// *handle* type: **Any**
+    /// *handle* type: `Any`
     ///
     /// *buffer* type: `zx_info_handle_basic_t[1]`
     ///
@@ -907,7 +907,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_HANDLE_COUNT
     ///
-    /// *handle* type: **Any**
+    /// *handle* type: `Any`
     ///
     /// *buffer* type: `zx_info_handle_count_t[1]`
     ///
@@ -926,7 +926,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_PROCESS_HANDLE_STATS
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *buffer* type: `zx_info_process_handle_stats_t[1]`
     ///
@@ -939,7 +939,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_HANDLE_TABLE
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *buffer* type: `zx_info_handle_extended_t[n]`
     ///
@@ -987,7 +987,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_JOB
     ///
-    /// *handle* type: **Job**
+    /// *handle* type: `Job`
     ///
     /// *buffer* type: `zx_info_job_t[1]`
     ///
@@ -1014,7 +1014,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_PROCESS
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *buffer* type: `zx_info_process_t[1]`
     ///
@@ -1040,7 +1040,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_PROCESS_THREADS
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *buffer* type: `zx_koid_t[n]`
     ///
@@ -1055,7 +1055,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_THREAD
     ///
-    /// *handle* type: **Thread**
+    /// *handle* type: `Thread`
     ///
     /// *buffer* type: `zx_info_thread_t[1]`
     ///
@@ -1083,58 +1083,58 @@ closed protocol Object {
     /// The values in this struct are mainly for informational and debugging purposes at
     /// the moment.
     ///
-    /// The various **ZX_THREAD_STATE_** values are defined by
+    /// The various `ZX_THREAD_STATE_` values are defined by
     ///
     /// ```
     /// #include <zircon/syscalls/object.h>
     /// ```
     ///
-    /// *   **ZX_THREAD_STATE_NEW**: The thread has been created but it has not started
+    /// *   `ZX_THREAD_STATE_NEW`: The thread has been created but it has not started
     ///     running yet.
-    /// *   **ZX_THREAD_STATE_RUNNING**: The thread is running user code normally.
-    /// *   **ZX_THREAD_STATE_SUSPENDED**: Stopped due to [`zx_task_suspend()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED**: In a syscall or handling an exception. This
-    ///     value is never returned by itself. See **ZX_THREAD_STATE_BLOCKED_\*** below.
-    /// *   **ZX_THREAD_STATE_DYING**: The thread is in the process of being terminated,
+    /// *   `ZX_THREAD_STATE_RUNNING`: The thread is running user code normally.
+    /// *   `ZX_THREAD_STATE_SUSPENDED`: Stopped due to [`zx_task_suspend()`].
+    /// *   `ZX_THREAD_STATE_BLOCKED`: In a syscall or handling an exception. This
+    ///     value is never returned by itself. See `ZX_THREAD_STATE_BLOCKED_\`* below.
+    /// *   `ZX_THREAD_STATE_DYING`: The thread is in the process of being terminated,
     ///     but it has not been stopped yet.
-    /// *   **ZX_THREAD_STATE_DEAD**: The thread has stopped running.
+    /// *   `ZX_THREAD_STATE_DEAD`: The thread has stopped running.
     ///
     /// When a thread is stopped inside a blocking syscall, or stopped in an exception,
-    /// the value returned in **state** is one of the following:
+    /// the value returned in `state` is one of the following:
     ///
-    /// *   **ZX_THREAD_STATE_BLOCKED_EXCEPTION**: The thread is stopped in an
+    /// *   `ZX_THREAD_STATE_BLOCKED_EXCEPTION`: The thread is stopped in an
     ///     exception.
-    /// *   **ZX_THREAD_STATE_BLOCKED_SLEEPING**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_SLEEPING`: The thread is stopped in
     ///     [`zx_nanosleep()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_FUTEX**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_FUTEX`: The thread is stopped in
     ///     [`zx_futex_wait()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_PORT**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_PORT`: The thread is stopped in
     ///     [`zx_port_wait()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_CHANNEL**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_CHANNEL`: The thread is stopped in
     ///     [`zx_channel_call()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_WAIT_ONE**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_WAIT_ONE`: The thread is stopped in
     ///     [`zx_object_wait_one()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_WAIT_MANY**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_WAIT_MANY`: The thread is stopped in
     ///     [`zx_object_wait_many()`].
-    /// *   **ZX_THREAD_STATE_BLOCKED_INTERRUPT**: The thread is stopped in
+    /// *   `ZX_THREAD_STATE_BLOCKED_INTERRUPT`: The thread is stopped in
     ///     [`zx_interrupt_wait()`].
     ///
-    /// The various **ZX_EXCEPTION_CHANNEL_TYPE_** values are defined by
+    /// The various `ZX_EXCEPTION_CHANNEL_TYPE_` values are defined by
     ///
     /// ```
     /// #include <zircon/syscalls/exception.h>
     /// ```
     ///
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_NONE**
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER**
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_THREAD**
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_PROCESS**
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_JOB**
-    /// *   **ZX_EXCEPTION_CHANNEL_TYPE_JOB_DEBUGGER**
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_NONE`
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER`
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_THREAD`
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_PROCESS`
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_JOB`
+    /// *   `ZX_EXCEPTION_CHANNEL_TYPE_JOB_DEBUGGER`
     ///
     /// ### ZX_INFO_THREAD_EXCEPTION_REPORT
     ///
-    /// *handle* type: **Thread**
+    /// *handle* type: `Thread`
     ///
     /// *buffer* type: `zx_exception_report_t[1]`
     ///
@@ -1144,14 +1144,14 @@ closed protocol Object {
     ///
     /// If the thread is currently in an exception and is waiting for an exception
     /// response, then this returns the exception report as a single
-    /// `zx_exception_report_t`, with status **ZX_OK**.
+    /// `zx_exception_report_t`, with status `ZX_OK`.
     ///
-    /// Returns **ZX_ERR_BAD_STATE** if the thread is not in an exception and waiting
+    /// Returns `ZX_ERR_BAD_STATE` if the thread is not in an exception and waiting
     /// for an exception response.
     ///
     /// ### ZX_INFO_THREAD_STATS {#zx-info-thread-stats}
     ///
-    /// *handle* type: **Thread**
+    /// *handle* type: `Thread`
     ///
     /// *buffer* type: `zx_info_thread_stats[1]`
     ///
@@ -1170,11 +1170,11 @@ closed protocol Object {
     /// } zx_info_thread_stats_t;
     /// ```
     ///
-    /// Returns **ZX_ERR_BAD_STATE** if the thread has exited.
+    /// Returns `ZX_ERR_BAD_STATE` if the thread has exited.
     ///
     /// ### ZX_INFO_GUEST_STATS
     ///
-    /// *handle* type: **Resource** (Specifically, the info resource)
+    /// *handle* type: `Resource` (Specifically, the info resource)
     ///
     /// *buffer* type: `zx_info_guest_stats_t[1]`
     ///
@@ -1221,7 +1221,7 @@ closed protocol Object {
     /// Note: many values of this topic are being retired in favor of a different
     /// mechanism.
     ///
-    /// *handle* type: **Resource** (Specifically, the info resource)
+    /// *handle* type: `Resource` (Specifically, the info resource)
     ///
     /// *buffer* type: `zx_info_cpu_stats_t[1]`
     ///
@@ -1256,7 +1256,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_VMAR
     ///
-    /// *handle* type: **VM Address Region**
+    /// *handle* type: `VM Address Region`
     ///
     /// *buffer* type: `zx_info_vmar_t[1]`
     ///
@@ -1275,7 +1275,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_VMO
     ///
-    /// *handle* type: **VM Object**
+    /// *handle* type: `VM Object`
     ///
     /// *buffer* type: `zx_info_vmo_t[1]`
     ///
@@ -1342,7 +1342,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_SOCKET
     ///
-    /// *handle* type: **Socket**
+    /// *handle* type: `Socket`
     ///
     /// *buffer* type: `zx_info_socket_t[1]`
     ///
@@ -1385,7 +1385,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_TIMER
     ///
-    /// *handle* type: **Timer**
+    /// *handle* type: `Timer`
     ///
     /// *buffer* type: `zx_info_timer_t[1]`
     ///
@@ -1414,7 +1414,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_JOB_CHILDREN
     ///
-    /// *handle* type: **Job**
+    /// *handle* type: `Job`
     ///
     /// *buffer* type: `zx_koid_t[n]`
     ///
@@ -1423,7 +1423,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_JOB_PROCESSES
     ///
-    /// *handle* type: **Job**
+    /// *handle* type: `Job`
     ///
     /// *buffer* type: `zx_koid_t[n]`
     ///
@@ -1432,7 +1432,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_TASK_STATS
     ///
-    /// *handle* type: **Process**
+    /// *handle* type: `Process`
     ///
     /// *buffer* type: `zx_info_task_stats_t[1]`
     ///
@@ -1468,11 +1468,11 @@ closed protocol Object {
     ///
     /// Additional errors:
     ///
-    /// *   **ZX_ERR_BAD_STATE**: If the target process has terminated
+    /// *   `ZX_ERR_BAD_STATE`: If the target process has terminated
     ///
     /// ### ZX_INFO_TASK_RUNTIME
     ///
-    /// *handle* type: **Job**, **Process**, or **Thread**
+    /// *handle* type: `Job`, `Process`, or `Thread`
     ///
     /// *buffer* type: `zx_info_task_runtime_t[1]`
     ///
@@ -1526,7 +1526,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_PROCESS_MAPS
     ///
-    /// *handle* type: **Process**, with **ZX_RIGHT_READ**
+    /// *handle* type: `Process`, with `ZX_RIGHT_READ`
     ///
     /// *buffer* type: `zx_info_maps_t[n]`
     ///
@@ -1583,13 +1583,13 @@ closed protocol Object {
     ///
     /// Additional errors:
     ///
-    /// *   **ZX_ERR_ACCESS_DENIED**: If the appropriate rights are missing.
-    /// *   **ZX_ERR_BAD_STATE**: If the target process has terminated, or if its
+    /// *   `ZX_ERR_ACCESS_DENIED`: If the appropriate rights are missing.
+    /// *   `ZX_ERR_BAD_STATE`: If the target process has terminated, or if its
     ///     address space has been destroyed
     ///
     /// ### ZX_INFO_PROCESS_VMOS
     ///
-    /// *handle* type: **Process**, with **ZX_RIGHT_READ**
+    /// *handle* type: `Process`, with `ZX_RIGHT_READ`
     ///
     /// *buffer* type: `zx_info_vmo_t[n]`
     ///
@@ -1683,7 +1683,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_KMEM_STATS
     ///
-    /// *handle* type: **Resource** (Specifically, the info resource)
+    /// *handle* type: `Resource` (Specifically, the info resource)
     ///
     /// *buffer* type: `zx_info_kmem_stats_t[1]`
     ///
@@ -1725,7 +1725,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_KMEM_STATS_EXTENDED
     ///
-    /// *handle* type: **Resource** (Specifically, the info resource)
+    /// *handle* type: `Resource` (Specifically, the info resource)
     ///
     /// *buffer* type: `zx_info_kmem_stats_extended_t[1]`
     ///
@@ -1796,7 +1796,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_KMEM_STATS_COMPRESSION
     ///
-    /// *handle* type: **Resource** (Specifically, the info resource)
+    /// *handle* type: `Resource` (Specifically, the info resource)
     ///
     /// *buffer* type: `zx_info_kmem_stats_compression_t[1]`
     ///
@@ -1876,7 +1876,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_RESOURCE
     ///
-    /// *handle* type: **Resource**
+    /// *handle* type: `Resource`
     ///
     /// *buffer* type: `zx_info_resource_t[1]`
     ///
@@ -1898,16 +1898,16 @@ closed protocol Object {
     ///
     /// The resource kind is one of
     ///
-    /// *   **ZX_RSRC_KIND_ROOT**
-    /// *   **ZX_RSRC_KIND_MMIO**
-    /// *   **ZX_RSRC_KIND_IOPORT**
-    /// *   **ZX_RSRC_KIND_IRQ**
-    /// *   **ZX_RSRC_KIND_SMC**
-    /// *   **ZX_RSRC_KIND_SYSTEM**
+    /// *   `ZX_RSRC_KIND_ROOT`
+    /// *   `ZX_RSRC_KIND_MMIO`
+    /// *   `ZX_RSRC_KIND_IOPORT`
+    /// *   `ZX_RSRC_KIND_IRQ`
+    /// *   `ZX_RSRC_KIND_SMC`
+    /// *   `ZX_RSRC_KIND_SYSTEM`
     ///
     /// ### ZX_INFO_BTI
     ///
-    /// *handle* type: **Bus Transaction Initiator**
+    /// *handle* type: `Bus Transaction Initiator`
     ///
     /// *buffer* type: `zx_info_bti_t[1]`
     ///
@@ -1934,7 +1934,7 @@ closed protocol Object {
     ///
     /// ### ZX_INFO_MEMORY_ATTRIBUTION
     ///
-    /// *handle* type: **Job**, or **Process**
+    /// *handle* type: `Job`, or `Process`
     ///
     /// *buffer* type: `zx_info_memory_attribution_t[n]`
     ///
@@ -1956,7 +1956,7 @@ closed protocol Object {
     ///
     /// ### Topic ZX_INFO_IOB
     ///
-    /// *handle* type: **IOBuffer**
+    /// *handle* type: `IOBuffer`
     ///
     /// *buffer* type: `zx_info_iob_t[1]`
     ///
@@ -1977,7 +1977,7 @@ closed protocol Object {
     ///
     /// Returns information about each region of an IOB as an array of `zx_iob_region_info_t`
     ///
-    /// *handle* type: **IOBuffer**
+    /// *handle* type: `IOBuffer`
     ///
     /// *buffer* type: `zx_iob_region_info_t[n]`
     ///
@@ -1996,80 +1996,80 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// If *topic* is **ZX_INFO_PROCESS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_PROCESS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_JOB**, *handle* must be of type **ZX_OBJ_TYPE_JOB** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_JOB`, *handle* must be of type `ZX_OBJ_TYPE_JOB` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_PROCESS_THREADS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_ENUMERATE**.
+    /// If *topic* is `ZX_INFO_PROCESS_THREADS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_ENUMERATE`.
     ///
-    /// If *topic* is **ZX_INFO_JOB_CHILDREN**, *handle* must be of type **ZX_OBJ_TYPE_JOB** and have **ZX_RIGHT_ENUMERATE**.
+    /// If *topic* is `ZX_INFO_JOB_CHILDREN`, *handle* must be of type `ZX_OBJ_TYPE_JOB` and have `ZX_RIGHT_ENUMERATE`.
     ///
-    /// If *topic* is **ZX_INFO_JOB_PROCESSES**, *handle* must be of type **ZX_OBJ_TYPE_JOB** and have **ZX_RIGHT_ENUMERATE**.
+    /// If *topic* is `ZX_INFO_JOB_PROCESSES`, *handle* must be of type `ZX_OBJ_TYPE_JOB` and have `ZX_RIGHT_ENUMERATE`.
     ///
-    /// If *topic* is **ZX_INFO_THREAD**, *handle* must be of type **ZX_OBJ_TYPE_THREAD** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_THREAD`, *handle* must be of type `ZX_OBJ_TYPE_THREAD` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_THREAD_EXCEPTION_REPORT**, *handle* must be of type **ZX_OBJ_TYPE_THREAD** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_THREAD_EXCEPTION_REPORT`, *handle* must be of type `ZX_OBJ_TYPE_THREAD` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_THREAD_STATS**, *handle* must be of type **ZX_OBJ_TYPE_THREAD** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_THREAD_STATS`, *handle* must be of type `ZX_OBJ_TYPE_THREAD` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_TASK_STATS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_TASK_STATS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_PROCESS_MAPS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_PROCESS_MAPS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_PROCESS_VMOS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_PROCESS_VMOS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_VMO**, *handle* must be of type **ZX_OBJ_TYPE_VMO**.
+    /// If *topic* is `ZX_INFO_VMO`, *handle* must be of type `ZX_OBJ_TYPE_VMO`.
     ///
-    /// If *topic* is **ZX_INFO_VMAR**, *handle* must be of type **ZX_OBJ_TYPE_VMAR** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_VMAR`, *handle* must be of type `ZX_OBJ_TYPE_VMAR` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_GUEST_STATS**, *handle* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base **ZX_RSRC_SYSTEM_INFO_BASE**.
+    /// If *topic* is `ZX_INFO_GUEST_STATS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
     ///
-    /// If *topic* is **ZX_INFO_CPU_STATS**, *handle* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base **ZX_RSRC_SYSTEM_INFO_BASE**.
+    /// If *topic* is `ZX_INFO_CPU_STATS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
     ///
-    /// If *topic* is **ZX_INFO_KMEM_STATS**, *handle* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base **ZX_RSRC_SYSTEM_INFO_BASE**.
+    /// If *topic* is `ZX_INFO_KMEM_STATS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
     ///
-    /// If *topic* is **ZX_INFO_KMEM_STATS_EXTENDED**, *handle* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base **ZX_RSRC_SYSTEM_INFO_BASE**.
+    /// If *topic* is `ZX_INFO_KMEM_STATS_EXTENDED`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
     ///
-    /// If *topic* is **ZX_INFO_RESOURCE**, *handle* must be of type **ZX_OBJ_TYPE_RESOURCE** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_RESOURCE`, *handle* must be of type `ZX_OBJ_TYPE_RESOURCE` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_HANDLE_COUNT**, *handle* must have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_HANDLE_COUNT`, *handle* must have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_BTI**, *handle* must be of type **ZX_OBJ_TYPE_BTI** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_BTI`, *handle* must be of type `ZX_OBJ_TYPE_BTI` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_PROCESS_HANDLE_STATS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_PROCESS_HANDLE_STATS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_SOCKET**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_SOCKET`, *handle* must be of type `ZX_OBJ_TYPE_SOCKET` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_MSI**, *handle* must be of type **ZX_OBJ_TYPE_MSI** and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_MSI`, *handle* must be of type `ZX_OBJ_TYPE_MSI` and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_TASK_RUNTIME**, *handle* must be of type **ZX_OBJ_TYPE_THREAD**, **ZX_OBJ_TYPE_PROCESS**, or **ZX_OBJ_TYPE_JOB**, and have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_TASK_RUNTIME`, *handle* must be of type `ZX_OBJ_TYPE_THREAD`, `ZX_OBJ_TYPE_PROCESS`, or `ZX_OBJ_TYPE_JOB`, and have `ZX_RIGHT_INSPECT`.
     ///
-    /// If *topic* is **ZX_INFO_MEMORY_ATTRIBUTION**, *handle* must have **ZX_RIGHT_INSPECT**.
+    /// If *topic* is `ZX_INFO_MEMORY_ATTRIBUTION`, *handle* must have `ZX_RIGHT_INSPECT`.
     ///
     /// ## Return value
     ///
-    /// `zx_object_get_info()` returns **ZX_OK** on success. In the event of failure, a
+    /// `zx_object_get_info()` returns `ZX_OK` on success. In the event of failure, a
     /// negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not an appropriate type for *topic*
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not an appropriate type for *topic*
     ///
-    /// **ZX_ERR_ACCESS_DENIED**: If *handle* does not have the necessary rights for the
+    /// `ZX_ERR_ACCESS_DENIED`: If *handle* does not have the necessary rights for the
     /// operation.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *buffer*, *actual*, or *avail* are invalid pointers.
+    /// `ZX_ERR_INVALID_ARGS` *buffer*, *actual*, or *avail* are invalid pointers.
     ///
-    /// **ZX_ERR_NO_MEMORY** Failure due to lack of memory. There is no good way for
+    /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory. There is no good way for
     /// userspace to handle this (unlikely) error. In a future build this error will no
     /// longer occur.
     ///
-    /// **ZX_ERR_BUFFER_TOO_SMALL** The *topic* returns a fixed number of records, but
+    /// `ZX_ERR_BUFFER_TOO_SMALL` The *topic* returns a fixed number of records, but
     /// the provided buffer is not large enough for these records.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED** *topic* does not exist.
+    /// `ZX_ERR_NOT_SUPPORTED` *topic* does not exist.
     ///
     /// ## EXAMPLES
     ///
@@ -2159,7 +2159,7 @@ closed protocol Object {
     /// by the *handle* to the parent, a new handle to the specified child object is
     /// returned.
     ///
-    /// *rights* may be **ZX_RIGHT_SAME_RIGHTS** which will result in rights equivalent
+    /// *rights* may be `ZX_RIGHT_SAME_RIGHTS` which will result in rights equivalent
     /// to the those on the *handle*.
     ///
     /// If the object is a *Process*, the *Threads* it contains may be obtained by
@@ -2170,28 +2170,28 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must have **ZX_RIGHT_ENUMERATE**.
+    /// *handle* must have `ZX_RIGHT_ENUMERATE`.
     ///
     /// ## Return value
     ///
-    /// On success, **ZX_OK** is returned and a handle to the desired child object is returned via *out*.
+    /// On success, `ZX_OK` is returned and a handle to the desired child object is returned via *out*.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *handle* is not a *Process*, *Job*, or *Resource*.
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not a *Process*, *Job*, or *Resource*.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**   *handle* lacks the right **ZX_RIGHT_ENUMERATE** or *rights* specifies
+    /// `ZX_ERR_ACCESS_DENIED`   *handle* lacks the right `ZX_RIGHT_ENUMERATE` or *rights* specifies
     /// rights that are not present on *handle*.
     ///
-    /// **ZX_ERR_NOT_FOUND**  *handle* does not have a child with the kernel object id *koid*.
+    /// `ZX_ERR_NOT_FOUND`  *handle* does not have a child with the kernel object id *koid*.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *out* is an invalid pointer.
+    /// `ZX_ERR_INVALID_ARGS`  *out* is an invalid pointer.
     ///
     /// ## See also
     ///
@@ -2243,23 +2243,23 @@ closed protocol Object {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_THREAD** and have **ZX_RIGHT_MANAGE_THREAD**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_THREAD` and have `ZX_RIGHT_MANAGE_THREAD`.
     ///
-    /// *profile* must be of type **ZX_OBJ_TYPE_PROFILE** and have **ZX_RIGHT_APPLY_PROFILE**.
+    /// *profile* must be of type `ZX_OBJ_TYPE_PROFILE` and have `ZX_RIGHT_APPLY_PROFILE`.
     ///
     /// ## Return value
     ///
-    /// Returns **ZX_OK** on success. In the event of failure, a negative error value is returned.
+    /// Returns `ZX_OK` on success. In the event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *target* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *target* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *target* is not a thread or vmar handle.
+    /// `ZX_ERR_WRONG_TYPE`  *target* is not a thread or vmar handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *target* does not have **ZX_RIGHT_MANAGE_THREAD** right.
+    /// `ZX_ERR_ACCESS_DENIED`  *target* does not have `ZX_RIGHT_MANAGE_THREAD` right.
     ///
-    /// **ZX_ERR_BAD_STATE**  When *target* is a thread that is still being created, is dying, or dead, and
+    /// `ZX_ERR_BAD_STATE`  When *target* is a thread that is still being created, is dying, or dead, and
     /// cannot have a *profile* applied to it, or *target* is a VMAR and *profile* contains an
     /// invalid priority.
     ///

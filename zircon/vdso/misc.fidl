@@ -24,11 +24,11 @@ closed protocol Misc {
     /// ## Description
     ///
     /// `zx_nanosleep()` suspends the calling thread execution until *deadline* passes
-    /// on **ZX_CLOCK_MONOTONIC**. *deadline* will be automatically adjusted according to the job's
+    /// on `ZX_CLOCK_MONOTONIC`. *deadline* will be automatically adjusted according to the job's
     /// [timer slack] policy.
     ///
     /// To sleep for a duration, use [`zx_deadline_after()`] and the
-    /// **ZX_\<time-unit\>** helpers:
+    /// `ZX_\<time-unit\>` helpers:
     ///
     /// ```
     /// #include <zircon/syscalls.h> // zx_deadline_after, zx_nanosleep
@@ -44,7 +44,7 @@ closed protocol Misc {
     ///
     /// ## Return value
     ///
-    /// `zx_nanosleep()` always returns **ZX_OK**.
+    /// `zx_nanosleep()` always returns `ZX_OK`.
     ///
     /// ## See also
     ///
@@ -188,7 +188,7 @@ closed protocol Misc {
     ///
     /// `zx_deadline_after()` is a utility for converting from now-relative durations
     /// to absolute deadlines. If *nanoseconds* plus the current time is bigger than the
-    /// maximum value for `zx_time_t`, the output is clamped to **ZX_TIME_INFINITE**.
+    /// maximum value for `zx_time_t`, the output is clamped to `ZX_TIME_INFINITE`.
     ///
     /// ## Rights
     ///
@@ -196,7 +196,7 @@ closed protocol Misc {
     ///
     /// ## Return value
     ///
-    /// `zx_deadline_after()` returns the absolute time (with respect to **ZX_CLOCK_MONOTONIC**)
+    /// `zx_deadline_after()` returns the absolute time (with respect to `ZX_CLOCK_MONOTONIC`)
     /// that is *nanoseconds* nanoseconds from now.
     ///
     /// ## Errors

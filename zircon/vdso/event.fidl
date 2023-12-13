@@ -20,26 +20,26 @@ closed protocol Event {
     /// ## Description
     ///
     /// `zx_event_create()` creates an event, which is an object that is signalable. That
-    /// is, its **ZX_USER_SIGNAL_n** (where *n* is 0 through 7) signals can be
+    /// is, its `ZX_USER_SIGNAL_n` (where *n* is 0 through 7) signals can be
     /// manipulated using [`zx_object_signal()`].
     ///
     /// The newly-created handle will have the [basic
-    /// rights](/docs/concepts/kernel/rights.md#zx_rights_basic) plus **ZX_RIGHT_SIGNAL**.
+    /// rights](/docs/concepts/kernel/rights.md#zx_rights_basic) plus `ZX_RIGHT_SIGNAL`.
     ///
     /// ## Rights
     ///
-    /// Caller job policy must allow **ZX_POL_NEW_EVENT**.
+    /// Caller job policy must allow `ZX_POL_NEW_EVENT`.
     ///
     /// ## Return value
     ///
-    /// `zx_event_create()` returns **ZX_OK** and a valid event handle (via *out*) on success.
+    /// `zx_event_create()` returns `ZX_OK` and a valid event handle (via *out*) on success.
     /// On failure, an error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *out* is an invalid pointer, or *options* is nonzero.
+    /// `ZX_ERR_INVALID_ARGS`  *out* is an invalid pointer, or *options* is nonzero.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///

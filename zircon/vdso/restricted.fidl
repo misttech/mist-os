@@ -31,7 +31,7 @@ closed protocol Restricted {
     ///
     /// *options* is a bit vector that contains zero more of the following:
     ///
-    /// - **ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL** indicates that any exceptions
+    /// - `ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL` indicates that any exceptions
     ///   encountered while in restricted mode should be delivered using exception
     ///   channels. If this option is not present then any exceptions not handled by a
     ///   process debugger will cause control to vector to `vector_table_ptr` in normal
@@ -75,12 +75,12 @@ closed protocol Restricted {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** *vector_table_ptr* is not a valid user address or *options*
+    /// `ZX_ERR_INVALID_ARGS` *vector_table_ptr* is not a valid user address or *options*
     /// is non-zero.
     ///
-    /// **ZX_ERR_BAD_STATE** restricted mode register state is invalid.
+    /// `ZX_ERR_BAD_STATE` restricted mode register state is invalid.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED** `ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL` is _not_ provided and
+    /// `ZX_ERR_NOT_SUPPORTED` `ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL` is _not_ provided and
     /// vectored exceptions are not implemented for the current architecture.
     ///
     /// ## See also
@@ -153,20 +153,20 @@ closed protocol Restricted {
     ///
     /// Note: If a handle to the newly created VMO cannot be returned because `out_vmo`
     /// is an invalid pointer, the VMO may still be bound to the thread even when the
-    /// call returns **ZX_ERR_INVALID_ARGS**.  A caller can recover from this state by
+    /// call returns `ZX_ERR_INVALID_ARGS`.  A caller can recover from this state by
     /// calling [`zx_restricted_unbind_state()`] or calling
     /// [zx_restricted_bind_state()`] again with a valid `out_vmo`.
     ///
     /// ## Rights
     ///
-    /// Caller's job policy must allow **ZX_POL_NEW_VMO**.
+    /// Caller's job policy must allow `ZX_POL_NEW_VMO`.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *out_vmo* is an invalid pointer or NULL, or *options*
+    /// `ZX_ERR_INVALID_ARGS`  *out_vmo* is an invalid pointer or NULL, or *options*
     /// is any value other than 0.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
@@ -216,7 +216,7 @@ closed protocol Restricted {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *options* is any value other than 0.
+    /// `ZX_ERR_INVALID_ARGS`  *options* is any value other than 0.
     ///
     /// ## See also
     ///
@@ -267,14 +267,14 @@ closed protocol Restricted {
     ///
     /// ## Rights
     ///
-    /// **ZX_RIGHT_MANAGE_THREAD** is required on *thread*.
+    /// `ZX_RIGHT_MANAGE_THREAD` is required on *thread*.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** *options* is any value other than 0.
-    /// **ZX_ERR_WRONG_TYPE** *thread* is not a thread.
-    /// **ZX_ERR_ACCESS_DENIED** *thread* does not have ZX_RIGHT_MANAGE_THREAD.
-    /// **ZX_ERR_BAD_STATE** *thread* is dead.
+    /// `ZX_ERR_INVALID_ARGS` *options* is any value other than 0.
+    /// `ZX_ERR_WRONG_TYPE` *thread* is not a thread.
+    /// `ZX_ERR_ACCESS_DENIED` *thread* does not have ZX_RIGHT_MANAGE_THREAD.
+    /// `ZX_ERR_BAD_STATE` *thread* is dead.
     @next
     strict Kick(resource struct {
         thread Handle:THREAD;

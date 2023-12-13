@@ -33,7 +33,7 @@ closed protocol Cprng {
     ///
     /// Clients that require a large volume of randomness should consider using these
     /// bytes to seed a user-space random number generator for better performance.
-    /// "Large" here would mean a large multiple of **ZX_CPRNG_DRAW_MAX_LEN**, which is
+    /// "Large" here would mean a large multiple of `ZX_CPRNG_DRAW_MAX_LEN`, which is
     /// currently 256. As always, test the actual latency of your call site before
     /// optimizing.
     ///
@@ -43,7 +43,7 @@ closed protocol Cprng {
     ///
     /// ## Notes
     ///
-    /// `zx_cprng_draw()` terminates the calling process if **buffer** is not a valid
+    /// `zx_cprng_draw()` terminates the calling process if `buffer` is not a valid
     /// userspace pointer.
     ///
     /// There are no other error conditions.  If its arguments are valid,
@@ -75,7 +75,7 @@ closed protocol Cprng {
     /// ## Description
     ///
     /// `zx_cprng_add_entropy()` mixes the given entropy into the kernel CPRNG.
-    /// a privileged operation.  It will accept at most **ZX_CPRNG_ADD_ENTROPY_MAX_LEN**
+    /// a privileged operation.  It will accept at most `ZX_CPRNG_ADD_ENTROPY_MAX_LEN`
     /// bytes of entropy at a time.
     ///
     /// ## Rights
@@ -84,11 +84,11 @@ closed protocol Cprng {
     ///
     /// ## Return value
     ///
-    /// `zx_cprng_add_entropy()` returns **ZX_OK** on success.
+    /// `zx_cprng_add_entropy()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** *buffer_size* is too large, or *buffer* is not a valid
+    /// `ZX_ERR_INVALID_ARGS` *buffer_size* is too large, or *buffer* is not a valid
     /// userspace pointer.
     ///
     /// ## BUGS

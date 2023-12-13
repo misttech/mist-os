@@ -123,25 +123,25 @@ closed protocol Profile {
     ///
     /// ## Rights
     ///
-    /// *root_job* must be of type **ZX_OBJ_TYPE_JOB** and have **ZX_RIGHT_MANAGE_PROCESS**.
+    /// *root_job* must be of type `ZX_OBJ_TYPE_JOB` and have `ZX_RIGHT_MANAGE_PROCESS`.
     ///
-    /// Caller job policy must allow **ZX_POL_NEW_PROFILE**.
+    /// Caller job policy must allow `ZX_POL_NEW_PROFILE`.
     ///
     /// ## Return value
     ///
-    /// Returns **ZX_OK** and a handle to the new profile (via *out*) on success. In the
+    /// Returns `ZX_OK` and a handle to the new profile (via *out*) on success. In the
     /// event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *root_job* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *root_job* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *root_job* is not a job handle.
+    /// `ZX_ERR_WRONG_TYPE`  *root_job* is not a job handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *root_job* does not have **ZX_RIGHT_MANAGE_PROCESS**
+    /// `ZX_ERR_ACCESS_DENIED`  *root_job* does not have `ZX_RIGHT_MANAGE_PROCESS`
     /// right, or *root_job* is not a handle to the root job.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  One or more of the arguments provided were invalid:
+    /// `ZX_ERR_INVALID_ARGS`  One or more of the arguments provided were invalid:
     ///
     ///   * *profile* or *out* was an invalid pointer
     ///   * *flags* contains an unknown option
@@ -154,7 +154,7 @@ closed protocol Profile {
     ///   * *options* was not zero
     ///   * *priority* was an invalid priority
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     ///
     /// ## See also
     ///

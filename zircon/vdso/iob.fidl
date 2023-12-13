@@ -58,10 +58,10 @@ closed protocol Iob {
     /// *access* specifies the access control modifiers for each endpoint. It
     /// must be a combination of one or more of:
     ///
-    ///  - **ZX_IOB_EP0_CAN_MAP_READ** to grant endpoint 0 to ability to map the region as readable
-    ///  - **ZX_IOB_EP0_CAN_MAP_WRITE** to grant endpoint 0 to ability to map the region as writable
-    ///  - **ZX_IOB_EP1_CAN_MAP_READ** to grant endpoint 1 to ability to map the region as readable
-    ///  - **ZX_IOB_EP1_CAN_MAP_WRITE** to grant endpoint 1 to ability to map the region as writable
+    ///  - `ZX_IOB_EP0_CAN_MAP_READ` to grant endpoint 0 to ability to map the region as readable
+    ///  - `ZX_IOB_EP0_CAN_MAP_WRITE` to grant endpoint 0 to ability to map the region as writable
+    ///  - `ZX_IOB_EP1_CAN_MAP_READ` to grant endpoint 1 to ability to map the region as readable
+    ///  - `ZX_IOB_EP1_CAN_MAP_WRITE` to grant endpoint 1 to ability to map the region as writable
     ///
     /// *size* is the requested size of the region in bytes. The size will be
     ///   rounded up to the next system page size boundary, as reported by
@@ -100,16 +100,16 @@ closed protocol Iob {
     ///
     /// ## Return value
     ///
-    /// `zx_iob_create()` returns **ZX_OK** on success. In the event of failure,
+    /// `zx_iob_create()` returns `ZX_OK` on success. In the event of failure,
     /// a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *ep_out0* or *ep_out1* is an invalid pointer or
+    /// `ZX_ERR_INVALID_ARGS`  *ep_out0* or *ep_out1* is an invalid pointer or
     /// NULL, *options* is any value other than 0, or the regions configuration
     /// is invalid
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory to allocated the
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory to allocated the
     /// requested buffers.
     strict Create(struct {
         options uint64;

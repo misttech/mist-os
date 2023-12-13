@@ -274,10 +274,10 @@ closed protocol System {
     ///
     /// `zx_system_get_features()` populates *features* with a bit mask of
     /// hardware-specific features.  *kind* indicates the specific type of features
-    /// to retrieve, e.g. **ZX_FEATURE_KIND_CPU**.  The supported kinds and the meaning
-    /// of individual feature bits is hardware-dependent.  **ZX_FEATURE_KIND_VM** is not
+    /// to retrieve, e.g. `ZX_FEATURE_KIND_CPU`.  The supported kinds and the meaning
+    /// of individual feature bits is hardware-dependent.  `ZX_FEATURE_KIND_VM` is not
     /// hardware-dependent and returns a bitset currently the only meaningful bit
-    /// is **ZX_VM_FEATURE_CAN_MAP_XOM** which is 1 if the system can map pages with
+    /// is `ZX_VM_FEATURE_CAN_MAP_XOM` which is 1 if the system can map pages with
     /// execute only permission.
     ///
     /// ## Rights
@@ -286,11 +286,11 @@ closed protocol System {
     ///
     /// ## Return value
     ///
-    /// `zx_system_get_features()`  returns **ZX_OK** on success.
+    /// `zx_system_get_features()`  returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  The requested feature kind is not available on this
+    /// `ZX_ERR_NOT_SUPPORTED`  The requested feature kind is not available on this
     /// platform.
     ///
     /// ## Notes
@@ -334,14 +334,14 @@ closed protocol System {
     ///
     /// *kind* must be one of the following:
     ///
-    /// - **ZX_SYSTEM_EVENT_OUT_OF_MEMORY** - An *event* will be returned that will
+    /// - `ZX_SYSTEM_EVENT_OUT_OF_MEMORY` - An *event* will be returned that will
     /// assert ZX_EVENT_SIGNALED when the system is in an out-of-memory situation.
     /// A process that is waiting on this event must quickly perform any important
     /// shutdown work. It is unspecified how much memory is available at the time this
     /// event is signaled, and unspecified how long the waiting process has to act
     /// before the kernel starts terminating processes or starting a full system reboot.
     ///
-    /// - **ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY** - An *event* will be returned that
+    /// - `ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY` - An *event* will be returned that
     /// will assert ZX_EVENT_SIGNALED when the system is nearing an out-of-memory
     /// situation. This event is signaled a little earlier than the
     /// ZX_SYSTEM_EVENT_OUT_OF_MEMORY event. The intent of this event is to allow the
@@ -349,20 +349,20 @@ closed protocol System {
     /// ZX_SYSTEM_EVENT_OUT_OF_MEMORY event, since it might be too late to do so
     /// reliably when ZX_SYSTEM_EVENT_OUT_OF_MEMORY is signaled.
     ///
-    /// - **ZX_SYSTEM_EVENT_MEMORY_PRESSURE_CRITICAL** - An *event* will be returned
+    /// - `ZX_SYSTEM_EVENT_MEMORY_PRESSURE_CRITICAL` - An *event* will be returned
     /// that will assert ZX_EVENT_SIGNALED when available memory on the system is
     /// critically low. The memory pressure level in this case is less severe than in
     /// the case of ZX_SYSTEM_EVENT_OUT_OF_MEMORY. The exact amount of memory available
     /// at the time the event is signaled is unspecified.
     ///
-    /// - **ZX_SYSTEM_EVENT_MEMORY_PRESSURE_WARNING** - An *event* will be returned
+    /// - `ZX_SYSTEM_EVENT_MEMORY_PRESSURE_WARNING` - An *event* will be returned
     /// that will assert ZX_EVENT_SIGNALED when available memory on the system is
     /// approaching the critically low range. The memory pressure level in this case is
     /// less severe than in the case of ZX_SYSTEM_EVENT_MEMORY_PRESSURE_CRITICAL. The
     /// exact amount of memory available at the time the event is signaled is
     /// unspecified.
     ///
-    /// - **ZX_SYSTEM_EVENT_MEMORY_PRESSURE_NORMAL** - An *event* will be returned that
+    /// - `ZX_SYSTEM_EVENT_MEMORY_PRESSURE_NORMAL` - An *event* will be returned that
     /// will assert ZX_EVENT_SIGNALED when available memory on the system is
     /// healthy. The exact amount of memory available at the time the event is signaled
     /// is unspecified.
@@ -400,12 +400,12 @@ closed protocol System {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_ACCESS_DENIED** The calling process' policy was invalid, the handle
+    /// `ZX_ERR_ACCESS_DENIED` The calling process' policy was invalid, the handle
     /// *root_job* did not have ZX_RIGHT_MANAGE_PROCESS rights for *kind*
     /// ZX_SYSTEM_EVENT_OUT_OF_MEMORY, *root_job* was not the
     /// root job of the system.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *kind* was not one of the supported values specified
+    /// `ZX_ERR_INVALID_ARGS` *kind* was not one of the supported values specified
     /// above.
     strict GetEvent(resource struct {
         root_job Handle:JOB;
@@ -462,26 +462,26 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_SYSTEM**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM`.
     ///
     /// ## Return value
     ///
-    /// `zx_system_set_performance_info()` returns **ZX_OK** on success. In the event of a failure, a
+    /// `zx_system_set_performance_info()` returns `ZX_OK` on success. In the event of a failure, a
     /// negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *resource* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *resource* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *resource* is not resource kind **ZX_RSRC_KIND_SYSTEM**.
+    /// `ZX_ERR_WRONG_TYPE` *resource* is not resource kind `ZX_RSRC_KIND_SYSTEM`.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE** *resource* is not in the range [**ZX_RSRC_SYSTEM_CPU_BASE**, **ZX_RSRC_SYSTEM_CPU_BASE**+1).
+    /// `ZX_ERR_OUT_OF_RANGE` *resource* is not in the range [`ZX_RSRC_SYSTEM_CPU_BASE`, `ZX_RSRC_SYSTEM_CPU_BASE`+1).
     ///
-    /// **ZX_ERR_INVALID_ARGS** *topic* or *info* have invalid values or *info* has out-of-order entries.
+    /// `ZX_ERR_INVALID_ARGS` *topic* or *info* have invalid values or *info* has out-of-order entries.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE** *count* or *info* entry values do not meet the requirements of the topic.
+    /// `ZX_ERR_OUT_OF_RANGE` *count* or *info* entry values do not meet the requirements of the topic.
     ///
-    /// **ZX_ERR_NO_MEMORY** Failure due to lack of memory. There is no good way for userspace to handle this (unlikely) error. In a future build this error will no longer occur.
+    /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory. There is no good way for userspace to handle this (unlikely) error. In a future build this error will no longer occur.
     ///
     /// ## See also
     ///
@@ -560,26 +560,26 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_SYSTEM**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM`.
     ///
     /// ## Return value
     ///
-    /// `zx_system_get_performance_info()` returns **ZX_OK** on success. In the event of a failure, a
+    /// `zx_system_get_performance_info()` returns `ZX_OK` on success. In the event of a failure, a
     /// negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *resource* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *resource* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *resource* is not resource kind **ZX_RSRC_KIND_SYSTEM**.
+    /// `ZX_ERR_WRONG_TYPE` *resource* is not resource kind `ZX_RSRC_KIND_SYSTEM`.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *resource* is not in the range [**ZX_RSRC_SYSTEM_CPU_BASE**, **ZX_RSRC_SYSTEM_CPU_BASE**+1).
+    /// `ZX_ERR_ACCESS_DENIED` *resource* is not in the range [`ZX_RSRC_SYSTEM_CPU_BASE`, `ZX_RSRC_SYSTEM_CPU_BASE`+1).
     ///
-    /// **ZX_ERR_INVALID_ARGS** *topic*, *info*, or *output_count* have invalid values.
+    /// `ZX_ERR_INVALID_ARGS` *topic*, *info*, or *output_count* have invalid values.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE** *count* does not meet the requirements of the topic.
+    /// `ZX_ERR_OUT_OF_RANGE` *count* does not meet the requirements of the topic.
     ///
-    /// **ZX_ERR_NO_MEMORY** Failure due to lack of memory. There is no good way for userspace to handle this (unlikely) error. In a future build this error will no longer occur.
+    /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory. There is no good way for userspace to handle this (unlikely) error. In a future build this error will no longer occur.
     ///
     /// ## See also
     ///
@@ -619,8 +619,8 @@ closed protocol System {
     /// kernel image and *bootimage_vmo* should contain an initrd whose address shall
     /// be passed to the new kernel as a kernel argument.
     ///
-    /// To supplant the running kernel, a *resource* of **ZX_RSRC_KIND_SYSTEM** with base
-    /// **ZX_RSRC_SYSTEM_MEXEC_BASE** must be supplied.
+    /// To supplant the running kernel, a *resource* of `ZX_RSRC_KIND_SYSTEM` with base
+    /// `ZX_RSRC_SYSTEM_MEXEC_BASE` must be supplied.
     ///
     /// Upon success, `zx_system_mexec()` shall supplant the currently running kernel
     /// image with the kernel image contained within *kernel_vmo*, load the ramdisk
@@ -630,22 +630,22 @@ closed protocol System {
     ///
     /// To use the `zx_system_mexec()` function, you must specify
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
-    /// the function returns **ZX_ERR_NOT_SUPPORTED**.
+    /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base
-    /// **ZX_RSRC_SYSTEM_MEXEC_BASE**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base
+    /// `ZX_RSRC_SYSTEM_MEXEC_BASE`.
     ///
-    /// *kernel_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
+    /// *kernel_vmo* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_READ`.
     ///
-    /// *bootimage_vmo* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_READ**.
+    /// *bootimage_vmo* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_READ`.
     ///
     /// ## Return value
     ///
     /// `zx_system_mexec()` shall not return upon success.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  `kernel.enable-debugging-syscalls` is not set to `true`
+    /// `ZX_ERR_NOT_SUPPORTED`  `kernel.enable-debugging-syscalls` is not set to `true`
     /// on the kernel command line.
     ///
     /// ## See also
@@ -681,28 +681,28 @@ closed protocol System {
     /// be appended to a ZBI before passing that image to [`zx_system_mexec()`]; the
     /// tail of the buffer is left untouched.
     ///
-    /// *resource* must be of type **ZX_RSRC_KIND_SYSTEM** with base
-    /// **ZX_RSRC_SYSTEM_MEXEC_BASE**.
+    /// *resource* must be of type `ZX_RSRC_KIND_SYSTEM` with base
+    /// `ZX_RSRC_SYSTEM_MEXEC_BASE`.
     ///
     /// *buffer* and *buffer_size* must point to a buffer that is no longer than 16KiB.
     ///
     /// To use the `zx_system_mexec_payload_get()` function, you must specify
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
-    /// the function returns **ZX_ERR_NOT_SUPPORTED**.
+    /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base
-    /// **ZX_RSRC_SYSTEM_MEXEC_BASE**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base
+    /// `ZX_RSRC_SYSTEM_MEXEC_BASE`.
     ///
     /// ## Return value
     ///
-    /// `zx_system_mexec_payload_get()` returns **ZX_OK** on success.
+    /// `zx_system_mexec_payload_get()` returns `ZX_OK` on success.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  `kernel.enable-debugging-syscalls` is not set to `true`
+    /// `ZX_ERR_NOT_SUPPORTED`  `kernel.enable-debugging-syscalls` is not set to `true`
     /// on the kernel command line.
     ///
-    /// **ZX_ERR_BUFFER_TOO_SMALL**  If the provided buffer is too small for the ZBI.
+    /// `ZX_ERR_BUFFER_TOO_SMALL`  If the provided buffer is too small for the ZBI.
     /// In this case, the caller is expected to make the syscall again with a larger
     /// buffer.
     ///
@@ -747,13 +747,13 @@ closed protocol System {
     ///
     /// Sets all processor cores as active.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_DISABLE_ALL_CPUS_BUT_PRIMARY
     ///
     /// Set only the primary CPU as active.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_ACPI_TRANSITION_S_STATE
     ///
@@ -781,18 +781,18 @@ closed protocol System {
     /// } acpi_transition_s_state;
     /// ```
     ///
-    /// Returns **ZX_ERR_INVALID_ARGS** if the target S state is not in the range 1-5.
+    /// Returns `ZX_ERR_INVALID_ARGS` if the target S state is not in the range 1-5.
     ///
-    /// Returns **ZX_ERR_NOT_SUPPORTED** if transitioning to the target S state is not
+    /// Returns `ZX_ERR_NOT_SUPPORTED` if transitioning to the target S state is not
     /// supported.
     ///
-    /// Returns **ZX_ERR_BAD_STATE** if the target S state is not 5 and the secondary
+    /// Returns `ZX_ERR_BAD_STATE` if the target S state is not 5 and the secondary
     /// CPUs have not been shut down.
     ///
-    /// Returns **ZX_ERR_NO_MEMORY** if there are not enough resources to run the
+    /// Returns `ZX_ERR_NO_MEMORY` if there are not enough resources to run the
     /// thread.
     ///
-    /// Returns **ZX_ERR_INTERNAL** if the S state transition fails.
+    /// Returns `ZX_ERR_INTERNAL` if the S state transition fails.
     ///
     /// ### ZX_SYSTEM_POWERCTL_X86_SET_PKG_PL1
     ///
@@ -818,49 +818,49 @@ closed protocol System {
     /// Restart the system, control should go through any relevant firmware and
     /// bootloaders.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_REBOOT_BOOTLOADER
     ///
     /// Restart the system, but stop in the bootloader instead of loading the operating
     /// system.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_REBOOT_RECOVERY
     ///
     /// Restart the system, but load the recovery operating system instead of the
     /// primary OS.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_SHUTDOWN
     ///
     /// Turn the system off.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
     /// ### ZX_SYSTEM_POWERCTL_ACK_KERNEL_INITIATED_REBOOT
     ///
     /// Used by userspace when it is ready for a reboot in response to a previous signal
     /// from the kernel that the kernel wanted to reboot the system.
     ///
-    /// *arg* type: **n/a**
+    /// *arg* type: `n/a`
     ///
-    /// Returns **ZX_ERR_BAD_STATE** if the kernel has not previously signaled a desire
+    /// Returns `ZX_ERR_BAD_STATE` if the kernel has not previously signaled a desire
     /// to reboot.
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base **ZX_RSRC_SYSTEM_POWER_BASE**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_POWER_BASE`.
     ///
     /// ## Return value
     ///
-    /// **ZX_OK**
+    /// `ZX_OK`
     ///
     /// ## Errors
     ///
-    /// Returns **ZX_ERR_INVALID_ARGS** when an unrecognized `cmd` value is supplied.
+    /// Returns `ZX_ERR_INVALID_ARGS` when an unrecognized `cmd` value is supplied.
     ///
     /// ## See also
     ///
@@ -892,18 +892,18 @@ closed protocol System {
     ///
     /// ## Return value
     ///
-    /// **ZX_OK** when *resume_deadline* expires and the system resumes.
+    /// `ZX_OK` when *resume_deadline* expires and the system resumes.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_TIMED_OUT** when *resume_deadline* is in the past.
+    /// `ZX_ERR_TIMED_OUT` when *resume_deadline* is in the past.
     ///
-    /// **ZX_ERR_BAD_HANDLE** *resource* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *resource* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *resource* is not resource kind **ZX_RSRC_KIND_SYSTEM**.
+    /// `ZX_ERR_WRONG_TYPE` *resource* is not resource kind `ZX_RSRC_KIND_SYSTEM`.
     ///
-    /// **ZX_ERR_OUT_OF_RANGE** *resource* is not in the range [**ZX_RSRC_SYSTEM_CPU_BASE**,
-    /// **ZX_RSRC_SYSTEM_CPU_BASE**+1).
+    /// `ZX_ERR_OUT_OF_RANGE` *resource* is not in the range [`ZX_RSRC_SYSTEM_CPU_BASE`,
+    /// `ZX_RSRC_SYSTEM_CPU_BASE`+1).
     ///
     @next
     strict SuspendEnter(resource struct {

@@ -80,11 +80,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind **ZX_RSRC_KIND_ROOT**.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
     ///
     /// ## Return value
     ///
@@ -120,11 +120,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -157,11 +157,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -200,11 +200,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_READ` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -243,11 +243,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_READ` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -289,11 +289,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind **ZX_RSRC_KIND_ROOT**.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
     ///
     /// ## Return value
     ///
@@ -344,7 +344,7 @@ closed protocol Pci {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_READ` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -382,11 +382,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_READ**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_READ`.
     ///
     /// ## Return value
     ///
@@ -423,11 +423,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_READ**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_READ`.
     ///
     /// ## Return value
     ///
@@ -464,11 +464,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PCI_DEVICE** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PCI_DEVICE` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
@@ -506,11 +506,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind **ZX_RSRC_KIND_ROOT**.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
     ///
     /// ## Return value
     ///
@@ -548,11 +548,11 @@ closed protocol Pci {
     /// ## Description
     ///
     /// This function is obsolete and should not be used. Drivers should instead use the PCI protocol
-    /// Typically, you obtain this in your **bind()** function through **device_get_protocol()**.
+    /// Typically, you obtain this in your `bind()` function through `device_get_protocol()`.
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind **ZX_RSRC_KIND_ROOT**.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
     ///
     /// ## Return value
     ///

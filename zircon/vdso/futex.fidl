@@ -32,7 +32,7 @@ closed protocol Futexfuncs {
     /// `zx_futex_wait()` atomically verifies that *value_ptr* still contains the value
     /// *current_value* and sleeps until the futex is made available by a call to
     /// `zx_futex_wake`. Optionally, the thread can also be woken up after the
-    /// *deadline* (with respect to **ZX_CLOCK_MONOTONIC**) passes. *deadline* may be
+    /// *deadline* (with respect to `ZX_CLOCK_MONOTONIC`) passes. *deadline* may be
     /// automatically adjusted according to the job's [timer slack] policy.
     ///
     /// ## SPURIOUS WAKEUPS
@@ -53,7 +53,7 @@ closed protocol Futexfuncs {
     ///
     /// A successful call to `zx_futex_wait()` results in the owner of the futex being
     /// set to the thread referenced by the *new_futex_owner* handle, or to nothing if
-    /// *new_futex_owner* is **ZX_HANDLE_INVALID**.
+    /// *new_futex_owner* is `ZX_HANDLE_INVALID`.
     ///
     /// See *Ownership and Priority Inheritance* in [futex](/docs/reference/kernel_objects/futex.md) for
     /// details.
@@ -64,25 +64,25 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_wait()` returns **ZX_OK** on success.
+    /// `zx_futex_wait()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  One of the following is true:
+    /// `ZX_ERR_INVALID_ARGS`  One of the following is true:
     ///
     /// + *value_ptr* is not a valid userspace pointer
     /// + *value_ptr* is not aligned to a `sizeof(zx_futex_t)` boundary.
     /// + *new_futex_owner* is currently a member of the waiters for *value_ptr*.
     /// + *new_futex_owner* has not been started yet.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *new_futex_owner* is not **ZX_HANDLE_INVALID**, and not a valid handle AND
+    /// `ZX_ERR_BAD_HANDLE`  *new_futex_owner* is not `ZX_HANDLE_INVALID`, and not a valid handle AND
     /// *current_value* matches the value at *value_ptr*
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *new_futex_owner* is a valid handle, but is not a handle to a thread.
+    /// `ZX_ERR_WRONG_TYPE`  *new_futex_owner* is a valid handle, but is not a handle to a thread.
     ///
-    /// **ZX_ERR_BAD_STATE**  *current_value* does not match the value at *value_ptr*.
+    /// `ZX_ERR_BAD_STATE`  *current_value* does not match the value at *value_ptr*.
     ///
-    /// **ZX_ERR_TIMED_OUT**  The thread was not woken before *deadline* passed.
+    /// `ZX_ERR_TIMED_OUT`  The thread was not woken before *deadline* passed.
     ///
     /// ## See also
     ///
@@ -143,11 +143,11 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_wake()` returns **ZX_OK** on success.
+    /// `zx_futex_wake()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *value_ptr* is not aligned.
+    /// `ZX_ERR_INVALID_ARGS`  *value_ptr* is not aligned.
     ///
     /// ## See also
     ///
@@ -187,7 +187,7 @@ closed protocol Futexfuncs {
     ///
     /// Requeuing is a generalization of waking. First, the kernel verifies
     /// that the value in *current_value* matches the value of the futex at
-    /// *value_ptr*, and if not reports **ZX_ERR_BAD_STATE**. After waking *wake_count*
+    /// *value_ptr*, and if not reports `ZX_ERR_BAD_STATE`. After waking *wake_count*
     /// threads, *requeue_count* threads are moved from the original futex's
     /// wait queue to the wait queue corresponding to *requeue_ptr*, another
     /// futex.
@@ -219,7 +219,7 @@ closed protocol Futexfuncs {
     /// A successful call to `zx_futex_requeue()` or [`zx_futex_requeue_single_owner()`]
     /// results in the owner of the futex being set to the thread referenced by the
     /// *new_requeue_owner* handle, or to nothing if *new_requeue_owner* is
-    /// **ZX_HANDLE_INVALID**.
+    /// `ZX_HANDLE_INVALID`.
     ///
     /// ## Rights
     ///
@@ -227,11 +227,11 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_requeue()` returns **ZX_OK** on success.
+    /// `zx_futex_requeue()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  One of the following is true:
+    /// `ZX_ERR_INVALID_ARGS`  One of the following is true:
     ///
     /// + Either *value_ptr* or *requeue_ptr* is not a valid userspace pointer
     /// + Either *value_ptr* or *requeue_ptr* is not aligned to a `sizeof(zx_futex_t)` boundary.
@@ -239,12 +239,12 @@ closed protocol Futexfuncs {
     /// + *new_requeue_owner* is currently a member of the waiters for either *value_ptr* or *requeue_ptr*
     /// + *new_requeue_owner* has not been started yet.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *new_requeue_owner* is not **ZX_HANDLE_INVALID**, and not a valid handle AND
+    /// `ZX_ERR_BAD_HANDLE`  *new_requeue_owner* is not `ZX_HANDLE_INVALID`, and not a valid handle AND
     /// *current_value* matches the value at *value_ptr*
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *new_requeue_owner* is a valid handle, but is not a handle to a thread.
+    /// `ZX_ERR_WRONG_TYPE`  *new_requeue_owner* is a valid handle, but is not a handle to a thread.
     ///
-    /// **ZX_ERR_BAD_STATE**  *current_value* does not match the value at *value_ptr*.
+    /// `ZX_ERR_BAD_STATE`  *current_value* does not match the value at *value_ptr*.
     ///
     /// ## See also
     ///
@@ -294,11 +294,11 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_wake_single_owner()` returns **ZX_OK** on success.
+    /// `zx_futex_wake_single_owner()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *value_ptr* is not aligned.
+    /// `ZX_ERR_INVALID_ARGS`  *value_ptr* is not aligned.
     ///
     /// ## See also
     ///
@@ -352,22 +352,22 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_requeue_single_owner()` returns **ZX_OK** on success.
+    /// `zx_futex_requeue_single_owner()` returns `ZX_OK` on success.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  One of the following is true:
+    /// `ZX_ERR_INVALID_ARGS`  One of the following is true:
     ///
     /// + Either *value_ptr* or *requeue_ptr* is not a valid userspace pointer
     /// + Either *value_ptr* or *requeue_ptr* is not aligned to a `sizeof(zx_futex_t)` boundary.
     /// + *value_ptr* is the same futex as *requeue_ptr*
     /// + *new_requeue_owner* is currently a member of the waiters for either *value_ptr* or *requeue_ptr*
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *new_requeue_owner* is not **ZX_HANDLE_INVALID**, and not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *new_requeue_owner* is not `ZX_HANDLE_INVALID`, and not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *new_requeue_owner* is a valid handle, but is not a handle to a thread.
+    /// `ZX_ERR_WRONG_TYPE`  *new_requeue_owner* is a valid handle, but is not a handle to a thread.
     ///
-    /// **ZX_ERR_BAD_STATE**  *current_value* does not match the value at *value_ptr*.
+    /// `ZX_ERR_BAD_STATE`  *current_value* does not match the value at *value_ptr*.
     ///
     /// ## See also
     ///
@@ -405,7 +405,7 @@ closed protocol Futexfuncs {
     /// ## Description
     ///
     /// Fetch the koid of the current owner of the futex identified by *value_ptr*, or
-    /// **ZX_KOID_INVALID** if there is no current owner.  Knowledge of the ownership of
+    /// `ZX_KOID_INVALID` if there is no current owner.  Knowledge of the ownership of
     /// a futex typically serves no purpose when building synchronization primitives
     /// from futexes.  This syscall is used primarily for testing.
     ///
@@ -418,13 +418,13 @@ closed protocol Futexfuncs {
     ///
     /// ## Return value
     ///
-    /// `zx_futex_get_owner()` returns **ZX_OK** on success, and koids hold the owner of
-    /// the futex at the time of the syscall, or **ZX_KOID_INVALID** if there was no
+    /// `zx_futex_get_owner()` returns `ZX_OK` on success, and koids hold the owner of
+    /// the futex at the time of the syscall, or `ZX_KOID_INVALID` if there was no
     /// owner.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  One of the following is true:
+    /// `ZX_ERR_INVALID_ARGS`  One of the following is true:
     ///
     /// + *value_ptr* is not a valid userspace pointer.
     /// + *value_ptr* is not aligned to a `sizeof(zx_futex_t)` boundary.

@@ -21,7 +21,7 @@ closed protocol Process {
     ///
     /// The `zx_process_exit()` call ends the calling process with the given
     /// return code. The return code of a process can be queried via the
-    /// **ZX_INFO_PROCESS** request to [`zx_object_get_info()`].
+    /// `ZX_INFO_PROCESS` request to [`zx_object_get_info()`].
     ///
     /// ## Rights
     ///
@@ -77,45 +77,45 @@ closed protocol Process {
     /// When the last handle to a process is closed, the process is destroyed.
     ///
     /// Process handles may be waited on and will assert the signal
-    /// **ZX_PROCESS_TERMINATED** when the process exits.
+    /// `ZX_PROCESS_TERMINATED` when the process exits.
     ///
     /// *job* is the controlling [job object](/docs/reference/kernel_objects/job.md) for the new
     /// process, which will become a child of that job.
     ///
     /// *options* can contain zero or the following flag:
     ///
-    ///  - **ZX_PROCESS_SHARED** to create a process that can share its address space with another
+    ///  - `ZX_PROCESS_SHARED` to create a process that can share its address space with another
     ///    process. Processes created with this flag can be passed to `zx_process_create_shared()`.
     ///
     /// ## Rights
     ///
-    /// *job* must be of type **ZX_OBJ_TYPE_JOB** and have **ZX_RIGHT_MANAGE_PROCESS**.
+    /// *job* must be of type `ZX_OBJ_TYPE_JOB` and have `ZX_RIGHT_MANAGE_PROCESS`.
     ///
-    /// Caller job policy must allow **ZX_POL_NEW_PROCESS**.
+    /// Caller job policy must allow `ZX_POL_NEW_PROCESS`.
     ///
     /// ## Return value
     ///
-    /// On success, `zx_process_create()` returns **ZX_OK**, a handle to the new process
+    /// On success, `zx_process_create()` returns `ZX_OK`, a handle to the new process
     /// (via *proc_handle*), and a handle to the root of its address space (via
     /// *vmar_handle*).  In the event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *job* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *job* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *job* is not a job handle.
+    /// `ZX_ERR_WRONG_TYPE`  *job* is not a job handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *job* does not have the **ZX_RIGHT_WRITE** right
-    /// (only when not **ZX_HANDLE_INVALID**).
+    /// `ZX_ERR_ACCESS_DENIED`  *job* does not have the `ZX_RIGHT_WRITE` right
+    /// (only when not `ZX_HANDLE_INVALID`).
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *name*, *proc_handle*, or *vmar_handle*  was an invalid pointer,
+    /// `ZX_ERR_INVALID_ARGS`  *name*, *proc_handle*, or *vmar_handle*  was an invalid pointer,
     /// or *options* contained invalid options.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
-    /// **ZX_ERR_BAD_STATE**  The job object is in the dead state.
+    /// `ZX_ERR_BAD_STATE`  The job object is in the dead state.
     ///
     /// ## See also
     ///
@@ -186,13 +186,13 @@ closed protocol Process {
     ///
     /// ## Rights
     ///
-    /// *shared_proc* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_MANAGE_PROCESS**.
+    /// *shared_proc* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_MANAGE_PROCESS`.
     ///
     /// See [`zx_process_create()`].
     ///
     /// ## Return value
     ///
-    /// On success, `zx_process_create_shared()` returns **ZX_OK**, a handle to the new process
+    /// On success, `zx_process_create_shared()` returns `ZX_OK`, a handle to the new process
     /// (via *proc_handle*), and a handle to the root of its restricted address space (via
     /// *restricted_vmar_handle*).  In the event of failure, a negative error value is returned.
     ///
@@ -200,19 +200,19 @@ closed protocol Process {
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *shared_proc* is a valid handle, but pointed to a process that
+    /// `ZX_ERR_INVALID_ARGS`  *shared_proc* is a valid handle, but pointed to a process that
     /// was not created via `zx_process_create_shared()`, or `zx_process_create()` with
     /// `ZX_PROCESS_SHARED`.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *shared_proc* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *shared_proc* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *shared_proc* is not a process handle.
+    /// `ZX_ERR_WRONG_TYPE`  *shared_proc* is not a process handle.
     ///
-    /// **ZX_ERR_BAD_STATE** *shared_proc* is a valid handle but the shared state is no longer valid
+    /// `ZX_ERR_BAD_STATE` *shared_proc* is a valid handle but the shared state is no longer valid
     /// (likely due to all processes sharing the state terminating).
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *shared_proc* does not have the **ZX_RIGHT_MANAGE_PROCESS** right
-    /// (only when not **ZX_HANDLE_INVALID**).
+    /// `ZX_ERR_ACCESS_DENIED`  *shared_proc* does not have the `ZX_RIGHT_MANAGE_PROCESS` right
+    /// (only when not `ZX_HANDLE_INVALID`).
     ///
     /// For other errors, see [`zx_process_create()`].
     ///
@@ -265,8 +265,8 @@ closed protocol Process {
     /// thread. If `zx_process_start()` returns an error, *arg1* is closed rather
     /// than transferred to the process being started.
     ///
-    /// Alternatively, *arg1* can be **ZX_HANDLE_INVALID** instead of a handle.
-    /// In this case the process starts with **ZX_HANDLE_INVALID** (i.e. zero)
+    /// Alternatively, *arg1* can be `ZX_HANDLE_INVALID` instead of a handle.
+    /// In this case the process starts with `ZX_HANDLE_INVALID` (i.e. zero)
     /// in its first argument register instead of a handle.  This means there
     /// are *no* handles in the process and *can never* be any handles to any
     /// objects shared outside the process.  `zx_process_start()` is the only
@@ -283,31 +283,31 @@ closed protocol Process {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_WRITE`.
     ///
-    /// *thread* must be of type **ZX_OBJ_TYPE_THREAD** and have **ZX_RIGHT_WRITE**.
+    /// *thread* must be of type `ZX_OBJ_TYPE_THREAD` and have `ZX_RIGHT_WRITE`.
     ///
-    /// *arg1* must have **ZX_RIGHT_TRANSFER**.
+    /// *arg1* must have `ZX_RIGHT_TRANSFER`.
     ///
     /// ## Return value
     ///
-    /// `zx_process_start()` returns **ZX_OK** on success.
+    /// `zx_process_start()` returns `ZX_OK` on success.
     /// In the event of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *process* or *thread* or *arg1* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *process* or *thread* or *arg1* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *process* is not a process handle or *thread* is
+    /// `ZX_ERR_WRONG_TYPE`  *process* is not a process handle or *thread* is
     /// not a thread handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  The handle *thread* lacks **ZX_RIGHT_WRITE** or *thread*
-    /// does not belong to *process*, or the handle *process* lacks **ZX_RIGHT_WRITE** or
-    /// *arg1* lacks **ZX_RIGHT_TRANSFER**.
+    /// `ZX_ERR_ACCESS_DENIED`  The handle *thread* lacks `ZX_RIGHT_WRITE` or *thread*
+    /// does not belong to *process*, or the handle *process* lacks `ZX_RIGHT_WRITE` or
+    /// *arg1* lacks `ZX_RIGHT_TRANSFER`.
     ///
-    /// **ZX_ERR_BAD_STATE**  *process* is already running or has exited.
+    /// `ZX_ERR_BAD_STATE`  *process* is already running or has exited.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *entry* is not a userspace address, is not a
+    /// `ZX_ERR_INVALID_ARGS` *entry* is not a userspace address, is not a
     /// canonical address, or is not `0`.
     ///
     /// ## See also
@@ -379,37 +379,37 @@ closed protocol Process {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_READ** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_READ` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
-    /// `zx_process_read_memory()` returns **ZX_OK** on success.
+    /// `zx_process_read_memory()` returns `ZX_OK` on success.
     /// In the event of failure, a negative error value is returned, and the number of
     /// bytes written to *buffer* is undefined.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_READ** right
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_READ` right
     /// or
-    /// **ZX_WRITE_RIGHT** is needed for historical reasons.
+    /// `ZX_WRITE_RIGHT` is needed for historical reasons.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_BAD_STATE**  the process's memory is not accessible (e.g.,
+    /// `ZX_ERR_BAD_STATE`  the process's memory is not accessible (e.g.,
     /// the process is being terminated),
     /// or the requested memory is not cacheable.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *buffer* is an invalid pointer or NULL,
+    /// `ZX_ERR_INVALID_ARGS` *buffer* is an invalid pointer or NULL,
     /// or *buffer_size* is zero or greater than 64MB.
     ///
-    /// **ZX_ERR_NOT_FOUND** if the process does not have any memory at the
-    /// requested address or **ZX_ERR_OUT_OF_RANGE** if the offset corresponding
+    /// `ZX_ERR_NOT_FOUND` if the process does not have any memory at the
+    /// requested address or `ZX_ERR_OUT_OF_RANGE` if the offset corresponding
     /// to *vaddr* within the mapped VMO is greater than or equal to the VMO
     /// size. These error codes are consistent with the error code that would be
     /// generated by a page fault at the same address (i.e. the *synth_code* in
     /// the page fault's exception report).
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *handle* is not a process handle.
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not a process handle.
     ///
     /// ## See also
     ///
@@ -461,43 +461,43 @@ closed protocol Process {
     ///
     /// To use the `zx_process_write_memory()` function, you must specify
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
-    /// the function returns **ZX_ERR_NOT_SUPPORTED**.
+    /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
-    /// `zx_process_write_memory()` returns **ZX_OK** on success.
+    /// `zx_process_write_memory()` returns `ZX_OK` on success.
     /// In the event of failure, a negative error value is returned, and the number of
     /// bytes written to *buffer* is undefined.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** right or
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_WRITE` right or
     /// the address range to write falls into a protected area like the vDSO.
     ///
-    /// **ZX_ERR_BAD_HANDLE**  *handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
     ///
-    /// **ZX_ERR_BAD_STATE**  the process's memory is not accessible (e.g.,
+    /// `ZX_ERR_BAD_STATE`  the process's memory is not accessible (e.g.,
     /// the process is being terminated),
     /// or the requested memory is not cacheable.
     ///
-    /// **ZX_ERR_INVALID_ARGS**  *buffer* is an invalid pointer or NULL,
+    /// `ZX_ERR_INVALID_ARGS`  *buffer* is an invalid pointer or NULL,
     /// or *buffer_size* is zero or greater than 64MB.
     ///
-    /// **ZX_ERR_NOT_FOUND** if the process does not have any memory at the
-    /// requested address or **ZX_ERR_OUT_OF_RANGE** if the offset corresponding
+    /// `ZX_ERR_NOT_FOUND` if the process does not have any memory at the
+    /// requested address or `ZX_ERR_OUT_OF_RANGE` if the offset corresponding
     /// to *vaddr* within the mapped VMO is greater than or equal to the VMO
     /// size. These error codes are consistent with the error code that would be
     /// generated by a page fault at the same address (i.e. the *synth_code* in
     /// the page fault's exception report).
     ///
-    /// **ZX_ERR_NOT_SUPPORTED**  `kernel.enable-debugging-syscalls` is not set to `true`
+    /// `ZX_ERR_NOT_SUPPORTED`  `kernel.enable-debugging-syscalls` is not set to `true`
     /// on the kernel command line.
     ///
-    /// **ZX_ERR_WRONG_TYPE**  *handle* is not a process handle.
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not a process handle.
     ///
     /// ## See also
     ///

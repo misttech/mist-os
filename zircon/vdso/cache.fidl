@@ -25,26 +25,26 @@ closed protocol Cache {
     ///
     /// *options* is a bitwise OR of:
     ///
-    ///  * **ZX_CACHE_FLUSH_DATA**
+    ///  * `ZX_CACHE_FLUSH_DATA`
     ///
     ///    Clean (write back) data caches, so previous writes on this CPU are
     ///    visible in main memory.
     ///
-    ///  * **ZX_CACHE_FLUSH_INVALIDATE**
-    ///    (valid only when combined with **ZX_CACHE_FLUSH_DATA**)
+    ///  * `ZX_CACHE_FLUSH_INVALIDATE`
+    ///    (valid only when combined with `ZX_CACHE_FLUSH_DATA`)
     ///
     ///    Clean (write back) data caches and then invalidate data caches, so
     ///    previous writes on this CPU are visible in main memory and future
     ///    reads on this CPU see external changes to main memory.
     ///
-    ///  * **ZX_CACHE_FLUSH_INSN**
+    ///  * `ZX_CACHE_FLUSH_INSN`
     ///
     ///    Synchronize instruction caches with data caches, so previous writes
     ///    on this CPU are visible to instruction fetches.  If this is combined
-    ///    with **ZX_CACHE_FLUSH_DATA**, then previous writes will be visible to
+    ///    with `ZX_CACHE_FLUSH_DATA`, then previous writes will be visible to
     ///    main memory as well as to instruction fetches.
     ///
-    /// At least one of **ZX_CACHE_FLUSH_DATA** and **ZX_CACHE_FLUSH_INSN**
+    /// At least one of `ZX_CACHE_FLUSH_DATA` and `ZX_CACHE_FLUSH_INSN`
     /// must be included in *options*.
     ///
     /// ## Rights
@@ -53,11 +53,11 @@ closed protocol Cache {
     ///
     /// ## Return value
     ///
-    /// `zx_cache_flush()` returns **ZX_OK** on success, or an error code on failure.
+    /// `zx_cache_flush()` returns `ZX_OK` on success, or an error code on failure.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** *options* is invalid.
+    /// `ZX_ERR_INVALID_ARGS` *options* is invalid.
     @vdsocall
     strict Flush(struct {
         @voidptr

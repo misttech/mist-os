@@ -25,7 +25,7 @@ closed protocol Ioports {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_IOPORT**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_IOPORT`.
     ///
     /// ## Return value
     ///
@@ -64,7 +64,7 @@ closed protocol Ioports {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind **ZX_RSRC_KIND_IOPORT**.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_IOPORT`.
     ///
     /// ## Return value
     ///

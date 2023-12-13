@@ -25,7 +25,7 @@ closed protocol Interrupt {
     /// `zx_interrupt_create()` creates an interrupt object that represents a physical
     /// or virtual interrupt.
     ///
-    /// If *options* is **ZX_INTERRUPT_VIRTUAL**, *src_obj* and *src_num* are ignored and
+    /// If *options* is `ZX_INTERRUPT_VIRTUAL`, *src_obj* and *src_num* are ignored and
     /// a virtual interrupt is returned.
     ///
     /// Otherwise *src_obj* must be a suitable resource for creating platform interrupts
@@ -33,13 +33,13 @@ closed protocol Interrupt {
     /// the creation of interrupts to the internals of the DDK (driver development kit).
     /// Physical interrupts are obtained by drivers through various DDK APIs.
     ///
-    /// Physical interrupts honor the options **ZX_INTERRUPT_EDGE_LOW**, **ZX_INTERRUPT_EDGE_HIGH**,
-    /// **ZX_INTERRUPT_LEVEL_LOW**, **ZX_INTERRUPT_LEVEL_HIGH**, and **ZX_INTERRUPT_REMAP_IRQ**.
+    /// Physical interrupts honor the options `ZX_INTERRUPT_EDGE_LOW`, `ZX_INTERRUPT_EDGE_HIGH`,
+    /// `ZX_INTERRUPT_LEVEL_LOW`, `ZX_INTERRUPT_LEVEL_HIGH`, and `ZX_INTERRUPT_REMAP_IRQ`.
     ///
-    /// The handles will have **ZX_RIGHT_INSPECT**, **ZX_RIGHT_DUPLICATE**, **ZX_RIGHT_TRANSFER**
-    /// (allowing them to be sent to another process via [`zx_channel_write()`]), **ZX_RIGHT_READ**,
-    /// **ZX_RIGHT_WRITE** (required for [`zx_interrupt_ack()`]), **ZX_RIGHT_WAIT** (required for
-    /// [`zx_interrupt_wait()`], and **ZX_RIGHT_SIGNAL** (required for [`zx_interrupt_trigger()`]).
+    /// The handles will have `ZX_RIGHT_INSPECT`, `ZX_RIGHT_DUPLICATE`, `ZX_RIGHT_TRANSFER`
+    /// (allowing them to be sent to another process via [`zx_channel_write()`]), `ZX_RIGHT_READ`,
+    /// `ZX_RIGHT_WRITE` (required for [`zx_interrupt_ack()`]), `ZX_RIGHT_WAIT` (required for
+    /// [`zx_interrupt_wait()`], and `ZX_RIGHT_SIGNAL` (required for [`zx_interrupt_trigger()`]).
     ///
     /// Interrupts are said to be "triggered" when the underlying physical interrupt occurs
     /// or when [`zx_interrupt_trigger()`] is called on a virtual interrupt.  A triggered interrupt,
@@ -51,25 +51,25 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// *src_obj* must have resource kind **ZX_RSRC_KIND_IRQ**.
+    /// *src_obj* must have resource kind `ZX_RSRC_KIND_IRQ`.
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_create()` returns **ZX_OK** on success. In the event
+    /// `zx_interrupt_create()` returns `ZX_OK` on success. In the event
     /// of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** the *src_obj* handle is invalid (if this is not a virtual interrupt)
+    /// `ZX_ERR_BAD_HANDLE` the *src_obj* handle is invalid (if this is not a virtual interrupt)
     ///
-    /// **ZX_ERR_WRONG_TYPE** the *src_obj* handle is not of an appropriate type to create an interrupt.
+    /// `ZX_ERR_WRONG_TYPE` the *src_obj* handle is not of an appropriate type to create an interrupt.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** the *src_obj* handle does not allow this operation.
+    /// `ZX_ERR_ACCESS_DENIED` the *src_obj* handle does not allow this operation.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *options* contains invalid flags or the *out_handle*
+    /// `ZX_ERR_INVALID_ARGS` *options* contains invalid flags or the *out_handle*
     /// parameter is an invalid pointer.
     ///
-    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.
     /// In a future build this error will no longer occur.
     ///
@@ -118,22 +118,22 @@ closed protocol Interrupt {
     /// `zx_interrupt_bind()` binds or unbinds an interrupt object to a port.
     ///
     /// An interrupt object may only be bound to a single port and may only be bound once.
-    /// The interrupt can only bind to a port created with **ZX_PORT_BIND_TO_INTERRUPT**
+    /// The interrupt can only bind to a port created with `ZX_PORT_BIND_TO_INTERRUPT`
     /// option.
     ///
-    /// When a bound interrupt object is triggered, a **ZX_PKT_TYPE_INTERRUPT** packet will
-    /// be delivered to the port it is bound to, with the timestamp (relative to **ZX_CLOCK_MONOTONIC**)
+    /// When a bound interrupt object is triggered, a `ZX_PKT_TYPE_INTERRUPT` packet will
+    /// be delivered to the port it is bound to, with the timestamp (relative to `ZX_CLOCK_MONOTONIC`)
     /// of when the interrupt was triggered in the `zx_packet_interrupt_t`.  The *key* used
     /// when binding the interrupt will be present in the `key` field of the `zx_port_packet_t`.
     ///
     /// If the interrupt being bound is in a triggered state, then a
-    /// **ZX_PKT_TYPE_INTERRUPT** packet will be sent to the port the interrupt is being bound to,
+    /// `ZX_PKT_TYPE_INTERRUPT` packet will be sent to the port the interrupt is being bound to,
     /// with the timestamp of when the interrupt was triggered. This packet will need
     /// to be processed normally.
     ///
-    /// To bind to a port pass **ZX_INTERRUPT_BIND** in *options*.
+    /// To bind to a port pass `ZX_INTERRUPT_BIND` in *options*.
     ///
-    /// To unbind a previously bound port pass **ZX_INTERRUPT_UNBIND** in *options*. For unbind the
+    /// To unbind a previously bound port pass `ZX_INTERRUPT_UNBIND` in *options*. For unbind the
     /// *port_handle* is required but the *key* is ignored. Unbinding the port removes previously
     /// queued packets to the port.
     ///
@@ -148,33 +148,33 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_INTERRUPT** and have **ZX_RIGHT_READ**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_INTERRUPT` and have `ZX_RIGHT_READ`.
     ///
-    /// *port_handle* must be of type **ZX_OBJ_TYPE_PORT** and have **ZX_RIGHT_WRITE**.
+    /// *port_handle* must be of type `ZX_OBJ_TYPE_PORT` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_bind()` returns **ZX_OK** on success. In the event
+    /// `zx_interrupt_bind()` returns `ZX_OK` on success. In the event
     /// of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* or *port_handle* is not a valid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* or *port_handle* is not a valid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not an interrupt object or *port_handle* is not a port object.
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not an interrupt object or *port_handle* is not a port object.
     ///
-    /// **ZX_ERR_CANCELED**  [`zx_interrupt_destroy()`] was called on *handle*.
+    /// `ZX_ERR_CANCELED`  [`zx_interrupt_destroy()`] was called on *handle*.
     ///
-    /// **ZX_ERR_BAD_STATE**  A thread is waiting on the interrupt using [`zx_interrupt_wait()`]
+    /// `ZX_ERR_BAD_STATE`  A thread is waiting on the interrupt using [`zx_interrupt_wait()`]
     ///
-    /// **ZX_ERR_ACCESS_DENIED** the *handle* handle lacks **ZX_RIGHT_READ** or the *port_handle* handle
-    /// lacks **ZX_RIGHT_WRITE**
+    /// `ZX_ERR_ACCESS_DENIED` the *handle* handle lacks `ZX_RIGHT_READ` or the *port_handle* handle
+    /// lacks `ZX_RIGHT_WRITE`
     ///
-    /// **ZX_ERR_ALREADY_BOUND** this interrupt object is already bound.
+    /// `ZX_ERR_ALREADY_BOUND` this interrupt object is already bound.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *options* is not **ZX_INTERRUPT_BIND** or **ZX_INTERRUPT_UNBIND**.
+    /// `ZX_ERR_INVALID_ARGS` *options* is not `ZX_INTERRUPT_BIND` or `ZX_INTERRUPT_UNBIND`.
     ///
-    /// **ZX_ERR_NOT_FOUND** the *port* does not match the bound port.
+    /// `ZX_ERR_NOT_FOUND` the *port* does not match the bound port.
     ///
     /// ## See also
     ///
@@ -225,28 +225,28 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_INTERRUPT** and have **ZX_RIGHT_WAIT**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_INTERRUPT` and have `ZX_RIGHT_WAIT`.
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_wait()` returns **ZX_OK** on success, and *out_timestamp*, if
+    /// `zx_interrupt_wait()` returns `ZX_OK` on success, and *out_timestamp*, if
     /// non-NULL, returns the timestamp of when the interrupt was triggered (relative
-    /// to **ZX_CLOCK_MONOTONIC**)
+    /// to `ZX_CLOCK_MONOTONIC`)
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is an invalid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is an invalid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not a handle to an interrupt object.
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not a handle to an interrupt object.
     ///
-    /// **ZX_ERR_BAD_STATE** the interrupt object is bound to a port.
+    /// `ZX_ERR_BAD_STATE` the interrupt object is bound to a port.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *handle* lacks **ZX_RIGHT_WAIT**.
+    /// `ZX_ERR_ACCESS_DENIED` *handle* lacks `ZX_RIGHT_WAIT`.
     ///
-    /// **ZX_ERR_CANCELED**  *handle* was closed while waiting or [`zx_interrupt_destroy()`] was called
+    /// `ZX_ERR_CANCELED`  *handle* was closed while waiting or [`zx_interrupt_destroy()`] was called
     /// on it.
     ///
-    /// **ZX_ERR_INVALID_ARGS** the *out_timestamp* parameter is an invalid pointer.
+    /// `ZX_ERR_INVALID_ARGS` the *out_timestamp* parameter is an invalid pointer.
     ///
     /// ## See also
     ///
@@ -288,7 +288,7 @@ closed protocol Interrupt {
     /// ## Description
     ///
     /// `zx_interrupt_destroy()` "destroys" an interrupt object, putting it in a state
-    /// where any [`zx_interrupt_wait()`] operations on it will return **ZX_ERR_CANCELED**,
+    /// where any [`zx_interrupt_wait()`] operations on it will return `ZX_ERR_CANCELED`,
     /// and it is unbound from any ports it was bound to.
     ///
     /// This provides a clean shut down mechanism.  Closing the last handle to the
@@ -298,7 +298,7 @@ closed protocol Interrupt {
     /// If the interrupt object is bound to a port when cancellation happens, if it
     /// has not yet triggered, or it has triggered but the packet has not yet been
     /// received by a caller of [`zx_port_wait()`], success is returned and any packets
-    /// in flight are removed.  Otherwise, **ZX_ERR_NOT_FOUND** is returned, indicating
+    /// in flight are removed.  Otherwise, `ZX_ERR_NOT_FOUND` is returned, indicating
     /// that the packet has been read but the interrupt has not been re-armed by calling
     /// [`zx_interrupt_ack()`].
     ///
@@ -308,19 +308,19 @@ closed protocol Interrupt {
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_destroy()` returns **ZX_OK** on success. In the event
+    /// `zx_interrupt_destroy()` returns `ZX_OK` on success. In the event
     /// of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is an invalid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is an invalid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not an interrupt object.
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not an interrupt object.
     ///
-    /// **ZX_ERR_NOT_FOUND**  *handle* was bound (and now no longer is) but was not
+    /// `ZX_ERR_NOT_FOUND`  *handle* was bound (and now no longer is) but was not
     /// being waited for.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *handle* lacks **ZX_RIGHT_WRITE**.
+    /// `ZX_ERR_ACCESS_DENIED` *handle* lacks `ZX_RIGHT_WRITE`.
     ///
     /// ## See also
     ///
@@ -373,24 +373,24 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_INTERRUPT** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_INTERRUPT` and have `ZX_RIGHT_WRITE`.
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_ack()` returns **ZX_OK** on success. In the event
+    /// `zx_interrupt_ack()` returns `ZX_OK` on success. In the event
     /// of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is an invalid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is an invalid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not an interrupt object.
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not an interrupt object.
     ///
-    /// **ZX_ERR_BAD_STATE** *handle* is not bound to a port.
+    /// `ZX_ERR_BAD_STATE` *handle* is not bound to a port.
     ///
-    /// **ZX_ERR_CANCELED**  [`zx_interrupt_destroy()`] was called on *handle*.
+    /// `ZX_ERR_CANCELED`  [`zx_interrupt_destroy()`] was called on *handle*.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *handle* lacks **ZX_RIGHT_WRITE**.
+    /// `ZX_ERR_ACCESS_DENIED` *handle* lacks `ZX_RIGHT_WRITE`.
     ///
     /// ## See also
     ///
@@ -437,26 +437,26 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_INTERRUPT** and have **ZX_RIGHT_SIGNAL**.
+    /// *handle* must be of type `ZX_OBJ_TYPE_INTERRUPT` and have `ZX_RIGHT_SIGNAL`.
     ///
     /// ## Return value
     ///
-    /// `zx_interrupt_trigger()` returns **ZX_OK** on success. In the event
+    /// `zx_interrupt_trigger()` returns `ZX_OK` on success. In the event
     /// of failure, a negative error value is returned.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_BAD_HANDLE** *handle* is an invalid handle.
+    /// `ZX_ERR_BAD_HANDLE` *handle* is an invalid handle.
     ///
-    /// **ZX_ERR_WRONG_TYPE** *handle* is not an interrupt object.
+    /// `ZX_ERR_WRONG_TYPE` *handle* is not an interrupt object.
     ///
-    /// **ZX_ERR_BAD_STATE** *handle* is not a virtual interrupt.
+    /// `ZX_ERR_BAD_STATE` *handle* is not a virtual interrupt.
     ///
-    /// **ZX_ERR_CANCELED**  [`zx_interrupt_destroy()`] was called on *handle*.
+    /// `ZX_ERR_CANCELED`  [`zx_interrupt_destroy()`] was called on *handle*.
     ///
-    /// **ZX_ERR_ACCESS_DENIED** *handle* lacks **ZX_RIGHT_SIGNAL**.
+    /// `ZX_ERR_ACCESS_DENIED` *handle* lacks `ZX_RIGHT_SIGNAL`.
     ///
-    /// **ZX_ERR_INVALID_ARGS** *options* is non-zero.
+    /// `ZX_ERR_INVALID_ARGS` *options* is non-zero.
     ///
     /// ## See also
     ///
