@@ -2,11 +2,11 @@
 IfsVersion:      3.0
 SoName:          libbackend_fuchsia_globals.so
 Symbols:
-  - { Name: AcquireState, Type: Func }
-  - { Name: AddDropped, Type: Func }
-  - { Name: GetAndResetDropped, Type: Func }
-  - { Name: GetCurrentThreadKoid, Type: Func }
-  - { Name: GetStateLocked, Type: Func }
-  - { Name: ReleaseState, Type: Func }
-  - { Name: SetStateLocked, Type: Func }
+  - { Name: FuchsiaLogAcquireState, Type: Func }
+  - { Name: FuchsiaLogAddDropped, Type: Func }
+  - { Name: FuchsiaLogGetAndResetDropped, Type: Func }
+  - { Name: FuchsiaLogGetCurrentThreadKoid, Type: Func }
+  - { Name: FuchsiaLogGetStateLocked, Type: Func }
+  - { Name: FuchsiaLogReleaseState, Type: Func }
+  - { Name: FuchsiaLogSetStateLocked, Type: Func }
 ...

@@ -15,19 +15,19 @@ class LogState;
 
 extern "C" {
 
-void AcquireState();
+void FuchsiaLogAcquireState();
 
-void SetStateLocked(syslog_backend::LogState* new_state);
+void FuchsiaLogSetStateLocked(syslog_backend::LogState* new_state);
 
-void ReleaseState();
+void FuchsiaLogReleaseState();
 
-syslog_backend::LogState* GetStateLocked();
+syslog_backend::LogState* FuchsiaLogGetStateLocked();
 
-uint32_t GetAndResetDropped();
+uint32_t FuchsiaLogGetAndResetDropped();
 
-void AddDropped(uint32_t count);
+void FuchsiaLogAddDropped(uint32_t count);
 
-zx_koid_t GetCurrentThreadKoid();
+zx_koid_t FuchsiaLogGetCurrentThreadKoid();
 
 }  // extern "C"
 

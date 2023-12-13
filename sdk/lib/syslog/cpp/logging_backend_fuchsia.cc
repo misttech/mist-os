@@ -44,7 +44,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 static zx_koid_t pid = GetKoid(zx_process_self());
-static thread_local zx_koid_t tid = GetCurrentThreadKoid();
+static thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
 
 struct RecordState {
   // Message string -- valid if severity is FATAL. For FATAL
@@ -143,22 +143,22 @@ class LogState {
 class GlobalStateLock {
  public:
   GlobalStateLock() {
-    AcquireState();
-    if (!GetStateLocked()) {
+    FuchsiaLogAcquireState();
+    if (!FuchsiaLogGetStateLocked()) {
       LogState::Set(fuchsia_logging::LogSettings(), *this);
     }
   }
 
   // Retrieves the global state
-  syslog_backend::LogState* operator->() const { return GetStateLocked(); }
+  syslog_backend::LogState* operator->() const { return FuchsiaLogGetStateLocked(); }
 
   // Sets the global state
-  void Set(syslog_backend::LogState* state) const { SetStateLocked(state); }
+  void Set(syslog_backend::LogState* state) const { FuchsiaLogSetStateLocked(state); }
 
   // Retrieves the global state
-  syslog_backend::LogState* operator*() const { return GetStateLocked(); }
+  syslog_backend::LogState* operator*() const { return FuchsiaLogGetStateLocked(); }
 
-  ~GlobalStateLock() { ReleaseState(); }
+  ~GlobalStateLock() { FuchsiaLogReleaseState(); }
 };
 
 static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia::diagnostics::Severity severity) {
