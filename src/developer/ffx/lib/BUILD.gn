@@ -34,6 +34,7 @@ libs = [
   "testing",
   "timeout",
   "usb_fastboot_discovery",
+  "validation",
   "version",
   "writer",
   "target",
