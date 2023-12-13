@@ -1080,6 +1080,9 @@
 
                 // TODO(b/302340440): Save XMM registers in signal handlers on x64.
                 "FPSigTest.NestedSignals",
+
+                // Skip for roll
+                "PivotRootTest.UnreachableNewRootFails",
             ],
         },
     ],
