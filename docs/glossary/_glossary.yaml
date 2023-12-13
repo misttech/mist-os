@@ -2077,6 +2077,25 @@
   related_guides: [""]
   area: ["General"]
 
+- term: "TOT"
+  short_description: "Top-Of-Tree: The source tree (or build artifact thereof)
+  based on the most recent commit to the main development branch of the source
+  code."
+  full_description: "Top-Of-Tree (or Tip-of-Tree, both are used interchangeably)
+  refers to various artifacts, depending on context. The common denominator is
+  that the artifact of interest is <b>not</b> relating to a stabilizing branch
+  like releases/f18. Frequent examples:
+  <ul>
+    <li>A Fuchsia git checkout sync'ed to JIRI_HEAD.</li>
+    <li>The resulting artifacts from a build from a Fuchsia git checkout sync'ed
+    to JIRI_HEAD.</li>
+    <li>The resulting artifacts from a component built from the development HEAD
+      of a component, against an unspecified version of the Fuchsia SDK.</li>
+  </ul>"
+  see_also: [""]
+  related_guides: [""]
+  area: ["General"]
+
 - term: "Universe driver"
   short_description: "An <a href=\"/docs/glossary#ephemeral-driver\">ephemeral driver</a>
   from a specific Fuchsia package set that is registered manually after the system's
