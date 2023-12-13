@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/zx/channel.h>
-#include <lib/zx/result.h>
 
 #include "wlantap-driver-context.h"
 #include "wlantap-mac.h"
@@ -60,7 +59,7 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
                                zx::channel mlme_channel);
 
   bool IfaceExists();
-  zx::result<> DestroyIface();
+  fit::result<zx_status_t> DestroyIface();
   void ShutdownComplete();
 
   const std::shared_ptr<const WlantapDriverContext> driver_context_;
