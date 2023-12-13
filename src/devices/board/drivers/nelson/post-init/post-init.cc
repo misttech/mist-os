@@ -10,6 +10,15 @@
 
 #include <array>
 
+#include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/infineon/platform/cpp/bind.h>
+#include <bind/fuchsia/spi/cpp/bind.h>
+
+#include "sdk/lib/driver/component/cpp/composite_node_spec.h"
+#include "sdk/lib/driver/component/cpp/node_add_args.h"
+
 namespace {
 
 constexpr std::array<const char*, 3> kBoardBuildNodeNames = {
@@ -92,6 +101,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
   }
 
   if (zx::result result = SetBoardInfo(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
+  if (zx::result result = AddSelinaCompositeNode(); result.is_error()) {
     return completer(result.take_error());
   }
 
@@ -225,6 +238,123 @@ zx::result<> PostInit::SetBoardInfo() {
   if (result->is_error()) {
     FDF_LOG(ERROR, "SetBoardInfo failed: %s", zx_status_get_string(result->error_value()));
     return result->take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> PostInit::AddSelinaCompositeNode() {
+  if (board_build_ == kBoardBuildP1) {
+    if (auto result = EnableSelinaOsc(); result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  const std::vector<fuchsia_driver_framework::BindRule> spi_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_VID_INFINEON),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_PID_BGT60TR13C),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_DID_RADAR_SENSOR),
+  };
+
+  const std::vector<fuchsia_driver_framework::NodeProperty> spi_properties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_VID_INFINEON),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_PID_BGT60TR13C),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_DID_RADAR_SENSOR),
+  };
+
+  const std::vector<fuchsia_driver_framework::BindRule> irq_gpio_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_3),
+  };
+
+  const std::vector<fuchsia_driver_framework::NodeProperty> irq_gpio_properties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::GPIO_PIN,
+                        bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_3),
+  };
+
+  const std::vector<fuchsia_driver_framework::BindRule> reset_gpio_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_2),
+  };
+
+  const std::vector<fuchsia_driver_framework::NodeProperty> reset_gpio_properties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::GPIO_PIN,
+                        bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_2),
+  };
+
+  const std::vector<fuchsia_driver_framework::ParentSpec> selina_parents{
+      {{spi_rules, spi_properties}},
+      {{irq_gpio_rules, irq_gpio_properties}},
+      {{reset_gpio_rules, reset_gpio_properties}},
+  };
+
+  const fuchsia_driver_framework::CompositeNodeSpec selina_node_spec{{
+      // TODO(b/304828063): Complete the Selina bind rule migration and update this.
+      .name = "selina-composite-new",
+      .parents = selina_parents,
+  }};
+
+  if (auto result = composite_manager_->AddSpec(selina_node_spec); result.is_error()) {
+    if (result.error_value().is_framework_error()) {
+      FDF_LOG(ERROR, "Call to AddSpec failed: %s",
+              result.error_value().framework_error().FormatDescription().c_str());
+      return zx::error(result.error_value().framework_error().status());
+    }
+    if (result.error_value().is_domain_error()) {
+      FDF_LOG(ERROR, "AddSpec failed");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+  }
+
+  return zx::ok();
+}
+
+zx::result<> PostInit::EnableSelinaOsc() {
+  zx::result gpio = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>("selina-osc-en");
+  if (gpio.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to GPIO node: %s", gpio.status_string());
+    return gpio.take_error();
+  }
+
+  fidl::SyncClient osc_en(*std::move(gpio));
+
+  if (auto result = osc_en->SetAltFunction(0); result.is_error()) {
+    if (result.error_value().is_framework_error()) {
+      FDF_LOG(ERROR, "Call to set SELINA_OSC_EN alt function failed: %s",
+              result.error_value().framework_error().FormatDescription().c_str());
+      return zx::error(result.error_value().framework_error().status());
+    }
+    if (result.error_value().is_domain_error()) {
+      FDF_LOG(ERROR, "Failed to set SELINA_OSC_EN alt function: %s",
+              zx_status_get_string(result.error_value().domain_error()));
+      return zx::error(result.error_value().domain_error());
+    }
+  }
+
+  if (auto result = osc_en->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+      result.is_error()) {
+    if (result.error_value().is_framework_error()) {
+      FDF_LOG(ERROR, "Call to set SELINA_OSC_EN to input failed: %s",
+              result.error_value().framework_error().FormatDescription().c_str());
+      return zx::error(result.error_value().framework_error().status());
+    }
+    if (result.error_value().is_domain_error()) {
+      FDF_LOG(ERROR, "Failed to set SELINA_OSC_EN to input function: %s",
+              zx_status_get_string(result.error_value().domain_error()));
+      return zx::error(result.error_value().domain_error());
+    }
   }
 
   return zx::ok();
