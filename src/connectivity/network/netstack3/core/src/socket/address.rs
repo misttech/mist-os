@@ -15,7 +15,7 @@ use net_types::{
     NonMappedAddr, ScopeableAddress, SpecifiedAddr, ZonedAddr,
 };
 
-use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
+use crate::socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec};
 
 /// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
 #[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
@@ -397,5 +397,99 @@ impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIter<I, D, A> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.next()
+    }
+}
+
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub(crate) enum TryUnmapResult<I: DualStackIpExt, D> {
+    /// The address does not have an un-mapped representation.
+    ///
+    /// This spits back the input address unmodified.
+    CannotBeUnmapped(ZonedAddr<SocketIpAddr<I::Addr>, D>),
+    /// The address in the other stack that corresponds to the input.
+    ///
+    /// Since [`SocketZonedIpAddr`] is guaranteed to hold a specified address,
+    /// this must hold an `Option<SocketZonedIpAddr>`. Since `::FFFF:0.0.0.0` is
+    /// a legal IPv4-mapped IPv6 address, this allows us to represent it as the
+    /// unspecified IPv4 address.
+    Mapped(Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>),
+}
+
+/// Try to convert a specified address into the address that maps to it from
+/// the other stack.
+///
+/// This is an IP-generic function that tries to invert the
+/// IPv4-to-IPv4-mapped-IPv6 conversion that is performed by
+/// [`Ipv4Addr::to_ipv6_mapped`].
+///
+/// The only inputs that will produce [`TryUnmapResult::Mapped`] are
+/// IPv4-mapped IPv6 addresses. All other inputs will produce
+/// [`TryUnmapResult::CannotBeUnmapped`].
+pub(crate) fn try_unmap<A: IpAddress, D>(
+    addr: SocketZonedIpAddr<A, D>,
+) -> TryUnmapResult<A::Version, D>
+where
+    A::Version: DualStackIpExt,
+{
+    <A::Version as Ip>::map_ip(
+        addr.into_inner(),
+        |v4| {
+            let addr = SocketIpAddr::new_ipv4_specified(v4.addr());
+            TryUnmapResult::CannotBeUnmapped(ZonedAddr::Unzoned(addr))
+        },
+        |v6| match v6.addr().to_ipv4_mapped() {
+            Some(v4) => {
+                let addr = SpecifiedAddr::new(v4).map(SocketIpAddr::new_ipv4_specified);
+                TryUnmapResult::Mapped(addr.map(ZonedAddr::Unzoned))
+            }
+            None => {
+                let (addr, zone) = v6.into_addr_zone();
+                let addr: SocketIpAddr<_> =
+                    addr.try_into().unwrap_or_else(|AddrIsMappedError {}| {
+                        unreachable!(
+                            "addr cannot be mapped because `to_ipv4_mapped` returned `None`"
+                        )
+                    });
+                TryUnmapResult::CannotBeUnmapped(ZonedAddr::new(addr, zone).unwrap_or_else(|| {
+                    unreachable!("addr should still be scopeable after wrapping in `SocketIpAddr`")
+                }))
+            }
+        },
+    )
+}
+
+/// A remote IP address that's either in the current stack or the other stack.
+pub(crate) enum DualStackRemoteIp<I: DualStackIpExt, D> {
+    ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
+    OtherStack(ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>),
+}
+
+/// Returns the [`DualStackRemoteIp`] for the given remote_ip.
+///
+/// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address, and
+/// an unspecified address will be populated with
+/// [`crate::socket::specify_unspecified_remote()`].
+pub(crate) fn dual_stack_remote_ip<I: DualStackIpExt, D>(
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, D>>,
+) -> DualStackRemoteIp<I, D> {
+    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
+        remote_ip.map(SocketZonedIpAddr::into_inner),
+    );
+    match try_unmap(remote_ip.into()) {
+        TryUnmapResult::CannotBeUnmapped(remote_ip) => {
+            DualStackRemoteIp::<I, _>::ThisStack(remote_ip)
+        }
+        TryUnmapResult::Mapped(remote_ip) => {
+            // NB: Even though we ensured the address was specified above by
+            // calling `specify_unspecified_remote`, it's possible that
+            // unmapping the address made it unspecified (e.g. `::FFFF:0.0.0.0`
+            // is a specified IPv6 addr but an unspecified IPv4 addr). Call
+            // `specify_unspecified_remote` again to ensure the unmapped address
+            // is specified.
+            let remote_ip =
+                crate::socket::specify_unspecified_remote::<I::OtherVersion, _, _>(remote_ip);
+            DualStackRemoteIp::OtherStack(remote_ip)
+        }
     }
 }

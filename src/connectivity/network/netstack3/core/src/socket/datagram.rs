@@ -33,7 +33,6 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId},
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
-        device::state::IpDeviceStateIpExt,
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
             IpSocketHandler, SendOneShotIpPacketError, SendOptions,
@@ -43,11 +42,12 @@ use crate::{
     socket::{
         self,
         address::{
-            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr,
-            DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
+            dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnIpAddr,
+            DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerIpAddr,
+            SocketIpAddr, SocketZonedIpAddr, TryUnmapResult,
         },
-        AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
-        SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        AddrVec, BoundSocketMap, EitherStack, ExistsError, InsertError, ListenerAddr,
+        MaybeDualStack, Shutdown, SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
 };
 
@@ -686,47 +686,12 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
     ) -> O;
 }
 
-/// Control flow type containing either a dual-stack or non-dual-stack context.
-///
-/// This type exists to provide nice names to the result of
-/// [`BoundStateContext::dual_stack_context`], and to allow generic code to
-/// match on when checking whether a socket protocol and IP version support
-/// dual-stack operation. If dual-stack operation is supported, a
-/// [`MaybeDualStack::DualStack`] value will be held, otherwise a `NonDualStack`
-/// value.
-///
-/// Note that the templated types to not have trait bounds; those are provided
-/// by the trait with the `dual_stack_context` function.
-///
-/// In monomorphized code, this type frequently has exactly one template
-/// parameter that is uninstantiable (it contains an instance of
-/// [`core::convert::Infallible`] or some other empty enum, or a reference to
-/// the same)! That lets the compiler optimize it out completely, creating no
-/// actual runtime overhead.
-#[derive(Debug)]
-pub(crate) enum MaybeDualStack<DS, NDS> {
-    DualStack(DS),
-    NotDualStack(NDS),
-}
-
 // Implement `GenericOverIp` for a `MaybeDualStack` whose `DS` and `NDS` also
 // implement `GenericOverIp`.
 impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOverIp<I>
     for MaybeDualStack<DS, NDS>
 {
     type Type = MaybeDualStack<<DS as GenericOverIp<I>>::Type, <NDS as GenericOverIp<I>>::Type>;
-}
-
-/// State belonging to either IP stack.
-///
-/// Like `[either::Either]`, but with more helpful variant names.
-///
-/// Note that this type is not optimally type-safe, because `T` and `O` are not
-/// bound by `IP` and `IP::OtherVersion`, respectively. In many cases it may be
-/// more appropriate to define a one-off enum parameterized over `I: Ip`.
-pub(crate) enum EitherStack<T, O> {
-    ThisStack(T),
-    OtherStack(O),
 }
 
 impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
@@ -1150,17 +1115,7 @@ pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-// TODO(https://fxbug.dev/21198): Move this somewhere more general once the
-// approach is proven to work for datagram sockets. When implementing dual-stack
-// TCP, extract a supertrait from `DatagramSocketSpec` as described in the TODO
-// below and put that together with this trait.
-pub(crate) trait DualStackIpExt: Ip + crate::ip::IpExt {
-    /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
-    type OtherVersion: Ip
-        + IpDeviceStateIpExt
-        + DualStackIpExt<OtherVersion = Self>
-        + crate::ip::IpExt;
-
+pub(crate) trait DualStackIpExt: super::DualStackIpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -1232,8 +1187,6 @@ pub(crate) enum DualStackIpSocket<'a, I: IpExt, S: DatagramSocketSpec> {
 }
 
 impl DualStackIpExt for Ipv4 {
-    type OtherVersion = Ipv6;
-
     /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
     type DualStackBoundSocketId<S: DatagramSocketSpec> = EitherIpSocket<S>;
     type OtherStackIpOptions<State: Clone + Debug + Default> = ();
@@ -1275,8 +1228,6 @@ impl DualStackIpExt for Ipv4 {
 }
 
 impl DualStackIpExt for Ipv6 {
-    type OtherVersion = Ipv4;
-
     /// Incoming IPv6 packets may only be received by IPv6 sockets.
     type DualStackBoundSocketId<S: DatagramSocketSpec> = S::SocketId<Self>;
     type OtherStackIpOptions<State: Clone + Debug + Default> = State;
@@ -2351,65 +2302,6 @@ fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
     Ok((addr, device, identifier))
 }
 
-#[derive(GenericOverIp)]
-#[generic_over_ip(I, Ip)]
-enum TryUnmapResult<I: DualStackIpExt, D> {
-    /// The address does not have an un-mapped representation.
-    ///
-    /// This spits back the input address unmodified.
-    CannotBeUnmapped(ZonedAddr<SocketIpAddr<I::Addr>, D>),
-    /// The address in the other stack that corresponds to the input.
-    ///
-    /// Since [`SocketZonedIpAddr`] is guaranteed to hold a specified address,
-    /// this must hold an `Option<SocketZonedIpAddr>`. Since `::FFFF:0.0.0.0` is
-    /// a legal IPv4-mapped IPv6 address, this allows us to represent it as the
-    /// unspecified IPv4 address.
-    Mapped(Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>),
-}
-
-/// Try to convert a specified address into the address that maps to it from
-/// the other stack.
-///
-/// This is an IP-generic function that tries to invert the
-/// IPv4-to-IPv4-mapped-IPv6 conversion that is performed by
-/// [`Ipv4Addr::to_ipv6_mapped`].
-///
-/// The only inputs that will produce [`TryUnmapResult::Mapped`] are
-/// IPv4-mapped IPv6 addresses. All other inputs will produce
-/// [`TryUnmapResult::CannotBeUnmapped`].
-// TODO(https://fxbug.dev/21198): Move this onto a method on the dual-stack
-// context trait so that it doesn't need map_ip.
-fn try_unmap<A: IpAddress, D>(addr: SocketZonedIpAddr<A, D>) -> TryUnmapResult<A::Version, D>
-where
-    A::Version: DualStackIpExt,
-{
-    <A::Version as Ip>::map_ip(
-        addr.into_inner(),
-        |v4| {
-            let addr = SocketIpAddr::new_ipv4_specified(v4.addr());
-            TryUnmapResult::CannotBeUnmapped(ZonedAddr::Unzoned(addr))
-        },
-        |v6| match v6.addr().to_ipv4_mapped() {
-            Some(v4) => {
-                let addr = SpecifiedAddr::new(v4).map(SocketIpAddr::new_ipv4_specified);
-                TryUnmapResult::Mapped(addr.map(ZonedAddr::Unzoned))
-            }
-            None => {
-                let (addr, zone) = v6.into_addr_zone();
-                let addr: SocketIpAddr<_> =
-                    addr.try_into().unwrap_or_else(|AddrIsMappedError {}| {
-                        unreachable!(
-                            "addr cannot be mapped because `to_ipv4_mapped` returned `None`"
-                        )
-                    });
-                TryUnmapResult::CannotBeUnmapped(ZonedAddr::new(addr, zone).unwrap_or_else(|| {
-                    unreachable!("addr should still be scopeable after wrapping in `SocketIpAddr`")
-                }))
-            }
-        },
-    )
-}
-
 fn listen_inner<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
@@ -2676,41 +2568,6 @@ fn listen_inner<
         original_bound_addr,
     });
     Ok(())
-}
-
-/// A remote IP address that's either in the current stack or the other stack.
-enum DualStackRemoteIp<I: DualStackIpExt, D> {
-    ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
-    OtherStack(ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>),
-}
-
-/// Returns the [`DualStackRemoteIp`] for the given remote_ip.
-///
-/// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address, and
-/// an unspecified address will be populated with
-/// [`crate::socket::specify_unspecified_remote()`].
-fn dual_stack_remote_ip<I: DualStackIpExt, D>(
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, D>>,
-) -> DualStackRemoteIp<I, D> {
-    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
-        remote_ip.map(SocketZonedIpAddr::into_inner),
-    );
-    match try_unmap(remote_ip.into()) {
-        TryUnmapResult::CannotBeUnmapped(remote_ip) => {
-            DualStackRemoteIp::<I, _>::ThisStack(remote_ip)
-        }
-        TryUnmapResult::Mapped(remote_ip) => {
-            // NB: Even though we ensured the address was specified above by
-            // calling `specify_unspecified_remote`, it's possible that
-            // unmapping the address made it unspecified (e.g. `::FFFF:0.0.0.0`
-            // is a specified IPv6 addr but an unspecified IPv4 addr). Call
-            // `specify_unspecified_remote` again to ensure the unmapped address
-            // is specified.
-            let remote_ip =
-                crate::socket::specify_unspecified_remote::<I::OtherVersion, _, _>(remote_ip);
-            DualStackRemoteIp::OtherStack(remote_ip)
-        }
-    }
 }
 
 /// An error when attempting to create a datagram socket.

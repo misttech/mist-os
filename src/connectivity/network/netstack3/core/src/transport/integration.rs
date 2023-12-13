@@ -11,7 +11,7 @@ use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     device::WeakDeviceId,
-    socket::datagram::{MaybeDualStack, UninstantiableContext},
+    socket::{datagram::UninstantiableContext, MaybeDualStack},
     transport::{
         tcp::{
             self,

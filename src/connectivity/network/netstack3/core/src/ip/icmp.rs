@@ -76,8 +76,8 @@ use crate::{
             DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, ShutdownType,
             SocketHopLimits,
         },
-        AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
+        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::{Mutex, RwLock},
     NonSyncContext, SyncCtx,
@@ -1078,8 +1078,8 @@ where
 
     fn dual_stack_context(
         &mut self,
-    ) -> datagram::MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-        datagram::MaybeDualStack::NotDualStack(self)
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+        MaybeDualStack::NotDualStack(self)
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(

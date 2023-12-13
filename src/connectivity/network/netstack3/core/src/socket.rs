@@ -15,7 +15,7 @@ use core::{
 use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
-    ip::{Ip, IpAddress},
+    ip::{Ip, IpAddress, Ipv4, Ipv6},
     AddrAndZone, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 
@@ -25,11 +25,63 @@ use crate::{
     },
     device,
     error::{ExistsError, NotFoundError},
-    ip::socket::SocketIpExt,
+    ip::{device::state::IpDeviceStateIpExt, socket::SocketIpExt, IpLayerIpExt},
     socket::address::{
         AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
     },
 };
+
+/// A dual stack IP extention trait that provides the `OtherVersion` associated
+/// type.
+pub(crate) trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
+    /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
+    type OtherVersion: IpLayerIpExt
+        + IpDeviceStateIpExt
+        + datagram::DualStackIpExt<OtherVersion = Self>;
+}
+
+impl DualStackIpExt for Ipv4 {
+    type OtherVersion = Ipv6;
+}
+
+impl DualStackIpExt for Ipv6 {
+    type OtherVersion = Ipv4;
+}
+
+/// State belonging to either IP stack.
+///
+/// Like `[either::Either]`, but with more helpful variant names.
+///
+/// Note that this type is not optimally type-safe, because `T` and `O` are not
+/// bound by `IP` and `IP::OtherVersion`, respectively. In many cases it may be
+/// more appropriate to define a one-off enum parameterized over `I: Ip`.
+pub(crate) enum EitherStack<T, O> {
+    ThisStack(T),
+    OtherStack(O),
+}
+
+/// Control flow type containing either a dual-stack or non-dual-stack context.
+///
+/// This type exists to provide nice names to the result of
+/// [`BoundStateContext::dual_stack_context`], and to allow generic code to
+/// match on when checking whether a socket protocol and IP version support
+/// dual-stack operation. If dual-stack operation is supported, a
+/// [`MaybeDualStack::DualStack`] value will be held, otherwise a `NonDualStack`
+/// value.
+///
+/// Note that the templated types to not have trait bounds; those are provided
+/// by the trait with the `dual_stack_context` function.
+///
+/// In monomorphized code, this type frequently has exactly one template
+/// parameter that is uninstantiable (it contains an instance of
+/// [`core::convert::Infallible`] or some other empty enum, or a reference to
+/// the same)! That lets the compiler optimize it out completely, creating no
+/// actual runtime overhead.
+#[derive(Debug)]
+pub(crate) enum MaybeDualStack<DS, NDS> {
+    DualStack(DS),
+    NotDualStack(NDS),
+}
 
 /// Describes which direction(s) of the data path should be shut down.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
