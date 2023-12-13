@@ -169,7 +169,7 @@ impl ClientIface for SmeClientIface {
                 let bss_description = BssDescription::try_from(r.bss_description.clone());
                 let compatibility =
                     r.compatibility.clone().map(|c| Compatibility::try_from(*c)).transpose();
-                // TODO(fxbug.dev/128604): handle the case when there are multiple BSS candidates
+                // TODO(b/316033554): handle the case when there are multiple BSS candidates
                 match (bss_description, compatibility) {
                     (Ok(bss_description), Ok(compatibility)) if bss_description.ssid == *ssid => {
                         Some((bss_description, compatibility))

@@ -321,7 +321,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
                             new_state: Some(fidl_wlanix::StaIfaceCallbackState::Completed),
                             bssid: Some(connected_result.bssid.to_array()),
-                            // TODO(fxbug.dev/128604): do we need to keep track of actual id?
+                            // TODO(b/316034688): do we need to keep track of actual id?
                             id: Some(1),
                             ssid: Some(connected_result.ssid),
                             ..Default::default()
@@ -355,7 +355,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             Nl80211Cmd::Connect,
                             vec![
                                 Nl80211Attr::IfaceIndex(iface_id.into()),
-                                // TODO(fxbug.dev/128604): Do we need to send the actual station MAC?
+                                // TODO(b/316035583): Do we need to send the actual station MAC?
                                 Nl80211Attr::Mac([0u8; 6]),
                                 Nl80211Attr::StatusCode(status_code),
                             ],
@@ -424,7 +424,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 let supplicant_sta_network_stream = supplicant_sta_network
                     .into_stream()
                     .context("create SupplicantStaNetwork stream")?;
-                // TODO(fxbug.dev/128604): Should we return NetworkAdded event?
+                // TODO(b/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
                     supplicant_sta_network_stream,
                     sta_iface_state,
@@ -481,7 +481,7 @@ async fn handle_supplicant_request<I: IfaceManager>(
         fidl_wlanix::SupplicantRequest::AddStaInterface { payload, .. } => {
             info!("fidl_wlanix::SupplicantRequest::AddStaInterface");
             if let Some(supplicant_sta_iface) = payload.iface {
-                // TODO(fxbug.dev/128604): Actually create the iface.
+                // TODO(b/316037136): Actually create the iface.
                 let existing_ifaces = iface_manager.list_interfaces().await?;
                 for iface in existing_ifaces {
                     if iface.role == fidl_fuchsia_wlan_common::WlanMacRole::Client {
@@ -573,7 +573,7 @@ fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
 }
 
 fn get_supported_frequencies() -> Vec<Vec<Nl80211FrequencyAttr>> {
-    // TODO(fxbug.dev/128604): Reevaluate this list later. This does not reflect
+    // TODO(b/316037008): Reevaluate this list later. This does not reflect
     // actual support. We should instead get supported frequencies from the phy.
     #[rustfmt::skip]
     let channels = vec![
@@ -648,7 +648,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     Nl80211Cmd::NewInterface,
                     vec![
                         Nl80211Attr::IfaceIndex(iface.id.into()),
-                        // TODO(fxbug.dev/128604): Populate this with the real iface name assigned by netcfg.
+                        // TODO(b/316037906): Populate this with the real iface name assigned by netcfg.
                         Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
                         Nl80211Attr::Mac(iface.sta_addr),
                     ],
@@ -661,7 +661,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
         }
         Nl80211Cmd::GetStation => {
             info!("Nl80211Cmd::GetStation (skipping)");
-            // TODO(fxbug.dev/128604): Report packet counters and station info.
+            // TODO(b/316038082): Report packet counters and station info.
             responder
                 .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
                 .context("Failed to send GetProtocolFeatures")?;
@@ -800,7 +800,7 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
         Nl80211BssAttr::SignalMbm(result.bss_description.rssi_dbm as i32 * 100),
         Nl80211BssAttr::Capability(result.bss_description.capability_info),
         Nl80211BssAttr::Status(0),
-        // TODO(fxbug.dev/128604): Determine whether we should provide real chain signals.
+        // TODO(b/316038074): Determine whether we should provide real chain signals.
         Nl80211BssAttr::ChainSignal(vec![ChainSignalAttr {
             id: 0,
             rssi: result.bss_description.rssi_dbm.into(),
