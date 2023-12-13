@@ -216,14 +216,14 @@ zx_status_t AmlGpio::GpioImplConfigIn(uint32_t index, uint32_t flags) {
 
     uint32_t regval = mmios_[block->mmio_index].Read32(block->oen_offset * sizeof(uint32_t));
     // Set the GPIO as pull-up or pull-down
-    uint32_t pull = flags & GPIO_PULL_MASK;
+    uint32_t pull = flags;
     uint32_t pull_reg_val = mmios_[block->mmio_index].Read32(block->pull_offset * sizeof(uint32_t));
     uint32_t pull_en_reg_val =
         mmios_[block->mmio_index].Read32(block->pull_en_offset * sizeof(uint32_t));
-    if (pull & GPIO_NO_PULL) {
+    if (pull == GPIO_NO_PULL) {
       pull_en_reg_val &= ~pinmask;
     } else {
-      if (pull & GPIO_PULL_UP) {
+      if (pull == GPIO_PULL_UP) {
         pull_reg_val |= pinmask;
       } else {
         pull_reg_val &= ~pinmask;

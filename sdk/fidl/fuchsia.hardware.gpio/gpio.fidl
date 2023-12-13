@@ -13,7 +13,6 @@ type GpioFlags = strict enum : uint32 {
     PULL_DOWN = 0x0;
     PULL_UP = 0x1;
     NO_PULL = 0x2;
-    PULL_MASK = 0x3;
 };
 
 /// Values for `SetPolarity`.
