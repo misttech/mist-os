@@ -18,6 +18,7 @@ libs = [
   "fidl-fuchsia-developer-ffx-ext",
   "fuchsia-controller",
   "isolate",
+  "manual_targets",
   "metrics",
   "netext",
   "pbms",

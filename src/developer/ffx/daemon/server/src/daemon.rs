@@ -14,7 +14,6 @@ use ffx_daemon_events::{
 };
 use ffx_daemon_protocols::create_protocol_register_map;
 use ffx_daemon_target::{
-    manual_targets::{Config, ManualTargets},
     target::{self, Target, TargetProtocol, TargetTransport},
     target_collection::{TargetCollection, TargetUpdateFilter},
     zedboot::zedboot_discovery,
@@ -36,6 +35,7 @@ use futures::{
     executor::block_on,
     prelude::*,
 };
+use manual_targets::{Config, ManualTargets};
 use notify::{RecursiveMode, Watcher};
 use overnet_core::ListablePeer;
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};

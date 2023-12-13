@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use emulator_targets::EmulatorTargetAction;
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
 use ffx_daemon_target::{
-    manual_targets,
     target::{
         self, target_addr_info_to_socketaddr, Target, TargetProtocol, TargetTransport,
         TargetUpdateBuilder,
@@ -21,6 +20,7 @@ use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use futures::TryStreamExt;
+use manual_targets;
 use protocols::prelude::*;
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
