@@ -10,4 +10,11 @@
     program: {
         binary: "bin/controller_integration_test_bin",
     },
+    offer: [
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
 }

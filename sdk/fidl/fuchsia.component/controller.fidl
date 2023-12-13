@@ -29,7 +29,7 @@ closed protocol Controller {
     @available(added=HEAD)
     strict GetExposedDict(resource struct {
         dict server_end:fuchsia.component.sandbox.Dict;
-    });
+    }) -> () error Error;
 };
 
 @available(added=14)

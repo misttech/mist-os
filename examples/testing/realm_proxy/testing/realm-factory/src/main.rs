@@ -4,12 +4,12 @@
 
 use {
     anyhow::{Error, Result},
-    fidl::endpoints::{self, DiscoverableProtocolMarker},
+    fidl::endpoints::{self},
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_test_echoserver::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
     fuchsia_async as fasync,
     fuchsia_component::{client, server::ServiceFs},
-    fuchsia_component_test::{RealmBuilder, RealmInstance},
+    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::{StreamExt, TryStreamExt},
     tracing::*,
 };
@@ -33,7 +33,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
 
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
-                    realm.root.controller().get_exposed_dict(server_end)?;
+                    realm.root.controller().get_exposed_dict(server_end).await?.unwrap();
                     let mut output_dict_entries = expose_dict.read().await?;
 
                     // Mix in additional capabilities to the dict.
@@ -59,7 +59,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     let () = factory.create_connector(echo_sender_server, echo_receiver_client)?;
 
                     output_dict_entries.push(fsandbox::DictItem {
-                        key: format!("{}", fecho::EchoMarker::PROTOCOL_NAME),
+                        key: format!("reverse-echo"),
                         value: fsandbox::Capability::Sender(echo_sender_client),
                     });
 
@@ -68,6 +68,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
 
                     // Serve the mixed-in capability.
                     task_group.spawn(async move {
+                        let _realm = realm;
                         let _ = realm_proxy::service::handle_receiver::<fecho::EchoMarker, _, _>(
                             echo_receiver_stream,
                             handle_echo_request_stream,
@@ -98,8 +99,16 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
 
     let builder = RealmBuilder::new().await?;
-
-    // FIXME: Copy realm builder code here.
+    let echo =
+        builder.add_child("echo", "echo_server#meta/default.cm", ChildOptions::new()).await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fecho::EchoMarker>())
+                .from(&echo)
+                .to(Ref::parent()),
+        )
+        .await?;
 
     let realm = builder.build().await?;
     Ok(realm)
@@ -109,6 +118,15 @@ async fn handle_echo_request_stream(mut stream: fecho::EchoRequestStream) {
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             fecho::EchoRequest::EchoString { value, responder } => {
+                let value = value.map(|value| {
+                    let mut reversed = String::with_capacity(value.len());
+                    let mut chars: Vec<_> = value.chars().collect();
+                    chars.reverse();
+                    for ch in chars {
+                        reversed.push(ch);
+                    }
+                    reversed
+                });
                 responder.send(value.as_deref()).unwrap();
             }
         }

@@ -4,8 +4,9 @@
 
 use {
     cm_rust::FidlIntoNative,
-    fidl::endpoints::{create_endpoints, create_proxy, Proxy},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
+    fidl::endpoints::{create_endpoints, create_proxy, ProtocolMarker, Proxy},
+    fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -108,6 +109,24 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
         )
         .await
         .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                .from(Ref::parent())
+                .to(Ref::collection(COLLECTION_NAME)),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::parent())
+                .to(Ref::collection(COLLECTION_NAME)),
+        )
+        .await
+        .unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
     realm_decl.collections.push(
         fcdecl::Collection {
@@ -120,7 +139,6 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
     builder.replace_realm_decl(realm_decl).await.unwrap();
     builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
 }
-
 /// Represents a local child that was created in a nested realm builder.
 struct SpawnedChild {
     /// The task which executes the local child.
@@ -139,9 +157,9 @@ struct SpawnedChild {
 
 /// Spawns a local child and populates the `SpawnedChild` struct.
 async fn spawn_local_child() -> SpawnedChild {
+    let builder = RealmBuilder::new().await.unwrap();
     let (handles_sender, handles_receiver) = mpsc::unbounded();
     let (cancel_sender, cancel_receiver) = oneshot::channel();
-    let builder = RealmBuilder::new().await.unwrap();
     let component_status = ComponentStatus::default();
     let component_status_clone = component_status.clone();
     let cancel_receiver = Arc::new(Mutex::new(Some(cancel_receiver)));
@@ -168,11 +186,22 @@ async fn spawn_local_child() -> SpawnedChild {
     let child_decl = builder.get_component_decl(&child_ref).await.unwrap();
     builder.replace_realm_decl(child_decl).await.unwrap();
     let (url, local_child_task) = builder.initialize().await.unwrap();
+    let (controller_proxy, cm_realm_instance) = spawn_child_with_url(&url).await;
+    SpawnedChild {
+        _local_child_task: local_child_task,
+        _cm_realm_instance: cm_realm_instance,
+        handles_receiver,
+        controller_proxy,
+        component_status,
+        cancel_sender: Some(cancel_sender),
+    }
+}
 
+async fn spawn_child_with_url(url: &str) -> (fcomponent::ControllerProxy, RealmInstance) {
     let collection_ref = fcdecl::CollectionRef { name: COLLECTION_NAME.to_string() };
     let child_decl = fcdecl::Child {
-        name: Some("local_child".to_string()),
-        url: Some(url),
+        name: Some("local_child".into()),
+        url: Some(url.into()),
         startup: Some(fcdecl::StartupMode::Lazy),
         ..Default::default()
     };
@@ -185,14 +214,7 @@ async fn spawn_local_child() -> SpawnedChild {
         child_args,
     )
     .await;
-    SpawnedChild {
-        _local_child_task: local_child_task,
-        _cm_realm_instance: cm_realm_instance,
-        handles_receiver,
-        controller_proxy,
-        component_status,
-        cancel_sender: Some(cancel_sender),
-    }
+    (controller_proxy, cm_realm_instance)
 }
 
 #[fuchsia::test]
@@ -404,4 +426,26 @@ pub async fn start_when_already_started() {
     fasync::OnSignals::new(&execution_controller_channel, zx::Signals::CHANNEL_PEER_CLOSED)
         .await
         .unwrap();
+}
+
+#[fuchsia::test]
+pub async fn get_exposed_dict() {
+    let (controller_proxy, _instance) = spawn_child_with_url("#meta/echo_server.cm").await;
+    let (exposed_dict, server_end) = create_proxy().unwrap();
+
+    controller_proxy.get_exposed_dict(server_end).await.unwrap().unwrap();
+    let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
+    let fsandbox::Capability::Open(echo_open) = echo_cap else { panic!("wrong type") };
+    let echo_open = echo_open.into_proxy().unwrap();
+    let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
+    echo_open
+        .open(
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            ".",
+            server_end.into_channel().into(),
+        )
+        .unwrap();
+    let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();
+    assert_eq!(response, "hello");
 }

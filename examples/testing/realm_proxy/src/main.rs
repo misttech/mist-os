@@ -6,7 +6,9 @@ use anyhow::Result;
 use fidl::endpoints::create_endpoints;
 use fidl_fidl_examples_routing_echo as fecho;
 use fidl_test_echoserver as ftest;
-use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
+use fuchsia_component::client::{
+    connect_to_protocol, connect_to_protocol_at, connect_to_protocol_at_path,
+};
 use realm_proxy::client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 
@@ -24,14 +26,21 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
 }
 
 #[fuchsia::test]
-async fn test_example() -> Result<()> {
+async fn test_example() {
     let realm_options = ftest::RealmOptions { ..Default::default() };
-    let test_ns = create_realm(realm_options).await?;
+    let test_ns = create_realm(realm_options).await.unwrap();
 
     info!("connected to the test realm!");
 
-    let echo = connect_to_protocol_at::<fecho::EchoMarker>(test_ns.prefix())?;
+    let echo = connect_to_protocol_at::<fecho::EchoMarker>(test_ns.prefix()).unwrap();
     let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
-    Ok(())
+
+    let echo = connect_to_protocol_at_path::<fecho::EchoMarker>(&format!(
+        "{}/reverse-echo",
+        test_ns.prefix()
+    ))
+    .unwrap();
+    let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();
+    assert_eq!(response, "olleh");
 }

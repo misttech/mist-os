@@ -28,6 +28,12 @@ rustc_binary("bin") {
 
 # [END executable]
 
+fuchsia_component("echo_server_cmp_for_nested_cm") {
+  component_name = "echo_server"
+  manifest = "meta/echo_server_for_nested_cm.cml"
+  deps = [ ":bin" ]
+}
+
 # [START component]
 # Unpackaged component "#meta/echo_server.cm"
 fuchsia_component("echo_server_cmp") {

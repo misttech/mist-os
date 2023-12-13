@@ -37,4 +37,5 @@ fuchsia_package("realm-factory") {
   package_name = "echo_server-realm-factory"
   testonly = true
   deps = [ ":realm-factory-component" ]
+  subpackages = [ "//examples/components/routing/rust/echo_server" ]
 }

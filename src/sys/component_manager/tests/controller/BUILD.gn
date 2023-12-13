@@ -10,8 +10,10 @@ rustc_test("controller_integration_test_bin") {
   testonly = true
   sources = [ "src/lib.rs" ]
   deps = [
+    "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/fidl/rust/fidl",
@@ -31,9 +33,11 @@ fuchsia_unittest_package("controller_integration_test") {
   manifest = "meta/controller_integration_test.cml"
   deps = [
     ":controller_integration_test_bin",
+    "//examples/components/routing/rust/echo_server:echo_server_cmp_for_nested_cm",
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
 }
+
 group("tests") {
   testonly = true
 

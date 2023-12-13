@@ -299,7 +299,10 @@ impl Routable for Open {
     /// Each request from the router will yield an [`Open`]  with rights downscoped to
     /// `request.rights` and paths relative to `request.relative_path`.
     fn route(&self, request: Request, completer: Completer) {
-        let mut open = self.clone().downscope_path(request.relative_path);
+        let mut open = self.clone();
+        if !request.relative_path.is_empty() {
+            open = open.downscope_path(request.relative_path);
+        }
         if let Some(rights) = request.rights {
             open = open.downscope_rights(rights)
         }
