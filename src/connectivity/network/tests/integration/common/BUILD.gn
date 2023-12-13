@@ -69,6 +69,7 @@ rustc_library("netstack_testing_common") {
     "src/interfaces.rs",
     "src/lib.rs",
     "src/ndp.rs",
+    "src/nud.rs",
     "src/packets.rs",
     "src/ping.rs",
     "src/realms.rs",

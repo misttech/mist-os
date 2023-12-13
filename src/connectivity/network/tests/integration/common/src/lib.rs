@@ -11,6 +11,7 @@ pub mod devices;
 pub mod dhcpv4;
 pub mod interfaces;
 pub mod ndp;
+pub mod nud;
 pub mod packets;
 pub mod ping;
 #[macro_use]
