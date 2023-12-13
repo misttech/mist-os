@@ -17,6 +17,7 @@ pub use features::*;
 pub use registry::*;
 
 pub mod framebuffer;
+pub mod gralloc;
 pub mod input;
 pub mod kobject;
 pub mod loop_device;

@@ -4,8 +4,8 @@
 
 use crate::{
     device::{
-        framebuffer::fb_device_init, input::init_input_devices, magma::magma_device_init,
-        perfetto_consumer::start_perfetto_consumer_thread,
+        framebuffer::fb_device_init, gralloc::gralloc_device_init, input::init_input_devices,
+        magma::magma_device_init, perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel},
 };
@@ -116,6 +116,18 @@ pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
     if kernel.features.framebuffer {
         fb_device_init(system_task);
         init_input_devices(system_task);
+    }
+    if kernel.features.gralloc {
+        // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
+        // whether swiftshader or magma will be used. This is separate from the
+        // magma feature because the policy choice whether to use magma or
+        // swiftshader is in vulkan_selector, and it can potentially choose
+        // switfshader for testing purposes even when magma0 is present. Also,
+        // it's nice to indicate swiftshader the same way regardless of whether
+        // the magma feature is enabled or disabled. If a call to gralloc AIDL
+        // IAllocator allocate2 occurs with this feature disabled, the call will
+        // fail.
+        gralloc_device_init(system_task);
     }
     if kernel.features.magma {
         magma_device_init(system_task);
