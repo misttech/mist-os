@@ -27,27 +27,43 @@ group("tests") {
   ]
 }
 
+source_set("aml-i2c-source") {
+  configs += [
+    "//build/config/fuchsia:enable_zircon_asserts",
+    "//build/config:all_source",
+  ]
+  sources = [
+    "aml-i2c.cc",
+    "aml-i2c.h",
+    "dfv1-driver.cc",
+    "dfv1-driver.h",
+  ]
+  deps = [
+    ":aml_i2c_bind",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/hwreg",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 fuchsia_driver("aml-i2c-driver") {
   output_name = "aml-i2c"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-i2c.cc" ]
-  deps = [
-    ":aml_i2c_bind",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zx",
-  ]
+  deps = [ ":aml-i2c-source" ]
 }
 
 fuchsia_driver_component("aml-i2c") {
@@ -65,29 +81,18 @@ fuchsia_driver_package("package") {
 test("aml-i2c-test-bin") {
   output_name = "aml-i2c-test"
   configs += [ "//build/config:all_source" ]
-  sources = [
-    "aml-i2c-test.cc",
-    "aml-i2c.cc",
-  ]
+  sources = [ "aml-i2c-test.cc" ]
   deps = [
-    ":aml_i2c_bind",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    ":aml-i2c-source",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

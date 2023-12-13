@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-i2c.h"
-
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/async-loop/default.h>
@@ -11,6 +9,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/zx/clock.h>
+#include <zircon/time.h>
 
 #include <optional>
 #include <span>
@@ -21,6 +20,7 @@
 #include <zxtest/zxtest.h>
 
 #include "aml-i2c-regs.h"
+#include "dfv1-driver.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
@@ -175,6 +175,14 @@ class AmlI2cTest : public zxtest::Test {
     kStop,
   };
 
+  void TearDown() override {
+    auto aml_i2c_dev = root_->GetLatestChild();
+    if (aml_i2c_dev != nullptr) {
+      device_async_remove(aml_i2c_dev);
+      mock_ddk::ReleaseFlaggedDevices(root_.get());
+    }
+  }
+
   cpp20::span<uint32_t> mmio() { return controller_->mmio(); }
 
   void InitResources() {
@@ -208,10 +216,21 @@ class AmlI2cTest : public zxtest::Test {
   void Init() {
     EXPECT_NO_FATAL_FAILURE(InitResources());
 
-    EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
+    EXPECT_OK(Dfv1Driver::Bind(nullptr, root_.get()));
     ASSERT_EQ(root_->child_count(), 1);
 
-    root_->GetLatestChild()->GetDeviceContext<AmlI2c>()->timeout_ = zx::duration(ZX_TIME_INFINITE);
+    root_->GetLatestChild()->GetDeviceContext<Dfv1Driver>()->SetTimeout(
+        zx::duration(ZX_TIME_INFINITE));
+  }
+
+  zx::result<ddk::I2cImplProtocolClient> I2cImplClient() {
+    ddk::I2cImplProtocolClient i2c_impl;
+    zx_status_t status = root_->GetLatestChild()->GetDeviceContext<Dfv1Driver>()->DdkGetProtocol(
+        ZX_PROTOCOL_I2C_IMPL, &i2c_impl);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(i2c_impl);
   }
 
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
@@ -224,8 +243,8 @@ class AmlI2cTest : public zxtest::Test {
 TEST_F(AmlI2cTest, SmallWrite) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   constexpr uint8_t kWriteData[]{0x45, 0xd9, 0x65, 0xbc, 0x31, 0x26, 0xd7, 0xe5};
 
@@ -239,7 +258,7 @@ TEST_F(AmlI2cTest, SmallWrite) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -266,8 +285,8 @@ TEST_F(AmlI2cTest, SmallWrite) {
 TEST_F(AmlI2cTest, BigWrite) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   constexpr uint8_t kWriteData[]{0xb9, 0x17, 0x32, 0xba, 0x8e, 0xf7, 0x19, 0xf2, 0x78, 0xbf,
                                  0xcb, 0xd3, 0xdc, 0xad, 0xbd, 0x78, 0x1b, 0xa8, 0xef, 0x1a};
@@ -282,7 +301,7 @@ TEST_F(AmlI2cTest, BigWrite) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -328,8 +347,8 @@ TEST_F(AmlI2cTest, BigWrite) {
 TEST_F(AmlI2cTest, SmallRead) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   constexpr uint8_t kExpectedReadData[]{0xf0, 0xdb, 0xdf, 0x6b, 0xb9, 0x3e, 0xa6, 0xfa};
   controller_->SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
@@ -344,7 +363,7 @@ TEST_F(AmlI2cTest, SmallRead) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -370,8 +389,8 @@ TEST_F(AmlI2cTest, SmallRead) {
 TEST_F(AmlI2cTest, BigRead) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   constexpr uint8_t kExpectedReadData[]{0xb9, 0x17, 0x32, 0xba, 0x8e, 0xf7, 0x19, 0xf2, 0x78, 0xbf,
                                         0xcb, 0xd3, 0xdc, 0xad, 0xbd, 0x78, 0x1b, 0xa8, 0xef, 0x1a};
@@ -387,7 +406,7 @@ TEST_F(AmlI2cTest, BigRead) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -432,8 +451,8 @@ TEST_F(AmlI2cTest, BigRead) {
 TEST_F(AmlI2cTest, NoStopFlag) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   uint8_t buffer[4];
   const i2c_impl_op_t op{
@@ -443,7 +462,7 @@ TEST_F(AmlI2cTest, NoStopFlag) {
       .stop = false,
   };
 
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -454,8 +473,8 @@ TEST_F(AmlI2cTest, NoStopFlag) {
 TEST_F(AmlI2cTest, TransferError) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   uint8_t buffer[4];
   controller_->SetReadData({buffer, std::size(buffer)});
@@ -468,14 +487,14 @@ TEST_F(AmlI2cTest, TransferError) {
 
   mmio()[kControlReg / sizeof(uint32_t)] = 1 << 3;
 
-  EXPECT_NOT_OK(i2c.Transact(&op, 1));
+  EXPECT_NOT_OK(i2c->Transact(&op, 1));
 }
 
 TEST_F(AmlI2cTest, ManyTransactions) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   constexpr uint8_t kExpectedReadData[]{0x85, 0xb0, 0xd0, 0x1c, 0xc6, 0x8a, 0x35, 0xfc,
                                         0xcf, 0xca, 0x95, 0x01, 0x61, 0x42, 0x60, 0x8c,
@@ -525,7 +544,7 @@ TEST_F(AmlI2cTest, ManyTransactions) {
       },
   };
 
-  EXPECT_OK(i2c.Transact(ops, std::size(ops)));
+  EXPECT_OK(i2c->Transact(ops, std::size(ops)));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 4);
@@ -605,8 +624,8 @@ TEST_F(AmlI2cTest, ManyTransactions) {
 TEST_F(AmlI2cTest, TransactionTooBig) {
   EXPECT_NO_FATAL_FAILURE(Init());
 
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
+  zx::result i2c = I2cImplClient();
+  ASSERT_OK(i2c.status_value());
 
   uint8_t buffer[513];
   i2c_impl_op_t op{
@@ -614,10 +633,10 @@ TEST_F(AmlI2cTest, TransactionTooBig) {
       .data_size = 512,
       .is_read = false,
   };
-  EXPECT_OK(i2c.Transact(&op, 1));
+  EXPECT_OK(i2c->Transact(&op, 1));
 
   op.data_size = 513;
-  EXPECT_NOT_OK(i2c.Transact(&op, 1));
+  EXPECT_NOT_OK(i2c->Transact(&op, 1));
 }
 
 TEST_F(AmlI2cTest, Metadata) {
@@ -664,7 +683,7 @@ TEST_F(AmlI2cTest, CanUsePDevFragment) {
   root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                         std::move(outgoing_endpoints->client), "pdev");
 
-  EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
+  EXPECT_OK(Dfv1Driver::Bind(nullptr, root_.get()));
   ASSERT_EQ(root_->child_count(), 1);
 }
 
@@ -690,7 +709,7 @@ TEST_F(AmlI2cTest, MmioIrqCountInvalid) {
   ASSERT_NO_FATAL_FAILURE();
   root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                         std::move(outgoing_endpoints->client), "pdev");
-  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
+  EXPECT_NOT_OK(Dfv1Driver::Bind(nullptr, root_.get()));
 }
 
 }  // namespace aml_i2c

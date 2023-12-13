@@ -13,22 +13,22 @@
 #include <lib/zx/time.h>
 #include <threads.h>
 
-#include <ddktl/device.h>
+#include "soc/aml-common/aml-i2c.h"
 
 namespace aml_i2c {
 
-class AmlI2c;
-using DeviceType = ddk::Device<AmlI2c>;
-
-class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_protocol> {
+class AmlI2c : public ddk::I2cImplProtocol<AmlI2c> {
  public:
-  static zx_status_t Bind(void* ctx, zx_device_t* parent);
+  // Create an `AmlI2c` object and return a pointer to it. The return type is a
+  // pointer to `AmlI2c` and not just `AmlI2c` because `AmlI2c` is not copyable.
+  static zx::result<std::unique_ptr<AmlI2c>> Create(ddk::PDevFidl& pdev,
+                                                    const aml_i2c_delay_values& delay);
 
-  AmlI2c(zx_device_t* parent, zx::interrupt irq, zx::event event, fdf::MmioBuffer regs_iobuff)
-      : DeviceType(parent),
-        irq_(std::move(irq)),
-        event_(std::move(event)),
-        regs_iobuff_(std::move(regs_iobuff)) {}
+  AmlI2c(zx::interrupt irq, zx::event event, fdf::MmioBuffer regs_iobuff)
+      : irq_(std::move(irq)), event_(std::move(event)), regs_iobuff_(std::move(regs_iobuff)) {
+    StartIrqThread();
+  }
+
   ~AmlI2c() {
     irq_.destroy();
     if (irqthrd_) {
@@ -36,16 +36,19 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
     }
   }
 
-  void DdkRelease() { delete this; }
-
   zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
   zx_status_t I2cImplSetBitrate(uint32_t bitrate);
   zx_status_t I2cImplTransact(const i2c_impl_op_t* rws, size_t count);
 
- private:
-  friend class AmlI2cTest;
+  thrd_t irqthrd() const { return irqthrd_; }
 
-  static zx_status_t SetClockDelay(zx_device_t* parent, const fdf::MmioBuffer& regs_iobuff);
+  void* get_ops() { return &i2c_impl_protocol_ops_; }
+
+  void SetTimeout(zx::duration timeout) { timeout_ = timeout; }
+
+ private:
+  static zx_status_t SetClockDelay(const aml_i2c_delay_values& delay,
+                                   const fdf::MmioBuffer& regs_iobuff);
 
   void SetTargetAddr(uint16_t addr) const;
   void StartXfer() const;
