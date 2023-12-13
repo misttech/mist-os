@@ -57,6 +57,10 @@ pub struct PlatformUiConfig {
     /// Set with_synthetic_device_support true to include input-helper to ui.
     #[serde(default)]
     pub with_synthetic_device_support: bool,
+
+    /// The renderer Scenic should use.
+    #[serde(default)]
+    pub renderer: RendererType,
 }
 
 impl Default for PlatformUiConfig {
@@ -73,6 +77,7 @@ impl Default for PlatformUiConfig {
             viewing_distance: Default::default(),
             brightness_manager: Default::default(),
             with_synthetic_device_support: Default::default(),
+            renderer: Default::default(),
         }
     }
 }
@@ -133,3 +138,15 @@ impl AsRef<str> for ViewingDistance {
 pub struct BrightnessManager {
     pub with_display_power: bool,
 }
+
+// LINT.IfChange
+/// Options for Scenic renderers that may be supported.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub enum RendererType {
+    Cpu,
+    Null,
+    #[default]
+    Vulkan,
+}
+// LINT.ThenChange(/src/ui/scenic/bin/app.h)

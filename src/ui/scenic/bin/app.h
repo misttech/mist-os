@@ -61,6 +61,7 @@ class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
 };
 
 // What type of renderer is used by Scenic.
+// LINT.IfChange
 enum class RendererType : uint8_t {
   // Use CPU for rendering.
   CPU_RENDERER,
@@ -69,6 +70,7 @@ enum class RendererType : uint8_t {
   // Use Vulkan for rendering.
   VULKAN,
 };
+// LINT.ThenChange(//src/lib/assembly/config_schema/src/platform_config/ui_config.rs)
 
 class App {
  public:

@@ -61,7 +61,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         // We should only configure scenic here when it has been added to assembly.
         let mut scenic_config = builder.package("scenic").component("meta/scenic.cm")?;
         scenic_config
-            .field("renderer", "vulkan")?
+            .field("renderer", serde_json::to_value(ui_config.renderer.clone())?)?
             .field(
                 "frame_scheduler_min_predicted_frame_duration_in_us",
                 ui_config.frame_scheduler_min_predicted_frame_duration_in_us,
