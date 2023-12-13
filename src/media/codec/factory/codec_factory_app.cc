@@ -171,9 +171,9 @@ CodecFactoryApp::CodecFactoryApp(async_dispatcher_t* dispatcher, ProdOrTest prod
               [this](fidl::InterfaceRequest<fuchsia::metrics::MetricEventLoggerFactory> request) {
                 ZX_DEBUG_ASSERT(startup_context_);
                 FX_SLOG(INFO, kLogTag,
-                        "codec_factory handling request for MetricEventLoggerFactory" KV("tag",
-                                                                                         kLogTag),
-                        KV("handle value", request.channel().get()));
+                        "codec_factory handling request for MetricEventLoggerFactory" FX_KV(
+                            "tag", kLogTag),
+                        FX_KV("handle value", request.channel().get()));
                 startup_context_->svc()->Connect(std::move(request));
               });
   outgoing_codec_aux_service_directory_ =
