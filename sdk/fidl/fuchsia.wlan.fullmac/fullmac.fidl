@@ -248,19 +248,10 @@ type WlanFullmacBandCapability = struct {
     operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
 };
 
-type WlanFullmacFeature = flexible enum : uint32 {
-    /// Supports DMA buffer transfer protocol
-    DMA = 0x1;
-    /// Synthetic (i.e., non-physical) device
-    SYNTH = 0x2;
-};
-
 type WlanFullmacQueryInfo = struct {
     sta_addr ieee80211.MacAddr;
     /// WLAN_MAC_ROLE_*
     role fuchsia.wlan.common.WlanMacRole;
-    /// WLAN_FULLMAC_FEATURE_*
-    features uint32;
     band_cap_list array<WlanFullmacBandCapability, fuchsia.wlan.common.MAX_BANDS>;
     band_cap_count uint8;
 };

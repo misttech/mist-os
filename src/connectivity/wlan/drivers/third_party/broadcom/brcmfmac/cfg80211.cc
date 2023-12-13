@@ -4534,14 +4534,6 @@ static void brcmf_dump_if_query_info(fuchsia_wlan_fullmac_wire::WlanFullmacQuery
                        info->role == fuchsia_wlan_common::WlanMacRole::kClient ? "client " : "",
                        info->role == fuchsia_wlan_common::WlanMacRole::kAp ? "ap " : "",
                        info->role == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
-  BRCMF_DBG_UNFILTERED(
-      "   feature(s): %s%s",
-      info->features & static_cast<uint32_t>(fuchsia_wlan_fullmac_wire::WlanFullmacFeature::kDma)
-          ? "DMA "
-          : "",
-      info->features & static_cast<uint32_t>(fuchsia_wlan_fullmac_wire::WlanFullmacFeature::kSynth)
-          ? "SYNTH "
-          : "");
   for (unsigned i = 0; i < info->band_cap_count; i++) {
     brcmf_dump_if_band_cap(&info->band_cap_list[i]);
   }

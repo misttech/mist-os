@@ -369,7 +369,6 @@ void ConvertQueryInfo(fuchsia_wlan_fullmac::wire::WlanFullmacQueryInfo& in,
                       wlan_fullmac_query_info_t* out) {
   memcpy(out->sta_addr, in.sta_addr.data(), fuchsia_wlan_ieee80211::wire::kMacAddrLen);
   out->role = ConvertWlanMacRole(in.role);
-  out->features = in.features;
   out->band_cap_count = in.band_cap_count;
   for (size_t band_idx = 0; band_idx < in.band_cap_count; band_idx++) {
     ConvertBandCapability(in.band_cap_list.data()[band_idx], &out->band_cap_list[band_idx]);

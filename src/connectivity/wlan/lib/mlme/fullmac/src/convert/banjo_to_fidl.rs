@@ -759,7 +759,6 @@ mod tests {
         let banjo_info = banjo_wlan_fullmac::WlanFullmacQueryInfo {
             sta_addr: [1u8; 6],
             role: banjo_wlan_common::WlanMacRole::CLIENT,
-            features: 2,
             band_cap_list: [dummy_band_capability.clone(); 16],
             band_cap_count: 1,
         };

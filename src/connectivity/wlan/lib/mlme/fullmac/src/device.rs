@@ -731,7 +731,6 @@ pub mod test_utils {
                     query_device_info_mock: banjo_wlan_fullmac::WlanFullmacQueryInfo {
                         sta_addr: [0u8; 6],
                         role: banjo_wlan_common::WlanMacRole::CLIENT,
-                        features: 0,
                         band_cap_list: [dummy_band_cap(); 16],
                         band_cap_count: 0,
                     },

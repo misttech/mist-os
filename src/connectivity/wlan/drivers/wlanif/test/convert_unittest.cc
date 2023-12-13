@@ -21,7 +21,6 @@ namespace wlan_internal = fuchsia_wlan_internal::wire;
 
 // Fake metadata -- general
 static constexpr uint8_t kFakeMacAddr[wlan_ieee80211::kMacAddrLen] = {6, 5, 4, 3, 2, 2};
-static constexpr uint32_t kFakeFeature = WLAN_FULLMAC_FEATURE_SYNTH;
 static constexpr uint8_t kFakeRate = 206;
 static constexpr uint8_t kFakeHtCapBytes[wlan_ieee80211::kHtCapLen] = {
     3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3};
@@ -245,7 +244,6 @@ TEST_F(ConvertTest, ToBanjoQueryInfo) {
   memcpy(sta_addr.begin(), kFakeMacAddr, sta_addr.size());
   in.sta_addr = sta_addr;
   in.role = kFakeFidlMacRole;
-  in.features = kFakeFeature;
 
   fidl::Array<wlan_fullmac::WlanFullmacBandCapability, wlan_common::kMaxBands> band_caps_buffer;
 
@@ -284,7 +282,6 @@ TEST_F(ConvertTest, ToBanjoQueryInfo) {
 
   EXPECT_EQ(0, memcmp(out.sta_addr, kFakeMacAddr, wlan_ieee80211::kMacAddrLen));
   EXPECT_EQ(kFakeBanjoMacRole, out.role);
-  EXPECT_EQ(kFakeFeature, out.features);
   EXPECT_EQ(wlan_common::kMaxBands, out.band_cap_count);
 
   for (size_t i = 0; i < wlan_common::kMaxBands; i++) {
