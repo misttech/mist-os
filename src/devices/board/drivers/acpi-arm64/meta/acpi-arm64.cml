@@ -17,6 +17,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
