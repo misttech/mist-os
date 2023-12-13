@@ -19,7 +19,9 @@ PREBUILT_THIRD_PARTY_DIR = PREBUILT_DIR / "third_party"
 HOST_PLATFORM = (
     platform.system().lower().replace("darwin", "mac")
     + "-"
-    + {"x86_64": "x64", "aarch64": "arm64"}[platform.machine()]
+    + {"x86_64": "x64", "aarch64": "arm64", "arm64": "arm64"}[
+        platform.machine()
+    ]
 )
 
 
