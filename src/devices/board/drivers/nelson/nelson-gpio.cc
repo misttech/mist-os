@@ -170,8 +170,8 @@ static const gpio_pin_t gpio_pins[] = {
 // instead of this one.
 static const gpio_pin_t gpio_h_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_SELINA_RESET), DECL_GPIO_PIN(GPIO_SOC_SPI_B_MOSI),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO), DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK)};
+    DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO),   DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
+    DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK),   DECL_GPIO_PIN(GPIO_SOC_SELINA_OSC_EN)};
 
 static const std::vector<fpbus::Metadata> gpio_h_metadata{
     {{

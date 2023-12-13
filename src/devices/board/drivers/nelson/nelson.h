@@ -20,6 +20,8 @@
 #include <fbl/macros.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+
 namespace nelson {
 
 // BTI IDs for our devices
@@ -102,7 +104,10 @@ class Nelson : public NelsonType {
   explicit Nelson(zx_device_t* parent,
                   fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
                   iommu_protocol_t* iommu)
-      : NelsonType(parent), pbus_(std::move(pbus)), iommu_(iommu) {}
+      : NelsonType(parent),
+        pbus_(std::move(pbus)),
+        iommu_(iommu),
+        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -111,6 +116,12 @@ class Nelson : public NelsonType {
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Nelson);
+
+  void Serve(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> request) {
+    device_connect_runtime_protocol(
+        parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
+        fuchsia_hardware_platform_bus::Service::PlatformBus::Name, request.TakeChannel().release());
+  }
 
   zx_status_t AudioInit();
   zx_status_t BluetoothInit();
@@ -147,6 +158,7 @@ class Nelson : public NelsonType {
   zx_status_t NnaInit();
   zx_status_t RamCtlInit();
   zx_status_t ThermistorInit();
+  zx_status_t AddPostInitDevice();
   int Thread();
 
   uint32_t GetBoardRev(void);
@@ -190,6 +202,8 @@ class Nelson : public NelsonType {
   inspect::UintProperty board_rev_property_;
   inspect::UintProperty board_option_property_;
   inspect::UintProperty display_id_property_;
+
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace nelson

@@ -34,5 +34,15 @@
         },
         "expected": "abort",
         "name": "WrongPlatform"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON",
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE",
+            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.platform.BIND_FIDL_PROTOCOL.PLATFORM_BUS",
+            "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "1"
+        },
+        "expected": "abort",
+        "name": "WrongInstanceId"
     }
 ]

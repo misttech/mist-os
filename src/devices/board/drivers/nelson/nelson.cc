@@ -19,6 +19,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <array>
+
+#include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
@@ -138,6 +145,11 @@ int Nelson::Thread() {
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
     zxlogf(ERROR, "%s: GpioInit() failed: %d", __func__, status);
+    return status;
+  }
+
+  if ((status = AddPostInitDevice()) != ZX_OK) {
+    zxlogf(ERROR, "%s: AddPostInitDevice() failed: %d", __func__, status);
     return status;
   }
 
@@ -312,8 +324,42 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
+  {
+    fuchsia_hardware_platform_bus::Service::InstanceHandler handler({
+        .platform_bus = fit::bind_member<&Nelson::Serve>(board.get()),
+    });
+    auto result =
+        board->outgoing_.AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (directory_endpoints.is_error()) {
+    return directory_endpoints.status_value();
+  }
+
+  {
+    auto result = board->outgoing_.Serve(std::move(directory_endpoints->server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  constexpr zx_device_prop_t kBoardDriverProps[] = {
+      {BIND_PLATFORM_DEV_VID, 0, bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE},
+      {BIND_PLATFORM_DEV_PID, 0, bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON},
+      {BIND_PLATFORM_DEV_INSTANCE_ID, 0, 1},
+  };
+
+  const char* fidl_service_offers[] = {fuchsia_hardware_platform_bus::Service::Name};
   status = board->DdkAdd(ddk::DeviceAddArgs("nelson")
-                             .set_flags(DEVICE_ADD_NON_BINDABLE)
+                             .set_props(kBoardDriverProps)
+                             .set_outgoing_dir(directory_endpoints->client.TakeChannel())
+                             .set_runtime_service_offers({fidl_service_offers, 1})
                              .set_inspect_vmo(board->inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     return status;
@@ -326,6 +372,58 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
     [[maybe_unused]] auto* dummy = board.release();
   }
   return status;
+}
+
+zx_status_t Nelson::AddPostInitDevice() {
+  constexpr std::array<uint32_t, 8> kPostInitGpios{
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_7,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_8,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_3,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_0,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_4,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_11,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_12,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_8,
+  };
+
+  const ddk::BindRule post_init_rules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_platform_bus::SERVICE,
+                              bind_fuchsia_hardware_platform_bus::SERVICE_DRIVERTRANSPORT),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, 1u),
+  };
+  const device_bind_prop_t post_init_properties[] = {
+      ddk::MakeProperty(bind_fuchsia_hardware_platform_bus::SERVICE,
+                        bind_fuchsia_hardware_platform_bus::SERVICE_DRIVERTRANSPORT),
+      ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON),
+      ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, 1u),
+  };
+
+  auto spec = ddk::CompositeNodeSpec(post_init_rules, post_init_properties);
+  for (const uint32_t pin : kPostInitGpios) {
+    const ddk::BindRule gpio_rules[] = {
+        ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+        ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, pin),
+    };
+    const device_bind_prop_t gpio_properties[] = {
+        ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+        ddk::MakeProperty(bind_fuchsia::GPIO_PIN, pin),
+    };
+    spec.AddParentSpec(gpio_rules, gpio_properties);
+  }
+
+  if (zx_status_t status = DdkAddCompositeNodeSpec("post-init", spec); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add board info composite: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 static zx_driver_ops_t nelson_driver_ops = []() {

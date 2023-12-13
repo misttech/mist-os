@@ -12,7 +12,10 @@ if (internal_access) {
 }
 
 group("nelson") {
-  deps = [ ":nelson-module" ]
+  deps = [
+    ":nelson-module",
+    "post-init:post-init",
+  ]
 
   if (internal_access) {
     deps += [ ":config-tas5805" ]
@@ -195,11 +198,13 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//src/connectivity/openthread/lib/ot-radio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
@@ -280,6 +285,7 @@ group("tests") {
   testonly = true
   deps = [
     ":aml_thermal_pll_bind_test",
+    ":nelson-bind_test",
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
