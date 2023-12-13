@@ -350,7 +350,10 @@ pub struct Path {
 
 impl Path {
     pub fn new(path: &str) -> Path {
-        Path { segments: path.split("/").map(|s| s.to_owned()).collect() }
+        debug_assert!(ValidatePath::validate(path).is_ok());
+        let path = Path { segments: path.split("/").map(|s| s.to_owned()).collect() };
+        debug_assert!(ValidatePath::validate(path.fuchsia_io_path().as_str()).is_ok());
+        path
     }
 
     pub fn is_empty(&self) -> bool {
@@ -366,11 +369,15 @@ impl Path {
     }
 
     pub fn prepend(&mut self, segment: String) {
+        debug_assert!(ValidatePath::validate(segment.as_str()).is_ok());
         self.segments.push_front(segment);
+        debug_assert!(ValidatePath::validate(self.fuchsia_io_path().as_str()).is_ok());
     }
 
     pub fn append(&mut self, segment: String) {
+        debug_assert!(ValidatePath::validate(segment.as_str()).is_ok());
         self.segments.push_back(segment);
+        debug_assert!(ValidatePath::validate(self.fuchsia_io_path().as_str()).is_ok());
     }
 
     /// Returns a path that will be valid for using in a `fuchsia.io/Directory.Open` operation.
