@@ -165,9 +165,7 @@ closed protocol RadarBurstReader {
         burst Burst;
     }) error StatusCode;
 
-    // TODO(fxbug.dev/99924): Remove this after `OnBurst()` has the same
-    // signature and all users have been migrated.
-    @available(added=12)
+    @available(added=12, removed=17)
     strict -> OnBurst2(flexible union {
         1: burst Burst;
         2: error StatusCode;
