@@ -8,7 +8,7 @@ Dispatcher interface. These are implemented in
 [kernel/object](/zircon/kernel/object). Many are self-contained higher-level Objects.
 Some wrap lower-level [lk][glossary.lk] primitives.
 
-## [System Calls](/reference/syscalls/README.md)
+## [System Calls](/reference/syscalls)
 
 Userspace code interacts with kernel objects via system calls, and almost
 exclusively via [Handles](/docs/concepts/kernel/handles.md).  In userspace, a Handle is represented as

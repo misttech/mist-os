@@ -1,7 +1,7 @@
 # Zircon vDSO
 
 The Zircon vDSO is the sole means of access to [system
-calls](/reference/syscalls/README.md)
+calls](/reference/syscalls)
 in Zircon. vDSO stands for *virtual Dynamic Shared Object*. (*Dynamic
 Shared Object* is a term used for a shared library in the ELF format.)
 It's *virtual* because it's not loaded from an ELF file that sits in a
@@ -30,7 +30,7 @@ makes it easier to use the system call ABI without implementing a
 general-purpose ELF loader and full ELF dynamic linking semantics.
 
 ELF symbol names are the same as C identifiers with external linkage.
-Each [system call](/reference/syscalls/README.md) corresponds to an ELF symbol in the vDSO,
+Each [system call](/reference/syscalls) corresponds to an ELF symbol in the vDSO,
 and has the ABI of a C function. The vDSO functions use only the basic
 machine-specific C calling conventions governing the use of machine
 registers and the stack, which is common across many systems that use ELF,
@@ -105,7 +105,7 @@ info entry* `PA_HND(PA_VMO_VDSO, 0)`.
 
 The [`zither` tool](/zircon/tools/zither/) generates both C/C++ function
 declarations that form the public [system
-call](/reference/syscalls/README.md) API, and some C++ and assembly code
+call](/reference/syscalls) API, and some C++ and assembly code
 used in the implementation of the vDSO. Both the public API and the private
 interface between the kernel and the vDSO code are specified by the .fidl files
 in [//zircon/vdso](/zircon/vdso).

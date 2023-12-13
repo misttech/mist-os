@@ -6,7 +6,7 @@ Fuchsia.
 ## System calls
 
 The lowest level of Fuchsia support in a language provides access to the
-[Zircon system calls](/reference/syscalls/README.md).
+[Zircon system calls](/reference/syscalls).
 Exposing these system calls lets programs written in the language interact with
 the kernel and, transitively, with the rest of the system.
 

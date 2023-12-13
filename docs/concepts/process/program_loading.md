@@ -247,7 +247,7 @@ A bootstrap message conveys:
 ### Handle info entry {#handle-info-entry}
 The handles serve many purposes, indicated by the *handle info entry* type:
 
- * essential handles for the process to make [system calls](/reference/syscalls/README.md):
+ * essential handles for the process to make [system calls](/reference/syscalls):
    [process](/docs/reference/kernel_objects/process.md), [VMAR](/docs/reference/kernel_objects/vm_address_region.md),
    [thread](/docs/reference/kernel_objects/thread.md), [job](/docs/reference/kernel_objects/job.md)
  * [channel](/docs/reference/kernel_objects/channel.md) to the [loader service](#the-loader-service)
@@ -391,7 +391,7 @@ When [SanitizerCoverage](https://clang.llvm.org/docs/SanitizerCoverage.html)
 is enabled, it publishes a VMO to the *data sink* name `sancov` and uses a
 VMO name including the process KOID.
 
-[system calls]: /reference/syscalls/README.md
+[system calls]: /reference/syscalls
 [`zx_channel_call()`]: /reference/syscalls/channel_call.md
 [`zx_process_start()`]: /reference/syscalls/process_start.md
 [`zx_thread_create()`]: /reference/syscalls/thread_create.md
