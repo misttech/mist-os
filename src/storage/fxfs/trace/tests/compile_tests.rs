@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fxfs_trace::{cstr, FxfsTraceFutureExt};
+use fxfs_trace::{trace_future_args, TraceFutureExt};
 
 #[fuchsia::test]
 fn test_fn_attr_sync() {
@@ -217,6 +217,15 @@ fn test_flow_end() {
 
 #[fuchsia::test]
 async fn test_trace_future() {
-    let value = async move { 5 }.trace(cstr!("test-future")).await;
+    let value = async move { 5 }.trace(trace_future_args!("test-future")).await;
+    assert_eq!(value, 5);
+
+    let value = async move { 5 }.trace(trace_future_args!("test-future", "arg1" => 6)).await;
+    assert_eq!(value, 5);
+
+    let tace_only_var = 7;
+    let value = async move { 5 }
+        .trace(trace_future_args!("test-future", "arg1" => 6, "ar2" => tace_only_var))
+        .await;
     assert_eq!(value, 5);
 }

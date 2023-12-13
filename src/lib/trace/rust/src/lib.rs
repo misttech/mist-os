@@ -7,7 +7,9 @@ pub use cstr::cstr;
 use {
     fuchsia_zircon as zx,
     pin_project::pin_project,
-    std::{ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll},
+    std::{
+        ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll, vec::Vec,
+    },
 };
 
 pub use sys::{TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO};
@@ -1736,6 +1738,71 @@ macro_rules! string_name_macro {
     };
 }
 
+/// Arguments for `TraceFuture` and `TraceFutureExt`. Use `trace_future_args!` to construct this
+/// object.
+pub struct TraceFutureArgs<'a> {
+    pub category: &'static CStr,
+    pub name: &'static CStr,
+
+    /// `TraceFuture::new` and `trace_future_args!` both check if the trace category is enabled. The
+    /// trace context is acquired in `trace_future_args!` and is passed to `TraceFuture::new` to
+    /// avoid acquiring it twice.
+    pub context: Option<TraceCategoryContext>,
+
+    /// The trace arguments to appear in every duration event written by the `TraceFuture`. `args`
+    /// should be empty if `context` is `None`.
+    pub args: Vec<Arg<'a>>,
+
+    /// The flow id to use in the flow events that connect the duration events together. A flow id
+    /// will be constructed with `Id::new()` if not provided.
+    pub flow_id: Option<Id>,
+
+    /// Use `trace_future_args!` to construct this object.
+    pub _use_trace_future_args: (),
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __impl_trace_future_args {
+    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
+        let context = $crate::TraceCategoryContext::acquire($crate::cstr!($category));
+        let args = if context.is_some() {
+            vec![$($crate::ArgValue::of($key, $val)),*]
+        } else {
+            vec![]
+        };
+        $crate::TraceFutureArgs {
+            category: $crate::cstr!($category),
+            name: $crate::cstr!($name),
+            context: context,
+            args: args,
+            flow_id: $flow_id,
+            _use_trace_future_args: (),
+        }
+    }};
+}
+
+/// Macro for constructing `TraceFutureArgs`. The trace arguments won't be constructed if the
+/// category is not enabled. If the category becomes enabled while the `TraceFuture` is still alive
+/// then the duration events will still be written but without the trace arguments.
+///
+/// Example:
+///
+/// ```
+/// async move {
+///     ....
+/// }.trace(trace_future_args!("category", "name", "x" => 5, "y" => 10)).await;
+/// ```
+#[macro_export]
+macro_rules! trace_future_args {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+        $crate::__impl_trace_future_args!($category, $name, None $(,$key => $val)*)
+    };
+    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
+        $crate::__impl_trace_future_args!($category, $name, Some($flow_id) $(,$key => $val)*)
+    };
+}
+
 /// Extension trait for tracing futures.
 pub trait TraceFutureExt: Future + Sized {
     /// Wraps a `Future` in a `TraceFuture`.
@@ -1743,48 +1810,61 @@ pub trait TraceFutureExt: Future + Sized {
     /// Example:
     ///
     /// ```rust
-    /// future.trace(cstr!("category"), cstr!("name")).await;
+    /// future.trace(trace_future_args!("category", "name")).await;
     /// ```
     ///
     /// Which is equivalent to:
     ///
     /// ```rust
-    /// TraceFuture::new(cstr!("category"), cstr!("name"), Id::new(), future).await;
+    /// TraceFuture::new(trace_future_args!("category", "name"), future).await;
     /// ```
-    fn trace(self, category: &'static CStr, name: &'static CStr) -> TraceFuture<Self> {
-        TraceFuture::new(category, name, Id::new(), self)
+    fn trace<'a>(self, args: TraceFutureArgs<'a>) -> TraceFuture<'a, Self> {
+        TraceFuture::new(args, self)
     }
 }
 
 impl<T: Future + Sized> TraceFutureExt for T {}
 
-/// Wraps a `Future` and emits a duration event every time the future is polled. The duration events
-/// are connected by flow events.
+/// Wraps a `Future` and writes duration events when the future is created, dropped, and every time
+/// it's polled. The duration events are connected by flow events.
 #[pin_project(PinnedDrop)]
-pub struct TraceFuture<Fut: Future> {
+pub struct TraceFuture<'a, Fut: Future> {
     category: &'static CStr,
     name: &'static CStr,
-    flow_id: Id,
+    args: Vec<Arg<'a>>,
+    flow_id: Option<Id>,
     #[pin]
     future: Fut,
 }
 
-impl<Fut: Future> TraceFuture<Fut> {
-    pub fn new(category: &'static CStr, name: &'static CStr, flow_id: Id, future: Fut) -> Self {
-        let this = Self { category, name, flow_id, future };
-        if let Some(context) = TraceCategoryContext::acquire(category) {
+impl<'a, Fut: Future> TraceFuture<'a, Fut> {
+    pub fn new(args: TraceFutureArgs<'a>, future: Fut) -> Self {
+        debug_assert!(
+            args.context.is_some() || args.args.is_empty(),
+            "There should not be any trace arguments when the category is disabled"
+        );
+        let mut this = Self {
+            category: args.category,
+            name: args.name,
+            args: args.args,
+            flow_id: args.flow_id,
+            future: future,
+        };
+        if let Some(context) = args.context {
             this.trace_create(context);
         }
         this
     }
 
     #[cold]
-    fn trace_create(&self, context: TraceCategoryContext) {
+    fn trace_create(&mut self, context: TraceCategoryContext) {
         let name_ref = context.register_string_literal(self.name);
-        let args = [ArgValue::of("state", "created")];
+        let flow_id = self.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::ticks_get();
-        context.write_flow_begin(name_ref, self.flow_id, &[]);
-        context.write_duration(name_ref, duration_start, &args);
+        context.write_flow_begin(name_ref, *flow_id, &[]);
+        self.args.push(ArgValue::of("state", "created"));
+        context.write_duration(name_ref, duration_start, &self.args);
+        self.args.pop();
     }
 
     #[cold]
@@ -1795,12 +1875,14 @@ impl<Fut: Future> TraceFuture<Fut> {
     ) -> Poll<Fut::Output> {
         let this = self.project();
         let name_ref = context.register_string_literal(this.name);
+        let flow_id = this.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::ticks_get();
-        context.write_flow_step(name_ref, *this.flow_id, &[]);
+        context.write_flow_step(name_ref, *flow_id, &[]);
         let result = this.future.poll(cx);
         let result_str: &'static str = if result.is_pending() { "pending" } else { "ready" };
-        let args = [ArgValue::of("state", result_str)];
-        context.write_duration(name_ref, duration_start, &args);
+        this.args.push(ArgValue::of("state", result_str));
+        context.write_duration(name_ref, duration_start, &this.args);
+        this.args.pop();
         result
     }
 
@@ -1808,14 +1890,16 @@ impl<Fut: Future> TraceFuture<Fut> {
     fn trace_drop(self: Pin<&mut Self>, context: TraceCategoryContext) {
         let this = self.project();
         let name_ref = context.register_string_literal(this.name);
-        let args = [ArgValue::of("state", "dropped")];
+        let flow_id = this.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::ticks_get();
-        context.write_flow_end(name_ref, *this.flow_id, &[]);
-        context.write_duration(name_ref, duration_start, &args);
+        context.write_flow_end(name_ref, *flow_id, &[]);
+        this.args.push(ArgValue::of("state", "dropped"));
+        context.write_duration(name_ref, duration_start, &this.args);
+        this.args.pop();
     }
 }
 
-impl<Fut: Future> Future for TraceFuture<Fut> {
+impl<Fut: Future> Future for TraceFuture<'_, Fut> {
     type Output = Fut::Output;
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Fut::Output> {
         if let Some(context) = TraceCategoryContext::acquire(self.as_ref().get_ref().category) {
@@ -1827,7 +1911,7 @@ impl<Fut: Future> Future for TraceFuture<Fut> {
 }
 
 #[pin_project::pinned_drop]
-impl<Fut: Future> PinnedDrop for TraceFuture<Fut> {
+impl<Fut: Future> PinnedDrop for TraceFuture<'_, Fut> {
     fn drop(self: Pin<&mut Self>) {
         if let Some(context) = TraceCategoryContext::acquire(self.as_ref().get_ref().category) {
             self.trace_drop(context);

@@ -243,12 +243,49 @@ TEST(TEST_SUITE, test_trace_future_enabled) {
       "{state: string(\"dropped\")})\n");
 }
 
+TEST(TEST_SUITE, test_trace_future_enabled_with_arg) {
+  BEGIN_TRACE_TEST;
+
+  fixture_initialize_and_start_tracing();
+
+  rs_test_trace_future_enabled_with_arg();
+
+  ASSERT_RECORDS(
+      "String(index: 1, \"+enabled\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
+      "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
+      "Thread(index: 1, <>)\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", FlowBegin(id: 3), {})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
+      "{arg: int32(10), state: string(\"created\")})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", FlowStep(id: 3), {})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
+      "{arg: int32(10), state: string(\"pending\")})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", FlowStep(id: 3), {})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
+      "{arg: int32(10), state: string(\"ready\")})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", FlowEnd(id: 3), {})\n"
+      "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
+      "{arg: int32(10), state: string(\"dropped\")})\n");
+}
+
 TEST(TEST_SUITE, test_trace_future_disabled) {
   BEGIN_TRACE_TEST;
 
   fixture_initialize_and_start_tracing();
 
   rs_test_trace_future_disabled();
+
+  ASSERT_RECORDS("");
+}
+
+TEST(TEST_SUITE, test_trace_future_disabled_with_arg) {
+  BEGIN_TRACE_TEST;
+
+  fixture_initialize_and_start_tracing();
+
+  rs_test_trace_future_disabled_with_arg();
 
   ASSERT_RECORDS("");
 }

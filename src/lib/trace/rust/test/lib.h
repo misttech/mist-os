@@ -25,5 +25,7 @@ void rs_test_async_event_with_scope(void);
 void rs_test_alert();
 
 void rs_test_trace_future_enabled();
+void rs_test_trace_future_enabled_with_arg();
 void rs_test_trace_future_disabled();
+void rs_test_trace_future_disabled_with_arg();
 }

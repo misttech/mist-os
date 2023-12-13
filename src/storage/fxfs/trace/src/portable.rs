@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{ffi::CStr, future::Future};
+use std::future::Future;
 
-pub trait FxfsTraceFutureExt: Future + Sized {
-    fn trace(self, _name: &'static CStr) -> Self {
+pub struct TraceFutureArgs {
+    pub _use_trace_future_args: (),
+}
+
+pub trait TraceFutureExt: Future + Sized {
+    fn trace(self, _args: TraceFutureArgs) -> Self {
         self
     }
 }
+
+impl<T: Future + Sized> TraceFutureExt for T {}
 
 #[macro_export]
 macro_rules! duration {
@@ -46,6 +52,18 @@ macro_rules! flow_end {
         $crate::__ignore_unused_variables!($flow_id);
         $crate::__ignore_unused_variables!($($val),*);
     }
+}
+
+#[macro_export]
+macro_rules! trace_future_args {
+    ($name:expr $(, $key:expr => $val:expr)*) => {
+        {
+            $crate::__ignore_unused_variables!($($val),*);
+            $crate::TraceFutureArgs {
+                _use_trace_future_args: ()
+            }
+        }
+    };
 }
 
 #[doc(hidden)]

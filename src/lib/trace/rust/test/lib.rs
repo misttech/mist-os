@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_trace as trace;
-use std::{ffi::CStr, future::poll_fn, task::Poll};
+use std::{future::poll_fn, task::Poll};
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_enabled() -> bool {
@@ -98,13 +98,11 @@ pub extern "C" fn rs_test_alert() {
     trace::alert!("+enabled", "alert_name");
 }
 
-fn trace_future_test(category: &'static CStr) {
+fn trace_future_test(args: trace::TraceFutureArgs<'_>) {
     let mut executor = fuchsia_async::TestExecutor::new();
     let mut polled = false;
     executor.run_singlethreaded(trace::TraceFuture::new(
-        category,
-        trace::cstr!("name"),
-        3.into(),
+        args,
         poll_fn(move |cx| {
             if !polled {
                 polled = true;
@@ -119,10 +117,26 @@ fn trace_future_test(category: &'static CStr) {
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_future_enabled() {
-    trace_future_test(trace::cstr!("+enabled"));
+    trace_future_test(trace::trace_future_args!("+enabled", "name", 3.into()));
+}
+
+#[no_mangle]
+pub extern "C" fn rs_test_trace_future_enabled_with_arg() {
+    trace_future_test(trace::trace_future_args!("+enabled", "name", 3.into(), "arg" => 10));
 }
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_future_disabled() {
-    trace_future_test(trace::cstr!("-disabled"));
+    trace_future_test(trace::trace_future_args!("-disabled", "name", 3.into()));
+}
+
+#[no_mangle]
+pub extern "C" fn rs_test_trace_future_disabled_with_arg() {
+    #[allow(unreachable_code)]
+    trace_future_test(trace::trace_future_args!(
+        "-disabled",
+        "name",
+        3.into(),
+        "arg" => panic!("arg should not be evaluated")
+    ));
 }

@@ -26,7 +26,7 @@ use {
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
     },
-    fxfs_trace::{cstr, FxfsTraceFutureExt},
+    fxfs_trace::TraceFutureExt,
     std::{
         ops::Range,
         sync::{
@@ -511,7 +511,7 @@ impl PagerBacked for FxFile {
 
     fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
         self.handle.owner().clone().spawn(async move {
-            self.handle.mark_dirty(range).trace(cstr!("mark_dirty")).await;
+            self.handle.mark_dirty(range).trace(fxfs_trace::trace_future_args!("mark_dirty")).await;
         });
     }
 

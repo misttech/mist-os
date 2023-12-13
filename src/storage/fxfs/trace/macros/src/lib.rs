@@ -183,10 +183,10 @@ fn add_tracing_to_async_block(return_type: &ReturnType, block: &mut Block, name:
 
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
-        ::fxfs_trace::FxfsTraceFutureExt::trace(async move {
+        ::fxfs_trace::TraceFutureExt::trace(async move {
             #type_inference_fix
             #(#stmts)*
-        }, ::fxfs_trace::cstr!(#name)).await
+        }, ::fxfs_trace::trace_future_args!(#name)).await
     );
 }
 

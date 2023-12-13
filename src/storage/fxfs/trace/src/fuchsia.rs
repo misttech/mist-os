@@ -2,15 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{ffi::CStr, future::Future};
-
 pub use fuchsia_trace;
-
-pub trait FxfsTraceFutureExt: Future + Sized {
-    fn trace(self, name: &'static CStr) -> fuchsia_trace::TraceFuture<Self> {
-        fuchsia_trace::TraceFuture::new(cstr::cstr!("fxfs"), name, fuchsia_trace::Id::new(), self)
-    }
-}
+pub use fuchsia_trace::TraceFutureExt;
 
 #[macro_export]
 macro_rules! duration {
@@ -49,4 +42,11 @@ macro_rules! flow_end {
     ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         $crate::fuchsia_trace::flow_end!("fxfs", $name, ($flow_id).into() $(,$key => $val)*);
     }
+}
+
+#[macro_export]
+macro_rules! trace_future_args {
+    ($name:expr $(, $key:expr => $val:expr)*) => {
+        $crate::fuchsia_trace::trace_future_args!("fxfs", $name $(,$key => $val)*);
+    };
 }
