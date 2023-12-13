@@ -165,10 +165,6 @@ int Nelson::Thread() {
     zxlogf(ERROR, "CpuInit failed: %d", status);
   }
 
-  if ((status = SelinaInit()) != ZX_OK) {
-    zxlogf(ERROR, "SelinaInit failed: %d\n", status);
-  }
-
   if ((status = MaliInit()) != ZX_OK) {
     zxlogf(ERROR, "MaliInit failed: %d", status);
   }

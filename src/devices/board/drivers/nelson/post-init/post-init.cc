@@ -301,8 +301,7 @@ zx::result<> PostInit::AddSelinaCompositeNode() {
   };
 
   const fuchsia_driver_framework::CompositeNodeSpec selina_node_spec{{
-      // TODO(b/304828063): Complete the Selina bind rule migration and update this.
-      .name = "selina-composite-new",
+      .name = "selina-composite",
       .parents = selina_parents,
   }};
 

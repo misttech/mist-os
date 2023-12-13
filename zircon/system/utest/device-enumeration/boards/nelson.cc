@@ -83,8 +83,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // Amber LED.
       "sys/platform/05:00:1c/aml_light",
 
-      // TODO(b/304828063): Complete the Selina bind rule migration and add this back.
-      // "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
+      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
 
       "sys/platform/05:05:24/ram",
 
@@ -120,14 +119,6 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
       cpp20::span(kTouchscreenDevicePaths, std::size(kTouchscreenDevicePaths))));
-
-  // TODO(b/304828063): Complete the Selina bind rule migration and remove this.
-  static const char* kSelinaDevicePaths[] = {
-      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
-      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite-new/selina",
-  };
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
-      cpp20::span(kSelinaDevicePaths, std::size(kSelinaDevicePaths))));
 
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/power-sensor", 2));
 }

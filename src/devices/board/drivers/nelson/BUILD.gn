@@ -94,19 +94,6 @@ driver_bind_rules("nelson_wifi_bind") {
   ]
 }
 
-driver_bind_rules("nelson_selina_bind") {
-  rules = "bind/nelson_selina.bind"
-  header_output = "nelson_selina_bind.h"
-  bind_output = "nelson_selina_bind.bc"
-  tests = "bind-tests/nelson_selina-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.infineon.platform",
-    "//src/devices/bind/fuchsia.spi",
-  ]
-}
-
 driver_bind_rules("aml_thermal_pll_bind") {
   rules = "bind/aml_thermal_pll.bind"
   header_output = "aml_thermal_pll_bind.h"
@@ -167,7 +154,6 @@ fuchsia_driver("nelson-module-driver") {
     "nelson-registers.cc",
     "nelson-sdio.cc",
     "nelson-securemem.cc",
-    "nelson-selina.cc",
     "nelson-spi.cc",
     "nelson-sysmem.cc",
     "nelson-tee.cc",
@@ -184,7 +170,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
     ":nelson_emmc_bind_header",
-    ":nelson_selina_bind_header",
     ":nelson_wifi_bind_header",
     ":pwm_init_bind_header",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
@@ -287,7 +272,6 @@ group("tests") {
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
-    ":nelson_selina_bind_test",
     ":nelson_wifi_bind_test",
   ]
 }

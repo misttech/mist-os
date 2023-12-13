@@ -120,7 +120,6 @@ class Nelson : public NelsonType {
   zx_status_t SdioInit();
   zx_status_t Start();
   zx_status_t SecureMemInit();
-  zx_status_t SelinaInit();
   zx_status_t SpiInit();
   zx_status_t Spi0Init();
   zx_status_t Spi1Init();
