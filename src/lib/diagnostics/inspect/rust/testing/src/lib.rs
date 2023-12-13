@@ -45,10 +45,6 @@ pub struct Options {
     #[structopt(long)]
     pub columns: usize,
 
-    // If set, only new-style Inspect will be published, not deprecated FIDL or VMO file.
-    #[structopt(long = "only-new")]
-    pub only_new: bool,
-
     /// If set, publish a top-level number called "extra_number".
     #[structopt(long = "extra-number")]
     pub extra_number: Option<i64>,
@@ -166,11 +162,9 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
     // Rust doesn't have a way of writing to the deprecated FIDL service, therefore
     // we read what we wrote to the VMO and provide it through the service for testing
     // purposes.
-    if !opts.only_new {
-        fs.dir("diagnostics").add_fidl_service(move |stream| {
-            spawn_inspect_server(stream, example_table.get_node_object());
-        });
-    }
+    fs.dir("diagnostics").add_fidl_service(move |stream| {
+        spawn_inspect_server(stream, example_table.get_node_object());
+    });
 
     let inspector_clone = inspector.clone();
     fs.dir("diagnostics").add_fidl_service(move |stream| {
@@ -189,18 +183,16 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
 
     // TODO(fxbug.dev/41952): remove when all clients writing VMO files today have been migrated to write
     // to Tree.
-    if !opts.only_new {
-        inspector
-            .duplicate_vmo()
-            .ok_or(format_err!("Failed to duplicate VMO"))
-            .and_then(|vmo| {
-                fs.dir("diagnostics").add_vmo_file_at("root.inspect", vmo);
-                Ok(())
-            })
-            .unwrap_or_else(|e| {
-                eprintln!("Failed to expose vmo. Error: {:?}", e);
-            });
-    }
+    inspector
+        .duplicate_vmo()
+        .ok_or(format_err!("Failed to duplicate VMO"))
+        .and_then(|vmo| {
+            fs.dir("diagnostics").add_vmo_file_at("root.inspect", vmo);
+            Ok(())
+        })
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to expose vmo. Error: {:?}", e);
+        });
 
     fs.take_and_serve_directory_handle()?;
 

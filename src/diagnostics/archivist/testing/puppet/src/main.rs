@@ -50,7 +50,6 @@ async fn handle_puppet_request(request: fpuppet::PuppetRequest) -> Result<(), Er
             inspect_testing::emit_example_inspect_data(inspect_testing::Options {
                 rows: rows as usize,
                 columns: columns as usize,
-                only_new: false,
                 extra_number: None,
             })
             .await?;
