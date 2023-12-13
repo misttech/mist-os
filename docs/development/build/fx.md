@@ -324,11 +324,11 @@ run the following command to [create a ZIP file][fx-create-pb-zip] that
 contains the product bundle:
 
 ```posix-terminal
-fx create-pb-zip
+fx create-pb-zip -o <path-to-pb-zip>
 ```
 
-This command creates a `pb.zip` file containing the product bundle in the
-`$(fx get-build-dir)` directory.
+This command creates a zip file containing the product bundle in the
+path you specified.
 
 ## Flash a board and prepare Zedboot {#flash-a-board-and-prepare-zedboot}
 
