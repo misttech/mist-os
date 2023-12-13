@@ -240,12 +240,9 @@ constexpr syslog_backend::KeyValue<Key, Value> KeyValueInternal(Key key, Value v
   return syslog_backend::KeyValue<Key, Value>(key, value);
 }
 
-// TODO(b/300157652): Remove this and replace it with FX_KV.
-#define KV(a, b) a, b
-
 // Used to denote a key-value pair for use in structured logging API calls.
 // This macro exists solely to improve readability of calls to FX_SLOG
-#define FX_KV KV
+#define FX_KV(a, b) a, b
 
 template <typename Msg, typename... KeyValuePairs>
 struct LogValue {
