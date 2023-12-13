@@ -165,13 +165,9 @@ fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
 }
 
 fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler() {
-  auto* dispatcher = async_get_default_dispatcher();
-  Handler device_handler = [impl = this, dispatcher = dispatcher](
-                               ::fidl::ServerEnd<::fuchsia_hardware_gpio::Gpio> request) {
-    impl->bindings_.AddBinding(dispatcher, std::move(request), impl, fidl::kIgnoreBindingClosure);
-  };
-
-  return fuchsia_hardware_gpio::Service::InstanceHandler({.device = std::move(device_handler)});
+  return fuchsia_hardware_gpio::Service::InstanceHandler(
+      {.device = bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                         fidl::kIgnoreBindingClosure)});
 }
 
 fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetCurrentPolarity() {
