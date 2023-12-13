@@ -457,6 +457,7 @@ sdk_molecule("core_cc_prebuilt_libraries") {
   deps = [
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/svc:svc_sdk",
+    "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",
     "//third_party/Vulkan-Loader:libvulkan_sdk",

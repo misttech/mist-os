@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::virtgralloc::{
-    virtgralloc_SetVulkanModeResult, virtgralloc_SetVulkanModeResult_SUCCESS,
-    virtgralloc_VulkanMode, virtgralloc_request_SetVulkanMode, virtgralloc_set_vulkan_mode,
-};
 use crate::{
     mm::MemoryAccessorExt,
     task::CurrentTask,
@@ -21,6 +17,10 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
 };
 use std::sync::Arc;
+use virtgralloc::{
+    virtgralloc_SetVulkanModeResult, virtgralloc_VulkanMode, virtgralloc_set_vulkan_mode,
+    VIRTGRALLOC_IOCTL_SET_VULKAN_MODE, VIRTGRALLOC_SET_VULKAN_MODE_RESULT_SUCCESS,
+};
 
 pub struct GrallocFile {
     mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterSynchronousProxy>>,
@@ -64,7 +64,7 @@ impl GrallocFile {
 
         log_info!("gralloc vulkan_mode set to {:?}", vulkan_mode);
 
-        Ok(virtgralloc_SetVulkanModeResult_SUCCESS)
+        Ok(VIRTGRALLOC_SET_VULKAN_MODE_RESULT_SUCCESS)
     }
 }
 
@@ -79,7 +79,7 @@ impl FileOps for GrallocFile {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            virtgralloc_request_SetVulkanMode => {
+            VIRTGRALLOC_IOCTL_SET_VULKAN_MODE => {
                 // switch from map_err to inspect_err when/if stable
                 let user_addr = UserAddress::from(arg);
                 let mut request: virtgralloc_set_vulkan_mode =
@@ -93,8 +93,8 @@ impl FileOps for GrallocFile {
                 })?;
                 current_task.write_object(UserRef::new(user_addr), &request)
             }
-            t => {
-                log_warn!("Got unknown request: {:?}", t);
+            unknown_ioctl => {
+                log_warn!("Got unknown request: {:?}", unknown_ioctl);
                 error!(ENOSYS)
             }
         }?;

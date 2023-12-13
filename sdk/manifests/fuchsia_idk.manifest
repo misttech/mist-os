@@ -78,6 +78,7 @@ cc_source_library://pkg/trace-headersonly
 cc_source_library://pkg/trace-vthread-headersonly
 cc_source_library://pkg/utf-utils
 cc_source_library://pkg/vfs_cpp
+cc_source_library://pkg/virtgralloc_headers
 cc_source_library://pkg/zx
 companion_host_tool://tools/x64/aemu_internal
 companion_host_tool://tools/x64/qemu_internal

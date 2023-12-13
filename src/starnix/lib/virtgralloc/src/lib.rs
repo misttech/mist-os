@@ -5,8 +5,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-#[allow(clippy::module_inception)]
-mod device;
-mod file;
+mod virtgralloc;
 
-pub use device::gralloc_device_init;
+pub use virtgralloc::*;
