@@ -9,7 +9,6 @@ from __future__ import annotations
 import enum
 import ipaddress
 from dataclasses import dataclass
-from typing import NamedTuple
 
 import fuchsia_controller_py as fuchsia_controller
 
@@ -22,8 +21,9 @@ class LEVEL(enum.Enum):
     ERROR = enum.auto()
 
 
-class IpPort(NamedTuple):
-    """Tuple that contains an IP Address and Port
+@dataclass
+class IpPort:
+    """Dataclass that holds IP Address and Port
 
     Args:
         ip: Ip Address
@@ -31,26 +31,46 @@ class IpPort(NamedTuple):
     """
 
     ip: ipaddress.IPv4Address | ipaddress.IPv6Address
-    port: int
+    port: int | None
+
+    def __post_init__(self) -> None:
+        """Validates ip and port args.
+
+        Raises:
+            ValueError
+        """
+        self.ip = ipaddress.ip_address(self.ip)
+
+        if self.port:
+            self.port = int(self.port)
+            if self.port < 1:
+                raise ValueError(
+                    f"port number: {self.port} was not a positive integer"
+                )
 
     def __str__(self) -> str:
         host: str = f"{self.ip}"
         if isinstance(self.ip, ipaddress.IPv6Address):
             host = f"[{host}]"
-        return f"{host}:{self.port}"
+        if self.port:
+            return f"{host}:{self.port}"
+        else:
+            return f"{host}"
 
     @staticmethod
-    def parse(target_name: str) -> IpPort:
-        """Checks if the given string is an IPAddress Port or not
+    def create_using_ip_and_port(ip_port: str) -> IpPort:
+        """Factory method to create IpPort object using str that has both ip
+        and port values.
 
         Args:
-          target_name: the name of the target to test. This is of format
-                       {ipv4_address}:{port}, or [{ipv6_address}]:{port},
-                       or {ipv6_address}:{port}
-
+            ip_port: IP address and port of the fuchsia device. This is of
+                     one the following formats:
+                        {ipv4_address}:{port}
+                        [{ipv6_address}]:{port}
+                        {ipv6_address}:{port}
 
         Returns:
-          A valid IpPort if the str is one. Otherwise None
+            A valid IpPort
 
         Raises:
           ValueError
@@ -60,49 +80,71 @@ class IpPort(NamedTuple):
             #     192.168.1.1:8888 ==> ["192.168.1.1", "8888"]
             # If we have something of form
             #     [::1]:8888 ==> ["[::1]", "8888"]
-            arr: list[str] = target_name.rsplit(":", 1)
-            if len(arr) != 2:
+            arr: list[str] = ip_port.rsplit(":", 1)
+            if len(arr) != 1 and len(arr) != 2:
                 raise ValueError(
-                    f"Value: {target_name} was not a valid IpPort (needs "
-                    f"IP Address and Port)"
+                    f"Value: {ip_port} was not a valid IpPort (needs "
+                    f"IP Address and optional Port)"
                 )
             addr_part: str = arr[0]
-            port_part: str = arr[1]
             # Remove [] that might be surrounding an IPv6 address
             addr_part = addr_part.replace("[", "").replace("]", "")
-            port = int(port_part)
-            if port < 1:
-                raise ValueError(
-                    f"For IpPort: {target_name}, port number: {port} was "
-                    f"not a positive integer)"
-                )
+
+            port = None
+            if len(arr) == 2:
+                port_part: str = arr[1]
+                port = int(port_part)
+                if port < 1:
+                    raise ValueError(
+                        f"For IpPort: {ip_port}, port number: {port} was "
+                        f"not a positive integer)"
+                    )
+
             return IpPort(ipaddress.ip_address(addr_part), port)
         except ValueError as e:
             raise e
 
+    @staticmethod
+    def create_using_ip(ip: str) -> IpPort:
+        """Factory method to create IpPort object using str that has ip address.
 
-class TargetSshAddress(NamedTuple):
-    """Tuple that holds target's ssh address information.
+        Args:
+            ip: IP address and port of the fuchsia device. This is of
+                     one the following formats:
+                        {ipv4_address}
+                        [{ipv6_address}]
+                        {ipv6_address}
+
+        Returns:
+            A valid IpPort
+
+        Raises:
+          ValueError
+        """
+        try:
+            # Remove [] that might be surrounding an IPv6 address
+            ip = ip.replace("[", "").replace("]", "")
+            return IpPort(ipaddress.ip_address(ip), None)
+        except ValueError as e:
+            raise e
+
+
+class TargetSshAddress(IpPort):
+    """Dataclass that holds target's ssh address information.
 
     Args:
         ip: Target's SSH IP Address
         port: Target's SSH port
     """
 
-    ip: str
-    port: int
 
-
-class Sl4fServerAddress(NamedTuple):
-    """Tuple that holds sl4f server address information.
+class Sl4fServerAddress(IpPort):
+    """Dataclass that holds sl4f server address information.
 
     Args:
         ip: IP Address of SL4F server
         port: Port where SL4F server is listening for SL4F requests
     """
-
-    ip: str
-    port: int
 
 
 @dataclass

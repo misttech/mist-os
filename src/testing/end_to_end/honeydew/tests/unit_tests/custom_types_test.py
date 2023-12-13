@@ -50,9 +50,55 @@ class CustomTypesTests(unittest.TestCase):
             ),
         ]
     )
-    def test_parse(self, _, addr: str, expected: custom_types.IpPort) -> None:
-        """Test cases for IpPort.parse()."""
-        got: custom_types.IpPort = custom_types.IpPort.parse(addr)
+    def test_create_using_ip_and_port(
+        self, _, addr: str, expected: custom_types.IpPort
+    ) -> None:
+        """Test cases for IpPort.create_using_ip_and_port()."""
+        got: custom_types.IpPort = custom_types.IpPort.create_using_ip_and_port(
+            addr
+        )
+        self.assertEqual(got, expected)
+
+    @parameterized.expand(
+        [
+            (
+                "valid_ipv4",
+                "127.0.0.1",
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("127.0.0.1"), port=None
+                ),
+            ),
+            (
+                "valid_ipv6",
+                "::1",
+                custom_types.IpPort(ip=ipaddress.ip_address("::1"), port=None),
+            ),
+            (
+                "valid_ipv6_scope",
+                "::1%eth0",
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%eth0"), port=None
+                ),
+            ),
+            (
+                "valid_ipv6_scope_digit",
+                "::1%123",
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%123"), port=None
+                ),
+            ),
+            (
+                "valid_ipv6_with_brackets",
+                "[::1]",
+                custom_types.IpPort(ip=ipaddress.ip_address("::1"), port=None),
+            ),
+        ]
+    )
+    def test_create_using_ip(
+        self, _, addr: str, expected: custom_types.IpPort
+    ) -> None:
+        """Test cases for IpPort.create_using_ip()."""
+        got: custom_types.IpPort = custom_types.IpPort.create_using_ip(addr)
         self.assertEqual(got, expected)
 
     @parameterized.expand(
@@ -64,31 +110,58 @@ class CustomTypesTests(unittest.TestCase):
             ("invalid_port_number", "[::1]:asdf"),
         ]
     )
-    def test_parse_raises(self, _, addr: str) -> None:
-        """Test cases for IpPort.parse() which raise exceptions."""
+    def test_create_using_ip_and_port_raises(self, _, addr: str) -> None:
+        """Test cases for IpPort.create_using_ip_and_port() which raise
+        exceptions."""
         with self.assertRaises(ValueError):
-            custom_types.IpPort.parse(addr)
+            custom_types.IpPort.create_using_ip_and_port(addr)
+
+    @parameterized.expand(
+        [
+            ("invalid", "some_str"),
+            ("invalid_double_scope", "[::1%e%eth0]"),
+            ("invalid_double_percent", "[::1%%eth0]"),
+        ]
+    )
+    def test_create_using_ip_raises(self, _, addr: str) -> None:
+        """Test cases for IpPort.create_using_ip() which raise exceptions."""
+        with self.assertRaises(ValueError):
+            custom_types.IpPort.create_using_ip(addr)
 
     @parameterized.expand(
         [
             (
-                "valid_ipv4",
+                "valid_ipv4_and_port",
                 custom_types.IpPort(
                     ip=ipaddress.ip_address("127.0.0.1"), port=8081
                 ),
                 "127.0.0.1:8081",
             ),
             (
-                "valid_ipv6",
+                "valid_ipv6_and_port",
                 custom_types.IpPort(ip=ipaddress.ip_address("::1"), port=8081),
                 "[::1]:8081",
             ),
             (
-                "valid_ipv6_scope",
+                "valid_ipv6_with_scope_and_port",
                 custom_types.IpPort(
                     ip=ipaddress.ip_address("::1%eth0"), port=8081
                 ),
                 "[::1%eth0]:8081",
+            ),
+            (
+                "valid_ipv4_without_port",
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("127.0.0.1"), port=None
+                ),
+                "127.0.0.1",
+            ),
+            (
+                "valid_ipv6_without_port",
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%eth0"), port=None
+                ),
+                "[::1%eth0]",
             ),
         ]
     )

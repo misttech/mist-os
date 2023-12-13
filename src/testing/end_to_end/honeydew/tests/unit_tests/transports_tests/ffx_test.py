@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.ffx.py."""
 
+import ipaddress
 import subprocess
 import unittest
 from typing import Any
@@ -15,11 +16,15 @@ from honeydew import custom_types, errors
 from honeydew.transports import ffx
 
 # pylint: disable=protected-access
-_SSH_ADDRESS = "fe80::3804:df7d:daa8:ce6c"
-_SSH_ADDRESS_SCOPE = "qemu"
+_TARGET_NAME: str = "fuchsia-emulator"
+
+_IPV6: str = "fe80::4fce:3102:ef13:888c%qemu"
+_IPV6_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(_IPV6)
+
+_SSH_ADDRESS: ipaddress.IPv6Address = _IPV6_OBJ
 _SSH_PORT = 8022
 _TARGET_SSH_ADDRESS = custom_types.TargetSshAddress(
-    ip=f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}", port=_SSH_PORT
+    ip=_SSH_ADDRESS, port=_SSH_PORT
 )
 
 _FFX_TARGET_SHOW_OUTPUT: bytes = (
@@ -28,7 +33,7 @@ _FFX_TARGET_SHOW_OUTPUT: bytes = (
     r'"value":"fuchsia-emulator"},{"title":"SSH Address",'
     r'"label":"ssh_address","description":"Interface address",'
     r'"value":'
-    f'"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}:{_SSH_PORT}"'
+    f'"{_SSH_ADDRESS}:{_SSH_PORT}"'
     r'}]},{"title":"Build",'
     r'"label":"build","description":"","child":[{"title":"Version",'
     r'"label":"version","description":"Build version.",'
@@ -50,13 +55,13 @@ _FFX_TARGET_SHOW_JSON: list[dict[str, Any]] = [
                 "title": "Name",
                 "label": "name",
                 "description": "Target name.",
-                "value": "fuchsia-emulator",
+                "value": _TARGET_NAME,
             },
             {
                 "title": "SSH Address",
                 "label": "ssh_address",
                 "description": "Interface address",
-                "value": f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}:{_SSH_PORT}",
+                "value": f"{_SSH_ADDRESS}:{_SSH_PORT}",
             },
         ],
     },
@@ -101,7 +106,7 @@ _FFX_TARGET_LIST_OUTPUT: str = (
 
 _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
     {
-        "nodename": "fuchsia-emulator",
+        "nodename": _TARGET_NAME,
         "rcs_state": "Y",
         "serial": "<unknown>",
         "target_type": "workstation_eng.qemu-x64",
@@ -112,14 +117,15 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
 ]
 
 _INPUT_ARGS: dict[str, Any] = {
-    "target": "fuchsia-emulator",
+    "target_name": _TARGET_NAME,
+    "target_ip": _IPV6_OBJ,
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
 
 _MOCK_ARGS: dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT,
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
-    "ffx_target_ssh_address_output": f"[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}",
+    "ffx_target_ssh_address_output": f"[{_SSH_ADDRESS}]:{_SSH_PORT}",
     "ffx_target_list_output": _FFX_TARGET_LIST_OUTPUT,
     "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
 }
@@ -147,7 +153,10 @@ class FfxCliTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.ffx_obj = ffx.FFX(target=_INPUT_ARGS["target"])
+        self.ffx_obj = ffx.FFX(
+            target_name=_INPUT_ARGS["target_name"],
+            target_ip=_INPUT_ARGS["target_ip"],
+        )
 
     def test_ffx_setup(self) -> None:
         """Test case for ffx.setup()."""
@@ -375,7 +384,7 @@ class FfxCliTests(unittest.TestCase):
             [
                 "ffx",
                 "-t",
-                "fuchsia-emulator",
+                _IPV6,
                 "--config",
                 "{}",
                 "test",
@@ -406,7 +415,7 @@ class FfxCliTests(unittest.TestCase):
             [
                 "ffx",
                 "-t",
-                "fuchsia-emulator",
+                _IPV6,
                 "--config",
                 "{}",
                 "test",
@@ -508,8 +517,8 @@ class FfxCliTests(unittest.TestCase):
     @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
     def test_add_target(self, mock_subprocess_check_output) -> None:
         """Test case for ffx_cli.add_target()."""
-        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "127.0.0.1:8082"
+        ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("127.0.0.1:8082")
         )
         ffx.FFX.add_target(target_ip_port=ip_port)
 
@@ -545,8 +554,8 @@ class FfxCliTests(unittest.TestCase):
         self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
         """Verify ffx_cli.add_target raise exception in failure cases."""
-        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "127.0.0.1:8082"
+        ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("127.0.0.1:8082")
         )
         mock_subprocess_check_output.side_effect = parameterized_dict[
             "side_effect"
@@ -567,12 +576,7 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_get_target_name(self, mock_ffx_get_target_information) -> None:
         """Verify get_target_name returns the name of the fuchsia device."""
-        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            f"[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}"
-        )
-        self.ffx_obj = ffx.FFX(target=str(ip_port))
-
-        self.assertEqual(self.ffx_obj.get_target_name(), "fuchsia-emulator")
+        self.assertEqual(self.ffx_obj.get_target_name(), _TARGET_NAME)
 
         mock_ffx_get_target_information.assert_called()
 
@@ -584,8 +588,7 @@ class FfxCliTests(unittest.TestCase):
                     "label": "CalledProcessError",
                     "side_effect": subprocess.CalledProcessError(
                         returncode=1,
-                        cmd=f"ffx -t '[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:"
-                        f"{_SSH_PORT}' target show",
+                        cmd=f"ffx -t '[{_SSH_ADDRESS}]:{_SSH_PORT}' target show",
                     ),
                 },
             ),

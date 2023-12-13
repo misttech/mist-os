@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Provides methods for Host-(Fuchsia)Target interactions via Fastboot."""
+
+import ipaddress
 import logging
 import subprocess
 from typing import Any, Iterable, Type
@@ -37,6 +39,9 @@ class Fastboot:
 
     Args:
         device_name: Fuchsia device name.
+        reboot_affordance: Object to RebootCapableDevice implementation.
+        device_ip: Fuchsia device IP Address.
+        fastboot_node_id: Fastboot Node ID.
 
     Raises:
         errors.FuchsiaDeviceError: Failed to get the fastboot node id
@@ -46,13 +51,19 @@ class Fastboot:
         self,
         device_name: str,
         reboot_affordance: affordances_capable.RebootCapableDevice,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         fastboot_node_id: str | None = None,
     ) -> None:
         self._device_name: str = device_name
+        self._device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            device_ip
+        )
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
         )
-        self._ffx: ffx_transport.FFX = ffx_transport.FFX(self._device_name)
+        self._ffx: ffx_transport.FFX = ffx_transport.FFX(
+            target_name=self._device_name, target_ip=self._device_ip
+        )
         self._get_fastboot_node(fastboot_node_id)
 
     # List all the public properties in alphabetical order

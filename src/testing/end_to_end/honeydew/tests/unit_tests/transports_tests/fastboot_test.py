@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.fastboot.py."""
 
+import ipaddress
 import subprocess
 import unittest
 from typing import Any
@@ -15,12 +16,15 @@ from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fastboot
 
-_USB_BASED_DEVICE_NAME = "fuchsia-d88c-799b-0e3a"
-_USB_BASED_FASTBOOT_NODE_ID = "0B190YCABZZ2ML"
+_IPV4: str = "11.22.33.44"
+_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
 
-_TCP_BASED_DEVICE_NAME = "fuchsia-54b2-038b-6e90"
-_TCP_IP_ADDRESS = "fe80::56b2:3ff:fe8b:6e90%enxa0cec8f442ce"
-_TCP_BASED_FASTBOOT_NODE_ID = f"tcp:{_TCP_IP_ADDRESS}"
+_USB_BASED_DEVICE_NAME: str = "fuchsia-d88c-799b-0e3a"
+_USB_BASED_FASTBOOT_NODE_ID: str = "0B190YCABZZ2ML"
+
+_TCP_BASED_DEVICE_NAME: str = "fuchsia-54b2-038b-6e90"
+_TCP_IP_ADDRESS: str = "fe80::56b2:3ff:fe8b:6e90%enxa0cec8f442ce"
+_TCP_BASED_FASTBOOT_NODE_ID: str = f"tcp:{_TCP_IP_ADDRESS}"
 
 _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: dict[str, Any] = {
     "nodename": _USB_BASED_DEVICE_NAME,
@@ -83,6 +87,7 @@ _FFX_TARGET_LIST_WHEN_IN_FUCHSIA_MODE: list[dict[str, Any]] = [
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": _USB_BASED_DEVICE_NAME,
     "fastboot_node_id": _USB_BASED_FASTBOOT_NODE_ID,
+    "device_ip_v4": _IPV4_OBJ,
     "run_cmd": ["getvar", "hw-revision"],
     "subprocess_run_cmd": [
         "fastboot",
@@ -127,6 +132,7 @@ class FastbootTests(unittest.TestCase):
 
         self.fastboot_obj = fastboot.Fastboot(
             device_name=_INPUT_ARGS["device_name"],
+            device_ip=_INPUT_ARGS["device_ip_v4"],
             reboot_affordance=self.reboot_affordance_obj,
             fastboot_node_id=_INPUT_ARGS["fastboot_node_id"],
         )

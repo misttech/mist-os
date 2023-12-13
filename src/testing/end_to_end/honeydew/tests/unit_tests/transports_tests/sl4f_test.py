@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.sl4f.py."""
 
+import ipaddress
 import unittest
 from typing import Any
 from unittest import mock
@@ -15,45 +16,54 @@ from honeydew.transports import sl4f
 
 # pylint: disable=protected-access
 
+_IPV4: str = "11.22.33.44"
+_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
+
+_IPV6: str = "fe80::4fce:3102:ef13:888c%qemu"
+_IPV6_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(_IPV6)
+
+_DEVICE_NAME: str = "fuchsia-emulator"
+
+_IPV6_LOCALHOST: str = "::1"
+_IPV6_LOCALHOST_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(
+    _IPV6_LOCALHOST
+)
+
+_SL4F_PORT_LOCAL: int = sl4f._SL4F_PORT["LOCAL"]
+_SL4F_PORT_REMOTE: int = sl4f._SL4F_PORT["REMOTE"]
+_SSH_PORT: int = 22
+
 _INPUT_ARGS: dict[str, Any] = {
-    "device_name": "fuchsia-emulator",
+    "device_name": _DEVICE_NAME,
+    "device_ip_v4": _IPV4_OBJ,
+    "device_ip_v6": _IPV6_OBJ,
 }
 
-_IPV4 = "11.22.33.44"
-_IPV6 = "fe80::4fce:3102:ef13:888c%qemu"
-_IPV6_WITH_SCOPE = _IPV6
-_IPV6_WO_SCOPE = "fe80::4fce:3102:ef13:888c"
-
-_IPV6_LOCALHOST = "::1"
-_SL4F_PORT_LOCAL = sl4f._SL4F_PORT["LOCAL"]
-_SL4F_PORT_REMOTE = sl4f._SL4F_PORT["REMOTE"]
-_SSH_PORT = 22
-
 _MOCK_ARGS: dict[str, Any] = {
-    "device_name": "fuchsia-emulator",
+    "device_name": _DEVICE_NAME,
     "invalid-device_name": "invalid-device_name",
     "sl4f_server_address_ipv4": custom_types.Sl4fServerAddress(
-        ip=_IPV4, port=_SL4F_PORT_LOCAL
+        ip=_IPV4_OBJ, port=_SL4F_PORT_LOCAL
     ),
     "sl4f_server_address_ipv6": custom_types.Sl4fServerAddress(
-        ip=_IPV6, port=_SL4F_PORT_LOCAL
+        ip=_IPV6_OBJ, port=_SL4F_PORT_LOCAL
     ),
     "sl4f_server_address_ipv6_localhost": custom_types.Sl4fServerAddress(
-        ip=_IPV6_LOCALHOST, port=_SL4F_PORT_REMOTE
+        ip=_IPV6_LOCALHOST_OBJ, port=_SL4F_PORT_REMOTE
     ),
     "target_ssh_address_ipv4": custom_types.TargetSshAddress(
-        ip=_IPV4, port=_SSH_PORT
+        ip=_IPV4_OBJ, port=_SSH_PORT
     ),
     "target_ssh_address_ipv6": custom_types.TargetSshAddress(
-        ip=_IPV6, port=_SSH_PORT
+        ip=_IPV6_OBJ, port=_SSH_PORT
     ),
     "target_ssh_address_ipv6_localhost": custom_types.TargetSshAddress(
-        ip=_IPV6_LOCALHOST, port=_SSH_PORT
+        ip=_IPV6_LOCALHOST_OBJ, port=_SSH_PORT
     ),
     "sl4f_request": sl4f._SL4F_METHODS["GetDeviceName"],
     "sl4f_response": {
         "id": "",
-        "result": "fuchsia-emulator",
+        "result": _DEVICE_NAME,
         "error": None,
     },
     "sl4f_error_response": {
@@ -68,13 +78,13 @@ _EXPECTED_VALUES: dict[str, Any] = {
     "url_ipv6": f"http://[{_IPV6}]:{_SL4F_PORT_LOCAL}",
     "url_ipv6_localhost": f"http://[{_IPV6_LOCALHOST}]:{_SL4F_PORT_REMOTE}",
     "sl4f_server_address_ipv4": custom_types.Sl4fServerAddress(
-        ip=_IPV4, port=_SL4F_PORT_LOCAL
+        ip=_IPV4_OBJ, port=_SL4F_PORT_LOCAL
     ),
     "sl4f_server_address_ipv6": custom_types.Sl4fServerAddress(
-        ip=_IPV6, port=_SL4F_PORT_LOCAL
+        ip=_IPV6_OBJ, port=_SL4F_PORT_LOCAL
     ),
     "sl4f_server_address_ipv6_localhost": custom_types.Sl4fServerAddress(
-        ip=_IPV6_LOCALHOST, port=_SL4F_PORT_REMOTE
+        ip=_IPV6_LOCALHOST_OBJ, port=_SL4F_PORT_REMOTE
     ),
 }
 
@@ -96,9 +106,19 @@ class Sl4fTests(unittest.TestCase):
     def setUp(self, mock_sl4f_start_server) -> None:
         super().setUp()
 
-        self.sl4f_obj = sl4f.SL4F(device_name=_INPUT_ARGS["device_name"])
+        self.sl4f_obj_wo_ip = sl4f.SL4F(device_name=_INPUT_ARGS["device_name"])
 
-        mock_sl4f_start_server.assert_called()
+        self.sl4f_obj_with_ipv4 = sl4f.SL4F(
+            device_name=_INPUT_ARGS["device_name"],
+            device_ip=_INPUT_ARGS["device_ip_v4"],
+        )
+
+        self.sl4f_obj_with_ipv6 = sl4f.SL4F(
+            device_name=_INPUT_ARGS["device_name"],
+            device_ip=_INPUT_ARGS["device_ip_v6"],
+        )
+
+        self.assertEqual(mock_sl4f_start_server.call_count, 3)
 
     @parameterized.expand(
         [
@@ -143,7 +163,9 @@ class Sl4fTests(unittest.TestCase):
             "sl4f_server_address"
         ]
 
-        self.assertEqual(self.sl4f_obj.url, parameterized_dict["expected_url"])
+        self.assertEqual(
+            self.sl4f_obj_wo_ip.url, parameterized_dict["expected_url"]
+        )
 
         mock_get_sl4f_server_address.assert_called()
 
@@ -155,7 +177,7 @@ class Sl4fTests(unittest.TestCase):
     )
     def test_check_connection(self, mock_sl4f_run) -> None:
         """Testcase for SL4F.check_connection()"""
-        self.sl4f_obj.check_connection()
+        self.sl4f_obj_wo_ip.check_connection()
 
         mock_sl4f_run.assert_called()
 
@@ -168,7 +190,7 @@ class Sl4fTests(unittest.TestCase):
     def test_check_connection_exception(self, mock_sl4f_run) -> None:
         """Testcase for SL4F.check_connection() raising exception"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.check_connection()
+            self.sl4f_obj_wo_ip.check_connection()
 
         mock_sl4f_run.assert_called()
 
@@ -232,7 +254,7 @@ class Sl4fTests(unittest.TestCase):
         method: str = parameterized_dict["method"]
         optional_params: dict[str, Any] = parameterized_dict["optional_params"]
 
-        response: dict[str, Any] = self.sl4f_obj.run(
+        response: dict[str, Any] = self.sl4f_obj_wo_ip.run(
             method=method, **optional_params
         )
 
@@ -259,7 +281,7 @@ class Sl4fTests(unittest.TestCase):
         """Testcase for SL4F.run() failure case when there is 'error' in SL4F
         response received"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.run(
+            self.sl4f_obj_wo_ip.run(
                 method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
             )
 
@@ -284,7 +306,7 @@ class Sl4fTests(unittest.TestCase):
         """Testcase for SL4F.run() failure case when there is an exception
         thrown while sending HTTP request"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.run(
+            self.sl4f_obj_wo_ip.run(
                 method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
             )
 
@@ -295,7 +317,7 @@ class Sl4fTests(unittest.TestCase):
     @mock.patch.object(sl4f.ffx_transport.FFX, "run", autospec=True)
     def test_start_server(self, mock_ffx_run, mock_check_connection) -> None:
         """Testcase for SL4F.start_server()"""
-        self.sl4f_obj.start_server()
+        self.sl4f_obj_wo_ip.start_server()
 
         mock_ffx_run.assert_called()
         mock_check_connection.assert_called()
@@ -309,7 +331,7 @@ class Sl4fTests(unittest.TestCase):
     def test_start_server_exception(self, mock_ffx_run) -> None:
         """Testcase for SL4F.start_server() raising exception"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.start_server()
+            self.sl4f_obj_wo_ip.start_server()
 
         mock_ffx_run.assert_called()
 
@@ -350,64 +372,32 @@ class Sl4fTests(unittest.TestCase):
     @mock.patch.object(
         sl4f.ffx_transport.FFX, "get_target_ssh_address", autospec=True
     )
-    def test_get_sl4f_server_address(
+    def test_get_sl4f_server_address_without_device_ip(
         self, parameterized_dict, mock_get_target_ssh_address
     ) -> None:
-        """Testcase for SL4F._get_sl4f_server_address()"""
+        """Testcase for SL4F._get_sl4f_server_address() when called using SL4F
+        object created without device_ip argument."""
         mock_get_target_ssh_address.return_value = parameterized_dict[
             "target_ssh_address"
         ]
 
         self.assertEqual(
-            self.sl4f_obj._get_sl4f_server_address(),
+            self.sl4f_obj_wo_ip._get_sl4f_server_address(),
             parameterized_dict["expected_sl4f_address"],
         )
 
         mock_get_target_ssh_address.assert_called()
 
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "ipv4",
-                    "py_ver": (3, 10),
-                    "ip": _IPV4,
-                    "expected": _IPV4,
-                },
-            ),
-            (
-                {
-                    "label": "ipv6_with_scope_id_on_py38",
-                    "py_ver": (3, 8),
-                    "ip": _IPV6_WITH_SCOPE,
-                    "expected": _IPV6_WO_SCOPE,
-                },
-            ),
-            (
-                {
-                    "label": "ipv6_with_scope_id_on_py310",
-                    "py_ver": (3, 10),
-                    "ip": _IPV6_WITH_SCOPE,
-                    "expected": _IPV6_WITH_SCOPE,
-                },
-            ),
-            (
-                {
-                    "label": "ipv6_without_scope_id",
-                    "py_ver": (3, 10),
-                    "ip": _IPV6_WO_SCOPE,
-                    "expected": _IPV6_WO_SCOPE,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
-    def test_normalize_ip_addr(self, parameterized_dict) -> None:
-        """Test case for FuchsiaDeviceBase._normalize_ip_addr()"""
-        with mock.patch.object(
-            sl4f.sys, "version_info", parameterized_dict["py_ver"]
-        ):
-            self.assertEqual(
-                self.sl4f_obj._normalize_ip_addr(parameterized_dict["ip"]),
-                parameterized_dict["expected"],
-            )
+    def test_get_sl4f_server_address_with_device_ip(self) -> None:
+        """Testcase for SL4F._get_sl4f_server_address() when called using SL4F
+        object created with device_ip argument."""
+
+        self.assertEqual(
+            self.sl4f_obj_with_ipv4._get_sl4f_server_address(),
+            _EXPECTED_VALUES["sl4f_server_address_ipv4"],
+        )
+
+        self.assertEqual(
+            self.sl4f_obj_with_ipv6._get_sl4f_server_address(),
+            _EXPECTED_VALUES["sl4f_server_address_ipv6"],
+        )

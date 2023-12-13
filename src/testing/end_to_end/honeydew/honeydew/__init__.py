@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """HoneyDew python module."""
 
+import ipaddress
 import logging
 import subprocess
 from typing import Type
@@ -20,16 +21,14 @@ from honeydew.transports import ffx as ffx_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_AFFORDANCE_NOT_IMPLEMENTED: str = "raise NotImplementedError"
-
 
 # List all the public methods in alphabetical order
 def create_device(
     device_name: str,
     transport: transports.TRANSPORT,
+    device_ip_port: custom_types.IpPort | None = None,
     ssh_private_key: str | None = None,
     ssh_user: str | None = None,
-    device_ip_port: custom_types.IpPort | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -38,15 +37,13 @@ def create_device(
 
         transport: Transport to use to perform host-target interactions.
 
+        device_ip_port: IP Address and port of the device.
+
         ssh_private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
-
-        device_ip_port: Ip Address and port of the target to create.
-            If specified, this will cause the device to be added and tracked
-            by ffx.
 
     Returns:
         Fuchsia device object
@@ -56,6 +53,15 @@ def create_device(
         errors.FfxCommandError: Failure in running an FFX Command.
     """
     if device_ip_port:
+        _LOGGER.info(
+            "CAUTION: device_ip_port='%s' argument has been passed. Please "
+            "make sure this value associated with the device is persistent "
+            "across the reboots. Otherwise, host-target interactions will not "
+            "work consistently.",
+            device_ip_port,
+        )
+
+    if device_ip_port:
         _add_and_verify_device(device_name, device_ip_port)
 
     try:
@@ -63,8 +69,11 @@ def create_device(
             fuchsia_device_interface.FuchsiaDevice
         ] = _get_device_class(transport)
 
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+        if device_ip_port and device_ip_port.ip:
+            device_ip = device_ip_port.ip
         return device_class(
-            device_name, ssh_private_key, ssh_user
+            device_name, device_ip, ssh_private_key, ssh_user
         )  # type: ignore[call-arg]
     except Exception as err:
         raise errors.FuchsiaDeviceError(
@@ -97,7 +106,7 @@ def _get_device_class(
 
 def _add_and_verify_device(
     device_name: str, device_ip_port: custom_types.IpPort
-):
+) -> None:
     """Adds the device to the ffx target collection and verifies names match.
 
     If the device is already in the collection, only verifies names match.
@@ -105,18 +114,19 @@ def _add_and_verify_device(
     Args:
         device_name: Device name returned by `ffx target list`.
 
-        device_ip: Ip Address of the target to create. If specified, this will
-            cause the device to be added and tracked by ffx.
+        device_ip_port: Device IP and Port of the device.
 
     Raises:
         errors.FfxCommandError: Failed to add device.
     """
     try:
-        if not _target_exists(device_ip_port):
+        if not _target_exists(device_name, device_ip_port):
             _LOGGER.debug("Adding target '%s'", device_ip_port)
             ffx_transport.FFX.add_target(device_ip_port)
-        ffx: ffx_transport.FFX = ffx_transport.FFX(target=str(device_ip_port))
-        reported_device_name = ffx.get_target_name()
+        ffx: ffx_transport.FFX = ffx_transport.FFX(
+            target_name=device_name, target_ip=device_ip_port.ip
+        )
+        reported_device_name: str = ffx.get_target_name()
         if reported_device_name != device_name:
             raise ValueError(
                 f"Target name reported for IpPort {device_ip_port}, "
@@ -127,9 +137,23 @@ def _add_and_verify_device(
         raise errors.FfxCommandError(f"Failed to add {device_name}") from err
 
 
-def _target_exists(device_ip_port: custom_types.IpPort) -> bool:
+def _target_exists(
+    device_name: str, device_ip_port: custom_types.IpPort
+) -> bool:
+    """Returns true if ffx already discovers this target, false otherwise.
+
+    Args:
+        device_name: Device name returned by `ffx target list`.
+
+        device_ip_port: Device IP and Port of the device.
+
+    Raises:
+        errors.FuchsiaDeviceError: Failed to determine if target exists or not.
+    """
     try:
-        ffx: ffx_transport.FFX = ffx_transport.FFX(target=str(device_ip_port))
+        ffx: ffx_transport.FFX = ffx_transport.FFX(
+            target_name=device_name, target_ip=device_ip_port.ip
+        )
 
         ffx.get_target_information()
         return True

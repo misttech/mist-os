@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Provides methods for Host-(Fuchsia)Target interactions via SSH."""
 
+import ipaddress
 import logging
 import subprocess
 import time
@@ -32,9 +33,11 @@ _OPTIONS_LIST: list[str] = [
     f"-oConnectTimeout={_TIMEOUTS['COMMAND_ARG']}",
 ]
 _OPTIONS: str = " ".join(_OPTIONS_LIST)
-_SSH_COMMAND: str = (
-    "ssh {options} -i {private_key} -p {port} "
-    "{username}@{ip_address} {command}"
+_SSH_COMMAND_WITH_PORT: str = (
+    "ssh {options} -i {private_key} -p {port} {username}@{ip_address} {command}"
+)
+_SSH_COMMAND_WITHOUT_PORT: str = (
+    "ssh {options} -i {private_key} {username}@{ip_address} {command}"
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -49,14 +52,23 @@ class SSH:
         private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
 
+        device_ip: Fuchsia device IP Address.
+
         username: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
     """
 
     def __init__(
-        self, device_name: str, private_key: str, username: str | None = None
+        self,
+        device_name: str,
+        private_key: str,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        username: str | None = None,
     ) -> None:
         self._name: str = device_name
+        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            device_ip
+        )
         self._private_key: str = private_key
         self._username: str = username or _DEFAULTS["USERNAME"]
 
@@ -103,19 +115,30 @@ class SSH:
             errors.SSHCommandError: On failure.
             errors.FfxCommandError: If failed to get the target SSH address.
         """
-        ffx = ffx_transport.FFX(target=self._name)
-        target_ssh_address: custom_types.TargetSshAddress = (
-            ffx.get_target_ssh_address()
-        )
+        if self._ip_address:
+            ssh_command: str = _SSH_COMMAND_WITHOUT_PORT.format(
+                options=_OPTIONS,
+                private_key=self._private_key,
+                username=self._username,
+                ip_address=self._ip_address,
+                command=command,
+            )
+        else:
+            ffx = ffx_transport.FFX(
+                target_name=self._name, target_ip=self._ip_address
+            )
+            target_ssh_address: custom_types.TargetSshAddress = (
+                ffx.get_target_ssh_address()
+            )
 
-        ssh_command: str = _SSH_COMMAND.format(
-            options=_OPTIONS,
-            private_key=self._private_key,
-            port=target_ssh_address.port,
-            username=self._username,
-            ip_address=target_ssh_address.ip,
-            command=command,
-        )
+            ssh_command = _SSH_COMMAND_WITH_PORT.format(
+                options=_OPTIONS,
+                private_key=self._private_key,
+                port=target_ssh_address.port,
+                username=self._username,
+                ip_address=target_ssh_address.ip,
+                command=command,
+            )
         try:
             _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
             output: str = subprocess.check_output(

@@ -144,8 +144,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it returns a device
         from an IpPort."""
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "[::1]:8088"
+        device_ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("[::1]:8088")
         )
 
         mock_ffx.return_value = mock_ffx
@@ -196,8 +196,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it raises an error due
         to an exception in add_target."""
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "[::1]:8022"
+        device_ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("[::1]:8022")
         )
 
         mock_ffx.return_value = mock_ffx
@@ -250,8 +250,8 @@ class InitTests(unittest.TestCase):
         because the returned target name is different from the given one."""
 
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "[::1]:8022"
+        device_ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("[::1]:8022")
         )
 
         mock_ffx.return_value = mock_ffx
@@ -301,8 +301,8 @@ class InitTests(unittest.TestCase):
         target since it is already registered."""
 
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
-            "[::1]:8022"
+        device_ip_port: custom_types.IpPort = (
+            custom_types.IpPort.create_using_ip_and_port("[::1]:8022")
         )
 
         mock_ffx.return_value = mock_ffx

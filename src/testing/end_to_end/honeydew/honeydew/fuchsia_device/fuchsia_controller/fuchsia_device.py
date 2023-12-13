@@ -5,6 +5,7 @@
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller."""
 
 import asyncio
+import ipaddress
 import logging
 from typing import Any
 
@@ -79,6 +80,7 @@ class FuchsiaDevice(
 
     Args:
         device_name: Device name returned by `ffx target list`.
+        device_ip: IP Address of the device.
         ssh_private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
         ssh_user: Username to be used to SSH into fuchsia device.
@@ -94,10 +96,11 @@ class FuchsiaDevice(
     def __init__(
         self,
         device_name: str,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         ssh_private_key: str | None = None,
         ssh_user: str | None = None,
     ) -> None:
-        super().__init__(device_name, ssh_private_key, ssh_user)
+        super().__init__(device_name, device_ip, ssh_private_key, ssh_user)
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
         self.fuchsia_controller.create_context()
 
@@ -115,7 +118,7 @@ class FuchsiaDevice(
             errors.FuchsiaControllerError: Failed to instantiate.
         """
         fuchsia_controller_obj: fuchsia_controller_transport.FuchsiaController = fuchsia_controller_transport.FuchsiaController(
-            device_name=self.device_name
+            device_name=self.device_name, device_ip=self._ip_address
         )
         return fuchsia_controller_obj
 

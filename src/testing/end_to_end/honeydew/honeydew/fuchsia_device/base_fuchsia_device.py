@@ -5,6 +5,7 @@
 """Fuchsia device common implementation with transport-independent logic."""
 
 import abc
+import ipaddress
 import logging
 import os
 from datetime import datetime
@@ -45,11 +46,15 @@ class BaseFuchsiaDevice(
     def __init__(
         self,
         device_name: str,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         ssh_private_key: str | None = None,
         ssh_user: str | None = None,
     ) -> None:
         _LOGGER.debug("Initializing FuchsiaDevice")
         self._name: str = device_name
+        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            device_ip
+        )
         self._ssh_private_key: str | None = ssh_private_key
         self._ssh_user: str | None = ssh_user
         self._on_device_boot_fns: list[Callable[[], None]] = []
@@ -141,7 +146,9 @@ class BaseFuchsiaDevice(
             Fastboot object.
         """
         fastboot_obj: fastboot_transport.Fastboot = fastboot_transport.Fastboot(
-            device_name=self.device_name, reboot_affordance=self
+            device_name=self.device_name,
+            device_ip=self._ip_address,
+            reboot_affordance=self,
         )
         return fastboot_obj
 
@@ -155,7 +162,9 @@ class BaseFuchsiaDevice(
         Raises:
             errors.FfxCommandError: Failed to instantiate.
         """
-        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(target=self.device_name)
+        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(
+            target_name=self.device_name, target_ip=self._ip_address
+        )
         return ffx_obj
 
     @properties.Transport
@@ -173,6 +182,7 @@ class BaseFuchsiaDevice(
             )
         ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
             device_name=self.device_name,
+            device_ip=self._ip_address,
             username=self._ssh_user,
             private_key=self._ssh_private_key,
         )

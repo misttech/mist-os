@@ -5,6 +5,7 @@
 """Mobly Controller for Fuchsia Device"""
 
 import logging
+import ipaddress
 from typing import Any, Dict, List, Optional
 
 import honeydew
@@ -61,9 +62,9 @@ def create(
             honeydew.create_device(
                 device_name=device_config["name"],
                 transport=device_config["transport"],
+                device_ip_port=device_config.get("device_ip_port"),
                 ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user"),
-                device_ip_port=device_config.get("device_ip_port"),
             )
         )
     return fuchsia_devices
@@ -193,14 +194,23 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
                 )
         elif config_key == "device_ip_port":
             try:
-                device_config["device_ip_port"] = custom_types.IpPort.parse(
-                    config_value
-                )
+                device_config[
+                    "device_ip_port"
+                ] = custom_types.IpPort.create_using_ip_and_port(config_value)
             except Exception as err:  # pylint: disable=broad-except
                 raise ValueError(
                     f"Invalid device_ip_port `{config_value}` passed for "
                     f"{config['name']}"
                 ) from err
+        elif config_key in ["ipv4", "ipv6"]:
+            if config.get("ipv4"):
+                device_config[
+                    "device_ip_port"
+                ] = custom_types.IpPort.create_using_ip(config["ipv4"])
+            if config.get("ipv6"):
+                device_config[
+                    "device_ip_port"
+                ] = custom_types.IpPort.create_using_ip(config["ipv6"])
         else:
             device_config[config_key] = config_value
 

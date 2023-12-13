@@ -5,6 +5,7 @@
 """Provides methods for Host-(Fuchsia)Target interactions via FFX."""
 
 import atexit
+import ipaddress
 import json
 import logging
 import subprocess
@@ -107,24 +108,37 @@ class FFX:
     """Provides methods for Host-(Fuchsia)Target interactions via FFX.
 
     Args:
-        target: Fuchsia device name.
+        target_name: Fuchsia device name.
+        target_ip: Fuchsia device IP address.
+
+        Note: When target_ip is provided, it will be used instead of target_name
+        while running ffx commands (ex: `ffx -t <target_ip> <command>`).
     """
 
-    def __init__(self, target: str) -> None:
-        self._target: str = target
+    def __init__(
+        self,
+        target_name: str,
+        target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+    ) -> None:
+        self._target_name: str = target_name
+        self._target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            target_ip
+        )
+        self._target: ipaddress.IPv4Address | ipaddress.IPv6Address | str
+        if self._target_ip:
+            self._target = self._target_ip
+        else:
+            self._target = self._target_name
 
     @staticmethod
     def add_target(
         target_ip_port: custom_types.IpPort,
         timeout: float = _TIMEOUTS["FFX_CLI"],
-    ):
+    ) -> None:
         """Adds a target to the ffx collection
 
         Args:
             target: Target IpPort.
-
-        Returns:
-            True for success, False otherwise
 
         Raises:
             subprocess.TimeoutExpired: In case of timeout
@@ -204,7 +218,7 @@ class FFX:
             raise
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"Failed to get the target information of {self._target}"
+                f"Failed to get the target information of {self._target_name}"
             ) from err
 
     def get_target_list(
@@ -279,7 +293,7 @@ class FFX:
             return name_entry["value"]
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"Failed to get the target name of {self._target}"
+                f"Failed to get the target name of {self._target_name}"
             ) from err
 
     def get_target_ssh_address(
@@ -308,10 +322,12 @@ class FFX:
             ssh_ip: str = ssh_info[0].replace("[", "").replace("]", "")
             ssh_port: int = int(ssh_info[1])
 
-            return custom_types.TargetSshAddress(ip=ssh_ip, port=ssh_port)
+            return custom_types.TargetSshAddress(
+                ip=ipaddress.ip_address(ssh_ip), port=ssh_port
+            )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"Failed to get the SSH address of {self._target}"
+                f"Failed to get the SSH address of {self._target_name}"
             ) from err
 
     def get_target_type(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
@@ -434,7 +450,7 @@ class FFX:
 
                 if _DEVICE_NOT_CONNECTED in str(err.output):
                     raise errors.DeviceNotConnectedError(
-                        f"{self._target} is not connected to host"
+                        f"{self._target_name} is not connected to host"
                     ) from err
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
@@ -507,7 +523,7 @@ class FFX:
             subprocess.TimeoutExpired: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
-        _LOGGER.info("Waiting for %s to connect to host...", self._target)
+        _LOGGER.info("Waiting for %s to connect to host...", self._target_name)
 
         cmd: list[str] = _FFX_CMDS["TARGET_WAIT"] + [str(timeout)]
         try:
@@ -516,7 +532,7 @@ class FFX:
                 # check_output timeout should be > rcs_connection timeout passed
                 timeout=timeout + 5,
             )
-            _LOGGER.info("%s is connected to host", self._target)
+            _LOGGER.info("%s is connected to host", self._target_name)
             return
         except (
             errors.DeviceNotConnectedError,
@@ -526,8 +542,8 @@ class FFX:
             raise
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"'{self._target}' is still not connected to host even after"
-                f" {timeout}sec."
+                f"'{self._target_name}' is still not connected to host even "
+                f"after {timeout}sec."
             ) from err
 
     def wait_for_rcs_disconnection(
@@ -543,7 +559,9 @@ class FFX:
             subprocess.TimeoutExpired: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
-        _LOGGER.info("Waiting for %s to disconnect from host...", self._target)
+        _LOGGER.info(
+            "Waiting for %s to disconnect from host...", self._target_name
+        )
         cmd: list[str] = _FFX_CMDS["TARGET_WAIT_DOWN"] + [str(timeout)]
 
         try:
@@ -552,7 +570,7 @@ class FFX:
                 # check_output timeout should be > rcs_disconnect timeout passed
                 timeout=timeout + 5,
             )
-            _LOGGER.info("%s is not connected to host", self._target)
+            _LOGGER.info("%s is not connected to host", self._target_name)
             return
         except (
             errors.DeviceNotConnectedError,
@@ -562,14 +580,19 @@ class FFX:
             raise
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"'{self._target}' is still connected to host even after"
+                f"'{self._target_name}' is still connected to host even after"
                 f" {timeout}sec."
             ) from err
 
     # List all private methods in alphabetical order
     @staticmethod
-    def _generate_ffx_args(target: str | None) -> list[str]:
+    def _generate_ffx_args(
+        target: str | ipaddress.IPv4Address | ipaddress.IPv6Address | None,
+    ) -> list[str]:
         """Generates all the arguments that need to be used with FFX command.
+
+        Args:
+            target: target name or ipaddress.
 
         Returns:
             List of FFX arguments.
@@ -595,12 +618,16 @@ class FFX:
         return ffx_args
 
     @staticmethod
-    def _generate_ffx_cmd(cmd: list[str], target: str | None) -> list[str]:
+    def _generate_ffx_cmd(
+        cmd: list[str],
+        target: str | ipaddress.IPv4Address | ipaddress.IPv6Address | None,
+    ) -> list[str]:
         """Generates the FFX command that need to be passed
         subprocess.check_output.
 
         Args:
             cmd: FFX command.
+            target: target name or ipaddress.
 
         Returns:
             FFX command to be run as list of string.

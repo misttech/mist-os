@@ -6,7 +6,6 @@
 
 import ipaddress
 import logging
-import sys
 import time
 from typing import Any, Iterable, Type
 
@@ -46,14 +45,24 @@ class SL4F:
 
     Args:
         device_name: Fuchsia device name.
+        device_ip: Fuchsia device IP Address.
 
     Raises:
         errors.Sl4fError: Failed to instantiate.
     """
 
-    def __init__(self, device_name: str) -> None:
+    def __init__(
+        self,
+        device_name: str,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+    ) -> None:
         self._name: str = device_name
-        self._ffx = ffx_transport.FFX(target=self._name)
+        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            device_ip
+        )
+        self._ffx = ffx_transport.FFX(
+            target_name=self._name, target_ip=self._ip_address
+        )
 
         self.start_server()
 
@@ -72,7 +81,7 @@ class SL4F:
             self._get_sl4f_server_address()
         )
 
-        if self._get_ip_version(sl4f_server_address.ip) == 6:
+        if sl4f_server_address.ip.version == 6:
             return (
                 f"http://[{sl4f_server_address.ip}]:{sl4f_server_address.port}"
             )
@@ -203,46 +212,16 @@ class SL4F:
             errors.Sl4fError: In case of failure.
             errors.FfxCommandError: If failed to get the SL4F server address.
         """
-        sl4f_server_ip: str = self._ffx.get_target_ssh_address().ip
+        sl4f_server_ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+        if self._ip_address:
+            sl4f_server_ip = self._ip_address
+        else:
+            sl4f_server_ip = self._ffx.get_target_ssh_address().ip
 
         # Device addr is localhost, assume that means that ports were forwarded
         # from a remote workstation/laptop with a device attached.
         sl4f_port: int = _SL4F_PORT["LOCAL"]
-        if ipaddress.ip_address(
-            self._normalize_ip_addr(sl4f_server_ip)
-        ).is_loopback:
+        if sl4f_server_ip.is_loopback:
             sl4f_port = _SL4F_PORT["REMOTE"]
 
         return custom_types.Sl4fServerAddress(ip=sl4f_server_ip, port=sl4f_port)
-
-    def _get_ip_version(self, ip_address: str) -> int:
-        """Returns the ip version (4 | 6).
-
-        Args:
-            ip_address: IPv4|IPv6 address.
-
-        Returns:
-            ip version (4 | 6).
-        """
-        ip_address = self._normalize_ip_addr(ip_address)
-        return ipaddress.ip_address(ip_address).version
-
-    def _normalize_ip_addr(self, ip_address: str) -> str:
-        """Workaround IPv6 scope IDs for Python 3.8 or older.
-
-        IPv6 scope identifiers are not supported in Python 3.8. Added a
-        workaround to remove the scope identifier from IPv6 address if python
-        version is 3.8 or lower.
-
-        Ex: In fe80::1f91:2f5c:5e9b:7ff3%qemu IPv6 address, "%qemu" is the scope
-        identifier.
-
-        Args:
-            ip_address: IPv4|IPv6 address.
-
-        Returns:
-            ip address with or without scope identifier based on python version.
-        """
-        if sys.version_info < (3, 9):
-            ip_address = ip_address.split("%")[0]
-        return ip_address

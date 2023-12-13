@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.ssh.py."""
 
+import ipaddress
 import subprocess
 import unittest
 from typing import Any
@@ -14,15 +15,24 @@ from parameterized import parameterized
 from honeydew import custom_types, errors
 from honeydew.transports import ssh
 
+_IPV4: str = "11.22.33.44"
+_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
+
+_SSH_PORT: int = 22
+_SSH_USER: str = "root"
+_SSH_PRIVATE_KEY: str = "/tmp/.ssh/pkey"
+_DEVICE_NAME: str = "fuchsia-emulator"
+
 _INPUT_ARGS: dict[str, Any] = {
-    "device_name": "fuchsia-emulator",
-    "ssh_private_key": "/tmp/.ssh/pkey",
-    "ssh_user": "root",
+    "device_name": _DEVICE_NAME,
+    "device_ip_v4": _IPV4_OBJ,
+    "ssh_private_key": _SSH_PRIVATE_KEY,
+    "ssh_user": _SSH_USER,
 }
 
 _MOCK_ARGS: dict[str, Any] = {
     "target_ssh_address": custom_types.TargetSshAddress(
-        ip="11.22.33.44", port=22
+        ip=_IPV4_OBJ, port=_SSH_PORT
     ),
 }
 
@@ -43,9 +53,15 @@ class SshTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.ssh_obj = ssh.SSH(
+        self.ssh_obj_wo_ip = ssh.SSH(
             device_name=_INPUT_ARGS["device_name"],
             private_key=_INPUT_ARGS["ssh_private_key"],
+        )
+
+        self.ssh_obj_with_ip = ssh.SSH(
+            device_name=_INPUT_ARGS["device_name"],
+            private_key=_INPUT_ARGS["ssh_private_key"],
+            device_ip=_INPUT_ARGS["device_ip_v4"],
         )
 
     @mock.patch("time.sleep", autospec=True)
@@ -59,7 +75,7 @@ class SshTests(unittest.TestCase):
         self, mock_ssh_run, mock_sleep
     ) -> None:
         """Testcase for SSH.check_connection() success case"""
-        self.ssh_obj.check_connection(timeout=5)
+        self.ssh_obj_wo_ip.check_connection(timeout=5)
 
         mock_ssh_run.assert_called()
         mock_sleep.assert_called()
@@ -74,7 +90,7 @@ class SshTests(unittest.TestCase):
     ) -> None:
         """Testcase for SSH.check_connection() failure case"""
         with self.assertRaises(errors.SSHCommandError):
-            self.ssh_obj.check_connection(timeout=2)
+            self.ssh_obj_wo_ip.check_connection(timeout=2)
 
         mock_ssh_run.assert_called()
         mock_time.assert_called()
@@ -92,15 +108,39 @@ class SshTests(unittest.TestCase):
         return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True,
     )
-    def test_ssh_run(
+    def test_ssh_run_wo_device_ip(
         self, mock_get_target_ssh_address, mock_check_output
     ) -> None:
-        """Testcase for SSH.run()"""
+        """Testcase for SSH.run() when called using SSH object created without
+        device_ip argument."""
         self.assertEqual(
-            self.ssh_obj.run(command="some_command"), "some output"
+            self.ssh_obj_wo_ip.run(command="some_command"), "some output"
         )
 
         mock_get_target_ssh_address.assert_called()
+        mock_check_output.assert_called()
+
+    @mock.patch.object(
+        ssh.subprocess,
+        "check_output",
+        return_value=b"some output",
+        autospec=True,
+    )
+    @mock.patch.object(
+        ssh.ffx_transport.FFX,
+        "get_target_ssh_address",
+        autospec=True,
+    )
+    def test_ssh_run_with_device_ip(
+        self, mock_get_target_ssh_address, mock_check_output
+    ) -> None:
+        """Testcase for SSH.run() when called using SSH object created with
+        device_ip argument."""
+        self.assertEqual(
+            self.ssh_obj_with_ip.run(command="some_command"), "some output"
+        )
+
+        mock_get_target_ssh_address.assert_not_called()
         mock_check_output.assert_called()
 
     @parameterized.expand(
@@ -139,7 +179,7 @@ class SshTests(unittest.TestCase):
         mock_check_output.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.SSHCommandError):
-            self.ssh_obj.run(command="some_command")
+            self.ssh_obj_wo_ip.run(command="some_command")
 
         mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()

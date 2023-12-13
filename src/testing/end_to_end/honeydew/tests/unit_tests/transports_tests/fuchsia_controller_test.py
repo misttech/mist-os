@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.fuchsia_controller.py."""
 
+import ipaddress
 import unittest
 from typing import Any
 from unittest import mock
@@ -15,8 +16,14 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 
+_IPV4: str = "11.22.33.44"
+_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
+
+_DEVICE_NAME: str = "fuchsia-emulator"
+
 _INPUT_ARGS: dict[str, Any] = {
-    "device_name": "fuchsia-emulator",
+    "device_name": _DEVICE_NAME,
+    "device_ip_v4": _IPV4_OBJ,
 }
 
 _MOCK_ARGS: dict[str, Any] = {
@@ -34,9 +41,16 @@ class FuchsiaControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.fuchsia_controller_obj = (
+        self.fuchsia_controller_obj_wo_device_ip = (
             fuchsia_controller_transport.FuchsiaController(
-                device_name=_INPUT_ARGS["device_name"]
+                device_name=_INPUT_ARGS["device_name"],
+            )
+        )
+
+        self.fuchsia_controller_obj_with_device_ip = (
+            fuchsia_controller_transport.FuchsiaController(
+                device_name=_INPUT_ARGS["device_name"],
+                device_ip=_INPUT_ARGS["device_ip_v4"],
             )
         )
 
@@ -60,13 +74,13 @@ class FuchsiaControllerTests(unittest.TestCase):
         self, mock_ffx_get_config, mock_fc_context, mock_remote_control_proxy
     ) -> None:
         """Test case for fuchsia_controller_transport.create_context()."""
-        self.fuchsia_controller_obj.create_context()
+        self.fuchsia_controller_obj_with_device_ip.create_context()
 
         mock_ffx_get_config.assert_called_once()
         mock_fc_context.assert_called_once_with(
             config=mock.ANY,
             isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
-            target=self.fuchsia_controller_obj._name,
+            target=self.fuchsia_controller_obj_with_device_ip._target,
         )
         mock_remote_control_proxy.assert_called()
 
@@ -83,7 +97,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         )
 
         with self.assertRaises(errors.FuchsiaControllerError):
-            self.fuchsia_controller_obj.create_context()
+            self.fuchsia_controller_obj_with_device_ip.create_context()
 
         mock_fc_context.assert_called()
 
@@ -107,14 +121,14 @@ class FuchsiaControllerTests(unittest.TestCase):
         )
 
         with self.assertRaises(errors.FuchsiaControllerError):
-            self.fuchsia_controller_obj.create_context()
+            self.fuchsia_controller_obj_with_device_ip.create_context()
 
         mock_fc_context.assert_called()
         mock_remote_control_proxy.assert_called()
 
     def test_destroy_context(self) -> None:
         """Test case for fuchsia_controller_transport.destroy_context()"""
-        self.fuchsia_controller_obj.destroy_context()
+        self.fuchsia_controller_obj_with_device_ip.destroy_context()
 
     @mock.patch.object(
         fuchsia_controller_transport.fd_remotecontrol.RemoteControl,
@@ -130,9 +144,9 @@ class FuchsiaControllerTests(unittest.TestCase):
         self, mock_fc_context, mock_remote_control_proxy
     ) -> None:
         """Test case for fuchsia_controller_transport.connect_device_proxy()"""
-        self.fuchsia_controller_obj.create_context()
+        self.fuchsia_controller_obj_with_device_ip.create_context()
 
-        self.fuchsia_controller_obj.connect_device_proxy(
+        self.fuchsia_controller_obj_with_device_ip.connect_device_proxy(
             fuchsia_controller_transport._FC_PROXIES["RemoteControl"]
         )
 

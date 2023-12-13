@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller."""
 
+import ipaddress
 import logging
 
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
@@ -26,11 +27,23 @@ class FuchsiaController:
 
     Args:
         device_name: Fuchsia device name.
+        device_ip: Fuchsia device IP Address.
     """
 
-    def __init__(self, device_name: str) -> None:
+    def __init__(
+        self,
+        device_name: str,
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+    ) -> None:
         self._name: str = device_name
-
+        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            device_ip
+        )
+        self._target: str
+        if self._ip_address:
+            self._target = str(self._ip_address)
+        else:
+            self._target = self._name
         self._ctx: fuchsia_controller.Context
         self.rcs_proxy: fd_remotecontrol.RemoteControl.Client
 
@@ -72,7 +85,7 @@ class FuchsiaController:
                 msg = f"{msg}, isolate_dir={isolate_dir.directory()}"
             _LOGGER.debug(msg)
             self._ctx = fuchsia_controller.Context(
-                config=config, isolate_dir=isolate_dir, target=self._name
+                config=config, isolate_dir=isolate_dir, target=self._target
             )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaControllerError(
