@@ -80,17 +80,19 @@ HotPlugDetection::HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> 
 }
 
 HotPlugDetection::~HotPlugDetection() {
-  if (hpd_thread_.has_value()) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_join(*hpd_thread_, nullptr));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "GPIO interrupt thread join failed: %s", zx_status_get_string(status));
-    }
-  }
-
+  // In order to shut down the interrupt handler and join the thread, the
+  // interrupt must be destroyed first.
   if (pin_gpio_irq_.is_valid()) {
     zx_status_t status = pin_gpio_irq_.destroy();
     if (status != ZX_OK) {
       zxlogf(ERROR, "GPIO interrupt destroy failed: %s", zx_status_get_string(status));
+    }
+  }
+
+  if (hpd_thread_.has_value()) {
+    zx_status_t status = thrd_status_to_zx_status(thrd_join(*hpd_thread_, nullptr));
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "GPIO interrupt thread join failed: %s", zx_status_get_string(status));
     }
   }
 }
