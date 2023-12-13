@@ -36,59 +36,6 @@ namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 namespace fhgpio = fuchsia_hardware_gpio;
 
-uint32_t Nelson::GetBoardRev() {
-  if (!board_rev_) {
-    uint32_t board_rev;
-    uint8_t id0, id1, id2;
-
-    gpio_impl_.ConfigIn(GPIO_HW_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_HW_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_HW_ID2, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.Read(GPIO_HW_ID0, &id0);
-    gpio_impl_.Read(GPIO_HW_ID1, &id1);
-    gpio_impl_.Read(GPIO_HW_ID2, &id2);
-    board_rev = id0 + (id1 << 1) + (id2 << 2);
-
-    if (board_rev >= MAX_SUPPORTED_REV) {
-      // We have detected a new board rev. Print this warning just in case the
-      // new board rev requires additional support that we were not aware of
-      zxlogf(INFO, "Unsupported board revision detected (%d)", board_rev);
-    }
-
-    board_rev_.emplace(board_rev);
-  }
-
-  return *board_rev_;
-}
-
-uint32_t Nelson::GetBoardOption() {
-  if (!board_option_) {
-    uint8_t id3, id4;
-
-    gpio_impl_.ConfigIn(GPIO_HW_ID3, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_HW_ID4, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.Read(GPIO_HW_ID3, &id3);
-    gpio_impl_.Read(GPIO_HW_ID4, &id4);
-
-    board_option_.emplace(id3 + (id4 << 1));
-  }
-
-  return *board_option_;
-}
-
-uint32_t Nelson::GetDisplayId() {
-  if (!display_id_) {
-    uint8_t id0, id1;
-    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.Read(GPIO_DISP_SOC_ID0, &id0);
-    gpio_impl_.Read(GPIO_DISP_SOC_ID1, &id1);
-    display_id_.emplace((id1 << 1) | id0);
-  }
-
-  return *display_id_;
-}
-
 int Nelson::Thread() {
   zx_status_t status;
 
@@ -147,6 +94,7 @@ int Nelson::Thread() {
     zxlogf(ERROR, "%s: GpioInit() failed: %d", __func__, status);
     return status;
   }
+  gpio_init_steps_.clear();
 
   if ((status = AddPostInitDevice()) != ZX_OK) {
     zxlogf(ERROR, "%s: AddPostInitDevice() failed: %d", __func__, status);
@@ -222,6 +170,7 @@ int Nelson::Thread() {
   }
 
   ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
+  ZX_ASSERT_MSG(gpio_init_steps_.empty(), "GPIO init steps added but not applied");
 
   return ZX_OK;
 }

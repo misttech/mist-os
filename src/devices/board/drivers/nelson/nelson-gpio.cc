@@ -223,6 +223,9 @@ static const fpbus::Node gpio_c_dev = []() {
 }();
 
 zx_status_t Nelson::GpioInit() {
+  // Enable mute LED so it will be controlled by mute switch.
+  gpio_init_steps_.push_back({GPIO_AMBER_LED_PWM, GpioConfigOut(1)});
+
   fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
   metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
       gpio_init_steps_.data(), gpio_init_steps_.size());
@@ -258,33 +261,18 @@ zx_status_t Nelson::GpioInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
-                                                     fidl::ToWire(fidl_arena, gpio_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
-  gpio_impl_ = ddk::GpioImplProtocolClient(parent());
-  if (!gpio_impl_.is_valid()) {
-    zxlogf(ERROR, "%s: GpioImplProtocolClient failed", __func__);
-    return ZX_ERR_INTERNAL;
-  }
-
-  // Enable mute LED so it will be controlled by mute switch.
-  zx_status_t status = gpio_impl_.ConfigOut(GPIO_AMBER_LED_PWM, 1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, status);
-  }
-
-  // TODO(fxbug.dev/130993): Add GPIO H and GPIO C devices after all init steps have been executed
-  // to ensure that there are no simultaneous accesses to these banks.
   {
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_h_dev));
     if (!result.ok()) {

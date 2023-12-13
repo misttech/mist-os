@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.clockimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <threads.h>
@@ -138,9 +137,6 @@ class Nelson : public NelsonType {
   zx_status_t AddPostInitDevice();
   int Thread();
 
-  uint32_t GetBoardRev(void);
-  uint32_t GetBoardOption(void);
-  uint32_t GetDisplayId(void);
   zx_status_t EnableWifi32K(void);
   zx_status_t SdEmmcConfigurePortB(void);
 
@@ -164,15 +160,11 @@ class Nelson : public NelsonType {
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   ddk::IommuProtocolClient iommu_;
-  ddk::GpioImplProtocolClient gpio_impl_;
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
 
   thrd_t thread_;
-  std::optional<uint32_t> board_rev_;
-  std::optional<uint32_t> board_option_;
-  std::optional<uint32_t> display_id_;
 
   fdf::OutgoingDirectory outgoing_;
 };

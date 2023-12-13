@@ -71,10 +71,6 @@ static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
 };
 
 zx_status_t Nelson::TouchInit() {
-  const uint32_t display_id = GetDisplayId();
-  zxlogf(INFO, "Board rev: %u", GetBoardRev());
-  zxlogf(INFO, "Panel ID: 0b%d%d", display_id & 0b10 ? 1 : 0, display_id & 0b01 ? 1 : 0);
-
   fpbus::Node touch_dev;
   touch_dev.name() = "gt6853-touch";
   touch_dev.vid() = PDEV_VID_GOODIX;
