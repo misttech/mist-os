@@ -153,9 +153,13 @@ class FfxCliTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.ffx_obj = ffx.FFX(
+        self.ffx_obj_with_ip = ffx.FFX(
             target_name=_INPUT_ARGS["target_name"],
             target_ip=_INPUT_ARGS["target_ip"],
+        )
+
+        self.ffx_obj_wo_ip = ffx.FFX(
+            target_name=_INPUT_ARGS["target_name"],
         )
 
     def test_ffx_setup(self) -> None:
@@ -184,10 +188,17 @@ class FfxCliTests(unittest.TestCase):
         """Test case for ffx.close()."""
         ffx.close()
 
+    def test_ffx_init_with_ip_as_target_name(self) -> None:
+        """Test case for ffx.FFX() when called with target_name=<ip>."""
+        with self.assertRaises(ValueError):
+            self.ffx_obj_with_ip = ffx.FFX(
+                target_name=_IPV6,
+            )
+
     @mock.patch.object(ffx.FFX, "wait_for_rcs_connection", autospec=True)
     def test_check_connection(self, mock_wait_for_rcs_connection) -> None:
         """Test case for check_connection()"""
-        self.ffx_obj.check_connection()
+        self.ffx_obj_with_ip.check_connection()
 
         mock_wait_for_rcs_connection.assert_called()
 
@@ -201,7 +212,7 @@ class FfxCliTests(unittest.TestCase):
         """Verify get_target_information() succeeds when target is connected to
         host."""
         self.assertEqual(
-            self.ffx_obj.get_target_information(),
+            self.ffx_obj_with_ip.get_target_information(),
             _EXPECTED_VALUES["ffx_target_show_json"],
         )
 
@@ -220,7 +231,7 @@ class FfxCliTests(unittest.TestCase):
     ) -> None:
         """Verify get_target_information raising subprocess.TimeoutExpired."""
         with self.assertRaises(subprocess.TimeoutExpired):
-            self.ffx_obj.get_target_information()
+            self.ffx_obj_with_ip.get_target_information()
 
         mock_ffx_run.assert_called()
 
@@ -237,7 +248,7 @@ class FfxCliTests(unittest.TestCase):
     ) -> None:
         """Verify get_target_information raising FfxCommandError."""
         with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj.get_target_information()
+            self.ffx_obj_with_ip.get_target_information()
 
         mock_ffx_run.assert_called()
 
@@ -270,7 +281,8 @@ class FfxCliTests(unittest.TestCase):
         """Test case for get_target_list()."""
         mock_ffx_run.return_value = parameterized_dict["return_value"]
         self.assertEqual(
-            self.ffx_obj.get_target_list(), parameterized_dict["expected_value"]
+            self.ffx_obj_with_ip.get_target_list(),
+            parameterized_dict["expected_value"],
         )
 
         mock_ffx_run.assert_called()
@@ -284,7 +296,7 @@ class FfxCliTests(unittest.TestCase):
     def test_get_target_list_exception(self, mock_ffx_run) -> None:
         """Test case for get_target_list() raising exception."""
         with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj.get_target_list()
+            self.ffx_obj_with_ip.get_target_list()
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
@@ -297,7 +309,7 @@ class FfxCliTests(unittest.TestCase):
         """Verify get_target_ssh_address returns SSH information of the fuchsia
         device."""
         self.assertEqual(
-            self.ffx_obj.get_target_ssh_address(), _TARGET_SSH_ADDRESS
+            self.ffx_obj_with_ip.get_target_ssh_address(), _TARGET_SSH_ADDRESS
         )
         mock_ffx_run.assert_called()
 
@@ -323,7 +335,7 @@ class FfxCliTests(unittest.TestCase):
         mock_ffx_run.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj.get_target_ssh_address()
+            self.ffx_obj_with_ip.get_target_ssh_address()
 
         mock_ffx_run.assert_called()
 
@@ -335,7 +347,7 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_get_target_type(self, mock_get_target_information) -> None:
         """Verify ffx.get_target_type returns target type of fuchsia device."""
-        result: str = self.ffx_obj.get_target_type()
+        result: str = self.ffx_obj_with_ip.get_target_type()
         expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
 
         self.assertEqual(result, expected)
@@ -351,11 +363,49 @@ class FfxCliTests(unittest.TestCase):
     def test_ffx_run(self, mock_subprocess_check_output) -> None:
         """Test case for ffx.run()"""
         self.assertEqual(
-            self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"]),
+            self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
             _EXPECTED_VALUES["ffx_target_show_output"],
         )
 
-        mock_subprocess_check_output.assert_called()
+        mock_subprocess_check_output.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                _IPV6,
+                "--config",
+                '{"discovery": {"mdns": {"enabled": false}}}',
+            ]
+            + ffx._FFX_CMDS["TARGET_SHOW"],
+            stderr=subprocess.STDOUT,
+            timeout=10,
+        )
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        return_value=_MOCK_ARGS["ffx_target_show_output"],
+        autospec=True,
+    )
+    def test_ffx_run_with_mdns(self, mock_subprocess_check_output) -> None:
+        """Test case for ffx.run() where ffx object is created without target_ip
+        which means we need to set mdns to true."""
+        self.assertEqual(
+            self.ffx_obj_wo_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
+            _EXPECTED_VALUES["ffx_target_show_output"],
+        )
+
+        mock_subprocess_check_output.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                _TARGET_NAME,
+                "--config",
+                '{"discovery": {"mdns": {"enabled": true}}}',
+            ]
+            + ffx._FFX_CMDS["TARGET_SHOW"],
+            stderr=subprocess.STDOUT,
+            timeout=10,
+        )
 
     @mock.patch.object(
         ffx.subprocess,
@@ -374,7 +424,7 @@ class FfxCliTests(unittest.TestCase):
     ) -> None:
         """Test case for ffx.run()"""
         self.assertEqual(
-            self.ffx_obj.run(
+            self.ffx_obj_with_ip.run(
                 cmd=["test", "run", "my-test"], capture_output=False
             ),
             "",
@@ -386,7 +436,7 @@ class FfxCliTests(unittest.TestCase):
                 "-t",
                 _IPV6,
                 "--config",
-                "{}",
+                '{"discovery": {"mdns": {"enabled": false}}}',
                 "test",
                 "run",
                 "my-test",
@@ -403,7 +453,7 @@ class FfxCliTests(unittest.TestCase):
     def test_ffx_run_test_component(self, mock_subprocess_check_call) -> None:
         """Test case for ffx.run()"""
         self.assertEqual(
-            self.ffx_obj.run_test_component(
+            self.ffx_obj_with_ip.run_test_component(
                 "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
                 ffx_test_args=["--foo", "bar"],
                 test_component_args=["baz", "--x", "2"],
@@ -417,7 +467,7 @@ class FfxCliTests(unittest.TestCase):
                 "-t",
                 _IPV6,
                 "--config",
-                "{}",
+                mock.ANY,
                 "test",
                 "run",
                 "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
@@ -491,7 +541,7 @@ class FfxCliTests(unittest.TestCase):
         ]
 
         with self.assertRaises(parameterized_dict["expected_error"]):
-            self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"])
+            self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_subprocess_check_output.assert_called()
 
@@ -506,7 +556,7 @@ class FfxCliTests(unittest.TestCase):
     ) -> None:
         """Test case for ffx.run() when called with exceptions_to_skip."""
         self.assertEqual(
-            self.ffx_obj.run(
+            self.ffx_obj_with_ip.run(
                 cmd=_INPUT_ARGS["run_cmd"], exceptions_to_skip=[RuntimeError]
             ),
             "",
@@ -576,7 +626,7 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_get_target_name(self, mock_ffx_get_target_information) -> None:
         """Verify get_target_name returns the name of the fuchsia device."""
-        self.assertEqual(self.ffx_obj.get_target_name(), _TARGET_NAME)
+        self.assertEqual(self.ffx_obj_with_ip.get_target_name(), _TARGET_NAME)
 
         mock_ffx_get_target_information.assert_called()
 
@@ -610,14 +660,14 @@ class FfxCliTests(unittest.TestCase):
         ]
 
         with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj.get_target_name()
+            self.ffx_obj_with_ip.get_target_name()
 
         mock_ffx_get_target_information.assert_called_once()
 
     @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
     def test_wait_for_rcs_connection(self, mock_ffx_run) -> None:
         """Test case for ffx.wait_for_rcs_connection()"""
-        self.ffx_obj.wait_for_rcs_connection()
+        self.ffx_obj_with_ip.wait_for_rcs_connection()
         mock_ffx_run.assert_called()
 
     @parameterized.expand(
@@ -661,14 +711,14 @@ class FfxCliTests(unittest.TestCase):
         mock_ffx_run.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(parameterized_dict["expected_error"]):
-            self.ffx_obj.wait_for_rcs_connection()
+            self.ffx_obj_with_ip.wait_for_rcs_connection()
 
         mock_ffx_run.assert_called()
 
     @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
     def test_wait_for_rcs_disconnection(self, mock_ffx_run) -> None:
         """Test case for ffx.wait_for_rcs_disconnection()"""
-        self.ffx_obj.wait_for_rcs_disconnection()
+        self.ffx_obj_with_ip.wait_for_rcs_disconnection()
         mock_ffx_run.assert_called()
 
     @parameterized.expand(
@@ -714,6 +764,6 @@ class FfxCliTests(unittest.TestCase):
         mock_ffx_run.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(parameterized_dict["expected_error"]):
-            self.ffx_obj.wait_for_rcs_disconnection()
+            self.ffx_obj_with_ip.wait_for_rcs_disconnection()
 
         mock_ffx_run.assert_called()

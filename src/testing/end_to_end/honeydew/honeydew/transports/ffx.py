@@ -120,6 +120,17 @@ class FFX:
         target_name: str,
         target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
+        invalid_target_name: bool = False
+        try:
+            ipaddress.ip_address(target_name)
+            invalid_target_name = True
+        except ValueError:
+            pass
+        if invalid_target_name:
+            raise ValueError(
+                f"{target_name=} is an IP address instead of target name"
+            )
+
         self._target_name: str = target_name
         self._target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
             target_ip
@@ -607,11 +618,25 @@ class FFX:
         if _ISOLATE_DIR:
             ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
 
+        # TODO(b/316198820): Consider using "ffx config set <config>" for below
         config: dict[str, Any] = {}
 
         # To collect FFX logs
         if _LOGS_DIR:
             config["log"] = {"dir": _LOGS_DIR, "level": "debug"}
+
+        if isinstance(target, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            config["discovery"] = {
+                "mdns": {
+                    "enabled": False,
+                },
+            }
+        else:
+            config["discovery"] = {
+                "mdns": {
+                    "enabled": True,
+                },
+            }
 
         ffx_args.extend(["--config", json.dumps(config)])
 
