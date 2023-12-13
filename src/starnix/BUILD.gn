@@ -28,5 +28,8 @@ group("tests") {
 
 group("benchmarks") {
   testonly = true
-  deps = [ "lib:benchmarks" ]
+  deps = [
+    "lib:benchmarks",
+    "tests:benchmarks",
+  ]
 }

@@ -41,6 +41,11 @@ group("tests") {
   }
 }
 
+group("benchmarks") {
+  testonly = true
+  deps = [ "gvisor:benchmarks" ]
+}
+
 # Tests that use starnix_test_runner should depend on one of these.
 expect_includes("starnix_test") {
   includes = [ "starnix_test.shard.cml" ]

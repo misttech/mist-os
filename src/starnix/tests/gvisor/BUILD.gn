@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/dist/zip_resource.gni")
+import("//build/testing/perf/test.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 import("//src/starnix/kernel/starnix.gni")
@@ -248,32 +249,32 @@ gvisor_tests_custom_manifest = [
 ]
 
 gvisor_benchmarks = [
-  "clock_getres_benchmark",
-  "clock_gettime_benchmark",
-  "death_benchmark",
-  "dup_benchmark",
-  "epoll_benchmark",
-  "fork_benchmark",
-  "futex_benchmark",
-  "getdents_benchmark",
-  "getpid_benchmark",
-  "gettid_benchmark",
-  "mapping_benchmark",
-  "open_benchmark",
-  "open_read_close_benchmark",
-  "pipe_benchmark",
-  "poll_benchmark",
-  "randread_benchmark",
-  "read_benchmark",
-  "sched_yield_benchmark",
-  "select_benchmark",
-  "send_recv_benchmark",
-  "seqwrite_benchmark",
-  "signal_benchmark",
-  "sleep_benchmark",
-  "stat_benchmark",
-  "unlink_benchmark",
-  "write_benchmark",
+  "clock_getres",
+  "clock_gettime",
+  "death",
+  "dup",
+  "epoll",
+  "fork",
+  "futex",
+  "getdents",
+  "getpid",
+  "gettid",
+  "mapping",
+  "open",
+  "open_read_close",
+  "pipe",
+  "poll",
+  "randread",
+  "read",
+  "sched_yield",
+  "select",
+  "send_recv",
+  "seqwrite",
+  "signal",
+  "sleep",
+  "stat",
+  "unlink",
+  "write",
 ]
 
 expect_includes("gvisor_benchmark") {
@@ -490,10 +491,11 @@ foreach(test_name, gvisor_tests_custom_manifest) {
 }
 
 foreach(benchmark_name, gvisor_benchmarks) {
-  gvisor_generate_manifest(benchmark_name) {
+  name = "${benchmark_name}_benchmark"
+  gvisor_generate_manifest(name) {
     use_expectations = false
   }
-  gvisor_test_component(benchmark_name) {
+  gvisor_test_component(name) {
     use_gen_manifest = true
     use_expectations = false
     run_as_root = false
@@ -559,7 +561,7 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
   test_components = []
 
   foreach(benchmark_name, gvisor_benchmarks) {
-    test_components += [ ":${benchmark_name}" ]
+    test_components += [ ":${benchmark_name}_benchmark" ]
   }
 
   subpackages = starnix_test_subpackages
@@ -571,4 +573,40 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
   test_specs = {
     environments = []
   }
+}
+
+all_benchmark_targets = []
+foreach(benchmark_name, gvisor_benchmarks) {
+  # The "starnix_host_benchmark_gvisor_" prefix is useful for running all benchmarks with `fx test`.
+  name = "starnix_host_benchmark_gvisor_${benchmark_name}"
+  fuchsia_component_perf_test(name) {
+    package = ":starnix_gvisor_benchmarks"
+    component_name = "${benchmark_name}_benchmark"
+    expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.starnix.gvisor_benchmarks.${benchmark_name}.txt"
+
+    # TODO(b/275745984): Remove per-benchmark filters.
+    if (benchmark_name == "fork") {
+      test_component_args = [ "--benchmark_filter_internal=-BM_ThreadSwitch" ]
+    } else if (benchmark_name == "gettid") {
+      test_component_args = [ string_join("",
+                                          [
+                                            "--benchmark_filter_internal=-",
+                                            "BM_Gettid/real_time/threads:1024|",
+                                            "BM_Gettid/real_time/threads:2048|",
+                                            "BM_Gettid/real_time/threads:4000",
+                                          ]) ]
+    } else if (benchmark_name == "send_recv") {
+      test_component_args = [ "--benchmark_filter_internal=-BM_SendmsgTCP*" ]
+    } else {
+      test_component_args = [ "--benchmark_filter_internal=all" ]
+    }
+    test_type = "starnix"
+  }
+
+  all_benchmark_targets += [ ":${name}" ]
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = all_benchmark_targets
 }

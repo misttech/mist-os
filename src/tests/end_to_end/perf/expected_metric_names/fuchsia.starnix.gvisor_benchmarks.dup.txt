@@ -3,3 +3,4 @@ fuchsia.starnix.gvisor_benchmarks: Dup/8
 fuchsia.starnix.gvisor_benchmarks: Dup/64
 fuchsia.starnix.gvisor_benchmarks: Dup/512
 fuchsia.starnix.gvisor_benchmarks: Dup/4096
+fuchsia.starnix.gvisor_benchmarks: Dup/32768

@@ -38,9 +38,6 @@ pub struct BenchmarkRunData {
 
 const GBENCHMARK_RESULT_FILE: &str = "benchmark.json";
 
-/// The number of benchmark iterations to report.
-const MAX_BENCHMARK_COUNT: u8 = 5;
-
 /// Runs a gbenchmark associated with a single `ftest::SuiteRequest::Run` request.
 ///
 /// Reports results in the test component's `/custom_artifacts` to leverage
@@ -80,8 +77,6 @@ fn gbenchmark_to_fuchsiaperf(
     };
 
     let mut perfs = vec![];
-    let mut benchmark_count = 0;
-    let mut previous_benchmark_name = " ".to_string();
     for benchmark in benchmark_output.benchmarks {
         // Conform benchmark names to Fuchsia performance metric naming style.
         // https://fuchsia.dev/fuchsia-src/development/performance/metric_naming_style
@@ -96,15 +91,6 @@ fn gbenchmark_to_fuchsiaperf(
             segments.push(segment.to_camel_case());
         }
         let label = segments.join("/");
-        if label.starts_with(&previous_benchmark_name) {
-            if benchmark_count >= MAX_BENCHMARK_COUNT {
-                continue;
-            }
-            benchmark_count += 1;
-        } else {
-            previous_benchmark_name = label.split('/').collect::<Vec<_>>()[0].to_string();
-            benchmark_count = 1;
-        }
 
         perfs.push(FuchsiaPerfBenchmarkResult {
             label,
@@ -268,6 +254,12 @@ mod tests {
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![54292.060699663125],
+            },
+            FuchsiaPerfBenchmarkResult {
+                label: "MetricName1/Category/1024".to_string(),
+                test_suite: TEST_SUITE.to_owned(),
+                unit: "ns".to_string(),
+                values: vec![37122.060699663125],
             },
             FuchsiaPerfBenchmarkResult {
                 label: "MetricName2/Category/1".to_string(),
