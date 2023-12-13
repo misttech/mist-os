@@ -277,11 +277,6 @@ int Nelson::Thread() {
     zxlogf(ERROR, "ThermistorInit failed");
   }
 
-  root_ = inspector_.GetRoot().CreateChild("nelson_board_driver");
-  board_rev_property_ = root_.CreateUint("board_build", GetBoardRev());
-  board_option_property_ = root_.CreateUint("board_option", GetBoardOption());
-  display_id_property_ = root_.CreateUint("display_id", GetDisplayId());
-
   ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 
   return ZX_OK;
@@ -359,8 +354,7 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
   status = board->DdkAdd(ddk::DeviceAddArgs("nelson")
                              .set_props(kBoardDriverProps)
                              .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .set_runtime_service_offers({fidl_service_offers, 1})
-                             .set_inspect_vmo(board->inspector_.DuplicateVmo()));
+                             .set_runtime_service_offers({fidl_service_offers, 1}));
   if (status != ZX_OK) {
     return status;
   }

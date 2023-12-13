@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/inspect/cpp/inspect.h>
 #include <threads.h>
 
 #include <optional>
@@ -196,12 +195,6 @@ class Nelson : public NelsonType {
   std::optional<uint32_t> board_rev_;
   std::optional<uint32_t> board_option_;
   std::optional<uint32_t> display_id_;
-
-  inspect::Inspector inspector_;
-  inspect::Node root_;
-  inspect::UintProperty board_rev_property_;
-  inspect::UintProperty board_option_property_;
-  inspect::UintProperty display_id_property_;
 
   fdf::OutgoingDirectory outgoing_;
 };

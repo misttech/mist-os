@@ -8,6 +8,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
 
 namespace nelson {
 
@@ -19,11 +22,30 @@ class PostInit : public fdf::DriverBase {
   void Start(fdf::StartCompleter completer) override;
 
  private:
+  zx::result<> InitBoardInfo();
+  zx::result<> SetInspectProperties();
+
+  // Constructs a number using the value of each GPIO as one bit. The order of elements in
+  // node_names determines the bits set in the result from LSB to MSB.
+  zx::result<uint32_t> ReadGpios(cpp20::span<const char* const> node_names);
+
   fidl::SyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> controller_;
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> composite_manager_;
+
+  uint32_t board_build_{};
+  uint32_t board_option_{};
+  uint32_t display_id_{};
+
+  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
+
+  inspect::Inspector inspector_;
+  inspect::Node root_;
+  inspect::UintProperty board_build_property_;
+  inspect::UintProperty board_option_property_;
+  inspect::UintProperty display_id_property_;
 };
 
 }  // namespace nelson
