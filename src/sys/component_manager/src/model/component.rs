@@ -1309,6 +1309,9 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that the parent wished to provide to us.
     pub component_input_dict: Dict,
 
+    /// The router containing all capabilities that the parent wished to provide to us.
+    component_input: Router,
+
     /// The dict containing all capabilities that we expose.
     pub component_output_dict: Dict,
 
@@ -1373,6 +1376,8 @@ impl ResolvedInstanceState {
         let program_output =
             Self::start_component_on_request(Router::from_routable(program_output_dict), component);
 
+        let component_input = Router::from_routable(component_input_dict.clone());
+
         let mut state = Self {
             execution_scope: ExecutionScope::new(),
             resolved_component,
@@ -1385,6 +1390,7 @@ impl ResolvedInstanceState {
             address,
             anonymized_services: HashMap::new(),
             component_input_dict,
+            component_input,
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output,
@@ -1397,7 +1403,7 @@ impl ResolvedInstanceState {
             component,
             &state.children,
             &decl,
-            &state.component_input_dict,
+            &state.component_input,
             &state.component_output_dict,
             &state.program_input_dict,
             &state.program_output,
@@ -1722,7 +1728,7 @@ impl ResolvedInstanceState {
             let sources_and_receivers = extend_dict_with_offers(
                 component,
                 &self.children,
-                &self.component_input_dict,
+                &self.component_input,
                 &self.program_output,
                 &dynamic_offers,
                 &mut child_dict,

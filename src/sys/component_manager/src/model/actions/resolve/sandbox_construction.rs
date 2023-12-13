@@ -58,7 +58,7 @@ pub fn build_component_sandbox(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
-    component_input_dict: &Dict,
+    component_input: &Router,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output: &Router,
@@ -79,7 +79,7 @@ pub fn build_component_sandbox(
         extend_dict_with_use(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_input_dict,
             program_output,
             use_,
@@ -110,7 +110,7 @@ pub fn build_component_sandbox(
         extend_dict_with_offer(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_output,
             offer,
             target_dict,
@@ -137,7 +137,7 @@ pub fn build_component_sandbox(
 pub fn extend_dict_with_offers(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &Router,
     program_output: &Router,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_dict: &mut Dict,
@@ -147,7 +147,7 @@ pub fn extend_dict_with_offers(
         extend_dict_with_offer(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_output,
             offer,
             target_dict,
@@ -160,7 +160,7 @@ pub fn extend_dict_with_offers(
 fn extend_dict_with_use(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &Router,
     program_input_dict: &Dict,
     program_output: &Router,
     use_: &cm_rust::UseDecl,
@@ -177,14 +177,7 @@ fn extend_dict_with_use(
         unreachable!();
     };
     let router = match use_.source() {
-        cm_rust::UseSource::Parent => {
-            let Some(router) =
-                component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
-            else {
-                return;
-            };
-            router
-        }
+        cm_rust::UseSource::Parent => component_input.clone().get(source_name.as_str()),
         cm_rust::UseSource::Self_ => program_output.clone().get(source_name.as_str()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
@@ -200,7 +193,6 @@ fn extend_dict_with_use(
                     source_name.clone(),
                 ),
             )
-            .availability(*use_.availability())
         }
         cm_rust::UseSource::Framework => {
             let receiver = Receiver::new();
@@ -230,13 +222,14 @@ fn extend_dict_with_use(
         }
         _ => return, // unsupported
     };
-    program_input_dict.insert_capability(target_path.iter_segments(), router);
+    program_input_dict
+        .insert_capability(target_path.iter_segments(), router.availability(*use_.availability()));
 }
 
 fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &Router,
     program_output: &Router,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
@@ -258,14 +251,7 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => {
-            let Some(router) =
-                component_input_dict.get_capability::<Router>(iter::once(source_name.as_str()))
-            else {
-                return;
-            };
-            router
-        }
+        cm_rust::OfferSource::Parent => component_input.clone().get(source_name.as_str()),
         cm_rust::OfferSource::Self_ => program_output.clone().get(source_name.as_str()),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
