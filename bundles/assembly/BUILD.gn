@@ -2177,7 +2177,6 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
           shards = rebase_path([
                                  "//src/storage/fshost/meta/minfs_fshost.cml",
                                  "//src/storage/fshost/meta/fxfs_fshost.cml",
-                                 "//src/storage/fshost/meta/f2fs_fshost.cml",
                                ],
                                root_build_dir)
         },
