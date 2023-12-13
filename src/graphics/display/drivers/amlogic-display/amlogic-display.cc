@@ -21,7 +21,10 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/interrupt.h>
+#include <lib/zx/result.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -36,6 +39,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
@@ -1249,25 +1253,26 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   }
   canvas_.Bind(std::move(canvas_client_result.value()));
 
-  status = pdev_.GetBti(0, &bti_);
+  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, pdev_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
-    return status;
+    return bti_result.error_value();
   }
+  bti_ = std::move(bti_result).value();
 
-  // Get VSync interrupt (IRQ_VSYNC)
-  status = pdev_.GetInterrupt(IRQ_VSYNC, 0, &vsync_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get vsync interrupt: %s", zx_status_get_string(status));
-    return status;
+  zx::result<zx::interrupt> vsync_interrupt_result =
+      GetInterrupt(InterruptResourceIndex::kViu1Vsync, pdev_);
+  if (vsync_interrupt_result.is_error()) {
+    return vsync_interrupt_result.error_value();
   }
+  vsync_irq_ = std::move(vsync_interrupt_result).value();
 
-  // Get display capture finished interrupt (IRQ_VD1_WR)
-  status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &capture_finished_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get capture finished interrupt: %s", zx_status_get_string(status));
-    return status;
+  zx::result<zx::interrupt> capture_interrupt_result =
+      GetInterrupt(InterruptResourceIndex::kVid1Write, pdev_);
+  if (capture_interrupt_result.is_error()) {
+    return capture_interrupt_result.error_value();
   }
+  capture_finished_irq_ = std::move(capture_interrupt_result).value();
+
   return ZX_OK;
 }
 

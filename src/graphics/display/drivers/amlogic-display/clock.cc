@@ -5,10 +5,12 @@
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <zircon/status.h>
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
@@ -463,18 +465,18 @@ zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDevFidl& pdev, bool alrea
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // Map VPU and HHI registers
-  zx_status_t status = pdev.MapMmio(MMIO_VPU, &(self->vpu_mmio_));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Clock: Could not map VPU mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.take_error();
   }
+  self->vpu_mmio_ = std::move(vpu_mmio_result).value();
 
-  status = pdev.MapMmio(MMIO_HHI, &(self->hhi_mmio_));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Clock: Could not map HHI mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  if (hhi_mmio_result.is_error()) {
+    return hhi_mmio_result.take_error();
   }
+  self->hhi_mmio_ = std::move(hhi_mmio_result).value();
+
   self->clock_enabled_ = already_enabled;
 
   return zx::ok(std::move(self));

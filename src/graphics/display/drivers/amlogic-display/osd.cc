@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
@@ -14,6 +15,7 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 #include <zircon/utc.h>
 
@@ -21,15 +23,18 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 
 #include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -841,28 +846,25 @@ void Osd::Release() {
 zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_width,
                                              uint32_t fb_height, uint32_t display_width,
                                              uint32_t display_height, inspect::Node* osd_node) {
-  std::optional<fdf::MmioBuffer> vpu_mmio;
-  // Map vpu mmio used by the OSD object
-  zx_status_t status = pdev->MapMmio(MMIO_VPU, &vpu_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "osd: Could not map VPU mmio");
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.take_error();
   }
 
-  auto rdma_or_status = RdmaEngine::Create(pdev, osd_node);
-  if (rdma_or_status.is_error()) {
-    return zx::error(rdma_or_status.status_value());
+  zx::result<std::unique_ptr<RdmaEngine>> rdma_result = RdmaEngine::Create(pdev, osd_node);
+  if (rdma_result.is_error()) {
+    return rdma_result.take_error();
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Osd> self(new (&ac)
-                                Osd(fb_width, fb_height, display_width, display_height, osd_node,
-                                    std::move(vpu_mmio), std::move(rdma_or_status.value())));
+  std::unique_ptr<Osd> self(new (&ac) Osd(fb_width, fb_height, display_width, display_height,
+                                          osd_node, std::move(vpu_mmio_result).value(),
+                                          std::move(rdma_result).value()));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  status = self->rdma_->SetupRdma(&(*self->vpu_mmio_));
+  zx_status_t status = self->rdma_->SetupRdma(&(*self->vpu_mmio_));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not setup RDMA");
     return zx::error(status);
@@ -871,8 +873,8 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_wi
   // TODO(rlb): consider moving thread creation into RdmaEngine with appropriate
   // facilities for controlling the thread from test code.
   auto start_thread = [](void* arg) { return static_cast<RdmaEngine*>(arg)->RdmaIrqThread(); };
-  status = thrd_create_with_name(&self->rdma_irq_thread_, start_thread, self->rdma_.get(),
-                                 "rdma_irq_thread");
+  status = thrd_status_to_zx_status(thrd_create_with_name(&self->rdma_irq_thread_, start_thread,
+                                                          self->rdma_.get(), "rdma_irq_thread"));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create rdma_thread");
     return zx::error(status);

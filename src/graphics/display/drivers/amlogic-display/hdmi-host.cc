@@ -14,6 +14,7 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
@@ -160,46 +161,35 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(ddk::PDevFidl
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
-  // Map registers
-  static constexpr uint32_t kHdmitxControllerIpIndex = MMIO_HDMITX_CONTROLLER_IP;
-  std::optional<fdf::MmioBuffer> hdmitx_controller_ip_mmio;
-  zx_status_t status = pdev.MapMmio(kHdmitxControllerIpIndex, &hdmitx_controller_ip_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map MMIO HDMITX Controller IP registers: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> hdmi_tx_mmio_result =
+      MapMmio(MmioResourceIndex::kHdmiTxController, pdev);
+  if (hdmi_tx_mmio_result.is_error()) {
+    return hdmi_tx_mmio_result.take_error();
   }
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<designware_hdmi::HdmiTransmitterController> designware_controller =
       fbl::make_unique_checked<designware_hdmi::HdmiTransmitterControllerImpl>(
-          &alloc_checker, std::move(*hdmitx_controller_ip_mmio));
+          &alloc_checker, std::move(hdmi_tx_mmio_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Could not allocate memory for DesignWare HdmiTransmitterControllerImpl");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  static constexpr uint32_t kHdmitxTopLevelIndex = MMIO_HDMITX_TOP_LEVEL;
-  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio;
-  status = pdev.MapMmio(kHdmitxTopLevelIndex, &hdmitx_top_level_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map MMIO HDMITX top-level registers: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> hdmi_top_mmio_result = MapMmio(MmioResourceIndex::kHdmiTxTop, pdev);
+  if (hdmi_top_mmio_result.is_error()) {
+    return hdmi_top_mmio_result.take_error();
   }
 
-  static constexpr uint32_t kSiliconProviderSmcIndex = 0;
-  zx::resource smc;
-  status = pdev.GetSmc(kSiliconProviderSmcIndex, &smc);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get secure monitor call (SMC) resource: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<zx::resource> smc_result =
+      GetSecureMonitorCall(SecureMonitorCallResourceIndex::kSiliconProvider, pdev);
+  if (smc_result.is_error()) {
+    return smc_result.take_error();
   }
 
-  std::unique_ptr<HdmiTransmitter> hdmi_transmitter =
-      fbl::make_unique_checked<HdmiTransmitter>(&alloc_checker, std::move(designware_controller),
-                                                std::move(*hdmitx_top_level_mmio), std::move(smc));
+  std::unique_ptr<HdmiTransmitter> hdmi_transmitter = fbl::make_unique_checked<HdmiTransmitter>(
+      &alloc_checker, std::move(designware_controller), std::move(hdmi_top_mmio_result).value(),
+      std::move(smc_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Could not allocate memory for HdmiTransmitter");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -226,29 +216,20 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(zx_device_t* parent) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  std::optional<fdf::MmioBuffer> vpu_mmio;
-  zx_status_t status = pdev.MapMmio(MMIO_VPU, &vpu_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map VPU mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.take_error();
   }
-  ZX_ASSERT(vpu_mmio.has_value());
 
-  std::optional<fdf::MmioBuffer> hhi_mmio;
-  status = pdev.MapMmio(MMIO_HHI, &hhi_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map HHI mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  if (hhi_mmio_result.is_error()) {
+    return hhi_mmio_result.take_error();
   }
-  ZX_ASSERT(hhi_mmio.has_value());
 
-  std::optional<fdf::MmioBuffer> gpio_mux_mmio;
-  status = pdev.MapMmio(MMIO_GPIO_MUX, &gpio_mux_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map GPIO MUX mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> gpio_mux_mmio_result = MapMmio(MmioResourceIndex::kGpioMux, pdev);
+  if (gpio_mux_mmio_result.is_error()) {
+    return gpio_mux_mmio_result.take_error();
   }
-  ZX_ASSERT(gpio_mux_mmio.has_value());
 
   zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter = CreateHdmiTransmitter(pdev);
   if (hdmi_transmitter.is_error()) {
@@ -259,8 +240,8 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(zx_device_t* parent) {
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<HdmiHost> hdmi_host = fbl::make_unique_checked<HdmiHost>(
-      &alloc_checker, std::move(hdmi_transmitter).value(), std::move(*vpu_mmio),
-      std::move(*hhi_mmio), std::move(*gpio_mux_mmio));
+      &alloc_checker, std::move(hdmi_transmitter).value(), std::move(vpu_mmio_result).value(),
+      std::move(hhi_mmio_result).value(), std::move(gpio_mux_mmio_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Could not allocate memory for the HdmiHost instance.");
     return zx::error(ZX_ERR_NO_MEMORY);

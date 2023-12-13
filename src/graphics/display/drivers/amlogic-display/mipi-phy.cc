@@ -9,6 +9,8 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+
 namespace amlogic_display {
 
 template <typename T>
@@ -217,11 +219,11 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,
   self->phy_enabled_ = already_enabled;
 
   // Map Mipi Dsi and Dsi Phy registers
-  zx_status_t status = pdev.MapMmio(MMIO_DSI_PHY, &self->dsi_phy_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "MipiPhy: Could not map DSI PHY mmio");
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> dsi_phy_mmio_result = MapMmio(MmioResourceIndex::kDsiPhy, pdev);
+  if (dsi_phy_mmio_result.is_error()) {
+    return dsi_phy_mmio_result.take_error();
   }
+  self->dsi_phy_mmio_ = std::move(dsi_phy_mmio_result).value();
 
   return zx::ok(std::move(self));
 }

@@ -10,6 +10,7 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/initcodes-inl.h"
 
@@ -122,18 +123,18 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  // Map MIPI DSI and HHI registers
-  zx_status_t status = self->pdev_.MapMmio(MMIO_MPI_DSI, &(self->mipi_dsi_mmio_));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map MIPI DSI mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> dsi_top_mmio_result =
+      MapMmio(MmioResourceIndex::kDsiTop, self->pdev_);
+  if (dsi_top_mmio_result.is_error()) {
+    return dsi_top_mmio_result.take_error();
   }
+  self->mipi_dsi_mmio_ = std::move(dsi_top_mmio_result).value();
 
-  status = self->pdev_.MapMmio(MMIO_HHI, &(self->hhi_mmio_));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map HHI mmio: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, self->pdev_);
+  if (hhi_mmio_result.is_error()) {
+    return hhi_mmio_result.take_error();
   }
+  self->hhi_mmio_ = std::move(hhi_mmio_result).value();
 
   // panel_type_ is now canonical.
   lcd_gpio =

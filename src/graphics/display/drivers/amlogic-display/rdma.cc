@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
 #include <lib/zx/clock.h>
+#include <lib/zx/interrupt.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
@@ -14,6 +15,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
@@ -38,11 +40,12 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
   }
 
   // Map RDMA Done Interrupt
-  status = pdev->GetInterrupt(IRQ_RDMA, 0, &rdma->rdma_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map RDMA interrupt");
-    return zx::error(status);
+  zx::result<zx::interrupt> rdma_done_result =
+      GetInterrupt(InterruptResourceIndex::kRdmaDone, *pdev);
+  if (rdma_done_result.is_error()) {
+    return rdma_done_result.take_error();
   }
+  rdma->rdma_irq_ = std::move(rdma_done_result).value();
   return zx::ok(std::move(rdma));
 }
 

@@ -11,9 +11,11 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
+#include <utility>
 
 #include <ddktl/device.h>
 
+#include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
@@ -74,32 +76,29 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   ZX_ASSERT(!initialized_);
 
   // Map VPU registers
-  zx_status_t status = pdev.MapMmio(MMIO_VPU, &vpu_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "vpu: Could not map VPU mmio");
-    return status;
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.error_value();
   }
+  vpu_mmio_ = std::move(vpu_mmio_result).value();
 
-  // Map HHI registers
-  status = pdev.MapMmio(MMIO_HHI, &hhi_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "vpu: Could not map HHI mmio");
-    return status;
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  if (hhi_mmio_result.is_error()) {
+    return hhi_mmio_result.error_value();
   }
+  hhi_mmio_ = std::move(hhi_mmio_result).value();
 
-  // Map AOBUS registers
-  status = pdev.MapMmio(MMIO_AOBUS, &aobus_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "vpu: Could not map AOBUS mmio");
-    return status;
+  zx::result<fdf::MmioBuffer> aobus_mmio_result = MapMmio(MmioResourceIndex::kAonRti, pdev);
+  if (aobus_mmio_result.is_error()) {
+    return aobus_mmio_result.error_value();
   }
+  aobus_mmio_ = std::move(aobus_mmio_result).value();
 
-  // Map RESET registers
-  status = pdev.MapMmio(MMIO_RESET, &reset_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "vpu: Could not map RESET mmio");
-    return status;
+  zx::result<fdf::MmioBuffer> reset_mmio_result = MapMmio(MmioResourceIndex::kEeReset, pdev);
+  if (reset_mmio_result.is_error()) {
+    return reset_mmio_result.error_value();
   }
+  reset_mmio_ = std::move(reset_mmio_result).value();
 
   // VPU object is ready to be used
   initialized_ = true;
