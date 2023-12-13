@@ -68,8 +68,9 @@ images. All members of `base` and `cache` are inherently also members of
 
 ## Key Product Configurations
 
-There are many more than below, but the following three particularly
-important configurations to be familiar with:
+There are many more product definitions than those listed below, but the
+following four products are particularly important configurations to be familiar
+with:
 
 ### Bringup {#bringup-product}
 
