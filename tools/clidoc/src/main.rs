@@ -103,6 +103,7 @@ const ALLOW_LIST: &'static [&'static str] = &[
     "fremote",
     "fserve",
     "fssh",
+    "funnel",
     "minfs",
     "pm",
     "symbolizer",
