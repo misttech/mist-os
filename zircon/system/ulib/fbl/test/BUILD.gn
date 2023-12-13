@@ -91,8 +91,9 @@ test("fbl") {
   }
 
   _is_lto = select_variant + [ "lto" ] - [ "lto" ] != select_variant
-  if (_is_lto) {
-    # OOM on RBE workers
+  if (_is_lto || is_coverage) {
+    # LTO OOMs on RBE workers
+    # coverage mode timeout on RBE
     configs += [ "//build/config:no_remote_link" ]
   }
 }
