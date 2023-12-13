@@ -178,8 +178,27 @@ template("fshost_integration_test") {
 }
 
 fshost_integration_test("fshost_integration_tests_fxfs") {
+  options = {
+    data_filesystem_format = "fxfs"
+  }
+}
+
+fshost_integration_test("fshost_integration_tests_f2fs") {
+  options = {
+    data_filesystem_format = "f2fs"
+  }
+}
+
+fshost_integration_test("fshost_integration_tests_minfs") {
+  options = {
+    data_filesystem_format = "minfs"
+  }
+}
+
+fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
   data_filesystem_variant = "fxblob"
   options = {
+    fxfs_blob = true
     data_filesystem_format = "fxfs"
     use_disk_migration = false
   }
@@ -189,33 +208,11 @@ fshost_integration_test("fshost_integration_tests_fxfs") {
   ]
 }
 
-fshost_integration_test("fshost_integration_tests_fxfs_no_fxblob") {
-  options = {
-    data_filesystem_format = "fxfs"
-    fxfs_blob = false
-  }
-}
-
-fshost_integration_test("fshost_integration_tests_f2fs") {
-  options = {
-    data_filesystem_format = "f2fs"
-    fxfs_blob = false
-  }
-}
-
-fshost_integration_test("fshost_integration_tests_minfs") {
-  options = {
-    data_filesystem_format = "minfs"
-    fxfs_blob = false
-  }
-}
-
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
   data_filesystem_variant = "f2fs-no-zxcrypt"
   options = {
     no_zxcrypt = true
     data_filesystem_format = "f2fs"
-    fxfs_blob = false
   }
 }
 
@@ -224,7 +221,6 @@ fshost_integration_test("fshost_integration_tests_minfs_no_zxcrypt") {
   options = {
     no_zxcrypt = true
     data_filesystem_format = "minfs"
-    fxfs_blob = false
   }
 }
 
@@ -242,7 +238,7 @@ fuchsia_test_package("fshost_integration_tests") {
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_f2fs_no_zxcrypt",
     ":fshost_integration_tests_minfs_no_zxcrypt",
-    ":fshost_integration_tests_fxfs_no_fxblob",
+    ":fshost_integration_tests_fxfs_fxblob",
   ]
   deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }
