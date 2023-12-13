@@ -54,14 +54,6 @@
       "short": null,
       "description": "skip hardware verification.  This is dangerous, please be sure the images you are using match the device",
       "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--daemon",
-      "short": null,
-      "description": "DEPRECATED - use the daemon to communicate with the Target.",
-      "hidden": false
     }
   ],
   "notes": [],

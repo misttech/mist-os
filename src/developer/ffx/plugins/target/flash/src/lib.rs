@@ -10,17 +10,16 @@ use errors::ffx_bail;
 use ffx_fastboot::common::{
     cmd::OemFile,
     fastboot::{tcp_proxy, udp_proxy, usb_proxy},
-    fastboot_interface::FastbootInterface,
     from_manifest,
 };
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
 use fho::FfxContext;
 use fho::{FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
 };
-use fidl_fuchsia_developer_ffx::{FastbootProxy, TargetState};
 use fuchsia_async::Timer;
 use std::io::Write;
 use std::net::SocketAddr;
@@ -32,7 +31,6 @@ const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 pub struct FlashTool {
     #[command]
     cmd: FlashCommand,
-    fastboot_proxy: fho::Deferred<FastbootProxy>,
     target_proxy: fho::Deferred<TargetProxy>,
 }
 
@@ -48,11 +46,7 @@ impl FfxMain for FlashTool {
         // Massage FlashCommand
         let cmd = preprocess_flash_cmd(self.cmd).await?;
 
-        if cmd.daemon {
-            flash_plugin_with_daemon(self.fastboot_proxy.await?, cmd, &mut writer).await
-        } else {
-            flash_plugin_no_daemon(self.target_proxy.await?, cmd, &mut writer).await
-        }
+        flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await
     }
 }
 
@@ -108,17 +102,8 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
     Ok(cmd)
 }
 
-#[tracing::instrument(skip(fastboot_proxy, writer))]
-async fn flash_plugin_with_daemon<W: Write>(
-    mut fastboot_proxy: impl FastbootInterface,
-    cmd: FlashCommand,
-    mut writer: W,
-) -> fho::Result<()> {
-    from_manifest(&mut writer, cmd, &mut fastboot_proxy).await.map_err(fho::Error::from)
-}
-
 #[tracing::instrument(skip(target_proxy, writer))]
-async fn flash_plugin_no_daemon<W: Write>(
+async fn flash_plugin_impl<W: Write>(
     target_proxy: TargetProxy,
     cmd: FlashCommand,
     mut writer: W,

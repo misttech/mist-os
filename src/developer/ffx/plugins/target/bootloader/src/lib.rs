@@ -24,10 +24,8 @@ use ffx_fastboot::{
     unlock::unlock,
 };
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
-};
-use fidl_fuchsia_developer_ffx::{FastbootProxy, TargetState};
+use fidl_fuchsia_developer_ffx::FastbootInterface as FidlFastbootInterface;
+use fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy, TargetRebootState, TargetState};
 use fuchsia_async::Timer;
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
@@ -41,7 +39,6 @@ const WARNING: &str = "WARNING: ALL SETTINGS USER CONTENT WILL BE ERASED!\n\
 pub struct BootloaderTool {
     #[command]
     cmd: BootloaderCommand,
-    fastboot_proxy: FastbootProxy,
     target_proxy: TargetProxy,
 }
 
@@ -51,10 +48,6 @@ fho::embedded_plugin!(BootloaderTool);
 impl FfxMain for BootloaderTool {
     type Writer = SimpleWriter;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        if self.cmd.daemon {
-            return bootloader_impl(self.fastboot_proxy, self.cmd, &mut writer).await;
-        }
-
         let mut info = self.target_proxy.identity().await.map_err(|e| anyhow!(e))?;
 
         fn display_name(info: &TargetInfo) -> &str {
@@ -243,7 +236,6 @@ mod test {
                     vbmeta: Some(vbmeta_file_name),
                     slot: "a".to_string(),
                 }),
-                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -271,7 +263,6 @@ mod test {
                     vbmeta: None,
                     slot: "a".to_string(),
                 }),
-                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -299,7 +290,6 @@ mod test {
                     vbmeta: Some(vbmeta_file_name),
                     slot: "a".to_string(),
                 }),
-                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -324,7 +314,6 @@ mod test {
                 product_bundle: None,
                 skip_verify: false,
                 subcommand: Lock(LockCommand {}),
-                daemon: false,
             },
             &mut std::io::stdout(),
         )
