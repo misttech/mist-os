@@ -141,7 +141,7 @@ importantly [`ffx`][ffx] and its many
 FIDL, which affords for updatability. However some legacy tools are still offered
 to out-of-tree developers that don’t have the same updatability affordances.
 
-- SSH is supported (such as with the [`fssh` tool][fssh] and provides the host
+- SSH is supported (such as with the [`funnel` tool][funnel] and provides the host
   with a developer experience similar to a remote root shell on a target Fuchsia
   device. The client may circumvent the intended platform surface such as by
   directly observing, starting, and killing system processes.
@@ -187,7 +187,7 @@ even if CTS coverage never reaches 100% of the platform surface.
 [ffx-reference]: https://fuchsia.dev/reference/tools/sdk/ffx.md
 [ffx-component]: https://fuchsia.dev/reference/tools/sdk/ffx.md#component
 [fidl-versioning]: /docs/reference/fidl/language/versioning.md
-[fssh]: https://fuchsia.dev/reference/tools/sdk/fssh.md
+[funnel]: https://fuchsia.dev/reference/tools/sdk/funnel
 [fx-mem]: https://fuchsia.dev/reference/tools/fx/cmd/mem
 [fx-snapshot]: https://fuchsia.dev/reference/tools/fx/cmd/snapshot
 [fxb-34556]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=34556
