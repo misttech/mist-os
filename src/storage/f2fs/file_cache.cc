@@ -6,62 +6,6 @@
 
 namespace f2fs {
 
-DirtyPageList::~DirtyPageList() {
-  std::lock_guard list_lock(list_lock_);
-  ZX_ASSERT(dirty_list_.is_empty());
-}
-
-zx::result<> DirtyPageList::AddDirty(LockedPage &page) {
-  ZX_DEBUG_ASSERT(page->InTreeContainer());
-  ZX_DEBUG_ASSERT(page->IsActive());
-  if (page->GetVnode().GetPageType() == PageType::kData && !page->GetVnode().IsDir()) {
-    std::lock_guard lock(list_lock_);
-    if (page->InListContainer()) {
-      return zx::error(ZX_ERR_ALREADY_EXISTS);
-    } else {
-      // No need to consider a case where |page| is recycled as passing |page| is always active.
-      dirty_list_.push_back(page.CopyRefPtr());
-    }
-  }
-  return zx::ok();
-}
-
-zx_status_t DirtyPageList::RemoveDirty(LockedPage &page) {
-  ZX_DEBUG_ASSERT(page->IsActive());
-  if (page->GetVnode().GetPageType() == PageType::kData && !page->GetVnode().IsDir()) {
-    std::lock_guard lock(list_lock_);
-    if (!page->InListContainer()) {
-      return ZX_ERR_NOT_FOUND;
-    }
-    dirty_list_.erase(*page);
-  }
-  return ZX_OK;
-}
-
-std::vector<LockedPage> DirtyPageList::TakePages(size_t count) {
-  std::vector<LockedPage> dirty_pages;
-  std::lock_guard lock(list_lock_);
-  PageList temp_list;
-  size_t try_count = std::min(count, dirty_list_.size());
-  dirty_pages.reserve(try_count);
-  while (!dirty_list_.is_empty() && try_count--) {
-    auto page = dirty_list_.pop_front();
-    if (page->IsDirty()) {
-      if (!page->TryLock()) {
-        LockedPage locked_page(std::move(page), false);
-        dirty_pages.push_back(std::move(locked_page));
-      } else {
-        // If someone already holds its lock, skip it.
-        temp_list.push_back(std::move(page));
-      }
-    }
-  }
-
-  // Keep the order Pages are inserted in dirty_list_.
-  dirty_list_.splice(dirty_list_.begin(), temp_list);
-  return dirty_pages;
-}
-
 Page::Page(FileCache *file_cache, pgoff_t index) : file_cache_(file_cache), index_(index) {}
 
 VnodeF2fs &Page::GetVnode() const { return file_cache_->GetVnode(); }
@@ -282,13 +226,7 @@ zx::result<> LockedPage::SetVmoDirty() {
   return zx::ok();
 }
 
-bool LockedPage::SetDirty(bool add_to_list) {
-  bool ret = page_->SetDirty();
-  if (!ret && add_to_list) {
-    ZX_ASSERT(page_->GetFileCache().GetDirtyPageList().AddDirty(*this).is_ok());
-  }
-  return ret;
-}
+bool LockedPage::SetDirty() { return page_->SetDirty(); }
 
 FileCache::FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager)
     : vnode_(vnode), vmo_manager_(vmo_manager) {}
@@ -551,9 +489,6 @@ std::vector<LockedPage> FileCache::CleanupPagesUnsafe(pgoff_t start, pgoff_t end
   std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
   for (auto &page : pages) {
     EvictUnsafe(page.get());
-    if (page->IsDirty()) {
-      ZX_ASSERT(dirty_page_list_.RemoveDirty(page) == ZX_OK);
-    }
     page->Invalidate();
   }
   return pages;
@@ -582,9 +517,6 @@ void FileCache::ClearDirtyPages() {
   }
   // Clear the dirty flag of all Pages.
   for (auto &page : pages) {
-    if (page->IsDirty()) {
-      ZX_ASSERT(dirty_page_list_.RemoveDirty(page) == ZX_OK);
-    }
     page->ClearDirtyForIo();
   }
 }
@@ -618,20 +550,6 @@ std::vector<bool> FileCache::GetDirtyPagesInfo(pgoff_t index, size_t max_scan) {
   return read_blocks;
 }
 
-void FileCache::ReleaseInactivePages() {
-  std::lock_guard tree_lock(tree_lock_);
-  std::vector<LockedPage> pages;
-  auto current = page_tree_.begin();
-  while (current != page_tree_.end()) {
-    auto raw_page = current.CopyPointer();
-    ++current;
-    if (!raw_page->IsActive() && !raw_page->IsDirty()) {
-      auto page = fbl::ImportFromRawPtr(raw_page);
-      EvictUnsafe(page.get());
-    }
-  }
-}
-
 std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOperation &operation) {
   std::vector<LockedPage> pages;
   pgoff_t nwritten = 0;
@@ -640,58 +558,48 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOper
   // Get Pages from |operation.start| to |operation.end|.
   while (nwritten <= operation.to_write && current != page_tree_.end() &&
          current->GetKey() < operation.end) {
+    LockedPage locked_page;
     auto raw_page = current.CopyPointer();
     if (raw_page->IsActive()) {
-      // Do not touch any active Pages except for those in F2fs::dirty_data_page_list_.
-      // When getting active Pages, any Page in FileCache must not be recycled here. If so,
-      // deadlock can occurs since Page::RecycleNode tries to acquire tree_lock_.
-      if (raw_page->IsDirty() && raw_page->InListContainer() &&
-          vnode_->GetPageType() == PageType::kData && !vnode_->IsDir()) {
+      if (raw_page->IsDirty()) {
         auto prev_key = raw_page->GetKey();
         auto locked_page_or = GetLockedPageFromRawUnsafe(raw_page);
         if (locked_page_or.is_error()) {
           current = page_tree_.lower_bound(prev_key);
           continue;
         }
-        if (!operation.if_page || operation.if_page((*locked_page_or).CopyRefPtr()) == ZX_OK) {
-          ZX_ASSERT(dirty_page_list_.RemoveDirty(*locked_page_or) == ZX_OK);
-          pages.push_back(std::move(*locked_page_or));
-          ++nwritten;
-        } else {
-          // F2fs::dirty_data_page_list_ must keep the ref of |*locked_page_or|.
-          ZX_ASSERT(raw_page->InListContainer());
+        // Re-check if it is dirty after locking.
+        if (locked_page_or->IsDirty()) {
+          locked_page = std::move(*locked_page_or);
         }
       }
       ++current;
     } else {
       ++current;
-      // For inactive Pages, try to evict clean Pages if operation.bReleasePages is set or if their
-      // vnodes are inactive(closed).
-      ZX_ASSERT(!raw_page->IsLocked());
-      LockedPage page(fbl::ImportFromRawPtr(raw_page));
-
-      if (page->IsDirty()) {
-        ZX_DEBUG_ASSERT(page->IsLastReference());
-        auto page_ref = page.CopyRefPtr();
-        if (!operation.if_page || operation.if_page(page_ref) == ZX_OK) {
-          page->SetActive();
-          ZX_DEBUG_ASSERT(page->IsUptodate());
-          ZX_DEBUG_ASSERT(page->IsVmoLocked());
-          pages.push_back(std::move(page));
-          page.reset();
-          ++nwritten;
-        }
+      ZX_DEBUG_ASSERT(!raw_page->IsLocked());
+      ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
+      if (raw_page->IsDirty()) {
+        ZX_DEBUG_ASSERT(raw_page->IsLastReference());
+        locked_page = LockedPage(fbl::ImportFromRawPtr(raw_page));
       } else if (operation.bReleasePages || !vnode_->IsActive()) {
-        // There is no other reference. It is safe to release it.
-        EvictUnsafe(page.get());
-        page.reset();
+        // For inactive Pages, try to evict clean Pages if operation.bReleasePages is set or if
+        // their vnodes are inactive(closed).
+        fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
+        EvictUnsafe(raw_page);
       }
-      if (page) {
-        auto page_ref = page.release();
-        // It prevents |page| from entering RecyclePage() and
-        // keeps |page| alive in FileCache.
-        [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&page_ref);
-      }
+    }
+    if (!locked_page) {
+      continue;
+    }
+    if (!operation.if_page || operation.if_page(locked_page.CopyRefPtr()) == ZX_OK) {
+      locked_page->SetActive();
+      pages.push_back(std::move(locked_page));
+      ++nwritten;
+    } else {
+      auto page_ref = locked_page.release();
+      // It prevents |page| from entering RecyclePage() and
+      // keeps |page| alive in FileCache.
+      [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&page_ref);
     }
   }
   return pages;
@@ -706,100 +614,61 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOper
 // fs()->RemoveDirtyDirInode(this);
 pgoff_t FileCache::Writeback(WritebackOperation &operation) {
   pgoff_t nwritten = 0;
-  if (operation.bReclaim ||
-      (vnode_->IsReg() && operation.to_write == kPgOffMax && operation.start == 0 &&
-       operation.end == kPgOffMax && !operation.if_page)) {
-    ZX_ASSERT(vnode_->IsReg());
-    nwritten = WritebackFromDirtyList(operation);
-  } else {
-    std::vector<LockedPage> pages;
-    {
-      std::lock_guard tree_lock(tree_lock_);
-      pages = GetLockedDirtyPagesUnsafe(operation);
-    }
-
-    PageList pages_to_disk;
-    for (auto &page : pages) {
-      ZX_DEBUG_ASSERT(page->IsUptodate());
-      zx::result<block_t> addr_or;
-      if (operation.page_cb) {
-        // |page_cb| conducts additional process for the last page of node and meta vnodes.
-        bool is_last_page = page.get() == pages.back().get();
-        operation.page_cb(page.CopyRefPtr(), is_last_page);
-      }
-      if (vnode_->IsMeta()) {
-        addr_or = fs()->GetSegmentManager().GetBlockAddrForDirtyMetaPage(page, operation.bReclaim);
-      } else if (vnode_->IsNode()) {
-        addr_or = fs()->GetNodeManager().GetBlockAddrForDirtyNodePage(page, operation.bReclaim);
-      } else {
-        addr_or = vnode_->GetBlockAddrForDirtyDataPage(page, operation.bReclaim);
-      }
-      if (addr_or.is_error()) {
-        if (page->IsUptodate() && addr_or.status_value() != ZX_ERR_NOT_FOUND) {
-          // In case of failure, we just redirty it.
-          page.SetDirty();
-          FX_LOGS(WARNING) << "failed to allocate a block." << addr_or.status_value();
-        }
-        page->ClearWriteback();
-      } else {
-        ZX_ASSERT(*addr_or != kNullAddr && *addr_or != kNewAddr);
-        pages_to_disk.push_back(page.release());
-        ++nwritten;
-      }
-    }
-    sync_completion_t completion;
-    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk));
-    if (operation.bSync) {
-      sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    }
-  }
-  return nwritten;
-}
-
-pgoff_t FileCache::WritebackFromDirtyList(const WritebackOperation &operation) {
   std::vector<std::unique_ptr<VmoCleaner>> cleaners;
-  size_t merged_blocks = 0;
-  // Fetch |size| of dirty pages from the fifo list.
-  size_t size = vnode_->GetDirtyPageList().Size();
-  size_t nwritten = size;
-  while (size) {
-    bool flush = false;
-    auto num_pages = std::min(size, static_cast<uint64_t>(kDefaultBlocksPerSegment / 4));
-    auto pages = vnode_->GetDirtyPageList().TakePages(num_pages);
+  std::vector<LockedPage> pages;
+  {
+    std::lock_guard tree_lock(tree_lock_);
+    pages = GetLockedDirtyPagesUnsafe(operation);
+  }
 
-    for (const auto &page : pages) {
+  PageList pages_to_disk;
+  for (auto &page : pages) {
+    ZX_DEBUG_ASSERT(page->IsUptodate());
+    zx::result<block_t> addr_or;
+    if (operation.page_cb) {
+      // |page_cb| conducts additional process for the last page of node and meta vnodes.
+      bool is_last_page = page.get() == pages.back().get();
+      operation.page_cb(page.CopyRefPtr(), is_last_page);
+    }
+    if (vnode_->IsMeta()) {
+      addr_or = fs()->GetSegmentManager().GetBlockAddrForDirtyMetaPage(page, operation.bReclaim);
+    } else if (vnode_->IsNode()) {
+      addr_or = fs()->GetNodeManager().GetBlockAddrForDirtyNodePage(page, operation.bReclaim);
+    } else {
+      addr_or = vnode_->GetBlockAddrForDirtyDataPage(page, operation.bReclaim);
+    }
+    if (addr_or.is_error()) {
+      if (page->IsUptodate() && addr_or.status_value() != ZX_ERR_NOT_FOUND) {
+        // In case of failure, we just redirty it.
+        page.SetDirty();
+        FX_LOGS(WARNING) << "failed to allocate a block." << addr_or.status_value();
+      }
+      page->ClearWriteback();
+    } else {
+      ZX_ASSERT(*addr_or != kNullAddr && *addr_or != kNewAddr);
       // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for the page.
       // TODO(b/293977738): VmoCleaner is instantiated on a per-page basis, so
       // ZX_PAGER_OP_WRITEBACK_BEGIN is called for each dirty page. We need to change it to work on
       // a per-range basis for efficient system calls.
-      cleaners.push_back(std::make_unique<VmoCleaner>(
-          operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_), page->GetKey(), page->GetKey() + 1));
-    }
-    merged_blocks += pages.size();
-    size -= pages.size();
-    // Allocate block addrs for |pages|.
-    if (auto page_list_or = fs()->GetSegmentManager().GetBlockAddrsForDirtyDataPages(
-            std::move(pages), operation.bReclaim);
-        page_list_or.is_ok()) {
-      if (!(*page_list_or).is_empty()) {
-        if (merged_blocks >= kDefaultBlocksPerSegment) {
-          merged_blocks = 0;
-          flush = true;
-        }
-        fs()->ScheduleWriter(nullptr, std::move(*page_list_or), flush);
+      if (vmo_manager_->IsPaged()) {
+        cleaners.push_back(std::make_unique<VmoCleaner>(
+            operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_), page->GetKey(), page->GetKey() + 1));
+      }
+      pages_to_disk.push_back(page.release());
+      ++nwritten;
+      if (!(nwritten % kDefaultBlocksPerSegment)) {
+        fs()->ScheduleWriter(nullptr, std::move(pages_to_disk));
+        cleaners.clear();
       }
     }
+    page.reset();
   }
-  if (merged_blocks || operation.bSync) {
+  if (!pages_to_disk.is_empty() || operation.bSync) {
     sync_completion_t completion;
-    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr);
+    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk), true);
     if (operation.bSync) {
       sync_completion_wait(&completion, ZX_TIME_INFINITE);
     }
-  }
-  // Release inactive pages unless it is under fsync().
-  if (!operation.bSync && operation.bReleasePages) {
-    ReleaseInactivePages();
   }
   return nwritten;
 }

@@ -274,9 +274,7 @@ class LockedPage final {
   // caller have to supply a vmo.
   zx::result<> SetVmoDirty();
 
-  // Call Page::SetDirty().
-  // If |add_to_list| is true, it is inserted into F2fs::dirty_data_page_list_.
-  bool SetDirty(bool add_to_list = true);
+  bool SetDirty();
   void Zero(size_t start = 0, size_t end = Page::Size()) const;
 
   // release() returns the unlocked page without changing its ref_count.
@@ -310,30 +308,6 @@ class LockedPage final {
  private:
   static constexpr std::array<uint8_t, Page::Size()> kZeroBuffer_ = {0};
   fbl::RefPtr<Page> page_ = nullptr;
-};
-
-class DirtyPageList {
- public:
-  DirtyPageList() = default;
-  DirtyPageList(const DirtyPageList &) = delete;
-  DirtyPageList &operator=(const DirtyPageList &) = delete;
-  DirtyPageList(const DirtyPageList &&) = delete;
-  DirtyPageList &operator=(const DirtyPageList &&) = delete;
-  ~DirtyPageList();
-
-  zx::result<> AddDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
-  zx_status_t RemoveDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
-
-  uint64_t Size() const __TA_EXCLUDES(list_lock_) {
-    fs::SharedLock lock(list_lock_);
-    return dirty_list_.size();
-  }
-
-  std::vector<LockedPage> TakePages(size_t count) __TA_EXCLUDES(list_lock_);
-
- private:
-  mutable fs::SharedMutex list_lock_{};
-  PageList dirty_list_ __TA_GUARDED(list_lock_){};
 };
 
 class FileCache {
@@ -380,8 +354,6 @@ class FileCache {
   void Reset() __TA_EXCLUDES(tree_lock_);
   // Clear all dirty pages.
   void ClearDirtyPages() __TA_EXCLUDES(tree_lock_);
-  // Evict and release inactive pages.
-  void ReleaseInactivePages() __TA_EXCLUDES(tree_lock_);
 
   VnodeF2fs &GetVnode() const { return *vnode_; }
   // Only Page::RecyclePage() is allowed to call it.
@@ -392,7 +364,6 @@ class FileCache {
   std::vector<bool> GetDirtyPagesInfo(pgoff_t index, size_t max_scan) __TA_EXCLUDES(tree_lock_);
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
-  DirtyPageList &GetDirtyPageList() { return dirty_page_list_; }
 
  private:
   // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,
@@ -430,7 +401,6 @@ class FileCache {
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
   fs::SharedMutex tree_lock_;
-  DirtyPageList dirty_page_list_;
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;
   std::condition_variable_any recycle_cvar_;

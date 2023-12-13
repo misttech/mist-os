@@ -461,7 +461,6 @@ class VnodeF2fs : public fs::PagedVnode,
     return paged_vmo().is_valid();
   }
 
-  DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
   VmoManager &GetVmoManager() const { return vmo_manager(); }
 
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);

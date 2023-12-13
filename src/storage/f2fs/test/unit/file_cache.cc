@@ -222,8 +222,6 @@ TEST_F(FileCacheTest, Recycle) {
     raw_page = locked_page.get();
   }
 
-  // raw_page should have a reference in the dirty list.
-  ASSERT_TRUE(raw_page->IsActive());
   // Remove |raw_page| from the list to invoke Page::fbl_recycle().
   WritebackOperation op = {.bSync = true, .bReleasePages = false};
   file.Writeback(op);

@@ -428,7 +428,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
 }
 
 zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim) {
-  const pgoff_t end_index = GetSize() * kPageSize;
+  const pgoff_t end_index = GetSize() / kPageSize;
   block_t blk_addr = kNullAddr;
 
   if (page->GetIndex() >= end_index) {

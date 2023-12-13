@@ -398,13 +398,9 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       vnode->TruncateHole(offset, offset + kBlockSize, false);
       continue;
     }
-    // No need to add |data_page| to F2fs::dirty_data_page_list_ as it will be flushed
-    // just after this loop.
-    data_page.SetDirty(false);
+    data_page.SetDirty();
     data_page->SetColdData();
     if (gc_type == GcType::kFgGc) {
-      // If |data_page| is already in the list, remove it.
-      vnode->GetDirtyPageList().RemoveDirty(data_page);
       pages.push_back(std::move(data_page));
     }
   }

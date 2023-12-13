@@ -227,7 +227,7 @@ void F2fs::ScheduleWriteback(size_t num_pages) {
               return ZX_OK;
             },
             [](fbl::RefPtr<VnodeF2fs>& vnode) {
-              if (!vnode->IsDir() && vnode->GetDirtyPageList().Size()) {
+              if (!vnode->IsDir() && vnode->GetDirtyPageCount()) {
                 return ZX_OK;
               }
               return ZX_ERR_NEXT;

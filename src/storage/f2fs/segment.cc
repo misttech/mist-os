@@ -933,9 +933,6 @@ zx::result<PageList> SegmentManager::GetBlockAddrsForDirtyDataPages(std::vector<
         ZX_ASSERT(*addr_or != kNullAddr && *addr_or != kNewAddr);
         pages_to_disk.push_back(page.release());
       }
-    } else {
-      // Writeback for memory reclaim is not allowed for now.
-      ZX_ASSERT(page->GetFileCache().GetDirtyPageList().AddDirty(page).is_ok());
     }
     // Unlock |page| for waiters.
     page.reset();
