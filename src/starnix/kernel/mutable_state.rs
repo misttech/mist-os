@@ -242,6 +242,7 @@ pub(crate) use state_implementation;
 #[cfg(test)]
 mod test {
     use super::*;
+    use macro_rules_attribute::apply;
     use starnix_sync::RwLock;
     use std::sync::Arc;
 

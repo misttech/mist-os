@@ -417,6 +417,7 @@ rustc_library("starnix_core") {
 
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4/tests:test_img",
@@ -687,6 +688,7 @@ fuchsia_unittest_package("starnix-tests") {
   manifest = "meta/starnix-tests.cml"
   deps = [
     ":starnix-test-files",
+    ":starnix_core_test",
     ":starnix_kernel_bin_test",
     "//src/starnix/examples/hello_starnix:bin",
   ]
