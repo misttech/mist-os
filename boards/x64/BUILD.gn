@@ -85,13 +85,6 @@ board_input_bundle("main_bundle") {
       package_set = "bootfs"
       driver_components = [ "meta/simple.nv.cm" ]
     },
-
-    # Driver to handle oneshot reboot flags for bootloader
-    {
-      package_target = "//src/devices/block/drivers/abr-shim:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/abr-shim.cm" ]
-    },
   ]
   base_packages = [
     "//src/graphics/bin/vulkan_loader",

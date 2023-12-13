@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <zircon/hw/gpt.h>
 
 #include "x86.h"
 
@@ -39,75 +36,28 @@ static const sysmem_metadata_t sysmem_metadata = {
     .contiguous_memory_size = -5,
 };
 
-static zx_status_t GetDeviceMetadataGpt(std::vector<uint8_t> &device_metadata_gpt_encoded) {
-  fidl::Arena fidl_arena;
-  fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo> partition_info(fidl_arena,
-                                                                                      2);
-
-  // Block core should ignore the 'misc' partition; the abr-shim driver will bind in its place.
-  partition_info[0].name = GUID_ABR_META_NAME;
-  partition_info[0].options =
-      fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
-          .type_guid_override(GUID_ABR_META_VALUE)
-          .block_driver_should_ignore_device(true)
-          .Build();
-
-  partition_info[1].name = GPT_DURABLE_BOOT_NAME;
-  partition_info[1].options =
-      fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
-          .type_guid_override(GPT_DURABLE_BOOT_TYPE_GUID)
-          .block_driver_should_ignore_device(true)
-          .Build();
-
-  fit::result encoded =
-      fidl::Persist(fuchsia_hardware_gpt_metadata::wire::GptInfo::Builder(fidl_arena)
-                        .partition_info(partition_info)
-                        .Build());
-
-  if (!encoded.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPT metadata: %s",
-           encoded.error_value().FormatDescription().c_str());
-    return encoded.error_value().status();
-  }
-
-  device_metadata_gpt_encoded = std::move(encoded.value());
-  return ZX_OK;
+static const std::vector<fpbus::Metadata> GetSysmemMetadataList() {
+  return std::vector<fpbus::Metadata>{{{
+      .type = SYSMEM_METADATA_TYPE,
+      .data = std::vector<uint8_t>(
+          reinterpret_cast<const uint8_t *>(&sysmem_metadata),
+          reinterpret_cast<const uint8_t *>(&sysmem_metadata) + sizeof(sysmem_metadata)),
+  }}};
 }
 
-static const std::vector<fpbus::Metadata> GetSysmemMetadataList(
-    std::vector<uint8_t> device_metadata_gpt) {
-  return std::vector<fpbus::Metadata>{
-      {{
-          .type = SYSMEM_METADATA_TYPE,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t *>(&sysmem_metadata),
-              reinterpret_cast<const uint8_t *>(&sysmem_metadata) + sizeof(sysmem_metadata)),
-      }},
-      {{
-          .type = DEVICE_METADATA_GPT_INFO,
-          .data = std::move(device_metadata_gpt),
-      }}};
-}
-
-static const fpbus::Node GetSystemDev(std::vector<uint8_t> device_metadata_gpt) {
+static const fpbus::Node GetSystemDev() {
   fpbus::Node node;
   node.name() = "sysmem";
   node.vid() = PDEV_VID_GENERIC;
   node.pid() = PDEV_PID_GENERIC;
   node.did() = PDEV_DID_SYSMEM;
   node.bti() = sysmem_btis;
-  node.metadata() = GetSysmemMetadataList(std::move(device_metadata_gpt));
+  node.metadata() = GetSysmemMetadataList();
   return node;
 }
 
 zx_status_t X86::SysmemInit() {
-  std::vector<uint8_t> device_metadata_gpt;
-  auto res = GetDeviceMetadataGpt(device_metadata_gpt);
-  if (res != ZX_OK) {
-    return res;
-  }
-
-  auto sysmem_dev = GetSystemDev(std::move(device_metadata_gpt));
+  auto sysmem_dev = GetSystemDev();
 
   fdf::Arena arena('X86S');
   fidl::Arena fidl_arena;

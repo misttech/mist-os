@@ -162,7 +162,6 @@ sdk_static_library("ddk") {
     "//src/devices/bin/driver_manager/devfs:*",
     "//src/devices/bin/driver_manager/v1:*",
     "//src/devices/bin/driver_manager/v2:*",
-    "//src/devices/block/drivers/abr-shim:*",
     "//src/devices/block/drivers/ahci:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/block/drivers/block-verity:*",

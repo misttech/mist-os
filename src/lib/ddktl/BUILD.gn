@@ -125,7 +125,6 @@ source_set("ddktl") {
     "//src/devices/acpi/drivers/intel-thermal:*",
     "//src/devices/bin/driver_host:*",
     "//src/devices/bin/driver_host/tests:*",
-    "//src/devices/block/drivers/abr-shim:*",
     "//src/devices/block/drivers/ahci:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/block/drivers/block-verity:*",

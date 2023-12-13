@@ -500,3 +500,9 @@
   available_in_git: '7fb565c3701f38fefce51b8f16787ee94e118c55'
   areas: ['Misc']
   path: '/src/devices/mailbox/drivers/aml-fifo-mailbox'
+- short_description: 'ABR-Shim driver'
+  deletion_reason: 'Stopped working after DFv2 switch. OneShot flags logic moved to paver'
+  gerrit_change_id: '959153'
+  available_in_git: '7984ed3781551d6fff0c511a049a884825bef7a77'
+  areas: ['Block']
+  path: '/src/devices/block/drivers/abr-shim'
