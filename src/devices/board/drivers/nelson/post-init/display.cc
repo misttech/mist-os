@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/display/dsi/cpp/bind.h>
@@ -21,12 +17,11 @@
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
-#include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
-#include "nelson-gpios.h"
-#include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+#include "post-init.h"
+#include "sdk/lib/driver/compat/cpp/metadata.h"
+#include "src/devices/board/drivers/nelson/nelson-btis.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -106,7 +101,19 @@ uint32_t uboot_mapping[] = {
     PANEL_TV070WSM_FT_9365,  // 5
     PANEL_TV070WSM_ST7703I,  // 6
 };
-zx_status_t Nelson::DisplayInit(uint32_t bootloader_display_id) {
+zx::result<> PostInit::InitDisplay() {
+  uint32_t bootloader_display_id = display_id_;
+
+  // This is tightly coupled to the u-boot supplied metadata and the GT6853 touch driver.
+  zx::result metadata =
+      compat::GetMetadata<uint32_t>(incoming(), DEVICE_METADATA_BOARD_PRIVATE, "pbus");
+  if (metadata.is_ok() && *metadata) {
+    bootloader_display_id = **metadata;
+  } else {
+    FDF_LOG(ERROR, "no panel type metadata (%s), falling back to GPIO inspection",
+            zx_status_get_string(metadata.error_value()));
+  }
+
   display_panel_t display_panel_info[] = {
       {
           .width = 600,
@@ -117,12 +124,10 @@ zx_status_t Nelson::DisplayInit(uint32_t bootloader_display_id) {
 
   if (bootloader_display_id && bootloader_display_id < std::size(uboot_mapping)) {
     display_panel_info[0].panel_type = uboot_mapping[bootloader_display_id];
-    zxlogf(DEBUG, "%s: bootloader provided display panel %d", __func__,
-           display_panel_info[0].panel_type);
+    FDF_LOG(DEBUG, "bootloader provided display panel %d", display_panel_info[0].panel_type);
   }
   if (display_panel_info[0].panel_type == PANEL_UNKNOWN) {
-    auto display_id = GetDisplayId();
-    switch (display_id) {
+    switch (display_id_) {
       case 0b10:
         display_panel_info[0].panel_type = PANEL_TV070WSM_FT;
         break;
@@ -136,8 +141,8 @@ zx_status_t Nelson::DisplayInit(uint32_t bootloader_display_id) {
         display_panel_info[0].panel_type = PANEL_KD070D82_FT;
         break;
       default:
-        zxlogf(ERROR, "%s: invalid display panel detected: %d", __func__, display_id);
-        return ZX_ERR_INVALID_ARGS;
+        FDF_LOG(ERROR, "invalid display panel detected: %d", display_id_);
+        return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
   const std::vector<fpbus::Metadata> display_panel_metadata{
@@ -228,17 +233,17 @@ zx_status_t Nelson::DisplayInit(uint32_t bootloader_display_id) {
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, display_dev),
                                                           fidl::ToWire(fidl_arena, spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Display(display_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "AddNodeGroup Display(display_dev) request failed: %s",
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Display(display_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "AddNodeGroup Display(display_dev) failed: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace nelson

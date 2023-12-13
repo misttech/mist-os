@@ -19,30 +19,10 @@
 #include <fbl/macros.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 
+#include "nelson-btis.h"
 #include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace nelson {
-
-// BTI IDs for our devices
-enum {
-  BTI_BOARD,
-  BTI_USB,
-  BTI_DISPLAY,
-  BTI_EMMC,
-  BTI_MALI,
-  BTI_VIDEO,
-  BTI_SDIO,
-  BTI_CANVAS,
-  BTI_AUDIO_IN,
-  BTI_AUDIO_OUT,
-  BTI_TEE,
-  BTI_SYSMEM,
-  BTI_AML_SECURE_MEM,
-  BTI_NNA,
-  BTI_AUDIO_BT_IN,
-  BTI_AUDIO_BT_OUT,
-  BTI_SPI1,
-};
 
 // MAC address metadata indices
 enum {
@@ -127,7 +107,6 @@ class Nelson : public NelsonType {
   zx_status_t ButtonsInit();
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
-  zx_status_t DisplayInit(uint32_t bootloader_display_id);
   zx_status_t DsiInit();
   zx_status_t EmmcInit();
   zx_status_t GpioInit();

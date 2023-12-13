@@ -178,29 +178,6 @@ int Nelson::Thread() {
     return -1;
   }
 
-  // This is tightly coupled to the u-boot supplied metadata and the GT6853 touch driver.
-  size_t metadata_size;
-  uint32_t bootloader_display_id = 0;
-  status = DdkGetMetadataSize(DEVICE_METADATA_BOARD_PRIVATE, &metadata_size);
-  if (status == ZX_OK) {
-    if (metadata_size != sizeof(uint32_t)) {
-      zxlogf(ERROR, "%s: bootloader board metadata is the wrong size, got %zu want %zu", __func__,
-             metadata_size, sizeof(uint32_t));
-    } else {
-      size_t actual;
-      status = DdkGetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &bootloader_display_id, metadata_size,
-                              &actual);
-      if (status != ZX_OK || actual != metadata_size) {
-        zxlogf(ERROR, "%s: bootloader board metadata could not be read (%d, size=%zu)", __func__,
-               status, actual);
-        bootloader_display_id = 0;
-      }
-    }
-  } else {
-    zxlogf(ERROR, "%s: no panel type metadata (%d), falling back to GPIO inspection", __func__,
-           status);
-  }
-
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit failed: %d", status);
   }
@@ -231,10 +208,6 @@ int Nelson::Thread() {
 
   if ((status = DsiInit()) != ZX_OK) {
     zxlogf(ERROR, "DsiInit failed: %d", status);
-  }
-
-  if ((status = DisplayInit(bootloader_display_id)) != ZX_OK) {
-    zxlogf(ERROR, "DisplayInit failed: %d", status);
   }
 
   if ((status = CanvasInit()) != ZX_OK) {
@@ -354,7 +327,8 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
   status = board->DdkAdd(ddk::DeviceAddArgs("nelson")
                              .set_props(kBoardDriverProps)
                              .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .set_runtime_service_offers({fidl_service_offers, 1}));
+                             .set_runtime_service_offers({fidl_service_offers, 1})
+                             .forward_metadata(parent, DEVICE_METADATA_BOARD_PRIVATE));
   if (status != ZX_OK) {
     return status;
   }

@@ -482,6 +482,7 @@ library_headers("ddk-metadata-headers") {
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/nelson:*",
+    "//src/devices/board/drivers/nelson/post-init:*",
     "//src/devices/board/drivers/sherlock:*",
     "//src/devices/board/drivers/vim3:*",
     "//src/devices/bus/drivers/platform/test:*",
