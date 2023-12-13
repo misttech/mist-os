@@ -75,16 +75,6 @@ enum {
   MMIO_HDMITX_TOP_LEVEL,      // HDMITX (HDMI Transmitter Top-level block)
 };
 
-// Should match display_gpios table in board driver
-enum {
-  GPIO_BL,
-  GPIO_LCD,
-  GPIO_HW_ID0,
-  GPIO_HW_ID1,
-  GPIO_HW_ID2,
-  GPIO_COUNT,
-};
-
 // Should match display_irqs table in board driver
 enum {
   IRQ_VSYNC,
