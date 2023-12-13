@@ -10,6 +10,7 @@ load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_os", "wo
 _CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-amd64/+/{tag}"
 
 _LOCAL_FUCHSIA_PLATFORM_BUILD = "LOCAL_FUCHSIA_PLATFORM_BUILD"
+_LOCAL_FUCHSIA_CLANG_VERSION_FILE = "LOCAL_FUCHSIA_CLANG_VERSION_FILE"
 _LOCAL_FUCHSIA_CLANG_DIR = "../../prebuilt/third_party/clang"
 
 def _clang_url(os, tag):
@@ -34,6 +35,20 @@ def _instantiate_from_local_dir(ctx, local_clang):
     # the "dependency_file" feature to use relative file paths.
     for f in local_clang.readdir():
         ctx.symlink(f, f.basename)
+
+    # If a version file is provided, that is relative to the workspace,
+    # record its path to ensure this repository rule is re-run when its
+    # content changes.
+    version_file = ctx.attr.local_version_file
+    if version_file:
+        ctx.path(version_file)
+    else:
+        version_file = ctx.os.environ.get(_LOCAL_FUCHSIA_CLANG_VERSION_FILE)
+        if version_file:
+            if version_file.startswith(("/", "..")):
+                print("### Ignoring %s value, path should be relative to workspace root: %s" % (_LOCAL_FUCHSIA_CLANG_VERSION_FILE, version_file))
+            else:
+                ctx.path(Label("@//:" + version_file))
 
 def _instantiate_from_local_fuchsia_tree(ctx):
     # Copies clang prebuilt from a local Fuchsia platform tree.
@@ -204,7 +219,7 @@ If cipd_tag is not set, local_archive must be set to the path of a core IDK
 archive file.
 """,
     implementation = _fuchsia_clang_repository_impl,
-    environ = [_LOCAL_FUCHSIA_PLATFORM_BUILD],
+    environ = [_LOCAL_FUCHSIA_PLATFORM_BUILD, _LOCAL_FUCHSIA_CLANG_VERSION_FILE],
     attrs = {
         "cipd_tag": attr.string(
             doc = "CIPD tag for the version to load.",
@@ -217,6 +232,10 @@ archive file.
         ),
         "local_path": attr.string(
             doc = "local clang installation directory, relative to workspace root.",
+        ),
+        "local_version_file": attr.label(
+            doc = "Optional path to a workspace-relative path to a version file for this clang installation.",
+            allow_single_file = True,
         ),
         "sdk_root_label": attr.label(
             doc = "The fuchsia sdk root label. eg: @fuchsia_sdk",

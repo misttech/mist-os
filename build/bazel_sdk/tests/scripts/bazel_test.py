@@ -191,6 +191,16 @@ def main():
         help="Use specific Bazel output user root directory.",
     )
     parser.add_argument(
+        "--prebuilt-python-version-file",
+        type=Path,
+        help="Optional path to version file for prebuilt python toolchain.",
+    )
+    parser.add_argument(
+        "--prebuilt-clang-version-file",
+        type=Path,
+        help="Optional path to version file for prebuilt Clang toolchain.",
+    )
+    parser.add_argument(
         "--stamp-file", help="Output stamp file, written on success only."
     )
     parser.add_argument("--depfile", help="Output Ninja depfile file.")
@@ -318,11 +328,6 @@ def main():
 
     bazel = bazel.resolve()
 
-    # Location of the prebuilt python toolchain.
-    python_prebuilt_dir = (
-        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag
-    )
-
     # The Bazel workspace assumes that the Fuchsia cpu is the host
     # CPU unless --cpu or --platforms is used. Extract the target_cpu
     # from ${fuchsia_build_dir}/args.json and construct the corresponding
@@ -363,6 +368,58 @@ def main():
     script_dir = Path(__file__).parent.resolve()
     workspace_dir = script_dir.parent
     downloader_config_file = script_dir / "downloader_config"
+
+    # To ensure that the repository rules for @fuchsia_clang and
+    # @prebuilt_python are re-run properly when the content of the prebuilt
+    # toolchain directory changes, use a version file that is symlinked into
+    # the workspace, and whose path is passed through environment variables
+    # LOCAL_FUCHSIA_CLANG_VERSION_FILE and LOCAL_PREBUILT_PYTHON_VERSION_FILE
+    # respectively. The workspace symlinks are necessary to ensure that
+    # Bazel will track changes to these files properly, as repository rules
+    # cannot track changes to files outside the workspace :-(
+
+    def setup_version_file(name: str, source_path: Path) -> str:
+        if not source_path.exists():
+            return None
+
+        dst_file = workspace_dir / ".versions" / name
+        if not dst_file.exists():
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+            if dst_file.exists():
+                dst_file.unlink()
+            target = os.path.relpath(source_path, dst_file.parent)
+            dst_file.symlink_to(target)
+
+        return ".versions/" + name
+
+    python_prebuilt_dir = (
+        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag
+    )
+    python_version_file = args.prebuilt_python_version_file
+    if not python_version_file:
+        python_version_file = (
+            python_prebuilt_dir / ".versions" / "cpython3.cipd_version"
+        )
+
+    workspace_python_version_file = setup_version_file(
+        "prebuilt_python", python_version_file
+    )
+
+    clang_version_file = args.prebuilt_clang_version_file
+    if not clang_version_file:
+        clang_version_file = (
+            fuchsia_source_dir
+            / "prebuilt"
+            / "third_party"
+            / "clang"
+            / host_tag
+            / ".versions"
+            / "clang.cipd_version"
+        )
+
+    workspace_clang_version_file = setup_version_file(
+        "prebuilt_clang", clang_version_file
+    )
 
     # These options must appear before the Bazel command
     bazel_startup_args = [
@@ -495,6 +552,17 @@ def main():
         # do not expose the system-installed one.
         "PATH": f"{python_prebuilt_dir}/bin:{PATH}",
     }
+
+    if workspace_python_version_file:
+        bazel_env[
+            "LOCAL_PREBUILT_PYTHON_VERSION_FILE"
+        ] = workspace_python_version_file
+
+    if workspace_clang_version_file:
+        bazel_env[
+            "LOCAL_FUCHSIA_CLANG_VERSION_FILE"
+        ] = workspace_clang_version_file
+
     if has_fuchsia_build_dir:
         # Pass the location of the Fuchsia build directory to the
         # @fuchsia_sdk repository rule. Note that using --action_env will

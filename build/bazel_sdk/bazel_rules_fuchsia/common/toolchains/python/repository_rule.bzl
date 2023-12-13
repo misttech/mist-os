@@ -39,6 +39,15 @@ Example usage:
 
 """
 
+# Set to True to enable log messages.
+_LOG = False
+
+# Name of the environment variable used to check for a content-based hash
+# reflecting the content of the Python source toolchain, see documentation
+# for the compact_python_runtime_repository() repository rule below for
+# details.
+_VERSION_FILE_VARNAME = "LOCAL_PREBUILT_PYTHON_VERSION_FILE"
+
 def _make_path_from_str(repo_ctx, path_str):
     if not path_str.startswith("/"):
         path_str = "%s/%s" % (repo_ctx.workspace_root, path_str)
@@ -50,14 +59,18 @@ def _make_path_from_str(repo_ctx, path_str):
 def _record_path_dependency(repo_ctx, path_str):
     if path_str and not path_str.startswith("/"):
         repo_ctx.path(Label("@//:" + path_str))
+        if _LOG:
+            print("### Recording %s as path dependency for repository %s ###" % (path_str, repo_ctx.name))
+    elif _LOG:
+        print("### IGNORING %s AS PATH DEPENDENCY FOR REPOSITORY %s ####" % (path_str, repo_ctx.name))
 
 def _compact_python_runtime_impl(repo_ctx):
-    repo_ctx.file("WORKSPACE.bzl", "", executable = False)
-
     # If content_hash_file is provided, make sure this repository rule
     # is re-run whenever its content changes.
     if repo_ctx.attr.content_hash_file:
         _record_path_dependency(repo_ctx, repo_ctx.attr.content_hash_file)
+    elif repo_ctx.os.environ.get(_VERSION_FILE_VARNAME):
+        _record_path_dependency(repo_ctx, repo_ctx.os.environ[_VERSION_FILE_VARNAME])
     elif repo_ctx.attr.interpreter_path:
         _record_path_dependency(repo_ctx, repo_ctx.attr.interpreter_path)
 
@@ -68,6 +81,7 @@ def _compact_python_runtime_impl(repo_ctx):
         if not python_interpreter:
             fail("There is no python3 interpreter in your PATH! Set python_interpreter_path " +
                  "when calling this repository rule to point to an existing one.")
+        _record_path_dependency(repo_ctx, str(python_interpreter))
     else:
         python_interpreter = _make_path_from_str(repo_ctx, python_interpreter_path)
         if not python_interpreter.exists:
@@ -225,7 +239,26 @@ A regular toolchain requires adding 5000+ files to each sandbox every
 time a py_binary() is invoked. The compact toolchain avoids that by
 creating a zip archive containing all standard modules and ensuring
 the interpreter uses it at runtime. This reduces the number of files
-to add to the sandbox to only 3.""",
+to add to the sandbox to only 3.
+
+To ensure that the repository rule is re-run properly when the content of
+the source prebuilt python directory changes, one of the following techniques
+can be used:
+
+1) Define content_hash_file to point to a file whose content will be a unique
+   hash computed from the source directory's content. Whenever this value
+   changes, the repository rule will be run to regenerate the right content.
+   This technique is used by the Fuchsia platform build.
+
+2) Define the %s environment variable to
+   point to content hash file. This is used by the Bazel SDK test suite's
+   bazel_test.py script.
+
+3) As a fallback, if interpreter_path is given, and is a path relative to
+   the workspace, its hash will be used as the source of truth. Note that
+   if this path is absolute, it will be ignored entirely.
+""" % _VERSION_FILE_VARNAME,
+    environ = [_VERSION_FILE_VARNAME],
     attrs = {
         "interpreter_path": attr.string(
             doc = """\
