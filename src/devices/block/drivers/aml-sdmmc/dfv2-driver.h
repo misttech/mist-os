@@ -54,6 +54,13 @@ class Dfv2Driver : public fdf::DriverBase, public ddk::SdmmcProtocol<Dfv2Driver>
   }
 
  private:
+  void DriverLogTrace(const char* message) override { FDF_LOGL(TRACE, logger(), "%s", message); }
+  void DriverLogInfo(const char* message) override { FDF_LOGL(INFO, logger(), "%s", message); }
+  void DriverLogWarning(const char* message) override {
+    FDF_LOGL(WARNING, logger(), "%s", message);
+  }
+  void DriverLogError(const char* message) override { FDF_LOGL(ERROR, logger(), "%s", message); }
+
   zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client,
                              aml_sdmmc_config_t config);
 

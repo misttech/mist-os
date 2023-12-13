@@ -18,13 +18,15 @@ namespace aml_sdmmc {
 namespace {
 
 zx::result<aml_sdmmc_config_t> ParseMetadata(
-    const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector) {
+    const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector,
+    fdf::Logger& logger) {
   for (const auto& metadata : metadata_vector) {
     if (metadata.type == DEVICE_METADATA_PRIVATE) {
       size_t size;
       auto status = metadata.data.get_prop_content_size(&size);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size: %s", zx_status_get_string(status));
+        FDF_LOGL(ERROR, logger, "Failed to get_prop_content_size: %s",
+                 zx_status_get_string(status));
         return zx::error(status);
       }
 
@@ -35,7 +37,7 @@ zx::result<aml_sdmmc_config_t> ParseMetadata(
       aml_sdmmc_config_t aml_sdmmc_config;
       status = metadata.data.read(&aml_sdmmc_config, 0, sizeof(aml_sdmmc_config_t));
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read metadata: %s", zx_status_get_string(status));
+        FDF_LOGL(ERROR, logger, "Failed to read metadata: %s", zx_status_get_string(status));
         return zx::error(status);
       }
       return zx::ok(aml_sdmmc_config);
@@ -83,14 +85,6 @@ zx::result<pdev_device_info_t> FidlToBanjoDeviceInfo(
 
 }  // namespace
 
-void DriverLogTrace(const char* message) { FDF_LOG(TRACE, "%s", message); }
-
-void DriverLogInfo(const char* message) { FDF_LOG(INFO, "%s", message); }
-
-void DriverLogWarning(const char* message) { FDF_LOG(WARNING, "%s", message); }
-
-void DriverLogError(const char* message) { FDF_LOG(ERROR, "%s", message); }
-
 void Dfv2Driver::Start(fdf::StartCompleter completer) {
   parent_.Bind(std::move(node()));
   start_completer_.emplace(std::move(completer));
@@ -106,25 +100,26 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   {
     zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
     if (result.is_error() || !result->is_valid()) {
-      FDF_LOG(ERROR, "Failed to connect to compat service: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to connect to compat service: %s", result.status_string());
       return CompleteStart(result.take_error());
     }
     auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
 
     fidl::WireResult metadata = parent_compat->GetMetadata();
     if (!metadata.ok()) {
-      FDF_LOG(ERROR, "Call to GetMetadata failed: %s", metadata.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to GetMetadata failed: %s", metadata.status_string());
       return CompleteStart(zx::error(metadata.status()));
     }
     if (metadata->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata: %s", zx_status_get_string(metadata->error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to GetMetadata: %s",
+               zx_status_get_string(metadata->error_value()));
       return CompleteStart(metadata->take_error());
     }
 
-    zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata);
+    zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata, logger());
     if (parsed_metadata.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata: %s",
-              zx_status_get_string(parsed_metadata.error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to ParseMetadata: %s",
+               zx_status_get_string(parsed_metadata.error_value()));
       return CompleteStart(parsed_metadata.take_error());
     }
     config = parsed_metadata.value();
@@ -133,7 +128,7 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   {
     zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
     if (pdev.is_error() || !pdev->is_valid()) {
-      FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to connect to platform device: %s", pdev.status_string());
       return CompleteStart(pdev.take_error());
     }
 
@@ -144,7 +139,8 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
 
   auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
   if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to inspect sink: %s", inspect_sink.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
+             inspect_sink.status_string());
     return CompleteStart(inspect_sink.take_error());
   }
   exposed_inspector_.emplace(inspect::ComponentInspector(
@@ -156,7 +152,7 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
     });
     auto result = outgoing()->AddService<fuchsia_hardware_sdmmc::SdmmcService>(std::move(handler));
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add service: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to add service: %s", result.status_string());
       return CompleteStart(result.take_error());
     }
   }
@@ -164,8 +160,8 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return CompleteStart(controller_endpoints.take_error());
   }
 
@@ -190,11 +186,11 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
 
   auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child: %s", result.status_string());
     return CompleteStart(zx::error(result.status()));
   }
 
-  FDF_LOG(INFO, "Completed start hook");
+  FDF_LOGL(INFO, logger(), "Completed start hook");
 
   return CompleteStart(zx::ok());
 }
@@ -208,17 +204,18 @@ zx::result<> Dfv2Driver::InitResources(
   {
     const auto result = pdev->GetMmio(0);
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Call to get MMIO failed: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to get MMIO failed: %s", result.status_string());
       return zx::error(result.status());
     }
     if (!result->is_ok()) {
-      FDF_LOG(ERROR, "Failed to get MMIO: %s", zx_status_get_string(result->error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to get MMIO: %s",
+               zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }
 
     const auto& mmio_params = result->value();
     if (!mmio_params->has_offset() || !mmio_params->has_size() || !mmio_params->has_vmo()) {
-      FDF_LOG(ERROR, "Platform device provided invalid MMIO");
+      FDF_LOGL(ERROR, logger(), "Platform device provided invalid MMIO");
       return zx::error(ZX_ERR_BAD_STATE);
     };
 
@@ -226,7 +223,7 @@ zx::result<> Dfv2Driver::InitResources(
         fdf::MmioBuffer::Create(mmio_params->offset(), mmio_params->size(),
                                 std::move(mmio_params->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
     if (mmio_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to map MMIO: %s", mmio_result.status_string());
       return mmio_result.take_error();
     }
     mmio = std::move(mmio_result.value());
@@ -236,11 +233,12 @@ zx::result<> Dfv2Driver::InitResources(
   {
     const auto result = pdev->GetInterrupt(0, 0);
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Call to get interrupt failed: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to get interrupt failed: %s", result.status_string());
       return zx::error(result.status());
     }
     if (!result->is_ok()) {
-      FDF_LOG(ERROR, "Failed to get interrupt: %s", zx_status_get_string(result->error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to get interrupt: %s",
+               zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }
     irq = std::move(result->value()->irq);
@@ -250,11 +248,12 @@ zx::result<> Dfv2Driver::InitResources(
   {
     const auto result = pdev->GetBti(0);
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Call to get BTI failed: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to get BTI failed: %s", result.status_string());
       return zx::error(result.status());
     }
     if (!result->is_ok()) {
-      FDF_LOG(ERROR, "Failed to get BTI: %s", zx_status_get_string(result->error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to get BTI: %s",
+               zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }
     bti = std::move(result->value()->bti);
@@ -279,7 +278,7 @@ zx::result<> Dfv2Driver::InitResources(
   zx_status_t status = buffer_factory->CreateContiguous(
       bti, kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to allocate dma descriptors");
+    FDF_LOGL(ERROR, logger(), "Failed to allocate dma descriptors");
     return zx::error(status);
   }
 
@@ -289,11 +288,12 @@ zx::result<> Dfv2Driver::InitResources(
   {
     const auto result = pdev->GetDeviceInfo();
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Call to get device info failed: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to get device info failed: %s", result.status_string());
       return zx::error(result.status());
     }
     if (!result->is_ok()) {
-      FDF_LOG(ERROR, "Failed to get device info: %s", zx_status_get_string(result->error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to get device info: %s",
+               zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }
 

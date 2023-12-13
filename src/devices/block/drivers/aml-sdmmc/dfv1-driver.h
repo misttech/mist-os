@@ -65,6 +65,11 @@ class Dfv1Driver : public Dfv1DriverType,
   zx_status_t Bind();
 
  private:
+  void DriverLogTrace(const char* message) override { zxlogf(TRACE, "%s", message); }
+  void DriverLogInfo(const char* message) override { zxlogf(INFO, "%s", message); }
+  void DriverLogWarning(const char* message) override { zxlogf(WARNING, "%s", message); }
+  void DriverLogError(const char* message) override { zxlogf(ERROR, "%s", message); }
+
   // Dispatcher for being a FIDL server serving Sdmmc requests.
   fdf_dispatcher_t* dispatcher_;
   // Serves fuchsia_hardware_sdmmc::SdmmcService.

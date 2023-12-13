@@ -29,13 +29,6 @@
 
 namespace aml_sdmmc {
 
-// These are implemented in dfv1-driver.cc or dfv2-driver.cc.
-void DriverLogTrace(const char* message);
-void DriverLogInfo(const char* message);
-void DriverLogWarning(const char* message);
-void DriverLogError(const char* message);
-constexpr size_t kMaxLoggingCharacters = 256;
-
 class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
   // Limit maximum number of descriptors to 512 for now
@@ -96,6 +89,12 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
 
  protected:
+  static constexpr size_t kMaxLoggingCharacters = 256;
+  virtual void DriverLogTrace(const char* message) = 0;
+  virtual void DriverLogInfo(const char* message) = 0;
+  virtual void DriverLogWarning(const char* message) = 0;
+  virtual void DriverLogError(const char* message) = 0;
+
   void ShutDown() TA_EXCL(lock_);
 
   // Actual ddk::SdmmcProtocol implementation
@@ -197,7 +196,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   static constexpr LogSeverity WARNING = LogSeverity::WARNING;
   static constexpr LogSeverity ERROR = LogSeverity::ERROR;
 
-  static void DriverLog(LogSeverity log_severity, const char* format, ...) {
+  void DriverLog(LogSeverity log_severity, const char* format, ...) {
     va_list args;
     va_start(args, format);
     char buffer[kMaxLoggingCharacters];
@@ -257,7 +256,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   zx::result<aml_sdmmc_desc_t*> PopulateDescriptors(const sdmmc_req_t& req,
                                                     aml_sdmmc_desc_t* cur_desc,
                                                     fzl::PinnedVmo::Region region) TA_REQ(lock_);
-  static zx_status_t FinishReq(const sdmmc_req_t& req);
+  zx_status_t FinishReq(const sdmmc_req_t& req);
 
   void ClearStatus() TA_REQ(lock_);
   zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)

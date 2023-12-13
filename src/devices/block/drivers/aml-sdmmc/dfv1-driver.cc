@@ -12,14 +12,6 @@
 
 namespace aml_sdmmc {
 
-void DriverLogTrace(const char* message) { zxlogf(TRACE, "%s", message); }
-
-void DriverLogInfo(const char* message) { zxlogf(INFO, "%s", message); }
-
-void DriverLogWarning(const char* message) { zxlogf(WARNING, "%s", message); }
-
-void DriverLogError(const char* message) { zxlogf(ERROR, "%s", message); }
-
 zx_status_t Dfv1Driver::Bind() {
   auto protocol = [this](fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> server_end) mutable {
     fdf::BindServer(dispatcher_, std::move(server_end), this);
