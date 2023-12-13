@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 
   auto serve = outgoing.ServeFromStartupInfo();
   if (serve.is_error()) {
-    FX_SLOG(ERROR, "Failed to serve outgoing directory", KV("status", serve.status_string()));
+    FX_SLOG(ERROR, "Failed to serve outgoing directory", FX_KV("status", serve.status_string()));
     return serve.status_value();
   }
 
@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
   vfs::PseudoDir diagnostics_dir;
   status = diagnostics_dir.AddEntry(fi::Tree::Name_, std::move(tree_service));
   if (status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to add directory entry", KV("name", fi::Tree::Name_),
-            KV("status_str", zx_status_get_string(status)));
+    FX_SLOG(ERROR, "Failed to add directory entry", FX_KV("name", fi::Tree::Name_),
+            FX_KV("status_str", zx_status_get_string(status)));
     return status;
   }
 
@@ -77,8 +77,8 @@ int main(int argc, char** argv) {
       endpoints->server.TakeChannel(), loop.dispatcher());
   zx::result<> status_result = outgoing.AddDirectory(std::move(endpoints->client), kDiagnosticsDir);
   if (status_result.is_error()) {
-    FX_SLOG(ERROR, "Failed to add directory entry", KV("name", kDiagnosticsDir),
-            KV("status_str", status_result.status_string()));
+    FX_SLOG(ERROR, "Failed to add directory entry", FX_KV("name", kDiagnosticsDir),
+            FX_KV("status_str", status_result.status_string()));
     return status_result.status_value();
   }
 
