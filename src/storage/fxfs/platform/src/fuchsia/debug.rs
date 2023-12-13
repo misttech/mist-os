@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use vfs::directory::dirents_sink::AppendResult;
-
 use {
-    crate::fuchsia::errors::map_to_status,
+    crate::{component::map_to_raw_status, fuchsia::errors::map_to_status},
     async_trait::async_trait,
+    fidl_fuchsia_fxfs::DebugRequest,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},
     fxfs::{
@@ -22,8 +21,11 @@ use {
         attributes,
         common::rights_to_posix_mode_bits,
         directory::{
-            dirents_sink, entry::DirectoryEntry, entry_container::Directory,
-            helper::DirectlyMutable, traversal_position::TraversalPosition,
+            dirents_sink::{self, AppendResult},
+            entry::DirectoryEntry,
+            entry_container::Directory,
+            helper::DirectlyMutable,
+            traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
@@ -164,17 +166,22 @@ impl File for InternalFile {
 #[async_trait]
 impl FileIo for InternalFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
+        // Deal with alignment. Handle requires aligned reads.
         let handle = self.handle().await?;
         let block_size = handle.owner().block_size();
         let start = fxfs::round::round_down(offset, block_size);
         let end = fxfs::round::round_up(offset + buffer.len() as u64, block_size).unwrap();
         let mut buf = handle.allocate_buffer((end - start) as usize).await;
         let bytes = handle.read(start, buf.as_mut()).await.map_err(map_to_status)?;
-        let end = std::cmp::min(offset + buffer.len() as u64, start + bytes as u64) - start;
-        let start = offset - start;
-        buffer[..(end - start) as usize]
-            .copy_from_slice(&buf.as_slice()[start as usize..end as usize]);
-        Ok(end - start)
+        let end = std::cmp::min(offset + buffer.len() as u64, start + bytes as u64);
+        if end > offset {
+            buffer[..(end - offset) as usize].copy_from_slice(
+                &buf.as_slice()[(offset - start) as usize..(end - start) as usize],
+            );
+            Ok(end - start)
+        } else {
+            Ok(0)
+        }
     }
 
     async fn write_at(&self, _offset: u64, _content: &[u8]) -> Result<u64, Status> {
@@ -378,5 +385,16 @@ impl FxfsDebug {
 
     pub fn root(&self) -> Arc<vfs::directory::immutable::Simple> {
         self.root.clone()
+    }
+}
+
+pub async fn handle_debug_request(
+    fs: Arc<FxFilesystem>,
+    request: DebugRequest,
+) -> Result<(), fidl::Error> {
+    match request {
+        DebugRequest::Compact { responder } => {
+            responder.send(fs.journal().compact().await.map_err(map_to_raw_status))
+        }
     }
 }

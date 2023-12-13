@@ -284,3 +284,11 @@ closed protocol BlobReader {
         vmo zx.Handle:VMO;
     }) error zx.Status;
 };
+
+/// This is an internal protocol for on-device debugging and testing only.
+/// See `ffx fxfs help` for more details.
+@discoverable
+closed protocol Debug {
+    /// Forces a compaction.
+    strict Compact() -> () error zx.Status;
+};

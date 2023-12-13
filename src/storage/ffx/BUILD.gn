@@ -5,9 +5,9 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-# ffx storage plugin, which houses useful local storage related developer tools. You can add
-# subcommands to this by creating a new `ffx_plugin` and adding it under `plugin_deps`.
-ffx_plugin("ffx_storage") {
+# This is an older style ffx plugin (as opposed to subtool) that is only used for blackout
+# tests.
+ffx_plugin("ffx_storage_blackout") {
   version = "0.1.0"
   edition = "2021"
 
@@ -16,11 +16,11 @@ ffx_plugin("ffx_storage") {
   plugin_deps = [ "//tools/blackout:ffx_storage_blackout" ]
 }
 
-ffx_tool("ffx_storage_tool") {
+ffx_tool("ffx_storage_blackout_tool") {
   edition = "2021"
-  output_name = "ffx-storage"
+  output_name = "ffx-storage-blackout"
   deps = [
-    ":ffx_storage_suite",
+    ":ffx_storage_blackout_suite",
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]

@@ -4,10 +4,12 @@
 
 use {
     crate::fuchsia::{
-        debug::FxfsDebug, errors::map_to_status, memory_pressure::MemoryPressureMonitor,
+        debug::{handle_debug_request, FxfsDebug},
+        errors::map_to_status,
+        memory_pressure::MemoryPressureMonitor,
         volumes_directory::VolumesDirectory,
     },
-    anyhow::{Context, Error},
+    anyhow::{bail, Context, Error},
     async_trait::async_trait,
     fidl::{
         endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream},
@@ -17,7 +19,9 @@ use {
     fidl_fuchsia_fs_startup::{
         CheckOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
     },
-    fidl_fuchsia_fxfs::{VolumesMarker, VolumesRequest, VolumesRequestStream},
+    fidl_fuchsia_fxfs::{
+        DebugMarker, DebugRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+    },
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
@@ -186,6 +190,20 @@ impl Component {
                 async move {
                     if let Some(me) = weak.upgrade() {
                         let _ = me.handle_admin_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
+
+        // TODO(b/315704445): Only enable in debug builds?
+        let weak = Arc::downgrade(&self);
+        svc_dir.add_entry(
+            DebugMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_debug_requests(requests).await;
                     }
                 }
             }),
@@ -373,6 +391,23 @@ impl Component {
                 return Ok(true);
             }
         }
+    }
+
+    /// Handles fuchsia.fxfs.Debug requests, providing live debugging internals of the running
+    /// filesystem.
+    async fn handle_debug_requests(&self, mut stream: DebugRequestStream) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await.context("Reading request")? {
+            let state = self.state.lock().await;
+            let fs = match *state {
+                State::ComponentStarted => {
+                    info!("Debug commands are not valid unless component is started.");
+                    bail!("Component not started");
+                }
+                State::Running(RunningState { ref fs, .. }) => fs.deref().deref().clone(),
+            };
+            handle_debug_request(fs, request).await?;
+        }
+        Ok(())
     }
 
     async fn shutdown(&self) {

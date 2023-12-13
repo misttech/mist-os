@@ -1532,8 +1532,10 @@ impl Journal {
         Ok(())
     }
 
+    /// This should generally NOT be called externally. It is public to allow use by FIDL service
+    /// fxfs.Debug.
     #[trace]
-    async fn compact(&self) -> Result<(), Error> {
+    pub async fn compact(&self) -> Result<(), Error> {
         let trace = self.trace.load(Ordering::Relaxed);
         debug!("Compaction starting");
         if trace {
