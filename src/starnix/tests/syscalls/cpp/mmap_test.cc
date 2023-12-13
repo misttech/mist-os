@@ -999,4 +999,92 @@ TEST(Madvise, SetDontForkThenRemap) {
   munmap(remapped, 2 * page_size);
 }
 
+TEST(Mremap, RemapMayMoveSpanningMappings) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* mapping =
+      mmap(nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+
+  SAFE_SYSCALL(mprotect(mapping, page_size, PROT_READ));
+
+  void* destination =
+      mmap(nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(destination, MAP_FAILED);
+
+  SAFE_SYSCALL(munmap(destination, 2 * page_size));
+
+  void* remapped =
+      mremap(mapping, 2 * page_size, 2 * page_size, MREMAP_MAYMOVE | MREMAP_FIXED, destination);
+  EXPECT_EQ(remapped, MAP_FAILED);
+  EXPECT_EQ(errno, EFAULT);
+
+  SAFE_SYSCALL(munmap(mapping, 2 * page_size));
+}
+
+TEST(Mremap, RemapPartOfMapping) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* mapping =
+      mmap(nullptr, 3 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+
+  reinterpret_cast<volatile char*>(mapping)[0] = 'a';
+  reinterpret_cast<volatile char*>(mapping)[page_size] = 'b';
+  reinterpret_cast<volatile char*>(mapping)[2 * page_size] = 'c';
+
+  void* target =
+      mmap(nullptr, 3 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(target, MAP_FAILED);
+
+  reinterpret_cast<volatile char*>(target)[0] = 'x';
+  reinterpret_cast<volatile char*>(target)[page_size] = 'y';
+  reinterpret_cast<volatile char*>(target)[2 * page_size] = 'z';
+
+  void* remap_source = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping) + page_size);
+  void* remap_destination =
+      reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(target) + page_size);
+
+  void* remapped =
+      mremap(remap_source, page_size, page_size, MREMAP_MAYMOVE | MREMAP_FIXED, remap_destination);
+  ASSERT_EQ(remapped, remap_destination);
+
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(mapping)[0]);
+  EXPECT_EXIT([&]() { reinterpret_cast<volatile char*>(mapping)[page_size]; }(),
+              testing::KilledBySignal(SIGSEGV), "");
+  EXPECT_EQ('c', reinterpret_cast<volatile char*>(mapping)[2 * page_size]);
+
+  EXPECT_EQ('x', reinterpret_cast<volatile char*>(target)[0]);
+  EXPECT_EQ('b', reinterpret_cast<volatile char*>(target)[page_size]);
+  EXPECT_EQ('z', reinterpret_cast<volatile char*>(target)[2 * page_size]);
+}
+
+TEST(Mremap, GrowThenGrow) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* space =
+      mmap(nullptr, 3 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(space, MAP_FAILED);
+  munmap(space, 3 * page_size);
+
+  void* mapping = mmap(space, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  ASSERT_EQ(mapping, space);
+
+  void* first_remap = mremap(mapping, page_size, 2 * page_size, 0);
+  ASSERT_EQ(first_remap, mapping);
+
+  void* second_remap = mremap(mapping, 2 * page_size, 3 * page_size, 0);
+  ASSERT_EQ(second_remap, mapping);
+
+  munmap(mapping, 3 * page_size);
+}
+
+TEST(Mmap, ProtExecInChild) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    void* mapped =
+        mmap(nullptr, page_size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(mapped, MAP_FAILED);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
 }  // namespace

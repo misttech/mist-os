@@ -505,6 +505,8 @@ pub fn sys_munlock(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::testing::*;
     use starnix_uapi::{errors::EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ};
@@ -998,6 +1000,57 @@ mod tests {
 
         // The second page should be part of the original dst mapping.
         check_page_eq(&current_task, new_addr + *PAGE_SIZE, 'z');
+    }
+
+    /// Clobbers the middle of an existing mapping with mremap to a fixed location.
+    #[::fuchsia::test]
+    async fn test_mremap_clobber_vmo_mapping() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+
+        let dst_vmo = Arc::new(zx::Vmo::create(2 * *PAGE_SIZE).unwrap());
+        dst_vmo.write(&['x' as u8].repeat(*PAGE_SIZE as usize), 0).unwrap();
+        dst_vmo.write(&['y' as u8].repeat(*PAGE_SIZE as usize), *PAGE_SIZE).unwrap();
+
+        let dst_addr = current_task
+            .mm()
+            .map_vmo(
+                DesiredAddress::Any,
+                dst_vmo,
+                0,
+                2 * (*PAGE_SIZE as usize),
+                ProtectionFlags::READ,
+                MappingOptions::empty(),
+                MappingName::None,
+                crate::vfs::FileWriteGuardRef(None),
+            )
+            .unwrap();
+
+        // Map 3 pages.
+        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        fill_page(&current_task, addr, 'a');
+        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
+        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+
+        // Overwrite the second page of the mapping with the second page of the anonymous mapping.
+        let remapped_addr = sys_mremap(
+            &mut locked,
+            &*current_task,
+            addr + *PAGE_SIZE,
+            *PAGE_SIZE as usize,
+            *PAGE_SIZE as usize,
+            MREMAP_FIXED | MREMAP_MAYMOVE,
+            dst_addr + *PAGE_SIZE,
+        )
+        .unwrap();
+
+        assert_eq!(remapped_addr, dst_addr + *PAGE_SIZE);
+
+        check_page_eq(&current_task, addr, 'a');
+        check_unmapped(&current_task, addr + *PAGE_SIZE);
+        check_page_eq(&current_task, addr + 2 * *PAGE_SIZE, 'c');
+
+        check_page_eq(&current_task, dst_addr, 'x');
+        check_page_eq(&current_task, dst_addr + *PAGE_SIZE, 'b');
     }
 
     #[cfg(target_arch = "x86_64")]
