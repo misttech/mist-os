@@ -62,6 +62,9 @@ const MAX_IN_FLIGHT_TRANSACTIONS: u64 = 4;
 // TODO(b/293964968): We probably also want to reschedule trimming, e.g. every day.
 const TRIM_AFTER_BOOT_TIMER: std::time::Duration = std::time::Duration::from_secs(5 * 60);
 
+// After the initial trim, perform another trim every 24 hours.
+const TRIM_INTERVAL_TIMER: std::time::Duration = std::time::Duration::from_secs(60 * 60 * 24);
+
 /// Holds information on an Fxfs Filesystem
 pub struct Info {
     pub total_bytes: u64,
@@ -94,9 +97,11 @@ pub struct Options {
     /// testing.
     pub skip_initial_reap: bool,
 
-    /// How long after the filesystem is mounted to wait until we perform a batch trim.  If set to
-    /// None, trimming is not performed (which can be useful for testing).
-    pub trim_delay: Option<std::time::Duration>,
+    // The first duration is how long after the filesystem has been mounted to perform an initial
+    // trim.  The second is the interval to repeat trimming thereafter.  If set to None, no trimming
+    // is done.
+    // Default values are (5 minutes, 24 hours).
+    pub trim_config: Option<(std::time::Duration, std::time::Duration)>,
 }
 
 impl Default for Options {
@@ -107,7 +112,7 @@ impl Default for Options {
             pre_commit_hook: None,
             post_commit_hook: None,
             skip_initial_reap: false,
-            trim_delay: Some(TRIM_AFTER_BOOT_TIMER),
+            trim_config: Some((TRIM_AFTER_BOOT_TIMER, TRIM_INTERVAL_TIMER)),
         }
     }
 }
@@ -319,6 +324,15 @@ impl FxFilesystemBuilder {
         self
     }
 
+    #[cfg(test)]
+    pub fn trim_config(
+        mut self,
+        delay_and_interval: Option<(std::time::Duration, std::time::Duration)>,
+    ) -> Self {
+        self.options.trim_config = delay_and_interval;
+        self
+    }
+
     /// Constructs an `FxFilesystem` object with the specified settings.
     pub async fn open(self, device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
         let read_only = self.options.read_only;
@@ -418,16 +432,20 @@ impl FxFilesystemBuilder {
                 for store in objects.unlocked_stores() {
                     filesystem.graveyard.initial_reap(&store).await?;
                 }
-                // Now start the async reaper.
-                filesystem.graveyard.clone().reap_async();
-
-                if let Some(delay) = &filesystem.options.trim_delay {
-                    filesystem.start_trim_task(delay.clone());
-                }
             }
         }
 
         filesystem.closed.store(false, Ordering::SeqCst);
+
+        if !read_only {
+            // Start the background tasks.
+            filesystem.graveyard.clone().reap_async();
+
+            if let Some((delay, interval)) = filesystem.options.trim_config.clone() {
+                filesystem.start_trim_task(delay, interval);
+            }
+        }
+
         Ok(filesystem.into())
     }
 }
@@ -651,6 +669,7 @@ impl FxFilesystem {
         let mut bytes_trimmed = 0;
         loop {
             if self.closed.load(Ordering::Relaxed) {
+                info!("Filesystem is closed, nothing to trim");
                 return Ok(bytes_trimmed);
             }
             let allocator = self.allocator();
@@ -669,27 +688,43 @@ impl FxFilesystem {
         Ok(bytes_trimmed)
     }
 
-    fn start_trim_task(self: &Arc<Self>, delay: std::time::Duration) {
+    fn start_trim_task(
+        self: &Arc<Self>,
+        delay: std::time::Duration,
+        interval: std::time::Duration,
+    ) {
         if !self.device.supports_trim() {
             info!("Device does not support trim; not scheduling trimming");
             return;
         }
         let this = self.clone();
-        let shutdown_listener = self.shutdown_event.listen();
+        let mut next_timer = delay;
         *self.trim_task.lock().unwrap() = Some(fasync::Task::spawn(async move {
-            futures::select!(
-                () = fasync::Timer::new(delay).fuse() => {},
-                () = shutdown_listener.fuse() => return,
-            );
-            let start_time = std::time::Instant::now();
-            info!("Starting trim...");
-            let res = this.do_trim().await;
-            let duration = std::time::Instant::now() - start_time;
-            match res {
-                Ok(bytes_trimmed) => info!("Trimmed {bytes_trimmed} bytes in {duration:?}"),
-                Err(e) => error!(?e, "Failed to trim"),
+            loop {
+                let shutdown_listener = this.shutdown_event.listen();
+                // Note that we need to check if the filesystem was closed after we start listening
+                // to the shutdown event, but before we start waiting on `timer`, because otherwise
+                // we might start listening on `shutdown_event` *after* the event was signaled, and
+                // so `shutdown_listener` will never fire, and this task will get stuck until
+                // `timer` expires.
+                if this.closed.load(Ordering::SeqCst) {
+                    return;
+                }
+                futures::select!(
+                    () = fasync::Timer::new(next_timer.clone()).fuse() => {},
+                    () = shutdown_listener.fuse() => return,
+                );
+                let start_time = std::time::Instant::now();
+                info!("Starting trim...");
+                let res = this.do_trim().await;
+                let duration = std::time::Instant::now() - start_time;
+                match res {
+                    Ok(bytes_trimmed) => info!("Trimmed {bytes_trimmed} bytes in {duration:?}"),
+                    Err(e) => error!(?e, "Failed to trim"),
+                }
+                next_timer = interval.clone();
+                info!("Scheduled next trim after {:?}", next_timer);
             }
-            *this.trim_task.lock().unwrap() = None;
         }));
     }
 
@@ -1091,5 +1126,61 @@ mod tests {
         transactions.pop();
 
         assert!(futures::poll!(&mut fut).is_ready());
+    }
+
+    // If run on a single thread, the trim tasks starve out other work.
+    #[fuchsia::test(threads = 10)]
+    async fn test_continuously_trim() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystemBuilder::new()
+            .trim_config(Some((std::time::Duration::ZERO, std::time::Duration::ZERO)))
+            .format(true)
+            .open(device)
+            .await
+            .expect("open failed");
+        // Do a small sleep so trim has time to get going.
+        fasync::Timer::new(std::time::Duration::from_millis(10)).await;
+
+        // Create and delete a bunch of files whilst trim is ongoing.  This just ensures that
+        // regular usage isn't affected by trim.
+        let root_store = fs.root_store();
+        let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
+            .await
+            .expect("open failed");
+        for _ in 0..100 {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        root_store.store_object_id(),
+                        root_directory.object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let object = root_directory
+                .create_child_file(&mut transaction, "test", None)
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+
+            {
+                let buf = object.allocate_buffer(1024).await;
+                object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
+            }
+            std::mem::drop(object);
+
+            let mut transaction = root_directory
+                .acquire_context_for_replace(None, "test", true)
+                .await
+                .expect("acquire_context_for_replace failed")
+                .transaction;
+            replace_child(&mut transaction, None, (&root_directory, "test"))
+                .await
+                .expect("replace_child failed");
+            transaction.commit().await.expect("commit failed");
+        }
+        fs.close().await.expect("close failed");
     }
 }

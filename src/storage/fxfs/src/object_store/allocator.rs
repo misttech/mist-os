@@ -716,8 +716,16 @@ impl SimpleAllocator {
         &self.tree
     }
 
-    /// Returns the layer set for all layers and reservations.
-    pub fn layer_set(&self) -> LayerSet<AllocatorKey, AllocatorValue> {
+    /// Returns the layer set for all layers, including temporary allocations (e.g. due to
+    /// uncommitted transactions).
+    pub async fn layer_set(&self) -> LayerSet<AllocatorKey, AllocatorValue> {
+        // Update temporary_allocations using dropped_allocations.
+        let dropped_allocations =
+            std::mem::take(&mut self.inner.lock().unwrap().dropped_allocations);
+        for item in dropped_allocations {
+            self.temporary_allocations.erase(&item.key).await;
+        }
+
         let tree = &self.tree;
         let mut layer_set = tree.empty_layer_set();
         layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
@@ -863,7 +871,7 @@ impl SimpleAllocator {
         let mut free_extents = vec![];
         let mut bytes = 0;
         {
-            let layer_set = self.layer_set();
+            let layer_set = self.layer_set().await;
             let mut merger = layer_set.merger();
             let mut iter = self
                 .filter(
@@ -1160,16 +1168,8 @@ impl Allocator for SimpleAllocator {
             listener.await;
         }
 
-        let dropped_allocations =
-            std::mem::take(&mut self.inner.lock().unwrap().dropped_allocations);
-
-        // Update temporary_allocations using dropped_allocations.
-        for item in dropped_allocations {
-            self.temporary_allocations.erase(&item.key).await;
-        }
-
         let result = {
-            let layer_set = self.layer_set();
+            let layer_set = self.layer_set().await;
             let mut merger = layer_set.merger();
             let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
             let mut last_offset = 0;
@@ -1304,6 +1304,8 @@ impl Allocator for SimpleAllocator {
 
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
 
+        // NB: It is intentional that we don't call SimpleAllocator::layer_set here, because we
+        // don't want to look at temporary allocations (we should not deallocate them).
         let layer_set = self.tree.layer_set();
         let mut merger = layer_set.merger();
         // The precise search key that we choose here is important.  We need to perform a full merge
