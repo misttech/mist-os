@@ -61,7 +61,7 @@ pub fn build_component_sandbox(
     component_input_dict: &Dict,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
-    program_output_dict: &Dict,
+    program_output: &Router,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
@@ -79,9 +79,9 @@ pub fn build_component_sandbox(
         extend_dict_with_use(
             component,
             children,
-            &component_input_dict,
+            component_input_dict,
             program_input_dict,
-            &program_output_dict,
+            program_output,
             use_,
             &mut output.sources_and_receivers,
         );
@@ -110,8 +110,8 @@ pub fn build_component_sandbox(
         extend_dict_with_offer(
             component,
             children,
-            &component_input_dict,
-            &program_output_dict,
+            component_input_dict,
+            program_output,
             offer,
             target_dict,
             &mut output.sources_and_receivers,
@@ -122,7 +122,7 @@ pub fn build_component_sandbox(
         extend_dict_with_expose(
             component,
             children,
-            &program_output_dict,
+            program_output,
             expose,
             component_output_dict,
             &mut output.sources_and_receivers,
@@ -138,7 +138,7 @@ pub fn extend_dict_with_offers(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input_dict: &Dict,
-    program_output_dict: &Dict,
+    program_output: &Router,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_dict: &mut Dict,
 ) -> Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)> {
@@ -148,7 +148,7 @@ pub fn extend_dict_with_offers(
             component,
             children,
             component_input_dict,
-            program_output_dict,
+            program_output,
             offer,
             target_dict,
             &mut sources_and_receivers,
@@ -162,7 +162,7 @@ fn extend_dict_with_use(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input_dict: &Dict,
     program_input_dict: &Dict,
-    program_output_dict: &Dict,
+    program_output: &Router,
     use_: &cm_rust::UseDecl,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
@@ -185,14 +185,7 @@ fn extend_dict_with_use(
             };
             router
         }
-        cm_rust::UseSource::Self_ => {
-            let Some(router) =
-                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
-            else {
-                return;
-            };
-            router
-        }
+        cm_rust::UseSource::Self_ => program_output.clone().get(source_name.as_str()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child) = children.get(&child_name) else { return };
@@ -244,7 +237,7 @@ fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input_dict: &Dict,
-    program_output_dict: &Dict,
+    program_output: &Router,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
@@ -273,14 +266,7 @@ fn extend_dict_with_offer(
             };
             router
         }
-        cm_rust::OfferSource::Self_ => {
-            let Some(router) =
-                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
-            else {
-                return;
-            };
-            router
-        }
+        cm_rust::OfferSource::Self_ => program_output.clone().get(source_name.as_str()),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
@@ -327,7 +313,7 @@ fn extend_dict_with_offer(
 fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    program_output_dict: &Dict,
+    program_output: &Router,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
@@ -345,14 +331,7 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => {
-            let Some(router) =
-                program_output_dict.get_capability::<Router>(iter::once(source_name.as_str()))
-            else {
-                return;
-            };
-            router
-        }
+        cm_rust::ExposeSource::Self_ => program_output.clone().get(source_name.as_str()),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {

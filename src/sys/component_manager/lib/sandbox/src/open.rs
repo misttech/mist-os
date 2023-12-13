@@ -361,6 +361,10 @@ impl Path {
         self.segments.pop_front()
     }
 
+    pub fn peek(&self) -> Option<&String> {
+        self.segments.front()
+    }
+
     pub fn prepend(&mut self, segment: String) {
         self.segments.push_front(segment);
     }

@@ -16,14 +16,13 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx},
     futures::{
         future::BoxFuture,
         stream::{FuturesUnordered, StreamExt},
     },
     lazy_static::lazy_static,
-    moniker::Moniker,
     sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
     std::sync::Arc,
     tracing::{info, warn},
@@ -62,11 +61,6 @@ pub trait DictExt {
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
-
-    /// Waits for any of receivers in the top-level dictionary to become readable, and returns the
-    /// name of the readable receiver along with the moniker of the component that sent a message
-    /// to it. Returns `None` if there are no receivers in this dictionary.
-    async fn peek_receivers(&self) -> Option<(Name, Moniker)>;
 
     /// Reads a message from any of the receivers in the top-level dictionary, and returns the name
     /// of the receiver that was read from along with the message. Returns `None` if there are no
@@ -173,43 +167,6 @@ impl DictExt for Dict {
         }
     }
 
-    /// Waits for any Receivers to become readable.
-    ///
-    /// Once that happens, returns the name of the Dict that Receiver was in and the moniker that
-    /// sent the message. Returns `None` if there are no Receivers in this Dict.
-    ///
-    /// Does not remove messages from Receivers.
-    async fn peek_receivers(&self) -> Option<(Name, Moniker)> {
-        let mut futures_unordered = FuturesUnordered::new();
-        // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
-        {
-            let entries = self.lock_entries();
-            for (cap_name, cap) in entries.iter() {
-                if let Ok(receiver) =
-                    TryInto::<Receiver<WeakComponentInstance>>::try_into(cap.clone())
-                {
-                    let cap_name = cap_name.clone();
-                    futures_unordered.push(async move {
-                        // It would be great if we could return the value from the `peek` call here,
-                        // but the lifetimes don't work out. Let's block on the peek call, and then
-                        // return the `cap_dict` so we can access the `peek` value again outside
-                        // of the `FuturesUnordered`.
-                        let _ = receiver.peek().await;
-                        (cap_name, receiver)
-                    });
-                }
-            }
-            drop(entries);
-        }
-        if futures_unordered.is_empty() {
-            return None;
-        }
-        let (name, receiver) =
-            futures_unordered.next().await.expect("FuturesUnordered is not empty");
-        let message = receiver.peek().await;
-        return Some((name.parse().unwrap(), message.target.moniker.clone()));
-    }
-
     /// Reads messages from Receivers in this Dict.
     ///
     /// Once a message is received, returns the name of the Dict that the Receiver was in and the
@@ -283,28 +240,6 @@ pub fn new_terminating_router(sender: Sender<WeakComponentInstance>) -> Router {
         let open = Box::new(open) as AnyCapability;
         open.route(request, completer);
     })
-}
-
-/// Waits for any Receiver in a Dict to become readable, and calls a closure when that happens.
-pub struct DictWaiter {
-    _task: fasync::Task<()>,
-}
-
-impl DictWaiter {
-    pub fn new(
-        dict: Dict,
-        call_when_dict_is_readable: impl FnOnce(&Name, Moniker) -> BoxFuture<'static, ()>
-            + Send
-            + 'static,
-    ) -> Self {
-        Self {
-            _task: fasync::Task::spawn(async move {
-                if let Some((name, moniker)) = dict.peek_receivers().await {
-                    call_when_dict_is_readable(&name, moniker).await
-                }
-            }),
-        }
-    }
 }
 
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to

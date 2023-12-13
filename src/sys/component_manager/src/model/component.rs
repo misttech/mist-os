@@ -30,7 +30,7 @@ use {
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
     },
-    crate::sandbox_util::{new_terminating_router, DictExt, DictWaiter, LaunchTaskOnReceive},
+    crate::sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -46,7 +46,9 @@ use {
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
+        Router,
     },
+    anyhow::anyhow,
     async_trait::async_trait,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
@@ -83,7 +85,6 @@ use {
         collections::{HashMap, HashSet},
         convert::TryFrom,
         fmt,
-        ops::DerefMut,
         path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
@@ -733,13 +734,6 @@ impl ComponentInstance {
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
-
-            // If we're still in a resolved state then initiate watching the receivers in our
-            // dict so a new start action can be kicked off on the next capability access.
-            let mut state = self.lock_state().await;
-            if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.wait_on_program_receivers_dict(&self);
-            }
         }
         if let ExtendedInstance::Component(parent) =
             self.try_get_parent().map_err(|_| StopActionError::GetParentFailed)?
@@ -943,12 +937,6 @@ impl ComponentInstance {
             ),
         )
         .await?;
-        {
-            let mut state = self.lock_state().await;
-            if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.stop_waiting_on_program_receivers_dict();
-            }
-        }
 
         let eager_children: Vec<_> = {
             let state = self.lock_state().await;
@@ -1327,8 +1315,10 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that we use.
     pub program_input_dict: Dict,
 
-    /// The dict containing routers for all capabilities that we declare.
-    pub program_output_dict: Dict,
+    /// The router containing all capabilities that we declare.
+    ///
+    /// Requesting capabilities from this router will start the component.
+    program_output: Router,
 
     /// The dict containing receivers for all capabilities that we declare.
     program_receivers_dict: Dict,
@@ -1337,10 +1327,6 @@ pub struct ResolvedInstanceState {
     /// dynamic child gets a clone of one of these dicts (which is potentially extended by
     /// dynamic offers).
     collection_dicts: HashMap<Name, Dict>,
-
-    /// This waiter holds the component dict, and invokes a start command if any receiver
-    /// becomes available. The stop command sets this to a new DictWaiter.
-    dict_waiter: Option<DictWaiter>,
 }
 
 impl ResolvedInstanceState {
@@ -1364,6 +1350,29 @@ impl ResolvedInstanceState {
         )?;
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
+
+        // All declared capabilities must have a router, unless we are non-executable.
+        let program_output_dict = Dict::new();
+        let program_receivers_dict = Dict::new();
+        if decl.program.is_some() {
+            for capability in &decl.capabilities {
+                // We only support protocol capabilities right now
+                match &capability {
+                    cm_rust::CapabilityDecl::Protocol(_) => (),
+                    _ => continue,
+                }
+                let receiver = Receiver::new();
+                program_output_dict.insert_capability(
+                    iter::once(capability.name().as_str()),
+                    new_terminating_router(receiver.new_sender()),
+                );
+                program_receivers_dict
+                    .insert_capability(iter::once(capability.name().as_str()), receiver);
+            }
+        }
+        let program_output =
+            Self::start_component_on_request(Router::from_routable(program_output_dict), component);
+
         let mut state = Self {
             execution_scope: ExecutionScope::new(),
             resolved_component,
@@ -1378,31 +1387,11 @@ impl ResolvedInstanceState {
             component_input_dict,
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
-            program_output_dict: Dict::new(),
-            program_receivers_dict: Dict::new(),
+            program_output,
+            program_receivers_dict,
             collection_dicts: HashMap::new(),
-            dict_waiter: None,
         };
         state.add_static_children(component).await?;
-
-        // All declared capabilities must have a router, unless we are non-executable.
-        if decl.program.is_some() {
-            for capability in &decl.capabilities {
-                // We only support protocol capabilities right now
-                match &capability {
-                    cm_rust::CapabilityDecl::Protocol(_) => (),
-                    _ => continue,
-                }
-                let receiver = Receiver::new();
-                state.program_output_dict.insert_capability(
-                    iter::once(capability.name().as_str()),
-                    new_terminating_router(receiver.new_sender()),
-                );
-                state
-                    .program_receivers_dict
-                    .insert_capability(iter::once(capability.name().as_str()), receiver);
-            }
-        }
 
         let component_sandbox = build_component_sandbox(
             component,
@@ -1411,48 +1400,55 @@ impl ResolvedInstanceState {
             &state.component_input_dict,
             &state.component_output_dict,
             &state.program_input_dict,
-            &state.program_output_dict,
+            &state.program_output,
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_dicts).await;
 
-        state.wait_on_program_receivers_dict(component);
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
-    // Waits for any receiver in our program dict to become readable.
-    pub fn wait_on_program_receivers_dict(&mut self, component: &Arc<ComponentInstance>) {
+    /// Given a [`Router`] representing the program output, returns a router that starts the
+    /// component upon a capability request, then delegate the request to the provided router.
+    fn start_component_on_request(
+        program_output: Router,
+        component: &Arc<ComponentInstance>,
+    ) -> Router {
         let weak_component = WeakComponentInstance::new(component);
-        self.dict_waiter = Some(DictWaiter::new(
-            self.program_receivers_dict.clone(),
-            move |name, target_moniker| {
-                let name = name.clone();
-                async move {
-                    if let Ok(component) = weak_component.upgrade() {
-                        // This must be launched in a separate task because this closure needs to
-                        // return for the start action to finish (otherwise we deadlock).
-                        // TODO: We should have better ownership model for this task, or remove the
-                        // deadlock potential.
-                        fasync::Task::spawn(async move {
-                            if let Err(e) = component
-                                .start(
-                                    &StartReason::AccessCapability { target: target_moniker, name },
-                                    None,
-                                    vec![],
-                                    vec![],
-                                )
-                                .await
-                            {
-                                warn!("failed to start component due to capability access: {}", e);
-                            }
-                        })
-                        .detach();
+        Router::new(move |request, completer| {
+            let program_output = program_output.clone();
+            if let Ok(component) = weak_component.upgrade() {
+                let component_clone = component.clone();
+                component.nonblocking_task_group.spawn(async move {
+                    let target: WeakComponentInstance = request.target.unwrap();
+                    let target_moniker = target.moniker;
+                    // The path segments may be empty if one requested the entire program output.
+                    let name = request.relative_path.peek().map(String::as_str).unwrap_or("");
+                    let name = name.parse().unwrap();
+
+                    // If the component is already started, this will be a no-op.
+                    if let Err(e) = component_clone
+                        .start(
+                            &StartReason::AccessCapability { target: target_moniker, name },
+                            None,
+                            vec![],
+                            vec![],
+                        )
+                        .await
+                    {
+                        return completer.complete(Err(anyhow!(
+                            "failed to start component due to capability access: {}",
+                            e
+                        )));
                     }
-                }
-                .boxed()
-            },
-        ));
+
+                    program_output.route(request, completer);
+                });
+            } else {
+                completer.complete(Err(anyhow!("component is destroyed")));
+            }
+        })
     }
 
     fn dispatch_receivers_to_providers(
@@ -1506,11 +1502,6 @@ impl ResolvedInstanceState {
                 .run(),
             );
         }
-    }
-
-    // Causes this component to stop watching the receivers in our program dict.
-    pub fn stop_waiting_on_program_receivers_dict(&mut self) {
-        self.dict_waiter = None;
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -1732,7 +1723,7 @@ impl ResolvedInstanceState {
                 component,
                 &self.children,
                 &self.component_input_dict,
-                &self.program_output_dict,
+                &self.program_output,
                 &dynamic_offers,
                 &mut child_dict,
             );
