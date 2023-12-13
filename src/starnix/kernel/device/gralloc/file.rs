@@ -8,6 +8,7 @@ use crate::{
     vfs::{fileops_impl_nonseekable, FileObject, FileOps, InputBuffer, OutputBuffer},
 };
 use fidl_fuchsia_starnix_gralloc as fgralloc;
+use fuchsia_async::LocalExecutor;
 use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -23,12 +24,12 @@ use virtgralloc::{
 };
 
 pub struct GrallocFile {
-    mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterSynchronousProxy>>,
+    mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>,
 }
 
 impl GrallocFile {
     pub fn new_file(
-        mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterSynchronousProxy>>,
+        mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(Self { mode_setter }))
     }
@@ -44,21 +45,33 @@ impl GrallocFile {
                 e
             })?;
 
-        // This must be synchronous, and it must work, since this is the only way that gralloc will
-        // know which vulkan impl, which is necessary for gralloc to work properly, and the gralloc
-        // feature requires gralloc to work properly. There's no meaningful way for the IOCTL caller
-        // to handle an IOCTL failure other than just logging and then ignoring it, which would only
-        // make the overall broken situation more confusing that just using expect() here. This is
-        // only called once early in boot.
-        self.mode_setter
-            .lock()
-            .set_vulkan_mode(
-                &fgralloc::VulkanModeSetterSetVulkanModeRequest {
-                    vulkan_mode: Some(vulkan_mode),
-                    ..Default::default()
-                },
-                fuchsia_zircon::Time::INFINITE,
-            )
+        // The SetVulkanMode FIDL call must complete before the IOCTL can complete, but we don't
+        // need to hold the lock the whole time, just to start the request. We don't actually expect
+        // more than up to one call to this IOCTL per container boot, but nice to avoid holding the
+        // lock for any longer than necessary.
+        //
+        // This must work, since this is the only way that gralloc will know which vulkan impl,
+        // which is necessary for gralloc to work properly, and the gralloc feature requires gralloc
+        // to work properly. There's no meaningful way for the IOCTL caller to handle an IOCTL
+        // failure other than just logging and then ignoring it, which would only make the overall
+        // broken situation more confusing that just using expect() here. Under normal operation,
+        // this is only called once early in boot.
+        let mutex_guard = self.mode_setter.lock();
+        let response_future =
+            mutex_guard.set_vulkan_mode(&fgralloc::VulkanModeSetterSetVulkanModeRequest {
+                vulkan_mode: Some(vulkan_mode),
+                ..Default::default()
+            });
+        // Avoid holding the lock while we wait for the server; in principle this allows us to be
+        // making other requests while this one completes, but currently that won't happen under
+        // normal operation.
+        drop(mutex_guard);
+
+        // This happens up to once per container boot, so we may as well create and drop a
+        // LocalExecutor (vs. creating a separate dedicated thread up front that would stick around
+        // after it's no longer needed).
+        let mut exec = LocalExecutor::new();
+        exec.run_singlethreaded(response_future)
             .expect("gralloc feature requires working VulkanModeSetter")
             .expect("gralloc feature requires VulkanModeSetter to set mode");
 

@@ -16,11 +16,11 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 struct GrallocDevice {
-    mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterSynchronousProxy>>,
+    mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>,
 }
 
 impl GrallocDevice {
-    fn new(mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterSynchronousProxy>>) -> GrallocDevice {
+    fn new(mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>) -> GrallocDevice {
         GrallocDevice { mode_setter }
     }
 }
@@ -38,7 +38,7 @@ impl DeviceOps for GrallocDevice {
 }
 
 pub fn gralloc_device_init(current_task: &CurrentTask) {
-    let mode_setter = current_task.kernel().connect_to_named_protocol_at_container_svc::<fgralloc::VulkanModeSetterMarker>(fgralloc::VulkanModeSetterMarker::PROTOCOL_NAME).expect("gralloc feature requires fuchsia.starnix.gralloc.VulkanModeSetter protocol in container /svc dir, and a corresponding server").into_sync_proxy();
+    let mode_setter = current_task.kernel().connect_to_named_protocol_at_container_svc::<fgralloc::VulkanModeSetterMarker>(fgralloc::VulkanModeSetterMarker::PROTOCOL_NAME).expect("gralloc feature requires fuchsia.starnix.gralloc.VulkanModeSetter protocol in container /svc dir, and a corresponding server").into_proxy().expect("into_proxy failed");
     let mode_setter = Arc::new(Mutex::new(mode_setter));
 
     let kernel = current_task.kernel();
