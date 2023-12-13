@@ -21,10 +21,7 @@ use net_types::{
 use netstack3_core::{
     device::DeviceId,
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
-    ip::{
-        socket::{IpSockCreationError, IpSockSendError},
-        ResolveRouteError,
-    },
+    ip::{IpSockCreationError, IpSockSendError, ResolveRouteError},
     socket::{
         address::SocketZonedIpAddr,
         datagram::{ConnectError, SetMulticastMembershipError},

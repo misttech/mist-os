@@ -14,8 +14,8 @@ use crate::{
     ip::{
         device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
         path_mtu::{PmtuCache, PmtuStateContext},
-        reassembly::FragmentStateContext,
-        IpPacketFragmentCache, MulticastMembershipHandler,
+        reassembly::{FragmentStateContext, IpPacketFragmentCache},
+        MulticastMembershipHandler,
     },
     NonSyncContext, SyncCtx,
 };

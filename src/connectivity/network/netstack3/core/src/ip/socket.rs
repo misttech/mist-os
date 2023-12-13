@@ -17,11 +17,12 @@ use thiserror::Error;
 
 use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
+    device::{AnyDevice, DeviceIdContext},
     ip::{
         device::state::IpDeviceStateIpExt,
         types::{NextHop, ResolvedRoute},
-        AnyDevice, DeviceIdContext, EitherDeviceId, IpCounters, IpDeviceContext, IpExt,
-        IpLayerIpExt, ResolveRouteError, SendIpPacketMeta,
+        EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, ResolveRouteError,
+        SendIpPacketMeta,
     },
     socket::address::SocketIpAddr,
     trace_duration,
@@ -2316,7 +2317,7 @@ mod tests {
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
-            (&[0; crate::ip::Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
+            (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
             None,
         );
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));

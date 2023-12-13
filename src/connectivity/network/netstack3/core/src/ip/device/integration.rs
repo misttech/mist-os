@@ -66,8 +66,9 @@ use crate::{
         socket::ipv6_source_address_selection::SasCandidate,
         types::AddableMetric,
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
-        Ipv6PresentAddressStatus, NonSyncContext, SyncCtx, DEFAULT_TTL,
+        Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
+    NonSyncContext, SyncCtx,
 };
 
 pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {

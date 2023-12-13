@@ -20,7 +20,6 @@ use net_types::{
 };
 use netstack3_core::{
     device::{self, DeviceId, WeakDeviceId},
-    ip,
     transport::tcp,
 };
 use std::{fmt, string::ToString as _};
@@ -102,19 +101,23 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a> ip::forwarding::RoutesVisitor<'a, BindingsNonSyncCtxImpl> for DualIpVisitor {
+    impl<'a> netstack3_core::routes::RoutesVisitor<'a, BindingsNonSyncCtxImpl> for DualIpVisitor {
         type VisitResult = ();
         fn visit<'b, I: Ip>(
             &mut self,
-            per_route: impl Iterator<Item = &'b ip::types::Entry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>>
-                + 'b,
+            per_route: impl Iterator<
+                    Item = &'b netstack3_core::routes::Entry<
+                        I::Addr,
+                        DeviceId<BindingsNonSyncCtxImpl>,
+                    >,
+                > + 'b,
         ) -> Self::VisitResult
         where
             'a: 'b,
         {
             for route in per_route {
                 self.record_unique_child(|node| {
-                    let ip::types::Entry { subnet, device, gateway, metric } = route;
+                    let netstack3_core::routes::Entry { subnet, device, gateway, metric } = route;
                     node.record_string("Destination", format!("{}", subnet));
                     node.record_uint("InterfaceId", device.bindings_id().id.into());
                     match gateway {
@@ -126,11 +129,11 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                         }
                     }
                     match metric {
-                        ip::types::Metric::MetricTracksInterface(metric) => {
+                        netstack3_core::routes::Metric::MetricTracksInterface(metric) => {
                             node.record_uint("Metric", (*metric).into());
                             node.record_bool("MetricTracksInterface", true);
                         }
-                        ip::types::Metric::ExplicitMetric(metric) => {
+                        netstack3_core::routes::Metric::ExplicitMetric(metric) => {
                             node.record_uint("Metric", (*metric).into());
                             node.record_bool("MetricTracksInterface", false);
                         }
@@ -141,8 +144,8 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     }
     let sync_ctx = ctx.sync_ctx();
     let mut visitor = DualIpVisitor::new();
-    ip::forwarding::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
-    ip::forwarding::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
     visitor.inspector
 }
 
@@ -221,14 +224,14 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             &self,
             device: DeviceId<BindingsNonSyncCtxImpl>,
             neighbors: impl Iterator<
-                Item = ip::device::nud::NeighborStateInspect<LinkAddress, StackTime>,
+                Item = netstack3_core::neighbor::NeighborStateInspect<LinkAddress, StackTime>,
             >,
         ) {
             let Self(inspector) = self;
             let name = &device.bindings_id().name;
             inspector.root().record_child(name, |node| {
                 for (i, neighbor) in neighbors.enumerate() {
-                    let ip::device::nud::NeighborStateInspect {
+                    let netstack3_core::neighbor::NeighborStateInspect {
                         state,
                         ip_address,
                         link_address,

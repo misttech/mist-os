@@ -2475,7 +2475,8 @@ mod tests {
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
-            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
+            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
+            WeakDeviceId,
         },
         ip::{
             device::{
@@ -2484,7 +2485,7 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ip_packet, FrameDestination,
+            receive_ip_packet,
         },
         testutil::{
             self, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,

@@ -17,7 +17,7 @@ use rand::Rng as _;
 
 use crate::{
     context::{RngContext, TimerContext, TimerHandler},
-    ip::{AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext},
 };
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router

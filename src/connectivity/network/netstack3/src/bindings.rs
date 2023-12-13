@@ -72,18 +72,14 @@ use netstack3_core::{
     },
     error::NetstackError,
     handle_timer,
+    icmp::{self, IcmpBindingsContext},
     ip::{
-        device::{
-            nud,
-            slaac::SlaacConfiguration,
-            state::{Ipv6DeviceConfiguration, Lifetime},
-            AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-        },
-        icmp::{self, IcmpBindingsContext},
-        types::RawMetric,
-        IpExt,
+        AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent, IpExt,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
+        Lifetime, SlaacConfiguration,
     },
+    neighbor,
+    routes::RawMetric,
     transport::udp::{self, UdpBindingsContext},
     EventContext, InstantBindingsTypes, InstantContext, NonSyncContext, RngContext, SyncCtx,
     TimerContext, TimerId, TracingContext,
@@ -659,12 +655,12 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
     }
 }
 
-impl<I: Ip> EventContext<nud::Event<Mac, EthernetDeviceId<Self>, I, StackTime>>
+impl<I: Ip> EventContext<neighbor::Event<Mac, EthernetDeviceId<Self>, I, StackTime>>
     for BindingsNonSyncCtxImpl
 {
     fn on_event(
         &mut self,
-        nud::Event { device, kind, addr, at }: nud::Event<
+        neighbor::Event { device, kind, addr, at }: neighbor::Event<
             Mac,
             EthernetDeviceId<Self>,
             I,
@@ -731,7 +727,7 @@ impl BindingsNonSyncCtxImpl {
         &self,
         device: &DeviceId<BindingsNonSyncCtxImpl>,
         address: SpecifiedAddr<IpAddr>,
-        state: netstack3_core::ip::device::IpAddressState,
+        state: netstack3_core::ip::IpAddressState,
     ) {
         // Note that not all addresses have an associated watcher (e.g. loopback
         // address & autoconfigured SLAAC addresses).
@@ -831,7 +827,7 @@ async fn add_loopback_routes(
     non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     loopback: &DeviceId<BindingsNonSyncCtxImpl>,
 ) {
-    use netstack3_core::ip::types::{AddableEntry, AddableMetric};
+    use netstack3_core::routes::{AddableEntry, AddableMetric};
 
     let v4_changes = [
         AddableEntry::without_gateway(

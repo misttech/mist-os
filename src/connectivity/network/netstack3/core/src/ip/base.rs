@@ -2,21 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! The Internet Protocol, versions 4 and 6.
-
-#[macro_use]
-pub(crate) mod path_mtu;
-
-pub mod device;
-pub mod forwarding;
-pub(crate) mod gmp;
-pub mod icmp;
-mod integration;
-mod ipv6;
-pub(crate) mod reassembly;
-pub mod socket;
-pub mod types;
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     borrow::Borrow,
@@ -68,22 +53,25 @@ use crate::{
     },
     ip::{
         device::{
-            slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext,
-            IpDeviceSendContext,
+            self, slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceIpExt,
+            IpDeviceNonSyncContext, IpDeviceSendContext,
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
+        icmp,
         icmp::{
             IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters,
             IcmpTxCounters, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
             Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
             InnerIcmpContext, NdpCounters,
         },
+        ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuCache, PmtuTimerId},
         reassembly::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
         socket::{IpSocketContext, IpSocketHandler, IpSocketNonSyncContext},
+        types,
         types::{Destination, NextHop, ResolvedRoute},
     },
     socket::datagram,
@@ -93,7 +81,7 @@ use crate::{
 };
 
 /// Default IPv4 TTL.
-const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
+pub(crate) const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// Hop limits for packets sent to multicast and unicast destinations.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -108,7 +96,7 @@ pub(crate) const DEFAULT_HOP_LIMITS: HopLimits =
 
 /// The IPv6 subnet that contains all addresses; `::/0`.
 // Safe because 0 is less than the number of IPv6 address bits.
-const IPV6_DEFAULT_SUBNET: Subnet<Ipv6Addr> =
+pub(crate) const IPV6_DEFAULT_SUBNET: Subnet<Ipv6Addr> =
     unsafe { Subnet::new_unchecked(Ipv6::UNSPECIFIED_ADDRESS, 0) };
 
 /// An error encountered when receiving a transport-layer packet.
@@ -384,7 +372,10 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
 }
 
 impl<S: Id, W: Id> EitherDeviceId<&'_ S, &'_ W> {
-    fn as_strong_ref<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
+    pub(crate) fn as_strong_ref<
+        'a,
+        SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
+    >(
         &'a self,
         sync_ctx: &SC,
     ) -> Option<Cow<'a, SC::DeviceId>> {
@@ -1078,13 +1069,14 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv
 
 /// A builder for IPv4 state.
 #[derive(Copy, Clone, Default)]
-pub struct Ipv4StateBuilder {
+pub(crate) struct Ipv4StateBuilder {
     icmp: Icmpv4StateBuilder,
 }
 
 impl Ipv4StateBuilder {
     /// Get the builder for the ICMPv4 state.
-    pub fn icmpv4_builder(&mut self) -> &mut Icmpv4StateBuilder {
+    #[cfg(test)]
+    pub(crate) fn icmpv4_builder(&mut self) -> &mut Icmpv4StateBuilder {
         &mut self.icmp
     }
 
@@ -1104,16 +1096,11 @@ impl Ipv4StateBuilder {
 
 /// A builder for IPv6 state.
 #[derive(Copy, Clone, Default)]
-pub struct Ipv6StateBuilder {
+pub(crate) struct Ipv6StateBuilder {
     icmp: Icmpv6StateBuilder,
 }
 
 impl Ipv6StateBuilder {
-    /// Get the builder for the ICMPv6 state.
-    pub fn icmpv6_builder(&mut self) -> &mut Icmpv6StateBuilder {
-        &mut self.icmp
-    }
-
     pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId>(
         self,
     ) -> Ipv6State<Instant, StrongDeviceId> {
@@ -1129,10 +1116,10 @@ impl Ipv6StateBuilder {
 }
 
 pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
-    inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
-    icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
-    next_packet_id: AtomicU16,
-    counters: Ipv4Counters,
+    pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
+    pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
+    pub(super) next_packet_id: AtomicU16,
+    pub(super) counters: Ipv4Counters,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv4State<Instant, StrongDeviceId> {
@@ -1157,17 +1144,17 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDev
     }
 }
 
-fn gen_ip_packet_id<I: IpLayerIpExt, C, SC: IpDeviceStateContext<I, C>>(
+pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, C, SC: IpDeviceStateContext<I, C>>(
     sync_ctx: &mut SC,
 ) -> I::PacketId {
     sync_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
 pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
-    inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
-    icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
-    counters: Ipv6Counters,
-    slaac_counters: SlaacCounters,
+    pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
+    pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
+    pub(super) counters: Ipv6Counters,
+    pub(super) slaac_counters: SlaacCounters,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, StrongDeviceId> {

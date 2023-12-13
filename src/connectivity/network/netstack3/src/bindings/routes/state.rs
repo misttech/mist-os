@@ -26,10 +26,8 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, EthernetDeviceId, EthernetLinkDevice},
     error::AddressResolutionFailed,
-    ip::{
-        device::nud::{LinkResolutionContext, LinkResolutionResult},
-        types::{NextHop, ResolvedRoute},
-    },
+    neighbor::{LinkResolutionContext, LinkResolutionResult},
+    routes::{NextHop, ResolvedRoute},
 };
 use thiserror::Error;
 use tracing::{error, info, warn};
@@ -52,7 +50,7 @@ impl LinkResolutionContext<EthernetLinkDevice> for BindingsNonSyncCtxImpl {
 #[derive(Debug)]
 pub(crate) struct LinkResolutionNotifier(oneshot::Sender<Result<Mac, AddressResolutionFailed>>);
 
-impl netstack3_core::ip::device::nud::LinkResolutionNotifier<EthernetLinkDevice>
+impl netstack3_core::neighbor::LinkResolutionNotifier<EthernetLinkDevice>
     for LinkResolutionNotifier
 {
     type Observer = oneshot::Receiver<Result<Mac, AddressResolutionFailed>>;
@@ -108,7 +106,7 @@ async fn resolve_inner<A: IpAddress>(
 ) -> Result<fnet_routes::Resolved, zx::Status> {
     let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
     let ResolvedRoute { device, src_addr, next_hop } =
-        match netstack3_core::ip::resolve_route::<A::Version, _>(sync_ctx, destination) {
+        match netstack3_core::routes::resolve_route::<A::Version, _>(sync_ctx, destination) {
             Err(e) => {
                 info!("Resolve failed for {}, {:?}", destination, e);
                 return Err(zx::Status::ADDRESS_UNREACHABLE);

@@ -41,7 +41,6 @@ pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
-pub mod ip;
 pub mod socket;
 pub mod transport;
 
@@ -126,6 +125,82 @@ pub mod inspect {
     pub use crate::counters::{CounterVisitor, StackCounters};
 }
 
+/// Methods for dealing with ICMP sockets.
+pub mod icmp {
+    // Re-exported functions.
+    //
+    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // objects.
+    pub use crate::ip::icmp::{
+        bind, close, connect, disconnect, get_bound_device, get_info, get_multicast_hop_limit,
+        get_shutdown, get_unicast_hop_limit, new_socket, send, send_to, set_device,
+        set_multicast_hop_limit, set_unicast_hop_limit, shutdown,
+    };
+
+    // Re-exported types.
+    pub use crate::ip::icmp::{IcmpBindingsContext, IcmpIpExt, SocketId, SocketInfo};
+}
+
+/// The Internet Protocol, versions 4 and 6.
+pub mod ip {
+    #[macro_use]
+    pub(crate) mod path_mtu;
+
+    pub(crate) mod base;
+    pub(crate) mod device;
+    pub(crate) mod forwarding;
+    pub(crate) mod gmp;
+    pub(crate) mod icmp;
+    pub(crate) mod reassembly;
+    pub(crate) mod socket;
+    pub(crate) mod types;
+
+    mod integration;
+    mod ipv6;
+
+    pub(crate) use base::*;
+
+    // Re-exported types.
+    pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
+    pub use base::{IpExt, IpLayerEvent, ResolveRouteError};
+    pub use device::{
+        slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
+        state::{
+            AddrSubnetAndManualConfigEither, Ipv4AddrConfig, Ipv6AddrManualConfig,
+            Ipv6DeviceConfiguration, Lifetime,
+        },
+        AddressRemovedReason, IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    };
+    pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
+}
+
+/// Types and utilities for dealing with neighbors.
+pub mod neighbor {
+    // Re-exported types.
+    pub use crate::ip::device::nud::{
+        Event, EventDynamicState, EventKind, EventState, LinkResolutionContext,
+        LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect, MAX_ENTRIES,
+    };
+}
+
+/// Types and utilities for dealing with routes.
+pub mod routes {
+    // Re-exported functions.
+    //
+    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // objects.
+    pub use crate::ip::base::{get_all_routes, resolve_route};
+    pub use crate::ip::forwarding::{select_device_for_gateway, set_routes, with_routes};
+
+    // Re-exported types.
+    pub use crate::ip::forwarding::{AddRouteError, RoutesVisitor};
+    pub use crate::ip::types::{
+        AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,
+        NextHop, RawMetric, ResolvedRoute,
+    };
+}
+
 /// Useful synchronization primitives.
 pub mod sync {
     // TODO(https://fxbug.dev/110884): Support single-threaded variants of types
@@ -161,7 +236,6 @@ pub use context::{
     BindingsTypes, EventContext, InstantBindingsTypes, InstantContext, NonSyncContext,
     ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext,
 };
-pub use ip::forwarding::{select_device_for_gateway, set_routes};
 pub use time::{handle_timer, Instant, TimerId};
 
 pub(crate) use trace::trace_duration;

@@ -33,7 +33,7 @@ use crate::{
     context::{
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
     },
-    device::Id as _,
+    device::{AnyDevice, DeviceIdContext, Id as _},
     error::{ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
@@ -58,7 +58,6 @@ use crate::{
             mld::{MldDelayedReportTimerId, MldPacketHandler},
             GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
         },
-        AnyDevice, DeviceIdContext,
     },
     Instant,
 };

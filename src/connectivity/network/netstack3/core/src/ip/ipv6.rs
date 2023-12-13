@@ -15,10 +15,7 @@ use packet_formats::ipv6::{
 };
 use zerocopy::ByteSlice;
 
-use crate::{
-    device::{AnyDevice, FrameDestination},
-    ip::DeviceIdContext,
-};
+use crate::device::{AnyDevice, DeviceIdContext, FrameDestination};
 
 /// What to do with an IPv6 packet after parsing an extension header.
 #[derive(Debug, PartialEq, Eq)]

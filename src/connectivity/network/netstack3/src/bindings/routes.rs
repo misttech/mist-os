@@ -32,7 +32,7 @@ use net_types::{
 use netstack3_core::SyncCtx;
 
 use crate::bindings::{util::TryIntoFidlWithContext, BindingsNonSyncCtxImpl, Ctx};
-use netstack3_core::ip::types::AddableMetric;
+use netstack3_core::routes::AddableMetric;
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -45,7 +45,7 @@ type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyn
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
 pub(crate) enum RouteOp<A: IpAddress> {
-    Add(netstack3_core::ip::types::AddableEntry<A, WeakDeviceId>),
+    Add(netstack3_core::routes::AddableEntry<A, WeakDeviceId>),
     RemoveToSubnet(Subnet<A>),
     RemoveMatching {
         subnet: Subnet<A>,
@@ -70,14 +70,14 @@ pub(crate) enum ChangeEither {
 
 impl ChangeEither {
     pub(crate) fn add(
-        entry: netstack3_core::ip::types::AddableEntryEither<WeakDeviceId>,
+        entry: netstack3_core::routes::AddableEntryEither<WeakDeviceId>,
         set: WeakSetMembership,
     ) -> Self {
         match entry {
-            netstack3_core::ip::types::AddableEntryEither::V4(entry) => {
+            netstack3_core::routes::AddableEntryEither::V4(entry) => {
                 Self::V4(Change::RouteOp(RouteOp::Add(entry), set))
             }
-            netstack3_core::ip::types::AddableEntryEither::V6(entry) => {
+            netstack3_core::routes::AddableEntryEither::V6(entry) => {
                 Self::V6(Change::RouteOp(RouteOp::Add(entry), set))
             }
         }
@@ -118,11 +118,11 @@ pub(crate) struct WorkItem<A: IpAddress> {
 /// the concept of a route set to be implemented in core.
 #[derive(Clone, Debug)]
 struct Table<A: IpAddress> {
-    inner: HashMap<netstack3_core::ip::types::AddableEntry<A, DeviceId>, EntryData>,
-    /// The next [`netstack3_core::ip::types::Generation`] to be applied to new
+    inner: HashMap<netstack3_core::routes::AddableEntry<A, DeviceId>, EntryData>,
+    /// The next [`netstack3_core::routes::Generation`] to be applied to new
     /// entries. This allows the routing table ordering to explicitly take into
     /// account the order in which routes are added to the table.
-    next_generation: netstack3_core::ip::types::Generation,
+    next_generation: netstack3_core::routes::Generation,
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
@@ -139,17 +139,17 @@ pub(crate) enum ChangeOutcome {
 }
 
 impl<A: IpAddress> Table<A> {
-    fn new(initial_generation: netstack3_core::ip::types::Generation) -> Self {
+    fn new(initial_generation: netstack3_core::routes::Generation) -> Self {
         Self { inner: HashMap::new(), next_generation: initial_generation }
     }
 
     fn insert(
         &mut self,
-        route: netstack3_core::ip::types::AddableEntry<A, DeviceId>,
+        route: netstack3_core::routes::AddableEntry<A, DeviceId>,
         set: StrongSetMembership,
     ) -> TableModifyResult<(
-        netstack3_core::ip::types::AddableEntry<A, DeviceId>,
-        netstack3_core::ip::types::Generation,
+        netstack3_core::routes::AddableEntry<A, DeviceId>,
+        netstack3_core::routes::Generation,
     )> {
         let Self { inner, next_generation } = self;
         let (entry, new_to_table) = match inner.entry(route.clone()) {
@@ -189,12 +189,12 @@ impl<A: IpAddress> Table<A> {
     /// to the route.
     fn remove(
         &mut self,
-        mut should_remove: impl FnMut(&netstack3_core::ip::types::AddableEntry<A, DeviceId>) -> bool,
+        mut should_remove: impl FnMut(&netstack3_core::routes::AddableEntry<A, DeviceId>) -> bool,
         set: WeakSetMembership,
     ) -> TableModifyResult<
         Vec<(
-            netstack3_core::ip::types::AddableEntry<A, DeviceId>,
-            netstack3_core::ip::types::Generation,
+            netstack3_core::routes::AddableEntry<A, DeviceId>,
+            netstack3_core::routes::Generation,
         )>,
     > {
         let Self { inner, next_generation: _ } = self;
@@ -269,10 +269,8 @@ impl<A: IpAddress> Table<A> {
     fn remove_user_set(
         &mut self,
         set: WeakUserRouteSet,
-    ) -> Vec<(
-        netstack3_core::ip::types::AddableEntry<A, DeviceId>,
-        netstack3_core::ip::types::Generation,
-    )> {
+    ) -> Vec<(netstack3_core::routes::AddableEntry<A, DeviceId>, netstack3_core::routes::Generation)>
+    {
         let Self { inner, next_generation: _ } = self;
         let set = SetMembership::User(set);
         let mut removed_from_table = Vec::new();
@@ -346,7 +344,7 @@ impl WeakSetMembership {
 
 #[derive(Clone, Debug)]
 struct EntryData {
-    generation: netstack3_core::ip::types::Generation,
+    generation: netstack3_core::routes::Generation,
     // Logically, this should be viewed as a `HashSet<StrongSetMembership>`, but
     // we use a `HashMap<WeakSetMembership, StrongSetMembership>` (where the
     // key and value set-IDs always match) in order to be able to look up using
@@ -357,7 +355,7 @@ struct EntryData {
 }
 
 impl EntryData {
-    fn new(generation: netstack3_core::ip::types::Generation) -> Self {
+    fn new(generation: netstack3_core::routes::Generation) -> Self {
         Self { generation, set_membership: HashMap::new() }
     }
 }
@@ -408,8 +406,8 @@ impl<I: Ip> State<I> {
 
 fn to_entry<I: Ip>(
     sync_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
-    addable_entry: netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
-) -> netstack3_core::ip::types::Entry<I::Addr, DeviceId> {
+    addable_entry: netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
+) -> netstack3_core::routes::Entry<I::Addr, DeviceId> {
     let device_metric = netstack3_core::device::get_routing_metric(sync_ctx, &addable_entry.device);
     addable_entry.resolve_metric(device_metric)
 }
@@ -425,7 +423,7 @@ async fn handle_change<I: Ip>(
     tracing::debug!("routes::handle_change {change:?}");
 
     enum TableChange<I: Ip, Iter> {
-        Add(netstack3_core::ip::types::Entry<I::Addr, DeviceId>),
+        Add(netstack3_core::routes::Entry<I::Addr, DeviceId>),
         Remove(Iter),
     }
 
@@ -514,7 +512,7 @@ async fn handle_change<I: Ip>(
         }
     };
 
-    netstack3_core::set_routes::<I, _>(
+    netstack3_core::routes::set_routes::<I, _>(
         sync_ctx,
         non_sync_ctx,
         table
@@ -572,7 +570,7 @@ async fn handle_change<I: Ip>(
 async fn notify_removed_routes<I: Ip>(
     non_sync_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
-    removed_routes: impl IntoIterator<Item = netstack3_core::ip::types::Entry<I::Addr, DeviceId>>,
+    removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
     table: &Table<I::Addr>,
 ) {
     let mut devices_with_default_routes: Option<HashSet<_>> = None;
@@ -651,7 +649,7 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         let (sender, receiver) = mpsc::unbounded();
         let state = State {
             receiver,
-            table: Table::new(netstack3_core::ip::types::Generation::initial()),
+            table: Table::new(netstack3_core::routes::Generation::initial()),
             update_dispatcher: Default::default(),
         };
         (Changes { sender }, state)

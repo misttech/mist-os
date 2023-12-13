@@ -16,13 +16,12 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    device::{DeviceId, DeviceLayerTypes},
+    device::{AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes},
     ip::{
         types::{
             AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
         },
-        AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
-        IpStateContext,
+        IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext, IpStateContext,
     },
     NonSyncContext, SyncCtx,
 };
@@ -446,7 +445,8 @@ mod testutil_testonly {
 
     use crate::{
         context::testutil::FakeSyncCtx,
-        ip::{testutil::FakeIpDeviceIdCtx, types::Metric, StrongId},
+        device::StrongId,
+        ip::{testutil::FakeIpDeviceIdCtx, types::Metric},
     };
 
     /// Adds an on-link forwarding entry for the specified address and device.

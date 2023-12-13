@@ -31,11 +31,8 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
-    ip::{
-        icmp::{self, IcmpBindingsContext},
-        socket::IpSockCreateAndSendError,
-        IpExt,
-    },
+    icmp::{self, IcmpBindingsContext},
+    ip::{IpExt, IpSockCreateAndSendError},
     socket::{
         address::SocketZonedIpAddr,
         datagram::{

@@ -18,7 +18,7 @@ use net_types::{
 };
 use netstack3_core::{
     device_socket::{Protocol, TargetDevice},
-    ip::types::{AddableEntry, AddableMetric, RawMetric},
+    routes::{AddableEntry, AddableMetric, RawMetric},
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},

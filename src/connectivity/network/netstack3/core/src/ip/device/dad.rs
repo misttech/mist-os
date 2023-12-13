@@ -15,11 +15,8 @@ use tracing::debug;
 
 use crate::{
     context::{EventContext, TimerContext, TimerHandler},
-    device::AnyDevice,
-    ip::{
-        device::{state::Ipv6DadState, IpAddressId as _, IpDeviceAddressIdContext},
-        DeviceIdContext,
-    },
+    device::{AnyDevice, DeviceIdContext},
+    ip::device::{state::Ipv6DadState, IpAddressId as _, IpDeviceAddressIdContext},
 };
 
 /// A timer ID for duplicate address detection.

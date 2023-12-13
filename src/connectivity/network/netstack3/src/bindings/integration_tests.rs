@@ -28,13 +28,9 @@ use netstack3_core::{
         DeviceId,
     },
     error::AddressResolutionFailed,
-    ip::{
-        device::{
-            nud::LinkResolutionResult, slaac::STABLE_IID_SECRET_KEY_BYTES,
-            Ipv6DeviceConfigurationUpdate,
-        },
-        types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
-    },
+    ip::{Ipv6DeviceConfigurationUpdate, STABLE_IID_SECRET_KEY_BYTES},
+    neighbor::LinkResolutionResult,
+    routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
 };
 use tracing::Subscriber;
 use tracing_subscriber::{
@@ -759,13 +755,13 @@ async fn test_list_del_routes() {
             .ctx()
             .non_sync_ctx()
             .apply_route_change_either(match route.into() {
-                netstack3_core::ip::types::AddableEntryEither::V4(entry) => {
+                netstack3_core::routes::AddableEntryEither::V4(entry) => {
                     routes::ChangeEither::V4(routes::Change::RouteOp(
                         routes::RouteOp::Add(entry),
                         routes::SetMembership::Global,
                     ))
                 }
-                netstack3_core::ip::types::AddableEntryEither::V6(entry) => {
+                netstack3_core::routes::AddableEntryEither::V6(entry) => {
                     routes::ChangeEither::V6(routes::Change::RouteOp(
                         routes::RouteOp::Add(entry),
                         routes::SetMembership::Global,
@@ -862,7 +858,7 @@ async fn test_list_del_routes() {
     fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
         let mut ctx = ts.ctx();
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        netstack3_core::ip::get_all_routes(sync_ctx)
+        netstack3_core::routes::get_all_routes(sync_ctx)
             .into_iter()
             .map(|entry| {
                 entry

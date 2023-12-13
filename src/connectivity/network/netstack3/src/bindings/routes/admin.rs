@@ -12,7 +12,7 @@ use fnet_routes_ext::{
 };
 use futures::{pin_mut, TryStream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{device::DeviceId, ip::types::AddableEntry};
+use netstack3_core::{device::DeviceId, routes::AddableEntry};
 
 use crate::bindings::{
     routes,

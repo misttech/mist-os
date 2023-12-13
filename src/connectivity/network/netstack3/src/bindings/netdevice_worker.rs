@@ -23,15 +23,10 @@ use netstack3_core::{
         MaxEthernetFrameSize,
     },
     ip::{
-        device::{
-            slaac::{
-                SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
-            },
-            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate,
-        },
-        types::RawMetric,
+        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+        SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
     },
+    routes::RawMetric,
     RngContext as _,
 };
 use rand::Rng as _;
@@ -514,7 +509,7 @@ async fn add_initial_routes(
     non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     device: &DeviceId<BindingsNonSyncCtxImpl>,
 ) {
-    use netstack3_core::ip::types::{AddableEntry, AddableMetric};
+    use netstack3_core::routes::{AddableEntry, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
 
     let v4_changes = [

@@ -32,11 +32,9 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{ExistsError, NetstackError, NotFoundError},
-    ip::{
-        forwarding::AddRouteError,
-        types::{
-            AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric, RawMetric,
-        },
+    routes::{
+        AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
+        RawMetric,
     },
     socket::{
         address::SocketZonedIpAddr,
@@ -613,20 +611,18 @@ impl TryIntoFidl<fposix_socket::OptionalUint8> for Option<u8> {
     }
 }
 
-impl TryIntoFidl<fnet_interfaces::AddressAssignmentState>
-    for netstack3_core::ip::device::IpAddressState
-{
+impl TryIntoFidl<fnet_interfaces::AddressAssignmentState> for netstack3_core::ip::IpAddressState {
     type Error = Never;
 
     fn try_into_fidl(self) -> Result<fnet_interfaces::AddressAssignmentState, Never> {
         match self {
-            netstack3_core::ip::device::IpAddressState::Unavailable => {
+            netstack3_core::ip::IpAddressState::Unavailable => {
                 Ok(fnet_interfaces::AddressAssignmentState::Unavailable)
             }
-            netstack3_core::ip::device::IpAddressState::Assigned => {
+            netstack3_core::ip::IpAddressState::Assigned => {
                 Ok(fnet_interfaces::AddressAssignmentState::Assigned)
             }
-            netstack3_core::ip::device::IpAddressState::Tentative => {
+            netstack3_core::ip::IpAddressState::Tentative => {
                 Ok(fnet_interfaces::AddressAssignmentState::Tentative)
             }
         }
@@ -1408,7 +1404,7 @@ mod tests {
     #[test]
     fn ip_address_state() {
         use fnet_interfaces::AddressAssignmentState;
-        use netstack3_core::ip::device::IpAddressState;
+        use netstack3_core::ip::IpAddressState;
         assert_eq!(IpAddressState::Unavailable.into_fidl(), AddressAssignmentState::Unavailable);
         assert_eq!(IpAddressState::Tentative.into_fidl(), AddressAssignmentState::Tentative);
         assert_eq!(IpAddressState::Assigned.into_fidl(), AddressAssignmentState::Assigned);

@@ -37,9 +37,6 @@ impl From<RawMetric> for u64 {
     }
 }
 
-/// The default interface routing metric.
-pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
-
 /// The metric for an [`AddableEntry`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AddableMetric {
@@ -177,15 +174,6 @@ impl<A: IpAddress, D> From<Entry<A, D>> for AddableEntry<A, D> {
     fn from(Entry { subnet, device, gateway, metric }: Entry<A, D>) -> Self {
         Self { subnet: subnet, device: device, gateway: gateway, metric: metric.into() }
     }
-}
-
-/// An IPv4 addable entry or an IPv6 addable entry, with a generation.
-#[allow(missing_docs)]
-#[derive(Debug, Copy, Clone, GenericOverIp)]
-#[generic_over_ip()]
-pub enum AddableEntryAndGenerationEither<D> {
-    V4(AddableEntryAndGeneration<Ipv4Addr, D>),
-    V6(AddableEntryAndGeneration<Ipv6Addr, D>),
 }
 
 /// The metric for an [`Entry`].

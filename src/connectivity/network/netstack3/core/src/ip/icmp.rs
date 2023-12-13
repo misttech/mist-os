@@ -51,7 +51,7 @@ use crate::{
     context::{CounterContext, InstantContext, RngContext},
     counters::Counter,
     data_structures::{socketmap::IterShadows as _, token_bucket::TokenBucket},
-    device::{DeviceId, FrameDestination, Id, WeakId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, WeakId},
     error::{LocalAddressError, SocketError},
     ip::{
         device::{
@@ -61,9 +61,9 @@ use crate::{
         },
         path_mtu::PmtuHandler,
         socket::{DefaultSendOptions, IpSock, IpSocketHandler},
-        AddressStatus, AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceStateContext, IpExt,
-        IpLayerHandler, IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler,
-        SendIpPacketMeta, TransportIpContext, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+        AddressStatus, EitherDeviceId, IpDeviceStateContext, IpExt, IpLayerHandler,
+        IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler, SendIpPacketMeta,
+        TransportIpContext, TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{
         self,
@@ -302,7 +302,7 @@ impl<NonSyncCtx: NonSyncContext, L> CounterContext<NdpCounters>
 
 /// A builder for ICMPv4 state.
 #[derive(Copy, Clone)]
-pub struct Icmpv4StateBuilder {
+pub(crate) struct Icmpv4StateBuilder {
     send_timestamp_reply: bool,
     errors_per_second: u64,
 }
@@ -323,19 +323,9 @@ impl Icmpv4StateBuilder {
     /// Enabling this can introduce a very minor vulnerability in which an
     /// attacker can learn the system clock's time, which in turn can aid in
     /// attacks against time-based authentication systems.
-    pub fn send_timestamp_reply(&mut self, send_timestamp_reply: bool) -> &mut Self {
+    #[cfg(test)]
+    pub(crate) fn send_timestamp_reply(&mut self, send_timestamp_reply: bool) -> &mut Self {
         self.send_timestamp_reply = send_timestamp_reply;
-        self
-    }
-
-    /// Configure the number of ICMPv4 error messages to send per second
-    /// (default: [`DEFAULT_ERRORS_PER_SECOND`]).
-    ///
-    /// The number of ICMPv4 error messages sent by the stack will be rate
-    /// limited to the given number of errors per second. Any messages that
-    /// exceed this rate will be silently dropped.
-    pub fn errors_per_second(&mut self, errors_per_second: u64) -> &mut Self {
-        self.errors_per_second = errors_per_second;
         self
     }
 
@@ -374,7 +364,7 @@ impl<Instant, D: WeakId> AsMut<IcmpState<Ipv4, Instant, D>> for Icmpv4State<Inst
 
 /// A builder for ICMPv6 state.
 #[derive(Copy, Clone)]
-pub struct Icmpv6StateBuilder {
+pub(crate) struct Icmpv6StateBuilder {
     errors_per_second: u64,
 }
 
@@ -385,21 +375,6 @@ impl Default for Icmpv6StateBuilder {
 }
 
 impl Icmpv6StateBuilder {
-    /// Configure the number of ICMPv6 error messages to send per second
-    /// (default: [`DEFAULT_ERRORS_PER_SECOND`]).
-    ///
-    /// The number of ICMPv6 error messages sent by the stack will be rate
-    /// limited to the given number of errors per second. Any messages that
-    /// exceed this rate will be silently dropped.
-    ///
-    /// This rate limit is required by [RFC 4443 Section 2.4] (f).
-    ///
-    /// [RFC 4443 Section 2.4]: https://tools.ietf.org/html/rfc4443#section-2.4
-    pub fn errors_per_second(&mut self, errors_per_second: u64) -> &mut Self {
-        self.errors_per_second = errors_per_second;
-        self
-    }
-
     pub(crate) fn build<Instant, D: WeakId>(self) -> Icmpv6State<Instant, D> {
         Icmpv6State {
             inner: IcmpState {
@@ -4455,8 +4430,8 @@ mod tests {
             // TODO(http://fxbug.dev/134635): Redesign iterating through
             // assert_counters once CounterContext is removed.
             let count = match *counter {
-                "send_ipv4_packet" => sync_ctx.state.ipv4.inner.counters.send_ip_packet.get(),
-                "send_ipv6_packet" => sync_ctx.state.ipv6.inner.counters.send_ip_packet.get(),
+                "send_ipv4_packet" => sync_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
+                "send_ipv6_packet" => sync_ctx.state.ipv6.inner.counters().send_ip_packet.get(),
                 "echo_request" => sync_ctx.state.icmp_rx_counters::<I>().echo_request.get(),
                 "timestamp_request" => {
                     sync_ctx.state.icmp_rx_counters::<I>().timestamp_request.get()
@@ -5185,7 +5160,7 @@ mod tests {
     impl_pmtu_handler!(FakeIcmpInnerSyncCtx<Ipv6>, FakeIcmpNonSyncCtx<Ipv6>, Ipv6);
 
     impl<I: datagram::IpExt + IpDeviceStateIpExt>
-        crate::ip::IpSocketContext<I, FakeIcmpNonSyncCtx<I>> for FakeIcmpInnerSyncCtx<I>
+        crate::ip::socket::IpSocketContext<I, FakeIcmpNonSyncCtx<I>> for FakeIcmpInnerSyncCtx<I>
     {
         fn lookup_route(
             &mut self,
@@ -5193,7 +5168,7 @@ mod tests {
             device: Option<&FakeDeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Result<crate::ip::ResolvedRoute<I, FakeDeviceId>, crate::ip::ResolveRouteError>
+        ) -> Result<crate::ip::types::ResolvedRoute<I, FakeDeviceId>, crate::ip::ResolveRouteError>
         {
             self.inner.lookup_route(ctx, device, local_ip, addr)
         }

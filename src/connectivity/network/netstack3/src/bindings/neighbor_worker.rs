@@ -33,14 +33,14 @@ use crate::bindings::{
 use netstack3_core::{
     device::EthernetWeakDeviceId,
     error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
-    ip::device::nud,
+    neighbor,
 };
 
 #[derive(Debug)]
 pub(crate) struct Event {
     pub(crate) id: EthernetWeakDeviceId<BindingsNonSyncCtxImpl>,
     pub(crate) addr: SpecifiedAddr<IpAddr>,
-    pub(crate) kind: nud::EventKind<Mac>,
+    pub(crate) kind: neighbor::EventKind<Mac>,
     pub(crate) at: StackTime,
 }
 
@@ -54,23 +54,31 @@ impl std::fmt::Display for Event {
 fn new_fidl_entry(
     binding_id: BindingId,
     addr: SpecifiedAddr<IpAddr>,
-    state: nud::EventState<Mac>,
+    state: neighbor::EventState<Mac>,
     StackTime(at): StackTime,
 ) -> fnet_neighbor::Entry {
     let (state, mac) = match state {
-        nud::EventState::Dynamic(dynamic_state) => match dynamic_state {
-            nud::EventDynamicState::Incomplete => (fnet_neighbor::EntryState::Incomplete, None),
-            nud::EventDynamicState::Reachable(mac) => {
+        neighbor::EventState::Dynamic(dynamic_state) => match dynamic_state {
+            neighbor::EventDynamicState::Incomplete => {
+                (fnet_neighbor::EntryState::Incomplete, None)
+            }
+            neighbor::EventDynamicState::Reachable(mac) => {
                 (fnet_neighbor::EntryState::Reachable, Some(mac))
             }
-            nud::EventDynamicState::Stale(mac) => (fnet_neighbor::EntryState::Stale, Some(mac)),
-            nud::EventDynamicState::Delay(mac) => (fnet_neighbor::EntryState::Delay, Some(mac)),
-            nud::EventDynamicState::Probe(mac) => (fnet_neighbor::EntryState::Probe, Some(mac)),
-            nud::EventDynamicState::Unreachable(mac) => {
+            neighbor::EventDynamicState::Stale(mac) => {
+                (fnet_neighbor::EntryState::Stale, Some(mac))
+            }
+            neighbor::EventDynamicState::Delay(mac) => {
+                (fnet_neighbor::EntryState::Delay, Some(mac))
+            }
+            neighbor::EventDynamicState::Probe(mac) => {
+                (fnet_neighbor::EntryState::Probe, Some(mac))
+            }
+            neighbor::EventDynamicState::Unreachable(mac) => {
                 (fnet_neighbor::EntryState::Unreachable, Some(mac))
             }
         },
-        nud::EventState::Static(mac) => (fnet_neighbor::EntryState::Static, Some(mac)),
+        neighbor::EventState::Static(mac) => (fnet_neighbor::EntryState::Static, Some(mac)),
     };
     fnet_neighbor_ext::Entry {
         interface: binding_id.into(),
@@ -100,7 +108,7 @@ pub(crate) fn new_worker() -> (Worker, mpsc::Sender<NewWatcher>, mpsc::Unbounded
 fn handle_new_watcher(
     neighbor_state: &HashMap<
         BindingId,
-        HashMap<SpecifiedAddr<IpAddr>, (nud::EventState<Mac>, StackTime)>,
+        HashMap<SpecifiedAddr<IpAddr>, (neighbor::EventState<Mac>, StackTime)>,
     >,
     watchers: &mut futures::stream::FuturesUnordered<Watcher>,
     NewWatcher { options, stream }: NewWatcher,
@@ -141,7 +149,7 @@ impl Worker {
         let mut watchers = futures::stream::FuturesUnordered::<Watcher>::new();
         let mut neighbor_state: HashMap<
             _,
-            HashMap<SpecifiedAddr<IpAddr>, (nud::EventState<Mac>, StackTime)>,
+            HashMap<SpecifiedAddr<IpAddr>, (neighbor::EventState<Mac>, StackTime)>,
         > = HashMap::new();
 
         enum SinkItem {
@@ -193,7 +201,7 @@ impl Worker {
                         .or_insert_with(|| HashMap::new())
                         .entry(addr);
                     let fidl_event = match kind {
-                        nud::EventKind::Added(state) => match entry {
+                        neighbor::EventKind::Added(state) => match entry {
                             std::collections::hash_map::Entry::Occupied(occupied) => {
                                 panic!(
                                     "neighbor added but already exists: entry={:?}, event={:?}",
@@ -208,7 +216,7 @@ impl Worker {
                                 ))
                             }
                         },
-                        nud::EventKind::Removed => match entry {
+                        neighbor::EventKind::Removed => match entry {
                             std::collections::hash_map::Entry::Vacant(_) => {
                                 panic!("neighbor removed but not found: {event:?}");
                             }
@@ -228,7 +236,7 @@ impl Worker {
                                 ))
                             }
                         },
-                        nud::EventKind::Changed(state) => match entry {
+                        neighbor::EventKind::Changed(state) => match entry {
                             std::collections::hash_map::Entry::Vacant(_) => {
                                 panic!("neighbor changed but not found: {event:?}");
                             }
@@ -264,7 +272,7 @@ struct EventQueue(VecDeque<fnet_neighbor::EntryIteratorItem>);
 const MAX_ITEM_BATCH_SIZE: usize = fnet_neighbor::MAX_ITEM_BATCH_SIZE as usize;
 // Arbitrarily-chosen maximum number of events to queue per client (4 times the
 // maximum number of entries held in core per IP per interface).
-const MAX_EVENTS: usize = 4 * nud::MAX_ENTRIES;
+const MAX_EVENTS: usize = 4 * neighbor::MAX_ENTRIES;
 
 impl EventQueue {
     fn is_empty(&self) -> bool {

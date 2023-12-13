@@ -14,7 +14,7 @@ use fidl_fuchsia_net_stack::{
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use netstack3_core::ip::types::{AddableEntry, AddableEntryEither};
+use netstack3_core::routes::{AddableEntry, AddableEntryEither};
 use tracing::{debug, error};
 
 pub(crate) struct StackFidlWorker {
@@ -101,8 +101,10 @@ impl StackFidlWorker {
                 (Some(device), gateway) => (device, gateway),
                 (None, gateway) => {
                     let gateway = gateway?;
-                    let device =
-                        netstack3_core::select_device_for_gateway(sync_ctx, gateway.into())?;
+                    let device = netstack3_core::routes::select_device_for_gateway(
+                        sync_ctx,
+                        gateway.into(),
+                    )?;
                     (device, Some(gateway))
                 }
             };

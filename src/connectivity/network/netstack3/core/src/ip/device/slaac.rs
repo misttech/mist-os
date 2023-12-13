@@ -32,13 +32,10 @@ use crate::{
         TimerHandler,
     },
     counters::Counter,
-    device::Id,
+    device::{AnyDevice, DeviceIdContext, Id},
     error::{ExistsError, NotFoundError},
-    ip::{
-        device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-        AnyDevice, DeviceIdContext, NonSyncContext,
-    },
-    Instant, SyncCtx,
+    ip::device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
+    Instant, NonSyncContext, SyncCtx,
 };
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.

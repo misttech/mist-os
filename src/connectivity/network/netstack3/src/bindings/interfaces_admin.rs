@@ -51,9 +51,10 @@ use net_types::{
 };
 use netstack3_core::{
     device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
-    ip::device::{
-        state::{AddrSubnetAndManualConfigEither, Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
-        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    ip::{
+        AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
+        Lifetime,
     },
 };
 
@@ -1153,19 +1154,19 @@ async fn run_address_state_provider(
 
                 let add_route_result = match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => {
-                        let entry = netstack3_core::ip::types::AddableEntry {
+                        let entry = netstack3_core::routes::AddableEntry {
                             subnet,
                             device: core_id,
-                            metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                            metric: netstack3_core::routes::AddableMetric::MetricTracksInterface,
                             gateway: None,
                         };
                         route_set.apply_route_op(routes::RouteOp::Add(entry)).await
                     }
                     net_types::ip::SubnetEither::V6(subnet) => {
-                        let entry = netstack3_core::ip::types::AddableEntry {
+                        let entry = netstack3_core::routes::AddableEntry {
                             subnet,
                             device: core_id,
-                            metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                            metric: netstack3_core::routes::AddableMetric::MetricTracksInterface,
                             gateway: None,
                         };
                         route_set.apply_route_op(routes::RouteOp::Add(entry)).await

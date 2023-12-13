@@ -34,7 +34,7 @@ lib_sources = [
   "src/device/socket.rs",
   "src/device/state.rs",
   "src/error.rs",
-  "src/ip.rs",
+  "src/ip/base.rs",
   "src/ip/device.rs",
   "src/ip/device/dad.rs",
   "src/ip/device/integration.rs",

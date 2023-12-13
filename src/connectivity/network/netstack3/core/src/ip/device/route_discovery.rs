@@ -17,7 +17,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
 use crate::{
     context::{TimerContext, TimerHandler},
-    ip::{AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext},
 };
 
 #[derive(Default)]

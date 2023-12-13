@@ -53,8 +53,7 @@ use rand::Rng;
 use crate::{
     context::{RngContext, TimerContext},
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
-    device::DeviceIdContext,
-    ip::AnyDevice,
+    device::{AnyDevice, DeviceIdContext},
     Instant,
 };
 

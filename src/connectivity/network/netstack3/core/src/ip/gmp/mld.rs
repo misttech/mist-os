@@ -36,14 +36,11 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{RngContext, SendFrameContext, TimerContext, TimerHandler},
-    ip::{
-        gmp::{
-            gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
-            GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
-            QueryTarget,
-        },
-        AnyDevice, DeviceIdContext,
+    device::{AnyDevice, DeviceIdContext},
+    ip::gmp::{
+        gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
+        GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
+        GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific, QueryTarget,
     },
     Instant,
 };
