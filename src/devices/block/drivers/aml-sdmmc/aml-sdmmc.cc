@@ -150,7 +150,10 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
     }
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
-  if (status_irq.resp_timeout()) {
+  // Could not find a way to avoid a timeout for MMC_SELECT_CARD (deselect).
+  const bool is_mmc_cmd7_deselect =
+      req.cmd_idx == MMC_SELECT_CARD && req.cmd_flags == MMC_SELECT_CARD_FLAGS && req.arg == 0;
+  if (status_irq.resp_timeout() && !is_mmc_cmd7_deselect) {
     // A timeout is acceptable for SD_SEND_IF_COND but not for MMC_SEND_EXT_CSD.
     const bool is_sd_cmd8 =
         req.cmd_idx == SD_SEND_IF_COND && req.cmd_flags == SD_SEND_IF_COND_FLAGS;

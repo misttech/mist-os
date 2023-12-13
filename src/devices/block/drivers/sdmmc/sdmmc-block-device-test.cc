@@ -1866,6 +1866,27 @@ TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   EXPECT_EQ(max_lifetime->value(), 6);  // Only the valid value should be used.
 }
 
+TEST_F(SdmmcBlockDeviceTest, PowerSuspendResume) {
+  sdmmc_.set_command_callback(MMC_SLEEP_AWAKE,
+                              [](const sdmmc_req_t& req, uint32_t out_response[4]) {
+                                const bool sleep = (req.arg >> 15) & 0x1;
+                                if (sleep) {
+                                  out_response[0] |= MMC_STATUS_CURRENT_STATE_STBY;
+                                } else {
+                                  out_response[0] |= MMC_STATUS_CURRENT_STATE_SLP;
+                                }
+                              });
+
+  ASSERT_OK(StartDriverForMmc());
+  EXPECT_FALSE(block_device_->power_suspended());
+
+  EXPECT_OK(block_device_->SuspendPower());
+  EXPECT_TRUE(block_device_->power_suspended());
+
+  EXPECT_OK(block_device_->ResumePower());
+  EXPECT_FALSE(block_device_->power_suspended());
+}
+
 }  // namespace sdmmc
 
 FUCHSIA_DRIVER_EXPORT(sdmmc::TestSdmmcRootDevice);

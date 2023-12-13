@@ -91,7 +91,8 @@ class SdmmcDevice {
   zx_status_t MmcSetRelativeAddr(uint16_t rca);
   zx_status_t MmcSendCsd(std::array<uint8_t, SDMMC_CSD_SIZE>& csd);
   zx_status_t MmcSendExtCsd(std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd);
-  zx_status_t MmcSelectCard();
+  zx_status_t MmcSleepOrAwake(bool sleep);
+  zx_status_t MmcSelectCard(bool select = true);
   zx_status_t MmcSwitch(uint8_t index, uint8_t value);
 
   // TODO(b/299501583): Migrate these to use FIDL calls.

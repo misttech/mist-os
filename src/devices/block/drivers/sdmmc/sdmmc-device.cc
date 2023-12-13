@@ -696,10 +696,33 @@ zx_status_t SdmmcDevice::MmcSendExtCsd(std::array<uint8_t, MMC_EXT_CSD_SIZE>& ex
   return ZX_OK;
 }
 
-zx_status_t SdmmcDevice::MmcSelectCard() {
+zx_status_t SdmmcDevice::MmcSleepOrAwake(bool sleep) {
+  sdmmc_req_t req = {};
+  req.cmd_idx = MMC_SLEEP_AWAKE;
+  req.arg = RcaArg() | (sleep ? 1 : 0) << 15;
+  req.cmd_flags = MMC_SLEEP_AWAKE_FLAGS;
+  uint32_t response[4];
+  zx_status_t status = Request(req, response);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (sleep) {
+    if (MMC_STATUS_CURRENT_STATE(response[0]) != MMC_STATUS_CURRENT_STATE_STBY) {
+      return ZX_ERR_BAD_STATE;
+    }
+  } else {
+    if (MMC_STATUS_CURRENT_STATE(response[0]) != MMC_STATUS_CURRENT_STATE_SLP) {
+      return ZX_ERR_BAD_STATE;
+    }
+  }
+  return ZX_OK;
+}
+
+zx_status_t SdmmcDevice::MmcSelectCard(bool select) {
   sdmmc_req_t req = {};
   req.cmd_idx = MMC_SELECT_CARD;
-  req.arg = RcaArg();
+  req.arg = select ? RcaArg() : 0;
   req.cmd_flags = MMC_SELECT_CARD_FLAGS;
   uint32_t unused_response[4];
   return Request(req, unused_response);

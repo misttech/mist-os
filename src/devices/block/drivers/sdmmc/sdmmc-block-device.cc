@@ -787,6 +787,55 @@ int SdmmcBlockDevice::WorkerThread() {
   return thrd_success;
 }
 
+zx_status_t SdmmcBlockDevice::SuspendPower() {
+  fbl::AutoLock lock(&power_lock_);
+
+  if (power_suspended_ == true) {
+    return ZX_OK;
+  }
+
+  // TODO(b/309152727): Finish serving requests currently in the queue, if any.
+
+  if (zx_status_t status = Flush(); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to flush: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to (de-)SelectCard before sleep: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/true); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to sleep: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  power_suspended_ = true;
+  return ZX_OK;
+}
+
+zx_status_t SdmmcBlockDevice::ResumePower() {
+  fbl::AutoLock lock(&power_lock_);
+
+  if (power_suspended_ == false) {
+    return ZX_OK;
+  }
+
+  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to awake: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to SelectCard after awake: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  power_suspended_ = false;
+  return ZX_OK;
+}
+
 zx_status_t SdmmcBlockDevice::WaitForTran() {
   uint32_t current_state;
   size_t attempt = 0;

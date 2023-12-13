@@ -142,6 +142,10 @@ class SdmmcBlockDevice {
 
   zx_status_t AddDevice() TA_EXCL(lock_);
 
+  // TODO(b/309152899): Integrate with Power Framework.
+  zx_status_t SuspendPower() TA_EXCL(power_lock_);
+  zx_status_t ResumePower() TA_EXCL(power_lock_);
+
   // Called by children of this device.
   void Queue(BlockOperation txn) TA_EXCL(lock_);
   void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
@@ -157,6 +161,10 @@ class SdmmcBlockDevice {
     return child_partition_devices_;
   }
   const std::unique_ptr<RpmbDevice>& child_rpmb_device() const { return child_rpmb_device_; }
+  bool power_suspended() TA_EXCL(power_lock_) {
+    fbl::AutoLock lock(&power_lock_);
+    return power_suspended_;
+  }
 
   fdf::Logger& logger();
 
@@ -223,6 +231,8 @@ class SdmmcBlockDevice {
 
   thrd_t worker_thread_ = 0;
 
+  fbl::Mutex power_lock_;
+  bool power_suspended_ TA_GUARDED(power_lock_) = false;
   std::atomic<bool> dead_ = false;
 
   block_info_t block_info_{};
