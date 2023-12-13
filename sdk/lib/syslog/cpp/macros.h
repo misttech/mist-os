@@ -58,8 +58,6 @@ class NullSafeStringView {
   cpp17::optional<cpp17::string_view> string_view_;
 };
 
-#define WEAK __attribute__((weak))
-
 #ifdef __Fuchsia__
 void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
                            NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
@@ -86,8 +84,6 @@ static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char*
 }
 
 bool FlushRecord(LogBuffer* buffer);
-
-#undef WEAK
 
 template <typename... Args>
 constexpr size_t ArgsSize(Args... args) {
@@ -315,7 +311,7 @@ class LogEveryNSecondsState {
   uint32_t GetCounter();
 
  private:
-  __WEAK std::chrono::high_resolution_clock::time_point GetCurrentTime();
+  std::chrono::high_resolution_clock::time_point GetCurrentTime();
   bool ShouldLogInternal(uint32_t n);
 
   std::atomic<uint32_t> counter_{0};
