@@ -16,6 +16,9 @@ use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
 use zerocopy::{ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
+/// Maximum SELinux policy version supported by this implementation.
+pub const SUPPORTED_POLICY_VERSION: u32 = 33;
+
 /// Binary policy SIDs that may be referenced in the policy without be explicitly introduced in the
 /// policy because they are hard-coded in the Linux kernel.
 ///

@@ -15,6 +15,7 @@ use crate::{
 };
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;
+use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_debug, not_implemented};
 use starnix_sync::Mutex;
 use starnix_uapi::{
@@ -97,7 +98,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             b"policyvers",
-            BytesFile::new_node(b"33".to_vec()),
+            BytesFile::new_node(serialize_u32_file(SUPPORTED_POLICY_VERSION)),
             mode!(IFREG, 0o444),
         );
         dir.entry(
