@@ -367,7 +367,7 @@ void Driver::Start(fdf::StartCompleter completer) {
   zx::result driver_vmo = LoadVmo(*incoming(), driver_path_.c_str(), kOpenFlags);
   if (driver_vmo.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Failed to open driver vmo: %s", driver_vmo.status_string());
-    completer(loader_vmo.take_error());
+    completer(driver_vmo.take_error());
     return;
   }
 
