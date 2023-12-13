@@ -99,6 +99,8 @@ void dump_thread(zx_handle_t process, uint64_t tid, zx_handle_t thread, FILE* ou
   sp = regs.rsp;
 #elif defined(__aarch64__)
   sp = regs.sp;
+#elif defined(__riscv)
+  sp = regs.sp;
 #else
   // It's unlikely we'll get here as trying to read the regs will likely
   // fail, but we don't assume that.

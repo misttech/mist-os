@@ -31,13 +31,19 @@ Error FramePointerUnwinder::Step(Memory* stack, const Registers& current, Regist
       fp_reg = RegisterID::kArm64_x29;
       break;
     case Registers::Arch::kRiscv64:
-      return Error("not implemented");
+      fp_reg = RegisterID::kRiscv64_s0;
+      break;
   }
 
   uint64_t fp;
   if (auto err = current.Get(fp_reg, fp); err.has_err()) {
     return err;
   }
+
+  if (current.arch() == Registers::Arch::kRiscv64 && fp >= 16) {
+    fp -= 16;
+  }
+
   uint64_t sp;
   if (auto err = current.GetSP(sp); err.has_err()) {
     return err;

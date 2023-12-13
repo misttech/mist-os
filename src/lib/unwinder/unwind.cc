@@ -116,13 +116,16 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   std::string err_msg;
 
   // Try CFI first because it's the most accurate one.
-  if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, current.pc_is_return_address);
-      err.ok()) {
-    next.trust = Frame::Trust::kCFI;
-    next.pc_is_return_address = PcIsReturnAddress(next.regs);
-    success = true;
-  } else {
-    err_msg = "CFI: " + err.msg();
+  // TODO(fxbug.dev/316047562): Make CFI work on RISC-V.
+  if (current.regs.arch() != Registers::Arch::kRiscv64) {
+    if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, current.pc_is_return_address);
+        err.ok()) {
+      next.trust = Frame::Trust::kCFI;
+      next.pc_is_return_address = PcIsReturnAddress(next.regs);
+      success = true;
+    } else {
+      err_msg = "CFI: " + err.msg();
+    }
   }
 
   if (!success && !current.pc_is_return_address) {
