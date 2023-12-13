@@ -29,7 +29,7 @@ class SquareloadTest(fuchsia_power_base_test.FuchsiaPowerBaseTest):
         Compute and publish power metrics.
         """
         # Initialize host-side tracing and execute target workload.
-        self.device.tracing.initialize(
+        with self.device.tracing.trace_session(
             categories=[
                 "kernel:sched",
                 "kernel:meta",
@@ -39,18 +39,18 @@ class SquareloadTest(fuchsia_power_base_test.FuchsiaPowerBaseTest):
                 "memory_monitor",
             ],
             buffer_size=36,
-        )
-        self.device.tracing.start()
-        super().test_launch_hermetic_test()
-        self.device.tracing.stop()
+            download=True,
+            directory=self.log_path,
+            trace_file=f"{self.metric_name}.fxt",
+        ):
+            super().test_launch_hermetic_test()
 
         # Process trace-based CPU metrics.
-        fxt_trace_path: str = self.device.tracing.terminate_and_download(
-            directory=self.log_path, trace_file=f"{self.metric_name}.fxt"
-        )
         trace_json_path: os.PathLike = (
             trace_importing.convert_trace_file_to_json(
-                trace_path=str(fxt_trace_path)
+                trace_path=os.path.join(
+                    self.log_path, f"{self.metric_name}.fxt"
+                )
             )
         )
 

@@ -48,8 +48,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         # Add flatland-view-provider tile
         self.dut.session.add_component(TILE_URL)
 
-        # Initialize tracing session.
-        self.dut.tracing.initialize(
+        with self.dut.tracing.trace_session(
             categories=[
                 "input",
                 "gfx",
@@ -58,26 +57,14 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
                 "system_metrics_logger",
             ],
             buffer_size=36,
-        )
+            download=True,
+            directory=self.log_path,
+            trace_file="trace.fxt",
+        ):
+            time.sleep(BENCHMARK_DURATION_SEC)
 
-        # Start tracing.
-        self.dut.tracing.start()
+        expected_trace_filename: str = os.path.join(self.log_path, "trace.fxt")
 
-        time.sleep(BENCHMARK_DURATION_SEC)
-
-        # Stop tracing.
-        self.dut.tracing.stop()
-
-        # Terminate the tracing session.
-        trace_filename = self.dut.tracing.terminate_and_download(
-            directory=self.log_path, trace_file="trace.fxt"
-        )
-
-        expected_trace_filename = os.path.join(self.log_path, "trace.fxt")
-
-        asserts.assert_equal(
-            trace_filename, expected_trace_filename, msg="trace not downloaded"
-        )
         asserts.assert_true(
             os.path.exists(expected_trace_filename), msg="trace failed"
         )
