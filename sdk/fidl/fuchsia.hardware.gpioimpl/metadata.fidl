@@ -36,3 +36,10 @@ type InitStep = struct {
 type InitMetadata = struct {
     steps vector<InitStep>:MAX;
 };
+
+/// Information passed to the GPIO core driver through GpioImpl protocol methods.
+type ControllerMetadata = struct {
+    /// ID for the controller which is unique among all gpio controllers.
+    /// Passed through GetControllerId to the core driver.
+    id uint32;
+};
