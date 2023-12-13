@@ -28,7 +28,7 @@ struct LogBuffer;
 //
 // This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
 // NOLINT is used as implicit conversions are intentional here.
-class NullSafeStringView {
+class NullSafeStringView final {
  public:
   //  Constructs a NullSafeStringView from a cpp17::string_view.
   constexpr NullSafeStringView(cpp17::string_view string_view)
@@ -91,14 +91,14 @@ constexpr size_t ArgsSize(Args... args) {
 }
 
 template <typename... Args>
-struct Tuplet {
+struct Tuplet final {
   std::tuple<Args...> tuple;
   size_t size;
   constexpr Tuplet(std::tuple<Args...> tuple, size_t size) : tuple(tuple), size(size) {}
 };
 
 template <typename Key, typename Value>
-struct KeyValue {
+struct KeyValue final {
   Key key;
   Value value;
   constexpr KeyValue(Key key, Value value) : key(key), value(value) {}
@@ -117,7 +117,7 @@ constexpr bool Not() {
 // Opaque structure representing the backend encode state.
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
-struct LogBuffer {
+struct LogBuffer final {
   // Max size of log buffer. This number may change as additional fields
   // are added to the internal encoding state. It is based on trial-and-error
   // and is adjusted when compilation fails due to it not being large enough.
@@ -245,7 +245,7 @@ constexpr syslog_backend::KeyValue<Key, Value> KeyValueInternal(Key key, Value v
 #define FX_KV(a, b) a, b
 
 template <typename Msg, typename... KeyValuePairs>
-struct LogValue {
+struct LogValue final {
   constexpr LogValue(Msg msg, syslog_backend::Tuplet<KeyValuePairs...> kvps)
       : msg(msg), kvps(kvps) {}
   // FIXME(fxbug.dev/106574): With hwasan, or asan without stack-to-heap promotion for
@@ -271,12 +271,12 @@ struct LogValue {
   syslog_backend::Tuplet<KeyValuePairs...> kvps;
 };
 
-class LogMessageVoidify {
+class LogMessageVoidify final {
  public:
   void operator&(std::ostream&) {}
 };
 
-class LogMessage {
+class LogMessage final {
  public:
   LogMessage(LogSeverity severity, const char* file, int line, const char* condition,
              const char* tag
@@ -302,7 +302,7 @@ class LogMessage {
 };
 
 // LogFirstNState is used by the macro FX_SLOG_FIRST_N_SECONDS below.
-class LogEveryNSecondsState {
+class LogEveryNSecondsState final {
  public:
   bool ShouldLog(uint32_t n);
   uint32_t GetCounter();
@@ -316,7 +316,7 @@ class LogEveryNSecondsState {
 };
 
 // LogFirstNState is used by the macro FX_LOGS_FIRST_N below.
-class LogFirstNState {
+class LogFirstNState final {
  public:
   bool ShouldLog(uint32_t n);
 
