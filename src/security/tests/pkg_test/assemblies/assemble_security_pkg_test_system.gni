@@ -265,7 +265,6 @@ template("assemble_security_pkg_test_system") {
         configure_fshost = true
         filesystems = {
           image_name = labels.assembly
-          volume = "fxfs"
         }
       }
     }

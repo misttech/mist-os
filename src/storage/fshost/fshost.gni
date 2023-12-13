@@ -45,13 +45,13 @@ template("fshost_cml") {
           "//src/storage/fshost/meta/non_fxfs_fshost.cml",
         ]
       } else if (options.data_filesystem_format == "fxfs") {
-        if (defined(options.fxfs_blob) && options.fxfs_blob) {
-          sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ]
-        } else {
+        if (defined(options.fxfs_blob) && !options.fxfs_blob) {
           sources += [
             "//src/storage/fshost/meta/blobfs_fshost.cml",
             "//src/storage/fshost/meta/fxfs_fshost.cml",
           ]
+        } else {
+          sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ]
         }
       } else if (options.data_filesystem_format == "f2fs") {
         sources += [

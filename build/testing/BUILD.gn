@@ -44,7 +44,14 @@ template("cuckoo_product_assembly_config") {
   }
 }
 
-# Default Fxfs for the data partition.
+# Default configuration.
+cuckoo_product_assembly_config("cuckoo-product-configuration") {
+  filesystems = {
+    volume = "fxfs"
+  }
+}
+
+# Use FVM and Fxfs for the data partition.
 cuckoo_product_assembly_config("cuckoo-product-configuration-fxfs") {
   filesystems = {
     volume = {
@@ -58,7 +65,7 @@ cuckoo_product_assembly_config("cuckoo-product-configuration-fxfs") {
   }
 }
 
-# Override fxfs and use minfs for data partition.
+# Use FVM and minfs for the data partition.
 cuckoo_product_assembly_config("cuckoo-product-configuration-minfs") {
   filesystems = {
     volume = {
@@ -70,12 +77,5 @@ cuckoo_product_assembly_config("cuckoo-product-configuration-minfs") {
         }
       }
     }
-  }
-}
-
-# Replace FVM, blobfs and minfs with fxfs (both volume manage, blob and data).
-cuckoo_product_assembly_config("cuckoo-product-configuration-fxblob") {
-  filesystems = {
-    volume = "fxfs"
   }
 }
