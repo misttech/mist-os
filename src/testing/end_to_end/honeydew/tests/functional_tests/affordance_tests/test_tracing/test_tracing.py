@@ -87,6 +87,31 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
             )
 
+    def test_tracing_session(self) -> None:
+        """This test case tests the `tracing.trace_session()` context manager"""
+        with self.device.tracing.trace_session():
+            pass
+
+    def test_tracing_session_download(self) -> None:
+        """This test case tests the `tracing.trace_session()` context manager
+        and asserts that the trace was downloaded successfully.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.device.tracing.trace_session(
+                download=True, directory=tmpdir, trace_file="trace.fxt"
+            ):
+                pass
+            asserts.assert_true(
+                os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
+            )
+
+    def test_multi_tracing_session(self) -> None:
+        """This test case tests the multiple traces using trace context manager"""
+        with self.device.tracing.trace_session():
+            self.device.tracing.stop()
+            time.sleep(1)
+            self.device.tracing.start()
+
 
 if __name__ == "__main__":
     test_runner.main()

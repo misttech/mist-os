@@ -59,6 +59,14 @@ class Tracing(tracing.Tracing):
         self._session_initialized = False
         self._tracing_active = False
 
+    def is_session_initialized(self) -> bool:
+        """Checks if the session is initialized or not.
+
+        Returns:
+            True if the session is initialized, False otherwise.
+        """
+        return self._session_initialized
+
     # List all the public methods in alphabetical order
     def initialize(
         self,

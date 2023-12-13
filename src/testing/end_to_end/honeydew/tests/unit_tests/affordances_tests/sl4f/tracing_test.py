@@ -5,6 +5,7 @@
 """Unit tests for honeydew.affordances.sl4f.tracing.py."""
 
 import base64
+import os
 import tempfile
 import unittest
 from typing import Any
@@ -107,7 +108,7 @@ class TracingSL4FTests(unittest.TestCase):
         else:
             self.tracing_obj.initialize()
             self.tracing_obj.start()
-            self.sl4f_obj.run.assert_called()
+            self.sl4f_obj.run.assert_any_call(method="tracing_facade.Start")
 
     @parameterized.expand(
         [
@@ -146,7 +147,7 @@ class TracingSL4FTests(unittest.TestCase):
             self.tracing_obj.initialize()
             self.tracing_obj.start()
             self.tracing_obj.stop()
-            self.sl4f_obj.run.assert_called()
+            self.sl4f_obj.run.assert_any_call(method="tracing_facade.Stop")
 
     @parameterized.expand(
         [
@@ -175,7 +176,10 @@ class TracingSL4FTests(unittest.TestCase):
             # Initialize the tracing session.
             self.tracing_obj.initialize()
             self.tracing_obj.terminate()
-            self.sl4f_obj.run.assert_called()
+            self.sl4f_obj.run.assert_any_call(
+                method="tracing_facade.Terminate",
+                params={"results_destination": "Ignore"},
+            )
 
     @parameterized.expand(
         [
@@ -228,13 +232,74 @@ class TracingSL4FTests(unittest.TestCase):
                 trace_path: str = self.tracing_obj.terminate_and_download(
                     directory=tmpdir, trace_file=trace_file
                 )
-                self.sl4f_obj.run.assert_called()
+                self.sl4f_obj.run.assert_any_call(
+                    method="tracing_facade.Terminate"
+                )
 
                 # Check the return value of the terminate method.
                 if trace_file:
                     self.assertEqual(trace_path, f"{tmpdir}/{trace_file}")
                 else:
                     self.assertRegex(trace_path, f"{tmpdir}/trace_.*.fxt")
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "when_session_is_not_initialized",
+                    "session_initialized": False,
+                },
+            ),
+            (
+                {
+                    "label": "when_session_is_initialized",
+                    "session_initialized": True,
+                },
+            ),
+            (
+                {
+                    "label": "with_tracing_download_given_file_name",
+                    "download_trace": True,
+                    "trace_file": "trace.fxt",
+                    "return_value": {
+                        "data": base64.b64encode(
+                            "samp_trace_data".encode("utf-8")
+                        ),
+                    },
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    def test_trace_session(self, parameterized_dict) -> None:
+        """Test for Tracing.trace_session() method."""
+        if parameterized_dict.get("session_initialized"):
+            self.tracing_obj.initialize()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            return_value: str = parameterized_dict.get("return_value")
+            self.sl4f_obj.run.return_value = return_value
+
+            trace_file: str = parameterized_dict.get("trace_file")
+            download_trace: bool = parameterized_dict.get("download_trace")
+            with self.tracing_obj.trace_session(
+                download=download_trace, directory=tmpdir, trace_file=trace_file
+            ):
+                self.sl4f_obj.run.assert_any_call(method="tracing_facade.Start")
+
+            self.sl4f_obj.run.assert_any_call(method="tracing_facade.Stop")
+
+            if download_trace:
+                self.sl4f_obj.run.assert_any_call(
+                    method="tracing_facade.Terminate"
+                )
+                trace_path: str = os.path.join(tmpdir, trace_file)
+                self.assertTrue(os.path.exists(trace_path))
+            else:
+                self.sl4f_obj.run.assert_any_call(
+                    method="tracing_facade.Terminate",
+                    params={"results_destination": "Ignore"},
+                )
 
 
 if __name__ == "__main__":

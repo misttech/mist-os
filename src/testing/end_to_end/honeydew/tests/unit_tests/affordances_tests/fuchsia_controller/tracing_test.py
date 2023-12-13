@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
+import os
 import tempfile
 import unittest
 from typing import Any
@@ -426,6 +427,92 @@ class TracingFCTests(unittest.TestCase):
             with open(trace_path, "r", encoding="utf-8") as file:
                 data: str = file.read()
                 self.assertEqual(data, return_value)
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "when_session_is_not_initialized",
+                    "session_initialized": False,
+                },
+            ),
+            (
+                {
+                    "label": "when_session_is_initialized",
+                    "session_initialized": True,
+                },
+            ),
+            (
+                {
+                    "label": "with_tracing_download",
+                    "download_trace": True,
+                    "trace_file": "trace.fxt",
+                    "return_value": "samp_trace_data",
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "initialize_tracing",
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "start_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "stop_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "terminate_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(fc_tracing.fc, "Socket")
+    def test_trace_session(
+        self,
+        parameterized_dict,
+        mock_fc_socket,
+        mock_tracingcontroller_terminate,
+        *unused_args,
+    ) -> None:
+        """Test for Tracing.trace_session() method."""
+        # Mock out the tracing Socket.
+        return_value: str = parameterized_dict.get("return_value", "")
+        mock_client_socket = mock.MagicMock()
+        mock_client_socket.read.side_effect = [
+            bytes(return_value, encoding="utf-8"),
+            fc.ZxStatus(fc.ZxStatus.ZX_ERR_PEER_CLOSED),
+        ]
+        mock_fc_socket.create.return_value = (
+            mock.MagicMock(),
+            mock_client_socket,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            trace_file: str = parameterized_dict.get("trace_file")
+            download_trace: bool = parameterized_dict.get("download_trace")
+
+            if parameterized_dict.get("session_initialized"):
+                self.tracing_obj.initialize()
+            with self.tracing_obj.trace_session(
+                download=download_trace, directory=tmpdir, trace_file=trace_file
+            ):
+                mock_tracingcontroller_terminate.assert_not_called()
+            mock_tracingcontroller_terminate.assert_called()
+
+            if download_trace:
+                trace_path: str = os.path.join(tmpdir, trace_file)
+                self.assertTrue(os.path.exists(trace_path))
+
+                # Check the contents of the file.
+                with open(trace_path, "r", encoding="utf-8") as file:
+                    data: str = file.read()
+                    self.assertEqual(data, return_value)
 
 
 if __name__ == "__main__":
