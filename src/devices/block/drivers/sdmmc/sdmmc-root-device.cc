@@ -25,8 +25,8 @@ zx::result<> SdmmcRootDevice::Start() {
   {
     zx::result parsed_metadata = GetMetadata(arena);
     if (parsed_metadata.is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata: %s",
-              zx_status_get_string(parsed_metadata.error_value()));
+      FDF_LOGL(ERROR, logger(), "Failed to GetMetadata: %s",
+               zx_status_get_string(parsed_metadata.error_value()));
       return parsed_metadata.take_error();
     }
     sdmmc_metadata = *parsed_metadata;
@@ -35,14 +35,15 @@ zx::result<> SdmmcRootDevice::Start() {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return controller_endpoints.take_error();
   }
 
   zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   if (!node_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create node endpoints: %s", node_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create node endpoints: %s",
+             node_endpoints.status_string());
     return node_endpoints.take_error();
   }
 
@@ -55,7 +56,7 @@ zx::result<> SdmmcRootDevice::Start() {
   auto result = parent_node_->AddChild(args, std::move(controller_endpoints->server),
                                        std::move(node_endpoints->server));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child: %s", result.status_string());
     return zx::error(result.status());
   }
 
@@ -73,13 +74,14 @@ zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
     const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   if (zx_status_t st = sdmmc->Init(metadata.use_fidl()) != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize SdmmcDevice: %s", zx_status_get_string(st));
+    FDF_LOGL(ERROR, logger(), "Failed to initialize SdmmcDevice: %s", zx_status_get_string(st));
     return zx::error(st);
   }
 
   std::unique_ptr<DeviceType> device;
   if (zx_status_t st = DeviceType::Create(this, std::move(sdmmc), &device) != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to create %s device: %s", name.c_str(), zx_status_get_string(st));
+    FDF_LOGL(ERROR, logger(), "Failed to create %s device: %s", name.c_str(),
+             zx_status_get_string(st));
     return zx::error(st);
   }
 
@@ -104,7 +106,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
 
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(INFO, "No metadata provided");
+      FDF_LOGL(INFO, logger(), "No metadata provided");
       return zx::ok(
           fidl::ObjectView(arena, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
                                       .enable_trim(true)
@@ -114,7 +116,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
                                       .use_fidl(true)
                                       .Build()));
     }
-    FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to decode metadata: %s", decoded.status_string());
     return decoded.take_error();
   }
 
@@ -154,13 +156,13 @@ zx_status_t SdmmcRootDevice::Init(
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
     // TODO(fxbug.dev/130283): Enable detection of card insert/removal after initialization.
-    FDF_LOG(INFO, "failed to probe removable device");
+    FDF_LOGL(INFO, logger(), "failed to probe removable device");
     return ZX_OK;
   }
 
   // Failure to probe a hardwired device is unexpected. Reply with an error code so that our device
   // gets removed.
-  FDF_LOG(ERROR, "failed to probe irremovable device");
+  FDF_LOGL(ERROR, logger(), "failed to probe irremovable device");
   return ZX_ERR_NOT_FOUND;
 }
 

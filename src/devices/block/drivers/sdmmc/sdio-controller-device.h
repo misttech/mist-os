@@ -104,6 +104,8 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);
   void StopSdioIrqThread() TA_EXCL(irq_thread_lock_);
 
+  fdf::Logger& logger();
+
  private:
   struct SdioFuncTuple {
     uint8_t tuple_code;

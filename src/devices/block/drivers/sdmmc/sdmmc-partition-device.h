@@ -39,6 +39,8 @@ class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
     return block_impl_protocol_ops_;
   }
 
+  fdf::Logger& logger();
+
  private:
   SdmmcBlockDevice* const sdmmc_parent_;
   const block_info_t block_info_;

@@ -73,6 +73,8 @@ class SdioFunctionDevice : public fidl::WireServer<fuchsia_hardware_sdio::Device
   void RequestCardReset(RequestCardResetCompleter::Sync& completer) override;
   void PerformTuning(PerformTuningCompleter::Sync& completer) override;
 
+  fdf::Logger& logger();
+
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_sdio::Device> request);
 

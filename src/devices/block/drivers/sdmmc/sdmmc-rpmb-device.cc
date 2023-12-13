@@ -37,7 +37,7 @@ zx_status_t RpmbDevice::AddDevice() {
         sdmmc_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_rpmb::Service>(
             std::move(handler));
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add RPMB service: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to add RPMB service: %s", result.status_string());
       return result.status_value();
     }
   }
@@ -45,8 +45,8 @@ zx_status_t RpmbDevice::AddDevice() {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return controller_endpoints.status_value();
   }
 
@@ -71,7 +71,7 @@ zx_status_t RpmbDevice::AddDevice() {
   auto result =
       sdmmc_parent_->block_node()->AddChild(args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child partition device: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child partition device: %s", result.status_string());
     return result.status();
   }
   return ZX_OK;
@@ -111,5 +111,7 @@ void RpmbDevice::Request(RequestRequestView request, RequestCompleter::Sync& com
 
   sdmmc_parent_->RpmbQueue(std::move(info));
 }
+
+fdf::Logger& RpmbDevice::logger() { return sdmmc_parent_->logger(); }
 
 }  // namespace sdmmc

@@ -35,6 +35,8 @@ class RpmbDevice : public fidl::WireServer<fuchsia_hardware_rpmb::Rpmb> {
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void Request(RequestRequestView request, RequestCompleter::Sync& completer) override;
 
+  fdf::Logger& logger();
+
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_rpmb::Rpmb> request);
 

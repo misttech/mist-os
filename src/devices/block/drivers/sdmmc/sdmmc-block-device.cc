@@ -28,24 +28,26 @@ constexpr size_t kTranMaxAttempts = 10;
 // Boot and RPMB partition sizes are in units of 128 KiB/KB.
 constexpr uint32_t kBootSizeMultiplier = 128 * 1024;
 
-inline void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
-  if (txn.node()->complete_cb()) {
-    txn.Complete(status);
-  } else {
-    FDF_LOG(DEBUG, "block op %p completion_cb unset!", txn.operation());
-  }
-}
-
 }  // namespace
 
 namespace sdmmc {
+
+fdf::Logger& ReadWriteMetadata::logger() { return block_device_->logger(); }
+
+void SdmmcBlockDevice::BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
+  if (txn.node()->complete_cb()) {
+    txn.Complete(status);
+  } else {
+    FDF_LOGL(DEBUG, logger(), "block op %p completion_cb unset!", txn.operation());
+  }
+}
 
 zx_status_t SdmmcBlockDevice::Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                                      std::unique_ptr<SdmmcBlockDevice>* out_dev) {
   fbl::AllocChecker ac;
   out_dev->reset(new (&ac) SdmmcBlockDevice(parent, std::move(sdmmc)));
   if (!ac.check()) {
-    FDF_LOG(ERROR, "failed to allocate device memory");
+    FDF_LOGL(ERROR, parent->logger(), "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -56,7 +58,7 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   // Device must be in TRAN state at this point
   zx_status_t st = WaitForTran();
   if (st != ZX_OK) {
-    FDF_LOG(ERROR, "waiting for TRAN state failed, retcode = %d", st);
+    FDF_LOGL(ERROR, logger(), "waiting for TRAN state failed, retcode = %d", st);
     return ZX_ERR_TIMED_OUT;
   }
 
@@ -75,13 +77,14 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
       [](void* ctx) -> int { return reinterpret_cast<SdmmcBlockDevice*>(ctx)->WorkerThread(); },
       this, "sdmmc-block-worker");
   if (rc != thrd_success) {
-    FDF_LOG(ERROR, "Failed to start worker thread, retcode = %d", st);
+    FDF_LOGL(ERROR, logger(), "Failed to start worker thread, retcode = %d", st);
     return thrd_status_to_zx_status(rc);
   }
 
   auto inspect_sink = parent_->driver_incoming()->Connect<fuchsia_inspect::InspectSink>();
   if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to inspect sink: %s", inspect_sink.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
+             inspect_sink.status_string());
     return inspect_sink.status_value();
   }
   exposed_inspector_.emplace(inspect::ComponentInspector(
@@ -91,14 +94,15 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return controller_endpoints.status_value();
   }
 
   zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   if (!node_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create node endpoints: %s", node_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create node endpoints: %s",
+             node_endpoints.status_string());
     return node_endpoints.status_value();
   }
 
@@ -114,7 +118,7 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   auto result = parent_->root_node()->AddChild(args, std::move(controller_endpoints->server),
                                                std::move(node_endpoints->server));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child block device: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child block device: %s", result.status_string());
     return result.status();
   }
 
@@ -125,12 +129,12 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   std::unique_ptr<PartitionDevice> user_partition(
       new (&ac) PartitionDevice(this, block_info_, USER_DATA_PARTITION));
   if (!ac.check()) {
-    FDF_LOG(ERROR, "failed to allocate device memory");
+    FDF_LOGL(ERROR, logger(), "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
   }
 
   if ((st = user_partition->AddDevice()) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to add user partition device: %d", st);
+    FDF_LOGL(ERROR, logger(), "failed to add user partition device: %d", st);
     return st;
   }
 
@@ -152,26 +156,26 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
       std::unique_ptr<PartitionDevice> boot_partition_1(
           new (&ac) PartitionDevice(this, boot_info, BOOT_PARTITION_1));
       if (!ac.check()) {
-        FDF_LOG(ERROR, "failed to allocate device memory");
+        FDF_LOGL(ERROR, logger(), "failed to allocate device memory");
         return ZX_ERR_NO_MEMORY;
       }
 
       std::unique_ptr<PartitionDevice> boot_partition_2(
           new (&ac) PartitionDevice(this, boot_info, BOOT_PARTITION_2));
       if (!ac.check()) {
-        FDF_LOG(ERROR, "failed to allocate device memory");
+        FDF_LOGL(ERROR, logger(), "failed to allocate device memory");
         return ZX_ERR_NO_MEMORY;
       }
 
       if ((st = boot_partition_1->AddDevice()) != ZX_OK) {
-        FDF_LOG(ERROR, "failed to add boot partition device: %d", st);
+        FDF_LOGL(ERROR, logger(), "failed to add boot partition device: %d", st);
         return st;
       }
 
       child_partition_devices_.push_back(std::move(boot_partition_1));
 
       if ((st = boot_partition_2->AddDevice()) != ZX_OK) {
-        FDF_LOG(ERROR, "failed to add boot partition device: %d", st);
+        FDF_LOGL(ERROR, logger(), "failed to add boot partition device: %d", st);
         return st;
       }
 
@@ -182,12 +186,12 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   if (!is_sd_ && raw_ext_csd_[MMC_EXT_CSD_RPMB_SIZE_MULT] > 0) {
     std::unique_ptr<RpmbDevice> rpmb_device(new (&ac) RpmbDevice(this, raw_cid_, raw_ext_csd_));
     if (!ac.check()) {
-      FDF_LOG(ERROR, "failed to allocate device memory");
+      FDF_LOGL(ERROR, logger(), "failed to allocate device memory");
       return ZX_ERR_NO_MEMORY;
     }
 
     if ((st = rpmb_device->AddDevice()) != ZX_OK) {
-      FDF_LOG(ERROR, "failed to add rpmb device: %d", st);
+      FDF_LOGL(ERROR, logger(), "failed to add rpmb device: %d", st);
       return st;
     }
 
@@ -248,12 +252,12 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
     total_data_transfer_blocks += btxn.operation()->rw.length;
   }
 
-  FDF_LOG(DEBUG,
-          "sdmmc: do_txn blockop 0x%x offset_vmo 0x%" PRIx64
-          " length 0x%x packing_count %zu blocksize 0x%x"
-          " max_transfer_size 0x%x",
-          txn.command.opcode, txn.offset_vmo, total_data_transfer_blocks, btxns.size(),
-          block_info_.block_size, block_info_.max_transfer_size);
+  FDF_LOGL(DEBUG, logger(),
+           "sdmmc: do_txn blockop 0x%x offset_vmo 0x%" PRIx64
+           " length 0x%x packing_count %zu blocksize 0x%x"
+           " max_transfer_size 0x%x",
+           txn.command.opcode, txn.offset_vmo, total_data_transfer_blocks, btxns.size(),
+           block_info_.block_size, block_info_.max_transfer_size);
 
   sdmmc_buffer_region_t* buffer_region_ptr = entry->buffer_regions.get();
   std::vector<sdmmc_req_t> reqs;
@@ -353,11 +357,11 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
 
     properties_.io_retries_.Add(retries);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "do_txn error: %s", zx_status_get_string(status));
+      FDF_LOGL(ERROR, logger(), "do_txn error: %s", zx_status_get_string(status));
       properties_.io_errors_.Add(1);
     }
 
-    FDF_LOG(DEBUG, "do_txn complete");
+    FDF_LOGL(DEBUG, logger(), "do_txn complete");
     for (auto& btxn : btxns) {
       BlockComplete(btxn, status);
     }
@@ -375,7 +379,7 @@ zx_status_t SdmmcBlockDevice::Flush() {
 
   zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_FLUSH_CACHE, MMC_EXT_CSD_FLUSH_MASK);
   if (st != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to flush the cache: %s", zx_status_get_string(st));
+    FDF_LOGL(ERROR, logger(), "Failed to flush the cache: %s", zx_status_get_string(st));
   }
   return st;
 }
@@ -405,12 +409,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   };
   uint32_t response[4] = {};
   if ((status = sdmmc_->Request(&discard_start, response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to set discard group start: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to set discard group start: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOG(ERROR, "card reported discard group start error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported discard group start error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
@@ -421,12 +425,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
       .arg = static_cast<uint32_t>(txn.offset_dev + txn.length - 1),
   };
   if ((status = sdmmc_->Request(&discard_end, response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to set discard group end: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to set discard group end: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOG(ERROR, "card reported discard group end error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported discard group end error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
@@ -437,12 +441,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
       .arg = MMC_ERASE_DISCARD_ARG,
   };
   if ((status = sdmmc_->Request(&discard, response)) != ZX_OK) {
-    FDF_LOG(ERROR, "discard failed: %d", status);
+    FDF_LOGL(ERROR, logger(), "discard failed: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOG(ERROR, "card reported discard error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported discard error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
@@ -471,7 +475,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
   };
   uint32_t unused_response[4];
   if ((status = sdmmc_->Request(&set_tx_block_count, unused_response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to set block count for RPMB request: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to set block count for RPMB request: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
@@ -491,7 +495,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_count = 1,
   };
   if ((status = sdmmc_->Request(&write_tx_frames, unused_response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to write RPMB frames: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to write RPMB frames: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
@@ -506,7 +510,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .arg = static_cast<uint32_t>(rx_frame_count),
   };
   if ((status = sdmmc_->Request(&set_rx_block_count, unused_response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to set block count for RPMB request: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to set block count for RPMB request: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
@@ -526,7 +530,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_count = 1,
   };
   if ((status = sdmmc_->Request(&read_rx_frames, unused_response)) != ZX_OK) {
-    FDF_LOG(ERROR, "failed to read RPMB frames: %d", status);
+    FDF_LOGL(ERROR, logger(), "failed to read RPMB frames: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
@@ -547,7 +551,7 @@ zx_status_t SdmmcBlockDevice::SetPartition(const EmmcPartition partition) {
 
   zx_status_t status = MmcDoSwitch(MMC_EXT_CSD_PARTITION_CONFIG, partition_config_value);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "failed to switch to partition %u", partition);
+    FDF_LOGL(ERROR, logger(), "failed to switch to partition %u", partition);
     properties_.io_errors_.Add(1);
     return status;
   }
@@ -599,7 +603,7 @@ void SdmmcBlockDevice::RpmbQueue(RpmbRequestInfo info) {
   using fuchsia_hardware_rpmb::wire::kFrameSize;
 
   if (info.tx_frames.size % kFrameSize != 0) {
-    FDF_LOG(ERROR, "tx frame buffer size not a multiple of %u", kFrameSize);
+    FDF_LOGL(ERROR, logger(), "tx frame buffer size not a multiple of %u", kFrameSize);
     info.completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -614,23 +618,23 @@ void SdmmcBlockDevice::RpmbQueue(RpmbRequestInfo info) {
   }
 
   if (tx_frame_count > SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS) {
-    FDF_LOG(ERROR, "received %lu tx frames, maximum is %u", tx_frame_count,
-            SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS);
+    FDF_LOGL(ERROR, logger(), "received %lu tx frames, maximum is %u", tx_frame_count,
+             SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS);
     info.completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
     return;
   }
 
   if (info.rx_frames.vmo.is_valid()) {
     if (info.rx_frames.size % kFrameSize != 0) {
-      FDF_LOG(ERROR, "rx frame buffer size is not a multiple of %u", kFrameSize);
+      FDF_LOGL(ERROR, logger(), "rx frame buffer size is not a multiple of %u", kFrameSize);
       info.completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
 
     const uint64_t rx_frame_count = info.rx_frames.size / kFrameSize;
     if (rx_frame_count > SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS) {
-      FDF_LOG(ERROR, "received %lu rx frames, maximum is %u", rx_frame_count,
-              SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS);
+      FDF_LOGL(ERROR, logger(), "received %lu rx frames, maximum is %u", rx_frame_count,
+               SDMMC_SET_BLOCK_COUNT_MAX_BLOCKS);
       info.completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
       return;
     }
@@ -726,7 +730,7 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
       BlockComplete(btxns[0], status);
     } else {
       // should not get here
-      FDF_LOG(ERROR, "invalid block op %d", op);
+      FDF_LOGL(ERROR, logger(), "invalid block op %d", op);
       TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "opcode",
                     TA_INT32(bop.rw.command.opcode), "txn_status", TA_INT32(status));
       __UNREACHABLE;
@@ -779,7 +783,7 @@ int SdmmcBlockDevice::WorkerThread() {
     }
   }
 
-  FDF_LOG(DEBUG, "worker thread terminated successfully");
+  FDF_LOGL(DEBUG, logger(), "worker thread terminated successfully");
   return thrd_success;
 }
 
@@ -790,7 +794,7 @@ zx_status_t SdmmcBlockDevice::WaitForTran() {
     uint32_t response;
     zx_status_t st = sdmmc_->SdmmcSendStatus(&response);
     if (st != ZX_OK) {
-      FDF_LOG(ERROR, "SDMMC_SEND_STATUS error, retcode = %d", st);
+      FDF_LOGL(ERROR, logger(), "SDMMC_SEND_STATUS error, retcode = %d", st);
       return st;
     }
 
@@ -817,5 +821,7 @@ void SdmmcBlockDevice::SetBlockInfo(uint32_t block_size, uint64_t block_count) {
   block_info_.block_size = block_size;
   block_info_.block_count = block_count;
 }
+
+fdf::Logger& SdmmcBlockDevice::logger() { return parent_->logger(); }
 
 }  // namespace sdmmc

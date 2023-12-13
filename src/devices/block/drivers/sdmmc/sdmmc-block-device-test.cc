@@ -52,7 +52,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
   zx_status_t Init(
       fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
     zx_status_t status;
-    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    auto sdmmc = std::make_unique<SdmmcDevice>(this, sdmmc_.GetClient());
     if (status = sdmmc->RefreshHostInfo(); status != ZX_OK) {
       return status;
     }

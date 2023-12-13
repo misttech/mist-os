@@ -57,8 +57,8 @@ zx_status_t PartitionDevice::AddDevice() {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return controller_endpoints.status_value();
   }
 
@@ -80,7 +80,7 @@ zx_status_t PartitionDevice::AddDevice() {
   auto result =
       sdmmc_parent_->block_node()->AddChild(args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child partition device: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child partition device: %s", result.status_string());
     return result.status();
   }
   return ZX_OK;
@@ -130,5 +130,7 @@ zx_status_t PartitionDevice::BlockPartitionGetName(char* out_name, size_t capaci
 
   return ZX_OK;
 }
+
+fdf::Logger& PartitionDevice::logger() { return sdmmc_parent_->logger(); }
 
 }  // namespace sdmmc

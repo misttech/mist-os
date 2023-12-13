@@ -14,6 +14,8 @@
 
 #include <array>
 
+#include <sdk/lib/driver/logging/cpp/logger.h>
+
 namespace sdmmc {
 
 class SdmmcRootDevice;
@@ -29,9 +31,12 @@ class SdmmcDevice {
   explicit SdmmcDevice(SdmmcRootDevice* root_device) : root_device_(root_device) {}
 
   // For testing using Banjo.
-  explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host) {}
+  explicit SdmmcDevice(SdmmcRootDevice* root_device, const ddk::SdmmcProtocolClient& host)
+      : root_device_(root_device), host_(host) {}
   // For testing using FIDL.
-  explicit SdmmcDevice(fdf::ClientEnd<fuchsia_hardware_sdmmc::Sdmmc> client_end) {
+  explicit SdmmcDevice(SdmmcRootDevice* root_device,
+                       fdf::ClientEnd<fuchsia_hardware_sdmmc::Sdmmc> client_end)
+      : root_device_(root_device) {
     client_.Bind(std::move(client_end), fdf::Dispatcher::GetCurrent()->get());
     using_fidl_ = true;
   }
@@ -104,10 +109,12 @@ class SdmmcDevice {
   zx_status_t RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
                           uint64_t size, uint32_t vmo_rights);
   zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
-  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]) const;
+  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]);
 
   // Visible for testing.
   zx_status_t RefreshHostInfo() { return HostInfo(&host_info_); }
+
+  fdf::Logger& logger();
 
  private:
   static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
@@ -115,9 +122,9 @@ class SdmmcDevice {
   // Retry each request retries_ times (with wait_time delay in between) by default. Requests are
   // always tried at least once.
   zx_status_t Request(const sdmmc_req_t& req, uint32_t response[4], uint32_t retries = 0,
-                      zx::duration wait_time = {}) const;
+                      zx::duration wait_time = {});
   zx_status_t RequestWithBlockRead(const sdmmc_req_t& req, uint32_t response[4],
-                                   cpp20::span<uint8_t> read_data) const;
+                                   cpp20::span<uint8_t> read_data);
   zx_status_t SdSendAppCmd();
   // In case of IO failure, stop the transmission and wait for the card to go idle before retrying.
   void SdmmcStopForRetry();
@@ -125,7 +132,7 @@ class SdmmcDevice {
   inline uint32_t RcaArg() const { return rca_ << 16; }
 
   bool using_fidl_ = false;
-  const SdmmcRootDevice* const root_device_ = nullptr;
+  SdmmcRootDevice* const root_device_;
   ddk::SdmmcProtocolClient host_;
   // The FIDL client to communicate with Sdmmc device.
   fdf::WireSharedClient<fuchsia_hardware_sdmmc::Sdmmc> client_;

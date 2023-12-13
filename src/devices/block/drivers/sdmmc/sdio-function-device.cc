@@ -36,7 +36,7 @@ zx_status_t SdioFunctionDevice::Create(SdioControllerDevice* sdio_parent, uint32
   fbl::AllocChecker ac;
   out_dev->reset(new (&ac) SdioFunctionDevice(sdio_parent, func));
   if (!ac.check()) {
-    FDF_LOG(ERROR, "failed to allocate device memory");
+    FDF_LOGL(ERROR, sdio_parent->logger(), "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -52,7 +52,7 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
         sdio_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_sdio::Service>(
             std::move(handler), sdio_function_name_);
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add SDIO service: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to add SDIO service: %s", result.status_string());
       return result.status_value();
     }
   }
@@ -60,8 +60,8 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
+             controller_endpoints.status_string());
     return controller_endpoints.status_value();
   }
 
@@ -89,7 +89,8 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
   auto result = sdio_parent_->sdio_controller_node()->AddChild(
       args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child sdio function device: %s", result.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to add child sdio function device: %s",
+             result.status_string());
     return result.status();
   }
 
@@ -330,5 +331,7 @@ zx_status_t SdioFunctionDevice::SdioRequestCardReset() {
 }
 
 zx_status_t SdioFunctionDevice::SdioPerformTuning() { return sdio_parent_->SdioPerformTuning(); }
+
+fdf::Logger& SdioFunctionDevice::logger() { return sdio_parent_->logger(); }
 
 }  // namespace sdmmc

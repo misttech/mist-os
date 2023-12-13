@@ -48,6 +48,8 @@ class SdmmcRootDevice;
 //    throughput when using FIDL is as if command packing is disabled.
 class ReadWriteMetadata {
  public:
+  ReadWriteMetadata(SdmmcBlockDevice* block_device) : block_device_(block_device) {}
+
   struct Entry {
     // For non-packed commands, only this is needed, as initialized here.
     std::unique_ptr<sdmmc_buffer_region_t[]> buffer_regions =
@@ -68,14 +70,15 @@ class ReadWriteMetadata {
 
       zx_status_t status = zx::vmo::create(block_size, 0, &entries_[i].packed_command_header_vmo);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to create packed command header vmo: %s",
-                zx_status_get_string(status));
+        FDF_LOGL(ERROR, logger(), "Failed to create packed command header vmo: %s",
+                 zx_status_get_string(status));
         return status;
       }
 
       status = entries_[i].packed_command_header_mapper.Map(entries_[i].packed_command_header_vmo);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to map packed command header vmo: %s", zx_status_get_string(status));
+        FDF_LOGL(ERROR, logger(), "Failed to map packed command header vmo: %s",
+                 zx_status_get_string(status));
         return status;
       }
 
@@ -99,9 +102,13 @@ class ReadWriteMetadata {
   // No need to say which entry, since IOs are handled in order.
   void DoneWithEntry() { pending_readwrites_.release(); }
 
+  fdf::Logger& logger();
+
  private:
   // Balanced between keeping the sdmmc server busy and encouraging command packing.
   static constexpr int kMaxPendingReadWrites = 3;
+
+  SdmmcBlockDevice* const block_device_;
 
   std::counting_semaphore<> pending_readwrites_ = std::counting_semaphore<>(kMaxPendingReadWrites);
 
@@ -151,6 +158,8 @@ class SdmmcBlockDevice {
   }
   const std::unique_ptr<RpmbDevice>& child_rpmb_device() const { return child_rpmb_device_; }
 
+  fdf::Logger& logger();
+
  private:
   // An arbitrary limit to prevent RPMB clients from flooding us with requests.
   static constexpr size_t kMaxOutstandingRpmbRequests = 16;
@@ -190,6 +199,8 @@ class SdmmcBlockDevice {
   bool MmcSupportsHs400();
   void MmcSetInspectProperties();
 
+  void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status);
+
   SdmmcRootDevice* const parent_;
   std::unique_ptr<SdmmcDevice> sdmmc_;  // Only accessed by ProbeSd, ProbeMmc, and WorkerThread.
 
@@ -221,7 +232,7 @@ class SdmmcBlockDevice {
 
   uint32_t max_packed_reads_effective_ = 0;   // Use command packing up to this many reads.
   uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
-  ReadWriteMetadata readwrite_metadata_;
+  ReadWriteMetadata readwrite_metadata_{this};
 
   inspect::Inspector inspector_;
   inspect::Node root_;
