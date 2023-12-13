@@ -24,7 +24,6 @@
 #include "tools/fidl/fidlc/include/fidl/ordinals.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/include/fidl/tables_generator.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
@@ -374,12 +373,6 @@ class TestLibrary final : public SharedInterface {
     return out.str();
   }
 
-  std::string GenerateTables() {
-    auto tables_generator = fidl::TablesGenerator(compilation_.get());
-    auto out = tables_generator.Produce();
-    return out.str();
-  }
-
   // Note: We don't provide a convenient library() method because inspecting a
   // Library is usually the wrong thing to do in tests. What usually matters is
   // the Compilation, for which we provide compilation() and helpers like
@@ -551,10 +544,6 @@ class TestLibrary final : public SharedInterface {
 
   const std::vector<const fidl::flat::Decl*>& declaration_order() const {
     return compilation_->declaration_order;
-  }
-
-  const std::vector<const fidl::flat::Decl*>& all_libraries_declaration_order() const {
-    return compilation_->all_libraries_declaration_order;
   }
 
   const std::vector<fidl::flat::Compilation::Dependency>& direct_and_composed_dependencies() const {

@@ -28,7 +28,6 @@ with tests in [//tools/fidl/fidlc/tests][fidlc-compiler-tests].
 
 Target | Codegen | Runtime Libraries | Tests
 -------|---------|-------------------|-------
-Coding Tables | [/tools/fidl/fidlc/lib/tables_generator.cc] | - | [/src/lib/fidl/c]
 HLCPP (Old) | [/tools/fidl/fidlgen_hlcpp] | [/sdk/lib/fidl/cpp] | *(located alongside runtime libraries)*
 New C++ | [/tools/fidl/fidlgen_cpp] | [/sdk/lib/fidl/cpp] | [/src/lib/fidl/llcpp] and [/src/lib/fidl/cpp]
 Go | [/tools/fidl/fidlgen_go] | [/third_party/go/src/syscall/zx/fidl](https://fuchsia.googlesource.com/third_party/go/+/main/src/syscall/zx/fidl) | *(located alongside runtime libraries)*
@@ -734,7 +733,6 @@ fidl fmt --library my_library.fidl -i
 
 [/tools/fidl/fidlc/formatter]: /tools/fidl/fidlc/formatter
 [/tools/fidl/fidlc/linter]: /tools/fidl/fidlc/linter
-[/tools/fidl/fidlc/lib/tables_generator.cc]: /tools/fidl/fidlc/lib/tables_generator.cc
 [/tools/fidl/fidlgen_hlcpp]: /tools/fidl/fidlgen_hlcpp
 [/tools/fidl/fidlgen_cpp]: /tools/fidl/fidlgen_cpp
 [/tools/fidl/fidlgen_go]: /tools/fidl/fidlgen_go

@@ -142,10 +142,6 @@ template("_fidl_cpp_codegen_impl") {
 #  additional_visibility (optional)
 #    A list of labels which are allowed to depend on the generated code.
 #
-#  include_tables (optional)
-#    A boolean flag indicating if coding tables should be included.
-#    Defaults to false. These are needed for legacy high-level bindings.
-
 template("fidl_cpp_codegen") {
   if (current_toolchain == fidl_toolchain) {
     _fidl_cpp_codegen_impl(target_name) {
@@ -175,8 +171,6 @@ template("_fidl_cpp_library_impl") {
       include_dirs = [ root ]
     }
   }
-
-  include_tables = defined(invoker.include_tables) && invoker.include_tables
 
   source_set(target_name) {
     forward_variables_from(invoker,
@@ -221,9 +215,6 @@ template("_fidl_cpp_library_impl") {
       ":$generation_target_name($fidl_toolchain)",
       ":${fidl_target}($fidl_toolchain)",
     ]
-    if (include_tables) {
-      public_deps += [ ":${fidl_target}_tables" ]
-    }
 
     # Map FIDL library dependencies to generated library dependencies
     # of the same type (identified by bindings_flavor or dep_suffix).
@@ -237,12 +228,7 @@ template("_fidl_cpp_library_impl") {
       if (invoker.public_deps != []) {
         foreach(dep, invoker.public_deps) {
           label = get_label_info(dep, "label_no_toolchain")
-          if (label == "//zircon/vdso/zx:zx") {
-            # For the zx library, only link in the coding tables.
-            if (include_tables) {
-              public_deps += [ "${label}_tables" ]
-            }
-          } else {
+          if (label != "//zircon/vdso/zx:zx") {
             public_deps += [ "${label}${dep_suffix}" ]
           }
         }
@@ -420,7 +406,6 @@ template("fidl_cpp_family") {
                                "fidl_gen_dir",
                              ])
       forward_variables_from(hlcpp_options, "*")
-      include_tables = true
       if (is_fuchsia) {
         additional_public_deps = [ "//sdk/lib/fidl/cpp" ]
       } else {

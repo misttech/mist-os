@@ -359,26 +359,7 @@ type #Union# = union {
   }
 }
 
-TEST(DeclarationOrderTest, GoodAllLibrariesOrderSingle) {
-  for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
-library example;
-
-type #Foo# = struct {
-  bar vector<#Bar#>;
-};
-
-type #Bar# = struct {};
-
-)FIDL");
-    TestLibrary library(source);
-    ASSERT_COMPILED(library);
-    ASSERT_EQ(library.declaration_order(), library.all_libraries_declaration_order());
-  }
-}
-
-TEST(DeclarationOrderTest, GoodAllLibrariesOrderMultiple) {
+TEST(DeclarationOrderTest, GoodMultipleLibraries) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     SharedAmongstLibraries shared;
     TestLibrary dependency(&shared, "dependency.fidl", R"FIDL(
@@ -413,14 +394,6 @@ protocol ExampleDecl1 {
     ASSERT_EQ(fidl::NameFlatName(library_decl_order[1]->name), "example/ExampleDecl1MethodRequest");
     ASSERT_EQ(fidl::NameFlatName(library_decl_order[2]->name), "example/ExampleDecl1");
     ASSERT_EQ(fidl::NameFlatName(library_decl_order[3]->name), "example/ExampleDecl0");
-
-    auto all_decl_order = library.all_libraries_declaration_order();
-    ASSERT_EQ(5u, all_decl_order.size());
-    ASSERT_EQ(fidl::NameFlatName(all_decl_order[0]->name), "dependency/ExampleDecl1");
-    ASSERT_EQ(fidl::NameFlatName(all_decl_order[1]->name), "example/ExampleDecl2");
-    ASSERT_EQ(fidl::NameFlatName(all_decl_order[2]->name), "example/ExampleDecl1MethodRequest");
-    ASSERT_EQ(fidl::NameFlatName(all_decl_order[3]->name), "example/ExampleDecl1");
-    ASSERT_EQ(fidl::NameFlatName(all_decl_order[4]->name), "example/ExampleDecl0");
   }
 }
 

@@ -3,6 +3,13 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = transitional_allow_list
 
-// TODO(fxbug.dev/39388): This file is currently empty because we are in the
-// middle of transitioning coding tables from fidlc to fidlgen_hlcpp. Once the
-// transition is done, this file will contain the coding tables.
+#include <lib/fidl/internal.h>
+
+const struct FidlCodedStruct test_importedconstvalues_MyStructTable = {
+    .tag = kFidlTypeStruct,
+    .name = "test.importedconstvalues/MyStruct",
+    .is_empty = kFidlEmpty_IsEmpty,
+    .size_v2 = 1,
+    .elements = NULL,
+    .element_count = 0,
+};

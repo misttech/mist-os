@@ -426,22 +426,6 @@ template("fidl") {
     } else {
       not_needed(invoker, [ "sources" ])
     }
-
-    if (!is_fidl_toolchain) {
-      # Only import the fidl_tables() template if not in the fidl toolchain.
-      import("//build/c/fidl_c.gni")
-
-      # Define the fidl table bindings.
-      fidl_tables("${target_name}_tables") {
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                                 "visibility",
-                               ])
-        forward_variables_from(common_parameters, [ "fidl_target" ])
-      }
-    }
   } else {
     not_needed(invoker,
                non_go_only + [

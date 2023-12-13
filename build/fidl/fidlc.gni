@@ -40,7 +40,6 @@ template("fidlc") {
 
   # These paths are expected by the templates in //build/c/fidlc.gni.
   generated_binding_dir = "${invoker.gen_dir}/$fidl_target_name/c"
-  coding_tables = "$generated_binding_dir/$fidl_target_name.fidl.tables.c"
   fidlc_depfile_path = "$generated_binding_dir/${invoker.fidl_library_name}.d"
 
   libraries_file = "${invoker.gen_dir}/$fidl_target_name.libraries"
@@ -69,8 +68,6 @@ template("fidlc") {
              rebase_path(libraries_file, root_build_dir),
              "--json",
              rebase_path(invoker.json_representation, root_build_dir),
-             "--tables",
-             rebase_path(coding_tables, root_build_dir),
              "--name",
              invoker.fidl_library_name,
              "--depfile",
@@ -118,10 +115,7 @@ template("fidlc") {
     tool = "//tools/fidl/fidlc:fidlc"
     inputs = [ response_file ]
     depfile = fidlc_depfile_path
-    outputs = [
-      coding_tables,
-      invoker.json_representation,
-    ]
+    outputs = [ invoker.json_representation ]
     mnemonic = "FIDLC"
     args = [ "@" + rebase_path(response_file, root_build_dir) ]
     if (defined(invoker.non_fidl_deps)) {

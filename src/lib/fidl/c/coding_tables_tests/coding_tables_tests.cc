@@ -64,7 +64,7 @@ TEST(StructWithSomeFieldsRemoved, CodingTable) {
       "CodingStructWithSomeFieldsRemovedFromCodingTablesRequest",
       coded_struct.name);
 
-  ASSERT_EQ(6, coded_struct.element_count);
+  ASSERT_EQ(5, coded_struct.element_count);
 
   ASSERT_EQ(kFidlStructElementType_Padding64, coded_struct.elements[0].header.element_type);
   ASSERT_EQ(kFidlIsResource_NotResource, coded_struct.elements[0].header.is_resource);
@@ -76,21 +76,22 @@ TEST(StructWithSomeFieldsRemoved, CodingTable) {
   EXPECT_EQ(16, coded_struct.elements[1].padding.offset_v2);
   EXPECT_EQ(0xffffffffff000000ull, coded_struct.elements[1].padding.mask_64);
 
-  ASSERT_EQ(kFidlStructElementType_Padding16, coded_struct.elements[2].header.element_type);
+  ASSERT_EQ(kFidlStructElementType_Padding64, coded_struct.elements[2].header.element_type);
   ASSERT_EQ(kFidlIsResource_NotResource, coded_struct.elements[2].header.is_resource);
   EXPECT_EQ(32, coded_struct.elements[2].padding.offset_v2);
-  EXPECT_EQ(0xff00, coded_struct.elements[2].padding.mask_16);
+  EXPECT_EQ(0xff0000000000ff00, coded_struct.elements[2].padding.mask_64);
 
   ASSERT_EQ(kFidlStructElementType_Field, coded_struct.elements[3].header.element_type);
   ASSERT_EQ(kFidlIsResource_NotResource, coded_struct.elements[3].header.is_resource);
+  ASSERT_EQ(kFidlTypeArray, coded_struct.elements[3].field.field_type->type_tag());
   EXPECT_EQ(&fidl_internal_kBoolTable,
             coded_struct.elements[3].field.field_type->coded_array().element);
   EXPECT_EQ(38, coded_struct.elements[3].field.offset_v2);
 
-  ASSERT_EQ(kFidlStructElementType_Padding16, coded_struct.elements[4].header.element_type);
+  ASSERT_EQ(kFidlStructElementType_Padding64, coded_struct.elements[4].header.element_type);
   ASSERT_EQ(kFidlIsResource_NotResource, coded_struct.elements[4].header.is_resource);
-  EXPECT_EQ(38, coded_struct.elements[4].padding.offset_v2);
-  EXPECT_EQ(0xff00, coded_struct.elements[4].padding.mask_16);
+  EXPECT_EQ(40, coded_struct.elements[4].padding.offset_v2);
+  EXPECT_EQ(0xffffffffffff0000, coded_struct.elements[4].padding.mask_64);
 }
 
 TEST(MyXUnion, CodingTableWhenNullable) {

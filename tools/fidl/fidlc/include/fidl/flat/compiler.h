@@ -200,10 +200,6 @@ struct Compilation {
   // Filtered from library->declaration_order.
   std::vector<const Decl*> declaration_order;
 
-  // Filtered from the combined declaration_order of the target library and all
-  // its transitive dependencies, in a single topologically sorted list.
-  std::vector<const Decl*> all_libraries_declaration_order;
-
   // Filtered from library->dependencies, and also includes indirect
   // dependencies that come from protocol composition, i.e. what would need to
   // be imported if the composed methods were copied and pasted.

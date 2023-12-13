@@ -3,6 +3,29 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = transitional_allow_list
 
-// TODO(fxbug.dev/39388): This file is currently empty because we are in the
-// middle of transitioning coding tables from fidlc to fidlgen_hlcpp. Once the
-// transition is done, this file will contain the coding tables.
+#include <lib/fidl/internal.h>
+
+const struct FidlCodedBits test_consts_BitsTypeTable = {
+    .tag = kFidlTypeBits,
+    .name = "test.consts/BitsType",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Uint32,
+    .strictness = kFidlStrictness_Strict,
+    .mask = 0x3,
+};
+
+static bool EnumValidatorFor_test_consts_EnumType(uint64_t v) {
+  switch (v) {
+    case 1u:
+    case 2u:
+      return true;
+    default:
+      return false;
+  }
+}
+const struct FidlCodedEnum test_consts_EnumTypeTable = {
+    .tag = kFidlTypeEnum,
+    .name = "test.consts/EnumType",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Int32,
+    .strictness = kFidlStrictness_Strict,
+    .validate = EnumValidatorFor_test_consts_EnumType,
+};

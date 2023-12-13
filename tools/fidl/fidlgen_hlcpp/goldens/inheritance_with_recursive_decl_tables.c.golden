@@ -3,6 +3,55 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = transitional_allow_list
 
-// TODO(fxbug.dev/39388): This file is currently empty because we are in the
-// middle of transitioning coding tables from fidlc to fidlgen_hlcpp. Once the
-// transition is done, this file will contain the coding tables.
+#include <lib/fidl/internal.h>
+
+static const struct FidlCodedHandle Request0notnullableTable;
+
+static const struct FidlStructElement Fields52test_inheritancewithrecursivedecl_ChildSecondRequest[] = {
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_Resource,
+            },
+            .offset_v2 = 0,
+            .field_type = (const fidl_type_t*)&Request0notnullableTable,
+        },
+    },
+};
+const struct FidlCodedStruct test_inheritancewithrecursivedecl_ChildSecondRequestTable = {
+    .tag = kFidlTypeStruct,
+    .name = "test.inheritancewithrecursivedecl/ChildSecondRequest",
+    .is_empty = kFidlEmpty_IsNotEmpty,
+    .size_v2 = 4,
+    .elements = Fields52test_inheritancewithrecursivedecl_ChildSecondRequest,
+    .element_count = 1,
+};
+
+static const struct FidlStructElement Fields52test_inheritancewithrecursivedecl_ParentFirstRequest[] = {
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_Resource,
+            },
+            .offset_v2 = 0,
+            .field_type = (const fidl_type_t*)&Request0notnullableTable,
+        },
+    },
+};
+const struct FidlCodedStruct test_inheritancewithrecursivedecl_ParentFirstRequestTable = {
+    .tag = kFidlTypeStruct,
+    .name = "test.inheritancewithrecursivedecl/ParentFirstRequest",
+    .is_empty = kFidlEmpty_IsNotEmpty,
+    .size_v2 = 4,
+    .elements = Fields52test_inheritancewithrecursivedecl_ParentFirstRequest,
+    .element_count = 1,
+};
+
+static const struct FidlCodedHandle Request0notnullableTable = {
+    .tag = kFidlTypeHandle,
+    .handle_subtype = ZX_OBJ_TYPE_CHANNEL,
+    .handle_rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    .nullable = kFidlNullability_Nonnullable,
+};

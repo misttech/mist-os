@@ -8,7 +8,6 @@ import("//tools/fidl/fidlc/testdata/info.gni")
 
 source_set("fidl") {
   sources = [
-    "lib/coded_types_generator.cc",
     "lib/diagnostic_types.cc",
     "lib/diagnostics_json.cc",
     "lib/experimental_flags.cc",
@@ -47,7 +46,6 @@ source_set("fidl") {
     "lib/source_span.cc",
     "lib/span_sequence.cc",
     "lib/span_sequence_tree_visitor.cc",
-    "lib/tables_generator.cc",
     "lib/template_string.cc",
     "lib/tree_visitor.cc",
     "lib/type_shape.cc",
@@ -148,10 +146,6 @@ golden_files("fidlc_golden_tests") {
       {
         golden = "goldens/${info.name}.index.json.golden"
         candidate = "${info.fidl_gen_dir}/${info.target_name}.fidl.index.json"
-      },
-      {
-        golden = "goldens/${info.name}.tables.c.golden"
-        candidate = "${info.fidl_gen_dir}/${info.target_name}/c/${info.target_name}.fidl.tables.c"
       },
     ]
   }

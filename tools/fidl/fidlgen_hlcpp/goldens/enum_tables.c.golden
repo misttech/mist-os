@@ -3,6 +3,45 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = transitional_allow_list
 
-// TODO(fxbug.dev/39388): This file is currently empty because we are in the
-// middle of transitioning coding tables from fidlc to fidlgen_hlcpp. Once the
-// transition is done, this file will contain the coding tables.
+#include <lib/fidl/internal.h>
+
+const struct FidlCodedEnum test_enum_MyEmptyFlexibleEnumTable = {
+    .tag = kFidlTypeEnum,
+    .name = "test.enum/MyEmptyFlexibleEnum",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Uint32,
+    .strictness = kFidlStrictness_Flexible,
+    .validate = NULL,
+};
+
+const struct FidlCodedEnum test_enum_MyFlexibleEnumTable = {
+    .tag = kFidlTypeEnum,
+    .name = "test.enum/MyFlexibleEnum",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Uint32,
+    .strictness = kFidlStrictness_Flexible,
+    .validate = NULL,
+};
+
+const struct FidlCodedEnum test_enum_MyFlexibleEnumWithCustomUnknownTable = {
+    .tag = kFidlTypeEnum,
+    .name = "test.enum/MyFlexibleEnumWithCustomUnknown",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Uint32,
+    .strictness = kFidlStrictness_Flexible,
+    .validate = NULL,
+};
+
+static bool EnumValidatorFor_test_enum_MyStrictEnum(uint64_t v) {
+  switch (v) {
+    case 1u:
+    case 2u:
+      return true;
+    default:
+      return false;
+  }
+}
+const struct FidlCodedEnum test_enum_MyStrictEnumTable = {
+    .tag = kFidlTypeEnum,
+    .name = "test.enum/MyStrictEnum",
+    .underlying_type = kFidlCodedPrimitiveSubtype_Uint32,
+    .strictness = kFidlStrictness_Strict,
+    .validate = EnumValidatorFor_test_enum_MyStrictEnum,
+};

@@ -38,7 +38,7 @@ type StructWithSomeFieldsRemovedFromCodingTables = struct {
     padding_at_end_struct PaddingAtEndStruct;
     reset_alignment uint64;
     foo int8; // removed
-    // 3 bytes padding.
+    // 1 bytes padding.
     arr array<StructWithAllFieldsRemovedFromCodingTables, 1>; // removed
     bool_array array<bool, 1>; // not removed
     // 1 byte padding.

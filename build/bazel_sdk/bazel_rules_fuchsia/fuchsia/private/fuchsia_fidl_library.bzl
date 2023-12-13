@@ -23,7 +23,6 @@ def _gather_dependencies(deps):
 def _fidl_impl(context):
     sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ir = context.outputs.ir
-    tables = context.outputs.coding_tables
     library_name = context.attr.library
 
     info = _gather_dependencies(context.attr.deps)
@@ -49,21 +48,13 @@ def _fidl_impl(context):
             library_name,
             "--available",
             "fuchsia:%s" % api_level,
-            "--tables",
-            tables.path,
         ] + files_argument,
         inputs = inputs,
-        outputs = [
-            ir,
-            tables,
-        ],
+        outputs = [ir],
         mnemonic = "Fidlc",
     )
 
     return [
-        # Exposing the coding tables here so that the target can be consumed as a
-        # C++ source.
-        DefaultInfo(files = depset([tables])),
         # Passing library info for dependent libraries.
         FuchsiaFidlLibraryInfo(info = info, name = library_name, ir = ir),
     ]
@@ -96,8 +87,6 @@ _fidl_library = rule(
         # The intermediate representation of the library, to be consumed by bindings
         # generators.
         "ir": "%{name}.fidl.json",
-        # The C coding tables.
-        "coding_tables": "%{name}_tables.c",
     },
 )
 

@@ -3,6 +3,27 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = transitional_allow_list
 
-// TODO(fxbug.dev/39388): This file is currently empty because we are in the
-// middle of transitioning coding tables from fidlc to fidlgen_hlcpp. Once the
-// transition is done, this file will contain the coding tables.
+#include <lib/fidl/internal.h>
+
+extern const struct FidlCodedEnum test_dependent_MyEnumTable;
+
+static const struct FidlStructElement Fields47test_structdefaultvalueenumlibraryreference_Foo[] = {
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_NotResource,
+            },
+            .offset_v2 = 0,
+            .field_type = (const fidl_type_t*)&test_dependent_MyEnumTable,
+        },
+    },
+};
+const struct FidlCodedStruct test_structdefaultvalueenumlibraryreference_FooTable = {
+    .tag = kFidlTypeStruct,
+    .name = "test.structdefaultvalueenumlibraryreference/Foo",
+    .is_empty = kFidlEmpty_IsNotEmpty,
+    .size_v2 = 4,
+    .elements = Fields47test_structdefaultvalueenumlibraryreference_Foo,
+    .element_count = 1,
+};

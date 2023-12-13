@@ -17,9 +17,9 @@ source_set("test_sources") {
   ]
   public_deps = [
     ":fidl.test.coding.fuchsia_cpp",
-    ":fidl.test.coding.fuchsia_tables",
+    ":fidl.test.coding.fuchsia_hlcpp",
     ":fidl.test.coding_cpp",
-    ":fidl.test.coding_tables",
+    ":fidl.test.coding_hlcpp",
     "//sdk/lib/fidl",
     "//sdk/lib/fidl/cpp:cpp_base",
     "//sdk/lib/fit",
@@ -95,7 +95,7 @@ source_set("host_test_sources") {
   ]
   public_deps = [
     ":fidl.test.coding_cpp",
-    ":fidl.test.coding_tables",
+    ":fidl.test.coding_hlcpp",
     "//sdk/lib/fidl/cpp:cpp_base",
     "//sdk/lib/fidl_base",
     "//zircon/system/ulib/zxtest",
@@ -114,6 +114,7 @@ if (!is_fuchsia) {
 fidl("fidl.test.coding") {
   visibility = [ ":*" ]
   sources = [ "extra_messages.test.fidl" ]
+  enable_hlcpp = true
 }
 
 fidl("fidl.test.coding.fuchsia") {
@@ -123,4 +124,5 @@ fidl("fidl.test.coding.fuchsia") {
     "messages.test.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }

@@ -469,9 +469,6 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   compilation->external_structs = ExternalStructs(library, compilation->declarations.protocols);
   compilation->using_references = library->dependencies.library_references();
   filter(&compilation->declaration_order, library->declaration_order);
-  for (const auto& lib : libraries_) {
-    filter(&compilation->all_libraries_declaration_order, lib->declaration_order);
-  };
   auto dependencies = CalcDependencies().From(compilation->declaration_order);
   dependencies.erase(library);
   dependencies.erase(root_library());

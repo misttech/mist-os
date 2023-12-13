@@ -14,10 +14,6 @@ bindings for the library.
 
 The frontend is a command-line program named `fidlc`. The `fidlc` compiler has these flags:
 
-* `--tables TABLES_PATH`. If present, this flag instructs `fidlc` to output coding tables at the
-  given path. The coding tables are required to encode and decode messages from the C and C++
-  bindings.
-
 * `--json JSON_PATH`. If present, this flag instructs `fidlc` to output the library's intermediate
   representation at the given path. The intermediate representation is JSON that conforms to [a
   particular schema][schema]. The intermediate representation is used as

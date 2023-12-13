@@ -166,8 +166,6 @@ def _fidl_cc_library(name, library, binding_level, deps = [], tags = [], **kwarg
         ],
         srcs = [
             ":%s" % impl_name,
-            # For the coding tables.
-            library,
         ],
         # This is necessary in order to locate generated headers.
         strip_include_prefix = gen_name + "." + binding_level,

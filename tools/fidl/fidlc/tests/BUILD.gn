@@ -46,7 +46,6 @@ test("fidlc-test") {
     "availability_interleaving_tests.cc",
     "bits_tests.cc",
     "canonical_names_tests.cc",
-    "coded_types_generator_tests.cc",
     "consts_tests.cc",
     "declaration_order_tests.cc",
     "decomposition_tests.cc",
