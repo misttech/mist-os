@@ -546,21 +546,21 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceRetransTimeout>
+impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceLearnedParams>
     for DualStackIpDeviceState<I>
 {
-    type Data = NonZeroDuration;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroDuration>
+    type Data = Ipv6NetworkLearnedParameters;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6NetworkLearnedParameters>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroDuration>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6NetworkLearnedParameters>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ipv6.retrans_timer.read()
+        self.ipv6.learned_params.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ipv6.retrans_timer.write()
+        self.ipv6.learned_params.write()
     }
 }
 
@@ -606,18 +606,29 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
     }
 }
 
-/// The state common to all IPv6 devices.
-pub(crate) struct Ipv6DeviceState<I: Instant> {
+/// IPv6 device parameters that can be learned from router advertisements.
+#[derive(Default)]
+pub(crate) struct Ipv6NetworkLearnedParameters {
     /// The time between retransmissions of Neighbor Solicitation messages to a
     /// neighbor when resolving the address or when probing the reachability of
     /// a neighbor.
     ///
-    /// Default: [`RETRANS_TIMER_DEFAULT`].
     ///
     /// See RetransTimer in [RFC 4861 section 6.3.2] for more details.
     ///
     /// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
-    pub(crate) retrans_timer: RwLock<NonZeroDuration>,
+    pub(crate) retrans_timer: Option<NonZeroDuration>,
+}
+
+impl Ipv6NetworkLearnedParameters {
+    pub(crate) fn retrans_timer_or_default(&self) -> NonZeroDuration {
+        self.retrans_timer.clone().unwrap_or(RETRANS_TIMER_DEFAULT)
+    }
+}
+
+/// The state common to all IPv6 devices.
+pub(crate) struct Ipv6DeviceState<I: Instant> {
+    pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
     pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
     pub(super) router_soliciations_remaining: Mutex<Option<NonZeroU8>>,
     pub(crate) ip_state: IpDeviceState<I, Ipv6>,
@@ -627,7 +638,7 @@ pub(crate) struct Ipv6DeviceState<I: Instant> {
 impl<I: Instant> Default for Ipv6DeviceState<I> {
     fn default() -> Ipv6DeviceState<I> {
         Ipv6DeviceState {
-            retrans_timer: RwLock::new(RETRANS_TIMER_DEFAULT),
+            learned_params: Default::default(),
             route_discovery: Default::default(),
             router_soliciations_remaining: Default::default(),
             ip_state: Default::default(),

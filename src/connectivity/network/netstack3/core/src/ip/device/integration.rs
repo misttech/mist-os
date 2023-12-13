@@ -19,12 +19,9 @@ use net_types::{
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
-use packet_formats::{
-    icmp::{
-        ndp::{NeighborSolicitation, RouterSolicitation},
-        IcmpUnusedCode,
-    },
-    utils::NonZeroDuration,
+use packet_formats::icmp::{
+    ndp::{NeighborSolicitation, RouterSolicitation},
+    IcmpUnusedCode,
 };
 
 use crate::{
@@ -70,6 +67,8 @@ use crate::{
     },
     NonSyncContext, SyncCtx,
 };
+
+use super::state::Ipv6NetworkLearnedParameters;
 
 pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
     pub(crate) sync_ctx: SyncCtxWithIpDeviceConfiguration<
@@ -703,10 +702,16 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContex
         cb: F,
     ) -> O {
         let Self { config, sync_ctx } = self;
-        let retrans_timer =
-            device::Ipv6DeviceContext::with_retrans_timer(sync_ctx, device_id, |retrans_timer| {
-                retrans_timer.get()
-            });
+        let retrans_timer = device::Ipv6DeviceContext::with_network_learned_parameters(
+            sync_ctx,
+            device_id,
+            |params| {
+                // NB: We currently only change the retransmission timer from
+                // learning it from the network. We might need to consider user
+                // settings once we allow users to override the value.
+                params.retrans_timer_or_default().get()
+            },
+        );
         let interface_identifier = device::Ipv6DeviceContext::get_eui64_iid(sync_ctx, device_id)
             .unwrap_or_else(Default::default);
 
@@ -821,8 +826,16 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
         cb: F,
     ) -> O {
         let Self { config, sync_ctx } = self;
-        let retrans_timer =
-            device::Ipv6DeviceContext::<C>::with_retrans_timer(sync_ctx, device_id, |s| *s);
+        let retrans_timer = device::Ipv6DeviceContext::<C>::with_network_learned_parameters(
+            sync_ctx,
+            device_id,
+            |p| {
+                // NB: We currently only change the retransmission timer from
+                // learning it from the network. We might need to consider user
+                // settings once we allow users to override the value.
+                p.retrans_timer_or_default()
+            },
+        );
 
         let mut entry = {
             // Get a `Locked` at the same lock-level of our `sync_ctx`. We show
@@ -1095,22 +1108,22 @@ impl<'a, Config, C: NonSyncContext> device::Ipv6DeviceContext<C>
         device::Ipv6DeviceContext::set_link_mtu(sync_ctx, device_id, mtu)
     }
 
-    fn with_retrans_timer<O, F: FnOnce(&NonZeroDuration) -> O>(
+    fn with_network_learned_parameters<O, F: FnOnce(&Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
         let Self { config: _, sync_ctx } = self;
-        device::Ipv6DeviceContext::with_retrans_timer(sync_ctx, device_id, cb)
+        device::Ipv6DeviceContext::with_network_learned_parameters(sync_ctx, device_id, cb)
     }
 
-    fn with_retrans_timer_mut<O, F: FnOnce(&mut NonZeroDuration) -> O>(
+    fn with_network_learned_parameters_mut<O, F: FnOnce(&mut Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
         let Self { config: _, sync_ctx } = self;
-        device::Ipv6DeviceContext::with_retrans_timer_mut(sync_ctx, device_id, cb)
+        device::Ipv6DeviceContext::with_network_learned_parameters_mut(sync_ctx, device_id, cb)
     }
 }
 

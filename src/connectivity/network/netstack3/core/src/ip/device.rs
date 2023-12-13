@@ -62,6 +62,8 @@ use crate::{
     Instant,
 };
 
+use self::state::Ipv6NetworkLearnedParameters;
+
 /// A timer ID for IPv4 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub(crate) struct Ipv4DeviceTimerId<DeviceId>(IgmpTimerId<DeviceId>);
@@ -754,14 +756,14 @@ pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceI
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
 
     /// Calls the function with an immutable reference to the retransmit timer.
-    fn with_retrans_timer<O, F: FnOnce(&NonZeroDuration) -> O>(
+    fn with_network_learned_parameters<O, F: FnOnce(&Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
 
     /// Calls the function with a mutable reference to the retransmit timer.
-    fn with_retrans_timer_mut<O, F: FnOnce(&mut NonZeroDuration) -> O>(
+    fn with_network_learned_parameters_mut<O, F: FnOnce(&mut Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -899,7 +901,9 @@ impl<
         device_id: &Self::DeviceId,
         retrans_timer: NonZeroDuration,
     ) {
-        self.with_retrans_timer_mut(device_id, |state| *state = retrans_timer)
+        self.with_network_learned_parameters_mut(device_id, |state| {
+            state.retrans_timer = Some(retrans_timer)
+        })
     }
 
     fn remove_duplicate_tentative_address(

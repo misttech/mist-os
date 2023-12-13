@@ -18,7 +18,7 @@ use net_types::{
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, Serializer};
-use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
+use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
     context::{CounterContext, RecvFrameContext, SendFrameContext},
@@ -42,7 +42,7 @@ use crate::{
         state::{
             AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
             Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
-            Ipv6DadState, Ipv6DeviceConfiguration,
+            Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
         },
         DualStackDeviceContext, DualStackDeviceStateRef, IpDeviceAddressContext,
         IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt, IpDeviceSendContext,
@@ -729,24 +729,24 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
         }
     }
 
-    fn with_retrans_timer<O, F: FnOnce(&NonZeroDuration) -> O>(
+    fn with_network_learned_parameters<O, F: FnOnce(&Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
         with_ip_device_state(self, device_id, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>();
+            let state = state.read_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
             cb(&state)
         })
     }
 
-    fn with_retrans_timer_mut<O, F: FnOnce(&mut NonZeroDuration) -> O>(
+    fn with_network_learned_parameters_mut<O, F: FnOnce(&mut Ipv6NetworkLearnedParameters) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
         with_ip_device_state(self, device_id, |mut state| {
-            let mut state = state.write_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>();
+            let mut state = state.write_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
             cb(&mut state)
         })
     }

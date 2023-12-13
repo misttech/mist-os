@@ -158,7 +158,7 @@ pub(crate) enum Ipv4DeviceAddressState {}
 
 pub(crate) enum Ipv6DeviceRouterSolicitations {}
 pub(crate) enum Ipv6DeviceRouteDiscovery {}
-pub(crate) enum Ipv6DeviceRetransTimeout {}
+pub(crate) enum Ipv6DeviceLearnedParams {}
 pub(crate) enum Ipv6DeviceAddressDad {}
 pub(crate) enum Ipv6DeviceAddressState {}
 
@@ -260,8 +260,8 @@ impl_lock_after!(Ipv6DeviceAddressState => IpDeviceDefaultHopLimit<Ipv4>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
 impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);
-impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceRetransTimeout);
-impl_lock_after!(Ipv6DeviceRetransTimeout => EthernetDeviceDynamicState);
+impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceLearnedParams);
+impl_lock_after!(Ipv6DeviceLearnedParams => EthernetDeviceDynamicState);
 impl_lock_after!(EthernetDeviceDynamicState => EthernetTxQueue);
 
 impl_lock_after!(DeviceLayerState => DeviceSockets);

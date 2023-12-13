@@ -318,14 +318,16 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 impl<
         'a,
         NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::Ipv6DeviceRetransTimeout>,
+        L: LockBefore<crate::lock_ordering::Ipv6DeviceLearnedParams>,
     > NudConfigContext<Ipv6> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<NonSyncCtx>, L>>
 {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         let Self { device_id, sync_ctx } = self;
         device::integration::with_ethernet_state(sync_ctx, device_id, |mut state| {
             let mut state = state.cast();
-            let x = state.read_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>().clone();
+            let x = state
+                .read_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>()
+                .retrans_timer_or_default();
             x
         })
     }
