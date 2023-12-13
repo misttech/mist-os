@@ -75,8 +75,21 @@ class Client {
     return zx::ok(info);
   }
 
+  zx::result<AbrDataOneShotFlags> GetAndClearOneShotFlags() {
+    AbrDataOneShotFlags flags;
+    auto status = AbrResultToZxStatus(AbrGetAndClearOneShotFlags(&abr_ops_, &flags));
+    if (status.is_error()) {
+      return status.take_error();
+    }
+    return zx::ok(flags);
+  }
+
   zx::result<> SetOneShotRecovery() {
     return AbrResultToZxStatus(AbrSetOneShotRecovery(&abr_ops_, true));
+  }
+
+  zx::result<> SetOneShotBootloader() {
+    return AbrResultToZxStatus(AbrSetOneShotBootloader(&abr_ops_, true));
   }
 
   static zx::result<> AbrResultToZxStatus(AbrResult status);

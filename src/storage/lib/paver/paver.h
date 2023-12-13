@@ -18,6 +18,7 @@
 #include <fbl/mutex.h>
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
+#include <sdk/lib/syslog/cpp/macros.h>
 
 #include "abr-client.h"
 #include "device-partitioner.h"
@@ -51,6 +52,8 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   }
 
   Paver() : context_(std::make_shared<Context>()) {}
+
+  void ListenForLifecycleStop();
 
  private:
   // Used for test injection.

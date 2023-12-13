@@ -39,6 +39,7 @@ class Vim3Partitioner : public DevicePartitioner {
                                cpp20::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override { return zx::ok(); }
+  zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
   explicit Vim3Partitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}

@@ -138,6 +138,10 @@ class DevicePartitioner {
 
   // Flush all buffered write to persistant storage.
   virtual zx::result<> Flush() const = 0;
+
+  // Called by paver when Lifetime::Stop event is received
+  // Can be used to update ABR oneshot flags for reboot.
+  virtual zx::result<> OnStop() const = 0;
 };
 
 struct BlockAndController {
@@ -200,6 +204,7 @@ class FixedDevicePartitioner : public DevicePartitioner {
                                cpp20::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override { return zx::ok(); }
+  zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
   explicit FixedDevicePartitioner(fbl::unique_fd devfs_root) : devfs_root_(std::move(devfs_root)) {}

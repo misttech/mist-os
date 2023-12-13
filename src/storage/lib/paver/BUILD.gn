@@ -21,6 +21,7 @@ source_set("paver-core") {
     "abr-client.cc",
     "device-partitioner.cc",
     "fvm.cc",
+    "lifecycle.cc",
     "partition-client.cc",
     "paver.cc",
     "sparse.cc",
@@ -42,6 +43,7 @@ source_set("paver-core") {
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
+    "//sdk/lib/syslog/cpp:cpp",
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//src/storage/gpt",
     "//src/storage/lib/fs_management",
@@ -57,6 +59,7 @@ source_set("paver-core") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/uuid",
@@ -155,10 +158,14 @@ source_set("vim3") {
 }
 
 source_set("x64") {
-  sources = [ "x64.cc" ]
+  sources = [
+    "system_shutdown_state.cc",
+    "x64.cc",
+  ]
   deps = [
     ":gpt",
     ":paver-core",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//src/lib/uuid",
   ]
 }

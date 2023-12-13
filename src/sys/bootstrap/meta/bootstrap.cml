@@ -875,6 +875,7 @@
                 "#driver-hosts",
                 "#driver_manager",
                 "#full-pkg-drivers",
+                "#miscsvc",
                 "#pkg-drivers",
             ],
         },

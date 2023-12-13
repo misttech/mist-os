@@ -5,17 +5,28 @@
 #include "src/storage/lib/paver/device-partitioner.h"
 
 #include <dirent.h>
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
+#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.fshost/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <fidl/fuchsia.tracing.provider/cpp/wire.h>
 #include <lib/abr/util.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/stdcompat/span.h>
+#include <lib/sys/cpp/testing/component_context_provider.h>
+#include <lib/sys/cpp/testing/service_directory_provider.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/hw/gpt.h>
@@ -31,14 +42,19 @@
 
 #include <fbl/unique_fd.h>
 #include <gpt/gpt.h>
+#include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 #include <soc/aml-common/aml-guid.h>
 #include <zxtest/zxtest.h>
 
+#include "fidl/fuchsia.device.manager/cpp/common_types.h"
+#include "fidl/fuchsia.device.manager/cpp/markers.h"
+#include "lib/zx/result.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/system_shutdown_state.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/vim3.h"
@@ -59,6 +75,8 @@ constexpr uint64_t kTebibyte{kGibibyte * 1024};
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
+using fuchsia_device_manager::SystemPowerState;
+using fuchsia_device_manager::SystemStateTransition;
 using paver::BlockWatcherPauser;
 using paver::PartitionSpec;
 
@@ -404,21 +422,88 @@ TEST_F(GptDevicePartitionerTests, AddPartitionAtLargeOffset) {
                                                   15LU * kGibibyte, 0));
 }
 
+class FakeSystemStateTransition final : public fidl::WireServer<SystemStateTransition> {
+ public:
+  void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
+    completer.Reply(state_);
+  }
+  void GetMexecZbis(GetMexecZbisCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetTerminationSystemState(SystemPowerState state) { state_ = state; }
+
+ private:
+  fidl::ServerBindingGroup<SystemStateTransition> bindings_;
+  SystemPowerState state_ = SystemPowerState::kFullyOn;
+};
+
+class FakeSvc {
+ public:
+  explicit FakeSvc(async_dispatcher_t* dispatcher, IsolatedDevmgr& devmgr) {
+    zx::result server_end = fidl::CreateEndpoints(&root_);
+    ASSERT_OK(server_end);
+    async::PostTask(dispatcher, [dispatcher, &devmgr = devmgr,
+                                 &fake_system_shutdown_state = fake_system_shutdown_state_,
+                                 server_end = std::move(server_end.value())]() mutable {
+      component::OutgoingDirectory outgoing{dispatcher};
+      ASSERT_OK(outgoing.AddUnmanagedProtocol<SystemStateTransition>(
+          [&fake_system_shutdown_state, dispatcher](fidl::ServerEnd<SystemStateTransition> server) {
+            fidl::BindServer(dispatcher, std::move(server), &fake_system_shutdown_state);
+          }));
+
+      // Forward protocol(s) to devmgr
+      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::BlockWatcher>(
+          [&devmgr](fidl::ServerEnd<fuchsia_fshost::BlockWatcher> server_end) {
+            ASSERT_OK(component::ConnectAt(devmgr.fshost_svc_dir(), std::move(server_end)));
+          }));
+
+      ASSERT_OK(outgoing.Serve(std::move(server_end)));
+
+      // Stash the outgoing directory on the dispatcher so that the dtor runs on the dispatcher
+      // thread.
+      async::PostDelayedTask(
+          dispatcher, [outgoing = std::move(outgoing)]() {}, zx::duration::infinite());
+    });
+  }
+
+  FakeSystemStateTransition& fake_system_shutdown_state() { return fake_system_shutdown_state_; }
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
+    return component::ConnectAt<fuchsia_io::Directory>(
+        root_, component::OutgoingDirectory::kServiceDirectory);
+  }
+
+ private:
+  FakeSystemStateTransition fake_system_shutdown_state_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_;
+};
+
 class EfiDevicePartitionerTests : public GptDevicePartitionerTests {
  protected:
-  EfiDevicePartitionerTests() : GptDevicePartitionerTests(fbl::String(), 512) {}
+  EfiDevicePartitionerTests() : GptDevicePartitionerTests(fbl::String(), 512) {
+    EXPECT_OK(loop_.StartThread("efi-devicepartitioner-tests-loop"));
+  }
+
+  ~EfiDevicePartitionerTests() { loop_.Shutdown(); }
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
-    fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
+    return CreatePartitioner(gpt, GetSvcRoot());
+  }
+  zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(
+      BlockDevice* gpt, fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
     zx::result controller = ControllerFromBlock(gpt);
     if (controller.is_error()) {
       return controller.take_error();
     }
-    return paver::EfiDevicePartitioner::Initialize(devmgr_.devfs_root().duplicate(), svc_root,
-                                                   paver::Arch::kX64,
-                                                   std::move(controller.value()));
+    std::shared_ptr<paver::Context> context;
+    return paver::EfiDevicePartitioner::Initialize(devmgr_.devfs_root().duplicate(),
+                                                   std::move(svc_root), paver::Arch::kX64,
+                                                   std::move(controller.value()), context);
   }
+
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(EfiDevicePartitionerTests, InitializeWithoutGptFails) {
@@ -749,6 +834,37 @@ TEST_F(EfiDevicePartitionerTests, ValidatePayload) {
   // Non-kernel partitions are not validated.
   ASSERT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kAbrMeta),
                                          cpp20::span<uint8_t>()));
+}
+
+TEST_F(EfiDevicePartitionerTests, OnStop) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
+
+  FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
+  zx::result svc = fake_svc.svc();
+  EXPECT_OK(svc);
+
+  zx::result partitioner_status = CreatePartitioner(gpt_dev.get(), std::move(svc.value()));
+  ASSERT_OK(partitioner_status);
+  std::unique_ptr<paver::DevicePartitioner> partitioner = std::move(partitioner_status.value());
+  ASSERT_OK(partitioner->InitPartitionTables());
+
+  // Set Termination system state to "reboot to bootloader"
+  fake_svc.fake_system_shutdown_state().SetTerminationSystemState(
+      SystemPowerState::kRebootBootloader);
+
+  // Trigger OnStop event that should set one shot flag
+  ASSERT_OK(partitioner->OnStop());
+
+  // Verify ABR flags
+  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  ASSERT_OK(partition);
+  auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
+  ASSERT_OK(abr_partition_client);
+  auto abr_flags_res = abr_partition_client.value()->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
 }
 
 class FixedDevicePartitionerTests : public zxtest::Test {

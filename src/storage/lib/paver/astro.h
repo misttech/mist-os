@@ -44,6 +44,8 @@ class AstroPartitioner : public DevicePartitioner {
 
   zx::result<> Flush() const override;
 
+  zx::result<> OnStop() const override { return zx::ok(); }
+
  private:
   AstroPartitioner(std::unique_ptr<SkipBlockDevicePartitioner> skip_block,
                    std::shared_ptr<Context> context)

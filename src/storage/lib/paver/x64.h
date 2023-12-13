@@ -14,7 +14,7 @@ class EfiDevicePartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      fidl::ClientEnd<fuchsia_device::Controller> block_device);
+      fidl::ClientEnd<fuchsia_device::Controller> block_device, std::shared_ptr<Context> context);
 
   bool IsFvmWithinFtl() const override { return false; }
 
@@ -39,12 +39,16 @@ class EfiDevicePartitioner : public DevicePartitioner {
 
   zx::result<> Flush() const override { return zx::ok(); }
 
+  zx::result<> OnStop() const override;
+
  private:
-  EfiDevicePartitioner(Arch arch, std::unique_ptr<GptDevicePartitioner> gpt)
-      : gpt_(std::move(gpt)), arch_(arch) {}
+  EfiDevicePartitioner(Arch arch, std::unique_ptr<GptDevicePartitioner> gpt,
+                       std::shared_ptr<Context> context)
+      : gpt_(std::move(gpt)), arch_(arch), context_(context) {}
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
   Arch arch_;
+  std::shared_ptr<Context> context_;
 };
 
 class X64PartitionerFactory : public DevicePartitionerFactory {

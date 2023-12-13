@@ -21,8 +21,11 @@
 #include <stddef.h>
 #include <string.h>
 #include <zircon/errors.h>
+#include <zircon/process.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/system/public/zircon/errors.h>
 #include <zircon/types.h>
 
 #include <cstdarg>
@@ -37,6 +40,7 @@
 
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/fvm.h"
+#include "src/storage/lib/paver/lifecycle.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/sparse.h"
@@ -876,6 +880,44 @@ void Paver::FindSysconfig(fidl::ServerEnd<fuchsia_paver::Sysconfig> sysconfig) {
   }
   Sysconfig::Bind(dispatcher_, devfs_root_.duplicate(), std::move(svc_root_), context_,
                   std::move(sysconfig));
+}
+
+void Paver::ListenForLifecycleStop() {
+  ZX_ASSERT(dispatcher_);
+  zx::channel lifecycle_channel = zx::channel(zx_take_startup_handle(PA_LIFECYCLE));
+  if (!lifecycle_channel.is_valid()) {
+    ERROR("PA_LIFECYCLE startup handle is required.");
+    return;
+  }
+
+  fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle(std::move(lifecycle_channel));
+  if (!lifecycle.is_valid()) {
+    LOG("No valid handle found for lifecycle events, assuming test environment and continuing");
+    return;
+  }
+
+  LifecycleServer::Create(
+      dispatcher_,
+      [this](fit::callback<void(zx_status_t status)> cb) {
+        LOG("Lifecycle stop request received.");
+
+        if (!svc_root_) {
+          svc_root_ = OpenServiceRoot();
+        }
+
+        zx::result partitioner = DevicePartitionerFactory::Create(
+            devfs_root_.duplicate(), svc_root_, GetCurrentArch(), context_);
+        if (partitioner.is_error()) {
+          ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
+          return;
+        }
+        zx::result res = partitioner->OnStop();
+        if (res.is_error()) {
+          ERROR("Failed to process OnStop with partitioner.");
+        }
+        cb(ZX_OK);
+      },
+      std::move(lifecycle));
 }
 
 }  // namespace paver

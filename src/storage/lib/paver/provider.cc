@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/paver/provider.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
@@ -24,6 +25,7 @@ zx_status_t Connect(void* ctx, async_dispatcher_t* dispatcher, const char* servi
   if (std::string_view{service_name} == fidl::DiscoverableProtocolName<fuchsia_paver::Paver>) {
     auto* paver = reinterpret_cast<paver::Paver*>(ctx);
     paver->set_dispatcher(dispatcher);
+    paver->ListenForLifecycleStop();
     fidl::BindServer(dispatcher, fidl::ServerEnd<fuchsia_paver::Paver>(zx::channel(request)),
                      paver);
     return ZX_OK;

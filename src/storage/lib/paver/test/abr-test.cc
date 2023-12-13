@@ -212,4 +212,107 @@ TEST(CurrentSlotTest, TestInvalid) {
   ASSERT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
+class FakePartitionClient final : public paver::PartitionClient {
+ public:
+  FakePartitionClient(size_t block_size, size_t partition_size)
+      : block_size_(block_size), partition_size_(partition_size) {}
+
+  zx::result<size_t> GetBlockSize() final {
+    if (result_ == ZX_OK) {
+      return zx::ok(block_size_);
+    }
+    return zx::error(result_);
+  }
+  zx::result<size_t> GetPartitionSize() final {
+    if (result_ == ZX_OK) {
+      return zx::ok(partition_size_);
+    }
+    return zx::error(result_);
+  }
+  zx::result<> Read(const zx::vmo& vmo, size_t size) final {
+    if (size > partition_size_) {
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
+    }
+    return zx::make_result(result_);
+  }
+  zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final {
+    if (vmo_size > partition_size_) {
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
+    }
+    return zx::make_result(result_);
+  }
+  zx::result<> Trim() final { return zx::make_result(result_); }
+  zx::result<> Flush() final { return zx::make_result(result_); }
+
+  void set_result(zx_status_t result) { result_ = result; }
+
+ private:
+  size_t block_size_;
+  size_t partition_size_;
+
+  zx_status_t result_ = ZX_OK;
+};
+
+class OneShotFlagsTest : public zxtest::Test {
+ public:
+  void SetUp() override {
+    auto partition_client = std::make_unique<FakePartitionClient>(10, 100);
+    auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition_client));
+    ASSERT_OK(abr_partition_client);
+    abr_client_ = std::move(abr_partition_client.value());
+
+    // Clear flags
+    ASSERT_OK(abr_client_->GetAndClearOneShotFlags());
+  }
+
+  std::unique_ptr<abr::Client> abr_client_;
+};
+
+TEST_F(OneShotFlagsTest, ClearFlags) {
+  // Set some flags to see that they are cleared
+  ASSERT_OK(abr_client_->SetOneShotRecovery());
+  ASSERT_OK(abr_client_->SetOneShotBootloader());
+
+  // First get flags would return flags
+  auto abr_flags_res = abr_client_->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_NE(abr_flags_res.value(), kAbrDataOneShotFlagNone);
+
+  // Second get flags should be cleared
+  abr_flags_res = abr_client_->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_EQ(abr_flags_res.value(), kAbrDataOneShotFlagNone);
+}
+
+TEST_F(OneShotFlagsTest, SetOneShotRecovery) {
+  ASSERT_OK(abr_client_->SetOneShotRecovery());
+
+  // Check if flag is set
+  auto abr_flags_res = abr_client_->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+  EXPECT_FALSE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+}
+
+TEST_F(OneShotFlagsTest, SetOneShotBootloader) {
+  ASSERT_OK(abr_client_->SetOneShotBootloader());
+
+  // Check if flag is set
+  auto abr_flags_res = abr_client_->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+}
+
+TEST_F(OneShotFlagsTest, Set2Flags) {
+  ASSERT_OK(abr_client_->SetOneShotBootloader());
+  ASSERT_OK(abr_client_->SetOneShotRecovery());
+
+  // Check if flag is set
+  auto abr_flags_res = abr_client_->GetAndClearOneShotFlags();
+  ASSERT_OK(abr_flags_res);
+  EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+  EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+}
+
 }  // namespace

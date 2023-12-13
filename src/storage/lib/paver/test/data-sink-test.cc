@@ -117,6 +117,7 @@ class MockDevicePartitioner : public FakeDevicePartitioner {
   }
 
   zx::result<> Flush() const override { return zx::ok(); }
+  zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
   MockUserPager* pager_;

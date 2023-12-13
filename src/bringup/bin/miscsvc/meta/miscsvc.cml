@@ -8,6 +8,7 @@
         binary: "bin/miscsvc",
         forward_stdout_to: "none",
         forward_stderr_to: "none",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {
@@ -39,6 +40,9 @@
                 // Services from bootsvc
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
+
+                // Paver queries system state transition
+                "fuchsia.device.manager.SystemStateTransition",
 
                 // Services from fshost
                 "fuchsia.fshost.BlockWatcher",
