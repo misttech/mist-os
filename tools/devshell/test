@@ -14,6 +14,8 @@
 ##     --test-filter                     Runs specific test cases in v2 suite. Can be specified multiple
 ##                                       times to pass in multiple patterns.
 ##                                       example: --test-filter glob1 --test-filter glob2
+## --restrict-logs, --no-restrict-logs   If false, do not limit maximum log severity regardless of the
+##                                       test's configuration. Default is true.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/dart_utils.sh || exit $?
