@@ -5,15 +5,14 @@
 use {
     crate::filesystems::MOUNT_PATH,
     async_trait::async_trait,
-    fidl_fuchsia_fs::AdminMarker,
-    fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
+    fidl_fuchsia_component::{CreateChildArgs, RealmMarker},
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+    fs_management::FS_COLLECTION_NAME,
+    fuchsia_component::client::{connect_to_protocol, open_childs_exposed_directory},
+    std::{
+        path::Path,
+        sync::atomic::{AtomicU64, Ordering},
     },
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::{connect_to_childs_protocol, open_childs_exposed_directory},
-    fuchsia_zircon as zx,
-    std::path::Path,
     storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig},
 };
 
@@ -37,34 +36,33 @@ impl FilesystemConfig for Memfs {
     }
 }
 
-pub struct MemfsInstance {}
+pub struct MemfsInstance {
+    instance_name: String,
+}
 
 impl MemfsInstance {
     async fn new() -> Self {
-        let startup = connect_to_childs_protocol::<StartupMarker>("memfs".to_string(), None)
-            .await
-            .expect("Failed to connect to memfs");
-        let options = StartOptions {
-            read_only: false,
-            verbose: false,
-            fsck_after_every_transaction: false,
-            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-            write_compression_level: 0,
-            cache_eviction_policy_override: EvictionPolicyOverride::None,
-            allow_delivery_blobs: false,
+        static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(0);
+        let instance_name = format!("memfs-{}", INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed));
+        let collection_ref = fdecl::CollectionRef { name: FS_COLLECTION_NAME.to_string() };
+        let child_decl = fdecl::Child {
+            name: Some(instance_name.to_string()),
+            url: Some("#meta/memfs.cm".to_string()),
+            startup: Some(fdecl::StartupMode::Lazy),
+            ..Default::default()
         };
-        // Memfs doesn't need a block device but FIDL prevents passing an invalid handle.
-        let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>();
-        startup
-            .start(device_client_end, options)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .unwrap();
 
-        let exposed_dir = open_childs_exposed_directory("memfs", None)
+        let realm_proxy = connect_to_protocol::<RealmMarker>().unwrap();
+        realm_proxy
+            .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
             .await
-            .expect("Failed to connect to memfs's exposed directory");
+            .expect("Failed to send FIDL request")
+            .expect("Failed to create memfs instance");
+
+        let exposed_dir =
+            open_childs_exposed_directory(&instance_name, Some(FS_COLLECTION_NAME.to_string()))
+                .await
+                .expect("Failed to connect to memfs's exposed directory");
 
         let (root_dir, server_end) = fidl::endpoints::create_endpoints();
         exposed_dir
@@ -73,24 +71,29 @@ impl MemfsInstance {
                     | fio::OpenFlags::POSIX_EXECUTABLE
                     | fio::OpenFlags::POSIX_WRITABLE,
                 fio::ModeType::empty(),
-                "root",
+                "memfs",
                 fidl::endpoints::ServerEnd::new(server_end.into_channel()),
             )
             .expect("Failed to open memfs's root");
         let namespace = fdio::Namespace::installed().expect("Failed to get local namespace");
         namespace.bind(MOUNT_PATH, root_dir).expect("Failed to bind memfs");
 
-        Self {}
+        Self { instance_name }
     }
 }
 
 #[async_trait]
 impl Filesystem for MemfsInstance {
     async fn shutdown(&mut self) {
-        let admin = connect_to_childs_protocol::<AdminMarker>("memfs".to_string(), None)
+        let realm_proxy = connect_to_protocol::<RealmMarker>().unwrap();
+        realm_proxy
+            .destroy_child(&fdecl::ChildRef {
+                name: self.instance_name.clone(),
+                collection: Some(FS_COLLECTION_NAME.to_string()),
+            })
             .await
-            .expect("Failed to connect to memfs Admin");
-        admin.shutdown().await.expect("Failed to shutdown memfs");
+            .expect("Failed to send FIDL request")
+            .expect("Failed to destroy memfs instance");
 
         let namespace = fdio::Namespace::installed().expect("Failed to get local namespace");
         namespace.unbind(MOUNT_PATH).expect("Failed to unbind memfs");

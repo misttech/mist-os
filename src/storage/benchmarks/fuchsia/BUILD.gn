@@ -26,8 +26,9 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "src/main.rs",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -44,9 +45,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/benchmarks:framework",
-    "//src/storage/benchmarks/fuchsia/pkgdir-component:production-component-and-config",
     "//src/storage/benchmarks/fuchsia/pkgdir-component/fidl/test.pkgdir:test.pkgdir_rust",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/delivery_blob",
@@ -90,12 +89,12 @@ fuchsia_test_package("benchmarks") {
     environments = []
   }
   deps = [
-    "//src/storage/benchmarks/fuchsia/memfs-component",
+    "//src/storage/benchmarks/fuchsia/pkgdir-component:production-component-and-config",
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/f2fs/bin:f2fs-component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs-crypt",
-    "//src/storage/minfs/bin:minfs-component",
+    "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",
   ]
 }
@@ -110,12 +109,12 @@ storage_driver_test_realm_v2_component(
 fuchsia_test_package("fuchsia-storage-benchmarks-tests") {
   test_components = [ ":fuchsia-storage-benchmarks-tests-component" ]
   deps = [
-    "//src/storage/benchmarks/fuchsia/memfs-component",
+    "//src/storage/benchmarks/fuchsia/pkgdir-component:production-component-and-config",
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/f2fs/bin:f2fs-component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs-crypt",
-    "//src/storage/minfs/bin:minfs-component",
+    "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",
   ]
   test_specs = {

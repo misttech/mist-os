@@ -7,31 +7,16 @@
         "//sdk/lib/sys/component/realm_builder.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
-        "//src/storage/fxfs/meta/test_fxfs.shard.cml",
         "//src/storage/lib/fs_management/client.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/storage/testing/meta/storage_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "inspect/offer.shard.cml",
     ],
     program: {
         binary: "bin/fuchsia_storage_benchmarks_bin_test",
     },
-    children: [
-        {
-            name: "memfs",
-            url: "#meta/memfs-component.cm",
-        },
-    ],
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#memfs",
-        },
     ],
 }
