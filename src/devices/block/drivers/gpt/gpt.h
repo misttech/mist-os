@@ -42,7 +42,7 @@ class PartitionDevice : public DeviceType,
 
   // Add device to devhost device list. Once added, the device cannot be deleted directly,
   // AsyncRemove() must be called to schedule an Unbind() and Release().
-  zx_status_t Add(uint32_t partition_number, bool ignore_device);
+  zx_status_t Add(uint32_t partition_number);
 
   // Block protocol implementation.
   void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out);

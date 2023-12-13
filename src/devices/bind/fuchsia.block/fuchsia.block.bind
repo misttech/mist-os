@@ -10,6 +10,3 @@ extend uint fuchsia.BIND_PROTOCOL {
   PARTITION = 0x03,
   VOLUME = 0x04,
 };
-
-// If true, the block core driver should not bind to this device.
-bool IGNORE_DEVICE;

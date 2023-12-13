@@ -276,7 +276,7 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_STREQ(name, "Linux filesystem");
 
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 3);
+    ASSERT_EQ(props.size(), 2);
 
     EXPECT_STREQ(props[0].key, "fuchsia.block.gpt.PARTITION_NAME");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
@@ -285,10 +285,6 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_STREQ(props[1].key, "fuchsia.block.gpt.PARTITION_TYPE_GUID");
     ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
-
-    EXPECT_STREQ(props[2].key, "fuchsia.block.IGNORE_DEVICE");
-    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[2].property_value.data.bool_val);
   }
 
   iter++;
@@ -299,7 +295,7 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_EQ(name, kPartition1Name);
 
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 3);
+    ASSERT_EQ(props.size(), 2);
 
     EXPECT_STREQ(props[0].key, "fuchsia.block.gpt.PARTITION_NAME");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
@@ -308,53 +304,6 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_STREQ(props[1].key, "fuchsia.block.gpt.PARTITION_TYPE_GUID");
     ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
-
-    EXPECT_STREQ(props[2].key, "fuchsia.block.IGNORE_DEVICE");
-    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[2].property_value.data.bool_val);
-  }
-}
-
-TEST_F(GptDeviceTest, ValidatePartitionBindPropIgnoreDevice) {
-  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
-      .partition_info = {{
-          {{
-              .name = "Linux filesystem",
-              .options = {{.block_driver_should_ignore_device{{true}}}},
-          }},
-      }},
-  }};
-
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
-                            encoded.value().size());
-
-  ASSERT_OK(Bind());
-  ASSERT_EQ(fake_parent_->child_count(), 3);
-
-  // Skip the first child, which is the partition manager
-  auto iter = ++fake_parent_->children().begin();
-
-  {
-    cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 3);
-
-    EXPECT_STREQ(props[2].key, "fuchsia.block.IGNORE_DEVICE");
-    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_TRUE(props[2].property_value.data.bool_val);
-  }
-
-  iter++;
-
-  {
-    cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 3);
-
-    EXPECT_STREQ(props[2].key, "fuchsia.block.IGNORE_DEVICE");
-    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[2].property_value.data.bool_val);
   }
 }
 

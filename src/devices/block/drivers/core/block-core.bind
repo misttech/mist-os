@@ -6,4 +6,3 @@ using fuchsia.block;
 using fuchsia.block;
 
 fuchsia.BIND_PROTOCOL == fuchsia.block.BIND_PROTOCOL.BLOCK_IMPL;
-fuchsia.block.IGNORE_DEVICE != true;

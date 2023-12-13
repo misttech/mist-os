@@ -72,18 +72,6 @@ void apply_guid_map(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::
   }
 }
 
-bool ignore_device(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo>& map,
-                   const char* name) {
-  for (const auto& entry : map) {
-    if (entry.name.get() == name) {
-      return entry.options.has_block_driver_should_ignore_device()
-                 ? entry.options.block_driver_should_ignore_device()
-                 : false;
-    }
-  }
-  return false;
-}
-
 }  // namespace
 
 void PartitionDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
@@ -177,7 +165,7 @@ void PartitionDevice::SetInfo(gpt_entry_t* entry, block_info_t* info, size_t op_
   block_op_size_ = op_size;
 }
 
-zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) {
+zx_status_t PartitionDevice::Add(uint32_t partition_number) {
   char name[kDeviceNameLength];
   snprintf(name, sizeof(name), "part-%03u", partition_number);
 
@@ -188,7 +176,6 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
   const zx_device_str_prop_t str_props[]{
       {bind_fuchsia_block_gpt::PARTITION_NAME.c_str(), str_prop_str_val(partition_name_)},
       {bind_fuchsia_block_gpt::PARTITION_TYPE_GUID.c_str(), str_prop_str_val(partition_type_guid_)},
-      {bind_fuchsia_block::IGNORE_DEVICE.c_str(), str_prop_bool_val(ignore_device)},
   };
 
   zx_status_t status =
@@ -373,10 +360,8 @@ zx_status_t PartitionManager::AddPartition(block_info_t block_info, size_t block
     zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
     return ZX_ERR_NEXT;
   }
-  bool ignore = false;
   if (metadata_ && (*metadata_)->has_partition_info()) {
     apply_guid_map((*metadata_)->partition_info(), partition_name, entry->type);
-    ignore = ignore_device((*metadata_)->partition_info(), partition_name);
   }
 
   char type_guid[GPT_GUID_STRLEN] = {};
@@ -391,7 +376,7 @@ zx_status_t PartitionManager::AddPartition(block_info_t block_info, size_t block
   // It would be nicer if we made these devices children of the PartitionManager (i.e. "gpt"
   // device), instead, they are siblings.  Fixing this will require updating a bunch of hard-coded
   // topological paths.
-  if (zx_status_t status = device->Add(partition_index, ignore); status != ZX_OK) {
+  if (zx_status_t status = device->Add(partition_index); status != ZX_OK) {
     return status;
   }
   [[maybe_unused]] auto ptr = device.release();

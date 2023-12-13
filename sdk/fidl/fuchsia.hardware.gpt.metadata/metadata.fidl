@@ -12,9 +12,6 @@ type PartitionOptions = table {
     /// The type GUID to report for this partition. If not set, the type GUID from the partition
     /// table is used.
     1: type_guid_override partition.Guid;
-    /// If true, the block core driver won't bind to this device in order to make way for a
-    /// partition-specific driver. Defaults to `false`.
-    2: block_driver_should_ignore_device bool;
 };
 
 /// For each partition in the table read from the block device, the GPT driver will attempt to
