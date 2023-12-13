@@ -225,7 +225,6 @@
                 "sigwaitinfo01",
                 "sockioctl01",
                 "ssetmask01",
-                "starvation",
                 "statx04",
                 "statx06",
                 "statx11",
@@ -318,6 +317,9 @@
                 "readlinkat01",
                 "recvmsg01",
                 "cve-2022-23222",
+
+                // Test sometimes timeout instead of failing
+                "starvation",
             ],
         },
     ],
