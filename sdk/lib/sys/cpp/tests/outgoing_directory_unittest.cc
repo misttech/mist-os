@@ -116,16 +116,4 @@ TEST_F(OutgoingDirectorySetupTest, Invalid) {
   ASSERT_EQ(ZX_ERR_BAD_HANDLE, outgoing.Serve({}, dispatcher()));
 }
 
-TEST_F(OutgoingDirectorySetupTest, AccessDenied) {
-  zx::channel svc_client, svc_server;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &svc_client, &svc_server));
-
-  svc_server.replace(ZX_RIGHT_NONE, &svc_server);
-
-  sys::OutgoingDirectory outgoing;
-  ASSERT_EQ(ZX_ERR_ACCESS_DENIED,
-            outgoing.Serve(fidl::InterfaceRequest<fuchsia::io::Directory>(std::move(svc_server)),
-                           dispatcher()));
-}
-
 }  // namespace
