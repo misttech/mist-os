@@ -16,6 +16,7 @@
       reg = <0x0 0xffffa000 0x0 0x1000>;
       #gpio-cells = <2>;
       gpio-controller;
+      phandle = <TEST_PHANDLE>;
 
       init-HOG_PIN1 {
         gpio-hog;

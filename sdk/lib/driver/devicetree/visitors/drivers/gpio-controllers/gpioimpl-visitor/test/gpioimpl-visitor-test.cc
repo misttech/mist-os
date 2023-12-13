@@ -53,10 +53,19 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(2lu, metadata->size());
+      ASSERT_EQ(3lu, metadata->size());
+
+      // Controller metadata
       std::vector<uint8_t> metadata_blob0 = std::move(*(*metadata)[0].data());
+      fit::result controller_metadata =
+          fidl::Unpersist<fuchsia_hardware_gpioimpl::ControllerMetadata>(metadata_blob0);
+      ASSERT_TRUE(controller_metadata.is_ok());
+      EXPECT_EQ(controller_metadata->id(), static_cast<uint32_t>(TEST_PHANDLE));
+
+      // Init metadata
+      std::vector<uint8_t> metadata_blob1 = std::move(*(*metadata)[1].data());
       fit::result init_metadata =
-          fidl::Unpersist<fuchsia_hardware_gpioimpl::InitMetadata>(metadata_blob0);
+          fidl::Unpersist<fuchsia_hardware_gpioimpl::InitMetadata>(metadata_blob1);
       ASSERT_TRUE(init_metadata.is_ok());
       ASSERT_EQ((*init_metadata).steps().size(), 3u);
       ASSERT_EQ((*init_metadata).steps()[0].index(), static_cast<uint32_t>(HOG_PIN1));
@@ -71,10 +80,11 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
                 fuchsia_hardware_gpioimpl::InitCall::WithInputFlags(
                     static_cast<fuchsia_hardware_gpio::GpioFlags>(HOG_PIN3_FLAG)));
 
-      std::vector<uint8_t> metadata_blob1 = std::move(*(*metadata)[1].data());
-      auto metadata_start = reinterpret_cast<gpio_pin_t*>(metadata_blob1.data());
+      // Pin metadata
+      std::vector<uint8_t> metadata_blob2 = std::move(*(*metadata)[2].data());
+      auto metadata_start = reinterpret_cast<gpio_pin_t*>(metadata_blob2.data());
       std::vector<gpio_pin_t> gpio_pins(
-          metadata_start, metadata_start + (metadata_blob1.size() / sizeof(gpio_pin_t)));
+          metadata_start, metadata_start + (metadata_blob2.size() / sizeof(gpio_pin_t)));
       ASSERT_EQ(gpio_pins.size(), 2lu);
       EXPECT_EQ(gpio_pins[0].pin, static_cast<uint32_t>(PIN1));
       EXPECT_EQ(strcmp(gpio_pins[0].name, PIN1_NAME), 0);

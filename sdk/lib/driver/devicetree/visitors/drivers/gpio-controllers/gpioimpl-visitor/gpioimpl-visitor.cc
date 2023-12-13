@@ -262,12 +262,34 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
 }
 
 zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
+  // Check that it is indeed a gpio-controller that we support.
+  if (!is_match(node.properties())) {
+    return zx::ok();
+  }
+
   if (node.phandle()) {
     auto controller = gpio_controllers_.find(*node.phandle());
     if (controller == gpio_controllers_.end()) {
       FDF_LOG(INFO, "Gpio controller '%s' is not being used. Not adding any metadata for it.",
               node.name().c_str());
       return zx::ok();
+    }
+
+    {
+      fuchsia_hardware_gpioimpl::ControllerMetadata metadata = {{.id = *node.phandle()}};
+      const fit::result encoded_controller_metadata = fidl::Persist(metadata);
+      if (!encoded_controller_metadata.is_ok()) {
+        FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
+                node.name().c_str(),
+                encoded_controller_metadata.error_value().FormatDescription().c_str());
+        return zx::error(encoded_controller_metadata.error_value().status());
+      }
+      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+          .type = DEVICE_METADATA_GPIO_CONTROLLER,
+          .data = encoded_controller_metadata.value(),
+      }};
+      node.AddMetadata(std::move(controller_metadata));
+      FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
     }
 
     if (!controller->second.init_steps.steps().empty()) {
