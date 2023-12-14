@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::ensure;
 use argh::{ArgsInfo, FromArgs};
 use diagnostics_data::Severity;
 use ffx_core::ffx_command;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -25,6 +27,7 @@ pub struct TestCommand {
 pub enum TestSubCommand {
     Run(RunCommand),
     List(ListCommand),
+    EarlyBootProfile(EarlyBootProfileCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
@@ -196,4 +199,55 @@ pub struct ListCommand {
 
 fn log_interest_selector_or_severity(input: &str) -> Result<LogInterestSelector, String> {
     selectors::parse_log_interest_selector_or_severity(input).map_err(|s| s.to_string())
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "early-boot-profile", description = "Manage early boot profiles")]
+
+pub struct EarlyBootProfileCommand {
+    /// output early boot profile to the specified directory. The produced output
+    /// is in the format described in
+    /// https://fuchsia.dev/fuchsia-src/reference/platform-spec/testing/test-output-format
+    #[argh(option, from_str_fn(dir_parse_path))]
+    pub output_directory: PathBuf,
+}
+
+fn dir_parse_path(path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(path);
+    let validation = move || {
+        ensure!(path.exists(), "{:?} does not exist", path);
+        let metadata = std::fs::metadata(&path)?;
+        ensure!(metadata.is_dir(), "{:?} should be a directory", path);
+        Ok(path)
+    };
+    validation().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dir_parse_path;
+    use tempfile::tempdir;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_dir_parse_path() {
+        // Create a temporary directory
+        let temp_dir = tempdir().expect("Failed to create temporary directory");
+        let temp_dir_path = temp_dir.path();
+
+        // Valid directory path
+        assert!(dir_parse_path(temp_dir_path.to_str().unwrap()).is_ok());
+        assert!(dir_parse_path(".").is_ok());
+
+        // Clean up temporary directory after the test
+        temp_dir.close().expect("Failed to close temporary directory");
+
+        // Invalid directory path
+        assert!(dir_parse_path("/non_existent_path").is_err());
+        // Create a temporary file
+        let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
+        let temp_file_path = temp_file.path().to_str().unwrap().to_string();
+
+        assert!(dir_parse_path(temp_file_path.as_str()).is_err()); // File path
+    }
 }

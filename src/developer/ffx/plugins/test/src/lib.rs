@@ -10,13 +10,16 @@ use anyhow::{anyhow, format_err, Context, Result};
 use async_trait::async_trait;
 use either::Either;
 use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxError};
-use ffx_test_args::{ListCommand, RunCommand, TestCommand, TestSubCommand};
+use ffx_test_args::{
+    EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
+};
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_test_manager as ftest_manager;
 use futures::FutureExt;
 use lazy_static::lazy_static;
+use run_test_suite_lib::output::Reporter;
 use signal_hook::{
     consts::signal::{SIGINT, SIGTERM},
     iterator::Signals,
@@ -66,6 +69,9 @@ impl FfxMain for TestTool {
             TestSubCommand::List(list) => {
                 get_tests(&remote_control, writer, list).await?;
             }
+            TestSubCommand::EarlyBootProfile(cmd) => {
+                early_boot_profile(remote_control, writer, cmd).await?;
+            }
         }
         Ok(())
     }
@@ -99,6 +105,40 @@ impl Experiments {
                 .await,
         }
     }
+}
+
+async fn early_boot_profile<W: 'static + Write + Send + Sync>(
+    remote_control: fremotecontrol::RemoteControlProxy,
+    mut writer: W,
+    cmd: EarlyBootProfileCommand,
+) -> Result<()> {
+    let early_boot_profile_proxy = testing_lib::connect_to_early_boot_profile(&remote_control)
+        .await
+        .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
+
+    let (client, iterator) = fidl::endpoints::create_endpoints();
+    early_boot_profile_proxy
+        .register_watcher(iterator)
+        .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
+
+    let reporter = run_test_suite_lib::output::DirectoryReporter::new(
+        cmd.output_directory,
+        run_test_suite_lib::output::SchemaVersion::V1,
+    )?;
+
+    match reporter.new_directory_artifact(
+        &run_test_suite_lib::output::EntityId::TestRun,
+        &run_test_suite_lib::output::DirectoryArtifactType::Debug,
+        None,
+    ) {
+        Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy()?, o).await,
+        Err(e) => {
+            writeln!(writer, "Cannot create output directory: {}", e)?;
+            return Err(e.into());
+        }
+    };
+
+    Ok(())
 }
 
 async fn run_test<W: 'static + Write + Send + Sync>(
@@ -401,10 +441,14 @@ async fn get_tests<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::endpoints::{create_proxy_and_stream, ProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_sys2 as fsys;
+    use ftest_manager::{
+        DebugData, DebugDataIteratorMarker, EarlyBootProfileMarker, EarlyBootProfileRequestStream,
+    };
     use futures::prelude::*;
     use lazy_static::lazy_static;
+    use std::io::Read;
     use std::num::NonZeroU32;
     use std::sync::Arc;
     use test_list::TestTag;
@@ -824,5 +868,102 @@ mod test {
                 case_name
             );
         }
+    }
+
+    async fn fake_debug_data_iterator(iterator: ServerEnd<DebugDataIteratorMarker>) {
+        let mut stream = iterator.into_stream().unwrap();
+
+        // we just need to send once sample file and not test full logic as that is tested inside the library.
+        let (s1, s2) = fidl::Socket::create_stream();
+        let mut debug_data = vec![DebugData {
+            name: "test_file".to_string().into(),
+            socket: s1.into(),
+            ..Default::default()
+        }];
+        s2.write(&[1, 2, 3, 4, 5]).unwrap();
+        while let Some(request) = stream.try_next().await.unwrap() {
+            match request {
+                ftest_manager::DebugDataIteratorRequest::GetNext { responder } => {
+                    responder.send(debug_data.drain(..).collect()).unwrap();
+                }
+            }
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_early_boot_profile() {
+        let (remote_control, mut stream) =
+            create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+        let task = fuchsia_async::Task::spawn(async move {
+            let mut once = false;
+            while let Some(request) = stream.try_next().await.unwrap() {
+                match request {
+                    fremotecontrol::RemoteControlRequest::OpenCapability {
+                        moniker,
+                        capability_set,
+                        capability_name,
+                        server_channel,
+                        flags: _,
+                        responder,
+                    } => {
+                        assert!(!once);
+                        once = true;
+                        assert_eq!(moniker, "/core/test_manager");
+                        assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
+                        assert!(capability_name == EarlyBootProfileMarker::DEBUG_NAME);
+                        responder.send(Ok(())).expect("error sending EchoString response");
+
+                        let mut stream = EarlyBootProfileRequestStream::from_channel(
+                            fidl::AsyncChannel::from_channel(server_channel).unwrap(),
+                        );
+                        while let Some(request) = stream.try_next().await.unwrap() {
+                            match request {
+                                ftest_manager::EarlyBootProfileRequest::RegisterWatcher {
+                                    iterator,
+                                    control_handle: _,
+                                } => {
+                                    fake_debug_data_iterator(iterator).await;
+                                }
+                                other => {
+                                    unreachable!("Got unexpected request: {other:?}");
+                                }
+                            }
+                        }
+                    }
+                    other => {
+                        unreachable!("Got unexpected request: {other:?}");
+                    }
+                }
+            }
+        });
+        // Create a temporary directory
+        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
+        let temp_dir_path = temp_dir.path();
+        early_boot_profile(
+            remote_control,
+            std::io::sink(),
+            EarlyBootProfileCommand { output_directory: temp_dir_path.to_path_buf() },
+        )
+        .await
+        .unwrap();
+        task.await;
+
+        let mut found_test_file = false;
+        for entry in walkdir::WalkDir::new(temp_dir_path).follow_links(false) {
+            let entry = entry.unwrap();
+
+            // Optionally, you can print other information about the entry
+            if entry.file_type().is_file() {
+                if entry.file_name() == "test_file" {
+                    found_test_file = true;
+                    let mut file_content = Vec::new();
+                    let mut file = std::fs::File::open(entry.path()).expect("Failed to open file");
+                    file.read_to_end(&mut file_content).expect("Failed to read file");
+                    assert_eq!(file_content, [1, 2, 3, 4, 5]);
+                    break;
+                }
+            }
+        }
+        assert!(found_test_file);
     }
 }

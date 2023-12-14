@@ -130,7 +130,7 @@ async fn copy_socket_artifact<W: Write>(
 }
 
 /// Copy debug data reported over a debug data iterator to an output directory.
-async fn copy_debug_data(
+pub async fn copy_debug_data(
     iterator: ftest_manager::DebugDataIteratorProxy,
     output_directory: Box<DynDirectoryArtifact>,
 ) {

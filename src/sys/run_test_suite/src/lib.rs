@@ -16,6 +16,7 @@ mod stream_util;
 mod trace;
 
 pub use {
+    artifacts::copy_debug_data,
     connector::{RunBuilderConnector, SingleRunConnector},
     outcome::{ConnectionError, Outcome, RunTestSuiteError, UnexpectedEventError},
     params::{RunParams, TestParams, TimeoutBehavior},
