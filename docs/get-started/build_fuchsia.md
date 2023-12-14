@@ -75,6 +75,14 @@ On the other hand, the example below sets the build configuration to
 fx set workbench_eng.x64
 ```
 
+The list of possible boards and products is dynamic. Both lists can be gleaned
+starting from the root of the fuchsia repository. For boards see
+[boards](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/boards/)
+
+for products, see
+[products](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/products/)
+
+
 For more information on the build configuration,
 see [Configure a build](/docs/development/build/fx.md#configure-a-build).
 
