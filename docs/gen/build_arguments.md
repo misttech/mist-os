@@ -7920,7 +7920,7 @@ Whether or not unified address spaces are leveraged.
 TODO(https://fxbug.dev/132980): Enable on other platforms once Zircon
 support is available.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/starnix/kernel/BUILD.gn:34
 
