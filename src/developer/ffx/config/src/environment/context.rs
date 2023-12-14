@@ -212,6 +212,16 @@ impl EnvironmentContext {
         }
     }
 
+    /// Returns the context's project root, if it makes sense for its
+    /// [`EnvironmentKind`].
+    pub fn project_root(&self) -> Option<&Path> {
+        match &self.kind {
+            EnvironmentKind::InTree { tree_root, .. } => Some(&tree_root),
+            EnvironmentKind::ConfigDomain { domain, .. } => Some(domain.root().as_std_path()),
+            _ => None,
+        }
+    }
+
     /// Returns the path to the currently active build output directory
     pub fn build_dir(&self) -> Option<&Path> {
         match &self.kind {

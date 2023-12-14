@@ -68,6 +68,7 @@ rustc_library("lib") {
     "src/mapping/home.rs",
     "src/mapping/mod.rs",
     "src/mapping/runtime.rs",
+    "src/mapping/workspace.rs",
     "src/nested.rs",
     "src/paths.rs",
     "src/runtime.rs",
