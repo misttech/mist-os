@@ -26,10 +26,6 @@ node "pdev" {
 
 node "reset" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
-  accept fuchsia.BIND_REGISTER_ID {
-    fuchsia.amlogic.platform.BIND_REGISTER_ID.SPICC0_RESET,
-    fuchsia.amlogic.platform.BIND_REGISTER_ID.SPICC1_RESET
-  }
 }
 
 node "gpio-init" {

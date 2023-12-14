@@ -29,8 +29,8 @@ static void check_encodes(
   ASSERT_EQ(registers.count(), register_entries.size());
 
   for (size_t i = 0; i < register_entries.size(); i++) {
-    ASSERT_TRUE(registers[i].has_bind_id());
-    ASSERT_EQ(registers[i].bind_id(), register_entries[i].bind_id);
+    ASSERT_TRUE(registers[i].has_name());
+    ASSERT_EQ(registers[i].name().get(), register_entries[i].name);
 
     ASSERT_TRUE(registers[i].has_mmio_id());
     ASSERT_EQ(registers[i].mmio_id(), register_entries[i].mmio_id);
@@ -75,7 +75,7 @@ static void check_encodes(
 TEST(RegistersMetadataTest, TestEncode8) {
   static const fidl_metadata::registers::Register<uint8_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test",
           .mmio_id = 1,
           .masks =
               {
@@ -93,7 +93,7 @@ TEST(RegistersMetadataTest, TestEncode8) {
 TEST(RegistersMetadataTest, TestEncode16) {
   static const fidl_metadata::registers::Register<uint16_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test",
           .mmio_id = 1,
           .masks =
               {
@@ -111,7 +111,7 @@ TEST(RegistersMetadataTest, TestEncode16) {
 TEST(RegistersMetadataTest, TestEncode32) {
   static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test",
           .mmio_id = 1,
           .masks =
               {
@@ -129,7 +129,7 @@ TEST(RegistersMetadataTest, TestEncode32) {
 TEST(RegistersMetadataTest, TestEncode64) {
   static const fidl_metadata::registers::Register<uint64_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test",
           .mmio_id = 1,
           .masks =
               {
@@ -147,7 +147,7 @@ TEST(RegistersMetadataTest, TestEncode64) {
 TEST(RegistersMetadataTest, TestEncodeCountAndOverlapCheck) {
   static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test",
           .mmio_id = 1,
           .masks =
               {
@@ -167,7 +167,7 @@ TEST(RegistersMetadataTest, TestEncodeCountAndOverlapCheck) {
 TEST(RegistersMetadataTest, TestEncodeMany) {
   static const fidl_metadata::registers::Register<uint16_t> kRegisters[]{
       {
-          .bind_id = 0,
+          .name = "test0",
           .mmio_id = 1,
           .masks =
               {
@@ -180,7 +180,7 @@ TEST(RegistersMetadataTest, TestEncodeMany) {
               },
       },
       {
-          .bind_id = 1,
+          .name = "test1",
           .mmio_id = 4,
           .masks =
               {
@@ -203,4 +203,25 @@ TEST(RegistersMetadataTest, TestEncodeMany) {
 TEST(RegistersMetadataTest, TestEncodeNoRegisters) {
   ASSERT_NO_FATAL_FAILURE(
       check_encodes(cpp20::span<const fidl_metadata::registers::Register<uint32_t>>()));
+}
+
+TEST(RegistersMetadataTest, TestEncodeLongNameFails) {
+  static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
+      {
+          .name = "test-with-a-really-long-register-name",
+          .mmio_id = 1,
+          .masks =
+              {
+                  {
+                      .value = 0xFFFF0000,
+                      .mmio_offset = 0x20,
+                      .count = 8,
+                      .overlap_check_on = false,
+                  },
+              },
+      },
+  };
+
+  auto result = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
+  ASSERT_TRUE(result.is_error());
 }

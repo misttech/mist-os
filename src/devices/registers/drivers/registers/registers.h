@@ -136,7 +136,7 @@ class Register : public RegisterType<T>,
   bool VerifyMask(T mask, uint64_t register_offset);
 
   std::shared_ptr<MmioInfo> mmio_;
-  uint64_t id_;
+  std::string id_;
   std::map<uint64_t, std::pair<T, uint32_t>> masks_;  // base_address to (mask, reg_count)
 
   async_dispatcher_t* dispatcher_;

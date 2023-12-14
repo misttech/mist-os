@@ -162,7 +162,7 @@ as an example on how to use the registers driver.
    The registers driver will create a device that serves [registers-util.fidl][registers-util.fidl]
    with bind properties:
    ``` {:.devsite-disable-click-to-copy}
-   bind_fuchsia::REGISTER_ID == bind_id
+   bind_fuchsia_register::NAME == bind_id
    ```
 
 1. Binding to the registers driver

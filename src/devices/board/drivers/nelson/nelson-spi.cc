@@ -49,7 +49,7 @@ using spi_channel_t = fidl_metadata::spi::Channel;
 
 fdf::wire::CompositeNodeSpec MakeSpiCompositeNodeSpec(fidl::AnyArena& fidl_arena, std::string name,
                                                       uint32_t gpio_pin, std::string gpio_function,
-                                                      uint32_t register_id) {
+                                                      std::string register_id) {
   const std::vector kGpioSpiRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -64,13 +64,13 @@ fdf::wire::CompositeNodeSpec MakeSpiCompositeNodeSpec(fidl::AnyArena& fidl_arena
   const std::vector kResetRegisterRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, register_id),
+      fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, register_id),
   };
 
   const std::vector kResetRegisterProperties = {
       fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia::REGISTER_ID, register_id),
+      fdf::MakeProperty(bind_fuchsia_register::NAME, register_id),
   };
 
   const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
@@ -211,10 +211,9 @@ zx_status_t Nelson::Spi0Init() {
   fdf::Arena arena('SPI0');
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, spi_0_dev),
-      MakeSpiCompositeNodeSpec(
-          fidl_arena, "spi_0", /* gpio_pin */ GPIO_SOC_SPI_A_SS0,
-          /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC0_SS0,
-          /* register_id */ bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC0_RESET));
+      MakeSpiCompositeNodeSpec(fidl_arena, "spi_0", /* gpio_pin */ GPIO_SOC_SPI_A_SS0,
+                               /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC0_SS0,
+                               /* register_id */ aml_registers::REGISTER_SPICC0_RESET));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Spi0(spi_0_dev) request failed: %s",
            result.FormatDescription().data());
@@ -329,10 +328,9 @@ zx_status_t Nelson::Spi1Init() {
   fidl::Arena<> fidl_arena;
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, spi_1_dev),
-      MakeSpiCompositeNodeSpec(
-          fidl_arena, "spi_1", /* gpio_pin */ GPIO_SOC_SPI_B_SS0,
-          /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC1_SS0,
-          /* register_id */ bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC1_RESET));
+      MakeSpiCompositeNodeSpec(fidl_arena, "spi_1", /* gpio_pin */ GPIO_SOC_SPI_B_SS0,
+                               /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC1_SS0,
+                               /* register_id */ aml_registers::REGISTER_SPICC1_RESET));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Spi1(spi_1_dev) request failed: %s",
            result.FormatDescription().data());

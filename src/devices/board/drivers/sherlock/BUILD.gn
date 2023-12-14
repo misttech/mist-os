@@ -132,20 +132,6 @@ driver_bind_rules("sherlock-wifi-bind") {
   ]
 }
 
-driver_bind_rules("camera-isp-bind") {
-  rules = "bind/camera-isp.bind"
-  header_output = "camera-isp-bind.h"
-  bind_output = "camera-isp-bind.bc"
-  tests = "bind-tests/camera-isp-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.arm.platform",
-    "//src/devices/bind/fuchsia.camera",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.register",
-  ]
-}
-
 driver_bind_rules("sherlock-woofer-bind") {
   rules = "bind/sherlock-woofer.bind"
   header_output = "sherlock-woofer-bind.h"
@@ -236,7 +222,6 @@ template("sherlock_driver") {
     ]
 
     deps = [
-      ":camera-isp-bind_header",
       ":sherlock-emmc-bind_header",
       ":sherlock-hevc-enc-bind_header",
       ":sherlock-pwm-bind_header",
@@ -350,8 +335,5 @@ sherlock_driver("sherlock-factory") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":camera-isp-bind_test",
-    ":sherlock-bind_test",
-  ]
+  deps = [ ":sherlock-bind_test" ]
 }

@@ -24,7 +24,7 @@ struct Mask {
 
 template <typename T>
 struct Register {
-  uint32_t bind_id;
+  std::string name;
   uint32_t mmio_id;
   std::vector<const Mask<T>> masks;
 };

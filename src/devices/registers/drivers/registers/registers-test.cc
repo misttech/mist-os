@@ -53,14 +53,15 @@ class FakeRegistersDevice : public RegistersDevice<T> {
       return;
     }
 
-    clients_.emplace(config.bind_id(),
+    clients_.emplace(config.name().get(),
                      std::make_shared<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>(
                          std::move(endpoints->client)));
   }
 
-  std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(uint64_t id) {
+  std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(
+      std::string name) {
     std::lock_guard guard(checker_);
-    return clients_[id];
+    return clients_[name];
   }
 
   zx_status_t Init(std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios) {
@@ -71,8 +72,9 @@ class FakeRegistersDevice : public RegistersDevice<T> {
  private:
   async::synchronization_checker checker_;
   std::vector<std::unique_ptr<Register<T>>> registers_ __TA_GUARDED(checker_);
-  std::map<uint64_t, std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>>
-      clients_ __TA_GUARDED(checker_);
+  std::map<std::string,
+           std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>> clients_
+      __TA_GUARDED(checker_);
 };
 
 // Wraps a FakeRegistersDevice inside a |TestDispatcherBound| and provides pass-through helpers
@@ -87,8 +89,9 @@ class FakeRegistersDeviceWrapper {
     registers_.SyncCall(&FakeRegistersDevice<T>::AddRegister, config);
   }
 
-  std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(uint64_t id) {
-    return registers_.SyncCall(&FakeRegistersDevice<T>::GetClient, id);
+  std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(
+      std::string name) {
+    return registers_.SyncCall(&FakeRegistersDevice<T>::GetClient, name);
   }
 
   zx_status_t Init(std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios) {
@@ -146,7 +149,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
   ASSERT_NOT_NULL(device);
 
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(0)
+                          .name("test0")
                           .mmio_id(0)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -157,7 +160,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
                                   .Build()})
                           .Build());
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(1)
+                          .name("test1")
                           .mmio_id(2)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -177,46 +180,46 @@ TEST_F(RegistersDeviceTest, Read32Test) {
 
   // Invalid Call
   auto invalid_call_result =
-      (*device->GetClient(0))->ReadRegister8(/* offset: */ 0x0, /* mask: */ 0xFF);
+      (*device->GetClient("test0"))->ReadRegister8(/* offset: */ 0x0, /* mask: */ 0xFF);
   ASSERT_TRUE(invalid_call_result.ok());
   EXPECT_FALSE(invalid_call_result->is_ok());
 
   // Address not aligned
   auto unaligned_result =
-      (*device->GetClient(0))->ReadRegister32(/* offset: */ 0x1, /* mask: */ 0xFFFFFFFF);
+      (*device->GetClient("test0"))->ReadRegister32(/* offset: */ 0x1, /* mask: */ 0xFFFFFFFF);
   EXPECT_TRUE(unaligned_result.ok());
   EXPECT_FALSE(unaligned_result->is_ok());
 
   // Address out of range
   auto out_of_range_result =
-      (*device->GetClient(1))->ReadRegister32(/* offset: */ 0xC, /* mask: */ 0xFFFFFFFF);
+      (*device->GetClient("test1"))->ReadRegister32(/* offset: */ 0xC, /* mask: */ 0xFFFFFFFF);
   ASSERT_TRUE(out_of_range_result.ok());
   EXPECT_FALSE(out_of_range_result->is_ok());
 
   // Invalid mask
   auto invalid_mask_result =
-      (*device->GetClient(1))->ReadRegister32(/* offset: */ 0x8, /* mask: */ 0xFFFFFFFF);
+      (*device->GetClient("test1"))->ReadRegister32(/* offset: */ 0x8, /* mask: */ 0xFFFFFFFF);
   EXPECT_TRUE(invalid_mask_result.ok());
   EXPECT_FALSE(invalid_mask_result->is_ok());
 
   // Successful
   (*(mock_mmio_[0]))[0x0].ExpectRead(0x12341234);
   auto read_result1 =
-      (*device->GetClient(0))->ReadRegister32(/* offset: */ 0x0, /* mask: */ 0xFFFFFFFF);
+      (*device->GetClient("test0"))->ReadRegister32(/* offset: */ 0x0, /* mask: */ 0xFFFFFFFF);
   ASSERT_TRUE(read_result1.ok());
   ASSERT_TRUE(read_result1->is_ok());
   EXPECT_EQ(read_result1->value()->value, 0x12341234);
 
   (*(mock_mmio_[2]))[0x4].ExpectRead(0x12341234);
   auto read_result2 =
-      (*device->GetClient(1))->ReadRegister32(/* offset: */ 0x4, /* mask: */ 0xFFFF0000);
+      (*device->GetClient("test1"))->ReadRegister32(/* offset: */ 0x4, /* mask: */ 0xFFFF0000);
   EXPECT_TRUE(read_result2.ok());
   EXPECT_TRUE(read_result2->is_ok());
   EXPECT_EQ(read_result2->value()->value, 0x12340000);
 
   (*(mock_mmio_[2]))[0x8].ExpectRead(0x12341234);
   auto read_result3 =
-      (*device->GetClient(1))->ReadRegister32(/* offset: */ 0x8, /* mask: */ 0xFFFF0000);
+      (*device->GetClient("test1"))->ReadRegister32(/* offset: */ 0x8, /* mask: */ 0xFFFF0000);
   EXPECT_TRUE(read_result3.ok());
   EXPECT_TRUE(read_result3->is_ok());
   EXPECT_EQ(read_result3->value()->value, 0x12340000);
@@ -227,7 +230,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
   ASSERT_NOT_NULL(device);
 
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(0)
+                          .name("test0")
                           .mmio_id(0)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -238,7 +241,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
                                   .Build()})
                           .Build());
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(1)
+                          .name("test1")
                           .mmio_id(1)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -258,14 +261,14 @@ TEST_F(RegistersDeviceTest, Write32Test) {
 
   // Invalid Call
   auto invalid_call_result =
-      (*device->GetClient(0))
+      (*device->GetClient("test0"))
           ->WriteRegister8(/* offset: */ 0x0, /* mask: */ 0xFF, /* value:  */ 0x12);
   ASSERT_TRUE(invalid_call_result.ok());
   EXPECT_FALSE(invalid_call_result->is_ok());
 
   // Address not aligned
   auto unaligned_result =
-      (*device->GetClient(0))
+      (*device->GetClient("test0"))
           ->WriteRegister32(
               /* offset: */ 0x1, /* mask: */ 0xFFFFFFFF, /* value: */ 0x43214321);
   ASSERT_TRUE(unaligned_result.ok());
@@ -273,7 +276,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
 
   // Address out of range
   auto out_of_range_result =
-      (*device->GetClient(1))
+      (*device->GetClient("test1"))
           ->WriteRegister32(
               /* offset: */ 0xC, /* mask: */ 0xFFFFFFFF, /* value: */ 0x43214321);
   EXPECT_TRUE(out_of_range_result.ok());
@@ -281,7 +284,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
 
   // Invalid mask
   auto invalid_mask_result =
-      (*device->GetClient(1))
+      (*device->GetClient("test1"))
           ->WriteRegister32(
               /* offset: */ 0x8, /* mask: */ 0xFFFFFFFF, /* value: */ 0x43214321);
   EXPECT_TRUE(invalid_mask_result.ok());
@@ -289,21 +292,21 @@ TEST_F(RegistersDeviceTest, Write32Test) {
 
   // Successful
   (*(mock_mmio_[0]))[0x0].ExpectRead(0x00000000).ExpectWrite(0x43214321);
-  auto read_result1 = (*device->GetClient(0))
+  auto read_result1 = (*device->GetClient("test0"))
                           ->WriteRegister32(
                               /* offset: */ 0x0, /* mask: */ 0xFFFFFFFF, /* value: */ 0x43214321);
   EXPECT_TRUE(read_result1.ok());
   EXPECT_TRUE(read_result1->is_ok());
 
   (*(mock_mmio_[1]))[0x4].ExpectRead(0x00000000).ExpectWrite(0x43210000);
-  auto read_result2 = (*device->GetClient(1))
+  auto read_result2 = (*device->GetClient("test1"))
                           ->WriteRegister32(
                               /* offset: */ 0x4, /* mask: */ 0xFFFF0000, /* value: */ 0x43214321);
   EXPECT_TRUE(read_result2.ok());
   EXPECT_TRUE(read_result2->is_ok());
 
   (*(mock_mmio_[1]))[0x8].ExpectRead(0x00000000).ExpectWrite(0x43210000);
-  auto read_result3 = (*device->GetClient(1))
+  auto read_result3 = (*device->GetClient("test1"))
                           ->WriteRegister32(
                               /* offset: */ 0x8, /* mask: */ 0xFFFF0000, /* value: */ 0x43214321);
   EXPECT_TRUE(read_result3.ok());
@@ -315,7 +318,7 @@ TEST_F(RegistersDeviceTest, Read64Test) {
   ASSERT_NOT_NULL(device);
 
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(0)
+                          .name("test0")
                           .mmio_id(0)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -327,7 +330,7 @@ TEST_F(RegistersDeviceTest, Read64Test) {
                                   .Build()})
                           .Build());
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(1)
+                          .name("test1")
                           .mmio_id(2)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -356,39 +359,41 @@ TEST_F(RegistersDeviceTest, Read64Test) {
 
   // Invalid Call
   auto invalid_call_result =
-      (*device->GetClient(0))->ReadRegister8(/* offset: */ 0x0, /* mask: */ 0xFF);
+      (*device->GetClient("test0"))->ReadRegister8(/* offset: */ 0x0, /* mask: */ 0xFF);
   ASSERT_TRUE(invalid_call_result.ok());
   EXPECT_FALSE(invalid_call_result->is_ok());
 
   // Address not aligned
-  auto unaligned_result =
-      (*device->GetClient(0))->ReadRegister64(/* offset: */ 0x1, /* mask: */ 0xFFFFFFFFFFFFFFFF);
+  auto unaligned_result = (*device->GetClient("test0"))
+                              ->ReadRegister64(/* offset: */ 0x1, /* mask: */ 0xFFFFFFFFFFFFFFFF);
   ASSERT_TRUE(unaligned_result.ok());
   EXPECT_FALSE(unaligned_result->is_ok());
 
   // Address out of range
   auto out_of_range_result =
-      (*device->GetClient(1))->ReadRegister64(/* offset: */ 0x20, /* mask: */ 0xFFFFFFFFFFFFFFFF);
+      (*device->GetClient("test1"))
+          ->ReadRegister64(/* offset: */ 0x20, /* mask: */ 0xFFFFFFFFFFFFFFFF);
   ASSERT_TRUE(out_of_range_result.ok());
   EXPECT_FALSE(out_of_range_result->is_ok());
 
   // Invalid mask
   auto invalid_mask_result =
-      (*device->GetClient(1))->ReadRegister64(/* offset: */ 0x8, /* mask: */ 0xFFFFFFFFFFFFFFFF);
+      (*device->GetClient("test1"))
+          ->ReadRegister64(/* offset: */ 0x8, /* mask: */ 0xFFFFFFFFFFFFFFFF);
   ASSERT_TRUE(invalid_mask_result.ok());
   EXPECT_FALSE(invalid_mask_result->is_ok());
 
   // Successful
   (*(mock_mmio_[0]))[0x0].ExpectRead(0x1234123412341234);
-  auto read_result1 =
-      (*device->GetClient(0))->ReadRegister64(/* offset: */ 0x0, /* mask: */ 0xFFFFFFFFFFFFFFFF);
+  auto read_result1 = (*device->GetClient("test0"))
+                          ->ReadRegister64(/* offset: */ 0x0, /* mask: */ 0xFFFFFFFFFFFFFFFF);
   ASSERT_TRUE(read_result1.ok());
   ASSERT_TRUE(read_result1->is_ok());
   EXPECT_EQ(read_result1->value()->value, 0x1234123412341234);
 
   (*(mock_mmio_[2]))[0x8].ExpectRead(0x1234123412341234);
-  auto read_result2 =
-      (*device->GetClient(1))->ReadRegister64(/* offset: */ 0x8, /* mask: */ 0x00000000FFFF0000);
+  auto read_result2 = (*device->GetClient("test1"))
+                          ->ReadRegister64(/* offset: */ 0x8, /* mask: */ 0x00000000FFFF0000);
   ASSERT_TRUE(read_result2.ok());
   ASSERT_TRUE(read_result2->is_ok());
   EXPECT_EQ(read_result2->value()->value, 0x0000000012340000);
@@ -399,7 +404,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
   ASSERT_NOT_NULL(device);
 
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(0)
+                          .name("test0")
                           .mmio_id(0)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -411,7 +416,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
                                   .Build()})
                           .Build());
   device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
-                          .bind_id(1)
+                          .name("test1")
                           .mmio_id(1)
                           .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
                               fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
@@ -440,14 +445,14 @@ TEST_F(RegistersDeviceTest, Write64Test) {
 
   // Invalid Call
   auto invalid_call_result =
-      (*device->GetClient(0))
+      (*device->GetClient("test0"))
           ->WriteRegister8(/* offset: */ 0x0, /* mask: */ 0xFF, /* value:  */ 0x12);
   ASSERT_TRUE(invalid_call_result.ok());
   EXPECT_FALSE(invalid_call_result->is_ok());
 
   // Address not aligned
   auto unaligned_result =
-      (*device->GetClient(0))
+      (*device->GetClient("test0"))
           ->WriteRegister64(
               /* offset: */ 0x1, /* mask: */ 0xFFFFFFFFFFFFFFFF, /* value: */ 0x4321432143214321);
   ASSERT_TRUE(unaligned_result.ok());
@@ -455,14 +460,14 @@ TEST_F(RegistersDeviceTest, Write64Test) {
 
   // Address out of range
   auto out_of_range_result =
-      (*device->GetClient(1))
+      (*device->GetClient("test1"))
           ->WriteRegister64(
               /* offset: */ 0x20, /* mask: */ 0xFFFFFFFFFFFFFFFF, /* value: */ 0x4321432143214321);
   ASSERT_TRUE(out_of_range_result.ok());
   EXPECT_FALSE(out_of_range_result->is_ok());
 
   // Invalid mask
-  auto invalid_mask_result = (*device->GetClient(1))
+  auto invalid_mask_result = (*device->GetClient("test1"))
                                  ->WriteRegister64(/* offset: */ 0x8,
                                                    /* mask: */ 0xFFFFFFFFFFFFFFFF,
                                                    /* value: */ 0x4321432143214321);
@@ -471,7 +476,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
 
   // Successful
   (*(mock_mmio_[0]))[0x0].ExpectRead(0x0000000000000000).ExpectWrite(0x4321432143214321);
-  auto read_result1 = (*device->GetClient(0))
+  auto read_result1 = (*device->GetClient("test0"))
                           ->WriteRegister64(
                               /* offset: */ 0x0, /* mask: */ 0xFFFFFFFFFFFFFFFF, /* value: */
                               0x4321432143214321);
@@ -479,7 +484,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
   EXPECT_TRUE(read_result1->is_ok());
 
   (*(mock_mmio_[1]))[0x8].ExpectRead(0x0000000000000000).ExpectWrite(0x0000000043210000);
-  auto read_result2 = (*device->GetClient(1))
+  auto read_result2 = (*device->GetClient("test1"))
                           ->WriteRegister64(
                               /* offset: */ 0x8, /* mask: */ 0x00000000FFFF0000, /* value: */
                               0x0000000043210000);

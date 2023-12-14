@@ -32,7 +32,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/camera-isp-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace sherlock {
@@ -158,20 +157,6 @@ static const fpbus::Node isp_dev = []() {
   dev.vid() = PDEV_VID_ARM;
   dev.pid() = PDEV_PID_ARM_ISP;
   dev.did() = PDEV_DID_ARM_MALI_IV009;
-  dev.mmio() = isp_mmios;
-  dev.bti() = isp_btis;
-  dev.irq() = isp_irqs;
-  return dev;
-}();
-
-static const fpbus::Node isp_dev_old = []() {
-  // ISP
-  fpbus::Node dev = {};
-  dev.name() = "isp-old";
-  dev.vid() = PDEV_VID_ARM;
-  dev.pid() = PDEV_PID_ARM_ISP;
-  dev.did() = PDEV_DID_ARM_MALI_IV009;
-  dev.instance_id() = 1;
   dev.mmio() = isp_mmios;
   dev.bti() = isp_btis;
   dev.irq() = isp_irqs;
@@ -488,15 +473,14 @@ zx_status_t Sherlock::CameraInit() {
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                                       bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-              fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
-                                      bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_ISP_RESET),
+              fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                                      aml_registers::REGISTER_ISP_RESET),
           },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                                 bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
-                                bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_ISP_RESET),
+              fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_ISP_RESET),
           },
   }};
 
@@ -515,22 +499,6 @@ zx_status_t Sherlock::CameraInit() {
     zxlogf(ERROR, "AddCompositeNodeSpec Camera(isp_dev) failed: %s",
            zx_status_get_string(spec_result->error_value()));
     return spec_result->error_value();
-  }
-
-  // Duplicate ARM ISP node added for soft transition of bind rules. Will be removed soon.
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, isp_dev_old),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, isp_fragments, std::size(isp_fragments)),
-      "camera-sensor");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev_old) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev_old) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
   }
 
   const ddk::BindRule kIspRules[] = {

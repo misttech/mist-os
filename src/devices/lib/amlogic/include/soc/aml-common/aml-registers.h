@@ -7,19 +7,18 @@
 
 namespace aml_registers {
 
-enum RegisterId : uint32_t {
-  REGISTER_USB_PHY_V2_RESET,
-  REGISTER_NNA_RESET_LEVEL2,
-  REGISTER_MALI_RESET,
-  REGISTER_ISP_RESET,
-  REGISTER_SPICC0_RESET,
-  REGISTER_SPICC1_RESET,
+// TODO(fxb/95933) : Move these to fuchsia.amlogic.platform bind library once extend string is
+// supported.
+constexpr char REGISTER_USB_PHY_V2_RESET[] = "usb_phy_v2_reset";
+constexpr char REGISTER_NNA_RESET_LEVEL2[] = "nna_reset_level2";
+constexpr char REGISTER_MALI_RESET[] = "mali_reset";
+constexpr char REGISTER_ISP_RESET[] = "isp_reset";
+constexpr char REGISTER_SPICC0_RESET[] = "spicc0_reset";
+constexpr char REGISTER_SPICC1_RESET[] = "spicc1_reset";
 #ifdef FACTORY_BUILD
-  REGISTER_USB_PHY_FACTORY,
+constexpr char REGISTER_USB_PHY_FACTORY[] = "usb_phy_factory";
 #endif  // FACTORY_BUILD
 
-  REGISTER_ID_COUNT,
-};
 
 // REGISTER_USB_PHY_V2_RESET constants
 constexpr uint32_t USB_RESET1_REGISTER_UNKNOWN_1_MASK = 0x4;

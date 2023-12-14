@@ -99,9 +99,6 @@ uint BIND_INIT_STEP;
 // Codec bind properties.
 uint BIND_CODEC_INSTANCE;
 
-// Registers bind properties.
-uint BIND_REGISTER_ID;
-
 // Power sensor bind properties.
 uint BIND_POWER_SENSOR_DOMAIN;
 

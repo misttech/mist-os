@@ -327,9 +327,6 @@ fn deprecated_keys() -> Vec<(String, u32)> {
     // PWM binding variables at 0x0A7X
     keys.push(("BIND_CODEC_INSTANCE".to_string(), 0x0A70));
 
-    // Registers binding variables at 0x0A8X
-    keys.push(("BIND_REGISTER_ID".to_string(), 0x0A80));
-
     // Power sensor binding variables at 0x0A9X
     keys.push(("BIND_POWER_SENSOR_DOMAIN".to_string(), 0x0A90));
 
@@ -442,9 +439,6 @@ pub fn get_deprecated_key_identifier(key: u32) -> Option<String> {
         // Codec binding variables at 0x0A7X.
         0x0A70 => Some("fuchsia.BIND_CODEC_INSTANCE".to_string()),
 
-        // Registers binding variables at 0x0A8X.
-        0x0A80 => Some("fuchsia.BIND_REGISTER_ID".to_string()),
-
         // Power sensor binding variables at 0x0A9X.
         0x0A90 => Some("fuchsia.BIND_POWER_SENSOR_DOMAIN".to_string()),
 
@@ -541,9 +535,6 @@ pub fn get_deprecated_key_value(key: &str) -> Option<u32> {
 
         // Codec binding variables at 0x0A7X.
         "fuchsia.BIND_CODEC_INSTANCE" => Some(0x0A70),
-
-        // Registers binding variables at 0x0A8X
-        "fuchsia.BIND_REGISTER_ID" => Some(0x0A80),
 
         // Power sensor binding variables at 0x0A9X
         "fuchsia.BIND_POWER_SENSOR_DOMAIN" => Some(0x0A90),

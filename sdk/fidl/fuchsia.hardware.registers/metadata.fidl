@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 library fuchsia.hardware.registers;
 
+/// Maximum length of a `name` string.
+const MAX_NAME_LENGTH uint32 = 32;
+
 type Mask = strict union {
     1: r8 uint8;
     2: r16 uint16;
@@ -28,8 +31,8 @@ type MaskEntry = table {
 };
 
 type RegistersMetadataEntry = table {
-    /// ID for binding purposes (BIND_REGISTER_ID device property).
-    1: bind_id uint32;
+    /// Name for binding purposes (BIND_REGISTER_NAME device property).
+    1: name string:MAX_NAME_LENGTH;
 
     /// MMIO ID for MMIO corresponding to register.
     2: mmio_id uint32;

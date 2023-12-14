@@ -71,6 +71,7 @@ group("common") {
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/metadata:llcpp",

@@ -104,26 +104,12 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
 
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
 #endif
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
-
-#ifdef include_packaged_drivers
-  static const char* kIspDevicePaths[] = {
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp-old",
-  };
-  ASSERT_NO_FATAL_FAILURE(
-      device_enumeration::WaitForOne(cpp20::span(kIspDevicePaths, std::size(kIspDevicePaths))));
-
-  static const char* kCameraControllerDevicePaths[] = {
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp-old/arm-isp/camera_controller",
-  };
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
-      cpp20::span(kCameraControllerDevicePaths, std::size(kCameraControllerDevicePaths))));
-#endif
 }
 
 }  // namespace

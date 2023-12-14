@@ -148,8 +148,7 @@ __BEGIN_CDECLS
 // Codec binding variables at 0x0A7X
 #define BIND_CODEC_INSTANCE 0x0A70
 
-// Regsiters binding variables at 0x0A8X
-#define BIND_REGISTER_ID 0x0A80
+// 0x0A80 was BIND_REGISTER_ID which is now deprecated.
 
 // Power sensor binding variables at 0x0A9X
 #define BIND_POWER_SENSOR_DOMAIN 0x0A90

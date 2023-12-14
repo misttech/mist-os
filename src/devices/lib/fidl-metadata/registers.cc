@@ -46,7 +46,7 @@ zx::result<std::vector<uint8_t>> ToFidl(cpp20::span<const Register<T>> registers
 
     registers_metadata[i] =
         std::move(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator)
-                      .bind_id(src_reg.bind_id)
+                      .name(src_reg.name)
                       .mmio_id(src_reg.mmio_id)
                       .masks(std::move(mask_entries))
                       .Build());

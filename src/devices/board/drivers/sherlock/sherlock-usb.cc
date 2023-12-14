@@ -191,15 +191,14 @@ zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   const std::vector<fdf::BindRule> kResetRegisterRules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
-                              bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_USB_PHY_V2_RESET),
+      fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                              aml_registers::REGISTER_USB_PHY_V2_RESET),
   };
 
   const std::vector<fdf::NodeProperty> kResetRegisterProperties = std::vector{
       fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
-                        bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_USB_PHY_V2_RESET),
+      fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET),
   };
 
   std::vector<fdf::ParentSpec> parents{{kResetRegisterRules, kResetRegisterProperties}};

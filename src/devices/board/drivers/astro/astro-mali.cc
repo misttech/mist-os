@@ -100,15 +100,14 @@ zx_status_t Astro::MaliInit() {
             {
                 fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                                         bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-                fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
-                                        bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_MALI_RESET),
+                fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                                        aml_registers::REGISTER_MALI_RESET),
             },
         .properties =
             {
                 fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                                   bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-                fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
-                                  bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_MALI_RESET),
+                fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_MALI_RESET),
             },
     }};
 

@@ -4,6 +4,9 @@
 
 library fuchsia.register;
 
+// Register name to uniquely ID the register.
+string NAME;
+
 extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x98,
 };

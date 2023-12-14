@@ -37,7 +37,7 @@ static const std::vector<fpbus::Mmio> registers_mmios{
 
 static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     {
-        .bind_id = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .name = aml_registers::REGISTER_USB_PHY_V2_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -53,7 +53,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
             },
     },
     {
-        .bind_id = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .name = aml_registers::REGISTER_NNA_RESET_LEVEL2,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -64,7 +64,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
             },
     },
     {
-        .bind_id = aml_registers::REGISTER_MALI_RESET,
+        .name = aml_registers::REGISTER_MALI_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {

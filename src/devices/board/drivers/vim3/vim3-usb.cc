@@ -123,12 +123,12 @@ static const fpbus::Node usb_phy_dev = []() {
 const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-    fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
+    fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                       bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
-    fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
+    fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
