@@ -54,9 +54,14 @@ fn get_mac_identifier_from_octets(
 // PCI:
 // "/dev/sys/platform/pt/PCI0/bus/02:00.0/02:00.0/e1000/ethernet"
 //
-// USB:
+// USB over PCI:
 // "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
 // 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
+//
+// USB over DWC:
+// "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device"
+// 05:03:2d following "platform" represents
+// vid(vendor id):pid(product id):did(device id) and are defined in each board file
 //
 // SDIO
 // "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy"
@@ -68,9 +73,22 @@ fn get_mac_identifier_from_octets(
 // Though it is not a sdio device, it has the vid:pid:did info following "/platform/",
 // it's handled the same way as a sdio device.
 fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<String, anyhow::Error> {
+    let sdio_pattern = "/platform/";
     let pattern = match get_bus_type_for_topological_path(topological_path)? {
-        BusType::USB | BusType::PCI => "/PCI0/bus/",
-        BusType::SDIO => "/platform/",
+        BusType::USB | BusType::PCI => {
+            let pci_pattern = "/PCI0/bus/";
+            if topological_path.contains(pci_pattern) {
+                pci_pattern
+            } else {
+                // TODO(https://fxbug.dev/137456): Remove special case once we
+                // can rely on consistent bus paths
+                // On VIM3 targets, the USB bus is not over a PCI bridge, and
+                // the bus path we want to find is located in the same place
+                // as the SDIO bus type.
+                sdio_pattern
+            }
+        }
+        BusType::SDIO => sdio_pattern,
     };
 
     let index = topological_path.find(pattern).ok_or_else(|| {
@@ -215,6 +233,11 @@ fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, 
         } else {
             Ok(BusType::PCI)
         }
+    } else if topological_path.contains("/usb-peripheral/") {
+        // On VIM3 targets, the USB bus does not require a bridge over a PCI
+        // controller, so the bus path represents the USB type with a
+        // different string.
+        Ok(BusType::USB)
     } else if topological_path.contains("/platform/") {
         Ok(BusType::SDIO)
     } else {
@@ -864,7 +887,14 @@ mod tests {
         vec![BusType::USB],
         BusType::USB,
         true;
-        "usb_match"
+        "pci_usb_match"
+    )]
+    #[test_case(
+        "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+        vec![BusType::USB],
+        BusType::USB,
+        true;
+        "dwc_usb_match"
     )]
     // Same topological path as the case for USB, but with
     // non-matching bus types. Ensure that even though PCI is
@@ -1272,17 +1302,41 @@ mod tests {
             ..default_device_info()
         },
         "ethu0014";
-        "device_class_with_usb_bus_type_with_bus_path"
+        "device_class_with_pci_usb_bus_type_with_bus_path"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
+        ],
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+            ..default_device_info()
+        },
+        "ethu05032d";
+        "device_class_with_dwc_usb_bus_type_with_bus_path"
     )]
     #[test_case(
         vec![NameCompositionRule::Default],
         DeviceInfoRef {
             device_class: fhwnet::DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-            ..default_device_info()
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x2] },
         },
-        "ethx1";
-        "default_usb"
+        "ethx2";
+        "default_usb_pci"
+    )]
+    #[test_case(
+        vec![NameCompositionRule::Default],
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x3] },
+        },
+        "ethx3";
+        "default_usb_dwc"
     )]
     #[test_case(
         vec![NameCompositionRule::Default],
