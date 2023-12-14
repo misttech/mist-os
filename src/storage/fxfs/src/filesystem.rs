@@ -324,7 +324,6 @@ impl FxFilesystemBuilder {
         self
     }
 
-    #[cfg(test)]
     pub fn trim_config(
         mut self,
         delay_and_interval: Option<(std::time::Duration, std::time::Duration)>,

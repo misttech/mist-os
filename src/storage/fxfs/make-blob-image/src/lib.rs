@@ -10,7 +10,7 @@ use {
     futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
-        filesystem::{FxFilesystem, SyncOptions},
+        filesystem::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
         object_handle::WriteBytes,
         object_store::{
             directory::Directory,
@@ -97,8 +97,12 @@ pub async fn make_blob_image(
         BLOCK_SIZE,
         block_count,
     ));
-    let filesystem =
-        FxFilesystem::new_empty(device).await.context("Failed to format filesystem")?;
+    let filesystem = FxFilesystemBuilder::new()
+        .format(true)
+        .trim_config(None)
+        .open(device)
+        .await
+        .context("Failed to format filesystem")?;
     let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await.map_err(|e| {
         if target_size != 0 && FxfsError::NoSpace.matches(&e) {
             e.context(format!(
