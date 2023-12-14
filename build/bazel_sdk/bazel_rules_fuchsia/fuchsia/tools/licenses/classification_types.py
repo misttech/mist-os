@@ -320,7 +320,7 @@ class IdentifiedSnippet:
                     f"The overriding rules {rule_paths} changed the conditions to "
                     f"{self._format_conditions(self.overriden_conditions)} but the rules don't match the dependencies "
                     f"{self.dependents_unmatched_by_overriding_rules} that remain with the "
-                    f"condition {self._format_conditions(disallowed_conditions)} which is not allowed'."
+                    f"condition {self._format_conditions(disallowed_conditions)} which is not allowed."
                 )
 
         if verified:
@@ -836,7 +836,8 @@ class AsterixStringExpression:
             return False
 
         for part in self.parts:
-            next_match = value.find(part, offset)
+            # Uses rfind (right-most find) instead of find to make * greedy.
+            next_match = value.rfind(part, offset)
             if next_match == -1:
                 return False
             offset = next_match + len(part)

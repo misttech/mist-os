@@ -113,20 +113,24 @@ class SpdxPackage:
         return output
 
     def from_json_dict(input: DictReader):
-        license_concluded_str = input.get_or("licenseConcluded", None)
+        license_concluded_str = input.get_string_or_none("licenseConcluded")
+
         license_concluded = (
             SpdxLicenseExpression.create(license_concluded_str, input.location)
             if license_concluded_str
             else None
         )
-        homepage = input.get_or("homepage", None)
-        copyright_text = input.get_or("copyrightText", None)
-        if copyright_text == "NOASSERTION":
-            copyright_text = None
+        homepage = input.get_string_or_none("homepage")
+        copyright_text = input.get_string_or_none("copyrightText")
+
+        name = input.get("name")
+        if name.startswith("third_party/"):
+            # TODO(b/316188315): Remove once fixed upstream.
+            name = name[len("third_party/") :]
 
         return SpdxPackage(
             spdx_id=input.get("SPDXID"),
-            name=input.get("name"),
+            name=name,
             copyright_text=copyright_text,
             license_concluded=license_concluded,
             homepage=homepage,
@@ -179,6 +183,9 @@ class SpdxExtractedLicensingInfo:
     def from_json_dict(input: DictReader):
         license_id = input.get("licenseId")
         name = input.get("name")
+        if name.startswith("third_party/"):
+            # TODO(b/316188315): Remove once fixed upstream.
+            name = name[len("third_party/") :]
 
         cross_refs = [
             ref_dict.get("url")
@@ -425,7 +432,7 @@ class SpdxIndex:
             return self.get_packages_by_ids(self._packages_by_license_id[id])
         else:
             raise LicenseException(
-                f"No packages associated with '{license}",
+                f"No packages associated with '{license.license_id}' (name={license.name}, links={license.unique_links()})",
                 self._spdx_doc_file_path,
             )
 
@@ -546,7 +553,7 @@ class SpdxIndex:
                     f"spdx id '{child}' used in relationship but there is no element with that id",
                     input.file_path,
                 )
-            if r.relationship_type == "CONTAINS":
+            if r.relationship_type in ["CONTAINS", "DESCENDANT_OF"]:
                 child_packages_by_parent_id[parent].add(child)
                 parent_packages_by_child_id[child].add(parent)
 

@@ -117,6 +117,14 @@ class TestClassificationTypes(unittest.TestCase):
         self.assertTrue(sm.matches("XwYaZz"))
         self.assertTrue(sm.matches("wXaYzZ"))
 
+    def test_StringMatcher_asterix_matches_greedily(self):
+        sm = StringMatcher.create(["ba*r"])
+
+        self.assertTrue(sm.matches("bar"))
+        self.assertTrue(sm.matches("baar"))
+        self.assertTrue(sm.matches("barr"))
+        self.assertTrue(sm.matches("barbarr"))
+
 
 if __name__ == "__main__":
     unittest.main()

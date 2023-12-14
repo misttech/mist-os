@@ -142,6 +142,13 @@ class DictReader:
         """Reads a list of strings and converts to a Set"""
         return set(self.get_string_list(key))
 
+    def get_string_or_none(self, key) -> str:
+        value = self.get_or(key, default=None, expected_type=str)
+        # Special treatment for SPDX NOASSERTION value:
+        if value == "NOASSERTION":
+            value = None
+        return value
+
 
 def _verify_string_list(value):
     if not isinstance(value, list):
