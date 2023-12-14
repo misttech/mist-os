@@ -31,6 +31,12 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
             required=False,
             scope=ArgumentScope.GLOBAL,
         )
+        parser.add_argument(
+            "--realm",
+            help="Optionally specify the target realm to run this test.",
+            required=False,
+            scope=ArgumentScope.GLOBAL,
+        )
         return parser.parse_args()
 
     def run(self, parser: ScopedArgumentParser) -> None:
@@ -43,6 +49,7 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
                     *ffx,
                     "test",
                     "run",
+                    *(["--realm", args.realm] if args.realm else []),
                     args.url,
                 ]
             )

@@ -22,6 +22,9 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     if component == None:
         fail("Unable to find component with name {} in {}".format(ctx.attr.run_tag, package))
 
+    if not component.is_test and ctx.attr.test_realm:
+        fail("`test_realm` is not applicable to non-test components.")
+
     component_name = component.name
     manifest = component.manifest.basename
     url = "fuchsia-pkg://%s/%s#meta/%s" % (repo, package, manifest)
@@ -44,14 +47,20 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             args,
         )
     elif component.is_test:
+        args = [
+            "--ffx",
+            sdk.ffx,
+            "--url",
+            url,
+        ]
+        if ctx.attr.test_realm:
+            args += [
+                "--realm",
+                ctx.attr.test_realm,
+            ]
         return make_fuchsia_task(
             ctx.attr._run_test_component_tool,
-            [
-                "--ffx",
-                sdk.ffx,
-                "--url",
-                url,
-            ],
+            args,
         )
     else:
         return make_fuchsia_task(
@@ -98,6 +107,9 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
         ),
         "disable_repository": attr.string(
             doc = "The repository that contains the pre-existed driver we want to disable. This is only used in driver workflow now.",
+        ),
+        "test_realm": attr.string(
+            doc = "Specify --realm to `ffx test run`.",
         ),
         "_register_driver_tool": attr.label(
             doc = "The tool used to run components",

@@ -135,6 +135,7 @@ def _fuchsia_test_package(
         _test_component_mapping,
         _components = [],
         subpackages = [],
+        test_realm = None,
         **kwargs):
     """Defines test variants of fuchsia_package.
 
@@ -164,6 +165,7 @@ def _fuchsia_test_package(
         package = "%s_fuchsia_package" % name,
         component_run_tags = _test_component_mapping.keys(),
         is_test = True,
+        test_realm = test_realm,
         **kwargs
     )
 
