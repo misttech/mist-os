@@ -569,10 +569,7 @@ class I2cChildFidlTest : public zxtest::Test {
 
     namespace_.SyncCall([&](Wrapped* ns) {
       ASSERT_OK(ns->incoming->AddService<fi2cimpl::Service>(
-          fi2cimpl::Service::InstanceHandler(
-              { .device = std::move(handler) }
-          )
-      ));
+          fi2cimpl::Service::InstanceHandler({.device = std::move(handler)})));
       ASSERT_OK(ns->incoming->Serve(std::move(io_eps->server)));
     });
 
@@ -624,9 +621,15 @@ TEST_F(I2cChildFidlTest, Write3BytesOnce) {
       return;
     }
 
-    if (ops[0].data[0] != kTestWrite0 || ops[0].data[1] != kTestWrite1 ||
-        ops[0].data[2] != kTestWrite2 || ops[0].data.count() != 3 || ops[0].is_read ||
-        !ops[0].stop) {
+    const auto& op = ops[0];
+    if (op.type.is_read_size()) {
+      comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto write_data = op.type.write_data();
+    if (write_data.count() != 3 || write_data[0] != kTestWrite0 || write_data[1] != kTestWrite1 ||
+        write_data[2] != kTestWrite2) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -671,7 +674,8 @@ TEST_F(I2cChildFidlTest, Read3BytesOnce) {
       return;
     }
 
-    if (ops[0].data.count() != 3 || !ops[0].is_read || !ops[0].stop) {
+    const auto& op = ops[0];
+    if (op.type.is_write_data() || !op.stop || op.type.read_size() != 3) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -719,10 +723,23 @@ TEST_F(I2cChildFidlTest, Write1ByteOnceRead1Byte3Times) {
       return;
     }
 
-    if (ops[0].data[0] != kTestWrite0 || ops[0].data.count() != 1 || ops[0].is_read ||
-        ops[0].stop || ops[1].data.count() != 1 || !ops[1].is_read || ops[1].stop ||
-        ops[2].data.count() != 1 || !ops[2].is_read || ops[2].stop || ops[3].data.count() != 1 ||
-        !ops[3].is_read || !ops[3].stop) {
+    const auto& op1 = ops[0];
+    const auto& op2 = ops[1];
+    const auto& op3 = ops[2];
+    const auto& op4 = ops[3];
+
+    if (op1.type.is_read_size()) {
+      comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+    const auto& op1_write_data = op1.type.write_data();
+    if (op1_write_data.count() != 1 || op1_write_data[0] != kTestWrite0) {
+      comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    if (op2.type.is_write_data() || op2.type.read_size() != 1 || op3.type.is_write_data() ||
+        op3.type.read_size() != 1 || op4.type.is_write_data() || op4.type.read_size() != 1) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -982,26 +999,27 @@ TEST_F(I2cChildFidlTest, HugeTransfer) {
   auto txn = [](FakeFidlI2cImpl::TransactRequestView req, fdf::Arena& arena,
                 FakeFidlI2cImpl::TransactCompleter::Sync& comp) {
     fidl::VectorView<fi2cimpl::wire::I2cImplOp>& ops = req->op;
-    std::vector<uint8_t> out_data;  // Returned bytes.
+    constexpr size_t kReadCount = 1024;
 
+    std::vector<fi2cimpl::wire::ReadData> reads;
     for (auto& op : ops) {
-      cpp20::span in_data(op.data.data(), op.data.count());
-
-      if (op.is_read) {
-        if (in_data.size() != 1024) {
+      if (op.type.is_read_size() > 0) {
+        if (op.type.read_size() != kReadCount) {
           comp.buffer(arena).ReplyError(ZX_ERR_IO);
         }
-        memset(in_data.data(), 'r', in_data.size());
-        out_data.assign(in_data.begin(), in_data.end());
-      } else if (std::any_of(in_data.begin(), in_data.end(), [](uint8_t b) { return b != 'w'; })) {
-        comp.buffer(arena).ReplyError(ZX_ERR_IO);
-        return;
+        fi2cimpl::wire::ReadData read{{arena, kReadCount}};
+        memset(read.data.data(), 'r', kReadCount);
+        reads.push_back(read);
+      } else {
+        auto& write_data = op.type.write_data();
+        if (std::any_of(write_data.begin(), write_data.end(), [](uint8_t b) { return b != 'w'; })) {
+          comp.buffer(arena).ReplyError(ZX_ERR_IO);
+          return;
+        }
       }
     }
 
-    fidl::VectorView<fi2cimpl::wire::ReadData> read{arena, 1};
-    read[0].data = fidl::VectorView<uint8_t>{arena, out_data};
-    comp.buffer(arena).ReplySuccess(read);
+    comp.buffer(arena).ReplySuccess({arena, reads});
   };
   namespace_.SyncCall([&](Wrapped* ns) { ns->i2cimpl.emplace(txn); });
 

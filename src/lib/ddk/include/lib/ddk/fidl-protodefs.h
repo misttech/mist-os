@@ -42,5 +42,6 @@ DDK_FIDL_PROTOCOL_DEF(CODEC,           23, "fuchsia.hardware.audio.CodecService"
 DDK_FIDL_PROTOCOL_DEF(PWM,             24, "fuchsia.hardware.pwm.Service")
 DDK_FIDL_PROTOCOL_DEF(ETH_BOARD,       25, "fuchsia.hardware.ethernet.board.Service")
 DDK_FIDL_PROTOCOL_DEF(GPIO,            26, "fuchsia.hardware.gpio.Service")
+DDK_FIDL_PROTOCOL_DEF(I2C_IMPL,        27, "fuchsia.hardware.i2cimpl.Service")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

@@ -93,10 +93,15 @@ class FidlTransportAdapter : public TransportAdapter {
 
       cpp20::span<uint8_t> data{&banjo_op.data_buffer[0], banjo_op.data_size};
 
+      fuchsia_hardware_i2cimpl::wire::I2cImplOpType op_type =
+          banjo_op.is_read ? fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithReadSize(
+                                 static_cast<uint32_t>(data.size()))
+                           : fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithWriteData(
+                                 fidl::ObjectView<fidl::VectorView<uint8_t>>{
+                                     arena, fidl::VectorView<uint8_t>{arena, data}});
       fuchsia_hardware_i2cimpl::wire::I2cImplOp fidl_op{
           .address = banjo_op.address,
-          .data = fidl::VectorView<uint8_t>{arena, data},
-          .is_read = banjo_op.is_read,
+          .type = op_type,
           .stop = banjo_op.stop,
       };
 

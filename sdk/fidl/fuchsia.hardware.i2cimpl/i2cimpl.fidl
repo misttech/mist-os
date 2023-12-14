@@ -5,13 +5,17 @@ library fuchsia.hardware.i2cimpl;
 
 using zx;
 
+/// If `read_size` is set: This is a read operation and `read_size` bytes will be read.
+/// If `write_data` is set: This is a write operation and `write_data` will be written.
+type I2cImplOpType = strict union {
+    1: read_size uint32;
+    2: write_data vector<uint8>:MAX;
+};
+
 /// See `Transact` below for usage.
 type I2cImplOp = struct {
     address uint16;
-    @buffer
-    @mutable
-    data vector<uint8>:MAX;
-    is_read bool;
+    type I2cImplOpType;
     stop bool;
 };
 
@@ -33,8 +37,7 @@ open protocol Device {
         bitrate uint32;
     }) -> () error zx.Status;
 
-    /// |Transact| assumes that all ops buf are not null.
-    /// |Transact| assumes that all ops length are not zero.
+    /// |Transact| assumes that write ops write_data length are not zero.
     /// |Transact| assumes that at least the last op has stop set to true.
     ///
     /// For each read-transaction, there will be a corresponding ReadData
