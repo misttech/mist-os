@@ -106,11 +106,7 @@ template("cm") {
       restricted_features = []
     }
 
-    # Restricted features that don't require an explicit opt-in.
-    #
-    # Useful for features which we want to allow globally in tree but
-    # restrict out of tree.
-    restricted_features += [ "hub" ]
+    # Toggle restricted features that don't require an explicit opt-in.
 
     # Enables feature allow_non_hermetic_packages. This allows us disable the
     # feature in OOT builds.

@@ -7,11 +7,6 @@ group("structured_config") {
   # Available to all components in fuchsia.git
 }
 
-# The allowlist of components that can use the "hub" feature in CML.
-group("hub") {
-  # Available to all components in fuchsia.git
-}
-
 # The allowlist of components that can use dictionaries in CML.
 group("dictionaries") {
   visibility = []

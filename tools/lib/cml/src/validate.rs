@@ -575,10 +575,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
-        if let Some(directory) = use_.directory.as_ref() {
-            if directory.as_str() == "hub" && use_.from == Some(UseFromRef::Framework) {
-                self.features.check(Feature::Hub)?;
-            }
+        if let Some(_) = use_.directory.as_ref() {
             // All directory "use" expressions must have directory rights.
             match &use_.rights {
                 Some(rights) => self.validate_directory_rights(&rights)?,
@@ -653,13 +650,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
         if let Some(directory) = expose.directory.as_ref() {
             for directory in directory {
-                if directory.as_str() == "hub"
-                    && expose.from.iter().any(|r| *r == ExposeFromRef::Framework)
-                {
-                    {
-                        self.features.check(Feature::Hub)?;
-                    }
-                }
                 // Ensure that directories exposed from self are defined in `capabilities`.
                 if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
                     if !self.all_directories.contains(directory) {
@@ -864,11 +854,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
         if let Some(directory) = offer.directory.as_ref() {
             for directory in directory {
-                if directory.as_str() == "hub"
-                    && offer.from.iter().any(|r| *r == OfferFromRef::Framework)
-                {
-                    self.features.check(Feature::Hub)?;
-                }
                 // Ensure that directories offered from self are defined in `capabilities`.
                 if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
                     if !self.all_directories.contains(directory) {
@@ -6737,68 +6722,6 @@ mod tests {
             Err(Error::Parse { err, .. }) if &err == "invalid value: integer `0`, expected a nonzero u32"
         ),
     }}
-
-    // Tests the use of hub when the "hub" feature is set.
-    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Hub]), {
-        test_cml_use_hub(
-            json!({
-                "use": [
-                    {
-                        "directory": "hub",
-                        "from": "framework",
-                        "rights": [ "r*" ],
-                        "path": "/hub",
-                    },
-                ],
-                "expose": [
-                    { "directory": "hub", "from": "framework" },
-                ],
-                "offer": [
-                    { "directory": "hub", "from": "framework", "to": "#child" },
-                ],
-                "children": [
-                    { "name": "child", "url": "fuchsia-pkg://child" }
-                ],
-            }),
-            Ok(())
-        ),
-    }}
-
-    // Tests the use of hub fails when the "hub" feature is not set.
-    test_validate_cml! {
-        test_cml_use_hub_without_feature(
-            json!({
-                "use": [
-                    {
-                        "directory": "hub",
-                        "from": "framework",
-                        "rights": [ "r*" ],
-                        "path": "/hub",
-                    },
-                ],
-            }),
-            Err(Error::RestrictedFeature(s)) if s == "hub"
-        ),
-        test_cml_expose_hub_without_feature(
-            json!({
-                "expose": [
-                    { "directory": "hub", "from": "framework" },
-                ],
-            }),
-            Err(Error::RestrictedFeature(s)) if s == "hub"
-        ),
-        test_cml_offer_hub_without_feature(
-            json!({
-                "offer": [
-                    { "directory": "hub", "from": "framework", "to": "#child" },
-                ],
-                "children": [
-                    { "name": "child", "url": "fuchsia-pkg://child" }
-                ],
-            }),
-            Err(Error::RestrictedFeature(s)) if s == "hub"
-        ),
-    }
 
     // Tests the use of `allow_long_names` when the "AllowLongNames" feature is set.
     test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::AllowLongNames]), {

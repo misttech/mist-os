@@ -3102,7 +3102,7 @@ mod tests {
         },
 
         test_compile_expose => {
-            features = FeatureSet::from(vec![Feature::Hub, Feature::Dictionaries]),
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "expose": [
                     {
@@ -3701,7 +3701,7 @@ mod tests {
         },
 
         test_compile_offer => {
-            features = FeatureSet::from(vec![Feature::Hub, Feature::Dictionaries]),
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "offer": [
                     {
@@ -4370,7 +4370,7 @@ mod tests {
         },
 
         test_compile_offer_route_to_dictionary => {
-            features = FeatureSet::from(vec![Feature::Hub, Feature::Dictionaries]),
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "offer": [
                     {
