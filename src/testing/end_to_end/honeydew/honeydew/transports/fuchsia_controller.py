@@ -79,7 +79,7 @@ class FuchsiaController:
 
             msg: str = (
                 f"Creating Fuchsia-Controller Context with "
-                f"target='{self._name}', config='{config}'"
+                f"target='{self._target}', config='{config}'"
             )
             if isolate_dir:
                 msg = f"{msg}, isolate_dir={isolate_dir.directory()}"
