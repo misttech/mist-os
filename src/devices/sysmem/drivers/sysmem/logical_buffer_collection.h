@@ -224,8 +224,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   ~LogicalBufferCollection();
 
-  static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Device* parent_device);
-  static void CreateV2(TokenServerEndV2 buffer_collection_token_request, Device* parent_device);
+  static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Device* parent_device,
+                       const ClientDebugInfo* client_debug_info);
+  static void CreateV2(TokenServerEndV2 buffer_collection_token_request, Device* parent_device,
+                       const ClientDebugInfo* client_debug_info);
 
   // |parent_device| the Device* that the calling allocator is part of.  The
   // tokens_by_koid_ for each Device is separate.  If somehow two clients were
@@ -780,7 +782,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   fit::function<NodeFilterResult(const NodeProperties&)> PrunedSubtreeFilter(
       NodeProperties& subtree, fit::function<bool(const NodeProperties&)> visit_keep) const;
 
-  static fbl::RefPtr<LogicalBufferCollection> CommonCreate(Device* parent_device);
+  static fbl::RefPtr<LogicalBufferCollection> CommonCreate(
+      Device* parent_device, const ClientDebugInfo* client_debug_info);
 
   bool CommonCreateBufferCollectionTokenStage1(fbl::RefPtr<LogicalBufferCollection> self,
                                                NodeProperties* new_node_properties,

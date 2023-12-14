@@ -33,13 +33,18 @@ NodeProperties::~NodeProperties() {
 
 // static
 std::unique_ptr<NodeProperties> NodeProperties::NewRoot(
-    LogicalBufferCollection* logical_buffer_collection) {
+    LogicalBufferCollection* logical_buffer_collection, const ClientDebugInfo* client_debug_info) {
   auto result = std::unique_ptr<NodeProperties>(new NodeProperties(logical_buffer_collection));
   ZX_DEBUG_ASSERT(!result->parent_);
   // Set later with SetNode().
   ZX_DEBUG_ASSERT(!result->node_);
   ZX_DEBUG_ASSERT(result->children_.empty());
   result->logical_buffer_collection_->IncStrongNodeTally();
+  if (client_debug_info) {
+    auto& new_debug_info = result->client_debug_info();
+    new_debug_info.name = client_debug_info->name;
+    new_debug_info.id = client_debug_info->id;
+  }
   return result;
 }
 

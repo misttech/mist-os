@@ -24,10 +24,18 @@ void BufferCollectionTokenGroup::V2::Sync(SyncCompleter::Sync& completer) {
 }
 
 void BufferCollectionTokenGroup::V1::Close(CloseCompleter::Sync& completer) {
+  if (!parent_.ReadyForAllocation()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() before AllChildrenPresent()");
+    return;
+  }
   parent_.CloseImpl(completer);
 }
 
 void BufferCollectionTokenGroup::V2::Close(CloseCompleter::Sync& completer) {
+  if (!parent_.ReadyForAllocation()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() before AllChildrenPresent()");
+    return;
+  }
   parent_.CloseImpl(completer);
 }
 
@@ -121,6 +129,11 @@ bool BufferCollectionTokenGroup::CommonCreateChildStage1(
   if (input_rights_attenuation_mask.has_value()) {
     rights_attenuation_mask = input_rights_attenuation_mask.value();
   }
+  if (rights_attenuation_mask == 0) {
+    FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+             "CreateChild() rights_attenuation_mask 0 not permitted");
+    return false;
+  }
   NodeProperties* new_node_properties = node_properties().NewChild(&logical_buffer_collection());
   if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
     new_node_properties->rights_attenuation_mask() &= rights_attenuation_mask;
@@ -188,6 +201,13 @@ void BufferCollectionTokenGroup::V1::CreateChildrenSync(
                      "CreateChildrenSync() after AllChildrenPresent()");
     return;
   }
+  for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
+    if (rights_attenuation_mask == 0) {
+      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+                       "CreateChildrenSync() rights_attenuation_mask 0 not permitted");
+      return;
+    }
+  }
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>> new_tokens;
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -230,6 +250,13 @@ void BufferCollectionTokenGroup::V2::CreateChildrenSync(
     parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
                      "CreateChildrenSync() requires rights_attenuation_masks set");
     return;
+  }
+  for (auto& rights_attenuation_mask : *request.rights_attenuation_masks()) {
+    if (rights_attenuation_mask == 0) {
+      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+                       "CreateChildrenSync() rights_attenuation_mask 0 not permitted");
+      return;
+    }
   }
   std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>> new_tokens;
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks().value()) {

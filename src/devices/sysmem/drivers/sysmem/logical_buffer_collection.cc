@@ -465,21 +465,24 @@ TokenServerEndCombinedV1AndV2 ConvertV2TokenRequestToCombinedTokenRequest(
 }  // namespace
 
 // static
-fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(Device* parent_device) {
+fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(
+    Device* parent_device, const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
       fbl::AdoptRef<LogicalBufferCollection>(new LogicalBufferCollection(parent_device));
   // The existence of a channel-owned BufferCollectionToken adds a
   // fbl::RefPtr<> ref to LogicalBufferCollection.
   logical_buffer_collection->LogInfo(FROM_HERE, "LogicalBufferCollection::Create()");
-  logical_buffer_collection->root_ = NodeProperties::NewRoot(logical_buffer_collection.get());
+  logical_buffer_collection->root_ =
+      NodeProperties::NewRoot(logical_buffer_collection.get(), client_debug_info);
   return logical_buffer_collection;
 }
 
 // static
 void LogicalBufferCollection::CreateV1(TokenServerEndV1 buffer_collection_token_request,
-                                       Device* parent_device) {
+                                       Device* parent_device,
+                                       const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
-      LogicalBufferCollection::CommonCreate(parent_device);
+      LogicalBufferCollection::CommonCreate(parent_device, client_debug_info);
   logical_buffer_collection->CreateBufferCollectionTokenV1(
       logical_buffer_collection, logical_buffer_collection->root_.get(),
       std::move(buffer_collection_token_request));
@@ -487,9 +490,10 @@ void LogicalBufferCollection::CreateV1(TokenServerEndV1 buffer_collection_token_
 
 // static
 void LogicalBufferCollection::CreateV2(TokenServerEndV2 buffer_collection_token_request,
-                                       Device* parent_device) {
+                                       Device* parent_device,
+                                       const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
-      LogicalBufferCollection::CommonCreate(parent_device);
+      LogicalBufferCollection::CommonCreate(parent_device, client_debug_info);
   logical_buffer_collection->CreateBufferCollectionTokenV2(
       logical_buffer_collection, logical_buffer_collection->root_.get(),
       std::move(buffer_collection_token_request));

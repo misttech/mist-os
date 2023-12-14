@@ -104,8 +104,8 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   // NodeProperties are to be lifetime-managed using std::unique_ptr<NodeProperties>.  This is part
   // of preserving linkages from child NodeProperties to parent NodeProperties using a
   // NodeProperties*, since the child Node existing doesn't keep the parent alive.
-  static std::unique_ptr<NodeProperties> NewRoot(
-      LogicalBufferCollection* logical_buffer_collection);
+  static std::unique_ptr<NodeProperties> NewRoot(LogicalBufferCollection* logical_buffer_collection,
+                                                 const ClientDebugInfo* client_debug_info);
   // The returned NodeProperties is already linked into the tree, and owned by the tree, so this
   // method just returns a raw pointer so we can inform the Node of its NodeProperties.
   NodeProperties* NewChild(LogicalBufferCollection* logical_buffer_collection);

@@ -6900,6 +6900,84 @@ TEST(Sysmem, CombineableFormatsFromSingleParticipantFails) {
   ASSERT_FALSE(parent_wait_result.is_ok());
 }
 
+TEST(Sysmem, DuplicateSyncRightsAttenuationMaskZeroFails) {
+  auto parent = create_initial_token_v2();
+  std::vector<zx_rights_t> rights_masks{0, 0};
+  fuchsia_sysmem2::BufferCollectionTokenDuplicateSyncRequest request;
+  request.rights_attenuation_masks() = std::move(rights_masks);
+  auto duplicate_sync_result = parent->DuplicateSync(std::move(request));
+  ASSERT_FALSE(duplicate_sync_result.is_ok());
+}
+
+TEST(Sysmem, BufferCollectionTokenGroupCreateChildZeroAttenuationMaskFails) {
+  auto parent = create_initial_token_v2();
+  auto group = create_group_under_token_v2(parent);
+  auto child_endpoints =
+      std::move(fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>().value());
+  fuchsia_sysmem2::BufferCollectionTokenGroupCreateChildRequest request;
+  request.rights_attenuation_mask() = 0;
+  request.token_request() = std::move(child_endpoints.server);
+  auto create_child_result = group->CreateChild(std::move(request));
+  // one-way, so no failure yet
+  ASSERT_TRUE(create_child_result.is_ok());
+  // We shouldn't have to wait anywhere near this long, but to avoid flakes we
+  // won't fail the test until it's very clear that sysmem hasn't failed the
+  // buffer collection despite zero attenuation mask.
+  constexpr zx::duration kWaitDuration = zx::sec(10);
+  const zx::time start_wait = zx::clock::get_monotonic();
+  while (true) {
+    // give up after kWaitDuration
+    ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+    if (parent->Sync().is_ok()) {
+      // failure due to Close before AllChildrenPresent takes effect async; try again
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      continue;
+    } else {
+      // expected failure seen - pass
+      break;
+    }
+  }
+}
+
+TEST(Sysmem, BufferCollectionTokenGroupCreateChildrenZeroAttenuationMaskFails) {
+  auto parent = create_initial_token_v2();
+  auto group = create_group_under_token_v2(parent);
+  std::vector<zx_rights_t> rights_masks{0, 0};
+  fuchsia_sysmem2::BufferCollectionTokenGroupCreateChildrenSyncRequest request;
+  request.rights_attenuation_masks() = std::move(rights_masks);
+  auto create_sync_result = group->CreateChildrenSync(std::move(request));
+  ASSERT_FALSE(create_sync_result.is_ok());
+}
+
+TEST(Sysmem, BufferCollectionTokenGroupCloseBeforeAllChildrenPresentFails) {
+  auto parent = create_initial_token_v2();
+  auto group = create_group_under_token_v2(parent);
+  auto child1 = create_token_under_group_v2(group);
+
+  // sending Close before AllChildrenPresent expected to cause buffer collection failure
+  auto close_result = group->Close();
+  // one-way message; no visible error yet
+  ASSERT_TRUE(close_result.is_ok());
+
+  // We shouldn't have to wait anywhere near this long, but to avoid flakes we
+  // won't fail the test until it's very clear that sysmem hasn't failed the
+  // buffer collection despite Close before AllChildrenPresent.
+  constexpr zx::duration kWaitDuration = zx::sec(10);
+  const zx::time start_wait = zx::clock::get_monotonic();
+  while (true) {
+    // give up after kWaitDuration
+    ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+    if (parent->Sync().is_ok()) {
+      // failure due to Close before AllChildrenPresent takes effect async; try again
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      continue;
+    } else {
+      // expected failure seen - pass
+      break;
+    }
+  }
+}
+
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
 // and run this manually.
 #if 0
