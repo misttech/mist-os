@@ -14,6 +14,7 @@ executable("ping") {
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
+    "//zircon/system/ulib/zx",
   ]
 }
 

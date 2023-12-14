@@ -4,6 +4,7 @@
 
 #include <arpa/inet.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/time.h>
 #include <netdb.h>
 #include <netinet/icmp6.h>
 #include <netinet/in.h>
@@ -310,7 +311,7 @@ int main(int argc, char** argv) {
   auto packet = reinterpret_cast<packet_t*>(sent.get());
   auto received_packet = reinterpret_cast<packet_t*>(rcvd.get());
 
-  const zx_ticks_t ticks_per_usec = zx_ticks_per_second() / 1000000;
+  const zx_ticks_t ticks_per_usec = zx::ticks::per_second().get() / 1000000;
 
   while (options.count-- > 0) {
     *packet = {
@@ -330,7 +331,7 @@ int main(int argc, char** argv) {
     };
     memcpy(packet->payload, options.message.data(), options.message.size());
     // Netstack will overwrite the checksum
-    zx_ticks_t before = zx_ticks_get();
+    zx_ticks_t before = zx::ticks::now().get();
     ssize_t r = sendto(s.get(), packet, sent_packet_size, 0, info->ai_addr, info->ai_addrlen);
     if (r < 0) {
       fprintf(stderr, "ping: Could not send packet\n");
@@ -366,7 +367,7 @@ int main(int argc, char** argv) {
       fprintf(stderr, "ping: Could not read result of ping\n");
       return -1;
     }
-    zx_ticks_t after = zx_ticks_get();
+    zx_ticks_t after = zx::ticks::now().get();
     int seq = ntohs(packet->hdr.un.echo.sequence);
     uint64_t usec = (after - before) / ticks_per_usec;
     stats.Update(usec);
