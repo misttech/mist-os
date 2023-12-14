@@ -17,7 +17,7 @@ use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use starnix_logging::{
     impossible_error, log_warn, not_implemented, set_zx_name, trace_category_starnix_mm,
@@ -44,23 +44,58 @@ use std::{
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
-fn usercopy(mm: &MemoryManager) -> &Option<usercopy::Usercopy> {
-    static USERCOPY: OnceCell<Option<usercopy::Usercopy>> = OnceCell::new();
+// We do not create shared processes in unit tests.
+pub(crate) const UNIFIED_ASPACES_ENABLED: bool =
+    cfg!(not(test)) && cfg!(feature = "unified_aspace");
 
-    USERCOPY.get_or_init(|| {
+/// Initializes the usercopy utilities.
+///
+/// It is useful to explicitly call this so that the usercopy is initialized
+/// at a known instant. For example, Starnix may want to make sure the usercopy
+/// thread created to support user copying is associated to the Starnix process
+/// and not a restricted-mode process.
+pub fn init_usercopy() {
+    // This call lazily initializes the `Usercopy` instance.
+    let _ = usercopy();
+}
+
+// From //zircon/kernel/arch/x86/include/arch/kernel_aspace.h
+#[cfg(target_arch = "x86_64")]
+const USER_ASPACE_BASE: usize = 0x0000000000200000;
+#[cfg(target_arch = "x86_64")]
+const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 46) - USER_ASPACE_BASE;
+
+// From //zircon/kernel/arch/arm64/include/arch/kernel_aspace.h
+#[cfg(target_arch = "aarch64")]
+const USER_ASPACE_BASE: usize = 0x0000000000200000;
+#[cfg(target_arch = "aarch64")]
+const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 47) - USER_ASPACE_BASE;
+
+// From //zircon/kernel/arch/riscv64/include/arch/kernel_aspace.h
+#[cfg(target_arch = "riscv64")]
+const USER_ASPACE_BASE: usize = 0x0000000000200000;
+#[cfg(target_arch = "riscv64")]
+const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 37) - USER_ASPACE_BASE;
+
+// From //zircon/kernel/object/process_dispatcher.cc
+const PRIVATE_ASPACE_BASE: usize = USER_ASPACE_BASE;
+const PRIVATE_ASPACE_SIZE: usize = USER_RESTRICTED_ASPACE_SIZE;
+
+fn usercopy() -> Option<&'static usercopy::Usercopy> {
+    static USERCOPY: Lazy<Option<usercopy::Usercopy>> = Lazy::new(|| {
         // We do not create shared processes in unit tests.
-        if cfg!(not(test)) && cfg!(feature = "unified_aspace") {
+        if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
             // restricted mode address range.
             Some(
-                usercopy::Usercopy::new(mm.base_addr.ptr()..mm.maximum_valid_user_address.ptr())
-                    .unwrap()
-                    .unwrap(),
+                usercopy::Usercopy::new(PRIVATE_ASPACE_BASE..PRIVATE_ASPACE_SIZE).unwrap().unwrap(),
             )
         } else {
             None
         }
-    })
+    });
+
+    Lazy::force(&USERCOPY).as_ref()
 }
 
 pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
@@ -2327,7 +2362,7 @@ impl MemoryAccessor for MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyRead");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if unread_bytes.is_empty() {
@@ -2353,7 +2388,7 @@ impl MemoryAccessor for MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartialUntilNull");
             let (read_bytes, unread_bytes) = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
@@ -2371,7 +2406,7 @@ impl MemoryAccessor for MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartial");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
@@ -2393,7 +2428,7 @@ impl MemoryAccessor for MemoryManager {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWrite");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
             if num_copied != bytes.len() {
@@ -2411,7 +2446,7 @@ impl MemoryAccessor for MemoryManager {
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWritePartial");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
             if num_copied == 0 && !bytes.is_empty() {
@@ -2464,6 +2499,10 @@ impl MemoryManager {
         let info = root_vmar.info()?;
         let user_vmar = create_user_vmar(&root_vmar, &info)?;
         let user_vmar_info = user_vmar.info()?;
+
+        debug_assert_eq!(PRIVATE_ASPACE_BASE, user_vmar_info.base);
+        debug_assert_eq!(PRIVATE_ASPACE_SIZE, user_vmar_info.len);
+
         Ok(Self::from_vmar(root_vmar, user_vmar, user_vmar_info))
     }
 
@@ -3288,7 +3327,7 @@ impl MemoryManager {
     }
 
     pub fn atomic_load_u32_acquire(&self, addr: UserAddress) -> Result<u32, Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             usercopy.atomic_load_u32_acquire(addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
             let buf = self.read_memory_to_array(addr)?;
@@ -3297,7 +3336,7 @@ impl MemoryManager {
     }
 
     pub fn atomic_store_u32_release(&self, addr: UserAddress, value: u32) -> Result<(), Errno> {
-        if let Some(usercopy) = usercopy(self).as_ref() {
+        if let Some(usercopy) = usercopy() {
             usercopy.atomic_store_u32_release(addr.ptr(), value).map_err(|_| errno!(EFAULT))
         } else {
             let value_ref = UserRef::<u32>::new(addr);

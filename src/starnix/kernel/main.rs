@@ -23,7 +23,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use starnix_core::execution::{Container, ContainerServiceConfig};
+use starnix_core::{
+    execution::{Container, ContainerServiceConfig},
+    mm::init_usercopy,
+};
 use starnix_logging::{log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel};
 
 fn maybe_serve_lifecycle() {
@@ -129,6 +132,10 @@ async fn main() -> Result<(), Error> {
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
     health.set_ok();
+
+    // We call this early during Starnix boot to make sure the usercopy utilities
+    // are ready for use before any restricted-mode/Linux processes are created.
+    init_usercopy();
 
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
