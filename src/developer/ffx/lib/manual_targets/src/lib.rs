@@ -9,6 +9,8 @@ use ffx_config::{self, api::ConfigError, ConfigLevel};
 use serde_json::{json, Map, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+pub mod watcher;
+
 #[cfg(test)]
 pub(crate) const MANUAL_TARGETS: &'static str = "targets.manual";
 #[cfg(not(test))]
