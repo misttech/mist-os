@@ -9,6 +9,13 @@
             include: "bionic_unit_tests_static.json5",
         },
         {
+            type: "expect_failure",
+            matchers: [
+                "MemtagStackTest.*",
+                "MemtagGlobalsTest.*",
+            ],
+        },
+        {
             type: "skip",
             matchers: [
                 // This test is a benchmark of the clock() function which runs too slowly sometimes on the
@@ -17,10 +24,9 @@
 
                 // Test for a RISC-V syscall. Skipped on other architectures.
                 "sys_cachectl.__riscv_flush_icache",
-
-                // TODO(https://fxbug.dev/314997123):  Move them to "expect_pass" after roll.
-                // These are marked as failing in bionic_unit_tests_static.json5, but they pass on arm.
-                "MemtagNoteTest.*",
+                "sys_hwprobe.__riscv_hwprobe",
+                "sys_hwprobe.__riscv_hwprobe_fail",
+                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
             ],
         },
     ],

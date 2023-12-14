@@ -4,16 +4,32 @@
 
 // This file contains x64 specific test expectations.
 {
-  actions: [
-    {
-      include: "bionic_unit_tests_static.json5",
-    },
-    {
-      type: "skip",
-      matchers: [
-        // Test for a RISC-V syscall. Skipped on other architectures.
-        "sys_cachectl.__riscv_flush_icache",
-      ],
-    }
-  ]
+    actions: [
+        {
+            include: "bionic_unit_tests_static.json5",
+        },
+        {
+            type: "expect_failure",
+            matchers: [],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Test for a RISC-V syscall. Skipped on other architectures.
+                "sys_cachectl.__riscv_flush_icache",
+                "sys_hwprobe.__riscv_hwprobe",
+                "sys_hwprobe.__riscv_hwprobe_fail",
+                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
+
+                // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
+                "MemtagStackTest.*",
+                "MemtagGlobalsTest.*",
+                "MemtagNoteTest.*",
+                "scs_test.stack_overflow",
+                "scs_DeathTest.stack_overflow",
+                "stack_unwinding.unwind_through_signal_frame",
+                "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
+            ],
+        },
+    ],
 }

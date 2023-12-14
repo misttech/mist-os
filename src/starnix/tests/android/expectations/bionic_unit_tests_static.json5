@@ -39,15 +39,10 @@
                 // Depends on /sys/class/net
                 "ifaddrs.getifaddrs_interfaces",
 
-                // These tests fail on arm64, and skipped on other arches but counted as failed by expectation matcher.
-                "MemtagNoteTest.*", // Marked passing in arm64 expectations.
-                "MemtagStackTest.*",
-                "MemtagGlobalsTest.*",
-                "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
-
                 // Our test runner doesn't understand DISABLED
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
                 "malloc.DISABLED_alloc_after_fork",
+                "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
 
                 // Requires MTE support
                 "malloc.disable_mte",
@@ -94,8 +89,6 @@
                 "spawn.posix_spawn_POSIX_SPAWN_SETSIGMASK",
                 "spawn.posix_spawn_dup2_CLOEXEC",
                 "spawn.posix_spawn_file_actions",
-                "stack_unwinding.unwind_through_signal_frame",
-                "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
                 "stdio.cantwrite_EBADF",
                 "stdio.fdopen_add_CLOEXEC",
                 "stdio.fdopen_failures",
@@ -196,13 +189,6 @@
                 // This test tries to determine if the system has >=4GB of total memory which is not true in all test environments.
                 "*.fread_int_overflow",
 
-                // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
-                // Mark these skipped until we can figure out how to annotate them more precisely.
-                "scs_test.stack_overflow",
-                "scs_DeathTest.stack_overflow",
-                "stack_unwinding.unwind_through_signal_frame",
-                "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
-
                 // These tests are arm32 specific
                 "aeabi.read_tp",
                 "getauxval.arm_has_AT_HWCAP2",
@@ -245,19 +231,10 @@
                 "stdio.popen_return_value_signal",
                 "stdio_nofortify.popen_return_value_signal",
 
-                // These tests are skipped on not riscv architecture, and the tooling detect this
-                // as a failure.
-                "sys_hwprobe.__riscv_hwprobe",
-                "sys_hwprobe.__riscv_hwprobe_fail",
-                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
-
                 // These tests are skipped on low memory devices.
                 "malloc.zeroed_allocations_small_medium_sizes",
                 "malloc.zeroed_allocations_large_sizes",
                 "malloc.zeroed_allocations_realloc",
-
-                // TODO(b/306670972): Appears to pass in latest android roll, try removing after that.
-                "properties.__system_property_add_appcompat",
 
                 // TODO(b/308967162): Flaky on the bots - needs to be investigated.
                 "properties.empty_value",
