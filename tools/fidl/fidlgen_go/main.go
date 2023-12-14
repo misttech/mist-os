@@ -134,7 +134,17 @@ func makeIDEFriendlySymlinks(args ideFriendlySymlinksArgs) error {
 		return fmt.Errorf("Error removing old symlink at %q: %w", symlinkPathname, err)
 	}
 
-	if err := os.Symlink(absOutputImplPath, symlinkPathname); err != nil {
+	relOutputImplPath, err := filepath.Rel(absIDEOutputDir, absOutputImplPath)
+	if err != nil {
+		return fmt.Errorf(
+			"Error getting relative path from %q to %q: %w",
+			absIDEOutputDir,
+			absOutputImplPath,
+			err,
+		)
+	}
+
+	if err := os.Symlink(relOutputImplPath, symlinkPathname); err != nil {
 		// Ignore os.ErrExist here because if multiple targets are generating the Go
 		// impl in parallel, we may race with another fidlgen_go invocation trying
 		// to create an identical symlink.
