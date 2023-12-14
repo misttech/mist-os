@@ -19,7 +19,6 @@ std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(
     fuchsia_gpu_magma::ObjectType fidl_type) {
   switch (fidl_type) {
     case fuchsia_gpu_magma::ObjectType::kBuffer:
-    case fuchsia_gpu_magma::ObjectType::kEvent:
     case fuchsia_gpu_magma::ObjectType::kSemaphore:
       return {fidl_type};
     default:
@@ -162,34 +161,6 @@ void PrimaryFidlServer::FlowControl(uint64_t size) {
                      result.FormatDescription().c_str());
     }
   }
-}
-
-void PrimaryFidlServer::ImportObject2(ImportObject2RequestView request,
-                                      ImportObject2Completer::Sync& completer) {
-  TRACE_DURATION("magma", "PrimaryFidlServer::ImportObject2", "type",
-                 static_cast<uint32_t>(request->object_type));
-  MAGMA_DLOG("PrimaryFidlServer: ImportObject2");
-
-  auto object_type = ValidateObjectType(request->object_type);
-  if (!object_type) {
-    SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
-    return;
-  }
-
-  uint64_t size = 0;
-  if (object_type == fuchsia_gpu_magma::wire::ObjectType::kBuffer) {
-    zx::unowned_vmo vmo(request->object.get());
-    zx_status_t status = vmo->get_size(&size);
-    if (status != ZX_OK) {
-      SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
-      return;
-    }
-  }
-  FlowControl(size);
-
-  if (!delegate_->ImportObject(std::move(request->object), /*flags=*/0, *object_type,
-                               request->object_id))
-    SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
 }
 
 void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,

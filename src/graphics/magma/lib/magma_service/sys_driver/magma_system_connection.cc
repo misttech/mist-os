@@ -266,7 +266,6 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle, uint64_t fl
     case fuchsia_gpu_magma::wire::ObjectType::kBuffer:
       return ImportBuffer(std::move(handle), client_id);
 
-    case fuchsia_gpu_magma::wire::ObjectType::kEvent:
     case fuchsia_gpu_magma::wire::ObjectType::kSemaphore: {
       auto semaphore =
           MagmaSystemSemaphore::Create(owner_->driver(), std::move(handle), client_id, flags);
@@ -294,7 +293,6 @@ magma::Status MagmaSystemConnection::ReleaseObject(
     case fuchsia_gpu_magma::wire::ObjectType::kBuffer:
       return ReleaseBuffer(object_id);
 
-    case fuchsia_gpu_magma::wire::ObjectType::kEvent:
     case fuchsia_gpu_magma::wire::ObjectType::kSemaphore: {
       auto iter = semaphore_map_.find(object_id);
       if (iter == semaphore_map_.end())

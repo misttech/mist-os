@@ -464,7 +464,7 @@ class Test {
     zx::handle handle;
     platform_semaphore->duplicate_handle(&handle);
     connection_->ImportObject(std::move(handle), /*flags=*/0,
-                              fuchsia_gpu_magma::wire::ObjectType::kEvent,
+                              fuchsia_gpu_magma::wire::ObjectType::kSemaphore,
                               platform_semaphore->id());
 
     magma_arm_mali_atom atom;
@@ -486,7 +486,7 @@ class Test {
     zx::handle handle;
     platform_semaphore->duplicate_handle(&handle);
     connection_->ImportObject(std::move(handle), /*flags=*/0,
-                              fuchsia_gpu_magma::wire::ObjectType::kEvent,
+                              fuchsia_gpu_magma::wire::ObjectType::kSemaphore,
                               platform_semaphore->id());
 
     magma_arm_mali_atom atom;

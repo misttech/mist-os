@@ -143,7 +143,7 @@ TEST(MagmaSystemConnection, Semaphores) {
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle1));
 
   EXPECT_TRUE(connection.ImportObject(std::move(duplicate_handle1), /*flags=*/0,
-                                      fuchsia_gpu_magma::wire::ObjectType::kEvent,
+                                      fuchsia_gpu_magma::wire::ObjectType::kSemaphore,
                                       semaphore->id()));
 
   auto system_semaphore = connection.LookupSemaphore(semaphore->id());
@@ -157,18 +157,18 @@ TEST(MagmaSystemConnection, Semaphores) {
 
   // Can't import the same id twice
   EXPECT_FALSE(connection.ImportObject(std::move(duplicate_handle2), /*flags=*/0,
-                                       fuchsia_gpu_magma::wire::ObjectType::kEvent,
+                                       fuchsia_gpu_magma::wire::ObjectType::kSemaphore,
                                        semaphore->id()));
 
   EXPECT_TRUE(
-      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
+      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kSemaphore));
 
   // should no longer be able to get it from the map
   EXPECT_EQ(connection.LookupSemaphore(semaphore->id()), nullptr);
 
   // should not be able to double free it
   EXPECT_FALSE(
-      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
+      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kSemaphore));
 }
 
 TEST(MagmaSystemConnection, BadSemaphoreImport) {
@@ -181,7 +181,7 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
 
   constexpr uint32_t kBogusHandle = 0xabcd1234;
   EXPECT_FALSE(connection.ImportObject(zx::handle(kBogusHandle), /*flags=*/0,
-                                       fuchsia_gpu_magma::wire::ObjectType::kEvent, 0));
+                                       fuchsia_gpu_magma::wire::ObjectType::kSemaphore, 0));
 }
 
 TEST(MagmaSystemConnection, BufferSharing) {
