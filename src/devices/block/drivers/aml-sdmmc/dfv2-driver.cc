@@ -289,7 +289,8 @@ zx::result<> Dfv2Driver::InitResources(
     const fidl::WireResult result = clock->Enable();
     if (result.ok()) {
       if (result->is_error()) {
-        FDF_LOG(ERROR, "Failed to enable clock: %s", zx_status_get_string(result->error_value()));
+        FDF_LOGL(ERROR, logger(), "Failed to enable clock: %s",
+                 zx_status_get_string(result->error_value()));
         return zx::error(result->error_value());
       }
       clock_gate = clock.TakeClientEnd();
