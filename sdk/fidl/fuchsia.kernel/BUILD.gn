@@ -25,6 +25,7 @@ fidl("fuchsia.kernel") {
     "mmio-resource.fidl",
     "overview.fidl",
     "power-resource.fidl",
+    "profile-resource.fidl",
     "root-job.fidl",
     "smc-resource.fidl",
     "vmex-resource.fidl",

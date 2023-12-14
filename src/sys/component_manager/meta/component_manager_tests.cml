@@ -26,6 +26,7 @@
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.VmexResource",

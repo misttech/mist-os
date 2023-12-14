@@ -31,6 +31,7 @@ use {
             mexec_resource::MexecResource,
             mmio_resource::MmioResource,
             power_resource::PowerResource,
+            profile_resource::ProfileResource,
             realm_builder::{
                 RealmBuilderResolver, RealmBuilderRunnerFactory,
                 RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
@@ -880,6 +881,28 @@ impl BuiltinEnvironment {
         if let Some(power_resource) = power_resource {
             builtin_dict_builder.add_protocol_if_enabled::<fkernel::PowerResourceMarker>(
                 move |stream| power_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the ProfileResource service.
+        let profile_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_PROFILE_BASE,
+                        1,
+                        b"profile",
+                    )
+                    .ok()
+            })
+            .map(ProfileResource::new)
+            .and_then(Result::ok);
+        if let Some(profile_resource) = profile_resource {
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::ProfileResourceMarker>(
+                move |stream| profile_resource.clone().serve(stream).boxed(),
             );
         }
 
