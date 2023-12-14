@@ -15,7 +15,6 @@
                 "add_key01",
                 "add_key03",
                 "adjtimex01",
-                "adjtimex01",
                 "adjtimex02",
                 "adjtimex03",
                 "aio01",
@@ -64,6 +63,7 @@
                 "cve-2018-9568",
                 "cve-2020-29373",
                 "cve-2021-4034",
+                "cve-2022-23222",
                 "cve-2022-2590",
                 "delete_module02",
                 "epoll_wait06",
@@ -72,6 +72,8 @@
                 "eventfd04",
                 "eventfd05",
                 "fallocate04",
+                "mmap08",
+                "readlinkat01",
 
                 // 23 requires F_SETLEASE
                 "fcntl23",
@@ -279,6 +281,7 @@
                 // Flaky test.
                 "cve-2017-17052",
                 "io_pgetevents01",
+                "recvmsg01",
                 "rename14",
                 "select03",
 
@@ -311,12 +314,6 @@
                 "linker01",
                 "mtest06",
                 "nanosleep01",
-
-                // TODO(https://fxbug.dev/315032734): Move to expect_fail after roll.
-                "mmap08",
-                "readlinkat01",
-                "recvmsg01",
-                "cve-2022-23222",
 
                 // Test sometimes timeout instead of failing
                 "starvation",
