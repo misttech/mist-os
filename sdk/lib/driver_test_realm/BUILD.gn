@@ -167,6 +167,7 @@ fuchsia_component_manifest("test_realm_manifest") {
   testonly = true
   component_name = "test_realm"
   manifest = "meta/test_realm.cml"
+  restricted_features = [ "allow_long_names" ]
 }
 
 expect_includes("client_includes") {

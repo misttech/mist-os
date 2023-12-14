@@ -26,6 +26,7 @@ group("config_capabilities") {
 group("allow_long_names") {
   visibility = [
     # driver collections
+    "//sdk/lib/driver_test_realm/*",
     "//src/devices/bin/driver_manager/*",
     "//src/sys/bootstrap/*",
     "//tools/cmc:*",

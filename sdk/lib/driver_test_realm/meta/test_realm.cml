@@ -37,18 +37,21 @@
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
+            allow_long_names: true,
         },
         {
             name: "pkg-drivers",
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
+            allow_long_names: true,
         },
         {
             name: "full-pkg-drivers",
             environment: "#full-pkg-driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
+            allow_long_names: true,
         },
     ],
     offer: [
