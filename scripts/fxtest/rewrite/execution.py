@@ -36,6 +36,10 @@ class TestTimeout(TestExecutionError):
     """The test timed out."""
 
 
+# Unique number suffix for output subdirectories.
+UNIQUE_OUTPUT_SUFFIX = 0
+
+
 class TestExecution:
     """Represents a single execution for a specific test."""
 
@@ -60,11 +64,19 @@ class TestExecution:
                 a device. Otherwise if this is a host test it may not
                 connect to a device.
         """
+        global UNIQUE_OUTPUT_SUFFIX
         self._test = test
         self._exec_env = exec_env
         self._flags = flags
         self._run_suffix = run_suffix
         self._device_env = device_env
+        if self._flags.ffx_output_directory is not None:
+            self._outdir: str | None = os.path.join(
+                self._flags.ffx_output_directory, str(UNIQUE_OUTPUT_SUFFIX)
+            )
+            UNIQUE_OUTPUT_SUFFIX += 1
+        else:
+            self._outdir = None
 
     def name(self) -> str:
         """Get the name of the test.
@@ -127,6 +139,8 @@ class TestExecution:
                 extra_args += ["--run-disabled"]
             if self._flags.show_full_moniker_in_logs:
                 extra_args += ["--show-full-moniker-in-logs"]
+            if self._outdir is not None:
+                extra_args += ["--output-directory", self._outdir]
 
             return ["fx", "ffx", "test", "run"] + extra_args + [component_url]
         elif self._test.build.test.path:
@@ -231,22 +245,29 @@ class TestExecution:
         command = self.command_line()
         env = self.environment() or {}
 
-        with tempfile.TemporaryDirectory() as outdir:
-            # TODO(b/295340900): Use a passed output directory
-            env.update(
-                {
-                    "FUCHSIA_TEST_OUTDIR": outdir,
-                }
-            )
-            output = await run_command(
-                *command,
-                recorder=recorder,
-                parent=parent,
-                print_verbatim=flags.output,
-                symbolize=symbolize,
-                env=env,
-                timeout=timeout,
-            )
+        outdir = self._outdir
+        maybe_temp_dir: tempfile.TemporaryDirectory | None = None
+        if not outdir:
+            maybe_temp_dir = tempfile.TemporaryDirectory()
+            outdir = maybe_temp_dir.name
+
+        env.update(
+            {
+                "FUCHSIA_TEST_OUTDIR": outdir,
+            }
+        )
+        output = await run_command(
+            *command,
+            recorder=recorder,
+            parent=parent,
+            print_verbatim=flags.output,
+            symbolize=symbolize,
+            env=env,
+            timeout=timeout,
+        )
+
+        if maybe_temp_dir is not None:
+            maybe_temp_dir.cleanup()
 
         if not output:
             raise TestFailed("Failed to run the test command")

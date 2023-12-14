@@ -122,6 +122,18 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 [],
                 ["--show-full-moniker-in-logs"],
             ),
+            (
+                "without ffx output directory",
+                [],
+                [],
+                ["--output-directory"],
+            ),
+            (
+                "with ffx output directory",
+                ["--ffx-output-directory", "foo"],
+                [["--output-directory", "foo/0"]],
+                [],
+            ),
         ]
     )
     async def test_test_execution_component(

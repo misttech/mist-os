@@ -4,6 +4,7 @@
 
 import argparse
 from dataclasses import dataclass
+import pathlib
 import typing
 
 import termout
@@ -56,6 +57,7 @@ class Flags:
     verbose: bool
     status_lines: int
     status_delay: float
+    ffx_output_directory: str | None
 
     def validate(self):
         """Validate incoming flags, raising an exception on failure.
@@ -77,6 +79,11 @@ class Flags:
             raise FlagError("--count must be a positive number")
         if self.suggestion_count < 0:
             raise FlagError("--suggestion-count must be non-negative")
+        if (
+            self.ffx_output_directory is not None
+            and pathlib.Path(self.ffx_output_directory).is_file()
+        ):
+            raise FlagError("--ffx-output-directory cannot be a file")
 
         if not termout.is_valid() and self.status:
             raise FlagError(
@@ -357,6 +364,11 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         default=0.033,
         type=float,
         help="Control how frequently the status output is updated. Default is every 0.033s, but you can increase the number for calmer output on slower connections.",
+    )
+    output.add_argument(
+        "--ffx-output-directory",
+        default=None,
+        help="If set, write ffx test output to this directory for post processing.",
     )
 
     flags: Flags = Flags(**vars(parser.parse_args(cli_args)))
