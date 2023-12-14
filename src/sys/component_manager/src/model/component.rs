@@ -42,7 +42,6 @@ use {
         environment::EnvironmentInterface,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
-        policy::PolicyError,
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
@@ -1365,10 +1364,19 @@ impl ResolvedInstanceState {
                     _ => continue,
                 }
                 let receiver = Receiver::new();
-                program_output_dict.insert_capability(
-                    iter::once(capability.name().as_str()),
-                    new_terminating_router(receiver.new_sender()),
+                let router = new_terminating_router(receiver.new_sender());
+                let router = router.with_policy_check(
+                    CapabilitySource::Component {
+                        capability: ComponentCapability::Protocol(match capability {
+                            cm_rust::CapabilityDecl::Protocol(p) => p.clone(),
+                            _ => panic!("we currently only support protocols"),
+                        }),
+                        component: WeakComponentInstance::new(component),
+                    },
+                    component.policy_checker().clone(),
                 );
+                program_output_dict
+                    .insert_capability(iter::once(capability.name().as_str()), router);
                 program_receivers_dict
                     .insert_capability(iter::once(capability.name().as_str()), receiver);
             }
@@ -2073,7 +2081,7 @@ impl ComponentRuntime {
 }
 
 /// Reads messages from Receivers in a Dict, writing open requests into the given directory.
-pub struct DictDispatcher {
+struct DictDispatcher {
     _task: fasync::Task<()>,
 }
 
@@ -2097,18 +2105,6 @@ impl DictDispatcher {
                         .iter()
                         .find(|decl| decl.name() == &name)
                         .expect("capability received for name not in dict");
-                    // Check if this route is allowed by the security policy.
-                    if let Err(_e) = Self::can_route_capability(
-                        &component,
-                        &message.target,
-                        capability_decl.clone(),
-                    ) {
-                        // The `can_route_capability` function above will log an error, so we don't
-                        // have to.
-                        let _ =
-                            message.payload.channel.close_with_epitaph(zx::Status::ACCESS_DENIED);
-                        continue;
-                    }
                     // Check if the hooks system wants to claim the handle.
                     if let Some(channel) = Self::dispatch_capability_routed_hook(
                         &component,
@@ -2141,27 +2137,6 @@ impl DictDispatcher {
                 }
             }),
         }
-    }
-
-    fn can_route_capability(
-        source_component: &WeakComponentInstance,
-        target_component: &WeakComponentInstance,
-        decl: cm_rust::CapabilityDecl,
-    ) -> Result<(), PolicyError> {
-        let capability_source = CapabilitySource::Component {
-            capability: ComponentCapability::Protocol(match decl {
-                cm_rust::CapabilityDecl::Protocol(p) => p,
-                _ => panic!("we currently only support protocols"),
-            }),
-            component: source_component.clone(),
-        };
-        let source_component = source_component
-            .upgrade()
-            .expect("it's impossible to have an invalid reference while a component is running");
-        source_component
-            .context
-            .policy()
-            .can_route_capability(&capability_source, &target_component.moniker)
     }
 
     /// Dispatches the capability routed hook. Returns the handle if none of the hooks took it.

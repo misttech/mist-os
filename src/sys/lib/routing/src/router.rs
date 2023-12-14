@@ -19,7 +19,11 @@ use sandbox::{AnyCapability, Capability, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
 
-use crate::component_instance::AnyWeakComponentInstance;
+use crate::{
+    capability_source::CapabilitySource,
+    component_instance::{AnyWeakComponentInstance, ComponentInstanceInterface},
+    policy::{GlobalPolicyChecker, PolicyCheckRouter},
+};
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -148,6 +152,19 @@ impl Router {
             }
         };
         Router::new(route_fn)
+    }
+
+    /// Returns a router that ensures the capability request is allowed by the
+    /// policy in [`GlobalPolicyChecker`].
+    pub fn with_policy_check<C>(
+        self,
+        capability_source: CapabilitySource<C>,
+        policy_checker: GlobalPolicyChecker,
+    ) -> Self
+    where
+        C: ComponentInstanceInterface + 'static,
+    {
+        Router::from_routable(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
     /// Converts the [Router] capability into an [Open] capability such that open requests
