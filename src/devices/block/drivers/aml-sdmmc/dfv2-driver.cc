@@ -282,8 +282,22 @@ zx::result<> Dfv2Driver::InitResources(
     return zx::error(status);
   }
 
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> clock_gate;
+  zx::result result = incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-gate");
+  if (result.is_ok() && result->is_valid()) {
+    auto clock = fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(std::move(result.value()));
+    const fidl::WireResult result = clock->Enable();
+    if (result.ok()) {
+      if (result->is_error()) {
+        FDF_LOG(ERROR, "Failed to enable clock: %s", zx_status_get_string(result->error_value()));
+        return zx::error(result->error_value());
+      }
+      clock_gate = clock.TakeClientEnd();
+    }
+  }
+
   SetUpResources(std::move(bti), std::move(*mmio), config, std::move(irq), std::move(reset_gpio),
-                 std::move(descs_buffer));
+                 std::move(descs_buffer), std::move(clock_gate));
 
   {
     const auto result = pdev->GetDeviceInfo();

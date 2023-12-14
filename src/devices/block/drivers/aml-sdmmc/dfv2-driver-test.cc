@@ -141,11 +141,68 @@ class TestDfv2Driver : public Dfv2Driver {
   std::optional<fdf::MmioView> view_;
 };
 
+class FakeClock : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
+ public:
+  fuchsia_hardware_clock::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_clock::Service::InstanceHandler({
+        .clock = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                         fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  bool enabled() const { return enabled_; }
+
+ private:
+  void Enable(EnableCompleter::Sync& completer) override {
+    enabled_ = true;
+    completer.ReplySuccess();
+  }
+
+  void Disable(DisableCompleter::Sync& completer) override {
+    enabled_ = false;
+    completer.ReplySuccess();
+  }
+
+  void IsEnabled(IsEnabledCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetRate(SetRateRequestView request, SetRateCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void QuerySupportedRate(QuerySupportedRateRequestView request,
+                          QuerySupportedRateCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetRate(GetRateCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetInput(SetInputRequestView request, SetInputCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetNumInputs(GetNumInputsCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetInput(GetInputCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
+
+  bool enabled_ = false;
+};
+
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
   fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
   fake_pdev::FakePDevFidl pdev_server;
+  FakeClock clock_server;
 };
 
 class AmlSdmmcTest : public zxtest::Test {
@@ -205,12 +262,22 @@ class AmlSdmmcTest : public zxtest::Test {
       config.btis[0] = std::move(bti);
       config.device_info = pdev_device_info_t{};
       incoming->pdev_server.SetConfig(std::move(config));
-      auto result =
-          incoming->env.incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-              std::move(incoming->pdev_server.GetInstanceHandler(
-                  fdf::Dispatcher::GetCurrent()->async_dispatcher())),
-              "default");
-      ASSERT_TRUE(result.is_ok());
+      {
+        auto result = incoming->env.incoming_directory()
+                          .AddService<fuchsia_hardware_platform_device::Service>(
+                              std::move(incoming->pdev_server.GetInstanceHandler(
+                                  fdf::Dispatcher::GetCurrent()->async_dispatcher())),
+                              "default");
+        ASSERT_TRUE(result.is_ok());
+      }
+
+      // Serve (fake) clock_server.
+      {
+        auto result =
+            incoming->env.incoming_directory().AddService<fuchsia_hardware_clock::Service>(
+                std::move(incoming->clock_server.GetInstanceHandler()), "clock-gate");
+        ASSERT_TRUE(result.is_ok());
+      }
     });
 
     // Start dut_.
@@ -2047,6 +2114,30 @@ TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
   dut_->SetRequestInterruptStatus(1 << 11);
   memset(&request, 0, sizeof(request));
   EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
+}
+
+TEST_F(AmlSdmmcTest, PowerSuspendResume) {
+  StartDriver();
+
+  auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
+
+  ASSERT_OK(dut_->Init({}));
+  EXPECT_FALSE(dut_->power_suspended());
+  EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+  EXPECT_TRUE(incoming_.SyncCall(
+      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+
+  EXPECT_OK(dut_->SuspendPower());
+  EXPECT_TRUE(dut_->power_suspended());
+  EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+  EXPECT_FALSE(incoming_.SyncCall(
+      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+
+  EXPECT_OK(dut_->ResumePower());
+  EXPECT_FALSE(dut_->power_suspended());
+  EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+  EXPECT_TRUE(incoming_.SyncCall(
+      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
 }
 
 }  // namespace aml_sdmmc

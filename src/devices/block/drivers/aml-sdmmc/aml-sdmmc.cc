@@ -50,10 +50,11 @@ zx_paddr_t PageMask() {
 
 namespace aml_sdmmc {
 
-void AmlSdmmc::SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
-                              zx::interrupt irq,
-                              fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-                              std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) {
+void AmlSdmmc::SetUpResources(
+    zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config, zx::interrupt irq,
+    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
+    std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer,
+    std::optional<fidl::ClientEnd<fuchsia_hardware_clock::Clock>> clock_gate) {
   fbl::AutoLock lock(&lock_);
 
   mmio_ = std::move(mmio);
@@ -63,6 +64,9 @@ void AmlSdmmc::SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc
   descs_buffer_ = std::move(descs_buffer);
   if (reset_gpio.is_valid()) {
     reset_gpio_.Bind(std::move(reset_gpio));
+  }
+  if (clock_gate.has_value() && clock_gate->is_valid()) {
+    clock_gate_.Bind(std::move(*clock_gate));
   }
 }
 
@@ -252,6 +256,13 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
 }
 
 zx_status_t AmlSdmmc::SetBusWidth(sdmmc_bus_width_t bus_width) {
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting SetBusWidth while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
+
   uint32_t bus_width_val;
   switch (bus_width) {
     case SDMMC_BUS_WIDTH_EIGHT:
@@ -267,10 +278,7 @@ zx_status_t AmlSdmmc::SetBusWidth(sdmmc_bus_width_t bus_width) {
       return ZX_ERR_OUT_OF_RANGE;
   }
 
-  {
-    fbl::AutoLock lock(&lock_);
-    AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(bus_width_val).WriteTo(&*mmio_);
-  }
+  AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(bus_width_val).WriteTo(&*mmio_);
 
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
   return ZX_OK;
@@ -300,6 +308,11 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
 zx_status_t AmlSdmmc::SetBusFreq(uint32_t freq) {
   fbl::AutoLock lock(&lock_);
 
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting SetBusFreq while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
+
   uint32_t clk = 0, clk_src = 0, clk_div = 0;
   if (freq == 0) {
     AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(0).WriteTo(&*mmio_);
@@ -323,6 +336,65 @@ zx_status_t AmlSdmmc::SetBusFreq(uint32_t freq) {
   clk_div = (clk + freq - 1) / freq;
   AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(clk_div).set_cfg_src(clk_src).WriteTo(&*mmio_);
   inspect_.bus_clock_frequency.Set(clk / clk_div);
+  return ZX_OK;
+}
+
+zx_status_t AmlSdmmc::SuspendPower() {
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_ == true) {
+    return ZX_OK;
+  }
+
+  // Disable the device clock.
+  auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
+  clk_div_saved_ = clk.cfg_div();
+  clk.set_cfg_div(0).WriteTo(&*mmio_);
+
+  // Gate the core clock.
+  if (clock_gate_.is_valid()) {
+    const fidl::WireResult result = clock_gate_->Disable();
+    if (!result.ok()) {
+      DriverLog(ERROR, "Failed to send request to disable clock gate: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      DriverLog(ERROR, "Send request to disable clock gate error: %s",
+                zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  power_suspended_ = true;
+  return ZX_OK;
+}
+
+zx_status_t AmlSdmmc::ResumePower() {
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_ == false) {
+    return ZX_OK;
+  }
+
+  // Ungate the core clock.
+  if (clock_gate_.is_valid()) {
+    const fidl::WireResult result = clock_gate_->Enable();
+    if (!result.ok()) {
+      DriverLog(ERROR, "Failed to send request to enable clock gate: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      DriverLog(ERROR, "Send request to enable clock gate error: %s",
+                zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  // Re-enable the device clock.
+  auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
+  clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
+
+  power_suspended_ = false;
   return ZX_OK;
 }
 
@@ -391,6 +463,12 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
 zx_status_t AmlSdmmc::HwReset() {
   fbl::AutoLock lock(&lock_);
 
+  // TODO(b/309152727): Explore allowing HwReset while power is suspended.
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting HwReset while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
+
   if (reset_gpio_.is_valid()) {
     fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
     if (!result1.ok()) {
@@ -451,6 +529,11 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
 
 zx_status_t AmlSdmmc::SetTiming(sdmmc_timing_t timing) {
   fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting SetTiming while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
 
   auto config = AmlSdmmcCfg::Get().ReadFrom(&*mmio_);
   if (timing == SDMMC_TIMING_HS400 || timing == SDMMC_TIMING_HSDDR ||
@@ -778,6 +861,11 @@ void AmlSdmmc::WaitForBus() const {
 zx_status_t AmlSdmmc::TuningDoTransfer(const TuneContext& context) {
   fbl::AutoLock lock(&lock_);
 
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting TuningDoTransfer while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
+
   SetTuneSettings(context.new_settings);
 
   const sdmmc_buffer_region_t buffer = {
@@ -961,12 +1049,26 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
 zx_status_t AmlSdmmc::PerformTuning(uint32_t tuning_cmd_idx) {
   fbl::AutoLock tuning_lock(&tuning_lock_);
 
-  const auto [bw, clk_div, settings] = [this]() {
+  // Using a lambda for the constness of the resulting variables.
+  const auto result = [this]() -> zx::result<std::tuple<uint32_t, uint32_t, TuneSettings>> {
     fbl::AutoLock lock(&lock_);
+
+    if (power_suspended_) {
+      DriverLog(ERROR, "Rejecting PerformTuning while power is suspended.");
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
     const uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&*mmio_).bus_width();
     const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&*mmio_).cfg_div();
-    return std::tuple{bw, clk_div, GetTuneSettings()};
+    return zx::ok(std::tuple{bw, clk_div, GetTuneSettings()});
   }();
+
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  const auto bw = std::get<0>(*result);
+  const auto clk_div = std::get<1>(*result);
+  const auto settings = std::get<2>(*result);
 
   TuneContext context{.original_settings = settings};
 
@@ -1017,6 +1119,12 @@ zx_status_t AmlSdmmc::PerformTuning(uint32_t tuning_cmd_idx) {
 
   {
     fbl::AutoLock lock(&lock_);
+
+    if (power_suspended_) {
+      DriverLog(ERROR, "Rejecting PerformTuning while power is suspended.");
+      return ZX_ERR_BAD_STATE;
+    }
+
     SetTuneSettings(*tuning_settings);
   }
 
@@ -1202,6 +1310,11 @@ zx_status_t AmlSdmmc::Request(const sdmmc_req_t* req, uint32_t out_response[4]) 
 zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (shutdown_) {
     return ZX_ERR_CANCELED;
+  }
+
+  if (power_suspended_) {
+    DriverLog(ERROR, "Rejecting SdmmcRequestLocked while power is suspended.");
+    return ZX_ERR_BAD_STATE;
   }
 
   // Wait for the bus to become idle before issuing the next request. This could be necessary if the

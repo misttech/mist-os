@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AML_SDMMC_AML_SDMMC_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AML_SDMMC_AML_SDMMC_H_
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
@@ -56,7 +57,9 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
 
   void SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
                       zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-                      std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) TA_EXCL(lock_);
+                      std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer,
+                      std::optional<fidl::ClientEnd<fuchsia_hardware_clock::Clock>> clock_gate =
+                          std::nullopt) TA_EXCL(lock_);
 
   // fuchsia_hardware_sdmmc::Sdmmc implementation
   void HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) override;
@@ -84,9 +87,18 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   void Request(RequestRequestView request, fdf::Arena& arena,
                RequestCompleter::Sync& completer) override;
 
+  // TODO(b/309152899): Integrate with Power Framework.
+  // TODO(b/309152899): Consider not reporting an error upon client calls while power_suspended_.
+  zx_status_t SuspendPower() TA_EXCL(lock_);
+  zx_status_t ResumePower() TA_EXCL(lock_);
+
   // Visible for tests
   zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
   void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
+  bool power_suspended() TA_EXCL(lock_) {
+    fbl::AutoLock lock(&lock_);
+    return power_suspended_;
+  }
 
  protected:
   static constexpr size_t kMaxLoggingCharacters = 256;
@@ -267,12 +279,15 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   zx::bti bti_;
 
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   zx::interrupt irq_;
   aml_sdmmc_config_t board_config_;
 
   sdmmc_host_info_t dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   uint32_t max_freq_, min_freq_;
+  bool power_suspended_ TA_GUARDED(lock_) = false;
+  uint32_t clk_div_saved_ = 0;
 
   // TODO(fxbug.dev/134787): Remove redundant locking when Banjo is removed.
   fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);

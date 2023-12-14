@@ -6,6 +6,8 @@ composite vim3_emmc;
 
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a311d;
+using fuchsia.amlogic.platform.meson;
+using fuchsia.clock;
 using fuchsia.gpio;
 using fuchsia.platform;
 
@@ -24,4 +26,9 @@ node "gpio" {
 
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
+node "clock-gate" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_EMMC_C;
 }
