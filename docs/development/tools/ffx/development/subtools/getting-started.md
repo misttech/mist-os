@@ -1,4 +1,4 @@
-# Getting started with `ffx` subtools
+# Getting started with developing `ffx` subtools
 
 FFX Subtools are the top-level commands that the [ffx cli](/docs/development/tools/ffx/architecture/cli.md)
 can run. These can be either compiled directly into `ffx` and/or build as separate
