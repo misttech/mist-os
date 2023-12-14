@@ -1,14 +1,14 @@
 # Report an issue
 
 Filing issues is a great way to contribute to the Fuchsia project.
-You can file an issue using Monorail, Google’s issue tracking tool for open
+You can file an issue using Issue Tracker, Google’s issue tracking tool for open
 source projects.
 
-Note: You need a Google account to file an issue in Monorail.
+Note: You need a Google account to file an issue in Issue Tracker.
 
 ## When to file an issue
 
-Monorail issues are used to track and suggest the following
+Issue Tracker issues are used to track and suggest the following
 types of changes:
 
   + Minor changes or suggestions to Fuchsia's code and documentation.
@@ -66,16 +66,17 @@ following templates:
 
 To file an issue in Fuchsia, do the following:
 
-1. Go to [https://bugs.fuchsia.dev](https://bugs.fuchsia.dev).
-1. Click **New Issue.**
-1. Select one of the following templates from the **Template** dropdown:
-    1. Fuchsia Default
-    1. Fuchsia Security external bug report
-    1. Fuchsia.dev Documentation
-    1. Open Source Review Board
-    1. Report Community Abuse
+1. Go to [https://issues.fuchsia.dev](https://issues.fuchsia.dev).
+1. Click **Create Issue.**
+1. Select one of the following components from the **Component** dropdown:
+    1. For Fuchsia Default template, select Fuchsia
+    1. For Fuchsia Security bug report template, select Fuchsia > Security > Vulns
+    1. For Fuchsia.dev Documentation template, select Fuchsia > Documentation
+    1. For Open Source Review Board template, select Fuchsia > OSRB
+    1. For Report Community Abuse template, select Fuchsia > Community
+1. Select the template from the **Template** dropdown if not already defaulted to above named template
 1. Complete the questions associated with the template you selected.
-1. Click **Submit Issue**.
+1. Click **Create**.
 
 ## Issue reporting guidelines
 
