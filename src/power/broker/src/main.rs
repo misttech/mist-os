@@ -218,6 +218,90 @@ impl BrokerSvc {
                         control_handle.shutdown();
                         res
                     }
+                    ElementControlRequest::AddDependency {
+                        dependent_level,
+                        requires_token,
+                        requires_level,
+                        responder,
+                    } => {
+                        tracing::debug!("AddDependency({:?},{:?},{:?},{:?})", &element_id, &dependent_level, &requires_token, &requires_level);
+                        let mut broker = self.broker.lock().await;
+                        let res = broker.add_dependency(
+                            &element_id,
+                            dependent_level,
+                            requires_token.into(),
+                            requires_level,
+                        );
+                        tracing::debug!("AddDependency add_dependency = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    ElementControlRequest::RemoveDependency {
+                        dependent_level,
+                        requires_token,
+                        requires_level,
+                        responder,
+                    } => {
+                        tracing::debug!("RemoveDependency({:?},{:?},{:?},{:?})", &element_id, &dependent_level, &requires_token, &requires_level);
+                        let mut broker = self.broker.lock().await;
+                        let res = broker.remove_dependency(
+                            &element_id,
+                            dependent_level,
+                            requires_token.into(),
+                            requires_level,
+                        );
+                        tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    ElementControlRequest::RegisterDependencyToken {
+                        token,
+                        responder,
+                    } => {
+                        tracing::debug!(
+                            "RegisterDependencyToken({:?}, {:?})",
+                            &element_id,
+                            &token,
+                        );
+                        let mut broker = self.broker.lock().await;
+                        let res = broker.register_dependency_token(
+                            &element_id,
+                            token.into(),
+                        );
+                        tracing::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    ElementControlRequest::UnregisterDependencyToken {
+                        token,
+                        responder,
+                    } => {
+                        tracing::debug!(
+                            "UnregisterDependencyToken({:?}, {:?})",
+                            &element_id,
+                            &token,
+                        );
+                        let mut broker = self.broker.lock().await;
+                        let res = broker.unregister_dependency_token(
+                            &element_id,
+                            token.into(),
+                        );
+                        tracing::debug!("UnregisterDependencyToken unregister_credentials = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
                     ElementControlRequest::_UnknownMethod { ordinal, .. } => {
                         tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
                         todo!()
@@ -310,22 +394,24 @@ impl BrokerSvc {
                         element_name,
                         default_level,
                         dependencies,
-                        credentials_to_register,
+                        dependency_tokens_to_register,
                         responder,
                     } => {
                         tracing::debug!(
-                            "AddElement({:?}, {:?})",
+                            "AddElement({:?}, {:?}, {:?}, {:?})",
                             &element_name,
-                            &credentials_to_register
+                            &default_level,
+                            &dependencies,
+                            &dependency_tokens_to_register,
                         );
                         let mut broker = self.broker.lock().await;
-                        let credentials =
-                            credentials_to_register.into_iter().map(|d| d.into()).collect();
+                        let dependency_tokens =
+                            dependency_tokens_to_register.into_iter().map(|d| d.into()).collect();
                         let res = broker.add_element(
                             &element_name,
                             default_level,
                             dependencies,
-                            credentials,
+                            dependency_tokens,
                         );
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
@@ -394,82 +480,6 @@ impl BrokerSvc {
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }
-                    TopologyRequest::AddDependency { dependency, responder } => {
-                        tracing::debug!("AddDependency({:?})", &dependency);
-                        let mut broker = self.broker.lock().await;
-                        let res = broker.add_dependency(
-                            dependency.dependent.token.into(),
-                            dependency.dependent.level,
-                            dependency.requires.token.into(),
-                            dependency.requires.level,
-                        );
-                        tracing::debug!("AddDependency add_dependency = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    TopologyRequest::RemoveDependency { dependency, responder } => {
-                        tracing::debug!("RemoveDependency({:?})", &dependency);
-                        let mut broker = self.broker.lock().await;
-                        let res = broker.remove_dependency(
-                            dependency.dependent.token.into(),
-                            dependency.dependent.level,
-                            dependency.requires.token.into(),
-                            dependency.requires.level,
-                        );
-                        tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    TopologyRequest::RegisterCredentials {
-                        token,
-                        credentials_to_register,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "RegisterCredentials({:?}, {:?})",
-                            &token,
-                            &credentials_to_register
-                        );
-                        let mut broker = self.broker.lock().await;
-                        let res = broker.register_credentials(
-                            token.into(),
-                            credentials_to_register.into_iter().map(|c| c.into()).collect(),
-                        );
-                        tracing::debug!("RegisterCredentials register_credentials = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    TopologyRequest::UnregisterCredentials {
-                        token,
-                        tokens_to_unregister,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "UnregisterCredentials({:?}, {:?})",
-                            &token,
-                            &tokens_to_unregister
-                        );
-                        let mut broker = self.broker.lock().await;
-                        let res = broker.unregister_credentials(
-                            token.into(),
-                            tokens_to_unregister.into_iter().map(|c| c.into()).collect(),
-                        );
-                        tracing::debug!("RegisterCredentials register_credentials = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
                     TopologyRequest::_UnknownMethod { ordinal, .. } => {
                         tracing::warn!("Received unknown TopologyRequest: {ordinal}");
                         todo!()
@@ -491,10 +501,6 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     component::health().set_starting_up();
 
-    // Add services here. E.g:
-    // ```
-    // service_fs.dir("svc").add_fidl_service(IncomingRequest::MyProtocol);
-    // ```
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);
 
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;

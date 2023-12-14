@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, LeaseStatus, Permissions, PowerLevel,
+    RegisterDependencyTokenError, UnregisterDependencyTokenError,
 };
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use itertools::Itertools;
@@ -43,74 +44,44 @@ impl Broker {
         self.credentials.unregister_all_for_element(element_id)
     }
 
-    fn register_credential(
+    pub fn register_dependency_token(
         &mut self,
         element_id: &ElementID,
-        credential_to_register: CredentialToRegister,
-    ) -> Result<(), RegisterCredentialsError> {
-        self.credentials.register(element_id, credential_to_register)?;
-        Ok(())
-    }
-
-    fn unregister_credential(&mut self, credential: &Credential) -> Option<Credential> {
-        self.credentials.unregister(credential)
-    }
-
-    pub fn register_credentials(
-        &mut self,
         token: Token,
-        credentials_to_register: Vec<CredentialToRegister>,
-    ) -> Result<(), RegisterCredentialsError> {
+    ) -> Result<(), RegisterDependencyTokenError> {
+        match self.credentials.register(
+            element_id,
+            CredentialToRegister {
+                broker_token: token,
+                permissions: Permissions::MODIFY_DEPENDENT,
+            },
+        ) {
+            Err(RegisterCredentialsError::AlreadyInUse) => {
+                Err(RegisterDependencyTokenError::AlreadyInUse)
+            }
+            Err(RegisterCredentialsError::Internal) => Err(RegisterDependencyTokenError::Internal),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    pub fn unregister_dependency_token(
+        &mut self,
+        element_id: &ElementID,
+        token: Token,
+    ) -> Result<(), UnregisterDependencyTokenError> {
         let Some(credential) = self.lookup_credentials(token) else {
-            tracing::debug!("register_credentials: no credential found matching token");
-            return Err(RegisterCredentialsError::NotAuthorized);
+            tracing::debug!("unregister_dependency_token: token not found");
+            return Err(UnregisterDependencyTokenError::NotFound);
         };
-        if !credential.contains(Permissions::MODIFY_CREDENTIAL) {
+        if !credential.authorizes(element_id, Permissions::MODIFY_DEPENDENT) {
             tracing::debug!(
-                "register_credentials: credential missing MODIFY_CREDENTIAL: {:?}",
-                &credential
+                "unregister_dependency_token: token is registered to {:?}, not {:?}",
+                &credential.get_element(),
+                &element_id,
             );
-            return Err(RegisterCredentialsError::NotAuthorized);
+            return Err(UnregisterDependencyTokenError::NotAuthorized);
         }
-        for credential_to_register in credentials_to_register {
-            if let Err(err) =
-                self.register_credential(&credential.get_element(), credential_to_register)
-            {
-                tracing::debug!(
-                    "register_credentials: register_credential({:?}) failed",
-                    &credential.get_element(),
-                );
-                return Err(err);
-            }
-        }
-        Ok(())
-    }
-
-    pub fn unregister_credentials(
-        &mut self,
-        token: Token,
-        tokens_to_unregister: Vec<Token>,
-    ) -> Result<(), UnregisterCredentialsError> {
-        let Some(credential) = self.lookup_credentials(token) else {
-            tracing::debug!("unregister_credentials: no credential found matching token");
-            return Err(UnregisterCredentialsError::NotAuthorized);
-        };
-        for token in tokens_to_unregister {
-            let Some(credential_to_unregister) = self.lookup_credentials(token) else {
-                continue;
-            };
-            if !credential
-                .authorizes(credential_to_unregister.get_element(), &Permissions::MODIFY_CREDENTIAL)
-            {
-                tracing::debug!(
-                    "unregister_credentials: credential({:?}) missing MODIFY_CREDENTIAL: {:?}",
-                    &credential,
-                    &credential_to_unregister,
-                );
-                return Err(UnregisterCredentialsError::NotAuthorized);
-            }
-            self.unregister_credential(&credential_to_unregister);
-        }
+        self.credentials.unregister(&credential);
         Ok(())
     }
 
@@ -316,13 +287,13 @@ impl Broker {
         name: &str,
         default_level: PowerLevel,
         level_dependencies: Vec<fpb::LevelDependency>,
-        credentials_to_register: Vec<CredentialToRegister>,
+        dependency_tokens: Vec<Token>,
     ) -> Result<ElementID, AddElementError> {
         let id = self.catalog.topology.add_element(name, default_level)?;
         self.required.update(&id, default_level);
         for dependency in level_dependencies {
             let credential = self
-                .lookup_credentials(dependency.requires.token.into())
+                .lookup_credentials(dependency.requires_token.into())
                 .ok_or(AddElementError::NotAuthorized)?;
             if !credential.contains(Permissions::MODIFY_DEPENDENT) {
                 return Err(AddElementError::NotAuthorized);
@@ -334,7 +305,7 @@ impl Broker {
                 },
                 requires: ElementLevel {
                     element_id: credential.get_element().clone(),
-                    level: dependency.requires.level,
+                    level: dependency.requires_level,
                 },
             }) {
                 // Clean up by removing the element we just added.
@@ -348,20 +319,25 @@ impl Broker {
                 });
             };
         }
-        for credential_to_register in credentials_to_register {
-            if let Err(err) = self.register_credential(&id, credential_to_register) {
+        for token in dependency_tokens {
+            if let Err(err) = self.register_dependency_token(&id, token) {
                 match err {
-                    RegisterCredentialsError::Internal => {
-                        tracing::error!(
-                            "credentials.register returned an Internal error: {:?}",
-                            id
-                        );
+                    RegisterDependencyTokenError::Internal => {
+                        tracing::debug!("can't register_dependency_token for {:?}: internal", &id);
                         return Err(AddElementError::Internal);
                     }
-                    // Owner should be authorized for all credentials on its
-                    // own element, so this is an Internal error:
-                    RegisterCredentialsError::NotAuthorized => {
-                        tracing::error!("credentials.register unexpectedly returned NotAuthorized in add_element: {:?}", id);
+                    RegisterDependencyTokenError::AlreadyInUse => {
+                        tracing::debug!(
+                            "can't register_dependency_token for {:?}: already in use",
+                            &id
+                        );
+                        return Err(AddElementError::Invalid);
+                    }
+                    fpb::RegisterDependencyTokenErrorUnknown!() => {
+                        tracing::warn!(
+                            "unknown RegisterDependencyTokenError received: {}",
+                            err.into_primitive()
+                        );
                         return Err(AddElementError::Internal);
                     }
                 }
@@ -382,20 +358,14 @@ impl Broker {
         self.required.remove(element_id);
     }
 
-    /// Checks authorization from tokens, and if valid, adds a dependency to the Topology.
+    /// Checks authorization from requires_token, and if valid, adds a dependency to the Topology.
     pub fn add_dependency(
         &mut self,
-        dependent_token: Token,
+        element_id: &ElementID,
         dependent_level: PowerLevel,
         requires_token: Token,
         requires_level: PowerLevel,
     ) -> Result<(), AddDependencyError> {
-        let Some(dependent_cred) = self.lookup_credentials(dependent_token) else {
-            return Err(AddDependencyError::NotAuthorized);
-        };
-        if !dependent_cred.contains(Permissions::MODIFY_DEPENDENCY) {
-            return Err(AddDependencyError::NotAuthorized);
-        }
         let Some(requires_cred) = self.lookup_credentials(requires_token) else {
             return Err(AddDependencyError::NotAuthorized);
         };
@@ -403,10 +373,7 @@ impl Broker {
             return Err(AddDependencyError::NotAuthorized);
         }
         self.catalog.topology.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: dependent_cred.get_element().clone(),
-                level: dependent_level,
-            },
+            dependent: ElementLevel { element_id: element_id.clone(), level: dependent_level },
             requires: ElementLevel {
                 element_id: requires_cred.get_element().clone(),
                 level: requires_level,
@@ -414,20 +381,14 @@ impl Broker {
         })
     }
 
-    /// Checks authorization from tokens, and if valid, removes a dependency from the Topology.
+    /// Checks authorization from requires_token, and if valid, removes a dependency from the Topology.
     pub fn remove_dependency(
         &mut self,
-        dependent_token: Token,
+        element_id: &ElementID,
         dependent_level: PowerLevel,
         requires_token: Token,
         requires_level: PowerLevel,
     ) -> Result<(), RemoveDependencyError> {
-        let Some(dependent_cred) = self.lookup_credentials(dependent_token) else {
-            return Err(RemoveDependencyError::NotAuthorized);
-        };
-        if !dependent_cred.contains(Permissions::MODIFY_DEPENDENCY) {
-            return Err(RemoveDependencyError::NotAuthorized);
-        }
         let Some(requires_cred) = self.lookup_credentials(requires_token) else {
             return Err(RemoveDependencyError::NotAuthorized);
         };
@@ -435,10 +396,7 @@ impl Broker {
             return Err(RemoveDependencyError::NotAuthorized);
         }
         self.catalog.topology.remove_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: dependent_cred.get_element().clone(),
-                level: dependent_level,
-            },
+            dependent: ElementLevel { element_id: element_id.clone(), level: dependent_level },
             requires: ElementLevel {
                 element_id: requires_cred.get_element().clone(),
                 level: requires_level,
@@ -830,7 +788,7 @@ impl SatisfyPowerLevel for PowerLevel {
 mod tests {
     use super::*;
     use fidl_fuchsia_power_broker::{
-        BinaryPowerLevel, Permissions, PowerLevel, UserDefinedPowerLevel,
+        BinaryPowerLevel, DependencyToken, PowerLevel, UserDefinedPowerLevel,
     };
     use fuchsia_zircon::{self as zx, HandleBased};
 
@@ -932,72 +890,75 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_element_dependency_not_authorized() {
+    fn test_add_element_dependency_never_and_unregistered() {
         let mut broker = Broker::new();
-        let (token_mithril, token_mithril_broker) = zx::EventPair::create();
-        let credential_mithril = CredentialToRegister {
-            broker_token: token_mithril_broker.into(),
-            permissions: Permissions::all(),
-        };
-        let (token_mithril_read_only, token_mithril_read_only_broker) = zx::EventPair::create();
-        let credential_mithril_read_only = CredentialToRegister {
-            broker_token: token_mithril_read_only_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL,
-        };
-        let (_, token_silver_broker) = zx::EventPair::create();
-        let credential_silver = CredentialToRegister {
-            broker_token: token_silver_broker.into(),
-            permissions: Permissions::all(),
-        };
-        broker
+        let token_mithril = DependencyToken::create();
+        let never_registered_token = DependencyToken::create();
+        let mithril = broker
             .add_element(
                 "Mithril",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![credential_mithril, credential_mithril_read_only],
+                vec![token_mithril
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
 
-        // This should fail, because token_mithril_read_only does not have
-        // Permissions::MODIFY_DEPENDENT
+        // This should fail, because the token was never registered.
         let add_element_not_authorized_res = broker.add_element(
             "Silver",
             PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![fpb::LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                requires: fpb::ElementLevel {
-                    token: token_mithril_read_only
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
+                requires_token: never_registered_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed"),
+                requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
             }],
-            vec![credential_silver],
+            vec![],
         );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
 
-        // Add element with a valid dependency should succeed.
-        let (_, token_silver_broker) = zx::EventPair::create();
-        let credential_silver = CredentialToRegister {
-            broker_token: token_silver_broker.into(),
-            permissions: Permissions::all(),
-        };
+        // Add element with a valid token should succeed.
         broker
             .add_element(
                 "Silver",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                    requires: fpb::ElementLevel {
-                        token: token_mithril
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .expect("dup failed"),
-                        level: PowerLevel::Binary(BinaryPowerLevel::On),
-                    },
+                    requires_token: token_mithril
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 }],
-                vec![credential_silver],
+                vec![],
             )
             .expect("add_element failed");
+
+        // Unregister token_mithril, then try to add again, which should fail.
+        broker
+            .unregister_dependency_token(
+                &mithril,
+                token_mithril.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+            )
+            .expect("unregister_dependency_token failed");
+
+        let add_element_not_authorized_res: Result<ElementID, AddElementError> = broker
+            .add_element(
+                "Silver",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
+                vec![fpb::LevelDependency {
+                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires_token: token_mithril
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                }],
+                vec![],
+            );
+        assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
     }
 
     #[fuchsia::test]
@@ -1013,89 +974,32 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_register_unregister_credentials() {
-        let mut broker = Broker::new();
-        let (token_element_owner, token_element_broker) = zx::EventPair::create();
-        let broker_credential = CredentialToRegister {
-            broker_token: token_element_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL
-                | Permissions::MODIFY_POWER_LEVEL
-                | Permissions::MODIFY_DEPENDENT
-                | Permissions::MODIFY_DEPENDENCY
-                | Permissions::MODIFY_CREDENTIAL
-                | Permissions::REMOVE_ELEMENT,
-        };
-        broker
-            .add_element(
-                "element",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                vec![],
-                vec![broker_credential],
-            )
-            .expect("add_element failed");
-        let (token_new_owner, token_new_broker) = zx::EventPair::create();
-        let credential_to_register = CredentialToRegister {
-            broker_token: token_new_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
-        };
-        broker
-            .register_credentials(
-                token_element_owner
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("duplicate_handle failed")
-                    .into(),
-                vec![credential_to_register],
-            )
-            .expect("register_credentials failed");
-
-        let (_, token_not_authorized_broker) = zx::EventPair::create();
-        let credential_not_authorized = CredentialToRegister {
-            broker_token: token_not_authorized_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
-        };
-        let res_not_authorized = broker.register_credentials(
-            token_new_owner
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("duplicate_handle failed")
-                .into(),
-            vec![credential_not_authorized],
-        );
-        assert!(matches!(res_not_authorized, Err(RegisterCredentialsError::NotAuthorized)));
-
-        broker
-            .unregister_credentials(token_element_owner.into(), vec![token_new_owner.into()])
-            .expect("unregister_credentials failed");
-    }
-
-    #[fuchsia::test]
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut broker = Broker::new();
-        let (parent1_token, parent1_broker_token) = zx::EventPair::create();
-        let parent1_cred = CredentialToRegister {
-            broker_token: parent1_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
-        };
+        let parent1_token = DependencyToken::create();
         let parent1: ElementID = broker
             .add_element(
                 "P1",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![parent1_cred],
+                vec![parent1_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
-        let (parent2_token, parent2_broker_token) = zx::EventPair::create();
-        let parent2_cred = CredentialToRegister {
-            broker_token: parent2_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
-        };
+        let parent2_token = DependencyToken::create();
         let parent2: ElementID = broker
             .add_element(
                 "P2",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![parent2_cred],
+                vec![parent2_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
         let child = broker
@@ -1105,21 +1009,17 @@ mod tests {
                 vec![
                     fpb::LevelDependency {
                         dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                        requires: fpb::ElementLevel {
-                            token: parent1_token
-                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                .expect("dup failed"),
-                            level: PowerLevel::Binary(BinaryPowerLevel::On),
-                        },
+                        requires_token: parent1_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
                     },
                     fpb::LevelDependency {
                         dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                        requires: fpb::ElementLevel {
-                            token: parent2_token
-                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                .expect("dup failed"),
-                            level: PowerLevel::Binary(BinaryPowerLevel::On),
-                        },
+                        requires_token: parent2_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
                     },
                 ],
                 vec![],
@@ -1176,28 +1076,29 @@ mod tests {
         // dependencies.
         // C -> P -> GP
         let mut broker = Broker::new();
-        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
-        let grandparent_cred = CredentialToRegister {
-            broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
-        };
+        let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element(
                 "GP",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![grandparent_cred],
+                vec![grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
-        let (parent_token, parent_broker_token) = zx::EventPair::create();
-        let parent_cred = CredentialToRegister {
-            broker_token: parent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL
-                | Permissions::MODIFY_DEPENDENCY
-                | Permissions::MODIFY_DEPENDENT,
-        };
+        let parent_token = DependencyToken::create();
         let parent: ElementID = broker
-            .add_element("P", PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![parent_cred])
+            .add_element(
+                "P",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
+                vec![],
+                vec![parent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
             .expect("add_element failed");
         let child = broker
             .add_element(
@@ -1205,19 +1106,17 @@ mod tests {
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                    requires: fpb::ElementLevel {
-                        token: parent_token
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .expect("dup failed"),
-                        level: PowerLevel::Binary(BinaryPowerLevel::On),
-                    },
+                    requires_token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 }],
                 vec![],
             )
             .expect("add_element failed");
         broker
             .add_dependency(
-                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &parent,
                 PowerLevel::Binary(BinaryPowerLevel::On),
                 grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1319,26 +1218,19 @@ mod tests {
         // Grandparent has a default required level of 10.
         // All other elements have a default of 0.
         let mut broker = Broker::new();
-        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
-        let grandparent_cred = CredentialToRegister {
-            broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
-        };
+        let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element(
                 "GP",
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
                 vec![],
-                vec![grandparent_cred],
+                vec![grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
-        let (parent_token, parent_broker_token) = zx::EventPair::create();
-        let parent_cred = CredentialToRegister {
-            broker_token: parent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL
-                | Permissions::MODIFY_DEPENDENCY
-                | Permissions::MODIFY_DEPENDENT,
-        };
+        let parent_token = DependencyToken::create();
         let parent: ElementID = broker
             .add_element(
                 "P",
@@ -1348,26 +1240,29 @@ mod tests {
                         dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
                             level: 50,
                         }),
-                        requires: fpb::ElementLevel {
-                            token: grandparent_token
-                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                .expect("dup failed"),
-                            level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
-                        },
+                        requires_token: grandparent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
+                            level: 200,
+                        }),
                     },
                     fpb::LevelDependency {
                         dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
                             level: 30,
                         }),
-                        requires: fpb::ElementLevel {
-                            token: grandparent_token
-                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                .expect("dup failed"),
-                            level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }),
-                        },
+                        requires_token: grandparent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
+                            level: 90,
+                        }),
                     },
                 ],
-                vec![parent_cred],
+                vec![parent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
         let child1 = broker
@@ -1376,12 +1271,10 @@ mod tests {
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
-                    requires: fpb::ElementLevel {
-                        token: parent_token
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .expect("dup failed"),
-                        level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
-                    },
+                    requires_token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
                 }],
                 vec![],
             )
@@ -1392,12 +1285,10 @@ mod tests {
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
-                    requires: fpb::ElementLevel {
-                        token: parent_token
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .expect("dup failed"),
-                        level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
-                    },
+                    requires_token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
                 }],
                 vec![],
             )
@@ -1561,22 +1452,17 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_dependency() {
         let mut broker = Broker::new();
-        let (token_adamantium_all, token_adamantium_all_broker) = zx::EventPair::create();
-        let credential_adamantium_all = CredentialToRegister {
-            broker_token: token_adamantium_all_broker.into(),
-            permissions: Permissions::all(),
-        };
-        let (token_vibranium_all, token_vibranium_all_broker) = zx::EventPair::create();
-        let credential_vibranium_all = CredentialToRegister {
-            broker_token: token_vibranium_all_broker.into(),
-            permissions: Permissions::all(),
-        };
-        broker
+        let token_adamantium = DependencyToken::create();
+        let token_vibranium = DependencyToken::create();
+        let adamantium = broker
             .add_element(
                 "Adamantium",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![credential_adamantium_all],
+                vec![token_adamantium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
         broker
@@ -1584,50 +1470,29 @@ mod tests {
                 "Vibranium",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
-                vec![credential_vibranium_all],
+                vec![token_vibranium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
             )
             .expect("add_element failed");
 
-        // Only MODIFY_DEPENDENCY and MODIFY_DEPENDENT for the respective
-        // elements should be required to add and remove a dependency:
-        let (token_adamantium_mod_dependency_only, token_adamantium_mod_dependency_only_broker) =
-            zx::EventPair::create();
-        let credential_adamantium_mod_dependency_only = CredentialToRegister {
-            broker_token: token_adamantium_mod_dependency_only_broker.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY,
-        };
-        broker
-            .register_credentials(
-                token_adamantium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("duplicate_handle failed")
-                    .into(),
-                vec![credential_adamantium_mod_dependency_only],
-            )
-            .expect("register_credentials failed");
-        let (token_vibranium_mod_dependent_only, token_vibranium_mod_dependent_only_broker) =
-            zx::EventPair::create();
-        let credential_vibranium_mod_dependent_only = CredentialToRegister {
-            broker_token: token_vibranium_mod_dependent_only_broker.into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
-        };
-        broker
-            .register_credentials(
-                token_vibranium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("duplicate_handle failed")
-                    .into(),
-                vec![credential_vibranium_mod_dependent_only],
-            )
-            .expect("register_credentials failed");
+        // Adding should return NotAuthorized if token is not registered
+        let unregistered_token = DependencyToken::create();
+        let res_add_not_authorized = broker.add_dependency(
+            &adamantium,
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            unregistered_token.into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(res_add_not_authorized, Err(AddDependencyError::NotAuthorized)));
+
+        // Valid add should succeed
         broker
             .add_dependency(
-                token_adamantium_mod_dependency_only
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
+                &adamantium,
                 PowerLevel::Binary(BinaryPowerLevel::On),
-                token_vibranium_mod_dependent_only
+                token_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
@@ -1635,149 +1500,27 @@ mod tests {
             )
             .expect("add_dependency failed");
 
+        // Removing should return NotAuthorized if token is not registered
+        let unregistered_token = DependencyToken::create();
+        let res_remove_not_authorized = broker.remove_dependency(
+            &adamantium,
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            unregistered_token.into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(res_remove_not_authorized, Err(RemoveDependencyError::NotAuthorized)));
+
+        // Valid remove should succeed
         broker
             .remove_dependency(
-                token_adamantium_mod_dependency_only
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
+                &adamantium,
                 PowerLevel::Binary(BinaryPowerLevel::On),
-                token_vibranium_mod_dependent_only
+                token_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
             )
             .expect("remove_dependency failed");
-
-        // Adding should return NotAuthorized if missing MODIFY_DEPENDENCY for
-        // dependency.level
-        let (token_adamantium_none, token_adamantium_none_broker) = zx::EventPair::create();
-        let credential_adamantium_none = CredentialToRegister {
-            broker_token: token_adamantium_none_broker.into(),
-            permissions: Permissions::empty(),
-        };
-        broker
-            .register_credentials(
-                token_adamantium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("duplicate_handle failed")
-                    .into(),
-                vec![credential_adamantium_none],
-            )
-            .expect("register_credentials failed");
-        let res_add_missing_mod_dependency = broker.add_dependency(
-            token_adamantium_none
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-            token_vibranium_mod_dependent_only
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-        );
-        assert!(matches!(res_add_missing_mod_dependency, Err(AddDependencyError::NotAuthorized)));
-
-        // Adding should return NotAuthorized if missing MODIFY_DEPENDENT for
-        // dependency.requires
-        let (token_vibranium_none, token_vibranium_none_broker) = zx::EventPair::create();
-        let credential_vibranium_none = CredentialToRegister {
-            broker_token: token_vibranium_none_broker.into(),
-            permissions: Permissions::empty(),
-        };
-        broker
-            .register_credentials(
-                token_vibranium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("duplicate_handle failed")
-                    .into(),
-                vec![credential_vibranium_none],
-            )
-            .expect("register_credentials failed");
-        let res_add_missing_mod_dependent = broker.add_dependency(
-            token_adamantium_mod_dependency_only
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-            token_vibranium_none
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-        );
-        assert!(matches!(res_add_missing_mod_dependent, Err(AddDependencyError::NotAuthorized)));
-
-        // Adding with extra permissions should work.
-        broker
-            .add_dependency(
-                token_adamantium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                token_vibranium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-            )
-            .expect("add_dependency with extra permissions failed");
-
-        // Removing should return NotAuthorized if missing MODIFY_DEPENDENCY for
-        // dependency.level
-        let res_remove_missing_mod_dependency = broker.remove_dependency(
-            token_adamantium_none
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-            token_vibranium_mod_dependent_only
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-        );
-        assert!(matches!(
-            res_remove_missing_mod_dependency,
-            Err(RemoveDependencyError::NotAuthorized)
-        ));
-
-        // Removing should return NotAuthorized if missing MODIFY_DEPENDENT for
-        // dependency.requires
-        let res_remove_missing_mod_dependent = broker.remove_dependency(
-            token_adamantium_mod_dependency_only
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-            token_vibranium_none
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("dup failed")
-                .into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-        );
-        assert!(matches!(
-            res_remove_missing_mod_dependent,
-            Err(RemoveDependencyError::NotAuthorized)
-        ));
-
-        // Removing with extra permissions should work.
-        broker
-            .remove_dependency(
-                token_adamantium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                token_vibranium_all
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-            )
-            .expect("remove_dependency with extra permissions failed");
     }
 }
