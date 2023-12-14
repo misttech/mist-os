@@ -100,8 +100,8 @@ ffx_tool("ffx_echo") {
   ]
   sources = [ "src/main.rs" ]
 
-  sdk_category = "partner"
-  sdk_target_name = "ffx_echo_sdk"
+  # sdk_category = "partner"    # Add an sdk_category when your tool is no longer experimental
+  sdk_target_name = "sdk"
 }
 
 group("echo") {
@@ -185,7 +185,7 @@ Also, the `#[check()]` annotation above the tool uses an implementation of
 `CheckEnv` to validate that the command should be run without producing an item
 for the struct itself. The one here, `AvailabilityFlag`, checks for
 experimental status and exits early if it's not enabled. When writing a new
-plugin, it should have this declaration on it to discourage people from relying
+subcommand, it should have this declaration on it to discourage people from relying
 on it before it's ready for wider use.
 
 #### The `FfxMain` implementation
@@ -263,24 +263,88 @@ After this, if you `fx build ffx` you should be able to see your tool in the lis
 of `Workspace Commands` in the output of `ffx commands` and you should be able
 to run it.
 
+### Experimental subtools and subcommands
+
+It's recommended that subtools initially do not include an `sdk_category` in
+their `BUILD.gn`. These subtools without a specified category are considered
+“experimental”, and they will not be part of an SDK build. If users want to use
+the binary, they will have to be given the binary directly.
+
+Subcommands, however, are handled differently.
+
+Subcommands need an `AvailabilityFlag` attribute added to the tool (see
+[`ffx target update`][ffx-target-update] for an example). If users want to use
+a subcommand, they will need to set the associated config option in order to
+invoke that subcommand.
+
+However, there are problems with this approach, such as a lack of any verification
+of the FIDL dependencies of the subcommand. Therefore, the mechanism for handling
+subcommands is currently being changed as of December, 2023.
+
+Similar to subtools, subcommands will be able to declare their SDK category (with
+the default being “experimental”) to determine whether the subcommands are available.
+The subtool will be built with only the subcommands at or above the subtool’s category
+level. The FIDL dependency check will correctly verify the subcommand’s requirements.
+
 ## Adding to the SDK
 
 Once your tool has stabilized and you're ready to include it in the SDK, you'll
-want to add it in to the `host_tools` molecule of the [sdk gn file](/sdk/BUILD.gn):
+want to add the binary to the SDK build. Note that before doing this, the tool
+must be considered relatively stable and well tested (as much as possible without
+having already included it in the SDK), and you need to make sure youhave considered
+compatibility issues.
 
-```gn
-# ..snip..
+### Compatibility
+
+There are three areas that you need to be aware of before adding your subtool to
+the SDK and IDK:
+
+1. FIDL libraries - You are required to add any FIDL libraries you are dependent
+   on to the SDK when you add a subtool to the SDK. (For details, see
+   [Promoting an API to partner_internal][prmoting-an-api-to-partner-internal].)
+
+2. Golden files - Used to check compatibility of command line arguments.
+
+3. Machine Writer output - Tools and subcommands need to have machine output
+   whenever possible.
+
+   Machine output must be stable along the current compatibility
+   window. Eventually, there will be a golden check for the machine output format.
+   The benefit of having machine writer output is that it frees you up to have
+   unstable output in free text. It is recommended that your machine output is
+   simple, even if dense, and human comprehensible.
+
+### Updating the subtool
+
+To add your subtool to the SDK, set the `sdk_category` in its `BUILD.gn` to the
+appropriate category (for instance, `partner`).  If the subtool includes subcommands
+that are no longer experimental, remove their `AvailabilityFlag` attributes so
+that they will no longer require a special config option to invoke.
+
+### Inclusion in the SDK
+
+You also need to add your subtool to the `host_tools` molecule of the
+[SDK GN file][sdk-gn-file], for example:
+
+```gn {:.devsite-disable-click-to-copy}
 sdk_molecule("host_tools") {
   visibility = [ ":*" ]
 
   _host_tools = [
-    #...
-    "//path/to/your/tool:ffx_echo_sdk", # <-- insert this
-    #...
+    ...
+    "//path/to/your/tool:sdk", # <-- insert this
+    ...
   ]
 ]
 ```
 
-Note that before doing this, it should no longer have an experimental flag on it
-and it should be considered relatively stable and well tested (as much as possible
-without having already included it in the SDK, at least).
+### UX review
+
+Fuchsia currently does not have a formal “UX Review” for subtools before adding them to
+the SDK and IDK. This documentation will be updated once design criteria gets published.
+
+<!-- Reference links -->
+
+[ffx-target-update]: /src/developer/ffx/plugins/target/update/src/lib.rs
+[prmoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
+[sdk-gn-file]: /sdk/BUILD.gn
