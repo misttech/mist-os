@@ -21,6 +21,7 @@ packages:
   - package: libasound2-dev
   - package: libc6
   - package: libc6-dev
+  - package: libgl-dev
   - package: libgl1
   - package: libgl1-mesa-dev
   - package: libglapi-mesa
