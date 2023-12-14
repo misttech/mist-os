@@ -520,7 +520,7 @@ impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
     }
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
-        Ok(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject))
+        Ok(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject { supports_io2: false }))
     }
 }
 

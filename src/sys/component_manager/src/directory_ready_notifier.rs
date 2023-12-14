@@ -467,7 +467,9 @@ mod tests {
                         control_handle
                             .send_on_open_(
                                 zx::Status::OK.into_raw(),
-                                Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {})),
+                                Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
+                                    supports_io2: false,
+                                })),
                             )
                             .unwrap();
                     } else {

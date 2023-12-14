@@ -282,7 +282,9 @@ macro_rules! assert_get_attr_path {
                 assert_eq!(Status::from_raw(s), Status::OK);
                 assert_eq!(
                     info,
-                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)))
+                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
+                        supports_io2: false
+                    })))
                 );
             }
         );
@@ -471,7 +473,9 @@ macro_rules! open_get_directory_proxy_assert_ok {
                 assert_eq!(Status::from_raw(s), Status::OK);
                 assert_eq!(
                     info,
-                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject))),
+                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
+                        supports_io2: false
+                    }))),
                 );
             }
         )
@@ -635,7 +639,9 @@ macro_rules! clone_get_directory_proxy_assert_ok {
                 assert_eq!(Status::from_raw(s), Status::OK);
                 assert_eq!(
                     info,
-                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject))),
+                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
+                        supports_io2: false
+                    }))),
                 );
             }
         )
