@@ -6,18 +6,19 @@ library fuchsia.hardware.display;
 /// Type of the internal value in [`fuchsia.hardware.display/ImageId`].
 alias ImageIdValue = uint64;
 
-/// Identifies an image resource shared between the Display Coordinator and
-/// its client.
+/// Unique identifier for an image registered with the display coordinator.
 ///
 /// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
 ///
-/// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
-/// facilitate feed-forward dataflow.
+/// Valid values uniquely identify "live" images within a Display Coordinator
+/// connection. The identifier of an image destroyed via
+/// [`fuchsia.hardware.display/Coordinator.ReleaseImage`] can be reused in a
+/// subsequent [`fuchsia.hardware.display/Coordinator.ImportImage`] call.
 ///
-/// Valid values uniquely identify imported images within a Display Coordinator
-/// connection.
-// TODO(fxbug.dev/130027): Figure out a more accurate description for the
-// ID uniqueness.
+/// An image is a memory buffer whose bytes have a fixed interpretation as an
+/// array of pixels. Memory buffers are managed by sysmem, and are accessed by
+/// the display stack using a [`fuchsia.sysmem/BufferCollection`]. The buffer's
+/// interpretation is described by an [`ImageConfig`].
 type ImageId = struct {
     value ImageIdValue;
 };
