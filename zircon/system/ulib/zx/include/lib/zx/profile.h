@@ -8,6 +8,7 @@
 #include <lib/zx/handle.h>
 #include <lib/zx/job.h>
 #include <lib/zx/object.h>
+#include <lib/zx/resource.h>
 #include <zircon/availability.h>
 
 namespace zx {
@@ -29,8 +30,8 @@ class profile final : public object<profile> {
     return *this;
   }
 
-  static zx_status_t create(const job& job, uint32_t options, const zx_profile_info_t* info,
-                            profile* result) ZX_AVAILABLE_SINCE(7);
+  static zx_status_t create(const resource& profile_rsrc, uint32_t options,
+                            const zx_profile_info_t* info, profile* result) ZX_AVAILABLE_SINCE(7);
 } ZX_AVAILABLE_SINCE(7);
 
 using unowned_profile = unowned<profile> ZX_AVAILABLE_SINCE(7);

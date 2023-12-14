@@ -35,7 +35,7 @@ using zircon_profile::ParseRoleSelector;
 
 class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvider> {
  public:
-  static zx::result<ProfileProvider*> Create(const zx::job& root_job);
+  static zx::result<ProfileProvider*> Create(zx::resource profile_rsrc);
 
   void OnConnect(async_dispatcher_t* dispatcher,
                  fidl::ServerEnd<fuchsia_scheduler::ProfileProvider> server_end) {
@@ -43,8 +43,8 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
   }
 
  private:
-  ProfileProvider(const zx::job& root_job, ConfiguredProfiles profiles)
-      : root_job_(root_job), profiles_(std::move(profiles)) {}
+  ProfileProvider(zx::resource profile_rsrc, ConfiguredProfiles profiles)
+      : profile_rsrc_(std::move(profile_rsrc)), profiles_(std::move(profiles)) {}
 
   void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override;
 
@@ -58,7 +58,7 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
                         SetProfileByRoleCompleter::Sync& completer) override;
 
   fidl::ServerBindingGroup<fuchsia_scheduler::ProfileProvider> bindings_;
-  zx::unowned_job root_job_;
+  zx::resource profile_rsrc_;
   ConfiguredProfiles profiles_;
 };
 
@@ -75,7 +75,7 @@ void ProfileProvider::GetProfile(GetProfileRequestView request,
   };
 
   zx::profile profile;
-  zx_status_t status = zx::profile::create(*root_job_, 0u, &info, &profile);
+  zx_status_t status = zx::profile::create(profile_rsrc_, 0u, &info, &profile);
   completer.Reply(status, std::move(profile));
 }
 
@@ -99,7 +99,7 @@ void ProfileProvider::GetDeadlineProfile(GetDeadlineProfileRequestView request,
   };
 
   zx::profile profile;
-  zx_status_t status = zx::profile::create(*root_job_, 0u, &info, &profile);
+  zx_status_t status = zx::profile::create(profile_rsrc_, 0u, &info, &profile);
   completer.Reply(status, std::move(profile));
 }
 
@@ -116,7 +116,7 @@ void ProfileProvider::GetCpuAffinityProfile(GetCpuAffinityProfileRequestView req
          sizeof(request->cpu_mask.mask));
 
   zx::profile profile;
-  zx_status_t status = zx::profile::create(*root_job_, 0u, &info, &profile);
+  zx_status_t status = zx::profile::create(profile_rsrc_, 0u, &info, &profile);
   completer.Reply(status, std::move(profile));
 }
 
@@ -188,7 +188,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     info.deadline_params.period = media_role->deadline;
 
     zx::profile profile;
-    status = zx::profile::create(*root_job_, 0u, &info, &profile);
+    status = zx::profile::create(profile_rsrc_, 0u, &info, &profile);
     if (status != ZX_OK) {
       FX_SLOG(ERROR,
               "Failed to create media profile:", FX_KV("status", zx_status_get_string(status)),
@@ -211,7 +211,7 @@ constexpr const char* profile_svc_names[] = {
     nullptr,
 };
 
-zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
+zx::result<ProfileProvider*> ProfileProvider::Create(zx::resource profile_rsrc) {
   auto result = zircon_profile::LoadConfigs(kConfigPath);
   if (result.is_error()) {
     FX_SLOG(ERROR, "Failed to load configs", FX_KV("error", result.error_value()),
@@ -219,12 +219,12 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  auto create = [&root_job](zircon_profile::ProfileMap& profiles) {
+  auto create = [&profile_rsrc](zircon_profile::ProfileMap& profiles) {
     // Create profiles for each configured role. If creating the profile fails, remove the role
     // entry.
     for (auto iter = profiles.begin(); iter != profiles.end();) {
       const zx_status_t status =
-          zx::profile::create(root_job, 0, &iter->second.info, &iter->second.profile);
+          zx::profile::create(profile_rsrc, 0, &iter->second.info, &iter->second.profile);
       if (status != ZX_OK) {
         FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
                 FX_KV("role", iter->first), FX_KV("status", zx_status_get_string(status)));
@@ -248,13 +248,12 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
     }
   }
 
-  return zx::ok(new ProfileProvider{root_job, std::move(result.value())});
+  return zx::ok(new ProfileProvider{std::move(profile_rsrc), std::move(result.value())});
 }
 
 zx_status_t init(void** out_ctx) {
-  const auto root_job =
-      zx::unowned_job{static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(*out_ctx))};
-  zx::result provider = ProfileProvider::Create(*root_job);
+  auto profile_rsrc = zx::resource{static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(*out_ctx))};
+  zx::result provider = ProfileProvider::Create(std::move(profile_rsrc));
   if (!provider.is_ok()) {
     return provider.status_value();
   }

@@ -46,7 +46,7 @@ class TestThread {
  private:
   friend class std::default_delete<TestThread>;
 
-  static zx::result<zx::job> GetRootJob();
+  static zx::result<zx::resource> GetSystemProfileResource();
 
   TestThread(const TestThreadBehavior& behavior, zx::profile profile);
   ~TestThread();
@@ -58,7 +58,7 @@ class TestThread {
   static inline constexpr size_t kNumMutexes = 28;
   static inline constexpr size_t kNumCondVars = 4;
   static inline constexpr size_t kNumSyncObjs = kNumMutexes + kNumCondVars;
-  static inline zx::job root_job_;
+  static inline zx::resource profile_rsrc_;
   static inline std::array<std::unique_ptr<SyncObj>, kNumSyncObjs> sync_objs_;
   static inline std::atomic<bool> shutdown_now_{false};
   static inline std::vector<std::unique_ptr<TestThread>> threads_;

@@ -13,6 +13,7 @@
 #include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/process.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/time.h>
 #include <stdio.h>

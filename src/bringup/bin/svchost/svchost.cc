@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
       },
       {
           .provider = profile_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_job.get())),
+          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_resource.get())),
       },
       {
           .provider = ktrace_get_service_provider(),

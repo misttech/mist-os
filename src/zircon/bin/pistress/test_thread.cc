@@ -40,13 +40,13 @@ TestThread::TestThread(const TestThreadBehavior& behavior, zx::profile profile)
 TestThread::~TestThread() { ZX_ASSERT(!thread_.has_value()); }
 
 zx_status_t TestThread::InitStatics() {
-  // Get a handle to the root job.  We will need this in order to create
+  // Get a handle to the profile resource.  We will need this in order to create
   // profiles.
-  zx::result<zx::job> maybe_root_job = GetRootJob();
-  if (maybe_root_job.is_error()) {
-    return maybe_root_job.error_value();
+  zx::result<zx::resource> maybe_profile_rsrc = GetSystemProfileResource();
+  if (maybe_profile_rsrc.is_error()) {
+    return maybe_profile_rsrc.error_value();
   }
-  root_job_ = std::move(maybe_root_job.value());
+  profile_rsrc_ = std::move(maybe_profile_rsrc.value());
 
   // Create the proper number of mutexes and cond_vars, then shuffle the array
   // of object pointers so that the acquisition ordering requirements are
@@ -63,21 +63,22 @@ zx_status_t TestThread::InitStatics() {
   return ZX_OK;
 }
 
-zx::result<zx::job> TestThread::GetRootJob() {
-  auto connect_result = component::Connect<fuchsia_kernel::RootJob>();
+zx::result<zx::resource> TestThread::GetSystemProfileResource() {
+  auto connect_result = component::Connect<fuchsia_kernel::ProfileResource>();
 
   if (connect_result.is_error()) {
-    printf("Failed to connect to RootJob Service (%d)\n", connect_result.status_value());
+    printf("Failed to connect to ProfileResource Service (%d)\n", connect_result.status_value());
     return zx::error(connect_result.status_value());
   }
 
   auto response = fidl::WireCall(connect_result.value())->Get();
   if (response.status() != ZX_OK) {
-    printf("RootJob service failed to grant root job handle (%d)\n", response.status());
+    printf("ProfileResource service failed to grant profile resource handle (%d)\n",
+           response.status());
     return zx::error(response.status());
   }
 
-  return zx::ok(std::move(response.value().job));
+  return zx::ok(std::move(response.value().resource));
 }
 
 zx_status_t TestThread::AddThread(const TestThreadBehavior& behavior) {
@@ -99,7 +100,7 @@ zx_status_t TestThread::AddThread(const TestThreadBehavior& behavior) {
     profile_info.flags |= ZX_PROFILE_INFO_FLAG_NO_INHERIT;
   }
 
-  status = zx::profile::create(root_job_, 0, &profile_info, &profile);
+  status = zx::profile::create(profile_rsrc_, 0, &profile_info, &profile);
 
   if (status != ZX_OK) {
     if (behavior.profile_type == ProfileType::Fair) {

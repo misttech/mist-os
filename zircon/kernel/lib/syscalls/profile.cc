@@ -9,19 +9,21 @@
 #include <lib/ktrace.h>
 #include <lib/syscalls/forward.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/resource.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
 #include <object/handle.h>
 #include <object/job_dispatcher.h>
 #include <object/profile_dispatcher.h>
+#include <object/resource.h>
 #include <object/vm_address_region_dispatcher.h>
 
 KCOUNTER(profile_create, "profile.create")
 KCOUNTER(profile_set, "profile.set")
 
 // zx_status_t zx_profile_create
-zx_status_t sys_profile_create(zx_handle_t root_job, uint32_t options,
+zx_status_t sys_profile_create(zx_handle_t profile_rsrc, uint32_t options,
                                user_in_ptr<const zx_profile_info_t> user_profile_info,
                                zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
@@ -35,14 +37,12 @@ zx_status_t sys_profile_create(zx_handle_t root_job, uint32_t options,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::RefPtr<JobDispatcher> job;
-  status = up->handle_table().GetDispatcherWithRights(*up, root_job, ZX_RIGHT_MANAGE_PROCESS, &job);
+  status =
+      validate_resource_kind_base(profile_rsrc, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_PROFILE_BASE);
   if (status != ZX_OK) {
-    return status;
-  }
-
-  if (job != GetRootJobDispatcher()) {
-    // TODO(cpu): consider a better error code.
+    if (status == ZX_ERR_BAD_HANDLE) {
+      return status;
+    }
     return ZX_ERR_ACCESS_DENIED;
   }
 

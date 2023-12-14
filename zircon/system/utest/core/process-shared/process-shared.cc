@@ -3,27 +3,42 @@
 // found in the LICENSE file.
 
 #include <lib/fit/defer.h>
+#include <lib/maybe-standalone-test/maybe-standalone.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/profile.h>
+#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/resource.h>
 
 #include <mini-process/mini-process.h>
 #include <zxtest/zxtest.h>
 
 namespace {
 
-void SetDeadlineMemoryPriority(zx::vmar& vmar) {
-  zx::unowned_job root_job(zx::job::default_job());
-  ASSERT_TRUE(root_job->is_valid());
+zx::result<zx::resource> GetSystemProfileResource(zx::unowned_resource& root_resource) {
+  zx::resource system_profile_resource;
+  const zx_status_t status =
+      zx::resource::create(*root_resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_PROFILE_BASE, 1,
+                           nullptr, 0, &system_profile_resource);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(system_profile_resource));
+}
+
+void SetDeadlineMemoryPriority(zx::unowned_resource& root_resource, zx::vmar& vmar) {
   zx::profile profile;
   zx_profile_info_t profile_info = {.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY,
                                     .priority = ZX_PRIORITY_HIGH};
 
-  zx_status_t status = zx::profile::create(*root_job, 0u, &profile_info, &profile);
+  zx::result<zx::resource> result = GetSystemProfileResource(root_resource);
+  ASSERT_OK(result.status_value());
+  zx_status_t status = zx::profile::create(result.value(), 0u, &profile_info, &profile);
   if (status == ZX_ERR_ACCESS_DENIED) {
     // If we are running as a component test, and not a zbi test, we do not have the root job and
     // cannot create a profile. This is not an issue as when running tests as a component
@@ -211,6 +226,12 @@ TEST(ProcessShared, InfoProcessVmos) {
 //
 // See also fxbug.dev/123525.
 TEST(ProcessShared, InfoTaskStats) {
+  // First, verify we have access to the root resource to run this test.
+  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
+  if (!root_resource->is_valid()) {
+    printf("Root resource not available, skipping\n");
+    return;
+  }
   // We're going to create 3 processes, proc1, proc2, and proc3, with a total of 4 VMARs.  proc1 and
   // proc2 will share a region (vmar_shared) and each have their own private region (vmar1 and
   // vmar2).  proc3 will have one (unshared) region (vmar3).
@@ -252,10 +273,10 @@ TEST(ProcessShared, InfoTaskStats) {
 
   // With all the processes created apply a deadline memory priority to them all so that our memory
   // stats are predictable and will not change due to compression.
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar_shared));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar1));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar2));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar3));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar_shared));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar1));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar2));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar3));
 
   // Now create the 6 VMOs of 1 page each.
   const size_t kSize = zx_system_get_page_size();

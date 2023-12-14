@@ -63,6 +63,17 @@ zx::result<size_t> GetCpuCount() {
   return zx::ok(available);
 }
 
+zx::result<zx::resource> GetSystemProfileResource() {
+  zx::resource system_profile_resource;
+  const zx_status_t status =
+      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+                           ZX_RSRC_SYSTEM_PROFILE_BASE, 1, nullptr, 0, &system_profile_resource);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(system_profile_resource));
+}
+
 zx::result<zx::resource> GetSystemCpuResource() {
   zx::resource system_cpu_resource;
   const zx_status_t status =
@@ -95,14 +106,13 @@ zx_status_t RunThread(Callable&& callable) {
   info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE | ZX_PROFILE_INFO_FLAG_CPU_MASK;
   info.deadline_params = kTestThreadDeadlineParams;
   info.cpu_affinity_mask = CpuNumToCpuSet(kTestThreadCpu);
-
-  zx::unowned_job root_job(zx::job::default_job());
-  if (!root_job->is_valid()) {
-    return ZX_ERR_INVALID_ARGS;
+  zx::result<zx::resource> maybe_profile_rsrc = GetSystemProfileResource();
+  if (maybe_profile_rsrc.is_error()) {
+    return maybe_profile_rsrc.status_value();
   }
 
   zx::profile profile;
-  zx_status_t result = zx::profile::create(*root_job, 0u, &info, &profile);
+  zx_status_t result = zx::profile::create(maybe_profile_rsrc.value(), 0u, &info, &profile);
   if (result != ZX_OK) {
     return result;
   }
