@@ -11,6 +11,7 @@ library_headers("headers") {
   headers = [
     "lib/zxio/null.h",
     "lib/zxio/ops.h",
+    "lib/zxio/fault_catcher.h",
     "lib/zxio/posix_mode.h",
     "lib/zxio/bsdsocket.h",
     "lib/zxio/types.h",
@@ -57,6 +58,7 @@ source_set("zxio") {
     "create.cc",
     "debuglog.cc",
     "dgram_cache.cc",
+    "fault_catcher.cc",
     "get_vmo.cc",
     "inception.cc",
     "null.cc",

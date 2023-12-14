@@ -9,14 +9,16 @@
 		zxio_close;
 		zxio_connect;
 		zxio_create;
-                zxio_create_symlink;
+		zxio_create_symlink;
 		zxio_create_with_info;
 		zxio_create_with_on_open;
 		zxio_create_with_on_representation;
+		zxio_default_maybe_faultable_copy;
 		zxio_dirent_iterator_destroy;
 		zxio_dirent_iterator_init;
 		zxio_dirent_iterator_next;
 		zxio_dirent_iterator_rewind;
+		zxio_fault_catching_disabled;
 		zxio_flags_get;
 		zxio_flags_set;
 		zxio_get_posix_mode;
@@ -29,6 +31,7 @@
 		zxio_link;
 		zxio_link_into;
 		zxio_listen;
+		zxio_maybe_faultable_copy;
 		zxio_open;
 		zxio_open2;
 		zxio_open_async;

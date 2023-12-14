@@ -25,9 +25,29 @@ use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
 use starnix_core::{
     execution::{Container, ContainerServiceConfig},
-    mm::init_usercopy,
+    mm::{init_usercopy, zxio_maybe_faultable_copy_impl},
 };
 use starnix_logging::{log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel};
+
+/// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
+#[no_mangle]
+extern "C" fn zxio_maybe_faultable_copy(
+    dest: *mut u8,
+    src: *const u8,
+    count: usize,
+    ret_dest: bool,
+) -> bool {
+    // SAFETY: we know that we are either copying from or to a buffer that
+    // zxio (and thus Starnix) owns per `zxio_maybe_faultable_copy`'s
+    // documentation.
+    unsafe { zxio_maybe_faultable_copy_impl(dest, src, count, ret_dest) }
+}
+
+/// Overrides the `zxio_fault_catching_disabled` weak symbol found in zxio.
+#[no_mangle]
+extern "C" fn zxio_fault_catching_disabled() -> bool {
+    false
+}
 
 fn maybe_serve_lifecycle() {
     if let Some(lifecycle) =

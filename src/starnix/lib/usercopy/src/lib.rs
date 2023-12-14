@@ -204,8 +204,8 @@ unsafe fn assume_initialized_until(
 /// when the first `count` bytes are read/written.
 unsafe fn do_hermetic_copy(
     f: HermeticCopyFn,
-    source: usize,
     dest: usize,
+    source: usize,
     count: usize,
     ret_dest: bool,
 ) -> usize {
@@ -364,6 +364,24 @@ impl Usercopy {
         }))
     }
 
+    /// Copies bytes from the source address to the destination address.
+    ///
+    /// # Safety
+    ///
+    /// Only one of `source`/`dest` may be an address to a buffer owned by user/restricted-mode
+    /// (`ret_dest` indicates whether the user-owned buffer is `dest` when `true`).
+    /// The other must be a valid Starnix/normal-mode buffer that will never cause a fault
+    /// when the first `count` bytes are read/written.
+    pub unsafe fn raw_hermetic_copy(
+        &self,
+        dest: *mut u8,
+        source: *const u8,
+        count: usize,
+        ret_dest: bool,
+    ) -> usize {
+        do_hermetic_copy(self.hermetic_copy_fn, dest as usize, source as usize, count, ret_dest)
+    }
+
     /// Copies data from `source` to the restricted address `dest_addr`.
     ///
     /// Returns the number of bytes copied.
@@ -380,8 +398,8 @@ impl Usercopy {
         unsafe {
             do_hermetic_copy(
                 self.hermetic_copy_fn,
-                source.as_ptr() as usize,
                 dest_addr,
+                source.as_ptr() as usize,
                 source.len(),
                 true,
             )
@@ -408,8 +426,8 @@ impl Usercopy {
         let read_count = unsafe {
             do_hermetic_copy(
                 self.hermetic_copy_fn,
-                source_addr,
                 dest.as_ptr() as usize,
+                source_addr,
                 dest.len(),
                 false,
             )
@@ -441,8 +459,8 @@ impl Usercopy {
         let read_count = unsafe {
             do_hermetic_copy(
                 self.hermetic_copy_until_null_byte_fn,
-                source_addr,
                 dest.as_ptr() as usize,
+                source_addr,
                 dest.len(),
                 false,
             )

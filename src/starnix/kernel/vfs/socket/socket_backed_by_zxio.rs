@@ -4,7 +4,7 @@
 
 use crate::{
     fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    mm::MemoryAccessorExt,
+    mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
     vfs::{
         socket::{
@@ -16,8 +16,11 @@ use crate::{
 };
 use starnix_logging::not_implemented;
 use starnix_uapi::{
-    c_int, errno, errno_from_zxio_code, error, errors::Errno, from_status_like_fdio, uapi, ucred,
-    user_buffer::UserBuffer, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
+    c_int, errno, errno_from_zxio_code, error,
+    errors::{Errno, ENOTSUP},
+    from_status_like_fdio, uapi, ucred,
+    user_buffer::UserBuffer,
+    MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
@@ -27,7 +30,7 @@ use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, OnceLock};
-use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
+use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -90,7 +93,7 @@ impl ZxioBackedSocket {
         cmsgs: Vec<ControlMessage>,
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
-        let addr = match addr {
+        let mut addr = match addr {
             Some(
                 SocketAddress::Inet(sockaddr)
                 | SocketAddress::Inet6(sockaddr)
@@ -100,28 +103,106 @@ impl ZxioBackedSocket {
             None => vec![],
         };
 
-        let bytes = data.peek_all()?;
-        let sent_bytes = self
-            .zxio
-            .sendmsg(addr, bytes, cmsgs, flags.bits() & !MSG_DONTWAIT)
-            .map_err(|status| match status {
-                zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
-                other => from_status_like_fdio!(other),
-            })?
-            .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+        let flags = flags.bits() & !MSG_DONTWAIT;
+        let sent_bytes = if UNIFIED_ASPACES_ENABLED {
+            match data.peek_all_segments_as_iovecs() {
+                Ok(mut iovecs) => Some(self.zxio.sendmsg(&mut addr, &mut iovecs, &cmsgs, flags)),
+                Err(e) => {
+                    if e.code == ENOTSUP {
+                        None
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
+        // If we can't pass the iovecs directly so fallback to reading
+        // all the bytes from the input buffer first.
+        let sent_bytes = if let Some(sent_bytes) = sent_bytes {
+            sent_bytes
+        } else {
+            let mut bytes = data.peek_all()?;
+            self.zxio.sendmsg(
+                &mut addr,
+                &mut [syncio::zxio::iovec {
+                    iov_base: bytes.as_mut_ptr() as *mut starnix_uapi::c_void,
+                    iov_len: bytes.len(),
+                }],
+                &cmsgs,
+                flags,
+            )
+        }
+        .map_err(|status| match status {
+            zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
+            other => from_status_like_fdio!(other),
+        })?
+        .map_err(|out_code| errno_from_zxio_code!(out_code))?;
         data.advance(sent_bytes)?;
         Ok(sent_bytes)
     }
 
     pub fn recvmsg(
         &self,
-        iovec_length: usize,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<RecvMessageInfo, Errno> {
-        self.zxio
-            .recvmsg(iovec_length, flags.bits() & !MSG_DONTWAIT & !MSG_WAITALL)
-            .map_err(|status| from_status_like_fdio!(status))?
-            .map_err(|out_code| errno_from_zxio_code!(out_code))
+        let flags = flags.bits() & !MSG_DONTWAIT & !MSG_WAITALL;
+
+        fn with_res<F: FnOnce(&RecvMessageInfo) -> Result<(), Errno>>(
+            res: Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status>,
+            f: F,
+        ) -> Result<RecvMessageInfo, Errno> {
+            let info = res
+                .map_err(|status| from_status_like_fdio!(status))?
+                .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+            f(&info)?;
+            Ok(info)
+        }
+
+        let res = if UNIFIED_ASPACES_ENABLED {
+            match data.peek_all_segments_as_iovecs() {
+                Ok(mut iovecs) => {
+                    let res = self.zxio.recvmsg(&mut iovecs, flags);
+                    Some(with_res(res, |info| {
+                        // SAFETY: we successfully read `info.bytes_read` bytes
+                        // directly to the user's buffer segments.
+                        unsafe { data.advance(info.bytes_read) }
+                    }))
+                }
+                Err(e) => {
+                    if e.code == ENOTSUP {
+                        None
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
+        // If we can't pass the segments directly, fallback to receiving
+        // all the bytes in an intermediate buffer and writing that
+        // to our output buffer.
+        res.unwrap_or_else(|| {
+            // TODO: use MaybeUninit
+            let mut buf = vec![0; data.available()];
+            let res = self.zxio.recvmsg(
+                &mut [syncio::zxio::iovec {
+                    iov_base: buf.as_mut_ptr() as *mut starnix_uapi::c_void,
+                    iov_len: buf.len(),
+                }],
+                flags,
+            );
+            with_res(res, |info| {
+                let written = data.write_all(&buf[..info.bytes_read])?;
+                debug_assert_eq!(written, info.bytes_read);
+                Ok(())
+            })
+        })
     }
 }
 
@@ -197,10 +278,9 @@ impl SocketOps for ZxioBackedSocket {
             return error!(EAGAIN);
         }
 
-        let iovec_length = data.available();
-        let mut info = self.recvmsg(iovec_length, flags)?;
+        let mut info = self.recvmsg(data, flags)?;
 
-        let bytes_read = data.write_all(&info.message)?;
+        let bytes_read = info.bytes_read;
 
         let address = if !info.address.is_empty() {
             Some(SocketAddress::from_bytes(info.address)?)

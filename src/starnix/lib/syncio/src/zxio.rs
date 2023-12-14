@@ -1247,6 +1247,25 @@ extern "C" {
     ) -> zx_status_t;
 }
 extern "C" {
+    pub fn zxio_default_maybe_faultable_copy(
+        dest: *mut ::std::os::raw::c_uchar,
+        src: *const ::std::os::raw::c_uchar,
+        count: usize,
+        ret_dest: bool,
+    ) -> bool;
+}
+extern "C" {
+    pub fn zxio_maybe_faultable_copy(
+        dest: *mut ::std::os::raw::c_uchar,
+        src: *const ::std::os::raw::c_uchar,
+        count: usize,
+        ret_dest: bool,
+    ) -> bool;
+}
+extern "C" {
+    pub fn zxio_fault_catching_disabled() -> bool;
+}
+extern "C" {
     pub fn zxio_get_posix_mode(
         protocols: zxio_node_protocols_t,
         abilities: zxio_abilities_t,

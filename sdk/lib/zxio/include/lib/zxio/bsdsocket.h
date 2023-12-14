@@ -62,10 +62,26 @@ ZXIO_EXPORT zx_status_t zxio_setsockopt(zxio_t* io, int level, int optname, cons
                                         socklen_t optlen, int16_t* out_code);
 
 // Receives a message from a socket and sets |*out_actual| to the total bytes received.
+//
+// |msg|, |msg->msg_name|, |msg->msg_control| and |msg->msg_iov| must always point to
+// valid memory if not null (properly aligned and will not trigger faults if accessed).
+// The memory pointed to by the |iovec|s found in |msg->msg_iov| is allowed to fault
+// iff the library's |zxio_maybe_faultable_copy| method is overridden to a method
+// that can handle such faults. If the default definition of |zxio_maybe_faultable_copy|
+// is used, then |msg->msg_iov| must also not fault. Note that unexpected faults
+// will cause a Zircon exception to be raised.
 ZXIO_EXPORT zx_status_t zxio_recvmsg(zxio_t* io, struct msghdr* msg, int flags, size_t* out_actual,
                                      int16_t* out_code);
 
 // Sends a message from a socket and sets |*out_actual| to the total bytes sent.
+//
+// |msg|, |msg->msg_name|, |msg->msg_control| and |msg->msg_iov| must always point to
+// valid memory if not null (properly aligned and will not trigger faults if accessed).
+// The memory pointed to by the |iovec|s found in |msg->msg_iov| is allowed to fault
+// iff the library's |zxio_maybe_faultable_copy| method is overridden to a method
+// that can handle such faults. If the default definition of |zxio_maybe_faultable_copy|
+// is used, then |msg->msg_iov| must also not fault. Note that unexpected faults
+// will cause a Zircon exception to be raised.
 ZXIO_EXPORT zx_status_t zxio_sendmsg(zxio_t* io, const struct msghdr* msg, int flags,
                                      size_t* out_actual, int16_t* out_code);
 

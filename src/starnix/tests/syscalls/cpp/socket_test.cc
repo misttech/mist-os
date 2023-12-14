@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
+#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -296,6 +301,106 @@ TEST(Socket, ConcurrentCreate) {
   child.join();
 }
 
+class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
+ protected:
+  void SetUp() override {
+    const auto [type, protocol] = GetParam();
+
+    if (type == SOCK_DGRAM && protocol == IPPROTO_ICMP && getuid() != 0) {
+      GTEST_SKIP() << "Ping sockets require root.";
+    }
+
+    const sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(1337),
+        .sin_addr = {htonl(INADDR_LOOPBACK)},
+    };
+
+    ASSERT_TRUE(recv_fd_ = fbl::unique_fd(socket(AF_INET, type, protocol))) << strerror(errno);
+    ASSERT_EQ(bind(recv_fd_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+        << strerror(errno);
+    if (type == SOCK_STREAM) {
+      ASSERT_EQ(listen(recv_fd_.get(), 0), 0) << strerror(errno);
+      listen_fd_ = std::move(recv_fd_);
+    }
+
+    ASSERT_TRUE(send_fd_ = fbl::unique_fd(socket(AF_INET, type, protocol))) << strerror(errno);
+    ASSERT_EQ(connect(send_fd_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+        << strerror(errno);
+
+    if (type == SOCK_STREAM) {
+      ASSERT_TRUE(recv_fd_ = fbl::unique_fd(accept(listen_fd_.get(), nullptr, nullptr)))
+          << strerror(errno);
+    } else if (protocol == IPPROTO_ICMP) {
+      // ICMP sockets only get the packet on the sending socket since sockets do not
+      // receive ICMP requests, only replies. Note that the netstack internally
+      // responds to ICMP requests without any user-application needing to handle
+      // requests.
+      ASSERT_TRUE(recv_fd_ = fbl::unique_fd(dup(send_fd_.get()))) << strerror(errno);
+    }
+  }
+
+  void TearDown() override {
+    send_fd_.reset();
+    recv_fd_.reset();
+    listen_fd_.reset();
+  }
+
+  fbl::unique_fd recv_fd_;
+  fbl::unique_fd listen_fd_;
+  fbl::unique_fd send_fd_;
+};
+
+// Test sending a packet from invalid memory.
+TEST_P(SocketFault, Write) {
+  constexpr size_t kRandomLength = 987;
+  void* faulting_ptr = mmap(nullptr, kRandomLength, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(faulting_ptr, MAP_FAILED);
+  auto cleanup_mapped = fit::defer([&faulting_ptr]() {
+    EXPECT_EQ(munmap(faulting_ptr, kRandomLength), 0) << strerror(errno);
+    faulting_ptr = 0;
+  });
+
+  EXPECT_EQ(write(send_fd_.get(), faulting_ptr, kRandomLength), -1);
+  EXPECT_EQ(errno, EFAULT);
+}
+
+// Test receiving a packet to invalid memory.
+TEST_P(SocketFault, Read) {
+  // First send a valid message that we can read.
+  //
+  // We send an ICMP message since this test is generic over UDP/TCP/ICMP.
+  // UDP/TCP do not care about the shape of the payload but ICMP does so we just
+  // use an ICMP compatible payload for simplicity.
+  constexpr icmphdr kSendIcmp = {
+      .type = ICMP_ECHO,
+  };
+  ASSERT_EQ(write(send_fd_.get(), &kSendIcmp, sizeof(kSendIcmp)),
+            static_cast<ssize_t>(sizeof(kSendIcmp)));
+
+  pollfd p = {
+      .fd = recv_fd_.get(),
+      .events = POLLIN,
+  };
+  ASSERT_EQ(poll(&p, 1, -1), 1);
+  ASSERT_EQ(p.revents, POLLIN);
+
+  void* faulting_ptr =
+      mmap(nullptr, sizeof(kSendIcmp), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(faulting_ptr, MAP_FAILED);
+  auto cleanup_mapped = fit::defer([&faulting_ptr]() {
+    EXPECT_EQ(munmap(faulting_ptr, sizeof(kSendIcmp)), 0) << strerror(errno);
+    faulting_ptr = 0;
+  });
+
+  EXPECT_EQ(read(recv_fd_.get(), faulting_ptr, sizeof(kSendIcmp)), -1);
+  EXPECT_EQ(errno, EFAULT);
+}
+
+INSTANTIATE_TEST_SUITE_P(SocketFault, SocketFault,
+                         testing::Values(std::make_pair(SOCK_DGRAM, 0),
+                                         std::make_pair(SOCK_DGRAM, IPPROTO_ICMP),
+                                         std::make_pair(SOCK_STREAM, 0)));
 class SndRcvBufSockOpt : public testing::TestWithParam<int> {};
 
 // This test asserts that the value of SO_RCVBUF and SO_SNDBUF are doubled on

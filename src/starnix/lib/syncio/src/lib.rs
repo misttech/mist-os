@@ -14,6 +14,7 @@ use std::{
     ffi::CStr,
     marker::PhantomData,
     mem::{size_of, size_of_val},
+    num::TryFromIntError,
     os::raw::{c_char, c_int, c_uint, c_void},
     pin::Pin,
 };
@@ -350,7 +351,7 @@ fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
 
 pub struct RecvMessageInfo {
     pub address: Vec<u8>,
-    pub message: Vec<u8>,
+    pub bytes_read: usize,
     pub message_length: usize,
     pub control_messages: Vec<ControlMessage>,
     pub flags: i32,
@@ -1063,9 +1064,9 @@ impl Zxio {
 
     pub fn sendmsg(
         &self,
-        mut addr: Vec<u8>,
-        mut buffer: Vec<u8>,
-        cmsg: Vec<ControlMessage>,
+        addr: &mut [u8],
+        buffer: &mut [zxio::iovec],
+        cmsg: &[ControlMessage],
         flags: u32,
     ) -> Result<Result<usize, ZxioErrorCode>, zx::Status> {
         let mut msg = zxio::msghdr::default();
@@ -1075,12 +1076,11 @@ impl Zxio {
         };
         msg.msg_namelen = addr.len() as u32;
 
-        let mut iov =
-            zxio::iovec { iov_base: buffer.as_mut_ptr() as *mut c_void, iov_len: buffer.len() };
-        msg.msg_iov = &mut iov;
-        msg.msg_iovlen = 1;
+        msg.msg_iovlen =
+            i32::try_from(buffer.len()).map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
+        msg.msg_iov = buffer.as_mut_ptr();
 
-        let mut cmsg_buffer = serialize_control_messages(&cmsg);
+        let mut cmsg_buffer = serialize_control_messages(cmsg);
         msg.msg_control = cmsg_buffer.as_mut_ptr() as *mut c_void;
         msg.msg_controllen = cmsg_buffer.len() as u32;
 
@@ -1100,7 +1100,7 @@ impl Zxio {
 
     pub fn recvmsg(
         &self,
-        iovec_length: usize,
+        buffer: &mut [zxio::iovec],
         flags: u32,
     ) -> Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status> {
         let mut msg = msghdr::default();
@@ -1108,11 +1108,10 @@ impl Zxio {
         msg.msg_name = addr.as_mut_ptr() as *mut c_void;
         msg.msg_namelen = addr.len() as u32;
 
-        let mut iov_buf = vec![0u8; iovec_length];
-        let mut iov =
-            zxio::iovec { iov_base: iov_buf.as_mut_ptr() as *mut c_void, iov_len: iovec_length };
-        msg.msg_iov = &mut iov;
-        msg.msg_iovlen = 1;
+        let max_buffer_capacity = buffer.iter().map(|v| v.iov_len).sum();
+        msg.msg_iovlen =
+            i32::try_from(buffer.len()).map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
+        msg.msg_iov = buffer.as_mut_ptr();
 
         let mut cmsg_buffer = vec![0u8; MAX_CMSGS_BUFFER];
         msg.msg_control = cmsg_buffer.as_mut_ptr() as *mut c_void;
@@ -1136,10 +1135,9 @@ impl Zxio {
         }
 
         let control_messages = parse_control_messages(&cmsg_buffer[..msg.msg_controllen as usize]);
-        let min_buf_len = std::cmp::min(iov_buf.len(), out_actual);
         Ok(Ok(RecvMessageInfo {
             address: addr[..msg.msg_namelen as usize].to_vec(),
-            message: iov_buf[..min_buf_len].to_vec(),
+            bytes_read: std::cmp::min(max_buffer_capacity, out_actual),
             message_length: out_actual,
             control_messages,
             flags: msg.msg_flags,

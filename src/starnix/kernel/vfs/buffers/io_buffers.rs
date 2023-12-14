@@ -9,7 +9,10 @@ use crate::mm::{
 use starnix_uapi::{
     errno, error, errors::Errno, user_address::UserAddress, user_buffer::UserBuffer,
 };
-use std::mem::MaybeUninit;
+use std::{
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+};
 use zerocopy::FromBytes;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
@@ -21,10 +24,59 @@ fn slice_to_maybe_uninit(buffer: &[u8]) -> &[MaybeUninit<u8>] {
     unsafe { std::slice::from_raw_parts(buffer.as_ptr() as *const MaybeUninit<u8>, buffer.len()) }
 }
 
+/// Provides access to a slice of `iovec`s while retaining some reference.
+pub struct IovecsRef<'a> {
+    iovecs: Vec<syncio::zxio::iovec>,
+    _marker: std::marker::PhantomData<&'a syncio::zxio::iovec>,
+}
+
+impl Deref for IovecsRef<'_> {
+    type Target = [syncio::zxio::iovec];
+    fn deref(&self) -> &Self::Target {
+        &self.iovecs
+    }
+}
+
+impl DerefMut for IovecsRef<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.iovecs
+    }
+}
+
+pub type PeekBufferSegmentsCallback<'a> = dyn FnMut(&UserBuffer) + 'a;
+
+/// A buffer.
+///
+/// Provides the common implementations for input and output buffers.
+pub trait Buffer: std::fmt::Debug {
+    /// Calls the callback with each segment backing this buffer.
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno>;
+
+    /// Returns all the segments backing this `Buffer`.
+    ///
+    /// Note that we use `IovecsRef<'_>` so that while `IovecsRef` is held,
+    /// no other methods may be called on this `Buffer` since `IovecsRef`
+    /// holds onto the mutable reference for this `Buffer`.
+    fn peek_all_segments_as_iovecs(&mut self) -> Result<IovecsRef<'_>, Errno> {
+        let mut iovecs = vec![];
+        self.peek_each_segment(&mut |buffer| {
+            iovecs.push(syncio::zxio::iovec {
+                iov_base: buffer.address.ptr() as *mut starnix_uapi::c_void,
+                iov_len: buffer.length,
+            })
+        })?;
+
+        Ok(IovecsRef { iovecs, _marker: Default::default() })
+    }
+}
+
 /// The OutputBuffer allows for writing bytes to a buffer.
 /// A single OutputBuffer will only write up to MAX_RW_COUNT bytes which is the maximum size of a
 /// single operation.
-pub trait OutputBuffer: std::fmt::Debug {
+pub trait OutputBuffer: Buffer {
     /// Calls `callback` for each segment to write data for. `callback` must returns the number of
     /// bytes actually written. When it returns less than the size of the input buffer, the write
     /// is stopped.
@@ -40,6 +92,13 @@ pub trait OutputBuffer: std::fmt::Debug {
 
     /// Fills this buffer with zeros.
     fn zero(&mut self) -> Result<usize, Errno>;
+
+    /// Advance the output buffer by `length` bytes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that the length bytes are initialized.
+    unsafe fn advance(&mut self, length: usize) -> Result<(), Errno>;
 
     /// Write the content of `buffer` into this buffer. If this buffer is too small, the write will
     /// be partial.
@@ -92,7 +151,7 @@ pub type InputBufferCallback<'a> = dyn FnMut(&[u8]) -> Result<usize, Errno> + 'a
 /// The InputBuffer allows for reading bytes from a buffer.
 /// A single InputBuffer will only read up to MAX_RW_COUNT bytes which is the maximum size of a
 /// single operation.
-pub trait InputBuffer: std::fmt::Debug {
+pub trait InputBuffer: Buffer {
     /// Calls `callback` for each segment to peek data from. `callback` must returns the number of
     /// bytes actually peeked. When it returns less than the size of the output buffer, the read
     /// is stopped.
@@ -276,6 +335,22 @@ impl<'a> UserBuffersOutputBuffer<'a, true> {
     }
 }
 
+impl<'a, const USE_VMO: bool> Buffer for UserBuffersOutputBuffer<'a, USE_VMO> {
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        for buffer in self.buffers.iter().rev() {
+            if buffer.is_null() {
+                continue;
+            }
+            callback(buffer)
+        }
+
+        Ok(())
+    }
+}
+
 impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_VMO> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         let mut bytes_written = 0;
@@ -340,6 +415,30 @@ impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_V
 
         Ok(bytes_written)
     }
+
+    unsafe fn advance(&mut self, mut length: usize) -> Result<(), Errno> {
+        if length > self.available() {
+            return error!(EINVAL);
+        }
+
+        while let Some(mut buffer) = self.buffers.pop() {
+            if buffer.is_null() {
+                continue;
+            }
+
+            let advance_by = std::cmp::min(length, buffer.length);
+            buffer.advance(advance_by)?;
+            self.available -= advance_by;
+            self.bytes_written += advance_by;
+            if !buffer.is_empty() {
+                self.buffers.push(buffer);
+                break;
+            }
+            length -= advance_by;
+        }
+
+        Ok(())
+    }
 }
 
 /// An InputBuffer that read data from user space memory through a `MemoryManager`.
@@ -391,6 +490,22 @@ impl<'a> UserBuffersInputBuffer<'a> {
 impl<'a> UserBuffersInputBuffer<'a, true> {
     pub fn vmo_new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
+    }
+}
+
+impl<'a, const USE_VMO: bool> Buffer for UserBuffersInputBuffer<'a, USE_VMO> {
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        for buffer in self.buffers.iter().rev() {
+            if buffer.is_null() {
+                continue;
+            }
+            callback(buffer)
+        }
+
+        Ok(())
     }
 }
 
@@ -488,6 +603,22 @@ impl From<VecOutputBuffer> for Vec<u8> {
     }
 }
 
+impl Buffer for VecOutputBuffer {
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        let current_len = self.buffer.len();
+        let buffer = &mut self.buffer.spare_capacity_mut()[..self.capacity - current_len];
+        callback(&UserBuffer {
+            address: UserAddress::from(buffer.as_mut_ptr() as u64),
+            length: buffer.len(),
+        });
+
+        Ok(())
+    }
+}
+
 impl OutputBuffer for VecOutputBuffer {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         let current_len = self.buffer.len();
@@ -514,6 +645,17 @@ impl OutputBuffer for VecOutputBuffer {
         self.buffer.resize(self.capacity, 0);
         Ok(zeroed)
     }
+
+    unsafe fn advance(&mut self, length: usize) -> Result<(), Errno> {
+        if length > self.available() {
+            return error!(EINVAL);
+        }
+
+        self.capacity -= length;
+        let current_len = self.buffer.len();
+        self.buffer.set_len(current_len + length);
+        Ok(())
+    }
 }
 
 /// An InputBuffer that read data from an internal buffer.
@@ -534,6 +676,21 @@ impl VecInputBuffer {
 impl From<Vec<u8>> for VecInputBuffer {
     fn from(buffer: Vec<u8>) -> Self {
         Self { buffer, bytes_read: 0 }
+    }
+}
+
+impl Buffer for VecInputBuffer {
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        let buffer = &self.buffer[self.bytes_read..];
+        callback(&UserBuffer {
+            address: UserAddress::from(buffer.as_ptr() as u64),
+            length: buffer.len(),
+        });
+
+        Ok(())
     }
 }
 

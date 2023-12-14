@@ -41,6 +41,7 @@ use static_assertions::const_assert_eq;
 use std::{
     collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
 };
+use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
@@ -96,6 +97,32 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
     });
 
     Lazy::force(&USERCOPY).as_ref()
+}
+
+/// Provides an implementation for zxio's `zxio_maybe_faultable_copy` that supports
+/// catching faults.
+///
+/// See zxio's `zxio_maybe_faultable_copy` documentation for more details.
+///
+/// # Safety
+///
+/// Only one of `src`/`dest` may be an address to a buffer owned by user/restricted-mode
+/// (`ret_dest` indicates whether the user-owned buffer is `dest` when `true`).
+/// The other must be a valid Starnix/normal-mode buffer that will never cause a fault
+/// when the first `count` bytes are read/written.
+#[no_mangle]
+pub unsafe fn zxio_maybe_faultable_copy_impl(
+    dest: *mut u8,
+    src: *const u8,
+    count: usize,
+    ret_dest: bool,
+) -> bool {
+    if let Some(usercopy) = usercopy() {
+        let ret = usercopy.raw_hermetic_copy(dest, src, count, ret_dest);
+        ret == count
+    } else {
+        zxio_default_maybe_faultable_copy(dest, src, count, ret_dest)
+    }
 }
 
 pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);

@@ -6,12 +6,12 @@ use crate::{
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
-        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
+        buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, CacheConfig, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode,
         FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
+        PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
 };
 use bstr::B;
@@ -1621,6 +1621,15 @@ impl FuseOperation {
             written: usize,
         }
 
+        impl Buffer for CountingOutputBuffer {
+            fn peek_each_segment(
+                &mut self,
+                _callback: &mut PeekBufferSegmentsCallback<'_>,
+            ) -> Result<(), Errno> {
+                panic!("Should not be called");
+            }
+        }
+
         impl OutputBuffer for CountingOutputBuffer {
             fn available(&self) -> usize {
                 usize::MAX
@@ -1644,6 +1653,10 @@ impl FuseOperation {
             fn write_all(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
                 self.written += buffer.len();
                 Ok(buffer.len())
+            }
+
+            unsafe fn advance(&mut self, _length: usize) -> Result<(), Errno> {
+                panic!("Should not be called.");
             }
         }
 

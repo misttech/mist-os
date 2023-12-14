@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zxio/fault_catcher.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
 #include <sys/stat.h>
+#include <zircon/compiler.h>
 
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
@@ -162,7 +164,10 @@ static constexpr zxio_ops_t zxio_datagram_pipe_ops = []() {
         vector, vector_count, out_actual,
         [&](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
           size_t actual = std::min(capacity, remaining);
-          memcpy(buffer, data, actual);
+          if (unlikely(!zxio_maybe_faultable_copy(reinterpret_cast<uint8_t*>(buffer), data, actual,
+                                                  true))) {
+            return ZX_ERR_INVALID_ARGS;
+          }
           data += actual;
           remaining -= actual;
           *out_actual = actual;
@@ -184,7 +189,11 @@ static constexpr zxio_ops_t zxio_datagram_pipe_ops = []() {
 
     uint8_t* data = buf.get();
     for (size_t i = 0; i < vector_count; ++i) {
-      memcpy(data, vector[i].buffer, vector[i].capacity);
+      if (unlikely(!zxio_maybe_faultable_copy(data,
+                                              reinterpret_cast<const uint8_t*>(vector[i].buffer),
+                                              vector[i].capacity, false))) {
+        return ZX_ERR_INVALID_ARGS;
+      }
       data += vector[i].capacity;
     }
 

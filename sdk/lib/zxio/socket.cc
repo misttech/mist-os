@@ -10,12 +10,14 @@
 #include <lib/fit/result.h>
 #include <lib/zx/socket.h>
 #include <lib/zxio/cpp/transitional.h>
+#include <lib/zxio/fault_catcher.h>
 #include <lib/zxio/null.h>
 #include <netinet/icmp6.h>
 #include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -2074,7 +2076,12 @@ struct socket_with_event {
         iovec const& iov = msg->msg_iov[i];
         if (iov.iov_base != nullptr) {
           size_t actual = std::min(iov.iov_len, remaining);
-          memcpy(iov.iov_base, data, actual);
+          if (unlikely(!zxio_maybe_faultable_copy(static_cast<uint8_t*>(iov.iov_base), data, actual,
+                                                  true))) {
+            *out_code = EFAULT;
+            return ZX_OK;
+          }
+
           data += actual;
           remaining -= actual;
         } else if (iov.iov_len != 0) {
@@ -2141,18 +2148,33 @@ struct socket_with_event {
         break;
       }
       case 1: {
-        const iovec& iov = *msg->msg_iov;
-        vec = fidl::VectorView<uint8_t>::FromExternal(static_cast<uint8_t*>(iov.iov_base),
-                                                      iov.iov_len);
-        break;
+        if (zxio_fault_catching_disabled()) {
+          const iovec& iov = *msg->msg_iov;
+          vec = fidl::VectorView<uint8_t>::FromExternal(static_cast<uint8_t*>(iov.iov_base),
+                                                        iov.iov_len);
+          break;
+        }
+
+        // We reach here if the consumer of zxio expects faults to occur when
+        // accessing the message's paylod. We need to catch the fault now so
+        // that it can be gracefully handled instead of triggering a crash later
+        // on.
+        //
+        // TODO(https://fxbug.dev/84965): avoid this copy to catch faults.
+        __FALLTHROUGH;
       }
       default: {
-        // TODO(https://fxbug.dev/84965): avoid this copy.
+        // TODO(https://fxbug.dev/84965): avoid this copy to linearize the buffer.
         data = std::unique_ptr<uint8_t[]>(new uint8_t[total]);
         uint8_t* dest = data.get();
+
         for (int i = 0; i < msg->msg_iovlen; ++i) {
           const iovec& iov = msg->msg_iov[i];
-          memcpy(dest, iov.iov_base, iov.iov_len);
+          if (unlikely(!zxio_maybe_faultable_copy(dest, static_cast<const uint8_t*>(iov.iov_base),
+                                                  iov.iov_len, false))) {
+            *out_code = EFAULT;
+            return ZX_OK;
+          }
           dest += iov.iov_len;
         }
         vec = fidl::VectorView<uint8_t>::FromExternal(data.get(), total);

@@ -8,7 +8,8 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{
-            InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer, OutputBufferCallback,
+            Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
+            OutputBufferCallback, PeekBufferSegmentsCallback,
         },
         default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FdEvents, FileHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
@@ -26,6 +27,7 @@ use starnix_uapi::{
     signals::SIGPIPE,
     statfs, uapi,
     user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
 use std::{convert::TryInto, sync::Arc};
@@ -443,6 +445,15 @@ struct SpliceOutputBuffer<'a> {
     available: usize,
 }
 
+impl<'a> Buffer for SpliceOutputBuffer<'a> {
+    fn peek_each_segment(
+        &mut self,
+        _callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
+}
+
 impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         // SAFETY: `callback` returns the number of bytes read on success.
@@ -474,6 +485,10 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         }
         Ok(len)
     }
+
+    unsafe fn advance(&mut self, _length: usize) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
 }
 
 /// An InputBuffer that will read the data from `pipe`.
@@ -482,6 +497,25 @@ struct SpliceInputBuffer<'a> {
     pipe: &'a mut Pipe,
     len: usize,
     available: usize,
+}
+
+impl<'a> Buffer for SpliceInputBuffer<'a> {
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        let mut available = self.available;
+        for message in self.pipe.messages.messages() {
+            let to_read = std::cmp::min(available, message.len());
+            let buffer = &message.data.bytes()[0..to_read];
+            callback(&UserBuffer {
+                address: UserAddress::from(buffer.as_ptr() as u64),
+                length: buffer.len(),
+            });
+            available -= to_read;
+        }
+        Ok(())
+    }
 }
 
 impl<'a> InputBuffer for SpliceInputBuffer<'a> {
