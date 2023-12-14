@@ -770,9 +770,6 @@ closed protocol BufferCollection {
     /// of the number of buffers potenitally allocated in the overall logical
     /// buffer collection.
     ///
-    /// Multiple eventpair endpoints can be attached, with an enforced limit of
-    /// SYSMEM_LIFETIME_TRACKING_EVENTPAIR_PER_BUFFER_COLLECTION_CHANNEL_MAX.
-    ///
     /// The lifetime signalled by this event includes asynchronous cleanup of
     /// allocated buffers, and this asynchronous cleanup cannot occur until all
     /// holders of VMO handles to the buffers have closed those VMO handles.
@@ -797,11 +794,6 @@ closed protocol BufferCollection {
     /// the ZX_EVENTPAIR_PEER_CLOSED will be signalled when all the lifetime
     /// over conditions are met (all holders of duplicates have closed their
     /// handle(s)).
-    ///
-    /// A maximum of
-    /// SYSMEM_LIFETIME_TRACKING_EVENTPAIR_PER_BUFFER_COLLECTION_CHANNEL_MAX
-    /// AttachLifetimeTracking() messages are allowed per BufferCollection
-    /// channel.
     ///
     /// There is no way to cancel an attach.  Closing the client end of the
     /// eventpair doesn't subtract from the number of pending attach(es).

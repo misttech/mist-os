@@ -6,34 +6,44 @@ library fuchsia.sysmem2;
 using zx;
 
 type VmoBuffer = resource table {
-    /// The same VMO can be used by more than one CodecBuffer (only of the same
-    /// buffer_lifetime_ordinal), but each vmo handle must be a separate handle.
-    ///
-    /// |vmo| can be un-set if a participant has no usage which requires a
-    /// VMO handle.
+    /// `vmo` can be un-set if a participant has only
+    /// [`fuchsia.sysmem2/BufferUsage.none`] set to `NONE_USAGE` (explicitly or
+    /// implicitly by [`fuchsia.sysmem2/BufferCollection.SetConstraints`]
+    /// without `constraints` set).
     1: vmo zx.Handle:VMO;
 
-    /// Offset within the VMO of the first usable byte.  Must be < the VMO's
-    /// size in bytes, and leave sufficient room for
-    /// BufferMemorySettings.size_bytes before the end of the VMO.
+    /// Offset within the VMO of the first usable byte. Must be < the VMO's size
+    /// in bytes, and leave sufficient room for BufferMemorySettings.size_bytes
+    /// before the end of the VMO.
+    ///
+    /// Currently sysmem will always set this field to 0, and in future, sysmem
+    /// won't set this field to a non-zero value unless all participants have
+    /// explicitly indicated support for non-zero vmo_usable_start (this
+    /// mechanism does not exist as of this comment). A participant that hasn't
+    /// explicitly indicated support for non-zero vmo_usable_start (all current
+    /// clients) should implicitly assume this field is set to 0 without
+    /// actually checking this field.
     2: vmo_usable_start uint64;
 
-    /// This field is set iff the |vmo| is a sysmem weak VMO handle. The client
-    /// must keep |close_weak_asap| around for as long as |vmo|, and must notice
-    /// ZX_EVENTPAIR_PEER_CLOSED; if that signal occurs, the client must close
-    /// |vmo| asap. Not doing so is considered a VMO leak and in that case
-    /// sysmem will eventually complain loudly via syslog (currently 5s later).
+    /// This field is set iff `vmo` is a sysmem weak VMO handle. The client must
+    /// keep `close_weak_asap` around for as long as `vmo`, and must notice
+    /// `ZX_EVENTPAIR_PEER_CLOSED`. If that signal occurs, the client must close
+    /// `vmo` asap. Not doing so is considered a VMO leak by the client and in
+    /// that case sysmem will eventually complain loudly via syslog (currently
+    /// 5s later).
     3: close_weak_asap zx.Handle:EVENTPAIR;
 };
 
+/// The maximum entries that can be in the
+/// [`fuchsia.sysmem2/BufferCollectionInfo.buffers`] field.
 const MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS uint32 = 128;
 
 /// Information about a buffer collection and its buffers.
-// TODO(fxbug.dev/32119): provide a way for clients to receive this table instead of the
-// struct fuchsia.sysmem.BufferCollectionInfo_2.
 type BufferCollectionInfo = resource table {
-    /// These settings apply to all the buffers in the initial buffer allocation.
-    /// This must be set.
+    /// These settings apply to all the buffers in the initial buffer
+    /// allocation.
+    ///
+    /// This field will always be set by sysmem.
     1: settings SingleBufferSettings;
 
     /// VMO handles (and vmo_usable_start offset) for each buffer in the
@@ -46,15 +56,19 @@ type BufferCollectionInfo = resource table {
     /// is in settings.buffer_settings.size_bytes.
     ///
     /// The VMO access rights are determined based on the usages which the
-    /// client specified when allocating the buffer collection.  For example,
-    /// a client which expressed a read-only usage will receive VMOs without
-    /// write rights.  In addition, the rights can be attenuated by the
-    /// parameter to BufferCollectionToken.Duplicate() calls.
+    /// client specified when allocating the buffer collection.  For example, a
+    /// client which expressed a read-only usage will receive VMOs without write
+    /// rights.  In addition, the rights can be attenuated by the parameter to
+    /// BufferCollectionToken.Duplicate() calls.
     ///
     /// This field will always have VmoBuffer(s) in it, even if the participant
-    /// specifies usage whieh does not require VMO handles.  This permits such
-    /// a participant to know the vmo_usable_start values, in case that's of any
+    /// specifies usage whieh does not require VMO handles.  This permits such a
+    /// participant to know the vmo_usable_start values, in case that's of any
     /// use to the participant.
+    ///
+    /// This field will always be set by sysmem, even if the participant doesn't
+    /// specify any buffer usage (but the [`fuchsia.sysmem2/VmoBuffer.vmo`]
+    /// sub-field within this field won't be set in that case).
     2: buffers vector<VmoBuffer>:MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS;
 
     /// This number is unique among all logical buffer collections per boot.
@@ -68,11 +82,14 @@ type BufferCollectionInfo = resource table {
     /// The same ID can be retrieved from a BufferCollectionToken,
     /// BufferCollection, or BufferCollectionTokenGroup using
     /// GetBufferCollectionId (at the cost of a round-trip to sysmem and back).
+    ///
+    /// This field will always be set by sysmem.
     3: buffer_collection_id uint64;
 };
 
 /// These settings and constraints apply to all the buffers in the collection.
 type SingleBufferSettings = table {
+    /// This field will always be set by sysmem.
     1: buffer_settings BufferMemorySettings;
 
     /// Buffers holding data that is not uncompressed image data will not have
@@ -88,11 +105,17 @@ type SingleBufferSettings = table {
 
 /// These are memory-related settings for all buffers of a buffer collection.
 type BufferMemorySettings = table {
+    /// This field will always be set by sysmem.
     1: size_bytes uint64;
+    /// This field will always be set by sysmem.
     2: is_physically_contiguous bool;
+    /// This field will always be set by sysmem.
     3: is_secure bool;
+    /// This field will always be set by sysmem.
     4: coherency_domain CoherencyDomain;
     /// The specific heap from which buffers are allocated.
     /// See above in this file for heap identifier values.
+    ///
+    /// This field will always be set by sysmem.
     5: heap HeapType;
 };

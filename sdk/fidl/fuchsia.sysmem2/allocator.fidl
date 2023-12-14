@@ -9,109 +9,128 @@ using zx;
 @available(added=HEAD)
 @discoverable
 closed protocol Allocator {
-    /// Allocates a BufferCollection on behalf of a single client (aka initiator)
-    /// who is also the only participant (from the point of view of sysmem).
+    /// Allocates a buffer collection on behalf of a single client (aka
+    /// initiator) who is also the only participant (from the point of view of
+    /// sysmem).
     ///
     /// This call exists mainly for temp/testing purposes.  This call skips the
-    /// BufferCollectionToken stage, so there's no way to allow another
-    /// participant to specify its constraints.
+    /// [`fuchsia.sysmem2/BufferCollectionToken`] stage, so there's no way to
+    /// allow another participant to specify its constraints.
     ///
-    /// Real clients are encouraged to use AllocateSharedCollection() instead,
-    /// and to let relevant participants directly convey their own constraints to
-    /// sysmem.
+    /// Real clients are encouraged to use
+    /// [`fuchsia.sysmem2/Allocator.AllocateSharedCollection`] instead, and to
+    /// let relevant participants directly convey their own constraints to
+    /// sysmem by sending `BufferCollectionToken`s to those participants.
     ///
-    /// `collection_request` is the server end of the BufferCollection FIDL
-    /// channel.  The client can call SetConstraints() and then
-    /// WaitForBuffersAllocated() on the client end of this channel to specify
-    /// constraints and then determine success/failure and get the
-    /// BufferCollectionInfo_2 for the BufferCollection.  The client should also
-    /// keep the client end of this channel open while using the
-    /// BufferCollection, and should notice when this channel closes and stop
-    /// using the BufferCollection ASAP.
+    /// + request `collection_request` The server end of the
+    ///   [`fuchsia.sysmem2/BufferCollection`].
     strict AllocateNonSharedCollection(resource table {
         1: collection_request server_end:BufferCollection;
     });
 
-    /// Creates a logical BufferCollectionToken which can be shared among
-    /// participants (using BufferCollectionToken.Duplicate()), and then
-    /// converted into a BufferCollection using BindSharedCollection().
+    /// Creates a root [`fuchsia.sysmem2/BufferCollectionToken`].
     ///
-    /// Success/failure to populate the BufferCollection with buffers is
-    /// determined via the BufferCollection interface.
+    /// The `BufferCollectionToken` can be "duplicated" for distribution to
+    /// participants by using
+    /// [`fuchsia.sysmem2/BufferCollectionToken.Duplicate`]. Each
+    /// `BufferCollectionToken` can be converted into a
+    /// [`fuchsia.sysmem2.BufferCollection`] using
+    /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`].
+    ///
+    /// Buffer constraints can be set via
+    /// [`fuchsia.sysmem2/BufferCollection.SetConstraints`].
+    ///
+    /// Success/failure to populate the buffer collection with buffers can be
+    /// determined from
+    /// [`fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated`].
+    ///
+    /// Closing the client end of a `BufferCollectionToken` or
+    /// `BufferCollection` (without `Close` first) will fail all client ends in
+    /// the same failure domain, which by default is all client ends of the
+    /// buffer collection. See
+    /// [`fuchsia.sysmem2/BufferCollection.SetDispensable`] and
+    /// [`fuchsia.sysmem2/BufferCollection.AttachToken`] for ways to create
+    /// separate failure domains within a buffer collection.
     strict AllocateSharedCollection(resource table {
         1: token_request server_end:BufferCollectionToken;
     });
 
-    /// Convert a BufferCollectionToken into a connection to the logical
-    /// BufferCollection.  The BufferCollection hasn't yet been populated with
-    /// buffers - the participant must first also send SetConstraints() via the
-    /// client end of buffer_collection.
+    /// Convert a [`fuchsia.sysmem2/BufferCollectionToken`] into a
+    /// [`fuchsia.sysmem2/BufferCollection`].
     ///
-    /// All BufferCollectionToken(s) duplicated from a logical
-    /// BufferCollectionToken created via AllocateSharedCollection() must be
-    /// turned in via BindSharedCollection() before the logical BufferCollection
-    /// will be populated with buffers.
+    /// At the time of sending this message, the buffer collection hasn't yet
+    /// been populated with buffers - the participant must first also send
+    /// [`fuchsia.sysmem2/BufferCollection.SetConstraints`] via the
+    /// `BufferCollection` client end.
     ///
-    /// `token` the client endpoint of a channel whose server end was sent to
-    /// sysmem using AllocateSharedCollection or whose server end was sent to
-    /// sysmem using BufferCollectionToken.Duplicate().  The token is being
-    /// "exchanged" for a channel to the logical BufferCollection.
+    /// All `BufferCollectionToken`(s) duplicated from a root
+    /// `BufferCollectionToken` (created via `AllocateSharedCollection`) must be
+    /// "turned in" via `BindSharedCollection` (or `Close`ed), and all existing
+    /// `BufferCollection` client ends must have sent `SetConstraints` before
+    /// the logical BufferCollection will be populated with buffers (or will
+    /// fail if the overall set of constraints can't be satisfied).
     ///
-    /// `buffer_collection_request` the server end of a BufferCollection
-    /// channel.  The sender retains the client end as usual.  The
-    /// BufferCollection channel is a single participant's connection to the
-    /// logical BufferCollection.  There typically will be other participants
-    /// with their own BufferCollection channel to the logical BufferCollection.
+    /// + request `token` The client endpoint of a channel whose server end was
+    ///   sent to sysmem using
+    ///   [`fuchsia.sysmem2/Allocator.AllocateSharedCollection`] or whose server
+    ///   end was sent to sysmem using
+    ///   [`fuchsia.sysmem2/BufferCollectionToken.Duplicate`].  The token is
+    ///   being "turned in" in exchange for a
+    ///   [`fuchsia.sysmem2/BufferCollection`].
+    /// + request `buffer_collection_request` The server end of a
+    ///   [`fuchsia.sysmem2/BufferCollection`] channel.  The sender retains the
+    ///   client end. The `BufferCollection` channel is a single participant's
+    ///   connection to the logical buffer collection. Typically there will be
+    ///   other participants with their own `BufferCollection` channel to the
+    ///   logical buffer collection.
     strict BindSharedCollection(resource table {
         1: token client_end:BufferCollectionToken;
         2: buffer_collection_request server_end:BufferCollection;
     });
 
-    /// Validate that a BufferCollectionToken is known to the sysmem server.
+    /// Checks whether a [`fuchsia.sysmem2/BufferCollectionToken`] is known to
+    /// the sysmem server.
     ///
-    /// This can be used in cases where BindSharedCollection() won't be called
-    /// until after BufferCollectionToken.Duplicate() +
-    /// BufferCollectionToken.Sync(), when the client code wants to know earlier
-    /// whether an incoming token is valid (so far).
+    /// With this call, the client can determine whether an incoming token is a
+    /// real sysmem token that is known to the sysmem server, without any risk
+    /// of getting stuck waiting forever on a potentially fake token to complete
+    /// [`fuchsia.sysmem2/BufferCollectionToken.DuplicateSync`] or
+    /// [`fuchsia.sysmem2/BufferCollectionToken.Sync`] (or any other two-way
+    /// FIDL message). In cases where the client trusts the source of the token
+    /// to provide a real token, this call is not typically needed outside of
+    /// debugging.
     ///
-    /// Calling BufferCollectionToken.Sync() on a token that isn't known to
-    /// sysmem risks the Sync() hanging forever.
+    /// If the validate fails sometimes but succeeds other times, the source of
+    /// the token may itself not be calling
+    /// [`fuchsia.sysmem2/BufferCollectionToken.Sync`] or
+    /// [`fuchsia.sysmem2/BufferCollection.Sync`] after creating/duplicating the
+    /// token but before sending the token to the current client. It may be more
+    /// convenient for the source to use
+    /// [`fuchsia.sysmem2/BufferCollectionToken.DuplicateSync`] to duplicate
+    /// token(s), since that call has the sync step built in. Or, the buffer
+    /// collection may be failing before this call is processed by the sysmem
+    /// server, as buffer collection failure cleans up sysmem's tracking of
+    /// associated tokens.
     ///
-    /// Given that an incoming token can become invalid at any time if any
-    /// participant drops their BufferCollectionToken(s) or BufferCollection(s),
-    /// authors of client code are encouraged to consider not calling
-    /// ValidateBufferCollectionToken() and instead dealing with async failure
-    /// of the BufferCollection.Sync() after all the
-    /// BufferCollectionToken.Duplicate() and BindSharedCollection() (before
-    /// sending any duplicate tokens to other processes).
+    /// This call has no effect on any token.
     ///
-    /// Regardless of the result of this call, this call has no effect on the
-    /// token with the referenced koid.
-    ///
-    /// A true result from this call doesn't guarantee that the token remains
-    /// valid for any duration afterwards.
-    ///
-    /// Client code will zx_object_get_info() on the client's token handle,
-    /// passing ZX_INFO_HANDLE_BASIC and getting back the related_koid
-    /// which then gets passed to ValidateBufferCollectionToken().
-    ///
-    /// If ValidateBufferCollectionToken() returns true, the token was known at
-    /// the time the sysmem server processed the call, but may no longer be
-    /// valid/known by the time the client code receives the response.
-    ///
-    /// If ValidateBufferCollectionToken() returns false, the token wasn't known
-    /// at the time the sysmem server processed the call, but the token may
-    /// become known by the time the client code receives the response.  However
-    /// client code is not required to mitigate the possibility that the token
-    /// may become known late, since the source of the token should have synced
-    /// the token to sysmem before sending the token to the client code.
-    ///
-    /// If calling ValidateBufferCollectionToken() fails in some way, there will
-    /// be a zx_status_t from the FIDL layer.
-    ///
-    /// `token_server_koid` the koid of the server end of a channel that might
-    /// be a BufferCollectionToken channel.  This can be obtained from
-    /// zx_object_get_info() ZX_INFO_HANDLE_BASIC related_koid.
+    /// + request `token_server_koid` The koid of the server end of a channel
+    ///   that might be a BufferCollectionToken channel.  This can be obtained
+    ///   via `zx_object_get_info` `ZX_INFO_HANDLE_BASIC` `related_koid`.
+    /// - response `is_known` true means sysmem knew of the token at the time
+    ///   sysmem processed the request, but doesn't guarantee that the token is
+    ///   still valid by the time the client receives the reply. What it does
+    ///   guarantee is that the token at least was a real token, so a two-way
+    ///   call to the token won't stall forever (will fail or succeed fairly
+    ///   quickly, not stall). This can already be known implicitly if the
+    ///   source of the token can be trusted to provide a real token. A false
+    ///   value means the token wasn't known to sysmem at the time sysmem
+    ///   processed this call, but the token may have previously been valid, or
+    ///   may yet become valid. Or if the sender of the token isn't trusted to
+    ///   provide a real token, the token may be fake. It's the responsibility
+    ///   of the sender to sync with sysmem to ensure that previously
+    ///   created/duplicated token(s) are known to sysmem, before sending the
+    ///   token(s) to other participants.
     strict ValidateBufferCollectionToken(table {
         1: token_server_koid zx.Koid;
     }) -> (table {
@@ -119,131 +138,91 @@ closed protocol Allocator {
     });
 
     /// Set information about the current client that can be used by sysmem to
-    /// help debug leaking memory and hangs waiting for constraints. |name| can
-    /// be an arbitrary string, but the current process name (see
-    /// fsl::GetCurrentProcessName()) is a good default. |id| can be an
-    /// arbitrary id, but the current process ID (see
-    /// fsl::GetCurrentProcessKoid()) is a good default.
+    /// help diagnose leaking memory and allocation stalls waiting for a
+    /// participant to send [`fuchsia.sysmem2/BufferCollection.SetConstraints`].
     ///
-    /// This information is propagated to all BufferCollections created using
-    /// BindSharedCollection() or AllocateNonSharedCollection() from this
-    /// allocator. It does not affect BufferCollectionTokens, since they are
-    /// often passed cross-process and should have their names managed manually.
+    /// This sets the debug client info on all [`fuchsia.sysmem2/Node`](s)
+    /// subsequently created by this this [`fuchsia.sysmem2/Allocator`]
+    /// including any [`fuchsia.sysmem2/BufferCollection`](s) created via
+    /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`] (in the absence of
+    /// any prior call to [`fuchsia.sysmem2/Allocator.SetDebugClientInfo`],
+    /// these `BufferCollection`(s) have the same initial debug client info as
+    /// the token turned in to create the `BufferCollection`).
+    ///
+    /// This info can be subsequently overridden on a per-`Node` basis by
+    /// sending [`fuchsia.sysmem2/Node.SetDebugClientInfo`].
+    ///
+    /// Sending [`fuchsia.sysmem2/Allocator.SetDebugClientInfo`] once per
+    /// `Allocator` is the most efficient way to ensure that all
+    /// [`fuchsia.sysmem2/Node`](s) will have at least some debug client info
+    /// set, and is also more efficient than separately sending the same debug
+    /// client info via [`fuchsia.sysmem2/Node.SetDebugClientInfo`] for each
+    /// created [`fuchsia.sysmem2/Node`].
+    ///
+    /// + request `name` This can be an arbitrary string, but the current
+    ///   process name (see `fsl::GetCurrentProcessName`) is a good default.
+    /// + request `id` This can be an arbitrary id, but the current process ID
+    ///   (see `fsl::GetCurrentProcessKoid`) is a good default.
     strict SetDebugClientInfo(table {
         1: name string:MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
 
     /// Given a handle to a sysmem-provided VMO, this returns additional info
-    /// about the corresponding sysmem logical buffer, if any.
+    /// about the corresponding sysmem logical buffer.
     ///
-    /// Most callers will want to keep their main handle to the VMO rather than
-    /// transferring it to sysmem via this call. Callers can duplicate their
-    /// main handle (ZX_RIGHT_SAME_RIGHTS) and send the duplicate.
-    ///
-    /// On any error from this call (or at FIDL transport layer), the client
-    /// should not retry.
-    ///
-    /// The client must check vmo_info.close_weak_asap and if that field is set,
-    /// the client must satisfy the rules specified in the comments on that
-    /// field. Failure to do so results in VMO leaks caused by the client and
-    /// loud complaints to the log by sysmem.
-    ///
-    /// The number of distinct close_weak_asap object koids from repeated calls
-    /// to GetVmoInfo on the same input sysmem VMO is limited to a low constant.
+    /// Most callers will duplicate a VMO handle first and send the duplicate to
+    /// this call.
     ///
     /// If the client has created a child VMO of a sysmem-provided VMO, that
     /// child VMO isn't considered a "sysmem VMO" for purposes of this call.
     ///
-    /// Both strong and weak sysmem VMOs keep their info alive; the VMO handle
-    /// passed in to this call itself keeps the VMO's info alive for purposes of
-    /// responding to this call. Because of this, ZX_ERR_NOT_FOUND errors are
-    /// unambiguous (even if there are no other handles to the VMO when calling;
-    /// even if other handles are closed before the GetVmoInfo response arrives
-    /// at the client).
-    ///
-    /// Errors:
-    ///   * ZX_ERR_NOT_FOUND - the vmo isn't a sysmem VMO.
-    ///   * ZX_ERR_ACCESS_DENIED - the vmo isn't capable of being used with
-    ///     GetVmoInfo due to rights/capability attenuation.
-    ///   * ZX_ERR_INTERNAL - the request failed for an unspecified reason.
-    ///   * ZX_ERR_INVALID_ARGS
+    /// + request `vmo` A handle to a sysmem-provided VMO (or see errors).
+    /// - response `buffer_collection_id` The buffer collection ID, which is
+    ///   unique per logical buffer collection per boot.
+    /// - response `buffer_index` The buffer index of the buffer within the
+    ///   buffer collection. This is the same as the index of the buffer within
+    ///   [`fuchsia.sysmem2/BufferCollectionInfo.buffers`]. The `buffer_index`
+    ///   is the same for all sysmem-delivered VMOs corresponding to the same
+    ///   logical buffer, even if the VMO koids differ. The `buffer_index` is
+    ///   only unique across buffers of a buffer collection. For a given buffer,
+    ///   the combination of `buffer_collection_id` and `buffer_index` is unique
+    ///   per boot.
+    /// - response `close_weak_asap` Iff `vmo` is a handle to a weak sysmem VMO,
+    ///   the `close_weak_asap` field will be set in the response. This handle
+    ///   will signal `ZX_EVENTPAIR_PEER_CLOSED` when all weak VMO handles to
+    ///   the buffer should be closed as soon as possible. This is signalled
+    ///   shortly after all strong sysmem VMOs to the buffer are closed
+    ///   (including any held indirectly via strong `BufferCollectionToken` or
+    ///   strong `BufferCollection`). Failure to close all weak sysmem VMO
+    ///   handles to the buffer quickly upon `ZX_EVENTPAIR_PEER_CLOSED` is
+    ///   considered a VMO leak caused by the client still holding a weak sysmem
+    ///   VMO handle and results in loud complaints to the log by sysmem. The
+    ///   buffers of a collection can be freed independently of each other. The
+    ///   `ZX_EVENTPAIR_PEER_CLOSED` may already be signalled before the
+    ///   response arrives at the client. A client that isn't prepared to handle
+    ///   weak sysmem VMOs, on seeing this field set, can close all handles to
+    ///   the buffer and fail any associated request.
+    /// * error `ZX_ERR_NOT_FOUND` - the vmo isn't a sysmem VMO. Both strong and
+    ///   weak sysmem VMOs can be passed to this call, and the VMO handle passed
+    ///   in to this call itself keeps the VMO's info alive for purposes of
+    ///   responding to this call. Because of this, ZX_ERR_NOT_FOUND errors are
+    ///   unambiguous (even if there are no other handles to the VMO when
+    ///   calling; even if other handles are closed before the GetVmoInfo
+    ///   response arrives at the client).
+    /// * error `ZX_ERR_ACCESS_DENIED` The vmo isn't capable of being used with
+    ///   GetVmoInfo due to rights/capability attenuation.
+    /// * error `ZX_ERR_INTERNAL` The request failed for an unspecified reason.
+    /// * error `ZX_ERR_INVALID_ARGS` The vmo field wasn't set, or there was
+    ///   some other problem with the request field(s).
     strict GetVmoInfo(resource table {
         /// `vmo` is required to be set; ownership is transferred to the server
         /// so in most cases a client will duplicate a handle and transfer the
         /// duplicate via this field.
         1: vmo zx.Handle:VMO;
     }) -> (resource table {
-        /// The buffer_collection_id is the unique ID of the logical buffer
-        /// collection. This ID is unique across all logical buffer collections,
-        /// per boot.
         1: buffer_collection_id uint64;
-
-        /// The vmo's buffer_index is the index within the logical buffer
-        /// collection of which the vmo is a part. The buffer_collection_id and
-        /// buffer_index will be the same for all sysmem-delivered VMOs
-        /// corresponding to the same logical sysmem buffer, even if sysmem has
-        /// delivered child slice VMOs with different koid values (typically to
-        /// different clients). The buffer_index is only unique across logical
-        /// buffers in a collection; for a given logical buffer, the combination
-        /// of buffer_collection_id and buffer_index is unique per boot.
         2: buffer_index uint64;
-
-        /// The close_weak_asap eventpair will be present iff the vmo handle is
-        /// "weak" from sysmem's point of view. This "weak" concept is a sysmem
-        /// concept, not a zircon concept. A single sysmem logical buffer can
-        /// have some "strong" VMO handles and some "weak" VMO handles. The
-        /// "strong" handles represent ownership; these handles represent a
-        /// direct justification for the logical buffer to continue to exist for
-        /// as long as these handles exist. The "weak" handles just represent
-        /// usage; these handles don't represent justification for the logical
-        /// buffer to continue to exist, but we need the client's
-        /// cooperation/participation to close the weak handle asap shortly
-        /// after all strong handles are gone.
-        ///
-        /// All remaining handles to a weak sysmem VMO must be closed asap if
-        /// close_weak_asap signals ZX_EVENTPAIR_PEER_CLOSED, else the client
-        /// will likely be causing a VMO leak (the "weak"-ness only works with
-        /// the cooperation of all holders of weak sysmem VMO handles; we don't
-        /// remove the VMO's pages out from under the client's VMO handle(s)).
-        /// The ZX_EVENTPAIR_PEER_CLOSED will only be signaled when zero strong
-        /// sysmem VMO handles remain and zero strong BufferCollection
-        /// client_end(s) remain.
-        ///
-        /// Then, once zero weak sysmem VMO(s) remain, the underlying logical
-        /// buffer's memory will be freed. This mechanism applies per
-        /// buffer_index in a collection, meaning that a logical buffer can be
-        /// freed even if another buffer in the same collection can't be freed
-        /// yet due to outstanding handles to strong or weak sysmem VMOs of that
-        /// other buffer.
-        ///
-        /// Different close_weak_asap handles for the same logical buffer may
-        /// refer to different eventpair objects, but all will be signaled when
-        /// it's time for remaining VMO handles corresponding to the logical
-        /// buffer to be closed. The client is free to ignore/close any
-        /// extra/redundant close_weak_asap handles for the same logical buffer.
-        ///
-        /// The close_weak_asap eventpair may already have
-        /// ZX_EVENTPAIR_PEER_CLOSED signalled before VmoInfo arrives at the
-        /// client, in which case the client must close all of its remaining
-        /// handles to the same VMO object asap; the client may do so by
-        /// noticing ZX_EVENTPAIR_PEER_CLOSED via this handle, or via a
-        /// different close_weak_asap eventpair corresponding to the same
-        /// logical sysem buffer (matching buffer_collection_id and matching
-        /// buffer_index).
-        ///
-        /// If a client continues to hold (weak by definition) VMO handles of
-        /// the logical buffer after ZX_EVENTPAIR_PEER_CLOSED, after a while
-        /// sysmem will complain loudly to the log. There is intentionally no
-        /// way to disable that logging.
-        ///
-        /// A client can choose to notice that this field is set and just close
-        /// any remaining VMO handles corresponding to the logical buffer asap
-        /// immediately and never need to wait for ZX_EVENTPAIR_PEER_CLOSED.
-        /// This may be the easiest way to satisfy the rules here if the client
-        /// is not expecting to ever need to hold sysmem weak VMO handles, aside
-        /// from noticing a weak sysmem VMO and failing cleanly in that case.
-        /// See also BufferCollection.SetWeakOk.
         3: close_weak_asap zx.Handle:EVENTPAIR;
     }) error zx.Status;
 };

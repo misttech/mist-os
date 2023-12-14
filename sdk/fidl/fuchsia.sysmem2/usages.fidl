@@ -3,15 +3,25 @@
 // found in the LICENSE file.
 library fuchsia.sysmem2;
 
-// TODO(fxbug.dev/32119): The definitions in this file aren't final and shouldn't yet
-// be used in any FIDL protocol.
-
-// Describes how a client will access the contents of a buffer.
+/// Describes how a client will access the contents of a buffer.
 type BufferUsage = table {
+    /// If the client sets this field, the client should not set any other
+    /// fields in the same table instance. The only valid bit in this field is
+    /// `NONE_USAGE` which must be set if this field is set. The point of this
+    /// field and the one bit set in this field is to essentially prove that the
+    /// client really means they aren't going to use the buffers, so don't need
+    /// any VMOs (didn't just fail to fill out the table).
     1: none uint32;
+    /// If set, holds CPU usage bits. See `CPU_USAGE_*` flags in usages.fidl.
     2: cpu uint32;
+    /// If set, holds vulkan usage bits. See `VULKAN_IMAGE_*` and
+    /// `VULKAN_BUFFER_*` bits in usages.fidl. The `VULKAN_USAGE_*` bit
+    /// definitions/names are deprecated.
     3: vulkan uint32;
+    /// If set, holds display usage bits. See `DISPLAY_USAGE_*` bits in
+    /// usages.fidl.
     4: display uint32;
+    /// If set, holds video usage bits. See `VIDEO_USAGE_*` bits in usages.fidl.
     5: video uint32;
 };
 
@@ -69,24 +79,12 @@ const DISPLAY_USAGE_CURSOR uint32 = 2;
 // TODO(fxbug.dev/32118): Add more specific HwDecoder flags if needed.
 const VIDEO_USAGE_HW_DECODER uint32 = 1;
 const VIDEO_USAGE_HW_ENCODER uint32 = 2;
-// TODO(fxbug.dev/34192): This bit is redundant with secure_required and supported heaps.  This bit will
-// not be carried forward.
-const VIDEO_USAGE_HW_PROTECTED uint32 = 4;
 const VIDEO_USAGE_CAPTURE uint32 = 8;
-// videoUsageDecryptorOutput is for the output of a decryptor; such buffers will contain decrypted
-// encoded access units.  The decryptor output may be in secure memory (controlled separately via
-// secure_required).
-//
-// TODO(fxbug.dev/34192): Overhaul usage so we can add usage categories without breaking client struct init
-// code repeatedly.  For now, this value is in the "video" category but to some degree isn't really
-// video; this usage can be used for the output of any secure decryptor.  Also, other usages should
-// include input vs. output as those are separate buffer collections and are really separate usages.
-//
-// We have this as a separate usage because each participant that needs VMO handles needs to specify
-// a usage that isn't nonUsage, and the decryptor output participant shouldn't be specifying
-// videoUsageHwDecoder because the decryptor isn't the decoder.
+// VIDEO_USAGE_DECRYPTOR_OUTPUT is for the output of a decryptor; such buffers
+// will contain decrypted compressed media data. The decryptor output may be in
+// secure memory (controlled separately via secure_required). This bit can be
+// used for any decryptor output, not just a video decryptor output.
 const VIDEO_USAGE_DECRYPTOR_OUTPUT uint32 = 16;
-// This usage is for a HW video decoder's internal buffers that aren't shared with other
-// participants.  These are allocated via sysmem because sysmem pre-reserves contiguous SYSTEM_RAM
-// as appropriate, and is the only way to allocate secure memory.
+// This usage is for a HW video decoder's internal buffers that aren't shared
+// with other participants.
 const VIDEO_USAGE_HW_DECODER_INTERNAL uint32 = 32;

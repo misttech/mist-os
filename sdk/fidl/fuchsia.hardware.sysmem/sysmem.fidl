@@ -7,9 +7,9 @@ using fuchsia.sysmem;
 using fuchsia.sysmem2;
 using zx;
 
-/// This interface is for driver-to-driver connection to sysmem. This includes both connection to
-/// both sysmem/sysmem2 `Allocator`, and special-purpose connection for custom heaps and secure
-/// memory.
+/// This interface is for driver-to-driver connection to sysmem. This includes
+/// both connection to both sysmem/sysmem2 `Allocator`, and special-purpose
+/// connection for custom heaps and secure memory.
 @discoverable
 closed protocol Sysmem {
     /// Takes the client end of a FIDL connection that'll serve
