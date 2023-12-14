@@ -573,15 +573,20 @@ impl EventLoop {
         match self.monitor.resume(cookie, result) {
             Ok(NetworkCheckerOutcome::MustResume) => {}
             Ok(NetworkCheckerOutcome::Complete) => {
-                let (system_internet, system_gateway) = {
+                let (system_internet, system_gateway, system_dns) = {
                     let monitor_state = self.monitor.state();
-                    (monitor_state.system_has_internet(), monitor_state.system_has_gateway())
+                    (
+                        monitor_state.system_has_internet(),
+                        monitor_state.system_has_gateway(),
+                        monitor_state.system_has_active_dns(),
+                    )
                 };
 
                 self.handler
                     .update_state(|state| {
                         state.internet_available = system_internet;
                         state.gateway_reachable = system_gateway;
+                        state.dns_active = system_dns;
                     })
                     .await;
             }

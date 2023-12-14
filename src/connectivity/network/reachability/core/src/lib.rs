@@ -395,6 +395,10 @@ impl StateInfo {
         self.get_system().state().has_gateway()
     }
 
+    pub fn system_has_active_dns(&self) -> bool {
+        self.get_system().state().has_dns()
+    }
+
     /// Report the duration of the current state for each interface and each protocol.
     fn report(&self) {
         let time = fasync::Time::now();
@@ -2189,21 +2193,28 @@ mod tests {
         assert_eq!(state, want_state);
     }
 
-    #[test_case(None, None, false, false;
+    #[test_case(None, None, false, false, false;
         "no interfaces available")]
-    #[test_case(Some(&State::Local), Some(&State::Local), false, false;
+    #[test_case(Some(&State::Local), Some(&State::Local), false, false, false;
         "no interfaces with gateway or internet state")]
-    #[test_case(Some(&State::Local), Some(&State::Gateway), false, true;
+    #[test_case(Some(&State::Local), Some(&State::Gateway), false, false, true;
         "only one interface with gateway state or above")]
-    #[test_case(Some(&State::Local), Some(&State::Internet), true, true;
+    #[test_case(Some(&State::Local), Some(&State::Internet), false, true, true;
         "only one interface with internet state")]
-    #[test_case(Some(&State::Internet), Some(&State::Internet), true, true;
+    #[test_case(Some(&State::Internet), Some(&State::Internet), false, true, true;
         "all interfaces with internet")]
-    #[test_case(Some(&State::Internet), None, true, true;
+    #[test_case(Some(&State::Internet), None, false, true, true;
         "only one interface available, has internet state")]
+    #[test_case(Some(&State::Local), Some(&State::DnsResolved), true, true, true;
+        "only one interface with DNS resolved state")]
+    #[test_case(Some(&State::DnsResolved), Some(&State::DnsResolved), true, true, true;
+        "all interfaces with DNS resolved state")]
+    #[test_case(Some(&State::DnsResolved), None, true, true, true;
+        "only one interface available, has DNS resolved state")]
     fn test_system_has_state(
         ipv4_state: Option<&State>,
         ipv6_state: Option<&State>,
+        expect_dns: bool,
         expect_internet: bool,
         expect_gateway: bool,
     ) {
@@ -2229,6 +2240,7 @@ mod tests {
             system: IpVersions { ipv4: system_interface_ipv4, ipv6: system_interface_ipv6 },
         };
 
+        assert_eq!(state.system_has_active_dns(), expect_dns);
         assert_eq!(state.system_has_internet(), expect_internet);
         assert_eq!(state.system_has_gateway(), expect_gateway);
     }
