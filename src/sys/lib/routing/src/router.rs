@@ -126,7 +126,7 @@ impl Router {
     /// Returns a router that routes to the capability under `name`. This attenuates the
     /// router capability from anything that could be obtained from the base router to
     /// the set of capabilities located under `name`.
-    pub fn get(self, name: impl Into<String>) -> Router {
+    pub fn with_name(self, name: impl Into<String>) -> Router {
         let name: String = name.into();
         let route_fn = move |mut request: Request, completer: Completer| {
             request.relative_path.prepend(name.clone());

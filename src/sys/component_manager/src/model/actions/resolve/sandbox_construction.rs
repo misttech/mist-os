@@ -177,8 +177,8 @@ fn extend_dict_with_use(
         unreachable!();
     };
     let router = match use_.source() {
-        cm_rust::UseSource::Parent => component_input.clone().get(source_name.as_str()),
-        cm_rust::UseSource::Self_ => program_output.clone().get(source_name.as_str()),
+        cm_rust::UseSource::Parent => component_input.clone().with_name(source_name.as_str()),
+        cm_rust::UseSource::Self_ => program_output.clone().with_name(source_name.as_str()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child) = children.get(&child_name) else { return };
@@ -253,8 +253,8 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => component_input.clone().get(source_name.as_str()),
-        cm_rust::OfferSource::Self_ => program_output.clone().get(source_name.as_str()),
+        cm_rust::OfferSource::Parent => component_input.clone().with_name(source_name.as_str()),
+        cm_rust::OfferSource::Self_ => program_output.clone().with_name(source_name.as_str()),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
@@ -319,7 +319,7 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output.clone().get(source_name.as_str()),
+        cm_rust::ExposeSource::Self_ => program_output.clone().with_name(source_name.as_str()),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {

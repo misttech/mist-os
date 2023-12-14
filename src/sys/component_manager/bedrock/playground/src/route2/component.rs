@@ -158,7 +158,7 @@ fn route_from(
             child.clone()
         }
     };
-    Ok(source.get(cap_name.clone()))
+    Ok(source.with_name(cap_name.clone()))
 }
 
 /// Resolving a component creates the program and children, and returns an output
