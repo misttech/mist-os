@@ -71,9 +71,9 @@ class Driver : public fdf::DriverBase {
   TemperatureDeviceProtocolServer audio_temperature_server_;
   TemperatureDeviceProtocolServer thread_temperature_server_;
 
-  float soc_temperature_;
-  float audio_temperature_;
-  float thread_temperature_;
+  float soc_temperature_ = 0.0f;
+  float audio_temperature_ = 0.0f;
+  float thread_temperature_ = 0.0f;
 };
 
 }  // namespace fake_driver

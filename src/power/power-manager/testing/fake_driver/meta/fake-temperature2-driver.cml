@@ -8,8 +8,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/nelson-fake-driver.so",
-        bind: "meta/bind/bind-to-platform.bindbc",
+        binary: "driver/fake-temperature2.so",
+        bind: "meta/bind/bind-to-temp.bindbc",
     },
     capabilities: [
         {
