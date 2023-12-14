@@ -56,12 +56,11 @@ zx_status_t svc_directory_remove_entry_unsized(svc_dir_t* dir, std::string_view 
 
 class ServiceTest : public loop_fixture::RealLoop, public zxtest::Test {
  protected:
-  zx_status_t svc_directory_destroy(svc_dir_t* dir) {
+  // Destroys `dir` and waits until all connections have been closed.
+  zx_status_t DestroyAndWait(svc_dir_t* dir) {
     zx_status_t status = ::svc_directory_destroy(dir);
-
     // Cleanup is asynchronous.
     RunLoopUntilIdle();
-
     return status;
   }
 };
@@ -83,7 +82,7 @@ TEST_F(ServiceTest, Control) {
 
     RunLoop();
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   });
 
   // Verify that we can connect to a foobar service and get a response.
@@ -105,7 +104,7 @@ TEST_F(ServiceTest, Control) {
   QuitLoop();
   child.join();
 
-  // Verify that connection fails after svc_directory_destroy().
+  // Verify that connection fails after DestroyAndWait().
   ASSERT_OK(zx::channel::create(0, &svc, &request));
   ASSERT_OK(fdio_service_connect_at(dir.get(), "svc/foobar", request.release()));
   EXPECT_OK(svc.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), &observed));
@@ -125,7 +124,7 @@ TEST_F(ServiceTest, PublishLegacyService) {
 
     RunLoop();
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   });
 
   // Verify that we can connect to a foobar service and get a response.
@@ -147,7 +146,7 @@ TEST_F(ServiceTest, PublishLegacyService) {
   QuitLoop();
   child.join();
 
-  // Verify that connection fails after svc_directory_destroy().
+  // Verify that connection fails after DestroyAndWait().
   ASSERT_OK(zx::channel::create(0, &svc, &request));
   ASSERT_OK(fdio_service_connect_at(dir.get(), "foobar", request.release()));
   EXPECT_OK(svc.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), &observed));
@@ -166,7 +165,7 @@ TEST_F(ServiceTest, ConnectsByPath) {
 
     RunLoop();
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   });
 
   // Verify that we can connect to svc/fuchsia.logger.LogSink/default/foobar
@@ -213,7 +212,7 @@ TEST_F(ServiceTest, RejectsMalformedPaths) {
                 ZX_ERR_INVALID_ARGS);
 
   // Cleanup resources.
-  ASSERT_OK(svc_directory_destroy(dir));
+  ASSERT_OK(DestroyAndWait(dir));
 }
 
 TEST_F(ServiceTest, AddSubdDirByPath) {
@@ -231,8 +230,8 @@ TEST_F(ServiceTest, AddSubdDirByPath) {
     ASSERT_OK(svc_directory_create(&dir));
     ASSERT_OK(svc_directory_serve(dir, dispatcher(), dir_request.release()));
 
-    vfs::PseudoDir subdir;
-    ASSERT_OK(subdir.AddEntry(
+    auto subdir = std::make_unique<vfs::PseudoDir>();
+    ASSERT_OK(subdir->AddEntry(
         kTestFile,
         std::make_unique<vfs::PseudoFile>(
             kMaxFileSize,
@@ -244,10 +243,10 @@ TEST_F(ServiceTest, AddSubdDirByPath) {
             })));
     zx::channel server_end, client_end;
     ASSERT_OK(zx::channel::create(0, &server_end, &client_end));
-    ASSERT_OK(subdir.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                               fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                               fuchsia::io::OpenFlags::DIRECTORY,
-                           std::move(server_end), dispatcher()));
+    ASSERT_OK(subdir->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE |
+                                fuchsia::io::OpenFlags::RIGHT_WRITABLE |
+                                fuchsia::io::OpenFlags::DIRECTORY,
+                            std::move(server_end), dispatcher()));
 
     ASSERT_OK(
         svc_directory_add_directory_unsized(dir, kTestPath, kTestDirectory, client_end.release()));
@@ -255,7 +254,12 @@ TEST_F(ServiceTest, AddSubdDirByPath) {
     RunLoop();
 
     EXPECT_OK(svc_directory_remove_entry_unsized(dir, kTestPath, kTestDirectory));
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
+    // **NOTE**: Similar to `dir`, we must explicitly destroy `subdir` and wait for any active
+    // connections to be closed. These types are not thread safe (they must be used with a single
+    // threaded dispatcher), and cannot rely on channel-initiated teardown from the main thread.
+    subdir = nullptr;
+    RunLoopUntilIdle();
   });
 
   fbl::unique_fd root_fd;
@@ -306,7 +310,7 @@ TEST_F(ServiceTest, AddDirFailsOnBadInput) {
                                               subdir_client.release()),
                   ZX_ERR_INVALID_ARGS);
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   }
 
   // |subdir| is an invalid handle
@@ -322,7 +326,7 @@ TEST_F(ServiceTest, AddDirFailsOnBadInput) {
                                                       /*subdir=*/ZX_HANDLE_INVALID),
                   ZX_ERR_INVALID_ARGS);
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   }
 
   // |path| is invalid
@@ -345,7 +349,7 @@ TEST_F(ServiceTest, AddDirFailsOnBadInput) {
                     ZX_ERR_INVALID_ARGS);
     }
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   }
 }
 
@@ -360,7 +364,7 @@ TEST_F(ServiceTest, Rights) {
 
     RunLoop();
 
-    ASSERT_OK(svc_directory_destroy(dir));
+    ASSERT_OK(DestroyAndWait(dir));
   });
 
   // Turn dir into an file descriptor so open calls synchronously ensure the open completed
