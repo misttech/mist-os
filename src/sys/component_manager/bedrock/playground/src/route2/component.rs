@@ -217,7 +217,7 @@ fn resolve_impl(
             program_output.clone(),
             &children_outputs,
         )?;
-        let cap = router.availability(use_.availability);
+        let cap = router.with_availability(use_.availability);
         program_input.lock_entries().insert(use_.name, Box::new(cap));
     }
 
@@ -229,7 +229,7 @@ fn resolve_impl(
             program_output.clone(),
             &children_outputs,
         )?;
-        let cap = router.availability(offer.availability);
+        let cap = router.with_availability(offer.availability);
         // Determine the target dict and insert the capability into it.
         let target_dict: &mut Dict = match offer.to {
             decl::Ref::Hammerspace => &mut program_input,
@@ -250,7 +250,7 @@ fn resolve_impl(
             program_output.clone(),
             &children_outputs,
         )?;
-        let cap = router.availability(expose.availability);
+        let cap = router.with_availability(expose.availability);
         output.lock_entries().insert(expose.name.clone(), Box::new(cap));
     }
 

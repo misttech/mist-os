@@ -222,8 +222,10 @@ fn extend_dict_with_use(
         }
         _ => return, // unsupported
     };
-    program_input_dict
-        .insert_capability(target_path.iter_segments(), router.availability(*use_.availability()));
+    program_input_dict.insert_capability(
+        target_path.iter_segments(),
+        router.with_availability(*use_.availability()),
+    );
 }
 
 fn extend_dict_with_offer(
@@ -292,7 +294,7 @@ fn extend_dict_with_offer(
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
-        router.availability(*offer.availability()),
+        router.with_availability(*offer.availability()),
     );
 }
 
@@ -360,7 +362,7 @@ fn extend_dict_with_expose(
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
-        router.availability(*expose.availability()),
+        router.with_availability(*expose.availability()),
     );
 }
 

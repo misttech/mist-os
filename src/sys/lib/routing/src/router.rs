@@ -137,7 +137,7 @@ impl Router {
 
     /// Returns a router that ensures the capability request has an availability
     /// strength that is at least the provided `availability`.
-    pub fn availability(self, availability: Availability) -> Router {
+    pub fn with_availability(self, availability: Availability) -> Router {
         let route_fn = move |mut request: Request, completer: Completer| {
             // The availability of the request must be compatible with the
             // availability of this step of the route.
@@ -350,7 +350,7 @@ mod tests {
     async fn availability_good() {
         let source: AnyCapability = Box::new(Data::String("hello".to_string()));
         let base = Router::from_routable(source);
-        let proxy = base.availability(Availability::Optional);
+        let proxy = base.with_availability(Availability::Optional);
         let capability = route(
             &proxy,
             Request {
@@ -370,7 +370,7 @@ mod tests {
     async fn availability_bad() {
         let source: AnyCapability = Box::new(Data::String("hello".to_string()));
         let base = Router::from_routable(source);
-        let proxy = base.availability(Availability::Optional);
+        let proxy = base.with_availability(Availability::Optional);
         let error = route(
             &proxy,
             Request {
