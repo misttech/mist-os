@@ -3,13 +3,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-### Test "contrib/format-code" script.
+### Test "format-code" script.
 
 readonly TESTDATA="data/fx_format_code_test"
 
 BT_FILE_DEPS=(
   "scripts/fx"
-  "tools/devshell/contrib/format-code"
+  "tools/devshell/format-code"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
   "tools/devshell/lib/vars.sh"

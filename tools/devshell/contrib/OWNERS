@@ -14,7 +14,6 @@ per-file extract-pprof.py = file: /src/connectivity/network/OWNERS
 per-file ffx = file: /src/developer/ffx/OWNERS
 per-file flash-buckeye=gkalsi@google.com
 per-file             force-ota-from-devhost = file: /src/sys/pkg/OWNERS
-per-file format-code=jeremymanson@google.com
 per-file fuzz=aarongreen@google.com,eep@google.com,markdittmer@google.com,mvanotti@google.com
 per-file             gc = file: /src/sys/pkg/OWNERS
 per-file             gen-cargo = computerdruid@google.com,tmandry@google.com

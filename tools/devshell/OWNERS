@@ -14,6 +14,8 @@ per-file             get-build-dir,get-flash-source,get-src-dir,list-boards = fi
 per-file             list-build-artifacts,list-products,ninjatrace2json     = file: /build/OWNERS
 per-file             set-build-dir,use                                      = file: /build/OWNERS
 
+per-file             format-code = jeremymanson@google.com,olivernewman@google.com
+
 per-file             repro = olivernewman@google.com
 
 per-file             sync-to = olivernewman@google.com

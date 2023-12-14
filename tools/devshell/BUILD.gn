@@ -160,12 +160,12 @@ host_script_test_data("fx_bash_tests") {
       files = [
         "//tools/devshell/build-metrics",
         "//tools/devshell/contrib/ffx",
-        "//tools/devshell/contrib/format-code",
         "//tools/devshell/contrib/lint",
         "//tools/devshell/contrib/setup-go",
         "//tools/devshell/cp",
         "//tools/devshell/flash",
         "//tools/devshell/flash-remote",
+        "//tools/devshell/format-code",
         "//tools/devshell/get-build-dir",
         "//tools/devshell/get-device-addr",
         "//tools/devshell/get-flash-source",
