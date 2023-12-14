@@ -26,7 +26,7 @@
 
 #include "lib/syslog/cpp/macros.h"
 
-namespace syslog_backend {
+namespace syslog_runtime {
 
 bool HasStructuredBackend() { return true; }
 
@@ -150,13 +150,13 @@ class GlobalStateLock {
   }
 
   // Retrieves the global state
-  syslog_backend::LogState* operator->() const { return FuchsiaLogGetStateLocked(); }
+  syslog_runtime::LogState* operator->() const { return FuchsiaLogGetStateLocked(); }
 
   // Sets the global state
-  void Set(syslog_backend::LogState* state) const { FuchsiaLogSetStateLocked(state); }
+  void Set(syslog_runtime::LogState* state) const { FuchsiaLogSetStateLocked(state); }
 
   // Retrieves the global state
-  syslog_backend::LogState* operator*() const { return FuchsiaLogGetStateLocked(); }
+  syslog_runtime::LogState* operator*() const { return FuchsiaLogGetStateLocked(); }
 
   ~GlobalStateLock() { FuchsiaLogReleaseState(); }
 };
@@ -421,4 +421,4 @@ fuchsia_logging::LogSeverity GetMinLogLevel() {
   return lock->min_severity();
 }
 
-}  // namespace syslog_backend
+}  // namespace syslog_runtime

@@ -7,16 +7,16 @@
 
 namespace fuchsia_logging {
 
-void SetLogSettings(const LogSettings& settings) { syslog_backend::SetLogSettings(settings); }
+void SetLogSettings(const LogSettings& settings) { syslog_runtime::SetLogSettings(settings); }
 
 void SetLogSettings(const LogSettings& settings, const std::initializer_list<std::string>& tags) {
-  syslog_backend::SetLogSettings(settings, tags);
+  syslog_runtime::SetLogSettings(settings, tags);
 }
 
 void SetTags(const std::initializer_list<std::string>& tags) {
   SetLogSettings({.min_log_level = GetMinLogLevel()}, tags);
 }
 
-LogSeverity GetMinLogLevel() { return syslog_backend::GetMinLogLevel(); }
+LogSeverity GetMinLogLevel() { return syslog_runtime::GetMinLogLevel(); }
 
 }  // namespace fuchsia_logging

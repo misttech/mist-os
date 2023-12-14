@@ -59,13 +59,13 @@ LogMessage::~LogMessage() {
     stream_ << ": " << status_ << " (" << zx_status_get_string(status_) << ")";
   }
 #endif
-  auto buffer = std::make_unique<syslog_backend::LogBuffer>();
+  auto buffer = std::make_unique<syslog_runtime::LogBuffer>();
   auto str = stream_.str();
-  syslog_backend::BeginRecord(buffer.get(), severity_, file_, line_, str.data(), condition_);
+  syslog_runtime::BeginRecord(buffer.get(), severity_, file_, line_, str.data(), condition_);
   if (tag_) {
-    syslog_backend::WriteKeyValue(buffer.get(), "tag", tag_);
+    syslog_runtime::WriteKeyValue(buffer.get(), "tag", tag_);
   }
-  syslog_backend::FlushRecord(buffer.get());
+  syslog_runtime::FlushRecord(buffer.get());
   if (severity_ >= LOG_FATAL)
     __builtin_debugtrap();
 }

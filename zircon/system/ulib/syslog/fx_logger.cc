@@ -141,9 +141,9 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
                                          const char* file, uint32_t line, const char* msg,
                                          va_list args, bool perform_format) {
   if (this->socket_.is_valid()) {
-    std::unique_ptr<syslog_backend::LogBuffer> buf_ptr =
-        std::make_unique<syslog_backend::LogBuffer>();
-    syslog_backend::LogBuffer& buffer = *buf_ptr;
+    std::unique_ptr<syslog_runtime::LogBuffer> buf_ptr =
+        std::make_unique<syslog_runtime::LogBuffer>();
+    syslog_runtime::LogBuffer& buffer = *buf_ptr;
     constexpr size_t kFormatStringLength = 1024;
     char fmt_string[kFormatStringLength];
     fmt_string[kFormatStringLength - 1] = 0;
@@ -170,20 +170,20 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
-    syslog_backend::BeginRecordWithSocket(&buffer, severity, file, line, fmt_string, nullptr,
+    syslog_runtime::BeginRecordWithSocket(&buffer, severity, file, line, fmt_string, nullptr,
                                           this->socket_.get());
     {
       fbl::AutoLock tag_lock(&tags_mutex_);
       for (const auto& tag : tags_) {
         size_t len = tag.length();
         ZX_DEBUG_ASSERT(len < 128);
-        syslog_backend::WriteKeyValue(&buffer, "tag", tag.data());
+        syslog_runtime::WriteKeyValue(&buffer, "tag", tag.data());
       }
     }
     if (tag) {
-      syslog_backend::WriteKeyValue(&buffer, "tag", tag);
+      syslog_runtime::WriteKeyValue(&buffer, "tag", tag);
     }
-    if (!syslog_backend::FlushRecord(&buffer)) {
+    if (!syslog_runtime::FlushRecord(&buffer)) {
       return ZX_ERR_IO;
     }
     return ZX_OK;

@@ -30,7 +30,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     kMaxValue = kDoubleField,
     kBooleanField,
   };
-  syslog_backend::LogBuffer buffer;
+  syslog_runtime::LogBuffer buffer;
   auto severity = provider.ConsumeIntegral<fuchsia_logging::LogSeverity>();
   // Fatal crashes...
   if (severity == fuchsia_logging::LOG_FATAL) {
@@ -40,13 +40,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto line = provider.ConsumeIntegral<unsigned int>();
   auto msg = provider.ConsumeRandomLengthString();
   auto condition = provider.ConsumeRandomLengthString();
-  syslog_backend::BeginRecord(&buffer, severity, file.data(), line, msg.data(), condition.data());
+  syslog_runtime::BeginRecord(&buffer, severity, file.data(), line, msg.data(), condition.data());
   while (provider.remaining_bytes()) {
     auto op = provider.ConsumeEnum<OP>();
     auto key = provider.ConsumeRandomLengthString();
     switch (op) {
       case OP::kDoubleField:
-        syslog_backend::WriteKeyValue(&buffer, key.data(), provider.ConsumeFloatingPoint<double>());
+        syslog_runtime::WriteKeyValue(&buffer, key.data(), provider.ConsumeFloatingPoint<double>());
         break;
       case OP::kSignedIntField: {
         int64_t value;
@@ -54,7 +54,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           return 0;
         }
         value = provider.ConsumeIntegral<int64_t>();
-        syslog_backend::WriteKeyValue(&buffer, key.data(), value);
+        syslog_runtime::WriteKeyValue(&buffer, key.data(), value);
       } break;
       case OP::kUnsignedIntField: {
         uint64_t value;
@@ -62,17 +62,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           return 0;
         }
         value = provider.ConsumeIntegral<uint64_t>();
-        syslog_backend::WriteKeyValue(&buffer, key.data(), value);
+        syslog_runtime::WriteKeyValue(&buffer, key.data(), value);
       } break;
       case OP::kStringField: {
         auto value = provider.ConsumeRandomLengthString();
-        syslog_backend::WriteKeyValue(&buffer, key.data(), value.data());
+        syslog_runtime::WriteKeyValue(&buffer, key.data(), value.data());
       } break;
       case OP::kBooleanField: {
-        syslog_backend::WriteKeyValue(&buffer, key.data(), provider.ConsumeBool());
+        syslog_runtime::WriteKeyValue(&buffer, key.data(), provider.ConsumeBool());
       } break;
     }
   }
-  syslog_backend::FlushRecord(&buffer);
+  syslog_runtime::FlushRecord(&buffer);
   return 0;
 }

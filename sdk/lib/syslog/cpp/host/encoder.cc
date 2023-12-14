@@ -8,7 +8,7 @@
 
 #include <cstdio>
 
-namespace syslog_backend {
+namespace syslog_runtime {
 
 cpp17::string_view StripDots(cpp17::string_view path) {
   auto pos = path.rfind("../");
@@ -115,4 +115,4 @@ void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value) 
 
 void EndRecordLegacy(LogBuffer* buffer) {}
 
-}  // namespace syslog_backend
+}  // namespace syslog_runtime

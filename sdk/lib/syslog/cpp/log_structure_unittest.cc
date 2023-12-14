@@ -48,15 +48,15 @@ static cpp17::optional<cpp17::string_view> ToStringView(T input) {
 
 TEST(StructuredLogging, NullSafeStringView) {
   // Construct from nullptr directly.
-  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(nullptr)), cpp17::nullopt);
+  ASSERT_EQ(ToStringView(syslog_runtime::NullSafeStringView(nullptr)), cpp17::nullopt);
   // Construct from nullptr via const char*.
-  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(static_cast<const char*>(nullptr))),
+  ASSERT_EQ(ToStringView(syslog_runtime::NullSafeStringView(static_cast<const char*>(nullptr))),
             cpp17::nullopt);
   // Construct from std::string
-  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(std::string("test"))),
+  ASSERT_EQ(ToStringView(syslog_runtime::NullSafeStringView(std::string("test"))),
             cpp17::string_view("test"));
   // Construct from non-null const char*
-  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView("test")), cpp17::string_view("test"));
+  ASSERT_EQ(ToStringView(syslog_runtime::NullSafeStringView("test")), cpp17::string_view("test"));
 }
 
 // Test to validate that SetLogSettings and log initialization is thread-safe.
@@ -68,7 +68,7 @@ TEST(StructuredLogging, ThreadInitialization) {
     while (running) {
       zx::channel temp[2];
       zx::channel::create(0, &temp[0], &temp[1]);
-      syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{
+      syslog_runtime::SetLogSettings(fuchsia_logging::LogSettings{
           .log_sink = temp[0].release(), .wait_for_initial_interest = false});
     }
   });
@@ -86,25 +86,25 @@ TEST(StructuredLogging, ThreadInitialization) {
 
     zx::channel temp[2];
     zx::channel::create(0, &temp[0], &temp[1]);
-    syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{
+    syslog_runtime::SetLogSettings(fuchsia_logging::LogSettings{
         .log_sink = temp[0].release(), .wait_for_initial_interest = false});
     FX_SLOG(WARNING, "test_log", FX_KV("foo", "bar"));
   }
   thread_a.join();
   thread_b.join();
-  syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{.wait_for_initial_interest = false});
+  syslog_runtime::SetLogSettings(fuchsia_logging::LogSettings{.wait_for_initial_interest = false});
 }
 
 TEST(StructuredLogging, BackendDirect) {
-  syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+  syslog_runtime::FlushRecord(&buffer);
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_backend::WriteKeyValue(&buffer, "bar", true);
-  ASSERT_TRUE(syslog_backend::FlushRecord(&buffer));
+  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
+  syslog_runtime::WriteKeyValue(&buffer, "bar", true);
+  ASSERT_TRUE(syslog_runtime::FlushRecord(&buffer));
   // TODO(fxbug.dev/57482): Figure out how to verify this appropriately.
 }
 
@@ -113,16 +113,16 @@ TEST(StructuredLogging, Overflow) {
   very_large_string.resize(1000 * 1000);
   memset(very_large_string.data(), 5, very_large_string.size());
   very_large_string[very_large_string.size() - 1] = 0;
-  syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+  syslog_runtime::FlushRecord(&buffer);
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_backend::WriteKeyValue(&buffer, "bar", very_large_string.data());
+  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
+  syslog_runtime::WriteKeyValue(&buffer, "bar", very_large_string.data());
 
-  ASSERT_FALSE(syslog_backend::FlushRecord(&buffer));
+  ASSERT_FALSE(syslog_runtime::FlushRecord(&buffer));
 }
 
 TEST(StructuredLogging, LOGS) {

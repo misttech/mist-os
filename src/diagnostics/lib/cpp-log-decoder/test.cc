@@ -18,15 +18,15 @@ namespace log_decoder {
 namespace {
 
 TEST(LogDecoder, DecodesCorrectly) {
-  syslog_backend::LogBuffer buffer;
+  syslog_runtime::LogBuffer buffer;
   zx::socket logger_socket, our_socket;
   zx::socket::create(ZX_SOCKET_DATAGRAM, &logger_socket, &our_socket);
-  syslog_backend::BeginRecordWithSocket(&buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
+  syslog_runtime::BeginRecordWithSocket(&buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
                                         "test message", nullptr, logger_socket.release());
-  syslog_backend::WriteKeyValue(&buffer, "tag", "some tag");
-  syslog_backend::WriteKeyValue(&buffer, "tag", "some other tag");
-  syslog_backend::WriteKeyValue(&buffer, "user property", 5.2);
-  syslog_backend::FlushRecord(&buffer);
+  syslog_runtime::WriteKeyValue(&buffer, "tag", "some tag");
+  syslog_runtime::WriteKeyValue(&buffer, "tag", "some other tag");
+  syslog_runtime::WriteKeyValue(&buffer, "user property", 5.2);
+  syslog_runtime::FlushRecord(&buffer);
   uint8_t data[2048];
   size_t processed = 0;
   our_socket.read(0, data, sizeof(data), &processed);

@@ -40,7 +40,7 @@ inline zx_status_t init_helper(zx_handle_t handle, const char** tags, size_t num
   fuchsia_logging::LogSettings settings;
   settings.min_log_level = severity;
   settings.disable_interest_listener = true;
-  syslog_backend::SetLogSettings(settings);
+  syslog_runtime::SetLogSettings(settings);
   return fx_log_reconfigure(&config);
 }
 

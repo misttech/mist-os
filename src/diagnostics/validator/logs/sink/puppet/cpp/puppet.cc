@@ -24,12 +24,12 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
  public:
   explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
     context_->outgoing()->AddPublicService(sink_bindings_.GetHandler(this));
-    syslog_backend::SetInterestChangedListener(
+    syslog_runtime::SetInterestChangedListener(
         +[](void* context, fuchsia_logging::LogSeverity severity) {
-          syslog_backend::LogBuffer buffer;
-          syslog_backend::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
+          syslog_runtime::LogBuffer buffer;
+          syslog_runtime::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
                                       nullptr);
-          syslog_backend::FlushRecord(&buffer);
+          syslog_runtime::FlushRecord(&buffer);
         },
         nullptr);
   }
@@ -38,7 +38,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
     fuchsia_logging::LogSettings settings;
     settings.disable_interest_listener = true;
     settings.min_log_level = fuchsia_logging::LOG_TRACE;
-    syslog_backend::SetLogSettings(settings);
+    syslog_runtime::SetLogSettings(settings);
     callback();
   }
 
@@ -50,7 +50,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    syslog_backend::LogBuffer buffer;
+    syslog_runtime::LogBuffer buffer;
     fuchsia_logging::LogSeverity severity;
     switch (spec.record.severity) {
       case fuchsia::diagnostics::Severity::DEBUG:
@@ -72,30 +72,30 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
         severity = fuchsia_logging::LOG_WARNING;
         break;
     }
-    syslog_backend::BeginRecord(&buffer, severity, spec.file.data(), spec.line, nullptr, nullptr);
+    syslog_runtime::BeginRecord(&buffer, severity, spec.file.data(), spec.line, nullptr, nullptr);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:
         case fuchsia::diagnostics::stream::Value::Invalid:
           break;
         case fuchsia::diagnostics::stream::Value::kFloating:
-          syslog_backend::WriteKeyValue(&buffer, arg.name.data(), arg.value.floating());
+          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.floating());
           break;
         case fuchsia::diagnostics::stream::Value::kSignedInt:
-          syslog_backend::WriteKeyValue(&buffer, arg.name.data(), arg.value.signed_int());
+          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.signed_int());
           break;
         case fuchsia::diagnostics::stream::Value::kUnsignedInt:
-          syslog_backend::WriteKeyValue(&buffer, arg.name.data(), arg.value.unsigned_int());
+          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.unsigned_int());
           break;
         case fuchsia::diagnostics::stream::Value::kText:
-          syslog_backend::WriteKeyValue(&buffer, arg.name.data(), arg.value.text().data());
+          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.text().data());
           break;
         case fuchsia::diagnostics::stream::Value::kBoolean:
-          syslog_backend::WriteKeyValue(&buffer, arg.name.data(), arg.value.boolean());
+          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.boolean());
           break;
       }
     }
-    syslog_backend::FlushRecord(&buffer);
+    syslog_runtime::FlushRecord(&buffer);
     callback();
   }
 

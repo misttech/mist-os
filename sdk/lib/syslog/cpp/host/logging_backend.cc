@@ -14,7 +14,7 @@
 
 #include "lib/syslog/cpp/host/encoder.h"
 
-namespace syslog_backend {
+namespace syslog_runtime {
 
 namespace {
 
@@ -74,7 +74,7 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
 
 void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                     const std::initializer_list<std::string>& tags) {
-  syslog_backend::SetLogSettings(settings);
+  syslog_runtime::SetLogSettings(settings);
 }
 
 void SetLogTags(const std::initializer_list<std::string>& tags) {
@@ -135,4 +135,4 @@ void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned 
   std::cerr.flush();
 }
 
-}  // namespace syslog_backend
+}  // namespace syslog_runtime

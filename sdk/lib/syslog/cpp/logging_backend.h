@@ -8,7 +8,7 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
-namespace syslog_backend {
+namespace syslog_runtime {
 
 void SetLogSettings(const fuchsia_logging::LogSettings& settings);
 
@@ -17,6 +17,6 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings,
 
 fuchsia_logging::LogSeverity GetMinLogLevel();
 
-}  // namespace syslog_backend
+}  // namespace syslog_runtime
 
 #endif  // LIB_SYSLOG_CPP_LOGGING_BACKEND_H_

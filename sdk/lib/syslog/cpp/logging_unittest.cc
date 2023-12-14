@@ -364,16 +364,16 @@ TEST_F(LoggingFixture, BackendDirect) {
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
   LogState state = SetupLogs(new_settings);
 
-  syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
                               "condition");
-  syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
+  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
+  syslog_runtime::FlushRecord(&buffer);
+  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
                               "condition");
-  syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_backend::FlushRecord(&buffer);
+  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
+  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
+  syslog_runtime::FlushRecord(&buffer);
 
   std::string log = ReadLogs(state);
   EXPECT_THAT(log,
@@ -449,9 +449,9 @@ TEST(StructuredLogging, Remaining) {
   files::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
   SetLogSettings(new_settings);
-  syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_backend::MsgHeader::CreatePtr(&buffer);
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
+  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteChar('t');
   ASSERT_EQ(header->RemainingSpace(), initial - 1);
@@ -460,15 +460,15 @@ TEST(StructuredLogging, Remaining) {
 }
 
 TEST(StructuredLogging, FlushAndReset) {
-  syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_backend::MsgHeader::CreatePtr(&buffer);
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
+  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteString("test");
   ASSERT_EQ(header->RemainingSpace(), initial - 4);
   header->FlushAndReset();
   ASSERT_EQ(header->RemainingSpace(),
-            sizeof(syslog_backend::LogBuffer::data) - 2);  // last byte reserved for NULL terminator
+            sizeof(syslog_runtime::LogBuffer::data) - 2);  // last byte reserved for NULL terminator
 }
 #endif
 

@@ -16,7 +16,7 @@
 #include <sstream>
 #include <vector>
 
-namespace syslog_backend {
+namespace syslog_runtime {
 
 struct LogBuffer;
 
@@ -152,13 +152,13 @@ struct LogBuffer final {
 
   // Encodes an int64
   void Encode(KeyValue<const char*, int64_t> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
 #ifdef __APPLE__
   // Encodes a size_t. On Apple Clang, size_t is a special type.
   void Encode(KeyValue<const char*, size_t> value) {
-    syslog_backend::WriteKeyValue(this, value.key, static_cast<int64_t>(value.value));
+    syslog_runtime::WriteKeyValue(this, value.key, static_cast<int64_t>(value.value));
   }
 #endif
 
@@ -179,42 +179,42 @@ struct LogBuffer final {
 
   // Encodes an uint64
   void Encode(KeyValue<const char*, uint64_t> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a NULL-terminated C-string.
   void Encode(KeyValue<const char*, const char*> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a NULL-terminated C-string.
   void Encode(KeyValue<const char*, char*> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a C++ std::string.
   void Encode(KeyValue<const char*, std::string> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a C++ std::string_view.
   void Encode(KeyValue<const char*, std::string_view> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a double floating point value
   void Encode(KeyValue<const char*, double> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a floating point value
   void Encode(KeyValue<const char*, float> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a boolean value
   void Encode(KeyValue<const char*, bool> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value);
+    syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes an arbitrary list of values recursively.
@@ -226,18 +226,18 @@ struct LogBuffer final {
     Encode<i + 1, size>(value);
   }
 };
-}  // namespace syslog_backend
+}  // namespace syslog_runtime
 
 namespace fuchsia_logging {
 
 template <typename... LogArgs>
-constexpr syslog_backend::Tuplet<LogArgs...> Args(LogArgs... values) {
-  return syslog_backend::Tuplet<LogArgs...>(std::make_tuple(values...), sizeof...(values));
+constexpr syslog_runtime::Tuplet<LogArgs...> Args(LogArgs... values) {
+  return syslog_runtime::Tuplet<LogArgs...>(std::make_tuple(values...), sizeof...(values));
 }
 
 template <typename Key, typename Value>
-constexpr syslog_backend::KeyValue<Key, Value> KeyValueInternal(Key key, Value value) {
-  return syslog_backend::KeyValue<Key, Value>(key, value);
+constexpr syslog_runtime::KeyValue<Key, Value> KeyValueInternal(Key key, Value value) {
+  return syslog_runtime::KeyValue<Key, Value>(key, value);
 }
 
 // Used to denote a key-value pair for use in structured logging API calls.
@@ -246,7 +246,7 @@ constexpr syslog_backend::KeyValue<Key, Value> KeyValueInternal(Key key, Value v
 
 template <typename Msg, typename... KeyValuePairs>
 struct LogValue final {
-  constexpr LogValue(Msg msg, syslog_backend::Tuplet<KeyValuePairs...> kvps)
+  constexpr LogValue(Msg msg, syslog_runtime::Tuplet<KeyValuePairs...> kvps)
       : msg(msg), kvps(kvps) {}
   // FIXME(fxbug.dev/106574): With hwasan, or asan without stack-to-heap promotion for
   // detecting use-after-returns, we can encounter a stack overflow in blobfs when bringing
@@ -259,16 +259,16 @@ struct LogValue final {
   __attribute__((__noinline__)) void LogNew(::fuchsia_logging::LogSeverity severity,
                                             const char* file, unsigned int line,
                                             const char* condition) const {
-    syslog_backend::LogBuffer buffer;
-    syslog_backend::BeginRecord(&buffer, severity, file, line, msg, condition);
+    syslog_runtime::LogBuffer buffer;
+    syslog_runtime::BeginRecord(&buffer, severity, file, line, msg, condition);
     // https://bugs.llvm.org/show_bug.cgi?id=41093 -- Clang loses constexpr
     // even though this should be constexpr here.
     buffer.Encode<0, sizeof...(KeyValuePairs)>(kvps);
-    syslog_backend::FlushRecord(&buffer);
+    syslog_runtime::FlushRecord(&buffer);
   }
 
   Msg msg;
-  syslog_backend::Tuplet<KeyValuePairs...> kvps;
+  syslog_runtime::Tuplet<KeyValuePairs...> kvps;
 };
 
 class LogMessageVoidify final {
@@ -440,19 +440,19 @@ fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
 template <typename Msg, typename... Args>
-static auto MakeValue(Msg msg, syslog_backend::Tuplet<Args...> args) {
+static auto MakeValue(Msg msg, syslog_runtime::Tuplet<Args...> args) {
   return fuchsia_logging::LogValue<Msg, Args...>(msg, args);
 }
 
 template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<syslog_backend::Not<syslog_backend::ILessThanSize<i, size>()>(),
+          typename std::enable_if<syslog_runtime::Not<syslog_runtime::ILessThanSize<i, size>()>(),
                                   int>::type = 0>
 static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
-  return syslog_backend::Tuplet<Tuple...>(tuple, size);
+  return syslog_runtime::Tuplet<Tuple...>(tuple, size);
 }
 
 template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<syslog_backend::ILessThanSize<i, size>(), int>::type = 0>
+          typename std::enable_if<syslog_runtime::ILessThanSize<i, size>(), int>::type = 0>
 static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
   // Key at index i, value at index i+1
   auto k = std::get<i>(value);

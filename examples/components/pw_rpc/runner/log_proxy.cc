@@ -186,10 +186,10 @@ pw::Status LogEntry(pw::protobuf::Decoder& entry_decoder, const zx::socket& log_
   }
 
   if (log_socket.is_valid()) {
-    syslog_backend::LogBuffer log_buffer;
-    syslog_backend::BeginRecordWithSocket(&log_buffer, level, file.c_str(), line, message.c_str(),
+    syslog_runtime::LogBuffer log_buffer;
+    syslog_runtime::BeginRecordWithSocket(&log_buffer, level, file.c_str(), line, message.c_str(),
                                           /* condition */ nullptr, log_socket.get());
-    syslog_backend::FlushRecord(&log_buffer);
+    syslog_runtime::FlushRecord(&log_buffer);
   }
   return pw::OkStatus();
 }
@@ -242,9 +242,9 @@ void LogProxy::Run() {
 
   sc.ProcessPackets();
 
-  syslog_backend::LogBuffer log_buffer;
-  syslog_backend::BeginRecordWithSocket(&log_buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
+  syslog_runtime::LogBuffer log_buffer;
+  syslog_runtime::BeginRecordWithSocket(&log_buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
                                         "Connection to proxy has terminated. Exiting.",
                                         /* condition */ nullptr, log_socket_.get());
-  syslog_backend::FlushRecord(&log_buffer);
+  syslog_runtime::FlushRecord(&log_buffer);
 }
