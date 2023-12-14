@@ -4,7 +4,12 @@
 
 #include "aml-i2c.h"
 
-#include <lib/ddk/debug.h>
+#ifdef DFV1
+#include <lib/ddk/debug.h>  // nogncheck
+#else
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#endif
+
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/threads.h>

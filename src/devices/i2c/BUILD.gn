@@ -6,6 +6,7 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/aml-i2c",
+    "drivers/aml-i2c:aml-i2c-dfv2",
     "drivers/i2c",
     "drivers/intel-i2c:drivers",
   ]

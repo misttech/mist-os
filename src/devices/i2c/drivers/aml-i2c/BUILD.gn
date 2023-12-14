@@ -22,13 +22,102 @@ driver_bind_rules("aml_i2c_bind") {
 group("tests") {
   testonly = true
   deps = [
+    ":aml-i2c-dfv2-test",
     ":aml-i2c-test",
     ":aml_i2c_bind_test",
   ]
 }
 
+# DFv2
+source_set("aml-i2c-dfv2-source") {
+  configs += [
+    "//build/config/fuchsia:enable_zircon_asserts",
+    "//build/config:all_source",
+  ]
+  sources = [
+    "aml-i2c.cc",
+    "aml-i2c.h",
+    "dfv2-driver.cc",
+    "dfv2-driver.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/hwreg",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver("aml-i2c-dfv2-driver") {
+  output_name = "aml-i2c-dfv2"
+  deps = [ ":aml-i2c-dfv2-source" ]
+}
+
+fuchsia_driver_component("aml-i2c-dfv2") {
+  info = "aml-i2c-dfv2-info.json"
+  component_name = "aml-i2c-dfv2"
+  deps = [
+    ":aml-i2c-dfv2-driver",
+    ":aml_i2c_bind",
+  ]
+  manifest = "meta/aml-i2c-dfv2.cml"
+}
+
+fuchsia_driver_package("package-dfv2") {
+  package_name = "aml-i2c-dfv2"
+  driver_components = [ ":aml-i2c-dfv2" ]
+}
+
+test("aml-i2c-dfv2-test-bin") {
+  output_name = "aml-i2c-dfv2-test"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "aml-i2c-dfv2-test.cc" ]
+  deps = [
+    ":aml-i2c-dfv2-source",
+    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/driver",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("aml-i2c-dfv2-test") {
+  deps = [ ":aml-i2c-dfv2-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+#DFv1
+config("dfv1") {
+  defines = [ "DFV1" ]
+}
+
 source_set("aml-i2c-source") {
   configs += [
+    ":dfv1",
     "//build/config/fuchsia:enable_zircon_asserts",
     "//build/config:all_source",
   ]

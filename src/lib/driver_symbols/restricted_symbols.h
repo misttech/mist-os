@@ -37,6 +37,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/aml-g12-tdm-dsp.cm",
     "#meta/aml-g12-tdm.cm",
     "#meta/aml-i2c.cm",
+    "#meta/aml-i2c-dfv2.cm",
     "#meta/aml_mipicsi.cm",
     "#meta/amlogic-display.cm",
     "#meta/amlogic_h264_encoder_driver.cm",
