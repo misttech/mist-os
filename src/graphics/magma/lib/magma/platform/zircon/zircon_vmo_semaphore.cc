@@ -91,7 +91,6 @@ void ZirconVmoSemaphore::Reset() {
   TRACE_FLOW_END("magma:sync", "semaphore signal", koid_);
   TRACE_FLOW_END("magma:sync", "semaphore wait async", koid_);
   if (is_one_shot()) {
-    MAGMA_DMESSAGE("Ignoring reset of one-shot vmo semaphore");
     return;
   }
 
