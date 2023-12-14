@@ -37,7 +37,8 @@ impl TestEnv {
             HashMap::from_iter(std::env::vars()),
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
-        );
+            None,
+        )?;
         let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
             crate::logging::configure_subscribers(
                 &context,

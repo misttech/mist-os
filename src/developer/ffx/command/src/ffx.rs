@@ -239,6 +239,7 @@ impl Ffx {
         let overrides = self.runtime_config_overrides();
         let runtime_args = ffx_config::runtime::populate_runtime(&*self.config, overrides)?;
         let env_path = self.env.as_ref().map(PathBuf::from);
+        let current_dir = std::env::current_dir().bug_context("Failed to get working directory")?;
 
         // If we're given an isolation setting, use that. Otherwise do a normal detection of the environment.
         match (self, env_vars.get("FFX_ISOLATE_DIR").map(PathBuf::from)) {
@@ -261,21 +262,18 @@ impl Ffx {
                 .map_err(Into::into)
             }
             (Ffx { isolate_dir: Some(ref path), .. }, _) | (_, Some(ref path)) => {
-                Ok(EnvironmentContext::isolated(
+                EnvironmentContext::isolated(
                     exe_kind,
                     path.clone(),
                     env_vars,
                     runtime_args,
                     env_path,
-                ))
+                    Utf8PathBuf::try_from(current_dir).ok().as_deref(),
+                )
+                .map_err(Into::into)
             }
-            _ => EnvironmentContext::detect(
-                exe_kind,
-                runtime_args,
-                &std::env::current_dir().bug_context("Failed to get working directory")?,
-                env_path,
-            )
-            .map_err(|e| user_error!(e)),
+            _ => EnvironmentContext::detect(exe_kind, runtime_args, &current_dir, env_path)
+                .map_err(|e| user_error!(e)),
         }
     }
 

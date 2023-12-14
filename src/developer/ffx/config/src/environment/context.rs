@@ -8,7 +8,7 @@ use crate::{
     BuildOverride, ConfigMap, ConfigQuery, Environment,
 };
 use anyhow::{Context, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_error;
 use ffx_config_domain::ConfigDomain;
 use sdk::{Sdk, SdkRoot};
@@ -138,14 +138,20 @@ impl EnvironmentContext {
         env_vars: EnvVars,
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
-    ) -> Self {
-        Self::new(
-            EnvironmentKind::Isolated { isolate_root },
-            exe_kind,
-            Some(env_vars),
-            runtime_args,
-            env_file_path,
-        )
+        current_dir: Option<&Utf8Path>,
+    ) -> Result<Self> {
+        if let Some(domain_path) = current_dir.and_then(ConfigDomain::find_root) {
+            let domain = ConfigDomain::load_from(&domain_path)?;
+            Ok(Self::config_domain(exe_kind, domain, runtime_args, Some(isolate_root)))
+        } else {
+            Ok(Self::new(
+                EnvironmentKind::Isolated { isolate_root },
+                exe_kind,
+                Some(env_vars),
+                runtime_args,
+                env_file_path,
+            ))
+        }
     }
 
     /// Initialize an environment type that has no meaningful context, using only global and
@@ -610,6 +616,7 @@ mod test {
     async fn test_config_domain_context_isolated() {
         let isolate_dir = tempdir().expect("tempdir");
         let domain_root = domains_test_data_path().join("basic_example");
+        println!("check with explicit config domain path");
         let context = EnvironmentContext::config_domain_root(
             ExecutableKind::Test,
             domain_root.clone(),
@@ -617,6 +624,20 @@ mod test {
             Some(isolate_dir.path().to_owned()),
         )
         .expect("isolated config domain context");
+
+        check_config_domain_paths(&context, &domain_root).await;
+        check_isolated_paths(&context, &isolate_dir.path());
+
+        println!("check with implied config domain path");
+        let context = EnvironmentContext::isolated(
+            ExecutableKind::Test,
+            isolate_dir.path().to_owned(),
+            Default::default(),
+            Default::default(),
+            None,
+            Some(&domain_root),
+        )
+        .expect("Isolated context");
 
         check_config_domain_paths(&context, &domain_root).await;
         check_isolated_paths(&context, &isolate_dir.path());
@@ -631,7 +652,9 @@ mod test {
             Default::default(),
             Default::default(),
             None,
-        );
+            None,
+        )
+        .expect("Isolated context");
 
         check_isolated_paths(&context, &isolate_dir.path());
     }

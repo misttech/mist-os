@@ -61,7 +61,9 @@ mod test {
             [("FFX_TEST_ENV_VAR_MAPPER".to_owned(), "test".to_owned())].into(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$FFX_TEST_ENV_VAR_MAPPER".to_string());
         assert_eq!(env_var(&ctx, test), Some(Value::String("test".to_string())));
     }
@@ -74,7 +76,9 @@ mod test {
             [("FFX_TEST_ENV_VAR_MAPPER_MULTIPLE".to_owned(), "test".to_owned())].into(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String(
             "$FFX_TEST_ENV_VAR_MAPPER_MULTIPLE/$FFX_TEST_ENV_VAR_MAPPER_MULTIPLE".to_string(),
         );
@@ -89,7 +93,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$ENVIRONMENT_VARIABLE_THAT_DOES_NOT_EXIST".to_string());
         assert_eq!(env_var(&ctx, test), None);
     }
@@ -102,7 +108,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$HOME/$ENVIRONMENT_VARIABLE_THAT_DOES_NOT_EXIST".to_string());
         assert_eq!(env_var(&ctx, test), None);
     }
@@ -115,7 +123,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$$HOME".to_string());
         assert_eq!(env_var(&ctx, test), Some(Value::String("$HOME".to_string())));
     }
@@ -128,7 +138,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::Bool(false);
         assert_eq!(env_var(&ctx, test), Some(Value::Bool(false)));
     }

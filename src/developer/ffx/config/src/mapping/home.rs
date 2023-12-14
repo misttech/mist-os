@@ -49,7 +49,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value = home_dir("$HOME");
         let test = Value::String("$HOME".to_string());
         assert_eq!(home(&ctx, test), Some(Value::String(value.to_string())));
@@ -63,7 +65,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value = home_dir("$HOME");
         let test = Value::String("$HOME/$HOME".to_string());
         assert_eq!(home(&ctx, test), Some(Value::String(format!("{}/{}", value, value))));
@@ -77,7 +81,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$WHATEVER".to_string());
         assert_eq!(home(&ctx, test), Some(Value::String("$WHATEVER".to_string())));
     }

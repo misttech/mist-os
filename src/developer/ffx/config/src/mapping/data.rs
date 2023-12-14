@@ -30,7 +30,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value =
             ctx.get_data_path().expect("Getting data directory").to_string_lossy().to_string();
         let test = Value::String("$DATA".to_string());
@@ -45,7 +47,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value =
             ctx.get_data_path().expect("Getting data directory").to_string_lossy().to_string();
         let test = Value::String("$DATA/$DATA".to_string());
@@ -60,7 +64,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$WHATEVER".to_string());
         assert_eq!(data(&ctx, test), Some(Value::String("$WHATEVER".to_string())));
     }

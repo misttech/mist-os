@@ -30,7 +30,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value =
             ctx.get_cache_path().expect("Getting cache base dir").to_string_lossy().to_string();
         let test = Value::String("$CACHE".to_string());
@@ -45,7 +47,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let value =
             ctx.get_cache_path().expect("Getting cache base dir").to_string_lossy().to_string();
         let test = Value::String("$CACHE/$CACHE".to_string());
@@ -60,7 +64,9 @@ mod test {
             Default::default(),
             ConfigMap::default(),
             None,
-        );
+            None,
+        )
+        .unwrap();
         let test = Value::String("$WHATEVER".to_string());
         assert_eq!(cache(&ctx, test), Some(Value::String("$WHATEVER".to_string())));
     }

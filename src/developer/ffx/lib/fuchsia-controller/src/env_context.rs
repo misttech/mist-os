@@ -4,6 +4,7 @@
 
 use crate::LibContext;
 use anyhow::Result;
+use camino::Utf8PathBuf;
 use errors::ffx_error;
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -62,6 +63,7 @@ impl EnvContext {
             if formatted_config.is_empty() { None } else { Some(formatted_config) };
         let runtime_args = ffx_config::runtime::populate_runtime(&[], runtime_config)?;
         let env_path = None;
+        let current_dir = std::env::current_dir()?;
         let context = match isolate_dir {
             Some(d) => EnvironmentContext::isolated(
                 ExecutableKind::Test,
@@ -69,11 +71,13 @@ impl EnvContext {
                 std::collections::HashMap::from_iter(std::env::vars()),
                 runtime_args,
                 env_path,
-            ),
+                Utf8PathBuf::try_from(current_dir).ok().as_deref(),
+            )
+            .map_err(fxe)?,
             None => EnvironmentContext::detect(
                 ExecutableKind::Test,
                 runtime_args,
-                &std::env::current_dir()?,
+                &current_dir,
                 env_path,
             )
             .map_err(fxe)?,
