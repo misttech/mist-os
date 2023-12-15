@@ -607,7 +607,7 @@ impl FsNodeOps for RemoteNode {
             owner = FsCred { uid: attrs.uid, gid: attrs.gid };
             fsverity_enabled = attrs.fsverity_enabled;
             // fsverity should not be enabled for non-file nodes.
-            if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE != 0) {
+            if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
                 return error!(EINVAL);
             }
         } else {
@@ -2073,6 +2073,99 @@ mod test {
                         .lookup_child(&current_task, &mut context, b"file2")
                         .expect("lookup_child failed");
                     assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
+                }
+            })
+            .await
+            .expect("spawn");
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_lookup_on_fsverity_enabled_file() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |_, current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let file = ns
+                        .root()
+                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    // Enable verity on the file.
+                    let desc = fsverity_descriptor {
+                        version: 1,
+                        hash_algorithm: 1,
+                        salt_size: 32,
+                        log_blocksize: 12,
+                        ..Default::default()
+                    };
+                    file.entry.node.ops().enable_fsverity(&desc).expect("enable fsverity failed");
+                }
+            })
+            .await
+            .expect("spawn");
+
+        // Tear down the kernel and open the file again. The file should no longer be cached.
+        // Test that lookup works as expected for an fsverity-enabled file.
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |_, current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let _child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
                 }
             })
             .await
