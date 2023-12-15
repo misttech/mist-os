@@ -1,0 +1,41 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.images2;
+
+
+//
+/// An integral, rectangular, axis-aligned region in a 2D cartesian
+/// space, with unsigned location and distance fields.
+///
+/// This type does not specify units. Protocols that use this type should
+/// specify the characteristics of the vector space, including orientation and
+/// units.
+//
+// Some non-protocol types in this library are used by libmagma, which ships in
+// the IDK and must be built at all API levels supported by the IDK. See
+// fxbug.dev/42085119. ImageFormat is one of those types and relies on
+// fuchsia.math.RectU which is only available at HEAD. For other API levels,
+// use the definition of RectU that existed before https://fxrev.dev/796842.
+// TODO(fxbug.dev/42085119): Uncomment when fixing API level builds.
+// @available(removed=HEAD)
+type RectU = struct {
+    /// The location of the origin of the rectangle in the x-axis.
+    x uint32;
+
+    /// The location of the origin of the rectangle in the y-axis.
+    y uint32;
+
+    /// The distance along the x-axis.
+    ///
+    /// The region includes x values starting at `x` and increasing along the
+    /// x-axis.
+    width uint32;
+
+    /// The distance along the y-axis.
+    ///
+    /// The region includes y values starting at `y` and increasing along the
+    /// y-axis.
+    height uint32;
+};

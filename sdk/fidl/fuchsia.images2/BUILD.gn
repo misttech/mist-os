@@ -11,6 +11,7 @@ fidl("fuchsia.images2") {
   sources = [
     "format_modifier.fidl",
     "image_format.fidl",
+    "math.fidl",
   ]
 
   public_deps = [ "//sdk/fidl/fuchsia.math" ]
