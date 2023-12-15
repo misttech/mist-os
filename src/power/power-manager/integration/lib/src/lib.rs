@@ -10,12 +10,12 @@ use {
         activity_service::MockActivityService, input_settings_service::MockInputSettingsService,
         kernel_service::MockKernelService, system_controller::MockSystemControllerService,
     },
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker},
+    fidl::endpoints::DiscoverableProtocolMarker,
     fidl::AsHandleRef as _,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_power_statecontrol as fpower,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
-    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting,
+    fidl_fuchsia_testing as ftesting,
     fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
     },
@@ -230,16 +230,6 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        realm_builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fsys2::LifecycleControllerMarker>())
-                    .from(Ref::framework())
-                    .to(Ref::parent()),
-            )
-            .await
-            .unwrap();
-
         let power_manager_to_parent_routes = Route::new()
             .capability(Capability::protocol_by_name(
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
@@ -297,12 +287,7 @@ impl TestEnvBuilder {
 
         TestEnv {
             realm_instance: Some(realm_instance),
-            mocks: Mocks {
-                activity_service,
-                input_settings_service,
-                system_controller_service,
-                kernel_service,
-            },
+            mocks: Mocks { activity_service, input_settings_service, system_controller_service },
         }
     }
 }
@@ -321,13 +306,6 @@ impl TestEnv {
             .root
             .connect_to_protocol_at_exposed_dir::<P>()
             .unwrap()
-    }
-
-    pub fn connect_to_device<P: ProtocolMarker>(&self, driver_path: &str) -> P::Proxy {
-        let dev = self.realm_instance.as_ref().unwrap().driver_test_realm_connect_to_dev().unwrap();
-        let path = driver_path.strip_prefix("/dev/").unwrap();
-
-        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(&dev, path).unwrap()
     }
 
     /// Destroys the TestEnv and underlying RealmInstance.
@@ -356,14 +334,6 @@ impl TestEnv {
             .unwrap();
 
         let _status = fake_temperature_control.set_temperature_celsius(temperature).await.unwrap();
-    }
-
-    pub async fn set_cpu_stats(&self, cpu_stats: fkernel::CpuStats) {
-        self.mocks.kernel_service.set_cpu_stats(cpu_stats).await;
-    }
-
-    pub async fn wait_for_shutdown_request(&self) {
-        self.mocks.system_controller_service.wait_for_shutdown_request().await;
     }
 
     // Wait for the device to finish enumerating.
@@ -409,7 +379,6 @@ pub struct Mocks {
     pub activity_service: Arc<MockActivityService>,
     pub input_settings_service: Arc<MockInputSettingsService>,
     pub system_controller_service: Arc<MockSystemControllerService>,
-    pub kernel_service: Arc<MockKernelService>,
 }
 
 /// Tests that Power Manager triggers a thermal reboot if the temperature sensor at the given path

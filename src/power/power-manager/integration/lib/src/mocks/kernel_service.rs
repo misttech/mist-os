@@ -18,6 +18,7 @@ pub struct MockKernelService {
     cpu_stats: Mutex<fkernel::CpuStats>,
 }
 
+#[allow(dead_code)]
 impl MockKernelService {
     pub fn new() -> Arc<MockKernelService> {
         Arc::new(Self {
