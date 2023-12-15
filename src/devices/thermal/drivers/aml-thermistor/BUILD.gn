@@ -10,6 +10,8 @@ driver_bind_rules("aml-thermistor-bind") {
   bind_output = "astro-thermistor.bindbc"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
+    "//src/devices/bind/fuchsia.adc",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.platform",

@@ -165,6 +165,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "RamCtlInit failed");
   }
 
+  if (auto result = AdcInit(); result.is_error()) {
+    zxlogf(ERROR, "AdcInit failed: %d", result.error_value());
+  }
+
   if (ThermistorInit() != ZX_OK) {
     zxlogf(ERROR, "ThermistorInit failed");
   }

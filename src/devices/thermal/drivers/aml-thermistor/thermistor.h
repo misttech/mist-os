@@ -9,7 +9,6 @@
 #include <lib/thermal/ntc.h>
 
 #include <fbl/ref_ptr.h>
-#include <soc/aml-common/aml-g12-saradc.h>
 
 #include "thermistor-channel.h"
 
@@ -25,17 +24,12 @@ class AmlThermistor : public DeviceType {
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
 
-  zx_status_t InitPdev();
-
   void DdkInit(ddk::InitTxn txn);
 
   void DdkRelease() { delete this; }
 
-  fbl::RefPtr<AmlSaradcDevice> saradc_;
-
  private:
   zx_status_t AddThermChannel(NtcChannel ch, NtcInfo info);
-  zx_status_t AddRawChannel(uint32_t adc_chan);
 };
 }  // namespace thermal
 

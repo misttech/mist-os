@@ -23,7 +23,8 @@ AdcDevice::AdcDevice(fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl, 
       name_(name),
       resolution_(resolution),
       compat_server_(adc->dispatcher(), adc->incoming(), adc->outgoing(), adc->node_name(), name_,
-                     std::string(Adc::kDeviceName) + "/") {}
+                     std::string(Adc::kDeviceName) + "/"),
+      devfs_connector_(fit::bind_member<&AdcDevice::Serve>(this)) {}
 
 void AdcDevice::GetResolution(GetResolutionCompleter::Sync& completer) {
   completer.Reply(fit::ok(resolution_));
@@ -100,6 +101,15 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
 
   // Create node.
   fidl::Arena arena;
+  zx::result connector =
+      dev->devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (connector.is_error()) {
+    return connector.take_error();
+  }
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("adc");
+
   auto offers = dev->compat_server_.CreateOffers(arena);
   offers.push_back(fdf::MakeOffer<fuchsia_hardware_adc::Service>(arena, dev->name_));
   auto properties = std::vector{
@@ -112,6 +122,7 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
                   .name(arena, dev->name_)
                   .offers(arena, std::move(offers))
                   .properties(arena, std::move(properties))
+                  .devfs_args(devfs.Build())
                   .Build();
 
   zx::result controller_endpoints =

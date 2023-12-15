@@ -101,6 +101,7 @@ class Nelson : public NelsonType {
         fuchsia_hardware_platform_bus::Service::PlatformBus::Name, request.TakeChannel().release());
   }
 
+  zx::result<> AdcInit();
   zx_status_t AudioInit();
   zx_status_t BluetoothInit();
   zx_status_t ButtonsInit();

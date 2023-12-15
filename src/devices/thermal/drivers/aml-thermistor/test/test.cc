@@ -2,23 +2,16 @@
 // this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.adc/cpp/wire.h>
-#include <fidl/fuchsia.hardware.temperature/cpp/wire.h>
+#include <fidl/fuchsia.hardware.adc/cpp/test_base.h>
+#include <fidl/fuchsia.hardware.temperature/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <string.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 
-#include <cmath>
-#include <memory>
-#include <string_view>
-
-#include <fbl/array.h>
-#include <mock-mmio-reg/mock-mmio-reg.h>
-#include <soc/aml-common/aml-g12-saradc.h>
-#include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
-#include "../thermistor.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/devices/thermal/drivers/aml-thermistor/thermistor-channel.h"
 
 namespace {
 
@@ -27,9 +20,6 @@ bool FloatNear(float a, float b) { return std::abs(a - b) < 0.1f; }
 }  // namespace
 
 namespace thermal {
-
-using TemperatureClient = fidl::WireSyncClient<fuchsia_hardware_temperature::Device>;
-using AdcClient = fidl::WireSyncClient<fuchsia_hardware_adc::Device>;
 
 NtcInfo ntc_info[] = {
     {.part = "ncpXXwf104",
@@ -72,48 +62,46 @@ NtcInfo ntc_info[] = {
          }},
 };
 
-class TestSarAdc : public AmlSaradcDevice {
+class TestSarAdc : public fidl::testing::TestBase<fuchsia_hardware_adc::Device> {
  public:
-  static constexpr uint32_t kMaxChannels = 4;
-  TestSarAdc(fdf::MmioBuffer adc_mmio, fdf::MmioBuffer ao_mmio, zx::interrupt irq)
-      : AmlSaradcDevice(std::move(adc_mmio), std::move(ao_mmio), std::move(irq)) {}
-  void HwInit() override {}
-  void Shutdown() override {}
+  TestSarAdc(async_dispatcher_t* dispatcher,
+             fidl::ServerEnd<fuchsia_hardware_adc::Device> server_end)
+      : binding_(dispatcher, std::move(server_end), this, [](fidl::UnbindInfo) {}) {}
 
-  zx_status_t GetSample(uint32_t channel, uint32_t* outval) override {
-    if (channel >= kMaxChannels) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    *outval = values_[channel];
-    return ZX_OK;
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void SetReadValue(uint32_t ch, uint32_t value) { values_[ch] = value; }
+
+  void GetNormalizedSample(GetNormalizedSampleCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(normalized_sample_));
+  }
+  void set_normalized_sample(float normalized_sample) { normalized_sample_ = normalized_sample; }
 
  private:
-  uint32_t values_[kMaxChannels];
+  fidl::ServerBinding<fuchsia_hardware_adc::Device> binding_;
+
+  float normalized_sample_ = 0;
 };
 
 class ThermistorDeviceTest : public zxtest::Test {
  public:
-  uint32_t CalcSampleValue(NtcInfo info, uint32_t idx, uint32_t pullup) {
+  float CalcSampleValue(NtcInfo info, uint32_t idx, uint32_t pullup) {
     uint32_t ntc_resistance = info.profile[idx].resistance_ohm;
-    float ratio = static_cast<float>(ntc_resistance) / static_cast<float>(ntc_resistance + pullup);
-    float sample = roundf(ratio * static_cast<float>((1 << adc_->Resolution()) - 1));
-    return static_cast<uint32_t>(sample);
+    return static_cast<float>(ntc_resistance) / static_cast<float>(ntc_resistance + pullup);
   }
 
   void SetUp() override {
-    constexpr size_t kRegSize = S905D2_SARADC_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-
-    ddk_mock::MockMmioRegRegion mock0(sizeof(uint32_t), kRegSize);
-    ddk_mock::MockMmioRegRegion mock1(sizeof(uint32_t), kRegSize);
-
-    zx::interrupt irq;
-    adc_ = fbl::MakeRefCounted<TestSarAdc>(mock0.GetMmioBuffer(), mock1.GetMmioBuffer(),
-                                           std::move(irq));
-
-    thermistor_ = std::make_unique<ThermistorChannel>(root_.get(), adc_, 0, ntc_info[0],
-                                                      kPullupValue, "channel");
+    {
+      EXPECT_OK(incoming_loop_.StartThread("aml-thermistor-test-adc-thread"));
+      // Create devices.
+      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_adc::Device>();
+      adc_.SyncCall([&](std::unique_ptr<TestSarAdc>* adc) {
+        *adc =
+            std::make_unique<TestSarAdc>(incoming_loop_.dispatcher(), std::move(endpoints->server));
+      });
+      thermistor_ = std::make_unique<ThermistorChannel>(root_.get(), std::move(endpoints->client),
+                                                        ntc_info[0], kPullupValue, "channel");
+    }
 
     loop_.StartThread();
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
@@ -126,31 +114,38 @@ class ThermistorDeviceTest : public zxtest::Test {
   static constexpr uint32_t kPullupValue = 47000;
 
   std::unique_ptr<ThermistorChannel> thermistor_;
-  fbl::RefPtr<TestSarAdc> adc_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async_patterns::TestDispatcherBound<std::unique_ptr<TestSarAdc>> adc_{incoming_loop_.dispatcher(),
+                                                                        std::in_place};
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  TemperatureClient client_;
+  fidl::SyncClient<fuchsia_hardware_temperature::Device> client_;
 };
 
 TEST_F(ThermistorDeviceTest, GetTemperatureCelsius) {
   {
     uint32_t ntc_idx = 10;
-    adc_->SetReadValue(0, CalcSampleValue(ntc_info[0], ntc_idx, kPullupValue));
+    adc_.SyncCall([&](std::unique_ptr<TestSarAdc>* adc) {
+      (*adc)->set_normalized_sample(CalcSampleValue(ntc_info[0], ntc_idx, kPullupValue));
+    });
     auto result = client_->GetTemperatureCelsius();
-    EXPECT_OK(result.value().status);
-    EXPECT_TRUE(FloatNear(result.value().temp, ntc_info[0].profile[ntc_idx].temperature_c));
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_OK(result->status());
+    EXPECT_TRUE(FloatNear(result->temp(), ntc_info[0].profile[ntc_idx].temperature_c));
   }
 
   {  // set read value to 0, which should be out of range of the ntc table
-    adc_->SetReadValue(0, 0);
+    adc_.SyncCall([&](std::unique_ptr<TestSarAdc>* adc) { (*adc)->set_normalized_sample(0); });
     auto result = client_->GetTemperatureCelsius();
-    EXPECT_NOT_OK(result.value().status);
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_NOT_OK(result->status());
   }
 
   {  // set read value to max, which should be out of range of ntc table
-    adc_->SetReadValue(0, (1 << adc_->Resolution()) - 1);
+    adc_.SyncCall([&](std::unique_ptr<TestSarAdc>* adc) { (*adc)->set_normalized_sample(1); });
     auto result = client_->GetTemperatureCelsius();
-    EXPECT_NOT_OK(result.value().status);
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_NOT_OK(result->status());
   }
 }
 
@@ -158,9 +153,8 @@ TEST_F(ThermistorDeviceTest, GetSensorName) {
   constexpr char kExpectedSensorName[] = "channel";
 
   auto result = client_->GetSensorName();
-  ASSERT_TRUE(result.ok());
-  const std::string_view name(result->name.data(), result->name.size());
-  EXPECT_STREQ(name, kExpectedSensorName);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_STREQ(result->name(), kExpectedSensorName);
 }
 
 }  //  namespace thermal

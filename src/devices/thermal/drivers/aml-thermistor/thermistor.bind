@@ -2,17 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite thermistor;
+
+using fuchsia.adc;
+using fuchsia.hardware.adc;
 using fuchsia.amlogic.platform;
 using fuchsia.google.platform;
 using fuchsia.platform;
 
-fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO,
-  fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK,
-  fuchsia.google.platform.BIND_PLATFORM_DEV_PID.LUIS,
-  fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON,
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO,
+    fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK,
+    fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON,
+  }
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMISTOR;
 }
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMISTOR;
 
+optional node "adc-0" {
+  fuchsia.hardware.adc.Service == fuchsia.hardware.adc.Service.ZirconTransport;
+  fuchsia.adc.FUNCTION == fuchsia.adc.FUNCTION.THERMISTOR;
+  fuchsia.adc.CHANNEL == 0;
+}
+
+optional node "adc-1" {
+  fuchsia.hardware.adc.Service == fuchsia.hardware.adc.Service.ZirconTransport;
+  fuchsia.adc.FUNCTION == fuchsia.adc.FUNCTION.THERMISTOR;
+  fuchsia.adc.CHANNEL == 1;
+}
+
+optional node "adc-2" {
+  fuchsia.hardware.adc.Service == fuchsia.hardware.adc.Service.ZirconTransport;
+  fuchsia.adc.FUNCTION == fuchsia.adc.FUNCTION.THERMISTOR;
+  fuchsia.adc.CHANNEL == 2;
+}
+
+optional node "adc-3" {
+  fuchsia.hardware.adc.Service == fuchsia.hardware.adc.Service.ZirconTransport;
+  fuchsia.adc.FUNCTION == fuchsia.adc.FUNCTION.THERMISTOR;
+  fuchsia.adc.CHANNEL == 3;
+}

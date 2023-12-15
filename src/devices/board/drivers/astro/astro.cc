@@ -174,6 +174,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "ThermalInit failed: %d", status);
   }
 
+  if (auto result = AdcInit(); result.is_error()) {
+    zxlogf(ERROR, "AdcInit failed: %d", result.error_value());
+  }
+
   if ((status = ThermistorInit()) != ZX_OK) {
     zxlogf(ERROR, "ThermistorInit failed: %d", status);
   }

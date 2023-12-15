@@ -8,33 +8,21 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/thermal/ntc.h>
 #include <limits.h>
 
+#include <bind/fuchsia/adc/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/adc/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro.h"
+#include "src/devices/board/drivers/astro/astro-adc.h"
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
-
-static const std::vector<fpbus::Mmio> saradc_mmios{
-    {{
-        .base = S905D2_SARADC_BASE,
-        .length = S905D2_SARADC_LENGTH,
-    }},
-    {{
-        .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
-    }},
-};
-
-static const std::vector<fpbus::Irq> saradc_irqs{
-    {{
-        .irq = S905D2_SARADC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
 
 zx_status_t Astro::ThermistorInit() {
   thermal::NtcInfo ntc_info[] = {
@@ -79,10 +67,22 @@ zx_status_t Astro::ThermistorInit() {
   };
 
   thermal::NtcChannel ntc_channels[] = {
-      {.adc_channel = 0, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-soc"},
-      {.adc_channel = 1, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-wifi"},
-      {.adc_channel = 2, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-dsp"},
-      {.adc_channel = 3, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-ambient"},
+      {.adc_channel = ASTRO_THERMISTOR_SOC,
+       .pullup_ohms = 47000,
+       .profile_idx = 0,
+       .name = "therm-soc"},
+      {.adc_channel = ASTRO_THERMISTOR_WIFI,
+       .pullup_ohms = 47000,
+       .profile_idx = 0,
+       .name = "therm-wifi"},
+      {.adc_channel = ASTRO_THERMISTOR_DSP,
+       .pullup_ohms = 47000,
+       .profile_idx = 0,
+       .name = "therm-dsp"},
+      {.adc_channel = ASTRO_THERMISTOR_AMBIENT,
+       .pullup_ohms = 47000,
+       .profile_idx = 0,
+       .name = "therm-ambient"},
   };
 
   std::vector<fpbus::Metadata> therm_metadata{
@@ -105,13 +105,71 @@ zx_status_t Astro::ThermistorInit() {
   thermistor.vid() = PDEV_VID_GOOGLE;
   thermistor.pid() = PDEV_PID_ASTRO;
   thermistor.did() = PDEV_DID_AMLOGIC_THERMISTOR;
-  thermistor.mmio() = saradc_mmios;
-  thermistor.irq() = saradc_irqs;
   thermistor.metadata() = therm_metadata;
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermistor));
+
+  const std::vector<fuchsia_driver_framework::BindRule> kSocThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_SOC),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kSocThermistorCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_SOC),
+  };
+  const std::vector<fuchsia_driver_framework::BindRule> kWifiThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_WIFI),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kWifiThermistorCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_WIFI),
+  };
+  const std::vector<fuchsia_driver_framework::BindRule> kDspThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_DSP),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kDspThermistorCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_DSP),
+  };
+  const std::vector<fuchsia_driver_framework::BindRule> kAmbientThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_AMBIENT),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kAmbientThermistorCompositeProperties =
+      {
+          fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                            bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+          fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, ASTRO_THERMISTOR_AMBIENT),
+      };
+
+  const std::vector<fuchsia_driver_framework::ParentSpec> kThermistorParents = {
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kSocThermistorCompositeRules,
+                                            .properties = kSocThermistorCompositeProperties}},
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kWifiThermistorCompositeRules,
+                                            .properties = kWifiThermistorCompositeProperties}},
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kDspThermistorCompositeRules,
+                                            .properties = kDspThermistorCompositeProperties}},
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kAmbientThermistorCompositeRules,
+                                            .properties = kAmbientThermistorCompositeProperties}},
+  };
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, thermistor),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "thermistor", .parents = kThermistorParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) request failed: %s", __func__,
            result.FormatDescription().data());

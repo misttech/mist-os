@@ -96,6 +96,7 @@ class Astro : public AstroType {
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Astro);
 
+  zx::result<> AdcInit();
   zx_status_t AudioInit();
   zx_status_t BacklightInit();
   zx_status_t BluetoothInit();

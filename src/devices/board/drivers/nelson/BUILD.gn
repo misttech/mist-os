@@ -133,6 +133,7 @@ fuchsia_driver("nelson-module-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "nelson-adc.cc",
     "nelson-audio.cc",
     "nelson-backlight.cc",
     "nelson-bluetooth.cc",
@@ -176,6 +177,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
@@ -190,6 +192,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/lib/driver/outgoing/cpp",
     "//src/connectivity/openthread/lib/ot-radio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",

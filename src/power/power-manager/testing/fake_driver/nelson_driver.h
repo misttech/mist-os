@@ -22,23 +22,23 @@ class Driver : public fdf::DriverBase {
  private:
   // Add a fake temperature driver and a control driver.
   template <typename A, typename B>
-  zx::result<> AddDriverAndControl(fidl::ClientEnd<fuchsia_driver_framework::Node>* parent,
+  zx::result<> AddDriverAndControl(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent,
                                    std::string_view driver_node_name,
                                    std::string_view driver_class_name,
                                    driver_devfs::Connector<A>& driver_devfs_connector,
                                    driver_devfs::Connector<B>& control_devfs_connector);
   // Add a child device node and offer the service capabilities.
   template <typename T>
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> AddChild(
-      fidl::ClientEnd<fuchsia_driver_framework::Node>* parent, std::string_view node_name,
+  zx::result<fidl::UnownedClientEnd<fuchsia_driver_framework::Node>> AddChild(
+      fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent, std::string_view node_name,
       std::string_view class_name, driver_devfs::Connector<T>& devfs_connector);
   // Add a series of nodes.
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> AddNodes(
-      fidl::ClientEnd<fuchsia_driver_framework::Node>* parent,
+  zx::result<fidl::UnownedClientEnd<fuchsia_driver_framework::Node>> AddNodes(
+      fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent,
       const std::vector<std::string_view>& nodes);
   // Add a single child node.
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> AddNode(
-      fidl::ClientEnd<fuchsia_driver_framework::Node>* parent, std::string_view node_name);
+  zx::result<fidl::UnownedClientEnd<fuchsia_driver_framework::Node>> AddNode(
+      fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent, std::string_view node_name);
 
   // Start serving Protocol (to be called by the devfs connector when a connection is established).
   void ServeSocControl(

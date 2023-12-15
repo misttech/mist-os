@@ -16,12 +16,10 @@
 #include <zircon/types.h>
 
 #include <fbl/ref_counted.h>
-#include <soc/aml-common/aml-g12-saradc.h>
 
 namespace thermal {
 
 static constexpr uint32_t kMaxNtcChannels = 4;
-static constexpr uint32_t kMaxAdcChannels = 4;
 
 zx_status_t AmlThermistor::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
@@ -39,84 +37,32 @@ zx_status_t AmlThermistor::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t AmlThermistor::InitPdev() {
-  zx_status_t status;
-
-  ddk::PDevFidl pdev(parent());
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "%s: failed to get pdev", __func__);
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  std::optional<fdf::MmioBuffer> adc_mmio;
-  status = pdev.MapMmio(0, &adc_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-  std::optional<fdf::MmioBuffer> ao_mmio;
-  status = pdev.MapMmio(1, &ao_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  zx::interrupt irq;
-  status = pdev.GetInterrupt(0, &irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "dwmac: could not map dma interrupt");
-    return status;
-  }
-
-  saradc_ = fbl::MakeRefCounted<AmlSaradcDevice>(*std::move(adc_mmio), *std::move(ao_mmio),
-                                                 std::move(irq));
-  return ZX_OK;
-}
-
 zx_status_t AmlThermistor::AddThermChannel(NtcChannel ch, NtcInfo info) {
-  zx_status_t status;
+  char adc_name[32];
+  sprintf(adc_name, "adc-%u", ch.adc_channel);
+
+  auto adc = DdkConnectFragmentFidlProtocol<fuchsia_hardware_adc::Service::Device>(adc_name);
+  if (adc.is_error()) {
+    zxlogf(ERROR, "Failed to connect to %s", adc_name);
+    return adc.error_value();
+  }
 
   std::unique_ptr<ThermistorChannel> dev(
-      new ThermistorChannel(zxdev(), saradc_, ch.adc_channel, info, ch.pullup_ohms, ch.name));
+      new ThermistorChannel(zxdev(), std::move(*adc), info, ch.pullup_ohms, ch.name));
 
-  status = dev->DdkAdd(ddk::DeviceAddArgs(ch.name));
+  auto status = dev->DdkAdd(ddk::DeviceAddArgs(ch.name));
   if (status != ZX_OK) {
     return status;
   }
   [[maybe_unused]] auto ptr = dev.release();
-  return ZX_OK;
-}
-
-zx_status_t AmlThermistor::AddRawChannel(uint32_t adc_chan) {
-  std::unique_ptr<RawChannel> dev(new RawChannel(zxdev(), saradc_, adc_chan));
-
-  char name[20];
-  snprintf(name, sizeof(name), "adc-%d", adc_chan);
-
-  zx_status_t status = dev->DdkAdd(ddk::DeviceAddArgs(name));
-  if (status != ZX_OK) {
-    return status;
-  }
-  [[maybe_unused]] auto ptr = dev.release();
-
   return ZX_OK;
 }
 
 void AmlThermistor::DdkInit(ddk::InitTxn txn) {
-  zx_status_t status = ZX_OK;
-
-  status = InitPdev();
-  if (status != ZX_OK) {
-    txn.Reply(status);
-    return;
-  }
-
-  saradc_->HwInit();
-
-  auto on_error = fit::defer([this]() { saradc_->Shutdown(); });
-
   NtcChannel ntc_channels[kMaxNtcChannels];
   size_t actual;
 
-  status =
+  auto status =
       DdkGetMetadata(NTC_CHANNELS_METADATA_PRIVATE, &ntc_channels, sizeof(ntc_channels), &actual);
   if (status != ZX_OK) {
     txn.Reply(status);
@@ -146,18 +92,7 @@ void AmlThermistor::DdkInit(ddk::InitTxn txn) {
       return;
     }
   }
-
-  // Expose all the adc channels via adc protocol
-  //  this includes channels which may not have a thermistor.
-  for (uint32_t i = 0; i < kMaxAdcChannels; i++) {
-    status = AddRawChannel(i);
-    if (status != ZX_OK) {
-      txn.Reply(status);
-      return;
-    }
-  }
   txn.Reply(ZX_OK);
-  on_error.cancel();
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

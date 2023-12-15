@@ -71,7 +71,6 @@ zx_library("amlogic") {
     "a5-hiu.cc",
     "a5-pll-rates.cc",
     "aml-audio.cc",
-    "aml-g12-saradc.cc",
     "aml-loopback-audio.cc",
     "aml-meson-pll.cc",
     "aml-pdm-audio.cc",

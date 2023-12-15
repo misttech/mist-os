@@ -96,6 +96,7 @@ class Sherlock : public SherlockType {
   uint8_t GetDdicVersion();
 
   zx_status_t Start();
+  zx::result<> AdcInit();
   zx_status_t SysmemInit();
   zx_status_t GpioInit();
   zx_status_t RegistersInit();

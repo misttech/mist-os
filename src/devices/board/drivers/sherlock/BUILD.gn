@@ -185,6 +185,7 @@ template("sherlock_driver") {
     }
 
     sources = [
+      "sherlock-adc.cc",
       "sherlock-audio.cc",
       "sherlock-backlight.cc",
       "sherlock-bluetooth.cc",
@@ -238,6 +239,7 @@ template("sherlock_driver") {
       "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
       "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+      "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
@@ -250,6 +252,7 @@ template("sherlock_driver") {
       "//sdk/lib/driver/component/cpp:cpp",
       "//src/connectivity/openthread/lib/ot-radio",
       "//src/devices/bind/fuchsia:fuchsia_cpp",
+      "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",

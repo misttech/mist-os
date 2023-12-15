@@ -18,7 +18,6 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
-#include <soc/aml-common/aml-g12-saradc.h>
 
 namespace thermal {
 
@@ -31,13 +30,9 @@ using DeviceType2 =
 
 class ThermistorChannel : public DeviceType2, public ddk::EmptyProtocol<ZX_PROTOCOL_TEMPERATURE> {
  public:
-  ThermistorChannel(zx_device_t* device, fbl::RefPtr<AmlSaradcDevice> adc, uint32_t ch,
+  ThermistorChannel(zx_device_t* device, fidl::ClientEnd<fuchsia_hardware_adc::Device> adc,
                     NtcInfo ntc_info, uint32_t pullup_ohms, const char* name)
-      : DeviceType2(device),
-        adc_(adc),
-        adc_channel_(ch),
-        ntc_(ntc_info, pullup_ohms),
-        name_(name) {}
+      : DeviceType2(device), adc_(std::move(adc)), ntc_(ntc_info, pullup_ohms), name_(name) {}
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
   void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
@@ -46,29 +41,9 @@ class ThermistorChannel : public DeviceType2, public ddk::EmptyProtocol<ZX_PROTO
  private:
   friend ThermistorDeviceTest;
 
-  const fbl::RefPtr<AmlSaradcDevice> adc_;
-  const uint32_t adc_channel_;
+  fidl::WireSyncClient<fuchsia_hardware_adc::Device> adc_;
   const Ntc ntc_;
   const std::string name_;
-};
-
-namespace FidlAdc = fuchsia_hardware_adc;
-class RawChannel;
-using DeviceType3 = ddk::Device<RawChannel, ddk::Messageable<FidlAdc::Device>::Mixin>;
-
-class RawChannel : public DeviceType3, public ddk::EmptyProtocol<ZX_PROTOCOL_ADC> {
- public:
-  RawChannel(zx_device_t* device, fbl::RefPtr<AmlSaradcDevice> adc, uint32_t ch)
-      : DeviceType3(device), adc_(adc), adc_channel_(ch) {}
-
-  void GetSample(GetSampleCompleter::Sync& completer) override;
-  void GetNormalizedSample(GetNormalizedSampleCompleter::Sync& completer) override;
-  void GetResolution(GetResolutionCompleter::Sync& completer) override;
-  void DdkRelease() { delete this; }
-
- private:
-  const fbl::RefPtr<AmlSaradcDevice> adc_;
-  const uint32_t adc_channel_;
 };
 
 }  // namespace thermal

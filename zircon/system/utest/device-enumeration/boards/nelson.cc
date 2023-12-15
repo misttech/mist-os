@@ -87,8 +87,15 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
 
       "sys/platform/05:05:24/ram",
 
-      "sys/platform/03:0a:27/thermistor-device/therm-thread",
-      "sys/platform/03:0a:27/thermistor-device/therm-audio",
+      // Thermistor/ADC
+      "sys/platform/03:0a:27/thermistor/thermistor-device/therm-thread",
+      "sys/platform/03:0a:27/thermistor/thermistor-device/therm-audio",
+      "class/adc/000",
+      "class/adc/001",
+      "class/adc/002",
+      "class/adc/003",
+      "class/temperature/000",
+      "class/temperature/001",
 
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",

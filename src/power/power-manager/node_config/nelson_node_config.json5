@@ -25,7 +25,7 @@
     type: "TemperatureHandler",
     name: "thermistor_thread",
     config: {
-      driver_path: "/dev/sys/platform/03:0a:27/thermistor-device/therm-thread",
+      driver_path: "/dev/sys/platform/03:0a:27/thermistor/thermistor-device/therm-thread",
       cache_duration_ms: 50
     }
   },
@@ -33,7 +33,7 @@
     type: "TemperatureHandler",
     name: "thermistor_audio",
     config: {
-      driver_path: "/dev/sys/platform/03:0a:27/thermistor-device/therm-audio",
+      driver_path: "/dev/sys/platform/03:0a:27/thermistor/thermistor-device/therm-audio",
       cache_duration_ms: 50
     }
   },

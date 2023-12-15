@@ -112,6 +112,7 @@ fuchsia_driver("astro-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "astro-adc.cc",
     "astro-audio.cc",
     "astro-backlight.cc",
     "astro-bluetooth.cc",
@@ -154,6 +155,7 @@ fuchsia_driver("astro-driver") {
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
@@ -164,6 +166,7 @@ fuchsia_driver("astro-driver") {
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
