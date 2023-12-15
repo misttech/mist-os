@@ -9,6 +9,13 @@
 #define _LIBCPP_ENABLE_HARDENED_MODE 1
 #endif
 
+#include <zircon/availability.h>
+
+// Most of the functions in this file are only available at HEAD because they
+// depend on fuchsia.images2 and fuchsia.sysmem2 which are currently
+// `added=HEAD`. See fxbug.dev/42085119.
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -102,6 +109,7 @@ bool ImageFormatMinimumRowBytes(const fuchsia_sysmem::wire::ImageFormatConstrain
 fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysmemPixelFormat_v2(
     zbi_pixel_format_t zbi_pixel_format);
 
+// Though these are used within the .cc file, they do not need to be exposed for stable API levels.
 fpromise::result<fuchsia_images2::ImageFormat> ImageConstraintsToFormat(
     const fuchsia_sysmem2::ImageFormatConstraints& constraints, uint32_t width, uint32_t height);
 fpromise::result<fuchsia_images2::wire::ImageFormat> ImageConstraintsToFormat(
@@ -128,5 +136,29 @@ bool ImageFormatPlaneRowBytes(const fuchsia_sysmem::wire::ImageFormat2& image_fo
 bool ImageFormatCompatibleWithProtectedMemory(const PixelFormatAndModifier& pixel_format);
 bool ImageFormatCompatibleWithProtectedMemory(
     const fuchsia_sysmem::wire::PixelFormat& pixel_format);
+
+#else  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
+// A small subset of the functions are exposed for use by zircon_platform_sysmem_connection.cc when
+// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See fxbug.dev/42085119.
+#if defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <lib/fpromise/result.h>
+
+// The following functions are  used by zircon_platform_sysmem_connection.cc and thus must be
+// exposed at all supported API levels.
+fpromise::result<fuchsia_sysmem::wire::ImageFormat2> ImageConstraintsToFormat(
+    const fuchsia_sysmem::wire::ImageFormatConstraints& constraints, uint32_t width,
+    uint32_t height);
+bool ImageFormatPlaneByteOffset(const fuchsia_sysmem::wire::ImageFormat2& image_format,
+                                uint32_t plane, uint64_t* offset_out);
+bool ImageFormatPlaneRowBytes(const fuchsia_sysmem::wire::ImageFormat2& image_format,
+                              uint32_t plane, uint32_t* row_bytes_out);
+
+#else
+#error Should only be included for API level HEAD where fuchsia.images2 and fuchsia.sysmem2 are supported.
+#endif  // defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
+
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 #endif  // LIB_IMAGE_FORMAT_IMAGE_FORMAT_H_

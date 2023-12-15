@@ -2,7 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <zircon/availability.h>
+
+// This file is always in the GN sources list, but its contents should not be
+// used for API levels other than HEAD where images2 and sysmem2 are supported.
+
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+// Enable a subset of functionality. See fxbug.dev/42085119.
+#define __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__
+#endif
+
 #include "lib/sysmem-version/sysmem-version.h"
+
+#if defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
+#undef __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__
+#endif
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
@@ -24,6 +38,12 @@ using safemath::CheckMul;
 using safemath::CheckSub;
 
 namespace sysmem {
+
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+// Normally, this is declared by the header before use below.
+fuchsia_images2::ColorSpace V2CopyFromV1ColorSpace(const fuchsia_sysmem::ColorSpace& v1);
+#endif
+
 namespace {
 
 // Can be replaced with std::remove_cvref<> when C++20.
@@ -109,6 +129,8 @@ inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
     }                                                                                      \
   } while (false)
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 #define PROCESS_WIRE_SCALAR_FIELD_V1(field_name)                                         \
   do {                                                                                   \
     using V2FieldType = std::remove_reference_t<decltype(v2b.field_name())>;             \
@@ -141,6 +163,8 @@ inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
     }                                                                                         \
   } while (false)
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 #define PROCESS_SCALAR_FIELD_V2(field_name)                                                       \
   do {                                                                                            \
     using V1FieldType = std::remove_reference_t<decltype(v1.field_name())>;                       \
@@ -155,6 +179,8 @@ inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
       v1.field_name() = static_cast<V1FieldType>(0);                                              \
     }                                                                                             \
   } while (false)
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 #define PROCESS_SCALAR_FIELD_V2_BIGGER(field_name)                                                 \
   do {                                                                                             \
@@ -273,6 +299,8 @@ fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::HeapType>> V2CopyFromV1
   return fpromise::ok(v2a);
 }
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 template <size_t N>
 fpromise::result<std::vector<fuchsia_images2::ColorSpace>> V2CopyFromV1ColorSpaceArrayNatural(
     const std::array<fuchsia_sysmem::ColorSpace, N>& v1a, uint32_t v1_count) {
@@ -287,6 +315,8 @@ fpromise::result<std::vector<fuchsia_images2::ColorSpace>> V2CopyFromV1ColorSpac
   }
   return fpromise::ok(std::move(v2a));
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 template <size_t N>
 fpromise::result<fidl::VectorView<fuchsia_images2::wire::ColorSpace>> V2CopyFromV1ColorSpaceArray(
@@ -412,29 +442,13 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
   return fpromise::ok();
 }
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 }  // namespace
 
 fuchsia_images2::PixelFormat V2CopyFromV1PixelFormatType(
     const fuchsia_sysmem::PixelFormatType& v1) {
   return static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1));
-}
-
-PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {
-  PixelFormatAndModifier v2b;
-  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type());
-  if (v1.has_format_modifier()) {
-    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier().value());
-  }
-  return v2b;
-}
-
-PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::wire::PixelFormat& v1) {
-  PixelFormatAndModifier v2b;
-  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type);
-  if (v1.has_format_modifier) {
-    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier.value);
-  }
-  return V2CopyFromV1PixelFormat(fidl::ToNatural(v1));
 }
 
 uint64_t V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier) {
@@ -451,14 +465,40 @@ uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier) {
   return v2_pixel_format_modifier;
 }
 
+PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {
+  PixelFormatAndModifier v2b;
+  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type());
+  if (v1.has_format_modifier()) {
+    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier().value());
+  }
+  return v2b;
+}
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
+PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::wire::PixelFormat& v1) {
+  PixelFormatAndModifier v2b;
+  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type);
+  if (v1.has_format_modifier) {
+    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier.value);
+  }
+  return V2CopyFromV1PixelFormat(fidl::ToNatural(v1));
+}
+
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 fuchsia_images2::ColorSpace V2CopyFromV1ColorSpace(const fuchsia_sysmem::ColorSpace& v1) {
   return static_cast<fuchsia_images2::ColorSpace>(static_cast<uint32_t>(v1.type()));
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fuchsia_images2::wire::ColorSpace V2CopyFromV1ColorSpace(
     const fuchsia_sysmem::wire::ColorSpace& v1) {
   return static_cast<fuchsia_images2::wire::ColorSpace>(static_cast<uint32_t>(v1.type));
 }
+
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageFormatConstraints(
     const fuchsia_sysmem::ImageFormatConstraints& v1) {
@@ -544,6 +584,8 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
 
   return fpromise::ok(std::move(v2b));
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fpromise::result<fuchsia_sysmem2::wire::ImageFormatConstraints> V2CopyFromV1ImageFormatConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ImageFormatConstraints& v1) {
@@ -647,6 +689,8 @@ V2CopyFromV1BufferCollectionConstraints(
   return fpromise::ok(v2b);
 }
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
     const fuchsia_sysmem::ImageFormat2& v1) {
   if (v1.layers() > 1) {
@@ -689,6 +733,8 @@ fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
 
   return fpromise::ok(std::move(v2b));
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fpromise::result<fuchsia_images2::wire::ImageFormat> V2CopyFromV1ImageFormat(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ImageFormat2& v1) {
@@ -1014,6 +1060,8 @@ fpromise::result<fuchsia_sysmem::wire::BufferMemorySettings> V1CopyFromV2BufferM
   return fpromise::ok(v1);
 }
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
     const fuchsia_images2::PixelFormat& v2) {
   return static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2));
@@ -1027,6 +1075,7 @@ fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier
   return v1;
 }
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(const PixelFormatAndModifier& v2) {
   fuchsia_sysmem::wire::PixelFormat v1;
   v1.type = V1CopyFromV2PixelFormatType(v2.pixel_format);
@@ -1034,6 +1083,7 @@ fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(const PixelFormatA
   v1.format_modifier.value = V1ConvertFromV2PixelFormatModifier(v2.pixel_format_modifier);
   return v1;
 }
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(const fuchsia_images2::ColorSpace& v2) {
   fuchsia_sysmem::ColorSpace v1;
@@ -1041,6 +1091,7 @@ fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(const fuchsia_images2::ColorSp
   return v1;
 }
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 fuchsia_sysmem::wire::ColorSpace V1WireCopyFromV2ColorSpace(
     const fuchsia_images2::wire::ColorSpace& v2) {
   fuchsia_sysmem::wire::ColorSpace v1;
@@ -1143,6 +1194,8 @@ fpromise::result<fuchsia_sysmem::wire::ImageFormatConstraints> V1CopyFromV2Image
   return fpromise::ok(std::move(v1_wire));
 }
 
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::ImageFormat& v2) {
   fuchsia_sysmem::ImageFormat2 v1{};
@@ -1224,6 +1277,8 @@ fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
 
   return fpromise::ok(std::move(v1));
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::wire::ImageFormat& v2) {
@@ -1533,5 +1588,7 @@ fuchsia_sysmem2::wire::BufferMemoryConstraints V2CloneBufferMemoryConstraints(
   auto src_natural = fidl::ToNatural(src);
   return fidl::ToWire(allocator, src_natural);
 }
+
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 }  // namespace sysmem

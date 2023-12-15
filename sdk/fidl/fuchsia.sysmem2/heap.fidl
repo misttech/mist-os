@@ -11,6 +11,7 @@ using zx;
 ///
 /// Each member property should correspond to a coherency domain defined
 /// in the CoherencyDomain enum.
+@available(added=HEAD)
 type CoherencyDomainSupport = table {
     /// Iff set and true, this heap supports the CPU domain.
     1: cpu_supported bool;
@@ -22,6 +23,7 @@ type CoherencyDomainSupport = table {
 
 /// Memory properties for a sysmem Heap.
 /// Heaps send the `HeapProperties` to sysmem device at registration time.
+@available(added=HEAD)
 type HeapProperties = table {
     /// Which coherency domains are supported by this heap.
     1: coherency_domain_support CoherencyDomainSupport;
@@ -33,6 +35,7 @@ type HeapProperties = table {
 };
 
 /// Manages resources on a specific sysmem heap.
+@available(added=HEAD)
 closed protocol Heap {
     /// Request a new memory allocation of `size` on heap. For heaps which don't
     /// permit CPU access to the buffer data, this will create a VMO with an

@@ -14,8 +14,16 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fpromise/result.h>
+#include <zircon/availability.h>
 
 #include <type_traits>
+
+// While most of the code in this file is only available at HEAD, a subset is
+// available for a specific use case when
+// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See fxbug.dev/42085119.
+#if (__Fuchsia_API_level__ < FUCHSIA_HEAD) && !defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
+#error Should only be included for API level HEAD where fuchsia.images2 and fuchsia.sysmem2 are supported.
+#endif
 
 // In sysmem V1, there's a PixelFormat FIDL struct that includes both pixel_format and
 // pixel_format_modifier, used as a self-contained structure / sub-structure in various places in
@@ -60,6 +68,7 @@ inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
   return PixelFormatAndModifier(*image_format.pixel_format(), pixel_format_modifier);
 }
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
     const fuchsia_images2::wire::ImageFormat& image_format) {
   ZX_ASSERT(image_format.has_pixel_format());
@@ -70,6 +79,7 @@ inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
                                        : fuchsia_images2::wire::kFormatModifierNone;
   return PixelFormatAndModifier(image_format.pixel_format(), pixel_format_modifier);
 }
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 namespace sysmem {
 
@@ -80,6 +90,7 @@ template <typename T>
 struct TypeIdentity {
   using type = T;
 };
+// #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 template <typename T>
 using TypeIdentity_t = typename TypeIdentity<T>::type;
 
@@ -94,7 +105,9 @@ struct HasOperatorUInt32<
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(HasOperatorUInt32<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::HeapType>::value);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 static_assert(!HasOperatorUInt32<fuchsia_sysmem2::HeapType>::value);
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 template <typename T, typename Enable = void>
 struct HasOperatorUInt64 : std::false_type {};
@@ -107,7 +120,9 @@ struct HasOperatorUInt64<
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(!HasOperatorUInt64<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::HeapType>::value);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 static_assert(HasOperatorUInt64<fuchsia_sysmem2::HeapType>::value);
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 // The meaning of "fidl enum" here includes flexible enums, which are actually just final classes
 // with a single private scalar field after codegen, but the have an operator uint32_t() or
@@ -161,8 +176,10 @@ static_assert(
     std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem::HeapType>::type>::value);
 static_assert(
     std::is_same<uint32_t, FidlUnderlyingTypeOrType<fuchsia_images2::PixelFormat>::type>::value);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 static_assert(
     std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem2::HeapType>::type>::value);
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 }  // namespace internal
 
@@ -176,6 +193,8 @@ template <typename T>
 constexpr FidlUnderlyingTypeOrType_t<T> fidl_underlying_cast(const T& value) {
   return static_cast<FidlUnderlyingTypeOrType_t<T>>(value);
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2)));
 
@@ -364,6 +383,17 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferUsage& src);
 [[nodiscard]] fuchsia_sysmem2::wire::BufferMemoryConstraints V2CloneBufferMemoryConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemoryConstraints& src);
+
+#else
+
+[[nodiscard]] fpromise::result<fuchsia_sysmem2::ImageFormatConstraints>
+V2CopyFromV1ImageFormatConstraints(const fuchsia_sysmem::ImageFormatConstraints& v1);
+[[nodiscard]] fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
+    const fuchsia_sysmem::ImageFormat2& v1);
+[[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
+    fuchsia_images2::ImageFormat& v2);
+
+#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 }  // namespace sysmem
 

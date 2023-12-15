@@ -5,6 +5,7 @@ library fuchsia.sysmem2;
 
 using zx;
 
+@available(added=HEAD)
 type VmoBuffer = resource table {
     /// `vmo` can be un-set if a participant has only
     /// [`fuchsia.sysmem2/BufferUsage.none`] set to `NONE_USAGE` (explicitly or
@@ -36,9 +37,11 @@ type VmoBuffer = resource table {
 
 /// The maximum entries that can be in the
 /// [`fuchsia.sysmem2/BufferCollectionInfo.buffers`] field.
+@available(added=HEAD)
 const MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS uint32 = 128;
 
 /// Information about a buffer collection and its buffers.
+@available(added=HEAD)
 type BufferCollectionInfo = resource table {
     /// These settings apply to all the buffers in the initial buffer
     /// allocation.
@@ -88,6 +91,7 @@ type BufferCollectionInfo = resource table {
 };
 
 /// These settings and constraints apply to all the buffers in the collection.
+@available(added=HEAD)
 type SingleBufferSettings = table {
     /// This field will always be set by sysmem.
     1: buffer_settings BufferMemorySettings;
@@ -104,6 +108,7 @@ type SingleBufferSettings = table {
 };
 
 /// These are memory-related settings for all buffers of a buffer collection.
+@available(added=HEAD)
 type BufferMemorySettings = table {
     /// This field will always be set by sysmem.
     1: size_bytes uint64;

@@ -22,6 +22,7 @@ const MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS uint32 = 64;
 /// stored in the buffers. These constraints can be specified per-participant.
 /// The sysmem service implements aggregation of constraints from multiple
 /// participants.
+@available(added=HEAD)
 type BufferCollectionConstraints = table {
     /// The `usage` is a hint to sysmem to potentially help choose a more
     /// optimal [`fuchsia.images2/PixelFormat`] and/or `pixel_format_modifier`
@@ -150,6 +151,7 @@ type BufferCollectionConstraints = table {
 ///
 /// Vendor or device specific types should have bit 60 set. Top order bit is
 /// reserved and should not be set.
+@available(added=HEAD)
 type HeapType = flexible enum : uint64 {
     SYSTEM_RAM = 0x0000000000000000;
 
@@ -172,6 +174,7 @@ type HeapType = flexible enum : uint64 {
     FRAMEBUFFER = 0x1000000000030001;
 };
 
+@available(added=HEAD)
 type BufferMemoryConstraints = table {
     /// un-set is treated as 1
     1: min_size_bytes uint64;
@@ -247,6 +250,7 @@ type BufferMemoryConstraints = table {
 /// the CPU. The `RAM` domain can be faster than the `CPU` domain when all
 /// access is via HW DMA, since in that case no CPU cache ops are required,
 /// since no participant is actually reading/writing using the CPU.
+@available(added=HEAD)
 type CoherencyDomain = flexible enum {
     CPU = 0;
     RAM = 1;

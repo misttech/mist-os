@@ -5,9 +5,13 @@
 // TODO(dalesat): Consider changing this library name.
 // fuchsia.images is currently occupied by ImagePipe. Will we be able to use that name? When?
 // Is the term 'image' too generic?
-@available(added=HEAD)
-library fuchsia.images2;
 
+// Some non-protocol types in this library are used by libmagma, which ships in
+// the IDK and must be built at all API levels supported by the IDK. See
+// fxbug.dev/42085119. The library is, however, unstable, and all other parts of
+// it should be explicitly marked as `added=HEAD`.
+@available(added=12)
+library fuchsia.images2;
 using fuchsia.math;
 
 /// Describes the format of images.
@@ -100,9 +104,8 @@ type ImageFormat = table {
     // See math.fidl for context.
     @available(added=HEAD)
     6: display_rect fuchsia.math.RectU;
-    // TODO(fxbug.dev/42085119): Uncomment when fixing API level builds.
-    // @available(removed=HEAD)
-    // 6: display_rect RectU;
+    @available(replaced=HEAD)
+    6: display_rect RectU;
 
     /// The size of a frame in terms of the number of pixels that have valid
     /// pixel data in terms of video decoding, but not in terms of which pixels

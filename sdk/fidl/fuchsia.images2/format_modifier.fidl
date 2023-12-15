@@ -19,16 +19,27 @@ library fuchsia.images2;
 /// "modifier" part of the name is more accurate than "override" would be.
 const FORMAT_MODIFIER_NONE uint64 = 0x0000000000000000;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_NONE uint64 = 0x0000000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_INTEL uint64 = 0x0100000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_AMD uint64 = 0x0200000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_NVIDIA uint64 = 0x0300000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_SAMSUNG uint64 = 0x0400000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_QCOM uint64 = 0x0500000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_VIVANTE uint64 = 0x0600000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_BROADCOM uint64 = 0x0700000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_ARM uint64 = 0x0800000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_ALLWINNER uint64 = 0x0900000000000000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 // Avoid unilaterally allocating vendor numbers from 0x0b onwards, to hopefully
 // avoid collisions with vendor numbers allocated elsewhere and to allow for
@@ -37,12 +48,16 @@ const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 // The 0x67 is 'g'. The intent of this vendor number is to avoid collision with
 // sequentially-allocated vendor numbers allocated elsewhere and listed above,
 // at least for now.
+@available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_GOOGLE uint64 = 0x6700000000000000;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_VALUE_RESERVED uint64 = 0x00FFFFFFFFFFFFFF;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_DO_NOT_CARE uint64 = 0x00FFFFFFFFFFFFFE;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_INVALID uint64 = FORMAT_MODIFIER_VALUE_RESERVED;
 
 const FORMAT_MODIFIER_LINEAR uint64 = 0x0000000000000000;
@@ -95,16 +110,23 @@ const FORMAT_MODIFIER_ARM_AFBC_16X16 uint64 = 0x0800000000000001;
 const FORMAT_MODIFIER_ARM_AFBC_32X8 uint64 = 0x0800000000000002;
 // Variations with transaction elimination support 0x1000 should be set for these formats.
 const FORMAT_MODIFIER_ARM_LINEAR_TE uint64 = 0x0800000000001000;
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_TE uint64 = 0x0800000000001001;
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_32X8_TE uint64 = 0x0800000000001002;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_YUV_TILED_HEADER uint64 = 0x0800000000002011;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV uint64 = 0x0800000000000071;
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE uint64 = 0x0800000000001071;
 
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TILED_HEADER uint64
         = 0x0800000000002071;
+@available(added=HEAD)
 const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE_TILED_HEADER uint64
         = 0x0800000000003071;
 
