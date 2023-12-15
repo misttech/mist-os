@@ -142,11 +142,22 @@ class TestExecution:
             if self._outdir is not None:
                 extra_args += ["--output-directory", self._outdir]
 
-            return ["fx", "ffx", "test", "run"] + extra_args + [component_url]
+            suffix_args = (
+                ["--"] + self._flags.extra_args
+                if self._flags.extra_args
+                else []
+            )
+
+            return (
+                ["fx", "ffx", "test", "run"]
+                + extra_args
+                + [component_url]
+                + suffix_args
+            )
         elif self._test.build.test.path:
             return [
                 os.path.join(self._exec_env.out_dir, self._test.build.test.path)
-            ]
+            ] + self._flags.extra_args
         else:
             raise TestCouldNotRun(
                 f"We do not know how to run this test: {str(self._test)}"

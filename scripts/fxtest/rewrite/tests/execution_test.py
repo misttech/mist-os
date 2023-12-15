@@ -134,6 +134,12 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 [["--output-directory", "foo/0"]],
                 [],
             ),
+            (
+                "with extra args",
+                ["--", "--foo"],
+                [["--", "--foo"]],
+                [],
+            ),
         ]
     )
     async def test_test_execution_component(
@@ -166,7 +172,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
-            args.parse_args(flag_list + ["--no-use-package-hash"]),
+            args.parse_args(["--no-use-package-hash"] + flag_list),
         )
 
         command_line = test.command_line()

@@ -6,6 +6,7 @@ import argparse
 from dataclasses import dataclass
 import pathlib
 import typing
+import sys
 
 import termout
 import util.arg_option as arg_option
@@ -47,6 +48,7 @@ class Flags:
     restrict_logs: bool
     also_run_disabled_tests: bool
     show_full_moniker_in_logs: bool
+    extra_args: typing.List[str]
 
     output: bool
     simple: bool
@@ -113,6 +115,22 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     Returns:
         Flags: Typed representation of the command line for this program.
     """
+
+    extra_args: typing.List[str] = []
+
+    if cli_args is not None and "--" in cli_args:
+        extra_index = cli_args.index("--")
+        (cli_args, extra_args) = (
+            cli_args[:extra_index],
+            cli_args[extra_index + 1 :],
+        )
+    elif cli_args is None:
+        extra_index = sys.argv.index("--")
+        (sys.argv, extra_args) = (
+            sys.argv[:extra_index],
+            sys.argv[extra_index + 1 :],
+        )
+
     parser = argparse.ArgumentParser(
         "fx test",
         description="Test Executor for Humans",
@@ -371,5 +389,7 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         help="If set, write ffx test output to this directory for post processing.",
     )
 
-    flags: Flags = Flags(**vars(parser.parse_args(cli_args)))
+    flags: Flags = Flags(
+        **vars(parser.parse_args(cli_args)), extra_args=extra_args
+    )
     return flags
