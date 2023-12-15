@@ -1057,6 +1057,10 @@ void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
   auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
                           .force_rebind(false)
                           .driver_url_suffix(request->driver);
+  if (!controller_.is_valid()) {
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
   controller_->RequestBind(bind_request.Build())
       .ThenExactlyOnce(
           [completer = completer.ToAsync()](
@@ -1074,6 +1078,10 @@ void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer)
   auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
                           .force_rebind(true)
                           .driver_url_suffix(request->driver);
+  if (!controller_.is_valid()) {
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
   controller_->RequestBind(bind_request.Build())
       .ThenExactlyOnce(
           [completer = completer.ToAsync()](
