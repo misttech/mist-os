@@ -190,11 +190,17 @@ class JTrace {
     //    whoever is running on CPU X now).  Note that we cannot disable
     //    preemption until after thread_init_early has been called, but at that
     //    point in boot, interrupts are disabled and the secondary CPUs are not
-    //    running yet, so that should be OK.
+    //    running yet, so that should be OK.  Also, we don't want to disable and
+    //    later attempt to re-enable preemption if interrupts are currently off
+    //    (as they would be when a spinlock is held) as it _could_ trip an
+    //    assert in the consistency checks for the preempt-disabler.  If
+    //    interrupts are already disabled, we should be fine.  We can't change
+    //    CPUs at that point in time anyway.
     //
     const uint32_t wr = opt_wr.value();
     {
-      if (after_thread_init_early_) {
+      const bool disable_preemption = after_thread_init_early_ && !arch_ints_disabled();
+      if (disable_preemption) {
         Thread::Current::preemption_state().PreemptDisable();
       }
 
@@ -216,7 +222,7 @@ class JTrace {
         }
       }
 
-      if (after_thread_init_early_) {
+      if (disable_preemption) {
         Thread::Current::preemption_state().PreemptReenable();
       }
     }
