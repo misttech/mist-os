@@ -51,9 +51,11 @@ rustc_test("service-routing-test-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
     "//src/sys/lib/component-events",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing",
   ]

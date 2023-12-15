@@ -10,10 +10,12 @@ use {
         sequence::*,
     },
     fidl::endpoints::ServiceMarker,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples_services as fexamples,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
+    fidl_fuchsia_examples_services as fexamples, fidl_fuchsia_io as fio,
+    fidl_fuchsia_sys2 as fsys2,
     fuchsia_component::client,
-    fuchsia_component_test::ScopedInstance,
+    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance},
+    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
     moniker::{ChildName, ChildNameBase},
     test_case::test_case,
     tracing::*,
@@ -26,6 +28,7 @@ const A_ONECOLL_MONIKER: &str = "account_providers:a";
 const B_ONECOLL_MONIKER: &str = "account_providers:b";
 const A_TWOCOLL_MONIKER: &str = "account_providers_1:a";
 const B_TWOCOLL_MONIKER: &str = "account_providers_2:b";
+const ECHO_URL: &str = "#meta/multi-instance-echo-provider.cm";
 
 struct TestInput {
     url: &'static str,
@@ -169,6 +172,171 @@ async fn create_destroy_instance_test(test_type: TestType) {
 
     // The provider's instances should be removed from the aggregated service directory.
     verify_instances(instances, 1);
+}
+
+#[fuchsia::test]
+async fn static_aggregate_offer() {
+    let builder = RealmBuilder::new().await.unwrap();
+    // Add subrealm to test offer from parent.
+    let parent_echo = builder.add_child("echo", ECHO_URL, ChildOptions::new()).await.unwrap();
+    let subrealm = builder.add_child_realm("realm", ChildOptions::new().eager()).await.unwrap();
+    // Initialize subrealm from echo component to test "offer from self"
+    let echo_decl = builder.get_component_decl(&parent_echo).await.unwrap();
+    subrealm.replace_realm_decl(echo_decl).await.unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&parent_echo)
+                .to(&subrealm),
+        )
+        .await
+        .unwrap();
+    let echo = subrealm.add_child("echo", ECHO_URL, ChildOptions::new()).await.unwrap();
+    let (handles_sender, mut handles_receiver) = mpsc::unbounded();
+    let consumer = subrealm
+        .add_local_child(
+            "consumer",
+            move |handles| {
+                let mut handles_sender = handles_sender.clone();
+                async move {
+                    handles_sender.send(handles).await.unwrap();
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+    subrealm
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&echo)
+                .to(&consumer),
+        )
+        .await
+        .unwrap();
+    subrealm
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(Ref::parent())
+                .to(&consumer),
+        )
+        .await
+        .unwrap();
+    subrealm
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(Ref::self_())
+                .to(&consumer),
+        )
+        .await
+        .unwrap();
+    let _realm = builder.build().await.unwrap();
+
+    let handles = handles_receiver.next().await.unwrap();
+    let echo_svc = handles.open_service::<fecho::EchoServiceMarker>().unwrap();
+    let instances = fuchsia_fs::directory::readdir(&echo_svc)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|dirent| dirent.name);
+    // parent, self, child in the aggregate x 3 instances each
+    assert_eq!(instances.len(), 3 * 3);
+    drop(echo_svc);
+
+    // Connect to every instance and ensure the protocols are functional.
+    for instance in instances {
+        let proxy =
+            handles.connect_to_service_instance::<fecho::EchoServiceMarker>(&instance).unwrap();
+
+        let echo_proxy = proxy.connect_to_regular_echo().unwrap();
+        let res = echo_proxy.echo_string("hello").await.unwrap();
+        assert!(res.ends_with("hello"));
+
+        let echo_proxy = proxy.connect_to_reversed_echo().unwrap();
+        let res = echo_proxy.echo_string("hello").await.unwrap();
+        assert!(res.ends_with("olleh"));
+    }
+}
+
+#[fuchsia::test]
+async fn static_aggregate_expose() {
+    let builder = RealmBuilder::new().await.unwrap();
+    // Add placeholder echo component so we can get its decl. Then initialize a subrealm with this
+    // decl to test "expose from self".
+    let placeholder_echo =
+        builder.add_child("placeholder_echo", ECHO_URL, ChildOptions::new()).await.unwrap();
+    let subrealm = builder.add_child_realm("realm", ChildOptions::new()).await.unwrap();
+    let echo_decl = builder.get_component_decl(&placeholder_echo).await.unwrap();
+    subrealm.replace_realm_decl(echo_decl).await.unwrap();
+    let echo = subrealm.add_child("echo", ECHO_URL, ChildOptions::new()).await.unwrap();
+    subrealm
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&echo)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    subrealm
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(Ref::self_())
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&subrealm)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let realm = builder.build().await.unwrap();
+
+    let exposed_dir = realm.root.get_exposed_dir();
+    let echo_svc = fuchsia_fs::directory::open_directory(
+        exposed_dir,
+        fecho::EchoServiceMarker::SERVICE_NAME,
+        fio::OpenFlags::empty(),
+    )
+    .await
+    .unwrap();
+    let instances = fuchsia_fs::directory::readdir(&echo_svc)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|dirent| dirent.name);
+    // self, child in the aggregate x 3 instances each
+    assert_eq!(instances.len(), 3 * 2);
+    drop(echo_svc);
+
+    // Connect to every instance and ensure the protocols are functional.
+    for instance in instances {
+        let proxy = client::connect_to_service_instance_at_dir::<fecho::EchoServiceMarker>(
+            exposed_dir,
+            &instance,
+        )
+        .unwrap();
+
+        let echo_proxy = proxy.connect_to_regular_echo().unwrap();
+        let res = echo_proxy.echo_string("hello").await.unwrap();
+        assert!(res.ends_with("hello"));
+
+        let echo_proxy = proxy.connect_to_reversed_echo().unwrap();
+        let res = echo_proxy.echo_string("hello").await.unwrap();
+        assert!(res.ends_with("olleh"));
+    }
 }
 
 /// Starts a branch child component.

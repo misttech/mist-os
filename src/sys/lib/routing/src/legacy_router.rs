@@ -1371,15 +1371,6 @@ impl Expose {
                     }
                 }
                 RouteBundle::Aggregate(_) => {
-                    if expose_bundle
-                        .iter()
-                        .any(|e| !matches!(e.source(), ExposeSource::Collection(_)))
-                    {
-                        // TODO(fxbug.dev/4776): Support aggregation over collections and children.
-                        return Err(RoutingError::UnsupportedRouteSource {
-                            source_type: "mix of collections and child routes".into(),
-                        });
-                    }
                     return Ok(ExposeResult::ExposeFromAnonymizedAggregate(expose_bundle, target));
                 }
             }
