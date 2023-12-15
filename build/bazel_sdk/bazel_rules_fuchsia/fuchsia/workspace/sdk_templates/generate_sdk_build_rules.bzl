@@ -292,12 +292,11 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
     fidl_api_level_override = ctx.attr.fuchsia_api_level_override
     clang_api_level_override = ctx.attr.fuchsia_api_level_override
     if ctx.attr.fuchsia_api_level_override == "HEAD":
-        # TODO(https://fxbug.dev/104513) upstream clang support for HEAD
-        # Emulate a "HEAD" API level since it is not supported directly by clang.
-        # Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
-        # so we define this as `((uint32_t)-1)`. clang expects API levels to be integer literals.
-        clang_api_level_override = 4294967295
-        fidl_api_level_override = "HEAD"
+        versions.append(struct(
+            # Do not set abi_revision or status here because they don't really
+            # exist for HEAD and we don't want to silently use them by accident.
+            api_level = "HEAD",
+        ))
 
     _merge_template(
         ctx,
@@ -305,9 +304,7 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
         tmpl,
         {
             "{{default_target_api}}": str(max_api),
-            "{{default_clang_target_api}}": str(clang_api_level_override) or str(max_api),
-            "{{default_fidl_target_api}}": str(fidl_api_level_override) or str(max_api),
-            "{{valid_target_apis}}": _get_starlark_list(sorted(versions, key = lambda version: int(version.api_level))),
+            "{{valid_target_apis}}": _get_starlark_list(versions),
         },
     )
 
@@ -455,6 +452,7 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
     tmpl_linklib = ctx.path(ctx.attr._cc_prebuilt_library_linklib_subtemplate)
     tmpl_distlib = ctx.path(ctx.attr._cc_prebuilt_library_distlib_subtemplate)
     lib_base_path = meta["root"] + "/"
+
     deps = _find_dep_paths(meta["deps"], "pkg/", ctx.attr.parent_sdk, parent_sdk_contents)
     subs = {
         "{{deps}}": _get_starlark_list(deps),

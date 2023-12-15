@@ -49,7 +49,6 @@ def _fuchsia_toolchain_info_impl(ctx):
         zbi = ctx.executable.zbi,
         zbi_manifest = ctx.file.zbi_manifest,
         default_api_level = ctx.attr.default_target_api,
-        default_fidl_target_api = ctx.attr.default_fidl_target_api,
         exec_cpu = ctx.attr.exec_cpu,
         sdk_id = ctx.attr.sdk_id,
         sdk_manifest = ctx.file.sdk_manifest,
@@ -290,12 +289,8 @@ included in the Fuchsia IDK.
             cfg = "exec",
             allow_single_file = True,
         ),
-        "default_target_api": attr.int(
+        "default_target_api": attr.string(
             doc = "Default platform target api.",
-            mandatory = True,
-        ),
-        "default_fidl_target_api": attr.string(
-            doc = "Default platform target api for FIDL.",
             mandatory = True,
         ),
         "exec_cpu": attr.string(

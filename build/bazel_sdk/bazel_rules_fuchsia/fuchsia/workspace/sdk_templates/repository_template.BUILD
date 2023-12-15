@@ -8,7 +8,7 @@
 # the `fuchsia_sdk_repository` rule for more information.
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
 load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
-load("api_version.bzl", "DEFAULT_FIDL_TARGET_API", "DEFAULT_TARGET_API")
+load("api_version.bzl", "DEFAULT_TARGET_API")
 
 # Export all files as individual targets.
 exports_files(glob(["**/*"]))
@@ -52,8 +52,7 @@ fuchsia_toolchain_info(
         "//conditions:default": None,
     }),
     cmc_manifest = "//tools:{{HOST_CPU}}/cmc-meta.json",
-    default_fidl_target_api = DEFAULT_FIDL_TARGET_API,
-    default_target_api = DEFAULT_TARGET_API,
+    default_target_api = str(DEFAULT_TARGET_API),
     elf_test_runner_shard = "sys/testing/elf_test_runner.shard.cml",
     exec_cpu = "{{HOST_CPU}}",
     far = "//tools:{{HOST_CPU}}/far",
