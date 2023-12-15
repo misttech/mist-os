@@ -52,6 +52,7 @@ power_manager_deps = [
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
+  "//src/lib/fake-clock/named-timer",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fidl/rust/fidl-contrib",
   "//src/lib/fuchsia",
@@ -100,11 +101,11 @@ power_manager_sources = [
   "src/temperature_handler.rs",
   "src/test/mock_node.rs",
   "src/test/mod.rs",
-  "src/test/thermal_integration_tests.rs",
   "src/thermal_load_driver.rs",
   "src/thermal_policy.rs",
   "src/thermal_shutdown.rs",
   "src/thermal_state_handler.rs",
+  "src/timer.rs",
   "src/types.rs",
   "src/utils.rs",
 ]
@@ -118,7 +119,6 @@ rustc_binary("bin") {
   sources = power_manager_sources
   test_deps = [
     ":fake_syscalls",
-    "rkf45:lib",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",

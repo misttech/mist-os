@@ -3,4 +3,3 @@
 // found in the LICENSE file.
 
 pub mod mock_node;
-mod thermal_integration_tests;
