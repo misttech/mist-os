@@ -152,8 +152,10 @@ fuchsia::ui::pointer::augment::TouchEventWithLocalHit touchEvent(const PointerPa
 std::vector<std::pair<PointerParams, /*interaction_id=*/uint32_t>> tapEvents(
     PointerId pointer_id, const glm::vec2& coordinate, int32_t interaction_id) {
   return {
-      {{pointer_id, fuchsia::ui::input::PointerEventPhase::ADD, coordinate}, interaction_id},
-      {{pointer_id, fuchsia::ui::input::PointerEventPhase::REMOVE, coordinate}, interaction_id},
+      {{pointer_id, fuchsia::ui::input::PointerEventPhase::ADD, coordinate},
+       static_cast<uint32_t>(interaction_id)},
+      {{pointer_id, fuchsia::ui::input::PointerEventPhase::REMOVE, coordinate},
+       static_cast<uint32_t>(interaction_id)},
   };
 }
 
