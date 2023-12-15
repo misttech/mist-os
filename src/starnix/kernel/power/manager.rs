@@ -3,10 +3,21 @@
 // found in the LICENSE file.
 
 use crate::power::{SuspendState, SuspendStats};
-use starnix_logging::not_implemented;
+use fidl_fuchsia_kernel as fkernel;
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_zircon as zx;
+use once_cell::sync::Lazy;
 use starnix_sync::Mutex;
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::{errors::Errno, from_status_like_fdio};
 use std::{collections::HashSet, sync::Arc};
+use zx::AsHandleRef;
+
+static CPU_RESOURCE: Lazy<zx::Resource> = Lazy::new(|| {
+    connect_to_protocol_sync::<fkernel::CpuResourceMarker>()
+        .expect("couldn't connect to fuchsia.kernel.CpuResource")
+        .get(zx::Time::INFINITE)
+        .expect("couldn't talk to fuchsia.kernel.CpuResource")
+});
 
 #[derive(Default)]
 pub struct PowerManager {
@@ -20,14 +31,18 @@ impl PowerManager {
     }
 
     pub fn suspend_states(&self) -> HashSet<SuspendState> {
-        // TODO(b/303507442): Gets the real supported states via SPLA Control fidl api.
+        // TODO(b/303507442): Gets the real supported states via SGA (System Activity Governor)
+        // fidl api.
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
     pub fn suspend(&self, _state: SuspendState) -> Result<(), Errno> {
-        // TODO(b/303507442): Execute ops of suspend state transition via SPLA Suspend fidl api.
-        not_implemented!("PowerManager::suspend");
-        // TODO(b/287114999): Check `enable_sync_on_suspend` to execute sync on all filesystems.
-        error!(ENOTSUP)
+        // TODO(b/303507442): Execute ops of suspend state transition via SGA suspend fidl api.
+        // Temporary hack to trigger system suspend directly.
+        let resume_at = zx::Time::after(zx::Duration::from_seconds(5));
+        zx::Status::ok(unsafe {
+            zx::sys::zx_system_suspend_enter(CPU_RESOURCE.raw_handle(), resume_at.into_nanos())
+        })
+        .map_err(|status| from_status_like_fdio!(status))
     }
 }

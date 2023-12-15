@@ -85,6 +85,10 @@ TEST_F(SysfsPowerTest, SuspendStateFileContainsExpectedContents) {
   EXPECT_THAT(states_str, MatchesRegex("([mem|freeze|disk|standby]\\s?)*\n"));
 }
 
+TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
+}
+
 TEST_F(SysfsPowerTest, SuspendStateFileWriteFails) {
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "test"));
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "disk"));

@@ -45,6 +45,7 @@
         {
             protocol: [
                 "fuchsia.buildinfo.Provider",
+                "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.sysinfo.SysInfo",

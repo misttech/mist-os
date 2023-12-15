@@ -45,6 +45,9 @@
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
 
+                    // TODO(b/316023943): Remove after SGA is ready.
+                    "/core/testing/starnix-tests:**",
+
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this capability
                     // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
