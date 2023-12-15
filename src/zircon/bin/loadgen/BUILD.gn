@@ -10,6 +10,7 @@ executable("loadgen") {
   deps = [
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
   ]
 }
 

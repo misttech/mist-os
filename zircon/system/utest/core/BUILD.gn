@@ -135,13 +135,15 @@ foreach(test_name, all_bootfs_tests) {
   test(test_name) {
     output_name = "core-$test_name"
 
+    deps = [ test_name ]
+
     if (is_fuchsia) {
       fdio_config = [ "//build/config/fuchsia:fdio_config" ]
       if (configs + fdio_config - fdio_config != configs) {
         configs -= fdio_config
       }
+      deps += [ "//sdk/lib/fdio" ]
     }
-    deps = [ test_name ]
   }
 
   bootfs_test("core-$test_name-bootfs-test") {
