@@ -10,14 +10,17 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, SinkExt, StreamExt};
+use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use starnix_logging::not_implemented;
+use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{CAP_SYSLOG, CAP_SYS_ADMIN},
     errors::{errno, error, Errno},
     user_address::UserAddress,
 };
 use std::{
+    cmp,
     collections::VecDeque,
     io::{self, Write},
     time::Duration,
@@ -26,9 +29,17 @@ use std::{
 const BUFFER_SIZE: i32 = 1_049_000;
 
 #[derive(Default)]
-pub struct Syslog;
+pub struct Syslog {
+    syscall_subscription: OnceCell<Mutex<LogSubscription>>,
+}
 
 impl Syslog {
+    pub fn init(&self, system_task: &CurrentTask) -> Result<(), anyhow::Error> {
+        let subscription = LogSubscription::snapshot_then_subscribe(system_task, false)?;
+        self.syscall_subscription.set(Mutex::new(subscription)).expect("syslog.set called once");
+        Ok(())
+    }
+
     pub fn read(
         &self,
         current_task: &CurrentTask,
@@ -39,7 +50,12 @@ impl Syslog {
         if address.is_null() || length < 0 {
             return error!(EINVAL);
         }
-        not_implemented!("syslog: read");
+        let mut subscription = self.syscall_subscription.get().expect("syslog initialized").lock();
+        if let Some(data) = subscription.try_next()? {
+            let size_to_write = cmp::min(data.len(), length as usize);
+            current_task.write_memory(address, &data[..size_to_write])?;
+            return Ok(size_to_write as i32);
+        }
         Ok(0)
     }
 
@@ -73,6 +89,14 @@ impl Syslog {
         Ok(BUFFER_SIZE)
     }
 
+    pub fn snapshot_then_subscribe(
+        &self,
+        current_task: &CurrentTask,
+        non_blocking: bool,
+    ) -> Result<LogSubscription, Errno> {
+        LogSubscription::snapshot_then_subscribe(current_task, non_blocking)
+    }
+
     fn check_credentials(current_task: &CurrentTask) -> Result<(), Errno> {
         let credentials = current_task.creds();
         if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
@@ -82,6 +106,7 @@ impl Syslog {
     }
 }
 
+#[derive(Debug)]
 pub enum LogSubscription {
     Blocking {
         iterator: fdiagnostics::BatchIteratorSynchronousProxy,
@@ -98,11 +123,11 @@ enum OneOrMany<T> {
 }
 
 impl LogSubscription {
-    pub fn snapshot() -> Result<Self, Errno> {
+    fn snapshot() -> Result<Self, Errno> {
         Self::blocking(fdiagnostics::StreamMode::Snapshot)
     }
 
-    pub fn snapshot_then_subscribe(
+    fn snapshot_then_subscribe(
         current_task: &CurrentTask,
         non_blocking: bool,
     ) -> Result<Self, Errno> {

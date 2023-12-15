@@ -331,7 +331,7 @@ impl Kernel {
             stats: Arc::new(KernelStats::default()),
             delayed_releaser: Default::default(),
             profile_provider,
-            syslog: Syslog::default(),
+            syslog: Default::default(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

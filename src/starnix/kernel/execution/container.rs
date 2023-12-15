@@ -360,6 +360,8 @@ async fn create_container(
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
 
+    kernel.syslog.init(&system_task).source_context("initializing syslog")?;
+
     // Register common devices and add them in sysfs and devtmpfs.
     init_common_devices(&system_task);
 
