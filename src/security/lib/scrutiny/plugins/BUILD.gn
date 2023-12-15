@@ -63,7 +63,6 @@ if (is_fuchsia) {
         filesystems = {
           image_name = "assembly"
           image_mode = "no_image"
-          volume = "fxfs"
         }
       }
     }

@@ -75,7 +75,6 @@ template("assemble_network_conformance_system") {
         configure_fshost = true
         filesystems = {
           image_name = _image_name
-          volume = "fxfs"
         }
       }
     }

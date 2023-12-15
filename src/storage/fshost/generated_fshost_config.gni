@@ -14,7 +14,7 @@ declare_args() {
   # Use Fxfs's blob implementation
   # Changes the flashing logic because the outputs changed.
   # Toggles a bunch of tests to use fxfs.
-  fxfs_blob = false
+  fxfs_blob = true
 }
 
 # Generates a structured config value file for fshost.
@@ -60,7 +60,7 @@ template("generated_fshost_config") {
       factory = false
       fvm = true
       ramdisk_image = false
-      fxfs_blob = false
+      fxfs_blob = true
       gpt = true
       gpt_all = false
       mbr = false

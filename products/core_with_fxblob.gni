@@ -3,6 +3,4 @@
 # found in the LICENSE file.
 
 import("//products/core.gni")
-fuchsia_product_assembly_config_label = "//products/core:core_with_fxfs"
-zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fxfs"
-fxfs_blob = true
+# TODO(fxbug.dev/282896655): Remove this product (redundant with core).

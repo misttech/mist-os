@@ -74,16 +74,6 @@ _platform_configuration_base = {
 _storage_default = {
   storage = {
     configure_fshost = true
-    filesystems = {
-      volume = {
-        fvm = {
-          data = {
-          }
-          blob = {
-          }
-        }
-      }
-    }
   }
 }
 
@@ -117,15 +107,6 @@ _storage_minfs = {
           }
         }
       }
-    }
-  }
-}
-
-_storage_fxfs = {
-  storage = {
-    configure_fshost = true
-    filesystems = {
-      volume = "fxfs"
     }
   }
 }
@@ -172,21 +153,6 @@ product_assembly_configuration("core_with_minfs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_minfs, "*")
-  }
-  product = {
-    build_info = default_product_build_info
-  }
-
-  base_driver_packages = _base_driver_packages
-  base_packages = _base_packages
-  deps = [ "//build/info:build_info_files" ]
-}
-
-product_assembly_configuration("core_with_fxfs") {
-  testonly = true
-  platform = {
-    forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_fxfs, "*")
   }
   product = {
     build_info = default_product_build_info

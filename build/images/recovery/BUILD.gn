@@ -211,9 +211,6 @@ if (is_fuchsia) {
     _storage_config = {
       storage = {
         configure_fshost = true
-        filesystems = {
-          volume = "fxfs"
-        }
       }
     }
   }
