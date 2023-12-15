@@ -38,6 +38,7 @@ use {
         sync::{Arc, Weak},
     },
     tracing::{trace, warn},
+    vfs::directory::entry::DirectoryEntry,
 };
 
 lazy_static! {
@@ -428,8 +429,7 @@ async fn construct_namespace(
     let mut state = instance.lock_state().await;
     match &mut *state {
         InstanceState::Resolved(r) => {
-            let namespace =
-                create_namespace(r.package(), &instance, r.decl(), vec![]).await.unwrap();
+            let namespace = create_namespace(r.package(), &instance, r.decl()).await.unwrap();
             let (ns, fut) = namespace.serve().unwrap();
             instance.nonblocking_task_group().spawn(fut);
             Ok(ns.into())
@@ -503,17 +503,24 @@ async fn open(
             }
         }
         fsys::OpenDirType::NamespaceDir => {
-            let mut state = instance.lock_state().await;
-            match &mut *state {
-                InstanceState::Resolved(r) => {
-                    let path = vfs::path::Path::validate_and_split(path)
-                        .map_err(|_| fsys::OpenError::BadPath)?;
+            let path =
+                vfs::path::Path::validate_and_split(path).map_err(|_| fsys::OpenError::BadPath)?;
 
-                    r.get_ns_dir().open(flags, path, object);
-                    Ok(())
-                }
+            let mut state = instance.lock_state().await;
+            let resolved_state = match &mut *state {
+                InstanceState::Resolved(r) => Ok(r),
                 _ => Err(fsys::OpenError::InstanceNotResolved),
-            }
+            }?;
+
+            let execution_scope = resolved_state.execution_scope().clone();
+            resolved_state.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?.open(
+                execution_scope,
+                flags,
+                path,
+                object,
+            );
+
+            Ok(())
         }
         _ => Err(fsys::OpenError::BadDirType),
     }
@@ -1077,7 +1084,7 @@ mod tests {
             entries,
             vec![fuchsia_fs::directory::DirEntry {
                 name: "foo".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Unknown
+                kind: fuchsia_fs::directory::DirentKind::Service
             }]
         );
     }

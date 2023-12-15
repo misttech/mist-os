@@ -383,13 +383,6 @@ pub enum ResolveActionError {
         #[source]
         err: VfsError,
     },
-    #[error("error in namespace dir VFS for component {moniker}: {err}")]
-    NamespaceDirError {
-        moniker: Moniker,
-
-        #[source]
-        err: VfsError,
-    },
     #[error("could not add static child \"{}\": {}", child_name, err)]
     AddStaticChildError {
         child_name: String,
@@ -423,7 +416,6 @@ impl ResolveActionError {
             | ResolveActionError::ComponentAddressParseError { .. }
             | ResolveActionError::AbiCompatibilityError { .. } => zx::Status::NOT_FOUND,
             ResolveActionError::ExposeDirError { .. }
-            | ResolveActionError::NamespaceDirError { .. }
             | ResolveActionError::AddStaticChildError { .. }
             | ResolveActionError::StructuredConfigError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => zx::Status::INTERNAL,
@@ -445,7 +437,6 @@ impl Into<fsys::ResolveError> for ResolveActionError {
             ResolveActionError::InstanceShutDown { .. }
             | ResolveActionError::InstanceDestroyed { .. } => fsys::ResolveError::InstanceNotFound,
             ResolveActionError::ExposeDirError { .. }
-            | ResolveActionError::NamespaceDirError { .. }
             | ResolveActionError::ResolverError { .. }
             | ResolveActionError::StructuredConfigError { .. }
             | ResolveActionError::ComponentAddressParseError { .. }
@@ -471,7 +462,6 @@ impl Into<fsys::StartError> for ResolveActionError {
             ResolveActionError::InstanceShutDown { .. }
             | ResolveActionError::InstanceDestroyed { .. } => fsys::StartError::InstanceNotFound,
             ResolveActionError::ExposeDirError { .. }
-            | ResolveActionError::NamespaceDirError { .. }
             | ResolveActionError::ResolverError { .. }
             | ResolveActionError::StructuredConfigError { .. }
             | ResolveActionError::ComponentAddressParseError { .. }
@@ -849,8 +839,14 @@ pub enum CreateNamespaceError {
     #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
-    #[error("namespace configuration error: {0}")]
-    NamespaceError(#[from] serve_processargs::BuildNamespaceError),
+    #[error(transparent)]
+    BuildNamespaceError(#[from] serve_processargs::BuildNamespaceError),
+
+    #[error("failed to convert namespace into directory")]
+    ConvertToDirectory(#[source] ClonableError),
+
+    #[error(transparent)]
+    ComponentInstanceError(#[from] ComponentInstanceError),
 }
 
 impl CreateNamespaceError {
@@ -859,7 +855,9 @@ impl CreateNamespaceError {
             Self::ClonePkgDirFailed(_) => zx::Status::INTERNAL,
             Self::UseDeclWithoutPath(_) => zx::Status::NOT_FOUND,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
-            Self::NamespaceError(_) => zx::Status::NOT_FOUND,
+            Self::BuildNamespaceError(_) => zx::Status::NOT_FOUND,
+            Self::ConvertToDirectory(_) => zx::Status::INTERNAL,
+            Self::ComponentInstanceError(err) => err.as_zx_status(),
         }
     }
 }

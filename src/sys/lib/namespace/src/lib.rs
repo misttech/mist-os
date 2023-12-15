@@ -11,6 +11,9 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
 use thiserror::Error;
 
+#[cfg(target_os = "fuchsia")]
+use std::sync::Arc;
+
 mod path;
 mod tree;
 pub use path::{Path, PathError, MAX_PATH_LENGTH};
@@ -81,12 +84,6 @@ impl Default for Namespace {
     }
 }
 
-impl From<Tree<ClientEnd<fio::DirectoryMarker>>> for Namespace {
-    fn from(tree: Tree<ClientEnd<fio::DirectoryMarker>>) -> Self {
-        Self { tree }
-    }
-}
-
 #[cfg(target_os = "fuchsia")]
 impl Clone for Namespace {
     fn clone(&self) -> Self {
@@ -108,18 +105,6 @@ impl Clone for Namespace {
             }
         });
         Self { tree }
-    }
-}
-
-impl TryFrom<Vec<Entry>> for Namespace {
-    type Error = NamespaceError;
-
-    fn try_from(value: Vec<Entry>) -> Result<Self, Self::Error> {
-        let mut ns = Namespace::new();
-        for entry in value {
-            ns.add(&entry.path, entry.directory)?;
-        }
-        Ok(ns)
     }
 }
 
@@ -145,6 +130,52 @@ impl From<Namespace> for Vec<fprocess::NameInfo> {
 impl From<Namespace> for Vec<process_builder::NamespaceEntry> {
     fn from(namespace: Namespace) -> Self {
         namespace.flatten().into_iter().map(Into::into).collect()
+    }
+}
+
+/// Converts the [Namespace] to a vfs [TreeBuilder] with tree nodes for each entry.
+///
+/// The TreeBuilder can then be used to build a vfs directory for this Namespace.
+#[cfg(target_os = "fuchsia")]
+impl TryFrom<Namespace> for vfs::tree_builder::TreeBuilder {
+    type Error = vfs::tree_builder::Error;
+
+    fn try_from(namespace: Namespace) -> Result<Self, Self::Error> {
+        let mut builder = vfs::tree_builder::TreeBuilder::empty_dir();
+        for Entry { path, directory } in namespace.flatten().into_iter() {
+            let path: Vec<&str> = path.iter_segments().collect();
+            builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy().unwrap()))?;
+        }
+        Ok(builder)
+    }
+}
+
+/// Converts the [Namespace] into a vfs directory.
+#[cfg(target_os = "fuchsia")]
+impl TryFrom<Namespace> for Arc<vfs::directory::immutable::simple::Simple> {
+    type Error = vfs::tree_builder::Error;
+
+    fn try_from(namespace: Namespace) -> Result<Self, Self::Error> {
+        let builder: vfs::tree_builder::TreeBuilder = namespace.try_into()?;
+        Ok(builder.build())
+    }
+}
+
+impl From<Tree<ClientEnd<fio::DirectoryMarker>>> for Namespace {
+    fn from(tree: Tree<ClientEnd<fio::DirectoryMarker>>) -> Self {
+        Self { tree }
+    }
+}
+
+impl TryFrom<Vec<Entry>> for Namespace {
+    type Error = NamespaceError;
+
+    fn try_from(value: Vec<Entry>) -> Result<Self, Self::Error> {
+        let mut ns = Namespace::new();
+        for entry in value {
+            ns.add(&entry.path, entry.directory)?;
+        }
+        Ok(ns)
     }
 }
 

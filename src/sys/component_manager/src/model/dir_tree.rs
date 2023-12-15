@@ -10,7 +10,7 @@ use {
         routing::{self, RouteRequest},
     },
     ::routing::capability_source::ComponentCapability,
-    cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, UseDecl},
+    cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl},
     fidl_fuchsia_io as fio,
     std::collections::HashMap,
     std::sync::Arc,
@@ -26,21 +26,6 @@ pub struct DirTree {
 }
 
 impl DirTree {
-    /// Builds a directory hierarchy from a component's `uses` declarations.
-    /// `routing_factory` is a closure that generates the routing function that will be called
-    /// when a leaf node is opened.
-    pub fn build_from_uses(
-        routing_factory: impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
-        component: WeakComponentInstance,
-        decl: &ComponentDecl,
-    ) -> Self {
-        let mut tree = DirTree { directory_nodes: HashMap::new(), broker_nodes: HashMap::new() };
-        for use_ in &decl.uses {
-            tree.add_use_capability(&routing_factory, component.clone(), use_);
-        }
-        tree
-    }
-
     /// Builds a directory hierarchy from a component's `exposes` declarations.
     /// `routing_factory` is a closure that generates the routing function that will be called
     /// when a leaf node is opened.
@@ -72,26 +57,6 @@ impl DirTree {
             root_dir.add_node(&name, node)?;
         }
         Ok(())
-    }
-
-    fn add_use_capability(
-        &mut self,
-        routing_factory: &impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
-        component: WeakComponentInstance,
-        use_: &UseDecl,
-    ) {
-        let cap = ComponentCapability::Use(use_.clone());
-        let request = match routing::request_for_namespace_capability_use(use_.clone()) {
-            Some(r) => r,
-            None => return,
-        };
-        let path = match use_.path() {
-            Some(path) => path.clone(),
-            None => return,
-        };
-        let type_name = cap.type_name();
-        let routing_fn = routing_factory(component, cap, request);
-        self.add_capability(path, type_name, routing_fn);
     }
 
     fn add_expose_capability(
@@ -160,142 +125,14 @@ mod tests {
         },
         ::routing::component_instance::ComponentInstanceInterface,
         cm_rust::{
-            Availability, DependencyType, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
-            ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, ExposeTarget, UseDecl,
-            UseDirectoryDecl, UseProtocolDecl, UseSource, UseStorageDecl,
+            ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeRunnerDecl,
+            ExposeServiceDecl, ExposeSource, ExposeTarget,
         },
         fidl::endpoints::{ClientEnd, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         std::sync::{Arc, Weak},
         vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path},
     };
-
-    #[fuchsia::test]
-    async fn read_only_storage() {
-        // Call `build_from_uses` with a routing factory that routes to a mock directory or service,
-        // and a `ComponentDecl` with `use` declarations.
-        let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Use);
-        let decl = ComponentDecl {
-            uses: vec![UseDecl::Storage(UseStorageDecl {
-                source_name: "data".parse().unwrap(),
-                target_path: "/data".parse().unwrap(),
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
-        let root = ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "test://root".to_string(),
-        );
-        let tree = DirTree::build_from_uses(routing_factory, root.as_weak(), &decl);
-
-        // Convert the tree to a directory.
-        let mut in_dir = pfs::simple();
-        tree.install(&mut in_dir).expect("Unable to build pseudodirectory");
-
-        // Ensure that we can't create a file if the permission is read-only
-        let (data_dir, data_server) = zx::Channel::create();
-        in_dir.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            path::Path::validate_and_split("data").unwrap(),
-            ServerEnd::<fio::NodeMarker>::new(data_server.into()),
-        );
-        let data_dir = ClientEnd::<fio::DirectoryMarker>::new(data_dir.into());
-        let data_dir = data_dir.into_proxy().unwrap();
-        let error = fuchsia_fs::directory::open_file(
-            &data_dir,
-            "test",
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .unwrap_err();
-        match error {
-            fuchsia_fs::node::OpenError::OpenError(zx::Status::ACCESS_DENIED) => {}
-            e => panic!("Unexpected open error: {}", e),
-        }
-    }
-
-    #[fuchsia::test]
-    async fn build_from_uses() {
-        // Call `build_from_uses` with a routing factory that routes to a mock directory or service,
-        // and a `ComponentDecl` with `use` declarations.
-        let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Use);
-        let decl = ComponentDecl {
-            uses: vec![
-                UseDecl::Directory(UseDirectoryDecl {
-                    source: UseSource::Parent,
-                    source_name: "baz-dir".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/in/data/hippo".parse().unwrap(),
-                    rights: fio::Operations::CONNECT,
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "baz-svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/in/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/in/data/persistent".parse().unwrap(),
-                    availability: Availability::Required,
-                }),
-                UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/in/data/cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }),
-            ],
-            ..default_component_decl()
-        };
-        let root = ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "test://root".to_string(),
-        );
-        let tree = DirTree::build_from_uses(routing_factory, root.as_weak(), &decl);
-
-        // Convert the tree to a directory.
-        let mut in_dir = pfs::simple();
-        tree.install(&mut in_dir).expect("Unable to build pseudodirectory");
-        let (in_dir_client, in_dir_server) = zx::Channel::create();
-        in_dir.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            path::Path::dot(),
-            ServerEnd::<fio::NodeMarker>::new(in_dir_server.into()),
-        );
-        let in_dir_proxy = ClientEnd::<fio::DirectoryMarker>::new(in_dir_client)
-            .into_proxy()
-            .expect("failed to create directory proxy");
-        assert_eq!(
-            vec!["in/data/cache", "in/data/hippo", "in/data/persistent", "in/svc/hippo"],
-            test_helpers::list_directory_recursive(&in_dir_proxy).await
-        );
-
-        // Expect that calls on the directory nodes reach the mock directory/service.
-        assert_eq!("friend", test_helpers::read_file(&in_dir_proxy, "in/data/hippo/hello").await);
-        assert_eq!(
-            "friend",
-            test_helpers::read_file(&in_dir_proxy, "in/data/persistent/hello").await
-        );
-        assert_eq!("friend", test_helpers::read_file(&in_dir_proxy, "in/data/cache/hello").await);
-        assert_eq!(
-            "hippos".to_string(),
-            test_helpers::call_echo(&in_dir_proxy, "in/svc/hippo", "hippos").await
-        );
-    }
 
     #[fuchsia::test]
     async fn build_from_exposes() {

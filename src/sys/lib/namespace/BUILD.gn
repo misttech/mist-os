@@ -33,6 +33,7 @@ rustc_library("namespace") {
     deps += [
       "//src/lib/process_builder",
       "//src/lib/zircon/rust:fuchsia-zircon",
+      "//src/storage/lib/vfs/rust:vfs",
     ]
     test_deps += [
       "//src/lib/fuchsia-async",

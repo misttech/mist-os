@@ -7,13 +7,17 @@ use fidl_fuchsia_io as fio;
 use futures::stream::FuturesUnordered;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
-    future::BoxFuture,
+    future::{BoxFuture, Future},
     FutureExt, StreamExt,
 };
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
 use sandbox::{AnyCapability, Dict, Directory};
+use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
+
+/// Variant of [futures::future::BoxFuture] where the Future is Sync.
+pub type BoxFutureSync<'a, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 'a>>;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
@@ -23,12 +27,12 @@ pub struct NamespaceBuilder {
     /// Path-not-found errors are sent here.
     not_found: UnboundedSender<String>,
 
-    futures: FuturesUnordered<BoxFuture<'static, ()>>,
+    futures: FuturesUnordered<BoxFutureSync<'static, ()>>,
 }
 
 #[derive(Error, Debug, Clone)]
 pub enum BuildNamespaceError {
-    #[error("namespace configuration error: {0}")]
+    #[error(transparent)]
     NamespaceError(#[from] NamespaceError),
 
     #[error(
@@ -64,9 +68,7 @@ impl NamespaceBuilder {
         let any: &AnyCapability = match self.entries.get(&dirname) {
             Some(dir) => dir,
             None => {
-                let (dict, fut) =
-                    make_dict_with_not_found_logging(path.dirname().into(), self.not_found.clone());
-                self.futures.push(fut);
+                let dict = self.make_dict_with_not_found_logging(path.dirname().into());
                 self.entries.add(&dirname, Box::new(dict))?
             }
         };
@@ -114,9 +116,37 @@ impl NamespaceBuilder {
             .try_into()?;
 
         let mut futures = self.futures;
-        let fut = async move { while let Some(()) = futures.next().await {} };
+        let fut = async move { while let Some(()) = futures.next().await {} }.boxed();
 
-        Ok((ns, fut.boxed()))
+        Ok((ns, fut))
+    }
+
+    fn make_dict_with_not_found_logging(&self, root_path: String) -> Dict {
+        let (entry_not_found, mut entry_not_found_receiver) = unbounded();
+        let new_dict = Dict::new_with_not_found(entry_not_found);
+        let not_found = self.not_found.clone();
+        // Grab a copy of the directory path, it will be needed if we log a
+        // failed open request.
+        let fut = Box::pin(async move {
+            while let Some(path) = entry_not_found_receiver.next().await {
+                let requested_path = format!("{}/{}", root_path, path);
+                // Ignore the result of sending. The receiver is free to break away to ignore all the
+                // not-found errors.
+                let _ = not_found.unbounded_send(requested_path);
+            }
+        });
+        self.futures.push(fut);
+        new_dict
+    }
+}
+
+impl Clone for NamespaceBuilder {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+            not_found: self.not_found.clone(),
+            futures: FuturesUnordered::new(),
+        }
     }
 }
 
@@ -124,27 +154,6 @@ impl NamespaceBuilder {
 pub fn ignore_not_found() -> UnboundedSender<String> {
     let (sender, _receiver) = unbounded();
     sender
-}
-
-fn make_dict_with_not_found_logging(
-    root_path: String,
-    not_found: UnboundedSender<String>,
-) -> (Dict, BoxFuture<'static, ()>) {
-    let (entry_not_found, mut entry_not_found_receiver) = unbounded();
-    let new_dict = Dict::new_with_not_found(entry_not_found);
-    let not_found = not_found.clone();
-    // Grab a copy of the directory path, it will be needed if we log a
-    // failed open request.
-    let fut = async move {
-        while let Some(path) = entry_not_found_receiver.next().await {
-            let requested_path = format!("{}/{}", root_path, path);
-            // Ignore the result of sending. The receiver is free to break away to ignore all the
-            // not-found errors.
-            let _ = not_found.unbounded_send(requested_path);
-        }
-    }
-    .boxed();
-    (new_dict, fut)
 }
 
 #[cfg(test)]

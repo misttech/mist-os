@@ -53,7 +53,6 @@ use {
 
 #[derive(Clone, Copy)]
 pub enum DeclType {
-    Use,
     Expose,
 }
 
@@ -88,9 +87,6 @@ fn new_proxy_routing_fn(
             match ty {
                 CapabilityTypeName::Protocol => {
                     match decl_type {
-                        DeclType::Use => {
-                            assert_matches!(request, RouteRequest::UseProtocol(_));
-                        }
                         DeclType::Expose => {
                             assert_matches!(request, RouteRequest::ExposeProtocol(_));
                         }
@@ -104,9 +100,6 @@ fn new_proxy_routing_fn(
                 }
                 CapabilityTypeName::Service => {
                     match decl_type {
-                        DeclType::Use => {
-                            assert_matches!(request, RouteRequest::UseService(_));
-                        }
                         DeclType::Expose => {
                             assert_matches!(
                                 &request,
@@ -125,9 +118,6 @@ fn new_proxy_routing_fn(
                 }
                 CapabilityTypeName::Directory => {
                     match decl_type {
-                        DeclType::Use => {
-                            assert_matches!(request, RouteRequest::UseDirectory(_));
-                        }
                         DeclType::Expose => {
                             assert_matches!(request, RouteRequest::ExposeDirectory(_));
                         }
@@ -137,20 +127,7 @@ fn new_proxy_routing_fn(
                     );
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
-                CapabilityTypeName::Storage => {
-                    match decl_type {
-                        DeclType::Use => {
-                            assert_matches!(request, RouteRequest::UseStorage(_));
-                        }
-                        DeclType::Expose => {
-                            panic!("can't expose storage");
-                        }
-                    }
-                    let sub_dir = pseudo_directory!(
-                        "hello" => read_only(b"friend"),
-                    );
-                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
-                }
+                CapabilityTypeName::Storage => panic!("storage capability unsupported"),
                 CapabilityTypeName::Runner => panic!("runner capability unsupported"),
                 CapabilityTypeName::Config => panic!("config capability unsupported"),
                 CapabilityTypeName::Resolver => panic!("resolver capability unsupported"),

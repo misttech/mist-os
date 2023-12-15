@@ -17,14 +17,14 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, DestroyActionError, DiscoverActionError,
-            DynamicOfferError, ModelError, OpenExposedDirError, OpenOutgoingDirError, RebootError,
-            ResolveActionError, StartActionError, StopActionError, StructuredConfigError,
-            UnresolveActionError,
+            AddChildError, AddDynamicChildError, CreateNamespaceError, DestroyActionError,
+            DiscoverActionError, DynamicOfferError, ModelError, OpenExposedDirError,
+            OpenOutgoingDirError, RebootError, ResolveActionError, StartActionError,
+            StopActionError, StructuredConfigError, UnresolveActionError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
-        ns_dir::NamespaceDir,
+        namespace::create_namespace,
         routing::{
             self,
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
@@ -49,6 +49,8 @@ use {
     },
     anyhow::anyhow,
     async_trait::async_trait,
+    async_utils::async_once::Once,
+    clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
@@ -90,7 +92,7 @@ use {
     },
     tracing::{debug, warn},
     version_history::AbiRevision,
-    vfs::{execution_scope::ExecutionScope, path::Path},
+    vfs::{directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path},
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -1277,31 +1279,47 @@ impl shutdown::Component for ResolvedInstanceState {
 
 /// The mutable state of a resolved component instance.
 pub struct ResolvedInstanceState {
+    /// Weak reference to the component that owns this state.
+    weak_component: WeakComponentInstance,
+
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this
     /// scope to tie their life-time to that of the component.
     execution_scope: ExecutionScope,
+
     /// Result of resolving the component.
     pub resolved_component: Component,
+
     /// All child instances, indexed by child moniker.
     children: HashMap<ChildName, Arc<ComponentInstance>>,
+
     /// The next unique identifier for a dynamic children created in this realm.
     /// (Static instances receive identifier 0.)
     next_dynamic_instance_id: IncarnationId,
+
     /// The set of named Environments defined by this instance.
     environments: HashMap<String, Arc<Environment>>,
+
+    /// Directory that represents the program's namespace.
+    ///
+    /// This is only used for introspection, e.g. in RealmQuery. The program receives a
+    /// namespace created in StartAction. The latter may have additional entries from
+    /// [StartChildArgs].
+    namespace_dir: Once<Arc<pfs::Simple>>,
+
     /// Hosts a directory mapping the component's exposed capabilities.
     exposed_dir: ExposedDir,
-    /// Hosts a directory mapping the component's namespace.
-    ns_dir: NamespaceDir,
+
     /// Dynamic offers targeting this component's dynamic children.
     ///
     /// Invariant: the `target` field of all offers must refer to a live dynamic
     /// child (i.e., a member of `live_children`), and if the `source` field
     /// refers to a dynamic child, it must also be live.
     dynamic_offers: Vec<cm_rust::OfferDecl>,
+
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.
     address: ComponentAddress,
+
     /// Anonymized service directories aggregated from collections and children.
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
@@ -1338,17 +1356,13 @@ impl ResolvedInstanceState {
         address: ComponentAddress,
         component_input_dict: Dict,
     ) -> Result<Self, ResolveActionError> {
+        let weak_component = WeakComponentInstance::new(component);
+
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
             ExecutionScope::new(),
-            WeakComponentInstance::new(&component),
+            weak_component.clone(),
             &resolved_component.decl,
-        )?;
-        let ns_dir = NamespaceDir::new(
-            ExecutionScope::new(),
-            WeakComponentInstance::new(&component),
-            &resolved_component.decl,
-            resolved_component.package.clone().map(|p| p.package_dir),
         )?;
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
@@ -1371,7 +1385,7 @@ impl ResolvedInstanceState {
                             cm_rust::CapabilityDecl::Protocol(p) => p.clone(),
                             _ => panic!("we currently only support protocols"),
                         }),
-                        component: WeakComponentInstance::new(component),
+                        component: weak_component.clone(),
                     },
                     component.policy_checker().clone(),
                 );
@@ -1387,13 +1401,14 @@ impl ResolvedInstanceState {
         let component_input = Router::from_routable(component_input_dict.clone());
 
         let mut state = Self {
+            weak_component,
             execution_scope: ExecutionScope::new(),
             resolved_component,
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
             environments,
+            namespace_dir: Once::default(),
             exposed_dir,
-            ns_dir,
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
@@ -1566,14 +1581,44 @@ impl ResolvedInstanceState {
             .collect()
     }
 
+    /// Returns a directory that represents the program's namespace at resolution time.
+    ///
+    /// This may not exactly match the namespace when the component is started since StartAction
+    /// may add additional entries.
+    pub async fn namespace_dir(&self) -> Result<Arc<pfs::Simple>, CreateNamespaceError> {
+        let create_namespace_dir = async {
+            let component = self
+                .weak_component
+                .upgrade()
+                .map_err(CreateNamespaceError::ComponentInstanceError)?;
+            // Build a namespace and convert it to a directory.
+            let namespace_builder = create_namespace(
+                self.resolved_component.package.as_ref(),
+                &component,
+                &self.resolved_component.decl,
+            )
+            .await?;
+            let (namespace, fut) =
+                namespace_builder.serve().map_err(CreateNamespaceError::BuildNamespaceError)?;
+            component.nonblocking_task_group().spawn(fasync::Task::spawn(fut));
+            let namespace_dir: Arc<pfs::Simple> = namespace.try_into().map_err(|err| {
+                CreateNamespaceError::ConvertToDirectory(ClonableError::from(anyhow::Error::from(
+                    err,
+                )))
+            })?;
+            Ok(namespace_dir)
+        };
+
+        Ok(self
+            .namespace_dir
+            .get_or_try_init::<_, CreateNamespaceError>(create_namespace_dir)
+            .await?
+            .clone())
+    }
+
     /// Returns the exposed directory bound to this instance.
     pub fn get_exposed_dir(&self) -> &ExposedDir {
         &self.exposed_dir
-    }
-
-    /// Returns the namespace directory of this instance.
-    pub fn get_ns_dir(&self) -> &NamespaceDir {
-        &self.ns_dir
     }
 
     /// Returns the resolved structured configuration of this instance, if any.
@@ -2182,7 +2227,6 @@ impl DictDispatcher {
 
 #[cfg(test)]
 pub mod tests {
-
     use {
         super::*,
         crate::model::{

@@ -23,7 +23,7 @@ use {
         mapper::NoopRouteMapper,
     },
     async_trait::async_trait,
-    cm_rust::{ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
+    cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
     moniker::MonikerBase,
@@ -153,19 +153,6 @@ pub(super) async fn route_and_open_capability(
                     err: e,
                 })?)
         }
-    }
-}
-
-/// Create a new `RouteRequest` from a `UseDecl`, checking that the capability type can
-/// be installed in a namespace.
-pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRequest> {
-    match use_decl {
-        UseDecl::Directory(_)
-        | UseDecl::Config(_)
-        | UseDecl::Protocol(_)
-        | UseDecl::Service(_)
-        | UseDecl::Storage(_) => Some(use_decl.into()),
-        UseDecl::Runner(_) | UseDecl::EventStream(_) => None,
     }
 }
 

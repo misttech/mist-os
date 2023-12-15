@@ -21,7 +21,6 @@ pub(crate) mod routing_fns;
 pub(crate) mod storage;
 
 mod exposed_dir;
-mod ns_dir;
 
 #[cfg(test)]
 mod tests;

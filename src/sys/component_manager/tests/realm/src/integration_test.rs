@@ -232,7 +232,7 @@ pub async fn echo_server() {
         entries,
         vec![fuchsia_fs::directory::DirEntry {
             name: "fuchsia.logger.LogSink".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::Unknown,
+            kind: fuchsia_fs::directory::DirentKind::Service,
         }]
     );
 
