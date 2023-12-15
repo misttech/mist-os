@@ -251,7 +251,7 @@ impl Config {
                     Err(e) => return Err(e.into()),
                 };
             }
-            // TODO (fxbug.dev/70414): Check if the ProtectionInfo::LegacyWpa is a
+            // TODO(fxbug.dev/70414): Check if the ProtectionInfo::LegacyWpa is a
             // subset or superset of the other ProtectionInfo
             (_, ProtectionInfo::LegacyWpa(_)) => {}
             (ProtectionInfo::LegacyWpa(_), _) => {}

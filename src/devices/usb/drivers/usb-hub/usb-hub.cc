@@ -132,7 +132,7 @@ void UsbHubDevice::DdkInit(ddk::InitTxn txn) {
     txn_->Reply(status);
     return;
   }
-  // TODO (fxbug.dev/56002): Support multi-TT hubs properly. Currently, we
+  // TODO(fxbug.dev/56002): Support multi-TT hubs properly. Currently, we
   // operate in single-TT mode even if the hub supports multiple TTs.
   status = bus_.ConfigureHub(reinterpret_cast<uint64_t>(zxdev()), speed_, &raw_desc, false);
   if (status != ZX_OK) {

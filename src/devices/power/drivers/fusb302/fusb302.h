@@ -69,7 +69,7 @@ class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
   // Initialization Functions and Variables
   zx_status_t Init();
 
-  // TODO (rdzhuang): change power FIDL to supply required values in SourceInfo
+  // TODO(rdzhuang): change power FIDL to supply required values in SourceInfo
   void GetPowerInfo(GetPowerInfoCompleter::Sync& completer) override {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
   }

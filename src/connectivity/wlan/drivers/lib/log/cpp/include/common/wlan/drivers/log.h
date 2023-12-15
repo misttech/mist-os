@@ -9,7 +9,7 @@
 #include <wlan/drivers/internal/macro_helpers.h>
 #include <wlan/drivers/internal/throttle_counter.h>
 
-// TODO (fxbug.dev/81914) - Add support for log level fatal i.e. lfatal().
+// TODO(fxbug.dev/81914) - Add support for log level fatal i.e. lfatal().
 #define lerror(fmt, ...) (wlan_drivers_log_internal(ERROR, 0, NULL, fmt, ##__VA_ARGS__))
 #define lwarn(fmt, ...) (wlan_drivers_log_internal(WARNING, 0, NULL, fmt, ##__VA_ARGS__))
 #define linfo(fmt, ...) (wlan_drivers_log_internal(INFO, 0, NULL, fmt, ##__VA_ARGS__))

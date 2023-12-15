@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-// TODO (jakehehrlich): Add methods to make these node types usable
+// TODO(jakehehrlich): Add methods to make these node types usable
 
 // NodeVisitor is a visitor for all Node types
 type NodeVisitor interface {

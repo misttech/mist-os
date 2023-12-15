@@ -371,7 +371,7 @@ struct Status : TRB {
 };
 
 // Section 6.2.5.1
-// TODO (bbosak): Implement USB 3.1 support
+// TODO(bbosak): Implement USB 3.1 support
 class InputContextControlField : public hwreg::RegisterBase<InputContextControlField, uint32_t> {
  public:
   DEF_FIELD(23, 16, bAlternateSetting);

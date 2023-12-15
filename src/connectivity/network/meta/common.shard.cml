@@ -228,7 +228,7 @@
             from: "#netstack",
         },
 
-        // TODO (https://fxbug.dev/111695) Don't expose the Root API once
+        // TODO(https://fxbug.dev/111695) Don't expose the Root API once
         // Weavestack no longer needs it.
         {
             protocol: [ "fuchsia.net.root.Interfaces" ],

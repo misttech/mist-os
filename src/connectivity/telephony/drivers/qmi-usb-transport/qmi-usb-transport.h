@@ -54,7 +54,7 @@ constexpr std::array<uint8_t, kArpHdrSize> kArpReqHdr = {0x00, 0x01, 0x08, 0x00,
 constexpr uint8_t kIpLenLoc = 2;
 constexpr uint8_t kMacAddrLen = 6;
 constexpr uint8_t kIpv4AddrLen = 4;
-constexpr uint16_t kEthMtu = 1024;  // TODO (jiamingw): check if it can be 1500
+constexpr uint16_t kEthMtu = 1024;  // TODO(jiamingw): check if it can be 1500
 
 constexpr uint8_t kByteShift1 = 8;
 
@@ -195,12 +195,12 @@ class Device : public DeviceType {
   EthTxStats eth_tx_stats_;
 
   // Device attributes
-  uint16_t ethernet_mtu_;  // TODO (jiamingw) confirm that this is used to replace magic number 1024
+  uint16_t ethernet_mtu_;  // TODO(jiamingw) confirm that this is used to replace magic number 1024
 
   // Connection attributes
   bool online_;          // TODO(jiamingw) change it to `is_online`
   bool device_unbound_;  // set to true when device is going away. Guarded by tx_mutex
-  // TODO (jiamingw) - there is no code setting device_unbound_ to true
+  // TODO(jiamingw) - there is no code setting device_unbound_ to true
   //                   It will always be false in current code
 
   // Send context

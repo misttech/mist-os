@@ -155,7 +155,7 @@ static int at_fake_transport_thread(void* cookie) {
           }
           device_ptr->SnoopCtrlMsg(req_buf, kTelCtrlPlanePktMax,
                                    fidl_tel_snoop::wire::Direction::kToModem);
-          // TODO (jiamingw): parse AT msg, form reply and write back to channel.
+          // TODO(jiamingw): parse AT msg, form reply and write back to channel.
           device_ptr->ReplyCtrlMsg(req_buf, req_len, resp_buf, kTelCtrlPlanePktMax);
           status = device_ptr->SetAsyncWait();
           if (status != ZX_OK) {

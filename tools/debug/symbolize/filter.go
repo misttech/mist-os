@@ -11,7 +11,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
-// TODO (jakehehrlich): LineSource is now a part of the public interface. This is needed to
+// TODO(jakehehrlich): LineSource is now a part of the public interface. This is needed to
 // allow for the proper construction of triggers since triggers need to know
 // where a triggering element came from. Right now this is just an empty
 // interface. It would be nice if the user could do soemthing other than cast this.
@@ -112,7 +112,7 @@ type Filter struct {
 	repo Repository
 }
 
-// TODO (jakehehrlich): Consider making FindInfoForAddress private.
+// TODO(jakehehrlich): Consider making FindInfoForAddress private.
 
 // FindInfoForAddress takes a process an in memory address and converts it to a source location.
 func (s *Filter) findInfoForAddress(vaddr uint64) (addressInfo, error) {

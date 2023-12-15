@@ -89,7 +89,7 @@ fuchsia_test_package("optee_test") {
   test_components = [ ":optee_test_cmp" ]
   deps = [ ":tee_manager_optee_test_cmp" ]
   test_specs = {
-    # TODO (fxbug.dev/93347) add astro_env, sherlock_env and nelson_env once
+    # TODO(fxbug.dev/93347) add astro_env, sherlock_env and nelson_env once
     # the bug will be fixed
     environments = []
   }

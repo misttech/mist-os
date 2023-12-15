@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-// TODO (jakehehrlich): This whole file should be private.
+// TODO(jakehehrlich): This whole file should be private.
 
 type byVAddr []Segment
 

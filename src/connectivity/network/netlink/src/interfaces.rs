@@ -2629,7 +2629,7 @@ mod tests {
     /// interface, and handles all subsequent
     /// [`fnet_interfaces_admin::ControlRequest`] by calling the provided
     /// handler.
-    // TODO (https://github.com/rust-lang/rust/issues/99697): Remove the
+    // TODO(https://github.com/rust-lang/rust/issues/99697): Remove the
     // `Pin<Box<dyn ...>>` from the return type once Rust supports
     // `impl Fn() -> impl <SomeTrait>` style declarations.
     fn expect_get_admin_with_handler<

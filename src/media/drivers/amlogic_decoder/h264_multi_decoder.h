@@ -46,7 +46,7 @@ class H264MultiDecoder : public VideoDecoder {
     std::unique_ptr<CanvasEntry> y_canvas;
     std::unique_ptr<CanvasEntry> uv_canvas;
 
-    // TODO (use one per reference frame, rather than one per DPB frame)
+    // TODO(use one per reference frame, rather than one per DPB frame)
     InternalBuffer reference_mv_buffer;
 
     uint32_t info0{};

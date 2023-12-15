@@ -572,7 +572,7 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
       }
       // Ensure that we've actually invoked the completions above
       // before moving to the next step.
-      // TODO (fxbug.dev/44375): Migrate to joins
+      // TODO(fxbug.dev/44375): Migrate to joins
       RunUntilIdle();
       for (size_t i = 0; i < max_slots_; i++) {
         auto state = device_state_[i];
@@ -601,7 +601,7 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
         }
       }
       // Flush any outstanding async I/O
-      // TODO (fxbug.dev/44375): Migrate to joins
+      // TODO(fxbug.dev/44375): Migrate to joins
       RunUntilIdle();
     } while (pending);
 
@@ -792,7 +792,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
         .set_Type(Control::ConfigureEndpointCommand)
         .ToTrb(&trb);
   }
-  // TODO (fxbug.dev/34140): Implement async support
+  // TODO(fxbug.dev/34140): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
       .then(
@@ -855,7 +855,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t dev
         .set_Type(Control::ConfigureEndpointCommand)
         .ToTrb(&trb);
   }
-  // TODO (fxbug.dev/34140): Implement async support
+  // TODO(fxbug.dev/34140): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
       .then(
@@ -1088,7 +1088,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
       .box();
 }
 
-// TODO (fxbug.dev/34637): Either decide what these reset methods should do,
+// TODO(fxbug.dev/34637): Either decide what these reset methods should do,
 // or get rid of them.
 zx_status_t UsbXhci::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
   return ZX_ERR_NOT_SUPPORTED;
@@ -1231,7 +1231,7 @@ zx_status_t UsbXhci::InitQuirks() {
     qemu_quirk_ = true;
   }
   if ((info.vendor_id) == 0x8086 && (info.device_id == 0x8C31)) {
-    // TODO (bbosak): Implement stub EHCI driver so we can properly
+    // TODO(bbosak): Implement stub EHCI driver so we can properly
     // do the handoff in case the BIOS is managing a device on EHCI.
     // Quirk for some older Intel chipsets
     // Switch ports from EHCI to XHCI.
@@ -1491,7 +1491,7 @@ zx_status_t UsbXhci::HciFinalize() {
   }
   uint32_t page_size = USB_PAGESIZE::Get(cap_length_).ReadFrom(&mmio_.value()).PageSize() << 12;
   page_size_ = page_size;
-  // TODO (bbosak): Correct this to use variable alignment when we get kernel
+  // TODO(bbosak): Correct this to use variable alignment when we get kernel
   // support for this.
   if (page_size != zx_system_get_page_size()) {
     zxlogf(ERROR, "xHC page size differs from platform page size");

@@ -552,7 +552,7 @@ impl Client {
 
     pub fn eapol_required(&self) -> bool {
         self.connect_req.selected_bss.rsne().is_some()
-        // TODO (fxb/61020): Add detection of WPA1 in softmac for testing
+        // TODO(fxb/61020): Add detection of WPA1 in softmac for testing
         // purposes only. In particular, connect-to-wpa1-network relies
         // on this half of the OR statement.
             || self.connect_req.selected_bss.find_wpa_ie().is_some()

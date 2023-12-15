@@ -11,7 +11,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
-// TODO (jakehehrlich): Make as much of this private as possible.
+// TODO(jakehehrlich): Make as much of this private as possible.
 
 type remuxer struct {
 	seq chan (<-chan OutputLine)

@@ -586,7 +586,7 @@ struct NetworkCheckContext {
     gateway_pingable: bool,
     // Context that persists between check cycles
     persistent_context: PersistentNetworkCheckContext,
-    // TODO (fxbug.dev/123591): Add tombstone marker to inform NetworkCheck that the interface has
+    // TODO(fxbug.dev/123591): Add tombstone marker to inform NetworkCheck that the interface has
     // been removed and we no longer need to run checks on this interface. This can occur when
     // receiving an interface remote event, but a network check for that interface is still in
     // progress.

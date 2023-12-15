@@ -87,7 +87,7 @@ zx_status_t DeviceState::InitializeEndpointContext(const UsbXhci& hci, uint8_t s
   usb_speed_t speed;
   if (hub_info) {
     speed = static_cast<uint8_t>(hub_info->speed);
-    // TODO (fxbug.dev/34355): USB 3.1 support. Section 6.2.2
+    // TODO(fxbug.dev/34355): USB 3.1 support. Section 6.2.2
     if (((speed == USB_SPEED_LOW) || (speed == USB_SPEED_FULL)) &&
         (hub_info->hub_speed == USB_SPEED_HIGH)) {
       hub_info->tt_info.emplace(

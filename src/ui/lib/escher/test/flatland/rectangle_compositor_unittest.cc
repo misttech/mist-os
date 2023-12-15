@@ -454,7 +454,7 @@ VK_TEST_F(RectangleCompositorTest, OverlapTest) {
 // and one with it on. Transparency should only be applied when
 // the flag is on, even if the RectangleRenderable color has an
 // alpha that is < 1.0.
-// TODO (43394): Add testing for multiple interleaved opaque and
+// TODO(43394): Add testing for multiple interleaved opaque and
 // transparent rectangles.
 VK_TEST_F(RectangleCompositorTest, TransparencyTest) {
   frame_setup();

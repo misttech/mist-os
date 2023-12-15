@@ -54,7 +54,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
   void ProcessUnsolicitedResponse(const CodecResponse& resp);
   void ProcessWakeupEvt() const;
 
-  // TODO (johngro) : figure out shutdown... Currently, this expected to
+  // TODO(johngro) : figure out shutdown... Currently, this expected to
   // execute synchronously, which does not allow codec drivers any opportunity
   // to perform a graceful shutdown.
   //

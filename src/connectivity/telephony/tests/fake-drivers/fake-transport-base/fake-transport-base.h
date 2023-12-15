@@ -27,7 +27,7 @@ using DevicePacketEnum = enum {
   kTerminateMsg,
 };
 
-// TODO (jiamingw): change the name of FIDL protocol in next CL.
+// TODO(jiamingw): change the name of FIDL protocol in next CL.
 class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
  public:
   explicit Device(zx_device_t* device);

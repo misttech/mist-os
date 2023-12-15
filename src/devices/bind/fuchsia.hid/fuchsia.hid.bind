@@ -9,7 +9,7 @@ extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x17,
 };
 
-/// TODO (fxbug.dev/103439): Until bind language can handle lists/vectors better.
+/// TODO(fxbug.dev/103439): Until bind language can handle lists/vectors better.
 /// Incomplete list of Page + Usage pairs corresponding to HID spec in the format
 /// of PAGE__USAGE. New values can be added on demand.
 /// If value is true, HID descriptor has the Page + Usage pair. If value is false

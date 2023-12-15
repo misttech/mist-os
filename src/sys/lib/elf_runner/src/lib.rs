@@ -573,7 +573,7 @@ async fn start(
                 .map(|_: fidl::Signals| ()) // Discard.
                 .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
             // Process exit code '0' is considered a clean return.
-            // TODO (fxbug.dev/57024) If we create an epitaph that indicates
+            // TODO(fxbug.dev/57024) If we create an epitaph that indicates
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
             let exit_status: ChannelEpitaph = match proc_copy.info() {

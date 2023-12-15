@@ -183,7 +183,7 @@ def _transform_toc_files(is_regular_docs):
                 updated_file.writelines(file_lines)
 
 
-# TODO (https://fxbug.dev/91652) To refactor and streamline
+# TODO(https://fxbug.dev/91652) To refactor and streamline
 def referencedocs_transforms():
     _add_markdown_header_and_footer(False)
     _remove_toc()

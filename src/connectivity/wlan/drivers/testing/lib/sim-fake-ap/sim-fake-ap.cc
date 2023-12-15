@@ -397,7 +397,7 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
             if (auth_req_frame->seq_num_ == 3) {
               if (security_.expect_challenge_failure) {
                 // Refuse authentication if this AP has been configured to.
-                // TODO (fxb/61139): Actually check the challenge response rather than hardcoding
+                // TODO(fxb/61139): Actually check the challenge response rather than hardcoding
                 // authentication kSuccess or failure using expect_challenge_failure.
                 RemoveClient(auth_req_frame->src_addr_);
                 ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kChallengeFailure);

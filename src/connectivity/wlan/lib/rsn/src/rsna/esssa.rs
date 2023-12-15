@@ -215,7 +215,7 @@ impl EssSa {
 
     /// This function will not succeed unless called on a new Esssa or one that was reset.
     pub fn initiate(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
-        // TODO (fxbug.dev/69388): Ptksa starts in Initialized when the EssSa
+        // TODO(fxbug.dev/69388): Ptksa starts in Initialized when the EssSa
         // computes the PMKSA from a PSK. When an EssSa is not initialized with a PSK,
         // Ptksa start in Uninitialized since the PMKSA cannot be computed. For example,
         // when using SAE for authentication, Ptksa starts in Uninitialized.

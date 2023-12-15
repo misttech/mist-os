@@ -16,7 +16,7 @@ type Ge2dRotation = strict enum : uint8 {
 };
 
 type ResizeInfo = struct {
-    // TODO (jsasinowski): Determine if this is a src or dst rect & document accordingly.
+    // TODO(jsasinowski): Determine if this is a src or dst rect & document accordingly.
     crop fuchsia.hardware.camera.Rect; // Initially this will be the same size as the canvas.
     // Rotation is needed for video playback
     output_rotation Ge2dRotation;

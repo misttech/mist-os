@@ -2979,7 +2979,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 
 	// The Netstack's destinationCache tracks the state of the route table and is invalidated
 	// whenever the route table is modified.
-	// TODO (https://fxbug.dev/100895): Implement per-route caching invalidation.
+	// TODO(https://fxbug.dev/100895): Implement per-route caching invalidation.
 	var nsEventPair zx.Handle
 	if status := zx.Sys_handle_duplicate(s.ns.destinationCacheMu.destinationCache.peer, zx.RightsBasic, &nsEventPair); status != zx.ErrOk {
 		return socket.DatagramSocketSendMsgPreflightResult{}, &zx.Error{Status: status, Text: "zx.EventPair"}

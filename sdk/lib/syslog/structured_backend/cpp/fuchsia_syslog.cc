@@ -294,7 +294,7 @@ class ExternalDataBuffer final {
       : buffer_(data), cursor_(cursor) {}
   __WARN_UNUSED_RESULT bool Write(const log_word_t* data, WordOffset<log_word_t> length) {
     if (!cursor_.in_bounds(length)) {
-      // TODO (https://fxbug.dev/80984): Add test for this.
+      // TODO(https://fxbug.dev/80984): Add test for this.
       return false;
     }
     for (size_t i = 0; i < length.unsafe_get(); i++) {
@@ -309,7 +309,7 @@ class ExternalDataBuffer final {
     assert(written != nullptr);
     WordOffset<log_word_t> word_count = cursor_.begin().AddPadded(byte_count);
     if (!cursor_.in_bounds(word_count)) {
-      // TODO (https://fxbug.dev/80984): Add test for this.
+      // TODO(https://fxbug.dev/80984): Add test for this.
       return false;
     }
     auto retval = WritePaddedInternal(buffer_ + cursor_.unsafe_get(), msg, byte_count);

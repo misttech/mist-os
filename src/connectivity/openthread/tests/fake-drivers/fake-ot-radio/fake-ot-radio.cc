@@ -303,13 +303,13 @@ void FakeOtRadioDevice::FrameHandler(std::vector<uint8_t> data) {
   } else if (data.data()[kCmdLoc] == kPropValueSet) {
     // Handle prop value set
     // now we just reply what is being set
-    // TODO (jiamingw): make rcp stateful
+    // TODO(jiamingw): make rcp stateful
     std::vector<uint8_t> reply;
     reply.assign(data.cbegin(), data.cend());
     reply[1] = kPropValueIs;
     PostSendClientboundFrameTask(std::move(reply));
   } else {
-    // TODO (jiamingw): Send back response for invalid request.
+    // TODO(jiamingw): Send back response for invalid request.
     zxlogf(ERROR, "fake-ot-radio: received invalid spinel frame");
   }
 }

@@ -192,7 +192,7 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineIn
       return current_state;
 
     case SinkPolicyEngineState::kReady:
-      // TODO (rdzhuang): also accept requests from FIDL
+      // TODO(rdzhuang): also accept requests from FIDL
       if (input == SinkPolicyEngineInput::kMessageReceived &&
           device_.protocol().HasUnreadMessage()) {
         return ProcessMessageInReady();

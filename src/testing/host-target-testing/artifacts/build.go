@@ -586,7 +586,7 @@ func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, e
 }
 
 func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
-	// TODO (fxb/114760) Change to use ffx tool to start package server
+	// TODO(fxb/114760) Change to use ffx tool to start package server
 	pbJSON := filepath.Join(b.dir, ProductBundleManifest)
 	f, err := os.Open(pbJSON)
 	if err != nil {

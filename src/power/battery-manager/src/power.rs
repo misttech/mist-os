@@ -16,7 +16,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::battery_manager::BatteryManager;
 
-// TODO (fxbug.dev/33183): binding the FIDL service via file descriptor is still
+// TODO(fxbug.dev/33183): binding the FIDL service via file descriptor is still
 // required for hardware FIDLs (implemented by ACPI battery driver).
 // Once componentization of drivers is complete and they are capable of
 // publishing their FIDL services, should be abl to remove POWER_DEVICE

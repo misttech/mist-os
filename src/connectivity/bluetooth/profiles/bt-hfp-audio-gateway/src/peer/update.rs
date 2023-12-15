@@ -16,8 +16,8 @@ use super::{
 
 use crate::features::{AgFeatures, CodecId};
 
-// TODO (fxbug.dev/74091): Add multiparty support.
-// TODO (fxbug.dev/74093): Add Explicit Call Transfer support.
+// TODO(fxbug.dev/74091): Add multiparty support.
+// TODO(fxbug.dev/74093): Add Explicit Call Transfer support.
 
 // TODO(fxb/71668) Stop using raw bytes.
 const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \

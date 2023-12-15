@@ -148,7 +148,7 @@ zx_status_t VideoFrame::CopyData(usb_request_t* req, uint32_t data_offset) {
   ZX_DEBUG_ASSERT(avail >= data_size);
 
   uint8_t* dst = reinterpret_cast<uint8_t*>(buffer_.virtual_address()) + bytes_;
-  // TODO (fxb/63635): Decide what to do here
+  // TODO(fxb/63635): Decide what to do here
   [[maybe_unused]] auto copy_result = usb_request_copy_from(req, dst, data_size, data_offset);
 
   bytes_ += data_size;

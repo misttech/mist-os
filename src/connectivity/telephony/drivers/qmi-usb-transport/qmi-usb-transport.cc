@@ -36,7 +36,7 @@
 
 namespace telephony_snoop = fuchsia_telephony_snoop;
 
-// TODO (jiamingw): investigate whether it can be replaced by eth::Operation
+// TODO(jiamingw): investigate whether it can be replaced by eth::Operation
 typedef struct txn_info {
   ethernet_netbuf_t netbuf;
   ethernet_impl_queue_tx_callback completion_cb;
@@ -91,11 +91,11 @@ zx_status_t Device::HandleArpReq(const ArpFrame& arp_frame) {
   EthArpFrame eth_arp_resp;
   GenEthArpResp(arp_frame, &eth_arp_resp);
 
-  // TODO (jiamingw): understand the reason to sleep here.
+  // TODO(jiamingw): understand the reason to sleep here.
   zx_nanosleep(zx_deadline_after(ZX_USEC(tx_endpoint_delay_)));
   fbl::AutoLock lock(&eth_mutex_);
   if (eth_ifc_ptr_ && eth_ifc_ptr_->is_valid()) {
-    // TODO (jiamingw): Log arp response.
+    // TODO(jiamingw): Log arp response.
     zxlogf(INFO, "qmi-usb-transport: Replying Arp Msg");
     eth_ifc_ptr_->Recv(reinterpret_cast<const uint8_t*>(&eth_arp_resp), kArpSize + kEthFrameHdrSize,
                        0);
@@ -105,7 +105,7 @@ zx_status_t Device::HandleArpReq(const ArpFrame& arp_frame) {
 }
 
 void Device::GenEthArpResp(const ArpFrame& req, EthArpFrame* resp) {
-  // TODO (fxbug.dev/40051): Generate fake mac address to support multiple
+  // TODO(fxbug.dev/40051): Generate fake mac address to support multiple
   // cellular devices.
   // Eth header
   // eth_dst_mac_addr_ is ensured to be not null when calling this method.
@@ -150,7 +150,7 @@ zx_status_t Device::QueueUsbRequestHandler(const uint8_t* ip, size_t length, usb
       .ctx = this,
   };
   req->header.length = bytes_copied;
-  // TODO (jiamingw): logging IP packet ((uintptr_t)req->virt) + req->offset) with length ip_length.
+  // TODO(jiamingw): logging IP packet ((uintptr_t)req->virt) + req->offset) with length ip_length.
   zxlogf(INFO, "qmi-usb-transport: tx IP pkt");
   usb_request_queue(&usb_, req, &complete);
   return ZX_OK;
@@ -340,7 +340,7 @@ void Device::EthernetImplStop() {
 
 void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                  ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  // TODO (jiamingw): Log netbuf->data_buffer with length netbuf->data_size.
+  // TODO(jiamingw): Log netbuf->data_buffer with length netbuf->data_size.
   zxlogf(INFO, "qmi-usb-transport: transmitting outbound data plane msg:");
 
   size_t length = netbuf->data_size;
@@ -443,7 +443,7 @@ void Device::QmiInterruptHandler(usb_request_t* request) {
   [[maybe_unused]] auto copy_length =
       usb_request_copy_from(request, &usb_req, sizeof(usb_cdc_notification_t), 0);
 
-  // TODO (jiamingw): confirm this check is unnecessary
+  // TODO(jiamingw): confirm this check is unnecessary
   uint16_t packet_size = max_packet_size_;
   if (packet_size > kUsbCtrlEpMsgSizeMax) {
     zxlogf(ERROR, "qmi-usb-transport: packet too big: %d", packet_size);
@@ -607,7 +607,7 @@ void Device::UsbRecv(usb_request_t* request) {
     return;
   }
 
-  // TODO (jiamingw): Log message eth_frame_payload.
+  // TODO(jiamingw): Log message eth_frame_payload.
   zxlogf(INFO, "qmi-usb-transport: getting inbound data plane msg");
 
   if (eth_dst_mac_addr_ == nullptr) {

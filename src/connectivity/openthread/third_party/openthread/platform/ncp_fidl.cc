@@ -31,7 +31,7 @@ NcpFidl::NcpFidl(Instance *a_instance) : NcpBase(a_instance) {
 
 void NcpFidl::Init() {}
 
-// TODO (jiamingw): remove after ot-lib integration is stabilized
+// TODO(jiamingw): remove after ot-lib integration is stabilized
 static void printHexArr(const uint8_t *buf, uint16_t buf_len, const char *str) {
 #if 0
   if (buf_len) {

@@ -4377,7 +4377,7 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp,
       wlan::VhtCapabilities::ViewFromRawBytes(band_cap->vht_caps.bytes.data());
 
   // Set Max MPDU length to 11454
-  // TODO (fxbug.dev/29107): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
+  // TODO(fxbug.dev/29107): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
   // chips.
   vht_caps->vht_cap_info.set_max_mpdu_len(2);
 
@@ -4393,7 +4393,7 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp,
   }
 
   // Tx STBC
-  // TODO (fxbug.dev/29107): Value is hardcoded for now
+  // TODO(fxbug.dev/29107): Value is hardcoded for now
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
     vht_caps->vht_cap_info.set_tx_stbc(true);
   }
@@ -4704,7 +4704,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
   // The "rxstreams_cap" iovar, when present, indicates the maximum number of Rx streams
   // possible, encoded as one bit per stream (i.e., a value of 0x3 indicates 2 streams/chains).
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
-    // TODO (fxbug.dev/29107): The BCM4359 firmware supports rxstreams_cap, but it returns 0x2
+    // TODO(fxbug.dev/29107): The BCM4359 firmware supports rxstreams_cap, but it returns 0x2
     // instead of 0x3, which is incorrect.
     rxchain = 0x3;
   } else {
@@ -4712,7 +4712,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
     // the number of rx chains.
     status = brcmf_fil_iovar_int_get(ifp, "rxstreams_cap", &rxchain, nullptr);
     if (status != ZX_OK) {
-      // TODO (fxbug.dev/29107): The rxstreams_cap iovar isn't yet supported in the BCM4356
+      // TODO(fxbug.dev/29107): The rxstreams_cap iovar isn't yet supported in the BCM4356
       // firmware. For now we use a hard-coded value (another option would be to parse the
       // nvram contents ourselves (looking for the value associated with the key "rxchain").
       BRCMF_INFO("Failed to retrieve value for Rx chains. Assuming chip supports 2 Rx chains.");

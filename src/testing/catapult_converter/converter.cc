@@ -356,7 +356,7 @@ void Convert(rapidjson::Document* input, rapidjson::Document* output, const Conv
               "(new version). (http://fxb/59861)\n");
       exit(1);
     }
-    // TODO (fxb/59861): Make "metric" field required once all the producers provide it.
+    // TODO(fxb/59861): Make "metric" field required once all the producers provide it.
     if (element.HasMember("metric")) {
       std::string metric = element["metric"].GetString();
       if (metric != "real_time") {

@@ -57,7 +57,7 @@ pub struct Cluster {
     pub cpu_indexes: Vec<u16>,
 }
 
-// TODO (fxbug.dev/102987): Support CPU stats logging by performance groups for X86.
+// TODO(fxbug.dev/102987): Support CPU stats logging by performance groups for X86.
 fn vmo_to_topology(vmo: zx::Vmo, length: u32) -> Result<Vec<Cluster>> {
     let mut max_performance_class = 0;
     let mut clusters_to_cpus = BTreeMap::new();
@@ -115,7 +115,7 @@ fn calculate_cpu_usage(
     let num_cpus = cpu_indexes.len() as f64;
     let mut cpu_percentage_sum: f64 = 0.0;
     for cpu_index in cpu_indexes {
-        // TODO (fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
+        // TODO(fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
         let current_per_cpu_stats =
             &current_sample.cpu_stats.per_cpu_stats.as_ref().unwrap()[cpu_index as usize];
         let last_per_cpu_stats =
@@ -257,7 +257,7 @@ impl CpuLoadLogger {
                             "cpu_usage" => cpu_usage
                         );
                     }
-                    // TODO (fxbug.dev/100797): Remove system_metrics_logger category after the
+                    // TODO(fxbug.dev/100797): Remove system_metrics_logger category after the
                     // e2e test is transitioned.
                     fuchsia_trace::counter!(
                         "system_metrics_logger",

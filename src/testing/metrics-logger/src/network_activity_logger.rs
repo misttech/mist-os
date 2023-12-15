@@ -15,10 +15,10 @@ use {
     tracing::{error, info},
 };
 
-// TODO (didis): Use netstack API after fxbug.dev/111228 is implemented.
+// TODO(didis): Use netstack API after fxbug.dev/111228 is implemented.
 const NETWORK_SERVICE_DIR: &str = "/dev/class/network";
 
-// TODO (didis): This assumes the wifi device instance is already there. We should not depend on
+// TODO(didis): This assumes the wifi device instance is already there. We should not depend on
 // implicit ordering as it might cause racing issues if this code is triggered too early.
 pub async fn generate_network_devices() -> Result<Vec<fhwnet::DeviceProxy>> {
     let mut proxies = Vec::new();
@@ -52,7 +52,7 @@ async fn watch_and_update_ports(
     device: &fhwnet::DeviceProxy,
     ports: Rc<RefCell<HashMap<u8, fhwnet::PortProxy>>>,
 ) {
-    // TODO (fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
+    // TODO(fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
     let (port_watcher, port_watcher_server_end) =
         fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>().unwrap();
     device.get_port_watcher(port_watcher_server_end).unwrap();

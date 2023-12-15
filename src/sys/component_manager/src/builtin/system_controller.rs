@@ -19,7 +19,7 @@ pub struct SystemController {
 }
 
 impl SystemController {
-    // TODO (jmatt) allow timeout to be supplied in the constructor
+    // TODO(jmatt) allow timeout to be supplied in the constructor
     pub fn new(model: Weak<Model>, request_timeout: Duration) -> Self {
         Self { model, request_timeout }
     }

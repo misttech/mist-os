@@ -1760,7 +1760,7 @@ mod tests {
         .add_tag("You're")
         .add_tag("IT!")
         .add_key(LogsProperty::String(LogsField::Other("key".to_string()), "value".to_string()));
-        // TODO (http://fxbug.dev/77054): Convert to our custom DSL when possible.
+        // TODO(http://fxbug.dev/77054): Convert to our custom DSL when possible.
         let expected_json = json!({
           "moniker": "moniker",
           "version": 1,

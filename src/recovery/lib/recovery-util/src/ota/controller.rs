@@ -40,7 +40,7 @@ impl SendEvent for EventSender {
         })
         .detach();
     }
-    // TODO (b/255587508): we have some idea to improve this, such as using a general function
+    // TODO(b/255587508): we have some idea to improve this, such as using a general function
     // send_metric. It might require a mapping a metric type to a logging function.
     fn send_recovery_stage_event(&mut self, status: metrics::RecoveryEventMetricDimensionResult) {
         fasync::Task::local(async move {
