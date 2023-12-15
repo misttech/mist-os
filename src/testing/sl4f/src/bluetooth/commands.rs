@@ -7,6 +7,7 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use bt_rfcomm::ServerChannel;
 use fidl_fuchsia_bluetooth::PeerId;
+use fidl_fuchsia_bluetooth_a2dp::Role;
 use fidl_fuchsia_bluetooth_hfp::{CallDirection, CallState, NetworkInformation, SignalStrength};
 use fidl_fuchsia_bluetooth_le::Filter;
 use fidl_fuchsia_bluetooth_sys::{LeSecurityMode, Settings};
@@ -16,6 +17,7 @@ use test_call_manager::TestCallManager as HfpFacade;
 use test_rfcomm_client::RfcommManager as RfcommFacade;
 
 // Bluetooth-related functionality
+use crate::bluetooth::a2dp_facade::A2dpFacade;
 use crate::bluetooth::avdtp_facade::AvdtpFacade;
 use crate::bluetooth::avrcp_facade::AvrcpFacade;
 use crate::bluetooth::ble_advertise_facade::BleAdvertiseFacade;
@@ -429,6 +431,33 @@ impl Facade for AvdtpFacade {
                 Ok(to_value(result)?)
             }
             _ => bail!("Invalid AVDTP FIDL method: {:?}", method),
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl Facade for A2dpFacade {
+    async fn handle_request(&self, method: String, args: Value) -> Result<Value, Error> {
+        match method.as_ref() {
+            "A2dpSetRole" => {
+                let a2dp_role = if let Ok(s) = parse_arg!(args, as_str, "a2dp_role") {
+                    match s.to_uppercase().as_ref() {
+                        "SOURCE" => Role::Source,
+                        "SINK" => Role::Sink,
+                        _ => bail!("Invalid A2DP role {} passed to A2dpSetRole", s),
+                    }
+                } else {
+                    bail!("Could not parse A2DP role passed to A2dpSetRole")
+                };
+
+                self.init_audio_mode_proxy().await?;
+                let result = self.set_role(a2dp_role).await?;
+                Ok(to_value(result)?)
+            }
+
+            _ => {
+                bail!("Invalid A2DP FIDL method: {:?}", method)
+            }
         }
     }
 }

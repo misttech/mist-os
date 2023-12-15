@@ -109,6 +109,7 @@
         },
         {
             protocol: [
+                "fuchsia.bluetooth.a2dp.AudioMode",
                 "fuchsia.bluetooth.avdtp.test.PeerManager",
                 "fuchsia.bluetooth.avrcp.PeerManager",
                 "fuchsia.bluetooth.hfp.Hfp",
