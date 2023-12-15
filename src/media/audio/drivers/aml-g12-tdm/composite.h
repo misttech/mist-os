@@ -37,7 +37,7 @@ class Driver : public fdf::DriverBase {
                          fidl::kIgnoreBindingClosure);
   }
 
-  std::unique_ptr<Server> server_;
+  std::unique_ptr<AudioCompositeServer> server_;
   fidl::ServerBindingGroup<fuchsia_hardware_audio::Composite> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;

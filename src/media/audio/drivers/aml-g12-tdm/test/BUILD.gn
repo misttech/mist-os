@@ -109,6 +109,7 @@ test("aml-g12-composite-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/testing/fake-bti",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]

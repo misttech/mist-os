@@ -73,7 +73,7 @@ zx::result<> Driver::Start() {
       return zx::error(get_mmio_result.status());
     }
     if (!get_mmio_result->is_ok()) {
-      FDF_LOG(ERROR, "Failed to get MMIO: %s",
+      FDF_LOG(ERROR, "Platform device returned error for get MMIO: %s",
               zx_status_get_string(get_mmio_result->error_value()));
       return zx::error(get_mmio_result->error_value());
     }
@@ -93,7 +93,20 @@ zx::result<> Driver::Start() {
     }
     mmios[i] = std::make_optional(std::move(*mmio));
   }
-  server_ = std::make_unique<Server>(std::move(mmios), dispatcher());
+
+  // There is one BTI with index 0 used by this driver.
+  auto get_bti_result = pdev_->GetBti(0);
+  if (!get_bti_result.ok()) {
+    FDF_LOG(ERROR, "Call to get BTI failed: %s", get_bti_result.status_string());
+    return zx::error(get_bti_result.status());
+  }
+  if (!get_bti_result->is_ok()) {
+    FDF_LOG(ERROR, "Platform device returned error for get BTI: %s",
+            zx_status_get_string(get_bti_result->error_value()));
+    return zx::error(get_bti_result->error_value());
+  }
+  server_ = std::make_unique<AudioCompositeServer>(std::move(mmios),
+                                                   std::move((*get_bti_result)->bti), dispatcher());
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

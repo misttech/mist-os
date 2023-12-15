@@ -166,9 +166,12 @@ source_set("aml-g12-composite-common") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/memory_barriers",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
   ]
 }
+
 fuchsia_driver("aml-g12-composite-driver") {
   output_name = "aml-g12-composite"
 
