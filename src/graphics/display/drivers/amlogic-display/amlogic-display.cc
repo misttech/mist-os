@@ -457,13 +457,9 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
   display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
   if (!IgnoreDisplayMode()) {
     // `current_display_timing_` is already applied to the display so it's
-    // guaranteed to be supported. We can skip the check if `display_timing`
-    // equals to `current_display_timing_`.
-    if (!IsNewDisplayTiming(display_timing)) {
-      return CONFIG_CHECK_RESULT_OK;
-    }
-
-    if (!vout_->IsDisplayTimingSupported(display_timing)) {
+    // guaranteed to be supported. We only perform the timing check if there
+    // is a new `display_timing`.
+    if (IsNewDisplayTiming(display_timing) && !vout_->IsDisplayTimingSupported(display_timing)) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
     }
   }
