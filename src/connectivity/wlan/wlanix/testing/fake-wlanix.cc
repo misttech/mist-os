@@ -233,6 +233,15 @@ void FakeWlanix::handle_unknown_method(
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceUnknownMethod});
 }
 
+void FakeWlanix::SetBssid(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetBssidRequest* request,
+                          SetBssidCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetBssid});
+}
+
+void FakeWlanix::ClearBssid(ClearBssidCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkClearBssid});
+}
+
 void FakeWlanix::SetSsid(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetSsidRequest* request,
                          SetSsidCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetSsid});

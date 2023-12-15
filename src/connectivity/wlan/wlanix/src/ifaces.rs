@@ -100,6 +100,7 @@ pub(crate) trait ClientIface: Sync + Send {
         &self,
         ssid: &[u8],
         passphrase: Option<Vec<u8>>,
+        requested_bssid: Option<Bssid>,
     ) -> Result<ConnectedResult, Error>;
 }
 
@@ -161,18 +162,23 @@ impl ClientIface for SmeClientIface {
         &self,
         ssid: &[u8],
         passphrase: Option<Vec<u8>>,
+        bssid: Option<Bssid>,
     ) -> Result<ConnectedResult, Error> {
         let last_scan_results = self.last_scan_results.lock().clone();
+        // TODO(b/316033554): handle the case when there are multiple BSS candidates when no
+        //                    specific BSSID is requested.
         let selected_scan_result = last_scan_results
             .iter()
             .filter_map(|r| {
                 let bss_description = BssDescription::try_from(r.bss_description.clone());
                 let compatibility =
                     r.compatibility.clone().map(|c| Compatibility::try_from(*c)).transpose();
-                // TODO(b/316033554): handle the case when there are multiple BSS candidates
                 match (bss_description, compatibility) {
                     (Ok(bss_description), Ok(compatibility)) if bss_description.ssid == *ssid => {
-                        Some((bss_description, compatibility))
+                        match bssid {
+                            Some(bssid) if bss_description.bssid != bssid => None,
+                            _ => Some((bss_description, compatibility)),
+                        }
                     }
                     _ => None,
                 }
@@ -301,6 +307,7 @@ pub mod test_utils {
     pub struct TestClientIface {
         pub connected_ssid: Mutex<Option<Vec<u8>>>,
         pub connected_passphrase: Mutex<Option<Vec<u8>>>,
+        pub connect_req_bssid: Mutex<Option<Bssid>>,
         scan_end_receiver: Mutex<Option<oneshot::Receiver<Result<ScanEnd, Error>>>>,
     }
 
@@ -309,6 +316,7 @@ pub mod test_utils {
             Self {
                 connected_ssid: Mutex::new(None),
                 connected_passphrase: Mutex::new(None),
+                connect_req_bssid: Mutex::new(None),
                 scan_end_receiver: Mutex::new(None),
             }
         }
@@ -333,10 +341,15 @@ pub mod test_utils {
             &self,
             ssid: &[u8],
             passphrase: Option<Vec<u8>>,
+            bssid: Option<Bssid>,
         ) -> Result<ConnectedResult, Error> {
             *self.connected_ssid.lock() = Some(ssid.to_vec());
             *self.connected_passphrase.lock() = passphrase;
-            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: [42, 42, 42, 42, 42, 42].into() })
+            *self.connect_req_bssid.lock() = bssid;
+            Ok(ConnectedResult {
+                ssid: ssid.to_vec(),
+                bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+            })
         }
     }
 
@@ -507,29 +520,43 @@ mod tests {
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
         None,
+        false,
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Open,
             credentials: None
         };
-        "open"
+        "open_any_bssid"
     )]
     #[test_case(
         FakeProtectionCfg::Wpa2,
         vec![fidl_security::Protocol::Wpa2Personal],
         Some(b"password".to_vec()),
+        false,
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa2Personal,
             credentials: Some(Box::new(fidl_security::Credentials::Wpa(
                 fidl_security::WpaCredentials::Passphrase(b"password".to_vec())
             )))
         };
-        "wpa2"
+        "wpa2_any_bssid"
+    )]
+    #[test_case(
+        FakeProtectionCfg::Open,
+        vec![fidl_security::Protocol::Open],
+        None,
+        false,
+        fidl_security::Authentication {
+            protocol: fidl_security::Protocol::Open,
+            credentials: None
+        };
+        "bssid_specified"
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_to_network(
         fake_protection_cfg: FakeProtectionCfg,
         mutual_security_protocols: Vec<fidl_security::Protocol>,
         passphrase: Option<Vec<u8>>,
+        bssid_specified: bool,
         expected_authentication: fidl_security::Authentication,
     ) {
         let (mut exec, _monitor_stream, manager) = setup_test();
@@ -549,7 +576,8 @@ mod tests {
             timestamp_nanos: 1,
         }];
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase);
+        let bssid = if bssid_specified { Some(Bssid::from([1, 2, 3, 4, 5, 6])) } else { None };
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -576,6 +604,7 @@ mod tests {
         false,
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
+        None,
         None;
         "network_not_found"
     )]
@@ -583,15 +612,25 @@ mod tests {
         true,
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
-        Some(b"password".to_vec());
+        Some(b"password".to_vec()),
+        None;
         "open_with_password"
     )]
     #[test_case(
         true,
         FakeProtectionCfg::Wpa2,
         vec![fidl_security::Protocol::Wpa2Personal],
+        None,
         None;
         "wpa2_without_password"
+    )]
+    #[test_case(
+        true,
+        FakeProtectionCfg::Wpa2,
+        vec![fidl_security::Protocol::Open],
+        None,
+        Some([24, 51, 32, 52, 41, 32].into());
+        "bssid_not_found"
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_rejected(
@@ -599,6 +638,7 @@ mod tests {
         fake_protection_cfg: FakeProtectionCfg,
         mutual_security_protocols: Vec<fidl_security::Protocol>,
         passphrase: Option<Vec<u8>>,
+        bssid: Option<Bssid>,
     ) {
         let (mut exec, _monitor_stream, manager) = setup_test();
         let (sme_proxy, mut _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
@@ -621,7 +661,7 @@ mod tests {
             }];
         }
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase);
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
     }
 
@@ -646,7 +686,7 @@ mod tests {
             timestamp_nanos: 1,
         }];
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None);
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),

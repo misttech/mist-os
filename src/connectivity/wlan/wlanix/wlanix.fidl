@@ -153,6 +153,10 @@ type StaIfaceCallbackState = flexible enum : uint32 {
 };
 
 open protocol SupplicantStaNetwork {
+    flexible SetBssid(table {
+        1: bssid fuchsia.wlan.ieee80211.MacAddr;
+    });
+    flexible ClearBssid();
     flexible SetSsid(table {
         1: ssid fuchsia.wlan.ieee80211.Ssid;
     });
