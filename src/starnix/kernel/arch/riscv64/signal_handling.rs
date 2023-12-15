@@ -14,7 +14,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
+    sigaction_t, sigaltstack, sigcontext, sigcontext__bindgen_ty_1, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -60,7 +60,9 @@ impl SignalStackFrame {
             uc_sigmask: signal_state.mask().into(),
             uc_mcontext: sigcontext {
                 sc_regs: registers.to_user_regs_struct(),
-                sc_fpregs: extended_pstate_to_riscv_fpregs(extended_pstate),
+                __bindgen_anon_1: sigcontext__bindgen_ty_1 {
+                    sc_fpregs: extended_pstate_to_riscv_fpregs(extended_pstate),
+                },
             },
             ..Default::default()
         };
@@ -123,7 +125,7 @@ pub fn restore_registers(
     }
     .into();
 
-    let d_state = unsafe { &signal_stack_frame.context.uc_mcontext.sc_fpregs.d };
+    let d_state = unsafe { &signal_stack_frame.context.uc_mcontext.__bindgen_anon_1.sc_fpregs.d };
     current_task.thread_state.extended_pstate.set_riscv64_fp(&d_state.f, d_state.fcsr);
 
     Ok(())

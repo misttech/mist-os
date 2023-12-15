@@ -1323,6 +1323,7 @@ impl FuseKernelMessage {
                 uid: creds.uid,
                 gid: creds.gid,
                 pid: current_task.get_tid() as u32,
+                total_extlen: 0,
                 padding: 0,
             },
             operation,

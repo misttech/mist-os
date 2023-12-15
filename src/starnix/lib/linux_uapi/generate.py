@@ -81,6 +81,7 @@ AUTO_DERIVE_TRAITS = [
         r"__IncompleteArrayField",
         ["Clone", "AsBytes, FromBytes", "NoCell", "FromZeros"],
     ),
+    (r"__BindgenUnionField", ["AsBytes, FromBytes", "NoCell", "FromZeros"]),
     (
         r"__sifields__bindgen_ty_(2|3|7)",
         ["AsBytes, FromBytes", "NoCell", "FromZeros"],
@@ -91,7 +92,7 @@ AUTO_DERIVE_TRAITS = [
     ),
     (r"binder_transaction_data.*", ["FromBytes", "NoCell", "FromZeros"]),
     (
-        r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|15|16|17|18|19)$",
+        r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|16|17|18|19)(_.+)?$",
         ["AsBytes", "FromBytes", "NoCell", "FromZeros"],
     ),
     (r"bpf_attr.*", ["FromBytes", "NoCell", "FromZeros"]),
@@ -116,6 +117,7 @@ AUTO_DERIVE_TRAITS = [
     (r"sigevent", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sigval", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sockaddr_in*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
+    (r"sockaddr_ll*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sock_fprog", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sysinfo", ["AsBytes", "NoCell"]),
     (r"timeval", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
@@ -139,10 +141,10 @@ REPLACEMENTS = [
     (
         r"#\[repr\(C\)\]\n"
         r"#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n"
-        r"pub struct __IncompleteArrayField",
-        "#[repr(transparent)]\n"
-        "#[derive(\\1)]\n"
-        "pub struct __IncompleteArrayField",
+        r"pub struct (__IncompleteArrayField|__BindgenUnionField)",
+        """#[repr(transparent)]
+        #[derive(\\1)]
+        pub struct \\3""",
     ),
     # Add AsBytes/FromBytes/FromZeros to every copyable struct regardless of
     # name.

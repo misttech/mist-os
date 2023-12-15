@@ -174,6 +174,50 @@ impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
         fmt.write_str("__IncompleteArrayField")
     }
 }
+#[repr(transparent)]
+#[derive(AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct __BindgenUnionField<T>(::std::marker::PhantomData<T>);
+impl<T> __BindgenUnionField<T> {
+    #[inline]
+    pub const fn new() -> Self {
+        __BindgenUnionField(::std::marker::PhantomData)
+    }
+    #[inline]
+    pub unsafe fn as_ref(&self) -> &T {
+        ::std::mem::transmute(self)
+    }
+    #[inline]
+    pub unsafe fn as_mut(&mut self) -> &mut T {
+        ::std::mem::transmute(self)
+    }
+}
+impl<T> ::std::default::Default for __BindgenUnionField<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<T> ::std::clone::Clone for __BindgenUnionField<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T> ::std::marker::Copy for __BindgenUnionField<T> {}
+impl<T> ::std::fmt::Debug for __BindgenUnionField<T> {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        fmt.write_str("__BindgenUnionField")
+    }
+}
+impl<T> ::std::hash::Hash for __BindgenUnionField<T> {
+    fn hash<H: ::std::hash::Hasher>(&self, _state: &mut H) {}
+}
+impl<T> ::std::cmp::PartialEq for __BindgenUnionField<T> {
+    fn eq(&self, _other: &__BindgenUnionField<T>) -> bool {
+        true
+    }
+}
+impl<T> ::std::cmp::Eq for __BindgenUnionField<T> {}
 pub const _K_SS_MAXSIZE: u32 = 128;
 pub const SOCK_SNDBUF_LOCK: u32 = 1;
 pub const SOCK_RCVBUF_LOCK: u32 = 2;
@@ -450,6 +494,8 @@ pub const SO_BUF_LOCK: u32 = 72;
 pub const SO_RESERVE_MEM: u32 = 73;
 pub const SO_TXREHASH: u32 = 74;
 pub const SO_RCVMARK: u32 = 75;
+pub const SO_PASSPIDFD: u32 = 76;
+pub const SO_PEERPIDFD: u32 = 77;
 pub const SO_TIMESTAMP: u32 = 29;
 pub const SO_TIMESTAMPNS: u32 = 35;
 pub const SO_TIMESTAMPING: u32 = 37;
@@ -838,6 +884,8 @@ pub const AT_SECURE: u32 = 23;
 pub const AT_BASE_PLATFORM: u32 = 24;
 pub const AT_RANDOM: u32 = 25;
 pub const AT_HWCAP2: u32 = 26;
+pub const AT_RSEQ_FEATURE_SIZE: u32 = 27;
+pub const AT_RSEQ_ALIGN: u32 = 28;
 pub const AT_EXECFN: u32 = 31;
 pub const AT_MINSIGSTKSZ: u32 = 51;
 pub const BPF_LD: u32 = 0;
@@ -909,6 +957,7 @@ pub const BPF_F_TEST_RND_HI32: u32 = 4;
 pub const BPF_F_TEST_STATE_FREQ: u32 = 8;
 pub const BPF_F_SLEEPABLE: u32 = 16;
 pub const BPF_F_XDP_HAS_FRAGS: u32 = 32;
+pub const BPF_F_XDP_DEV_BOUND_ONLY: u32 = 64;
 pub const BPF_F_KPROBE_MULTI_RETURN: u32 = 1;
 pub const BPF_PSEUDO_MAP_FD: u32 = 1;
 pub const BPF_PSEUDO_MAP_IDX: u32 = 5;
@@ -1145,7 +1194,6 @@ pub const O_SYNC: u32 = 1052672;
 pub const O_PATH: u32 = 2097152;
 pub const __O_TMPFILE: u32 = 4194304;
 pub const O_TMPFILE: u32 = 4259840;
-pub const O_TMPFILE_MASK: u32 = 4259904;
 pub const O_NDELAY: u32 = 2048;
 pub const F_DUPFD: u32 = 0;
 pub const F_GETFD: u32 = 1;
@@ -1203,6 +1251,7 @@ pub const F_SEAL_SHRINK: u32 = 2;
 pub const F_SEAL_GROW: u32 = 4;
 pub const F_SEAL_WRITE: u32 = 8;
 pub const F_SEAL_FUTURE_WRITE: u32 = 16;
+pub const F_SEAL_EXEC: u32 = 32;
 pub const F_GET_RW_HINT: u32 = 1035;
 pub const F_SET_RW_HINT: u32 = 1036;
 pub const F_GET_FILE_RW_HINT: u32 = 1037;
@@ -1233,6 +1282,7 @@ pub const AT_STATX_SYNC_AS_STAT: u32 = 0;
 pub const AT_STATX_FORCE_SYNC: u32 = 8192;
 pub const AT_STATX_DONT_SYNC: u32 = 16384;
 pub const AT_RECURSIVE: u32 = 32768;
+pub const AT_HANDLE_FID: u32 = 512;
 pub const EPOLL_CLOEXEC: u32 = 524288;
 pub const EPOLL_CTL_ADD: u32 = 1;
 pub const EPOLL_CTL_DEL: u32 = 2;
@@ -1617,7 +1667,8 @@ pub const MOVE_MOUNT_T_SYMLINKS: u32 = 16;
 pub const MOVE_MOUNT_T_AUTOMOUNTS: u32 = 32;
 pub const MOVE_MOUNT_T_EMPTY_PATH: u32 = 64;
 pub const MOVE_MOUNT_SET_GROUP: u32 = 256;
-pub const MOVE_MOUNT__MASK: u32 = 375;
+pub const MOVE_MOUNT_BENEATH: u32 = 512;
+pub const MOVE_MOUNT__MASK: u32 = 887;
 pub const FSOPEN_CLOEXEC: u32 = 1;
 pub const FSPICK_CLOEXEC: u32 = 1;
 pub const FSPICK_SYMLINK_NOFOLLOW: u32 = 2;
@@ -1768,6 +1819,8 @@ pub const FUSE_INIT_EXT: u32 = 1073741824;
 pub const FUSE_INIT_RESERVED: u32 = 2147483648;
 pub const FUSE_SECURITY_CTX: u64 = 4294967296;
 pub const FUSE_HAS_INODE_DAX: u64 = 8589934592;
+pub const FUSE_CREATE_SUPP_GROUP: u64 = 17179869184;
+pub const FUSE_HAS_EXPIRE_ONLY: u64 = 34359738368;
 pub const FUSE_PASSTHROUGH: i64 = -9223372036854775808;
 pub const CUSE_UNRESTRICTED_IOCTL: u32 = 1;
 pub const FUSE_RELEASE_FLUSH: u32 = 1;
@@ -1887,6 +1940,7 @@ pub const PACKET_QDISC_BYPASS: u32 = 20;
 pub const PACKET_ROLLOVER_STATS: u32 = 21;
 pub const PACKET_FANOUT_DATA: u32 = 22;
 pub const PACKET_IGNORE_OUTGOING: u32 = 23;
+pub const PACKET_VNET_HDR_SZ: u32 = 24;
 pub const PACKET_FANOUT_HASH: u32 = 0;
 pub const PACKET_FANOUT_LB: u32 = 1;
 pub const PACKET_FANOUT_CPU: u32 = 2;
@@ -1908,6 +1962,7 @@ pub const TP_STATUS_VLAN_VALID: u32 = 16;
 pub const TP_STATUS_BLK_TMO: u32 = 32;
 pub const TP_STATUS_VLAN_TPID_VALID: u32 = 64;
 pub const TP_STATUS_CSUM_VALID: u32 = 128;
+pub const TP_STATUS_GSO_TCP: u32 = 256;
 pub const TP_STATUS_AVAILABLE: u32 = 0;
 pub const TP_STATUS_SEND_REQUEST: u32 = 1;
 pub const TP_STATUS_SENDING: u32 = 2;
@@ -3108,6 +3163,8 @@ pub const HUGETLB_FLAG_ENCODE_16GB: u32 = 2281701376;
 pub const MFD_CLOEXEC: u32 = 1;
 pub const MFD_ALLOW_SEALING: u32 = 2;
 pub const MFD_HUGETLB: u32 = 4;
+pub const MFD_NOEXEC_SEAL: u32 = 8;
+pub const MFD_EXEC: u32 = 16;
 pub const MFD_HUGE_SHIFT: u32 = 26;
 pub const MFD_HUGE_MASK: u32 = 63;
 pub const MFD_HUGE_64KB: u32 = 1073741824;
@@ -3315,6 +3372,8 @@ pub const MCAST_LEAVE_SOURCE_GROUP: u32 = 47;
 pub const MCAST_MSFILTER: u32 = 48;
 pub const IP_MULTICAST_ALL: u32 = 49;
 pub const IP_UNICAST_IF: u32 = 50;
+pub const IP_LOCAL_PORT_RANGE: u32 = 51;
+pub const IP_PROTOCOL: u32 = 52;
 pub const MCAST_EXCLUDE: u32 = 0;
 pub const MCAST_INCLUDE: u32 = 1;
 pub const IP_DEFAULT_MULTICAST_TTL: u32 = 1;
@@ -3681,8 +3740,23 @@ pub const PR_SME_SET_VL_ONEXEC: u32 = 262144;
 pub const PR_SME_GET_VL: u32 = 64;
 pub const PR_SME_VL_LEN_MASK: u32 = 65535;
 pub const PR_SME_VL_INHERIT: u32 = 131072;
+pub const PR_SET_MDWE: u32 = 65;
+pub const PR_MDWE_REFUSE_EXEC_GAIN: u32 = 1;
+pub const PR_GET_MDWE: u32 = 66;
 pub const PR_SET_VMA: u32 = 1398164801;
 pub const PR_SET_VMA_ANON_NAME: u32 = 0;
+pub const PR_GET_AUXV: u32 = 1096112214;
+pub const PR_SET_MEMORY_MERGE: u32 = 67;
+pub const PR_GET_MEMORY_MERGE: u32 = 68;
+pub const PR_RISCV_V_SET_CONTROL: u32 = 69;
+pub const PR_RISCV_V_GET_CONTROL: u32 = 70;
+pub const PR_RISCV_V_VSTATE_CTRL_DEFAULT: u32 = 0;
+pub const PR_RISCV_V_VSTATE_CTRL_OFF: u32 = 1;
+pub const PR_RISCV_V_VSTATE_CTRL_ON: u32 = 2;
+pub const PR_RISCV_V_VSTATE_CTRL_INHERIT: u32 = 16;
+pub const PR_RISCV_V_VSTATE_CTRL_CUR_MASK: u32 = 3;
+pub const PR_RISCV_V_VSTATE_CTRL_NEXT_MASK: u32 = 12;
+pub const PR_RISCV_V_VSTATE_CTRL_MASK: u32 = 31;
 pub const PTRACE_TRACEME: u32 = 0;
 pub const PTRACE_PEEKTEXT: u32 = 1;
 pub const PTRACE_PEEKDATA: u32 = 2;
@@ -3716,6 +3790,8 @@ pub const PTRACE_SYSCALL_INFO_ENTRY: u32 = 1;
 pub const PTRACE_SYSCALL_INFO_EXIT: u32 = 2;
 pub const PTRACE_SYSCALL_INFO_SECCOMP: u32 = 3;
 pub const PTRACE_GET_RSEQ_CONFIGURATION: u32 = 16911;
+pub const PTRACE_SET_SYSCALL_USER_DISPATCH_CONFIG: u32 = 16912;
+pub const PTRACE_GET_SYSCALL_USER_DISPATCH_CONFIG: u32 = 16913;
 pub const PTRACE_EVENTMSG_SYSCALL_ENTRY: u32 = 1;
 pub const PTRACE_EVENTMSG_SYSCALL_EXIT: u32 = 2;
 pub const PTRACE_PEEKSIGINFO_SHARED: u32 = 1;
@@ -3784,6 +3860,8 @@ pub const X86_CR0_PG_BIT: u32 = 31;
 pub const X86_CR3_PWT_BIT: u32 = 3;
 pub const X86_CR3_PCD_BIT: u32 = 4;
 pub const X86_CR3_PCID_BITS: u32 = 12;
+pub const X86_CR3_LAM_U57_BIT: u32 = 61;
+pub const X86_CR3_LAM_U48_BIT: u32 = 62;
 pub const X86_CR3_PCID_NOFLUSH_BIT: u32 = 63;
 pub const X86_CR4_VME_BIT: u32 = 0;
 pub const X86_CR4_PVI_BIT: u32 = 1;
@@ -3807,6 +3885,7 @@ pub const X86_CR4_SMEP_BIT: u32 = 20;
 pub const X86_CR4_SMAP_BIT: u32 = 21;
 pub const X86_CR4_PKE_BIT: u32 = 22;
 pub const X86_CR4_CET_BIT: u32 = 23;
+pub const X86_CR4_LAM_SUP_BIT: u32 = 28;
 pub const CX86_PCR0: u32 = 32;
 pub const CX86_GCR: u32 = 184;
 pub const CX86_CCR0: u32 = 192;
@@ -4714,6 +4793,7 @@ pub const __NR_memfd_secret: u32 = 447;
 pub const __NR_process_mrelease: u32 = 448;
 pub const __NR_futex_waitv: u32 = 449;
 pub const __NR_set_mempolicy_home_node: u32 = 450;
+pub const __NR_cachestat: u32 = 451;
 pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
 pub const SO_VM_SOCKETS_BUFFER_MIN_SIZE: u32 = 1;
 pub const SO_VM_SOCKETS_BUFFER_MAX_SIZE: u32 = 2;
@@ -4824,9 +4904,15 @@ pub const ARCH_GET_XCOMP_PERM: u32 = 4130;
 pub const ARCH_REQ_XCOMP_PERM: u32 = 4131;
 pub const ARCH_GET_XCOMP_GUEST_PERM: u32 = 4132;
 pub const ARCH_REQ_XCOMP_GUEST_PERM: u32 = 4133;
+pub const ARCH_XCOMP_TILECFG: u32 = 17;
+pub const ARCH_XCOMP_TILEDATA: u32 = 18;
 pub const ARCH_MAP_VDSO_X32: u32 = 8193;
 pub const ARCH_MAP_VDSO_32: u32 = 8194;
 pub const ARCH_MAP_VDSO_64: u32 = 8195;
+pub const ARCH_GET_UNTAG_MASK: u32 = 16385;
+pub const ARCH_ENABLE_TAGGED_ADDR: u32 = 16386;
+pub const ARCH_GET_MAX_TAG_BITS: u32 = 16387;
+pub const ARCH_FORCE_TAGGED_SVA: u32 = 16388;
 pub const SPLICE_F_MOVE: u32 = 1;
 pub const SPLICE_F_NONBLOCK: u32 = 2;
 pub const SPLICE_F_MORE: u32 = 4;
@@ -4935,6 +5021,8 @@ pub type __kernel_clockid_t = crate::types::c_int;
 pub type __kernel_caddr_t = uref<crate::types::c_char>;
 pub type __kernel_uid16_t = crate::types::c_ushort;
 pub type __kernel_gid16_t = crate::types::c_ushort;
+pub type __s128 = i128;
+pub type __u128 = u128;
 pub type __le16 = __u16;
 pub type __be16 = __u16;
 pub type __le32 = __u32;
@@ -5699,6 +5787,8 @@ pub const binder_driver_return_protocol_BR_FAILED_REPLY: binder_driver_return_pr
 pub const binder_driver_return_protocol_BR_FROZEN_REPLY: binder_driver_return_protocol = 29202;
 pub const binder_driver_return_protocol_BR_ONEWAY_SPAM_SUSPECT: binder_driver_return_protocol =
     29203;
+pub const binder_driver_return_protocol_BR_TRANSACTION_PENDING_FROZEN:
+    binder_driver_return_protocol = 29204;
 pub type binder_driver_return_protocol = crate::types::c_uint;
 pub const binder_driver_command_protocol_BC_TRANSACTION: binder_driver_command_protocol =
     1077961472;
@@ -6046,6 +6136,7 @@ pub const bpf_prog_type_BPF_PROG_TYPE_EXT: bpf_prog_type = 28;
 pub const bpf_prog_type_BPF_PROG_TYPE_LSM: bpf_prog_type = 29;
 pub const bpf_prog_type_BPF_PROG_TYPE_SK_LOOKUP: bpf_prog_type = 30;
 pub const bpf_prog_type_BPF_PROG_TYPE_SYSCALL: bpf_prog_type = 31;
+pub const bpf_prog_type_BPF_PROG_TYPE_NETFILTER: bpf_prog_type = 32;
 pub type bpf_prog_type = crate::types::c_uint;
 pub const bpf_attach_type_BPF_CGROUP_INET_INGRESS: bpf_attach_type = 0;
 pub const bpf_attach_type_BPF_CGROUP_INET_EGRESS: bpf_attach_type = 1;
@@ -6091,7 +6182,9 @@ pub const bpf_attach_type_BPF_SK_REUSEPORT_SELECT_OR_MIGRATE: bpf_attach_type = 
 pub const bpf_attach_type_BPF_PERF_EVENT: bpf_attach_type = 41;
 pub const bpf_attach_type_BPF_TRACE_KPROBE_MULTI: bpf_attach_type = 42;
 pub const bpf_attach_type_BPF_LSM_CGROUP: bpf_attach_type = 43;
-pub const bpf_attach_type___MAX_BPF_ATTACH_TYPE: bpf_attach_type = 44;
+pub const bpf_attach_type_BPF_STRUCT_OPS: bpf_attach_type = 44;
+pub const bpf_attach_type_BPF_NETFILTER: bpf_attach_type = 45;
+pub const bpf_attach_type___MAX_BPF_ATTACH_TYPE: bpf_attach_type = 46;
 pub type bpf_attach_type = crate::types::c_uint;
 pub const bpf_link_type_BPF_LINK_TYPE_UNSPEC: bpf_link_type = 0;
 pub const bpf_link_type_BPF_LINK_TYPE_RAW_TRACEPOINT: bpf_link_type = 1;
@@ -6103,7 +6196,8 @@ pub const bpf_link_type_BPF_LINK_TYPE_XDP: bpf_link_type = 6;
 pub const bpf_link_type_BPF_LINK_TYPE_PERF_EVENT: bpf_link_type = 7;
 pub const bpf_link_type_BPF_LINK_TYPE_KPROBE_MULTI: bpf_link_type = 8;
 pub const bpf_link_type_BPF_LINK_TYPE_STRUCT_OPS: bpf_link_type = 9;
-pub const bpf_link_type_MAX_BPF_LINK_TYPE: bpf_link_type = 10;
+pub const bpf_link_type_BPF_LINK_TYPE_NETFILTER: bpf_link_type = 10;
+pub const bpf_link_type_MAX_BPF_LINK_TYPE: bpf_link_type = 11;
 pub type bpf_link_type = crate::types::c_uint;
 pub const BPF_ANY: _bindgen_ty_5 = 0;
 pub const BPF_NOEXIST: _bindgen_ty_5 = 1;
@@ -6123,6 +6217,8 @@ pub const BPF_F_CLONE: _bindgen_ty_6 = 512;
 pub const BPF_F_MMAPABLE: _bindgen_ty_6 = 1024;
 pub const BPF_F_PRESERVE_ELEMS: _bindgen_ty_6 = 2048;
 pub const BPF_F_INNER_MAP: _bindgen_ty_6 = 4096;
+pub const BPF_F_LINK: _bindgen_ty_6 = 8192;
+pub const BPF_F_PATH_FD: _bindgen_ty_6 = 16384;
 pub type _bindgen_ty_6 = crate::types::c_uint;
 pub const bpf_stats_type_BPF_STATS_RUN_TIME: bpf_stats_type = 0;
 pub type bpf_stats_type = crate::types::c_uint;
@@ -6275,7 +6371,7 @@ pub struct bpf_attr__bindgen_ty_4 {
     pub fd_array: __u64,
     pub core_relos: __u64,
     pub core_relo_rec_size: __u32,
-    pub __bindgen_padding_0: [u8; 4usize],
+    pub log_true_size: __u32,
 }
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
@@ -6307,6 +6403,8 @@ pub struct bpf_attr__bindgen_ty_5 {
     pub pathname: __u64,
     pub bpf_fd: __u32,
     pub file_flags: __u32,
+    pub path_fd: __s32,
+    pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -6405,7 +6503,7 @@ pub struct bpf_attr__bindgen_ty_12 {
     pub btf_size: __u32,
     pub btf_log_size: __u32,
     pub btf_log_level: __u32,
-    pub __bindgen_padding_0: [u8; 4usize],
+    pub btf_log_true_size: __u32,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -6423,17 +6521,17 @@ pub struct bpf_attr__bindgen_ty_13 {
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
 pub struct bpf_attr__bindgen_ty_14 {
-    pub prog_fd: __u32,
     pub __bindgen_anon_1: bpf_attr__bindgen_ty_14__bindgen_ty_1,
+    pub __bindgen_anon_2: bpf_attr__bindgen_ty_14__bindgen_ty_2,
     pub attach_type: __u32,
     pub flags: __u32,
-    pub __bindgen_anon_2: bpf_attr__bindgen_ty_14__bindgen_ty_2,
+    pub __bindgen_anon_3: bpf_attr__bindgen_ty_14__bindgen_ty_3,
 }
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
 pub union bpf_attr__bindgen_ty_14__bindgen_ty_1 {
-    pub target_fd: __u32,
-    pub target_ifindex: __u32,
+    pub prog_fd: __u32,
+    pub map_fd: __u32,
 }
 impl Default for bpf_attr__bindgen_ty_14__bindgen_ty_1 {
     fn default() -> Self {
@@ -6447,27 +6545,43 @@ impl Default for bpf_attr__bindgen_ty_14__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
 pub union bpf_attr__bindgen_ty_14__bindgen_ty_2 {
+    pub target_fd: __u32,
+    pub target_ifindex: __u32,
+}
+impl Default for bpf_attr__bindgen_ty_14__bindgen_ty_2 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub union bpf_attr__bindgen_ty_14__bindgen_ty_3 {
     pub target_btf_id: __u32,
-    pub __bindgen_anon_1: bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_1,
-    pub perf_event: bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_2,
-    pub kprobe_multi: bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_3,
-    pub tracing: bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_4,
+    pub __bindgen_anon_1: bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_1,
+    pub perf_event: bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_2,
+    pub kprobe_multi: bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_3,
+    pub tracing: bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_4,
+    pub netfilter: bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_5,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
-pub struct bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_1 {
+pub struct bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_1 {
     pub iter_info: __u64,
     pub iter_info_len: __u32,
     pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
-pub struct bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_2 {
+pub struct bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_2 {
     pub bpf_cookie: __u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
-pub struct bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_3 {
+pub struct bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_3 {
     pub flags: __u32,
     pub cnt: __u32,
     pub syms: __u64,
@@ -6476,12 +6590,20 @@ pub struct bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_3 {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
-pub struct bpf_attr__bindgen_ty_14__bindgen_ty_2__bindgen_ty_4 {
+pub struct bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_4 {
     pub target_btf_id: __u32,
     pub __bindgen_padding_0: [u8; 4usize],
     pub cookie: __u64,
 }
-impl Default for bpf_attr__bindgen_ty_14__bindgen_ty_2 {
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct bpf_attr__bindgen_ty_14__bindgen_ty_3__bindgen_ty_5 {
+    pub pf: __u32,
+    pub hooknum: __u32,
+    pub priority: __s32,
+    pub flags: __u32,
+}
+impl Default for bpf_attr__bindgen_ty_14__bindgen_ty_3 {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -6500,12 +6622,51 @@ impl Default for bpf_attr__bindgen_ty_14 {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
 pub struct bpf_attr__bindgen_ty_15 {
     pub link_fd: __u32,
-    pub new_prog_fd: __u32,
+    pub __bindgen_anon_1: bpf_attr__bindgen_ty_15__bindgen_ty_1,
     pub flags: __u32,
+    pub __bindgen_anon_2: bpf_attr__bindgen_ty_15__bindgen_ty_2,
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub union bpf_attr__bindgen_ty_15__bindgen_ty_1 {
+    pub new_prog_fd: __u32,
+    pub new_map_fd: __u32,
+}
+impl Default for bpf_attr__bindgen_ty_15__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub union bpf_attr__bindgen_ty_15__bindgen_ty_2 {
     pub old_prog_fd: __u32,
+    pub old_map_fd: __u32,
+}
+impl Default for bpf_attr__bindgen_ty_15__bindgen_ty_2 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for bpf_attr__bindgen_ty_15 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -6775,6 +6936,7 @@ pub type _bindgen_ty_12 = crate::types::c_uint;
 pub const BPF_F_ZERO_CSUM_TX: _bindgen_ty_13 = 2;
 pub const BPF_F_DONT_FRAGMENT: _bindgen_ty_13 = 4;
 pub const BPF_F_SEQ_NUMBER: _bindgen_ty_13 = 8;
+pub const BPF_F_NO_TUNNEL_KEY: _bindgen_ty_13 = 16;
 pub type _bindgen_ty_13 = crate::types::c_uint;
 pub const BPF_F_TUNINFO_FLAGS: _bindgen_ty_14 = 16;
 pub type _bindgen_ty_14 = crate::types::c_uint;
@@ -6796,6 +6958,8 @@ pub const BPF_F_ADJ_ROOM_ENCAP_L4_GRE: _bindgen_ty_18 = 8;
 pub const BPF_F_ADJ_ROOM_ENCAP_L4_UDP: _bindgen_ty_18 = 16;
 pub const BPF_F_ADJ_ROOM_NO_CSUM_RESET: _bindgen_ty_18 = 32;
 pub const BPF_F_ADJ_ROOM_ENCAP_L2_ETH: _bindgen_ty_18 = 64;
+pub const BPF_F_ADJ_ROOM_DECAP_L3_IPV4: _bindgen_ty_18 = 128;
+pub const BPF_F_ADJ_ROOM_DECAP_L3_IPV6: _bindgen_ty_18 = 256;
 pub type _bindgen_ty_18 = crate::types::c_uint;
 pub const BPF_ADJ_ROOM_ENCAP_L2_MASK: _bindgen_ty_19 = 255;
 pub const BPF_ADJ_ROOM_ENCAP_L2_SHIFT: _bindgen_ty_19 = 56;
@@ -7562,6 +7726,8 @@ pub union bpf_link_info__bindgen_ty_1 {
     pub iter: bpf_link_info__bindgen_ty_1__bindgen_ty_4,
     pub netns: bpf_link_info__bindgen_ty_1__bindgen_ty_5,
     pub xdp: bpf_link_info__bindgen_ty_1__bindgen_ty_6,
+    pub struct_ops: bpf_link_info__bindgen_ty_1__bindgen_ty_7,
+    pub netfilter: bpf_link_info__bindgen_ty_1__bindgen_ty_8,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -7658,6 +7824,19 @@ pub struct bpf_link_info__bindgen_ty_1__bindgen_ty_5 {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_link_info__bindgen_ty_1__bindgen_ty_6 {
     pub ifindex: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_link_info__bindgen_ty_1__bindgen_ty_7 {
+    pub map_id: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_link_info__bindgen_ty_1__bindgen_ty_8 {
+    pub pf: __u32,
+    pub hooknum: __u32,
+    pub priority: __s32,
+    pub flags: __u32,
 }
 impl Default for bpf_link_info__bindgen_ty_1 {
     fn default() -> Self {
@@ -7944,6 +8123,8 @@ pub struct bpf_raw_tracepoint_args {
 }
 pub const BPF_FIB_LOOKUP_DIRECT: _bindgen_ty_38 = 1;
 pub const BPF_FIB_LOOKUP_OUTPUT: _bindgen_ty_38 = 2;
+pub const BPF_FIB_LOOKUP_SKIP_NEIGH: _bindgen_ty_38 = 4;
+pub const BPF_FIB_LOOKUP_TBID: _bindgen_ty_38 = 8;
 pub type _bindgen_ty_38 = crate::types::c_uint;
 pub const BPF_FIB_LKUP_RET_SUCCESS: _bindgen_ty_39 = 0;
 pub const BPF_FIB_LKUP_RET_BLACKHOLE: _bindgen_ty_39 = 1;
@@ -7967,8 +8148,7 @@ pub struct bpf_fib_lookup {
     pub __bindgen_anon_2: bpf_fib_lookup__bindgen_ty_2,
     pub __bindgen_anon_3: bpf_fib_lookup__bindgen_ty_3,
     pub __bindgen_anon_4: bpf_fib_lookup__bindgen_ty_4,
-    pub h_vlan_proto: __be16,
-    pub h_vlan_TCI: __be16,
+    pub __bindgen_anon_5: bpf_fib_lookup__bindgen_ty_5,
     pub smac: [__u8; 6usize],
     pub dmac: [__u8; 6usize],
 }
@@ -8025,6 +8205,27 @@ pub union bpf_fib_lookup__bindgen_ty_4 {
     pub ipv6_dst: [__u32; 4usize],
 }
 impl Default for bpf_fib_lookup__bindgen_ty_4 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union bpf_fib_lookup__bindgen_ty_5 {
+    pub __bindgen_anon_1: bpf_fib_lookup__bindgen_ty_5__bindgen_ty_1,
+    pub tbid: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_fib_lookup__bindgen_ty_5__bindgen_ty_1 {
+    pub h_vlan_proto: __be16,
+    pub h_vlan_TCI: __be16,
+}
+impl Default for bpf_fib_lookup__bindgen_ty_5 {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -8214,6 +8415,48 @@ impl bpf_list_node {
     #[inline]
     pub fn new_bitfield_1() -> __BindgenBitfieldUnit<[u8; 16usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 16usize]> = Default::default();
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[repr(align(8))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_rb_root {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
+}
+impl bpf_rb_root {
+    #[inline]
+    pub fn new_bitfield_1() -> __BindgenBitfieldUnit<[u8; 16usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 16usize]> = Default::default();
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[repr(align(8))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_rb_node {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 24usize]>,
+}
+impl bpf_rb_node {
+    #[inline]
+    pub fn new_bitfield_1() -> __BindgenBitfieldUnit<[u8; 24usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 24usize]> = Default::default();
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[repr(align(4))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_refcount {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+}
+impl bpf_refcount {
+    #[inline]
+    pub fn new_bitfield_1() -> __BindgenBitfieldUnit<[u8; 4usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
         __bindgen_bitfield_unit
     }
 }
@@ -8441,6 +8684,13 @@ impl Default for bpf_core_relo {
         }
     }
 }
+pub const BPF_F_TIMER_ABS: _bindgen_ty_42 = 1;
+pub type _bindgen_ty_42 = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_iter_num {
+    pub __opaque: [__u64; 1usize],
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct __user_cap_header_struct {
@@ -8626,12 +8876,12 @@ pub struct fb_con2fbmap {
     pub console: __u32,
     pub framebuffer: __u32,
 }
-pub const FB_BLANK_UNBLANK: _bindgen_ty_42 = 0;
-pub const FB_BLANK_NORMAL: _bindgen_ty_42 = 1;
-pub const FB_BLANK_VSYNC_SUSPEND: _bindgen_ty_42 = 2;
-pub const FB_BLANK_HSYNC_SUSPEND: _bindgen_ty_42 = 3;
-pub const FB_BLANK_POWERDOWN: _bindgen_ty_42 = 4;
-pub type _bindgen_ty_42 = crate::types::c_uint;
+pub const FB_BLANK_UNBLANK: _bindgen_ty_43 = 0;
+pub const FB_BLANK_NORMAL: _bindgen_ty_43 = 1;
+pub const FB_BLANK_VSYNC_SUSPEND: _bindgen_ty_43 = 2;
+pub const FB_BLANK_HSYNC_SUSPEND: _bindgen_ty_43 = 3;
+pub const FB_BLANK_POWERDOWN: _bindgen_ty_43 = 4;
+pub type _bindgen_ty_43 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct fb_vblank {
@@ -9088,6 +9338,9 @@ pub struct fuse_file_lock {
     pub type_: u32,
     pub pid: u32,
 }
+pub const fuse_ext_type_FUSE_MAX_NR_SECCTX: fuse_ext_type = 31;
+pub const fuse_ext_type_FUSE_EXT_GROUPS: fuse_ext_type = 32;
+pub type fuse_ext_type = crate::types::c_uint;
 pub const fuse_opcode_FUSE_LOOKUP: fuse_opcode = 1;
 pub const fuse_opcode_FUSE_FORGET: fuse_opcode = 2;
 pub const fuse_opcode_FUSE_GETATTR: fuse_opcode = 3;
@@ -9487,7 +9740,8 @@ pub struct fuse_in_header {
     pub uid: u32,
     pub gid: u32,
     pub pid: u32,
-    pub padding: u32,
+    pub total_extlen: u16,
+    pub padding: u16,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -9623,6 +9877,18 @@ pub struct fuse_secctx_header {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct fuse_ext_header {
+    pub size: u32,
+    pub type_: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct fuse_supp_groups {
+    pub nr_groups: u32,
+    pub groups: __IncompleteArrayField<u32>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct futex_waitv {
     pub val: __u64,
     pub uaddr: __u64,
@@ -9667,7 +9933,7 @@ pub struct sockaddr_pkt {
     pub spkt_protocol: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct sockaddr_ll {
     pub sll_family: crate::types::c_ushort,
     pub sll_protocol: __be16,
@@ -9675,7 +9941,41 @@ pub struct sockaddr_ll {
     pub sll_hatype: crate::types::c_ushort,
     pub sll_pkttype: crate::types::c_uchar,
     pub sll_halen: crate::types::c_uchar,
-    pub sll_addr: [crate::types::c_uchar; 8usize],
+    pub __bindgen_anon_1: sockaddr_ll__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sockaddr_ll__bindgen_ty_1 {
+    pub sll_addr: __BindgenUnionField<[crate::types::c_uchar; 8usize]>,
+    pub __bindgen_anon_1: __BindgenUnionField<sockaddr_ll__bindgen_ty_1__bindgen_ty_1>,
+    pub bindgen_union_field: [u8; 8usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sockaddr_ll__bindgen_ty_1__bindgen_ty_1 {
+    pub __empty_sll_addr_flex: sockaddr_ll__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+    pub sll_addr_flex: __IncompleteArrayField<crate::types::c_uchar>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sockaddr_ll__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {}
+impl Default for sockaddr_ll__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for sockaddr_ll {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -10206,41 +10506,41 @@ pub struct ip_beet_phdr {
     pub padlen: __u8,
     pub reserved: __u8,
 }
-pub const IPV4_DEVCONF_FORWARDING: _bindgen_ty_43 = 1;
-pub const IPV4_DEVCONF_MC_FORWARDING: _bindgen_ty_43 = 2;
-pub const IPV4_DEVCONF_PROXY_ARP: _bindgen_ty_43 = 3;
-pub const IPV4_DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_43 = 4;
-pub const IPV4_DEVCONF_SECURE_REDIRECTS: _bindgen_ty_43 = 5;
-pub const IPV4_DEVCONF_SEND_REDIRECTS: _bindgen_ty_43 = 6;
-pub const IPV4_DEVCONF_SHARED_MEDIA: _bindgen_ty_43 = 7;
-pub const IPV4_DEVCONF_RP_FILTER: _bindgen_ty_43 = 8;
-pub const IPV4_DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_43 = 9;
-pub const IPV4_DEVCONF_BOOTP_RELAY: _bindgen_ty_43 = 10;
-pub const IPV4_DEVCONF_LOG_MARTIANS: _bindgen_ty_43 = 11;
-pub const IPV4_DEVCONF_TAG: _bindgen_ty_43 = 12;
-pub const IPV4_DEVCONF_ARPFILTER: _bindgen_ty_43 = 13;
-pub const IPV4_DEVCONF_MEDIUM_ID: _bindgen_ty_43 = 14;
-pub const IPV4_DEVCONF_NOXFRM: _bindgen_ty_43 = 15;
-pub const IPV4_DEVCONF_NOPOLICY: _bindgen_ty_43 = 16;
-pub const IPV4_DEVCONF_FORCE_IGMP_VERSION: _bindgen_ty_43 = 17;
-pub const IPV4_DEVCONF_ARP_ANNOUNCE: _bindgen_ty_43 = 18;
-pub const IPV4_DEVCONF_ARP_IGNORE: _bindgen_ty_43 = 19;
-pub const IPV4_DEVCONF_PROMOTE_SECONDARIES: _bindgen_ty_43 = 20;
-pub const IPV4_DEVCONF_ARP_ACCEPT: _bindgen_ty_43 = 21;
-pub const IPV4_DEVCONF_ARP_NOTIFY: _bindgen_ty_43 = 22;
-pub const IPV4_DEVCONF_ACCEPT_LOCAL: _bindgen_ty_43 = 23;
-pub const IPV4_DEVCONF_SRC_VMARK: _bindgen_ty_43 = 24;
-pub const IPV4_DEVCONF_PROXY_ARP_PVLAN: _bindgen_ty_43 = 25;
-pub const IPV4_DEVCONF_ROUTE_LOCALNET: _bindgen_ty_43 = 26;
-pub const IPV4_DEVCONF_IGMPV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_43 = 27;
-pub const IPV4_DEVCONF_IGMPV3_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_43 = 28;
-pub const IPV4_DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_43 = 29;
-pub const IPV4_DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_43 = 30;
-pub const IPV4_DEVCONF_DROP_GRATUITOUS_ARP: _bindgen_ty_43 = 31;
-pub const IPV4_DEVCONF_BC_FORWARDING: _bindgen_ty_43 = 32;
-pub const IPV4_DEVCONF_ARP_EVICT_NOCARRIER: _bindgen_ty_43 = 33;
-pub const __IPV4_DEVCONF_MAX: _bindgen_ty_43 = 34;
-pub type _bindgen_ty_43 = crate::types::c_uint;
+pub const IPV4_DEVCONF_FORWARDING: _bindgen_ty_44 = 1;
+pub const IPV4_DEVCONF_MC_FORWARDING: _bindgen_ty_44 = 2;
+pub const IPV4_DEVCONF_PROXY_ARP: _bindgen_ty_44 = 3;
+pub const IPV4_DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_44 = 4;
+pub const IPV4_DEVCONF_SECURE_REDIRECTS: _bindgen_ty_44 = 5;
+pub const IPV4_DEVCONF_SEND_REDIRECTS: _bindgen_ty_44 = 6;
+pub const IPV4_DEVCONF_SHARED_MEDIA: _bindgen_ty_44 = 7;
+pub const IPV4_DEVCONF_RP_FILTER: _bindgen_ty_44 = 8;
+pub const IPV4_DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_44 = 9;
+pub const IPV4_DEVCONF_BOOTP_RELAY: _bindgen_ty_44 = 10;
+pub const IPV4_DEVCONF_LOG_MARTIANS: _bindgen_ty_44 = 11;
+pub const IPV4_DEVCONF_TAG: _bindgen_ty_44 = 12;
+pub const IPV4_DEVCONF_ARPFILTER: _bindgen_ty_44 = 13;
+pub const IPV4_DEVCONF_MEDIUM_ID: _bindgen_ty_44 = 14;
+pub const IPV4_DEVCONF_NOXFRM: _bindgen_ty_44 = 15;
+pub const IPV4_DEVCONF_NOPOLICY: _bindgen_ty_44 = 16;
+pub const IPV4_DEVCONF_FORCE_IGMP_VERSION: _bindgen_ty_44 = 17;
+pub const IPV4_DEVCONF_ARP_ANNOUNCE: _bindgen_ty_44 = 18;
+pub const IPV4_DEVCONF_ARP_IGNORE: _bindgen_ty_44 = 19;
+pub const IPV4_DEVCONF_PROMOTE_SECONDARIES: _bindgen_ty_44 = 20;
+pub const IPV4_DEVCONF_ARP_ACCEPT: _bindgen_ty_44 = 21;
+pub const IPV4_DEVCONF_ARP_NOTIFY: _bindgen_ty_44 = 22;
+pub const IPV4_DEVCONF_ACCEPT_LOCAL: _bindgen_ty_44 = 23;
+pub const IPV4_DEVCONF_SRC_VMARK: _bindgen_ty_44 = 24;
+pub const IPV4_DEVCONF_PROXY_ARP_PVLAN: _bindgen_ty_44 = 25;
+pub const IPV4_DEVCONF_ROUTE_LOCALNET: _bindgen_ty_44 = 26;
+pub const IPV4_DEVCONF_IGMPV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_44 = 27;
+pub const IPV4_DEVCONF_IGMPV3_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_44 = 28;
+pub const IPV4_DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_44 = 29;
+pub const IPV4_DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_44 = 30;
+pub const IPV4_DEVCONF_DROP_GRATUITOUS_ARP: _bindgen_ty_44 = 31;
+pub const IPV4_DEVCONF_BC_FORWARDING: _bindgen_ty_44 = 32;
+pub const IPV4_DEVCONF_ARP_EVICT_NOCARRIER: _bindgen_ty_44 = 33;
+pub const __IPV4_DEVCONF_MAX: _bindgen_ty_44 = 34;
+pub type _bindgen_ty_44 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct in6_addr {
@@ -10534,66 +10834,66 @@ impl ipv6hdr {
         __bindgen_bitfield_unit
     }
 }
-pub const DEVCONF_FORWARDING: _bindgen_ty_44 = 0;
-pub const DEVCONF_HOPLIMIT: _bindgen_ty_44 = 1;
-pub const DEVCONF_MTU6: _bindgen_ty_44 = 2;
-pub const DEVCONF_ACCEPT_RA: _bindgen_ty_44 = 3;
-pub const DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_44 = 4;
-pub const DEVCONF_AUTOCONF: _bindgen_ty_44 = 5;
-pub const DEVCONF_DAD_TRANSMITS: _bindgen_ty_44 = 6;
-pub const DEVCONF_RTR_SOLICITS: _bindgen_ty_44 = 7;
-pub const DEVCONF_RTR_SOLICIT_INTERVAL: _bindgen_ty_44 = 8;
-pub const DEVCONF_RTR_SOLICIT_DELAY: _bindgen_ty_44 = 9;
-pub const DEVCONF_USE_TEMPADDR: _bindgen_ty_44 = 10;
-pub const DEVCONF_TEMP_VALID_LFT: _bindgen_ty_44 = 11;
-pub const DEVCONF_TEMP_PREFERED_LFT: _bindgen_ty_44 = 12;
-pub const DEVCONF_REGEN_MAX_RETRY: _bindgen_ty_44 = 13;
-pub const DEVCONF_MAX_DESYNC_FACTOR: _bindgen_ty_44 = 14;
-pub const DEVCONF_MAX_ADDRESSES: _bindgen_ty_44 = 15;
-pub const DEVCONF_FORCE_MLD_VERSION: _bindgen_ty_44 = 16;
-pub const DEVCONF_ACCEPT_RA_DEFRTR: _bindgen_ty_44 = 17;
-pub const DEVCONF_ACCEPT_RA_PINFO: _bindgen_ty_44 = 18;
-pub const DEVCONF_ACCEPT_RA_RTR_PREF: _bindgen_ty_44 = 19;
-pub const DEVCONF_RTR_PROBE_INTERVAL: _bindgen_ty_44 = 20;
-pub const DEVCONF_ACCEPT_RA_RT_INFO_MAX_PLEN: _bindgen_ty_44 = 21;
-pub const DEVCONF_PROXY_NDP: _bindgen_ty_44 = 22;
-pub const DEVCONF_OPTIMISTIC_DAD: _bindgen_ty_44 = 23;
-pub const DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_44 = 24;
-pub const DEVCONF_MC_FORWARDING: _bindgen_ty_44 = 25;
-pub const DEVCONF_DISABLE_IPV6: _bindgen_ty_44 = 26;
-pub const DEVCONF_ACCEPT_DAD: _bindgen_ty_44 = 27;
-pub const DEVCONF_FORCE_TLLAO: _bindgen_ty_44 = 28;
-pub const DEVCONF_NDISC_NOTIFY: _bindgen_ty_44 = 29;
-pub const DEVCONF_MLDV1_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_44 = 30;
-pub const DEVCONF_MLDV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_44 = 31;
-pub const DEVCONF_SUPPRESS_FRAG_NDISC: _bindgen_ty_44 = 32;
-pub const DEVCONF_ACCEPT_RA_FROM_LOCAL: _bindgen_ty_44 = 33;
-pub const DEVCONF_USE_OPTIMISTIC: _bindgen_ty_44 = 34;
-pub const DEVCONF_ACCEPT_RA_MTU: _bindgen_ty_44 = 35;
-pub const DEVCONF_STABLE_SECRET: _bindgen_ty_44 = 36;
-pub const DEVCONF_USE_OIF_ADDRS_ONLY: _bindgen_ty_44 = 37;
-pub const DEVCONF_ACCEPT_RA_MIN_HOP_LIMIT: _bindgen_ty_44 = 38;
-pub const DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_44 = 39;
-pub const DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_44 = 40;
-pub const DEVCONF_DROP_UNSOLICITED_NA: _bindgen_ty_44 = 41;
-pub const DEVCONF_KEEP_ADDR_ON_DOWN: _bindgen_ty_44 = 42;
-pub const DEVCONF_RTR_SOLICIT_MAX_INTERVAL: _bindgen_ty_44 = 43;
-pub const DEVCONF_SEG6_ENABLED: _bindgen_ty_44 = 44;
-pub const DEVCONF_SEG6_REQUIRE_HMAC: _bindgen_ty_44 = 45;
-pub const DEVCONF_ENHANCED_DAD: _bindgen_ty_44 = 46;
-pub const DEVCONF_ADDR_GEN_MODE: _bindgen_ty_44 = 47;
-pub const DEVCONF_DISABLE_POLICY: _bindgen_ty_44 = 48;
-pub const DEVCONF_ACCEPT_RA_RT_INFO_MIN_PLEN: _bindgen_ty_44 = 49;
-pub const DEVCONF_NDISC_TCLASS: _bindgen_ty_44 = 50;
-pub const DEVCONF_RPL_SEG_ENABLED: _bindgen_ty_44 = 51;
-pub const DEVCONF_RA_DEFRTR_METRIC: _bindgen_ty_44 = 52;
-pub const DEVCONF_IOAM6_ENABLED: _bindgen_ty_44 = 53;
-pub const DEVCONF_IOAM6_ID: _bindgen_ty_44 = 54;
-pub const DEVCONF_IOAM6_ID_WIDE: _bindgen_ty_44 = 55;
-pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_44 = 56;
-pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_44 = 57;
-pub const DEVCONF_MAX: _bindgen_ty_44 = 58;
-pub type _bindgen_ty_44 = crate::types::c_uint;
+pub const DEVCONF_FORWARDING: _bindgen_ty_45 = 0;
+pub const DEVCONF_HOPLIMIT: _bindgen_ty_45 = 1;
+pub const DEVCONF_MTU6: _bindgen_ty_45 = 2;
+pub const DEVCONF_ACCEPT_RA: _bindgen_ty_45 = 3;
+pub const DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_45 = 4;
+pub const DEVCONF_AUTOCONF: _bindgen_ty_45 = 5;
+pub const DEVCONF_DAD_TRANSMITS: _bindgen_ty_45 = 6;
+pub const DEVCONF_RTR_SOLICITS: _bindgen_ty_45 = 7;
+pub const DEVCONF_RTR_SOLICIT_INTERVAL: _bindgen_ty_45 = 8;
+pub const DEVCONF_RTR_SOLICIT_DELAY: _bindgen_ty_45 = 9;
+pub const DEVCONF_USE_TEMPADDR: _bindgen_ty_45 = 10;
+pub const DEVCONF_TEMP_VALID_LFT: _bindgen_ty_45 = 11;
+pub const DEVCONF_TEMP_PREFERED_LFT: _bindgen_ty_45 = 12;
+pub const DEVCONF_REGEN_MAX_RETRY: _bindgen_ty_45 = 13;
+pub const DEVCONF_MAX_DESYNC_FACTOR: _bindgen_ty_45 = 14;
+pub const DEVCONF_MAX_ADDRESSES: _bindgen_ty_45 = 15;
+pub const DEVCONF_FORCE_MLD_VERSION: _bindgen_ty_45 = 16;
+pub const DEVCONF_ACCEPT_RA_DEFRTR: _bindgen_ty_45 = 17;
+pub const DEVCONF_ACCEPT_RA_PINFO: _bindgen_ty_45 = 18;
+pub const DEVCONF_ACCEPT_RA_RTR_PREF: _bindgen_ty_45 = 19;
+pub const DEVCONF_RTR_PROBE_INTERVAL: _bindgen_ty_45 = 20;
+pub const DEVCONF_ACCEPT_RA_RT_INFO_MAX_PLEN: _bindgen_ty_45 = 21;
+pub const DEVCONF_PROXY_NDP: _bindgen_ty_45 = 22;
+pub const DEVCONF_OPTIMISTIC_DAD: _bindgen_ty_45 = 23;
+pub const DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_45 = 24;
+pub const DEVCONF_MC_FORWARDING: _bindgen_ty_45 = 25;
+pub const DEVCONF_DISABLE_IPV6: _bindgen_ty_45 = 26;
+pub const DEVCONF_ACCEPT_DAD: _bindgen_ty_45 = 27;
+pub const DEVCONF_FORCE_TLLAO: _bindgen_ty_45 = 28;
+pub const DEVCONF_NDISC_NOTIFY: _bindgen_ty_45 = 29;
+pub const DEVCONF_MLDV1_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_45 = 30;
+pub const DEVCONF_MLDV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_45 = 31;
+pub const DEVCONF_SUPPRESS_FRAG_NDISC: _bindgen_ty_45 = 32;
+pub const DEVCONF_ACCEPT_RA_FROM_LOCAL: _bindgen_ty_45 = 33;
+pub const DEVCONF_USE_OPTIMISTIC: _bindgen_ty_45 = 34;
+pub const DEVCONF_ACCEPT_RA_MTU: _bindgen_ty_45 = 35;
+pub const DEVCONF_STABLE_SECRET: _bindgen_ty_45 = 36;
+pub const DEVCONF_USE_OIF_ADDRS_ONLY: _bindgen_ty_45 = 37;
+pub const DEVCONF_ACCEPT_RA_MIN_HOP_LIMIT: _bindgen_ty_45 = 38;
+pub const DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_45 = 39;
+pub const DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_45 = 40;
+pub const DEVCONF_DROP_UNSOLICITED_NA: _bindgen_ty_45 = 41;
+pub const DEVCONF_KEEP_ADDR_ON_DOWN: _bindgen_ty_45 = 42;
+pub const DEVCONF_RTR_SOLICIT_MAX_INTERVAL: _bindgen_ty_45 = 43;
+pub const DEVCONF_SEG6_ENABLED: _bindgen_ty_45 = 44;
+pub const DEVCONF_SEG6_REQUIRE_HMAC: _bindgen_ty_45 = 45;
+pub const DEVCONF_ENHANCED_DAD: _bindgen_ty_45 = 46;
+pub const DEVCONF_ADDR_GEN_MODE: _bindgen_ty_45 = 47;
+pub const DEVCONF_DISABLE_POLICY: _bindgen_ty_45 = 48;
+pub const DEVCONF_ACCEPT_RA_RT_INFO_MIN_PLEN: _bindgen_ty_45 = 49;
+pub const DEVCONF_NDISC_TCLASS: _bindgen_ty_45 = 50;
+pub const DEVCONF_RPL_SEG_ENABLED: _bindgen_ty_45 = 51;
+pub const DEVCONF_RA_DEFRTR_METRIC: _bindgen_ty_45 = 52;
+pub const DEVCONF_IOAM6_ENABLED: _bindgen_ty_45 = 53;
+pub const DEVCONF_IOAM6_ID: _bindgen_ty_45 = 54;
+pub const DEVCONF_IOAM6_ID_WIDE: _bindgen_ty_45 = 55;
+pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_45 = 56;
+pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_45 = 57;
+pub const DEVCONF_MAX: _bindgen_ty_45 = 58;
+pub type _bindgen_ty_45 = crate::types::c_uint;
 pub const kcmp_type_KCMP_FILE: kcmp_type = 0;
 pub const kcmp_type_KCMP_VM: kcmp_type = 1;
 pub const kcmp_type_KCMP_FILES: kcmp_type = 2;
@@ -10611,11 +10911,11 @@ pub struct kcmp_epoll_slot {
     pub tfd: __u32,
     pub toff: __u32,
 }
-pub const LO_FLAGS_READ_ONLY: _bindgen_ty_45 = 1;
-pub const LO_FLAGS_AUTOCLEAR: _bindgen_ty_45 = 4;
-pub const LO_FLAGS_PARTSCAN: _bindgen_ty_45 = 8;
-pub const LO_FLAGS_DIRECT_IO: _bindgen_ty_45 = 16;
-pub type _bindgen_ty_45 = crate::types::c_uint;
+pub const LO_FLAGS_READ_ONLY: _bindgen_ty_46 = 1;
+pub const LO_FLAGS_AUTOCLEAR: _bindgen_ty_46 = 4;
+pub const LO_FLAGS_PARTSCAN: _bindgen_ty_46 = 8;
+pub const LO_FLAGS_DIRECT_IO: _bindgen_ty_46 = 16;
+pub type _bindgen_ty_46 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct loop_info {
@@ -10696,10 +10996,26 @@ pub const membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE: membarrier_
 pub const membarrier_cmd_MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE: membarrier_cmd = 64;
 pub const membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ: membarrier_cmd = 128;
 pub const membarrier_cmd_MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ: membarrier_cmd = 256;
+pub const membarrier_cmd_MEMBARRIER_CMD_GET_REGISTRATIONS: membarrier_cmd = 512;
 pub const membarrier_cmd_MEMBARRIER_CMD_SHARED: membarrier_cmd = 1;
 pub type membarrier_cmd = crate::types::c_uint;
 pub const membarrier_cmd_flag_MEMBARRIER_CMD_FLAG_CPU: membarrier_cmd_flag = 1;
 pub type membarrier_cmd_flag = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct cachestat_range {
+    pub off: __u64,
+    pub len: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct cachestat {
+    pub nr_cache: __u64,
+    pub nr_dirty: __u64,
+    pub nr_writeback: __u64,
+    pub nr_evicted: __u64,
+    pub nr_recently_evicted: __u64,
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct mq_attr {
@@ -10791,18 +11107,18 @@ pub const net_device_flags_IFF_LOWER_UP: net_device_flags = 65536;
 pub const net_device_flags_IFF_DORMANT: net_device_flags = 131072;
 pub const net_device_flags_IFF_ECHO: net_device_flags = 262144;
 pub type net_device_flags = crate::types::c_uint;
-pub const IF_OPER_UNKNOWN: _bindgen_ty_46 = 0;
-pub const IF_OPER_NOTPRESENT: _bindgen_ty_46 = 1;
-pub const IF_OPER_DOWN: _bindgen_ty_46 = 2;
-pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_46 = 3;
-pub const IF_OPER_TESTING: _bindgen_ty_46 = 4;
-pub const IF_OPER_DORMANT: _bindgen_ty_46 = 5;
-pub const IF_OPER_UP: _bindgen_ty_46 = 6;
-pub type _bindgen_ty_46 = crate::types::c_uint;
-pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_47 = 0;
-pub const IF_LINK_MODE_DORMANT: _bindgen_ty_47 = 1;
-pub const IF_LINK_MODE_TESTING: _bindgen_ty_47 = 2;
+pub const IF_OPER_UNKNOWN: _bindgen_ty_47 = 0;
+pub const IF_OPER_NOTPRESENT: _bindgen_ty_47 = 1;
+pub const IF_OPER_DOWN: _bindgen_ty_47 = 2;
+pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_47 = 3;
+pub const IF_OPER_TESTING: _bindgen_ty_47 = 4;
+pub const IF_OPER_DORMANT: _bindgen_ty_47 = 5;
+pub const IF_OPER_UP: _bindgen_ty_47 = 6;
 pub type _bindgen_ty_47 = crate::types::c_uint;
+pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_48 = 0;
+pub const IF_LINK_MODE_DORMANT: _bindgen_ty_48 = 1;
+pub const IF_LINK_MODE_TESTING: _bindgen_ty_48 = 2;
+pub type _bindgen_ty_48 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ifmap {
@@ -10945,36 +11261,36 @@ pub type in_addr_t = u32;
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
-pub const IPPROTO_IP: _bindgen_ty_48 = 0;
-pub const IPPROTO_ICMP: _bindgen_ty_48 = 1;
-pub const IPPROTO_IGMP: _bindgen_ty_48 = 2;
-pub const IPPROTO_IPIP: _bindgen_ty_48 = 4;
-pub const IPPROTO_TCP: _bindgen_ty_48 = 6;
-pub const IPPROTO_EGP: _bindgen_ty_48 = 8;
-pub const IPPROTO_PUP: _bindgen_ty_48 = 12;
-pub const IPPROTO_UDP: _bindgen_ty_48 = 17;
-pub const IPPROTO_IDP: _bindgen_ty_48 = 22;
-pub const IPPROTO_TP: _bindgen_ty_48 = 29;
-pub const IPPROTO_DCCP: _bindgen_ty_48 = 33;
-pub const IPPROTO_IPV6: _bindgen_ty_48 = 41;
-pub const IPPROTO_RSVP: _bindgen_ty_48 = 46;
-pub const IPPROTO_GRE: _bindgen_ty_48 = 47;
-pub const IPPROTO_ESP: _bindgen_ty_48 = 50;
-pub const IPPROTO_AH: _bindgen_ty_48 = 51;
-pub const IPPROTO_MTP: _bindgen_ty_48 = 92;
-pub const IPPROTO_BEETPH: _bindgen_ty_48 = 94;
-pub const IPPROTO_ENCAP: _bindgen_ty_48 = 98;
-pub const IPPROTO_PIM: _bindgen_ty_48 = 103;
-pub const IPPROTO_COMP: _bindgen_ty_48 = 108;
-pub const IPPROTO_L2TP: _bindgen_ty_48 = 115;
-pub const IPPROTO_SCTP: _bindgen_ty_48 = 132;
-pub const IPPROTO_UDPLITE: _bindgen_ty_48 = 136;
-pub const IPPROTO_MPLS: _bindgen_ty_48 = 137;
-pub const IPPROTO_ETHERNET: _bindgen_ty_48 = 143;
-pub const IPPROTO_RAW: _bindgen_ty_48 = 255;
-pub const IPPROTO_MPTCP: _bindgen_ty_48 = 262;
-pub const IPPROTO_MAX: _bindgen_ty_48 = 263;
-pub type _bindgen_ty_48 = crate::types::c_uint;
+pub const IPPROTO_IP: _bindgen_ty_49 = 0;
+pub const IPPROTO_ICMP: _bindgen_ty_49 = 1;
+pub const IPPROTO_IGMP: _bindgen_ty_49 = 2;
+pub const IPPROTO_IPIP: _bindgen_ty_49 = 4;
+pub const IPPROTO_TCP: _bindgen_ty_49 = 6;
+pub const IPPROTO_EGP: _bindgen_ty_49 = 8;
+pub const IPPROTO_PUP: _bindgen_ty_49 = 12;
+pub const IPPROTO_UDP: _bindgen_ty_49 = 17;
+pub const IPPROTO_IDP: _bindgen_ty_49 = 22;
+pub const IPPROTO_TP: _bindgen_ty_49 = 29;
+pub const IPPROTO_DCCP: _bindgen_ty_49 = 33;
+pub const IPPROTO_IPV6: _bindgen_ty_49 = 41;
+pub const IPPROTO_RSVP: _bindgen_ty_49 = 46;
+pub const IPPROTO_GRE: _bindgen_ty_49 = 47;
+pub const IPPROTO_ESP: _bindgen_ty_49 = 50;
+pub const IPPROTO_AH: _bindgen_ty_49 = 51;
+pub const IPPROTO_MTP: _bindgen_ty_49 = 92;
+pub const IPPROTO_BEETPH: _bindgen_ty_49 = 94;
+pub const IPPROTO_ENCAP: _bindgen_ty_49 = 98;
+pub const IPPROTO_PIM: _bindgen_ty_49 = 103;
+pub const IPPROTO_COMP: _bindgen_ty_49 = 108;
+pub const IPPROTO_L2TP: _bindgen_ty_49 = 115;
+pub const IPPROTO_SCTP: _bindgen_ty_49 = 132;
+pub const IPPROTO_UDPLITE: _bindgen_ty_49 = 136;
+pub const IPPROTO_MPLS: _bindgen_ty_49 = 137;
+pub const IPPROTO_ETHERNET: _bindgen_ty_49 = 143;
+pub const IPPROTO_RAW: _bindgen_ty_49 = 255;
+pub const IPPROTO_MPTCP: _bindgen_ty_49 = 262;
+pub const IPPROTO_MAX: _bindgen_ty_49 = 263;
+pub type _bindgen_ty_49 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ip_mreq {
@@ -11096,16 +11412,16 @@ pub const nf_dev_hooks_NF_NETDEV_INGRESS: nf_dev_hooks = 0;
 pub const nf_dev_hooks_NF_NETDEV_EGRESS: nf_dev_hooks = 1;
 pub const nf_dev_hooks_NF_NETDEV_NUMHOOKS: nf_dev_hooks = 2;
 pub type nf_dev_hooks = crate::types::c_uint;
-pub const NFPROTO_UNSPEC: _bindgen_ty_49 = 0;
-pub const NFPROTO_INET: _bindgen_ty_49 = 1;
-pub const NFPROTO_IPV4: _bindgen_ty_49 = 2;
-pub const NFPROTO_ARP: _bindgen_ty_49 = 3;
-pub const NFPROTO_NETDEV: _bindgen_ty_49 = 5;
-pub const NFPROTO_BRIDGE: _bindgen_ty_49 = 7;
-pub const NFPROTO_IPV6: _bindgen_ty_49 = 10;
-pub const NFPROTO_DECNET: _bindgen_ty_49 = 12;
-pub const NFPROTO_NUMPROTO: _bindgen_ty_49 = 13;
-pub type _bindgen_ty_49 = crate::types::c_uint;
+pub const NFPROTO_UNSPEC: _bindgen_ty_50 = 0;
+pub const NFPROTO_INET: _bindgen_ty_50 = 1;
+pub const NFPROTO_IPV4: _bindgen_ty_50 = 2;
+pub const NFPROTO_ARP: _bindgen_ty_50 = 3;
+pub const NFPROTO_NETDEV: _bindgen_ty_50 = 5;
+pub const NFPROTO_BRIDGE: _bindgen_ty_50 = 7;
+pub const NFPROTO_IPV6: _bindgen_ty_50 = 10;
+pub const NFPROTO_DECNET: _bindgen_ty_50 = 12;
+pub const NFPROTO_NUMPROTO: _bindgen_ty_50 = 13;
+pub type _bindgen_ty_50 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union nf_inet_addr {
@@ -11604,9 +11920,9 @@ pub const nl_mmap_status_NL_MMAP_STATUS_VALID: nl_mmap_status = 2;
 pub const nl_mmap_status_NL_MMAP_STATUS_COPY: nl_mmap_status = 3;
 pub const nl_mmap_status_NL_MMAP_STATUS_SKIP: nl_mmap_status = 4;
 pub type nl_mmap_status = crate::types::c_uint;
-pub const NETLINK_UNCONNECTED: _bindgen_ty_50 = 0;
-pub const NETLINK_CONNECTED: _bindgen_ty_50 = 1;
-pub type _bindgen_ty_50 = crate::types::c_uint;
+pub const NETLINK_UNCONNECTED: _bindgen_ty_51 = 0;
+pub const NETLINK_CONNECTED: _bindgen_ty_51 = 1;
+pub type _bindgen_ty_51 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct nlattr {
@@ -11653,42 +11969,42 @@ pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MASK: netlink_policy_type
 pub const netlink_policy_type_attr___NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 13;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 12;
 pub type netlink_policy_type_attr = crate::types::c_uint;
-pub const UNAME26: _bindgen_ty_51 = 131072;
-pub const ADDR_NO_RANDOMIZE: _bindgen_ty_51 = 262144;
-pub const FDPIC_FUNCPTRS: _bindgen_ty_51 = 524288;
-pub const MMAP_PAGE_ZERO: _bindgen_ty_51 = 1048576;
-pub const ADDR_COMPAT_LAYOUT: _bindgen_ty_51 = 2097152;
-pub const READ_IMPLIES_EXEC: _bindgen_ty_51 = 4194304;
-pub const ADDR_LIMIT_32BIT: _bindgen_ty_51 = 8388608;
-pub const SHORT_INODE: _bindgen_ty_51 = 16777216;
-pub const WHOLE_SECONDS: _bindgen_ty_51 = 33554432;
-pub const STICKY_TIMEOUTS: _bindgen_ty_51 = 67108864;
-pub const ADDR_LIMIT_3GB: _bindgen_ty_51 = 134217728;
-pub type _bindgen_ty_51 = crate::types::c_uint;
-pub const PER_LINUX: _bindgen_ty_52 = 0;
-pub const PER_LINUX_32BIT: _bindgen_ty_52 = 8388608;
-pub const PER_LINUX_FDPIC: _bindgen_ty_52 = 524288;
-pub const PER_SVR4: _bindgen_ty_52 = 68157441;
-pub const PER_SVR3: _bindgen_ty_52 = 83886082;
-pub const PER_SCOSVR3: _bindgen_ty_52 = 117440515;
-pub const PER_OSR5: _bindgen_ty_52 = 100663299;
-pub const PER_WYSEV386: _bindgen_ty_52 = 83886084;
-pub const PER_ISCR4: _bindgen_ty_52 = 67108869;
-pub const PER_BSD: _bindgen_ty_52 = 6;
-pub const PER_SUNOS: _bindgen_ty_52 = 67108870;
-pub const PER_XENIX: _bindgen_ty_52 = 83886087;
-pub const PER_LINUX32: _bindgen_ty_52 = 8;
-pub const PER_LINUX32_3GB: _bindgen_ty_52 = 134217736;
-pub const PER_IRIX32: _bindgen_ty_52 = 67108873;
-pub const PER_IRIXN32: _bindgen_ty_52 = 67108874;
-pub const PER_IRIX64: _bindgen_ty_52 = 67108875;
-pub const PER_RISCOS: _bindgen_ty_52 = 12;
-pub const PER_SOLARIS: _bindgen_ty_52 = 67108877;
-pub const PER_UW7: _bindgen_ty_52 = 68157454;
-pub const PER_OSF4: _bindgen_ty_52 = 15;
-pub const PER_HPUX: _bindgen_ty_52 = 16;
-pub const PER_MASK: _bindgen_ty_52 = 255;
+pub const UNAME26: _bindgen_ty_52 = 131072;
+pub const ADDR_NO_RANDOMIZE: _bindgen_ty_52 = 262144;
+pub const FDPIC_FUNCPTRS: _bindgen_ty_52 = 524288;
+pub const MMAP_PAGE_ZERO: _bindgen_ty_52 = 1048576;
+pub const ADDR_COMPAT_LAYOUT: _bindgen_ty_52 = 2097152;
+pub const READ_IMPLIES_EXEC: _bindgen_ty_52 = 4194304;
+pub const ADDR_LIMIT_32BIT: _bindgen_ty_52 = 8388608;
+pub const SHORT_INODE: _bindgen_ty_52 = 16777216;
+pub const WHOLE_SECONDS: _bindgen_ty_52 = 33554432;
+pub const STICKY_TIMEOUTS: _bindgen_ty_52 = 67108864;
+pub const ADDR_LIMIT_3GB: _bindgen_ty_52 = 134217728;
 pub type _bindgen_ty_52 = crate::types::c_uint;
+pub const PER_LINUX: _bindgen_ty_53 = 0;
+pub const PER_LINUX_32BIT: _bindgen_ty_53 = 8388608;
+pub const PER_LINUX_FDPIC: _bindgen_ty_53 = 524288;
+pub const PER_SVR4: _bindgen_ty_53 = 68157441;
+pub const PER_SVR3: _bindgen_ty_53 = 83886082;
+pub const PER_SCOSVR3: _bindgen_ty_53 = 117440515;
+pub const PER_OSR5: _bindgen_ty_53 = 100663299;
+pub const PER_WYSEV386: _bindgen_ty_53 = 83886084;
+pub const PER_ISCR4: _bindgen_ty_53 = 67108869;
+pub const PER_BSD: _bindgen_ty_53 = 6;
+pub const PER_SUNOS: _bindgen_ty_53 = 67108870;
+pub const PER_XENIX: _bindgen_ty_53 = 83886087;
+pub const PER_LINUX32: _bindgen_ty_53 = 8;
+pub const PER_LINUX32_3GB: _bindgen_ty_53 = 134217736;
+pub const PER_IRIX32: _bindgen_ty_53 = 67108873;
+pub const PER_IRIXN32: _bindgen_ty_53 = 67108874;
+pub const PER_IRIX64: _bindgen_ty_53 = 67108875;
+pub const PER_RISCOS: _bindgen_ty_53 = 12;
+pub const PER_SOLARIS: _bindgen_ty_53 = 67108877;
+pub const PER_UW7: _bindgen_ty_53 = 68157454;
+pub const PER_OSF4: _bindgen_ty_53 = 15;
+pub const PER_HPUX: _bindgen_ty_53 = 16;
+pub const PER_MASK: _bindgen_ty_53 = 255;
+pub type _bindgen_ty_53 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct prctl_mm_map {
@@ -11793,6 +12109,14 @@ pub struct ptrace_rseq_configuration {
     pub signature: __u32,
     pub flags: __u32,
     pub pad: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct ptrace_sud_config {
+    pub mode: __u64,
+    pub selector: __u64,
+    pub offset: __u64,
+    pub len: __u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
