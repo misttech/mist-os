@@ -84,7 +84,7 @@ impl MemfsInstance {
 
 #[async_trait]
 impl Filesystem for MemfsInstance {
-    async fn shutdown(&mut self) {
+    async fn shutdown(self) {
         let realm_proxy = connect_to_protocol::<RealmMarker>().unwrap();
         realm_proxy
             .destroy_child(&fdecl::ChildRef {
@@ -121,7 +121,7 @@ mod tests {
     async fn start_memfs() {
         const FILE_CONTENTS: &str = "file-contents";
         let block_device_factory = PanickingBlockDeviceFactory::new();
-        let mut fs = Memfs.start_filesystem(&block_device_factory).await;
+        let fs = Memfs.start_filesystem(&block_device_factory).await;
 
         let file_path = fs.benchmark_dir().join("filename");
         {

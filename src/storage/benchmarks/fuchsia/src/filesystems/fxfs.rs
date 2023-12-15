@@ -156,7 +156,7 @@ impl FxfsInstance {
 
 #[async_trait]
 impl Filesystem for FxfsInstance {
-    async fn shutdown(&mut self) {
+    async fn shutdown(self) {
         self.fxfs.shutdown().await
     }
 

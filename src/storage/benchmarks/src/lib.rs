@@ -371,7 +371,7 @@ mod tests {
 
     #[async_trait]
     impl Filesystem for TestFilesystemInstance {
-        async fn shutdown(&mut self) {}
+        async fn shutdown(self) {}
 
         fn benchmark_dir(&self) -> &std::path::Path {
             panic!("not supported");

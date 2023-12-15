@@ -134,7 +134,7 @@ impl FsManagementFilesystemInstance {
 
 #[async_trait]
 impl Filesystem for FsManagementFilesystemInstance {
-    async fn shutdown(&mut self) {
+    async fn shutdown(mut self) {
         if let Some(fs) = self.serving_filesystem.take() {
             match fs {
                 FsType::SingleVolume(fs) => fs.shutdown().await.expect("Failed to stop filesystem"),

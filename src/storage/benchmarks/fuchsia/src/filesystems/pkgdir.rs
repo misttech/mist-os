@@ -78,8 +78,8 @@ impl PkgDirInstance {
 
 #[async_trait]
 impl Filesystem for PkgDirInstance {
-    async fn shutdown(&mut self) {
-        self.fs.shutdown().await
+    async fn shutdown(self) {
+        self.fs.shutdown_boxed().await
     }
 
     fn benchmark_dir(&self) -> &Path {

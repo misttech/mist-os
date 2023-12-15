@@ -45,7 +45,7 @@ impl TestFilesystem {
 
 #[async_trait]
 impl Filesystem for TestFilesystem {
-    async fn shutdown(&mut self) {
+    async fn shutdown(self) {
         let mut inner = self.inner.lock().await;
         inner.fs.take().unwrap().shutdown().await;
     }

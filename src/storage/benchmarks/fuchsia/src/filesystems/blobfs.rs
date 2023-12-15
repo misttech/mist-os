@@ -55,7 +55,7 @@ pub struct BlobfsInstance {
 
 #[async_trait]
 impl Filesystem for BlobfsInstance {
-    async fn shutdown(&mut self) {
+    async fn shutdown(self) {
         self.blobfs.shutdown().await
     }
 

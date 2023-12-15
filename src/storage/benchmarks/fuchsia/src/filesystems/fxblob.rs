@@ -62,7 +62,7 @@ pub struct FxblobInstance {
 
 #[async_trait]
 impl Filesystem for FxblobInstance {
-    async fn shutdown(&mut self) {
+    async fn shutdown(self) {
         self.fxblob.shutdown().await
     }
 
