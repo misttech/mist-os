@@ -447,7 +447,7 @@ mod tests {
         let device = bus
             .get_or_create_child(b"mem", KType::Test, SysFsDirectory::new)
             .get_or_create_child(b"null", KType::Test, DeviceDirectory::new);
-        assert_eq!(device.path(), b"/devices/virtual/mem/null".to_vec());
+        assert_eq!(device.path(), b"devices/virtual/mem/null".to_vec());
     }
 
     #[::fuchsia::test]

@@ -105,6 +105,12 @@ rustc_library("starnix_core") {
   with_unit_tests = true
   source_root = "lib.rs"
 
+  # TODO(fxbug.dev/107698): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
+
   sources = [
     "arch/${current_cpu}/execution.rs",
     "arch/${current_cpu}/loader.rs",
