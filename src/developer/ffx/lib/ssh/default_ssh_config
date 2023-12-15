@@ -63,7 +63,8 @@ HostbasedAuthentication=no
 
 # Specifies that ssh should only use the identity keys configured in the
 # ssh_config files, even if ssh-agent offers more identities.
-IdentitiesOnly=yes
+# By setting no, it allows hardware keys like yubikey
+IdentitiesOnly=no
 
 # Specifies whether to use keyboard-interactive authentication. This is a common
 # method for password authentication, one-time passwords, and multi-factor authentication.
