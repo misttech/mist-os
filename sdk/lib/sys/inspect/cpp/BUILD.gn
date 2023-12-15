@@ -31,6 +31,7 @@ import("//build/cpp/sdk_source_set.gni")
 # To regenerate:
 # fx gn refs $(fx get-build-dir) //sdk/lib/sys/inspect/cpp //sdk/lib/sys/inspect/cpp:cpp | sed 's|\(.*:\).*|"\1*",|' | sort | uniq
 inspect_hlcpp_allowlist = [
+  # keep-sorted start
   "//build/sdk:*",
   "//examples/components/config/cpp:*",
   "//examples/components/config_from_parent/cpp:*",
@@ -80,6 +81,7 @@ inspect_hlcpp_allowlist = [
   "//src/storage/fs_test:*",
   "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf:*",
   "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf_hlcpp:*",
+  "//src/tests/benchmarks:*",
   "//src/ui/a11y/lib/screen_reader/focus:*",
   "//src/ui/a11y/lib/semantics/tests/mocks:*",
   "//src/ui/a11y/lib/semantics:*",
@@ -88,7 +90,11 @@ inspect_hlcpp_allowlist = [
   "//src/ui/scenic/lib/image-compression:*",
   "//src/ui/scenic/lib/input:*",
   "//tools/create/goldens/my-component-v2-cpp:*",
+
+  # keep-sorted end
 ]
+
+inspect_hlcpp_allowlist += [ "//sdk/lib/sys/inspect/cpp:*" ]
 
 # vendor and third party are currently allowed.
 inspect_hlcpp_allowlist += [
@@ -120,7 +126,7 @@ sdk_source_set("cpp") {
 
   public_configs = [ "//sdk/config" ]
 
-  #visibility = inspect_hlcpp_allowlist
+  visibility = inspect_hlcpp_allowlist
 }
 
 group("tests") {
