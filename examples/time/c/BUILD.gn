@@ -8,6 +8,8 @@ import("//build/testing/environments.gni")
 executable("bin") {
   output_name = "c_time_example"
 
+  deps = [ "//zircon/system/ulib/zx" ]
+
   sources = [ "main.c" ]
 }
 
