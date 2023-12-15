@@ -30,8 +30,3 @@ fuchsia_prebuilt_board_configuration(
     name = "riscv64",
     directory = "@legacy_ninja_build_outputs//:riscv64.bazel_input",
 )
-
-fuchsia_prebuilt_board_configuration(
-    name = "qemu-riscv64",
-    directory = "@legacy_ninja_build_outputs//:qemu-riscv64.bazel_input",
-)
