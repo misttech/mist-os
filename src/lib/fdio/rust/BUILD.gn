@@ -12,6 +12,7 @@ rustc_library("fdio") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/lib/fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
