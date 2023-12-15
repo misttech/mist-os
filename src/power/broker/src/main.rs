@@ -392,15 +392,17 @@ impl BrokerSvc {
                 match request {
                     TopologyRequest::AddElement {
                         element_name,
-                        default_level,
+                        initial_current_level,
+                        minimum_level,
                         dependencies,
                         dependency_tokens_to_register,
                         responder,
                     } => {
                         tracing::debug!(
-                            "AddElement({:?}, {:?}, {:?}, {:?})",
+                            "AddElement({:?}, {:?}, {:?}, {:?}, {:?})",
                             &element_name,
-                            &default_level,
+                            &initial_current_level,
+                            &minimum_level,
                             &dependencies,
                             &dependency_tokens_to_register,
                         );
@@ -409,7 +411,8 @@ impl BrokerSvc {
                             dependency_tokens_to_register.into_iter().map(|d| d.into()).collect();
                         let res = broker.add_element(
                             &element_name,
-                            default_level,
+                            initial_current_level,
+                            minimum_level,
                             dependencies,
                             dependency_tokens,
                         );

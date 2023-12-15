@@ -40,6 +40,7 @@ async fn test_direct() -> Result<()> {
         .add_element(
             "P",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![],
             vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
         )
@@ -54,6 +55,7 @@ async fn test_direct() -> Result<()> {
     let (_, child_lessor, _) = topology
         .add_element(
             "C",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -127,6 +129,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "A",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![],
             vec![element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
         )
@@ -142,6 +145,7 @@ async fn test_transitive() -> Result<()> {
     let (element_b_element_control, _, element_b_level_control) = topology
         .add_element(
             "B",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -164,6 +168,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "C",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 requires_token: element_b_token
@@ -177,7 +182,13 @@ async fn test_transitive() -> Result<()> {
         .expect("add_element failed");
     let element_c_lessor = element_c_lessor.into_proxy()?;
     let (element_d_element_control, _, element_d_level_control) = topology
-        .add_element("D", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![])
+        .add_element(
+            "D",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
+            vec![],
+            vec![],
+        )
         .await?
         .expect("add_element failed");
     let element_d_level_control = element_d_level_control.into_proxy()?;
@@ -349,6 +360,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "GP",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
             vec![],
             vec![grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
         )
@@ -359,6 +371,7 @@ async fn test_shared() -> Result<()> {
     let (_, _, parent_control) = topology
         .add_element(
             "P",
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             vec![
                 LevelDependency {
@@ -385,6 +398,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "C1",
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             vec![LevelDependency {
                 dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
                 requires_token: parent_token
@@ -400,6 +414,7 @@ async fn test_shared() -> Result<()> {
     let (_, child2_lessor, _) = topology
         .add_element(
             "C2",
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             vec![LevelDependency {
                 dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
@@ -580,6 +595,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Earth",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![],
             vec![earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
         )
@@ -590,6 +606,7 @@ async fn test_topology() -> Result<()> {
     let (water_element_control, _, _) = topology
         .add_element(
             "Water",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -608,6 +625,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Fire",
             &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![],
             vec![fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
         )
@@ -618,6 +636,7 @@ async fn test_topology() -> Result<()> {
     let (air_element_control, _, _) = topology
         .add_element(
             "Air",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![],
             vec![air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],

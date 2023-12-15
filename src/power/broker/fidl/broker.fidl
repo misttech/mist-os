@@ -54,9 +54,12 @@ open protocol Topology {
     flexible AddElement(resource struct {
         /// Human-readable name for logging and debug purposes.
         element_name string:1024;
-        /// Default level (i.e. OFF or the lowest possible power level) for
+        /// The initial current power level of the element.
+        initial_current_level PowerLevel;
+        /// Minimum level (i.e. OFF or the lowest possible power level) for
         /// this element.
-        default_level PowerLevel;
+        /// TODO(b/311905380): Specify all allowed power levels here.
+        minimum_level PowerLevel;
         /// List of dependencies for this element's power levels.
         /// Note: dependencies UPON this element's levels cannot be added here.
         dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;

@@ -137,11 +137,21 @@ impl Broker {
         Ok(())
     }
 
+    #[cfg(test)]
+    pub fn get_current_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
+        self.current.get(element_id)
+    }
+
     pub fn watch_current_level(
         &mut self,
         element_id: &ElementID,
     ) -> UnboundedReceiver<Option<PowerLevel>> {
         self.current.subscribe(element_id)
+    }
+
+    #[cfg(test)]
+    pub fn get_required_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
+        self.required.get(element_id)
     }
 
     pub fn watch_required_level(
@@ -285,12 +295,14 @@ impl Broker {
     pub fn add_element(
         &mut self,
         name: &str,
-        default_level: PowerLevel,
+        initial_current_level: PowerLevel,
+        minimum_level: PowerLevel,
         level_dependencies: Vec<fpb::LevelDependency>,
         dependency_tokens: Vec<Token>,
     ) -> Result<ElementID, AddElementError> {
-        let id = self.catalog.topology.add_element(name, default_level)?;
-        self.required.update(&id, default_level);
+        let id = self.catalog.topology.add_element(name, minimum_level)?;
+        self.current.update(&id, initial_current_level);
+        self.required.update(&id, minimum_level);
         for dependency in level_dependencies {
             let credential = self
                 .lookup_credentials(dependency.requires_token.into())
@@ -890,6 +902,28 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_initialize_current_and_required_levels() {
+        let mut broker = Broker::new();
+        let latinum = broker
+            .add_element(
+                "Latinum",
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 7 }),
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 2 }),
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        assert_eq!(
+            broker.get_current_level(&latinum),
+            Some(PowerLevel::UserDefined(UserDefinedPowerLevel { level: 7 }))
+        );
+        assert_eq!(
+            broker.get_required_level(&latinum),
+            Some(PowerLevel::UserDefined(UserDefinedPowerLevel { level: 2 }))
+        );
+    }
+
+    #[fuchsia::test]
     fn test_add_element_dependency_never_and_unregistered() {
         let mut broker = Broker::new();
         let token_mithril = DependencyToken::create();
@@ -897,6 +931,7 @@ mod tests {
         let mithril = broker
             .add_element(
                 "Mithril",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![token_mithril
@@ -909,6 +944,7 @@ mod tests {
         // This should fail, because the token was never registered.
         let add_element_not_authorized_res = broker.add_element(
             "Silver",
+            PowerLevel::Binary(BinaryPowerLevel::Off),
             PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![fpb::LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -925,6 +961,7 @@ mod tests {
         broker
             .add_element(
                 "Silver",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -949,6 +986,7 @@ mod tests {
             .add_element(
                 "Silver",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                     requires_token: token_mithril
@@ -965,7 +1003,13 @@ mod tests {
     fn test_remove_element() {
         let mut broker = Broker::new();
         let unobtanium = broker
-            .add_element("Unobtainium", PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![])
+            .add_element(
+                "Unobtainium",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
+                vec![],
+                vec![],
+            )
             .expect("add_element failed");
         assert_eq!(broker.element_exists(&unobtanium), true);
 
@@ -983,6 +1027,7 @@ mod tests {
             .add_element(
                 "P1",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![parent1_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -995,6 +1040,7 @@ mod tests {
             .add_element(
                 "P2",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![parent2_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1005,6 +1051,7 @@ mod tests {
         let child = broker
             .add_element(
                 "C",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![
                     fpb::LevelDependency {
@@ -1081,6 +1128,7 @@ mod tests {
             .add_element(
                 "GP",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1093,6 +1141,7 @@ mod tests {
             .add_element(
                 "P",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1103,6 +1152,7 @@ mod tests {
         let child = broker
             .add_element(
                 "C",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
@@ -1223,6 +1273,7 @@ mod tests {
             .add_element(
                 "GP",
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1234,6 +1285,7 @@ mod tests {
         let parent: ElementID = broker
             .add_element(
                 "P",
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 vec![
                     fpb::LevelDependency {
@@ -1269,6 +1321,7 @@ mod tests {
             .add_element(
                 "C1",
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
                     requires_token: parent_token
@@ -1282,6 +1335,7 @@ mod tests {
         let child2 = broker
             .add_element(
                 "C2",
+                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
                 vec![fpb::LevelDependency {
                     dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
@@ -1458,6 +1512,7 @@ mod tests {
             .add_element(
                 "Adamantium",
                 PowerLevel::Binary(BinaryPowerLevel::Off),
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![token_adamantium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1468,6 +1523,7 @@ mod tests {
         broker
             .add_element(
                 "Vibranium",
+                PowerLevel::Binary(BinaryPowerLevel::Off),
                 PowerLevel::Binary(BinaryPowerLevel::Off),
                 vec![],
                 vec![token_vibranium
