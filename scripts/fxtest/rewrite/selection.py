@@ -203,7 +203,8 @@ async def select_tests(
                     # In exact mode, don't match names against
                     # anything but the name field itself.
                     tasks = [
-                        name.distances(n, recorder, id) for n in group.names
+                        name.distances(n, recorder, id, exact=True)
+                        for n in group.names
                     ]
                 results: typing.List[
                     typing.List[_TestDistance]
@@ -314,7 +315,23 @@ class _TestDistanceMeasurer:
         value: str,
         recorder: event.EventRecorder | None,
         parent_id: event.Id | None,
+        exact: bool = False,
     ) -> typing.List[_TestDistance]:
+        """Process and return the list of match distances for the list.
+
+        Args:
+            value (str): Value to compare against.
+            recorder (event.EventRecorder | None): Recorder for events.
+            parent_id (event.Id | None): ID of the event to nest under.
+            exact (bool, optional): If true, force exact matches only. Defaults to False.
+
+        Raises:
+            RuntimeError: The required matching script is missing.
+
+        Returns:
+            typing.List[_TestDistance]: Description of distances from contained set
+            of tests to the input value.
+        """
         with tempfile.TemporaryDirectory() as td:
             file_name = os.path.join(td, "temp-input.txt")
             with open(file_name, "w") as f:
@@ -344,14 +361,17 @@ class _TestDistanceMeasurer:
                             "Could not find matcher script dldist"
                         )
 
-            output = await execution.run_command(
-                *program_prefix,
+            arg_suffix = [
                 "-v",
                 "--needle",
                 value,
                 "--input",
                 file_name,
-                "--match-prefixes",
+            ] + (["--match-contains"] if not exact else [])
+
+            output = await execution.run_command(
+                *program_prefix,
+                *arg_suffix,
                 recorder=recorder,
                 parent=parent_id,
             )

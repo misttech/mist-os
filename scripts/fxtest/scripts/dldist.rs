@@ -23,6 +23,10 @@ struct Args {
     #[argh(switch)]
     match_prefixes: bool,
 
+    /// if set, return a perfect match if needle is contained in any input
+    #[argh(switch)]
+    match_contains: bool,
+
     /// if set, print verbose debugging to stderr
     #[argh(switch, short = 'v')]
     verbose: bool,
@@ -36,6 +40,8 @@ fn main() -> Result<()> {
     let contents = read_to_string(args.input)?;
     for line in contents.lines() {
         let val = if args.match_prefixes && line.starts_with(&args.needle) {
+            PERFECT_MATCH
+        } else if args.match_contains && line.contains(&args.needle) {
             PERFECT_MATCH
         } else {
             strsim::damerau_levenshtein(&args.needle, line)

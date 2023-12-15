@@ -315,6 +315,41 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
 
+    async def test_contains_matches(self):
+        """Test that selecting substrings of tests results in a perfect match."""
+
+        tests = [
+            self._make_package_test("src/tests", "foo-pkg", "bar-test"),
+            self._make_host_test("src/other-tests", "binary_test"),
+        ]
+        select_path = await selection.select_tests(tests, ["rc/te"])
+        select_name1 = await selection.select_tests(tests, ["o-pk"])
+        select_name2 = await selection.select_tests(tests, ["ar-test"])
+        select_pkg = await selection.select_tests(tests, ["--package", "o-pk"])
+        select_cm = await selection.select_tests(
+            tests, ["--component", "ar-test"]
+        )
+        url_contains = await selection.select_tests(tests, ["fuchsia.com/foo"])
+
+        self.assertEqual(select_path.selected, select_name1.selected)
+        self.assertEqual(select_path.selected, select_name2.selected)
+        self.assertEqual(select_path.selected, select_pkg.selected)
+        self.assertEqual(select_path.selected, select_cm.selected)
+        self.assertEqual(select_path.selected, url_contains.selected)
+
+        for _, matches in select_path.group_matches:
+            self.assertEqual(len(matches), 1)
+
+        host_path = await selection.select_tests(tests, ["ary_test"])
+        self.assertEqual(
+            [s.name() for s in host_path.selected], ["host_x64/binary_test"]
+        )
+
+        full_path = await selection.select_tests(tests, ["src"])
+        self.assertEqual(
+            [s.name() for s in full_path.selected], [t.name() for t in tests]
+        )
+
     async def test_approximate_matches(self):
         """Test that fuzzy matching catches common issues."""
 
