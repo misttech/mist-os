@@ -5,7 +5,7 @@
 use crate::{
     task::CurrentTask,
     vfs::{
-        FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, MountInfo,
+        path, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, MountInfo,
         NamespaceNode, UnlinkKind,
     },
 };
@@ -281,9 +281,12 @@ impl DirEntry {
         if DirEntry::is_reserved_name(name) {
             return error!(EEXIST);
         }
-        // TODO: Do we need to check name for embedded "/" or NUL characters?
+        // TODO: Do we need to check name for embedded NUL characters?
         if name.len() > NAME_MAX as usize {
             return error!(ENAMETOOLONG);
+        }
+        if name.contains(&path::SEPARATOR) {
+            return error!(EINVAL);
         }
         let (entry, exists) =
             self.get_or_create_child(current_task, mount, name, create_node_fn)?;
