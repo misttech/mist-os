@@ -165,6 +165,9 @@ $ ffx component show config_example
                       ...
 ```
 
+A CVF file must match the component's configuration schema exactly. Components with partial or
+missing configurations will not resolve and therefore not start.
+
 ## Reading the configuration
 
 Components read their resolved configuration values with a generated library. Generate a library
