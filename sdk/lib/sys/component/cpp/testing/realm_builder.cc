@@ -77,10 +77,12 @@ Realm& Realm::AddLegacyChild(const std::string& child_name, const std::string& u
 }
 #endif
 
+#if __Fuchsia_API_level__ < 17
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                             const ChildOptions& options) {
   return AddLocalChildImpl(child_name, LocalComponentKind(local_impl), options);
 }
+#endif
 
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
                             const ChildOptions& options) {
@@ -89,9 +91,11 @@ Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponentFactory
 
 Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKind local_impl,
                                 const ChildOptions& options) {
+#if __Fuchsia_API_level__ < 17
   if (cpp17::holds_alternative<LocalComponent*>(local_impl)) {
     ZX_SYS_ASSERT_NOT_NULL(cpp17::get<LocalComponent*>(local_impl));
   }
+#endif
   runner_builder_->Register(GetResolvedName(child_name), std::move(local_impl));
   fuchsia::component::test::Realm_AddLocalChild_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
@@ -285,6 +289,7 @@ RealmBuilder& RealmBuilder::AddLegacyChild(const std::string& child_name, const 
 }
 #endif
 
+#if __Fuchsia_API_level__ < 17
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                                           const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
@@ -292,6 +297,7 @@ RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalCo
   root_.AddLocalChildImpl(child_name, local_impl, options);
   return *this;
 }
+#endif
 
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name,
                                           LocalComponentFactory local_impl,

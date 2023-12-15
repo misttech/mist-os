@@ -13,6 +13,7 @@
 #include <lib/sys/component/cpp/testing/internal/local_component_runner.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/status.h>
 
 #include <cstddef>
@@ -167,6 +168,7 @@ void LocalComponentRunner::Start(
   // take the component from the ready_components_ list
   auto component = std::move(ready_components_[name]);
   ZX_ASSERT_MSG(ready_components_.erase(name) == 1, "ready component not erased");
+#if __Fuchsia_API_level__ < 17
   if (cpp17::holds_alternative<LocalComponent*>(component)) {
     auto local_component_ptr = cpp17::get<LocalComponent*>(component);
     auto on_start = [local_component_ptr](LocalComponentInstance*,
@@ -187,6 +189,9 @@ void LocalComponentRunner::Start(
     running_components_[name] = std::make_unique<LocalComponentInstance>(
         std::move(controller), dispatcher_, std::move(on_start), std::move(on_exit));
   } else {
+#else
+  if (true) {
+#endif
     auto local_component_factory = std::move(cpp17::get<LocalComponentFactory>(component));
     auto local_component = local_component_factory();
     auto on_start = [name, local_component = std::move(local_component)](

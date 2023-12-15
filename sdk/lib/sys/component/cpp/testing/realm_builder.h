@@ -17,6 +17,7 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/component/cpp/testing/scoped_child.h>
 #include <lib/sys/cpp/service_directory.h>
+#include <zircon/availability.h>
 #include <zircon/errors.h>
 
 #include <cstddef>
@@ -32,11 +33,11 @@
 namespace component_testing {
 
 // Default child options provided to all components.
-const ChildOptions kDefaultChildOptions {
-  .startup_mode = StartupMode::LAZY, .environment = ""
+const ChildOptions kDefaultChildOptions{.startup_mode = StartupMode::LAZY,
+                                        .environment = ""
 #if __Fuchsia_API_level__ >= 13
-      ,
-  .config_overrides = {}
+                                        ,
+                                        .config_overrides = {}
 #endif
 };
 
@@ -137,6 +138,12 @@ class RealmRoot final {
   async_dispatcher_t* dispatcher_;
 };
 
+#if __Fuchsia_API_level__ >= 17
+// Declare the class as it is used in method declarations that use
+// ZX_REMOVED_SINCE() and are not conditionally compiled.
+class LocalComponent;
+#endif
+
 // A `Realm` describes a component instance together with its children.
 // Clients can use this class to build a realm from scratch,
 // programmatically adding children and routes.
@@ -184,11 +191,11 @@ class Realm final {
   //
   // Names must be unique. Duplicate names will result in a panic.
   //
-  // TODO(fxbug.dev/109804): Migrate clients to use |LocalComponentFactory|, and
-  // remove this deprecated method.
+  // TODO(fxbug.dev/296292544): Remove this method when build-time support for
+  // API level 16 is removed.
   Realm& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                        const ChildOptions& options = kDefaultChildOptions)
-      ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
+      ZX_REMOVED_SINCE(1, 9, 17, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
   // Add a component by implementing a factory function that creates and returns
   // a new instance of a |LocalComponentImpl|-derived class. The factory
@@ -322,11 +329,11 @@ class RealmBuilder final {
   // Add a component by raw pointer to a LocalComponent-derived instance.
   // See |Realm.AddLocalChild| for more details.
   //
-  // TODO(fxbug.dev/109804): Migrate clients to use LocalComponentFactory, and
-  // remove this deprecated method.
+  // TODO(fxbug.dev/296292544): Remove this method when build-time support for
+  // API level 16 is removed.
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                               const ChildOptions& options = kDefaultChildOptions)
-      ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
+      ZX_REMOVED_SINCE(1, 9, 17, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
   // Add a component by LocalComponentFactory.
   //

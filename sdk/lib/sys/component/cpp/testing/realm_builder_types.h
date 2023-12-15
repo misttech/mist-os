@@ -15,6 +15,7 @@
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/outgoing_directory.h>
 #include <lib/sys/cpp/service_directory.h>
+#include <zircon/availability.h>
 
 #include <memory>
 #include <optional>
@@ -175,13 +176,14 @@ class LocalComponentImpl {
 };
 // [END mock_interface_cpp]
 
+#if __Fuchsia_API_level__ < 17
 // The use of this class is DEPRECATED.
 //
 // The interface for backing implementations of components with a Source of Mock
 // when added by deprecated method AddLocalChild(..., LocalComponent*, ...).
 //
-// TODO(fxbug.dev/109804): Remove this class when all uses have migrated to
-// `AddLocalChild(..., LocalComponentFactory, ...)`.
+// TODO(fxbug.dev/296292544): Remove this class when build-time support for API
+// level 15 is removed.
 class LocalComponent {
  public:
   virtual ~LocalComponent();
@@ -191,6 +193,7 @@ class LocalComponent {
   // the component.
   virtual void Start(std::unique_ptr<LocalComponentHandles> mock_handles) = 0;
 };
+#endif
 
 // Type for a function that returns a new |LocalComponentImpl| when component
 // manager requests a new component instance.
@@ -200,10 +203,13 @@ using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImpl>(
 
 // Type for either variation of implementation passed to AddLocalChild(): the
 // deprecated raw pointer, or one of the valid callback functions.
-//
-// TODO(fxbug.dev/109804): Remove this variant when all uses have migrated to
-// `AddLocalChild(..., LocalComponentFactory, ...)`.
+#if __Fuchsia_API_level__ < 17
+// TODO(fxbug.dev/296292544): Remove this variant when build-time support for
+// API level 15 is removed.
 using LocalComponentKind = cpp17::variant<LocalComponent*, LocalComponentFactory>;
+#else
+using LocalComponentKind = cpp17::variant<LocalComponentFactory>;
+#endif
 
 using StartupMode = fuchsia::component::decl::StartupMode;
 
