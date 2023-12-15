@@ -890,13 +890,25 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
           {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
-  // Grab the capture vmo data.
-  std::vector<uint8_t> read_values;
-  CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+  bool images_are_same = [&]() -> bool {
+    // The amlogic capture IP block can sometimes be flaky.
+    // If the images aren't the same, retry a single time.
+    static constexpr int kNumTries = 2;
 
-  // Compare the capture vmo data to the texture data above.
-  bool images_are_same = CaptureCompare(read_values, write_bytes, GetParam(),
-                                        display->height_in_px(), display->width_in_px());
+    for (int i = 0; i < kNumTries; i++) {
+      // Grab the capture vmo data.
+      std::vector<uint8_t> read_values;
+      CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+
+      // Compare the capture vmo data to the texture data above.
+      if (CaptureCompare(read_values, write_bytes, GetParam(), display->height_in_px(),
+                         display->width_in_px())) {
+        return true;
+      }
+    }
+    return false;
+  }();
+
   EXPECT_TRUE(images_are_same);
 }
 
@@ -1757,14 +1769,25 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
                    EXPECT_EQ(0U, display_bytes_per_row % 4);
                    const uint32_t display_width_including_padding = display_bytes_per_row / 4;
 
-                   // Grab the capture vmo data.
-                   std::vector<uint8_t> read_values;
-                   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+                   bool images_are_same = [&]() -> bool {
+                     // The amlogic capture IP block can sometimes be flaky.
+                     // If the images aren't the same, retry a single time.
+                     static constexpr int kNumTries = 2;
 
-                   // Compare the capture vmo data to the values we are expecting.
-                   bool images_are_same =
-                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), GetParam(),
-                                      display->height_in_px(), display->width_in_px());
+                     for (int i = 0; i < kNumTries; i++) {
+                       // Grab the capture vmo data.
+                       std::vector<uint8_t> read_values;
+                       CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+
+                       // Compare the capture vmo data to the values we are expecting.
+                       if (CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), GetParam(),
+                                          display->height_in_px(), display->width_in_px())) {
+                         return true;
+                       }
+                     }
+                     return false;
+                   }();
+
                    EXPECT_TRUE(images_are_same);
 
                    // |vmo_host| has BGRA sequence in pixel values.
