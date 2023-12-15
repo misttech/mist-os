@@ -874,8 +874,6 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
         None,
         input_class,
         format!("event{}", device_id).as_bytes(),
-        // TODO(b/310963779): file name should not include /, need another way
-        // to create this dev.
         format!("input/event{}", device_id).as_bytes(),
         DeviceType::new(INPUT_MAJOR, device_id),
         DeviceMode::Char,

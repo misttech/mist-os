@@ -10,6 +10,7 @@ group("integration_input_tests") {
     "focus:tests",
     "media-buttons:tests",
     "mouse:tests",
+    "starnix-touch:tests",
     "text-input:tests",
     "touch:tests",
     "virtual-keyboard:tests",

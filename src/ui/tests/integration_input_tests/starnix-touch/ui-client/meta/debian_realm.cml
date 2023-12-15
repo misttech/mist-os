@@ -1,0 +1,80 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "kernel",
+            url: "starnix_kernel#meta/starnix_kernel.cm",
+        },
+        {
+            name: "debian_container",
+            url: "#meta/debian_container.cm",
+            environment: "#starnix_kernel_env",
+        },
+    ],
+    capabilities: [
+        {
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            directory: "dev-gpu",
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.display.singleton.Info",
+            ],
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.component.Realm",
+                "fuchsia.ui.app.ViewProvider",
+            ],
+            from: "#debian_container",
+        },
+    ],
+    environments: [
+        {
+            name: "starnix_kernel_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix",
+                    from: "#kernel",
+                },
+            ],
+        },
+    ],
+}

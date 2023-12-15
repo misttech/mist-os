@@ -1,0 +1,58 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/starnix/containers/container.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "starnix",
+        features: [ "framebuffer" ],
+        init: [],
+        mounts: [
+            "/:remote_bundle:data/system",
+            "/data:remotefs:data",
+            "/dev:devtmpfs",
+        ],
+        rlimits: [ "RLIMIT_NOFILE=131072" ],
+        name: "debian",
+        startup_file_path: "",
+    },
+
+    // This child is created statically, to plumb Starnix into Fuchsia's
+    // view system and input system.
+    children: [
+        {
+            name: "launch_input",
+            url: "#meta/launch_input.cm",
+            environment: "#daemon-env",
+        },
+    ],
+
+    // This collection is where `touch-input-test.cc` dynamically launches
+    // `touch_dump`, so that the test can have a handle to read the stdout
+    // of `touch_dump`.
+    collections: [
+        {
+            name: "debian_userspace",
+            environment: "#daemon-env",
+            durability: "single_run",
+        },
+    ],
+    expose: [
+        {
+            // Expose the `Realm` protocol, so that `starnix-touch-test.cc`
+            // can call `CreateChild()` to launch `touch_dump.cm`.
+            protocol: [ "fuchsia.component.Realm" ],
+            from: "framework",
+        },
+        {
+            // Expose the `ViewProvider` protocol, so that `PortableUITest`
+            // can connect the Starnix view to Fuchsia's view and input
+            // systems.
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
+            from: "#launch_input",
+        },
+    ],
+}

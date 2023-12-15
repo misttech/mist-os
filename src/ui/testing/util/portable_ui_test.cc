@@ -239,7 +239,10 @@ fuchsia::math::SizeU PortableUITest::display_size() {
 void PortableUITest::RegisterTouchScreen() {
   FX_LOGS(INFO) << "Registering fake touch screen";
   input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
-  input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
+  input_registry_.set_error_handler([](zx_status_t status) {
+    FX_LOGS(ERROR) << "Error connecting to f.ui.test.input.Registry: "
+                   << zx_status_get_string(status);
+  });
 
   bool touchscreen_registered = false;
   fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;
