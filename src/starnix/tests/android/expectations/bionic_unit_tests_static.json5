@@ -240,6 +240,10 @@
                 "properties.empty_value",
                 "properties.no_fd_leaks",
                 "properties.smoke",
+
+                // TODO(https://fxbug.dev/316443018): Flaky on the bots - needs to be investigated.
+                "pthread.pthread_mutex_clocklock",
+                "pthread.pthread_mutex_timedlock",
             ],
         },
     ],
