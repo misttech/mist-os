@@ -57,7 +57,7 @@ vbmeta_r_partition = "vbmeta_r"
 fvm_partition = "fvm"
 fxfs_partition = "fvm"
 active_partition = "a"
-fastboot_product = "vim3"
+fastboot_product = "galilei"
 
 assembly_generate_fvm_fastboot = true
 
