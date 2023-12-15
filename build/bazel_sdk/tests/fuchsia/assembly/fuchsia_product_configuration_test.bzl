@@ -37,3 +37,45 @@ fuchsia_product_configuration_test = rule(
         ),
     } | CREATE_VALIDATION_SCRIPT_ATTRS,
 )
+
+def _fuchsia_product_ota_config_test_impl(ctx):
+    golden_file = ctx.file.golden_file
+
+    file_to_test = None
+    for generated_file in ctx.files.product_config:
+        if generated_file.basename == golden_file.basename:
+            if file_to_test:
+                fail("Found multiple files with the name: %s" % golden_file.basename)
+            file_to_test = generated_file
+    if not file_to_test:
+        fail("Unable to location a file named: %s" % golden_file.basename)
+
+    script, runfiles = create_validation_script(ctx, file_to_test, golden_file)
+
+    return [
+        DefaultInfo(
+            executable = script,
+            runfiles = runfiles,
+            files = depset(
+                direct = ctx.files.product_config,
+            ),
+        ),
+    ]
+
+fuchsia_product_ota_config_test = rule(
+    doc = """Validate a generated ota config file from a product config label""",
+    test = True,
+    implementation = _fuchsia_product_ota_config_test_impl,
+    attrs = {
+        "product_config": attr.label(
+            doc = "Built Product Config.",
+            providers = [FuchsiaProductConfigInfo],
+            mandatory = True,
+        ),
+        "golden_file": attr.label(
+            doc = "Validate that the file with the same name is produced by the product config rule, and matches in contents.",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+    } | CREATE_VALIDATION_SCRIPT_ATTRS,
+)

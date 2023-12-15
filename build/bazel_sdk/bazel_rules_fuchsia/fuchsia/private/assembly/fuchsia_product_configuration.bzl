@@ -9,6 +9,7 @@ load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
+    "FuchsiaOmahaOtaConfigInfo",
     "FuchsiaProductConfigInfo",
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
@@ -56,17 +57,17 @@ def _fuchsia_product_configuration_impl(ctx):
     product = product_config.get("product", {})
     packages = {}
 
-    pkg_files = []
+    output_files = []
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
         base_pkg_details.append(_create_pkg_detail(dep))
-        pkg_files += _collect_file_deps(dep)
+        output_files += _collect_file_deps(dep)
     packages["base"] = base_pkg_details
 
     cache_pkg_details = []
     for dep in ctx.attr.cache_packages:
         cache_pkg_details.append(_create_pkg_detail(dep))
-        pkg_files += _collect_file_deps(dep)
+        output_files += _collect_file_deps(dep)
     packages["cache"] = cache_pkg_details
     product["packages"] = packages
 
@@ -78,17 +79,39 @@ def _fuchsia_product_configuration_impl(ctx):
                 "components": get_driver_component_manifests(dep),
             },
         )
-        pkg_files += _collect_file_deps(dep)
+        output_files += _collect_file_deps(dep)
     product["base_drivers"] = base_driver_details
 
     product_config["product"] = product
 
+    if ctx.attr.ota_configuration:
+        swd_config = product_config["platform"].setdefault("software_delivery", {})
+        update_checker_config = swd_config.setdefault("update_checker", {})
+        omaha_config = update_checker_config.setdefault("omaha_client", {})
+
+        ota_config_info = ctx.attr.ota_configuration[FuchsiaOmahaOtaConfigInfo]
+
+        channels_file = ctx.actions.declare_file("channel_config.json")
+        ctx.actions.write(channels_file, ota_config_info.channels)
+        output_files.append(channels_file)
+
+        omaha_config["channels_path"] = channels_file.path
+
+        tuf_config_paths = []
+        for (hostname, repo_config) in ota_config_info.tuf_repositories.items():
+            repo_config_file = ctx.actions.declare_file(hostname + ".json")
+            ctx.actions.write(repo_config_file, repo_config)
+            tuf_config_paths.append(repo_config_file.path)
+            output_files.append(repo_config_file)
+        swd_config["tuf_config_paths"] = tuf_config_paths
+
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
     content = json.encode_indent(product_config, indent = "  ")
     ctx.actions.write(product_config_file, content)
+    output_files.append(product_config_file)
 
     return [
-        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.product_config_labels + ctx.files.deps)),
+        DefaultInfo(files = depset(direct = output_files + ctx.files.product_config_labels + ctx.files.deps)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
         ),
@@ -129,6 +152,10 @@ _fuchsia_product_configuration = rule(
             providers = [FuchsiaPackageInfo],
             default = [],
         ),
+        "ota_configuration": attr.label(
+            doc = "OTA configuration to include in product. only for use with products that use Omaha.",
+            providers = [FuchsiaOmahaOtaConfigInfo],
+        ),
         "deps": attr.label_list(
             doc = "Additional dependencies that must be built.",
             default = [],
@@ -142,6 +169,7 @@ def fuchsia_product_configuration(
         base_packages = None,
         cache_packages = None,
         base_driver_packages = None,
+        ota_configuration = None,
         **kwarg):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
@@ -169,6 +197,7 @@ def fuchsia_product_configuration(
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
+        ota_configuration: OTA configuration to use with the product.
         **kwarg: Common bazel rule args passed through to the implementation rule.
     """
 
@@ -184,5 +213,6 @@ def fuchsia_product_configuration(
         base_packages = base_packages,
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
+        ota_configuration = ota_configuration,
         **kwarg
     )

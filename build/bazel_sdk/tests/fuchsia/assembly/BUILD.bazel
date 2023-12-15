@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test")
+load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
 load(
@@ -16,7 +16,11 @@ load(
     "fuchsia_partitions_configuration",
     "fuchsia_prebuilt_package",
     "fuchsia_product_configuration",
+    "fuchsia_product_ota_config",
     "fuchsia_virtual_device",
+    "ota_realm",
+    "tuf_repo",
+    "tuf_repo_root",
 )
 
 fuchsia_prebuilt_package(
@@ -210,5 +214,102 @@ fuchsia_virtual_device_test(
     name = "virtual_device_golden_test",
     golden_file = ":test_data/virtual_device_golden_file.json",
     virtual_device = ":my_virtual_device",
+    visibility = ["//visibility:public"],
+)
+
+test_ota_realm_a = ota_realm(
+    name = "test_realm_a",
+    app_id = "some_app_id_a",
+    channels = [
+        "channel_a",
+        "channel_b",
+        "channel_c",
+        "channel_d",
+    ],
+    tuf = tuf_repo(
+        hostnames =
+            ["some.hostname.com"],
+        mirror_url = "https://some.hostname.com",
+        root = tuf_repo_root(
+            signing_threshold = 1,
+            type = "ed25519",
+            value =
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            version = 4,
+        ),
+    ),
+)
+
+test_ota_realm_b = ota_realm(
+    name = "test_realm_b",
+    app_id = "some_app_id_b",
+    channels = [
+        "channel_e",
+        "channel_f",
+        "channel_g",
+        "channel_h",
+    ],
+    tuf = tuf_repo(
+        hostnames =
+            ["some.other_hostname.com"],
+        mirror_url = "https://some.other_hostname.com",
+        root = tuf_repo_root(
+            signing_threshold = 1,
+            type = "ed25519",
+            value =
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            version = 4,
+        ),
+    ),
+)
+
+fuchsia_product_ota_config(
+    name = "test_ota_config",
+    default_channel = "channel_b",
+    realms = [
+        test_ota_realm_a,
+        test_ota_realm_b,
+    ],
+)
+
+fuchsia_product_configuration(
+    name = "test_product_configuration_with_ota_config",
+    json_config = {
+        "platform": {
+            "build_type": "userdebug",
+        },
+    },
+    ota_configuration = ":test_ota_config",
+)
+
+fuchsia_product_configuration_test(
+    name = "product_ota_config_golden_test",
+    golden_file = select({
+        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/product_config_with_ota_golden_file_arm64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_with_ota_golden_file_x64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/product_config_with_ota_golden_file_riscv64.json",
+    }),
+    product_config = ":test_product_configuration_with_ota_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_ota_config_test(
+    name = "product_ota_config_golden_test_channel_config",
+    golden_file = ":test_data/channel_config.json",
+    product_config = ":test_product_configuration_with_ota_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_ota_config_test(
+    name = "product_ota_config_golden_test_realm_a_tuf_repo",
+    golden_file = ":test_data/some.hostname.com.json",
+    product_config = ":test_product_configuration_with_ota_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_ota_config_test(
+    name = "product_ota_config_golden_test_realm_b_tuf_repo",
+    golden_file = ":test_data/some.other_hostname.com.json",
+    product_config = ":test_product_configuration_with_ota_config",
     visibility = ["//visibility:public"],
 )

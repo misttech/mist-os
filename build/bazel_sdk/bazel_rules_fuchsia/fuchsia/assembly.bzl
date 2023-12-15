@@ -29,6 +29,13 @@ load(
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_product_ota_config.bzl",
+    _fuchsia_product_ota_config = "fuchsia_product_ota_config",
+    _ota_realm = "ota_realm",
+    _tuf_repo = "tuf_repo",
+    _tuf_repo_root = "tuf_repo_root",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
     _ARCH = "ARCH",
     _fuchsia_virtual_device = "fuchsia_virtual_device",
@@ -102,6 +109,7 @@ fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_package_directory = _fuchsia_package_directory
 fuchsia_assemble_package = _fuchsia_assemble_package
 fuchsia_product_configuration = _fuchsia_product_configuration
+fuchsia_product_ota_config = _fuchsia_product_ota_config
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
@@ -133,3 +141,8 @@ PARTITION_TYPE = _PARTITION_TYPE
 SLOT = _SLOT
 ARCH = _ARCH
 INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE
+
+# Helper functions
+ota_realm = _ota_realm
+tuf_repo = _tuf_repo
+tuf_repo_root = _tuf_repo_root

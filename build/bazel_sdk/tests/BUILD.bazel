@@ -29,6 +29,10 @@ test_suite(
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
         "//fuchsia/assembly:product_config_with_labels_golden_test",
+        "//fuchsia/assembly:product_ota_config_golden_test",
+        "//fuchsia/assembly:product_ota_config_golden_test_channel_config",
+        "//fuchsia/assembly:product_ota_config_golden_test_realm_a_tuf_repo",
+        "//fuchsia/assembly:product_ota_config_golden_test_realm_b_tuf_repo",
         "//fuchsia/assembly:virtual_device_golden_test",
     ],
 )

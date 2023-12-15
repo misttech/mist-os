@@ -146,3 +146,11 @@ FuchsiaRepositoryKeysInfo = provider(
     doc = "A directory containing Fuchsia TUF repository keys.",
     fields = {"dir": "Path to the directory"},
 )
+
+FuchsiaOmahaOtaConfigInfo = provider(
+    doc = "OTA configuration data for products that use the Omaha client.",
+    fields = {
+        "channels": "The omaha channel configuration data.",
+        "tuf_repositories": "A dict of TUF repository configurations, by hostname.",
+    },
+)

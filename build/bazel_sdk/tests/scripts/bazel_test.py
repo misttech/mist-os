@@ -781,7 +781,12 @@ def main():
         env=bazel_env,
         cwd=workspace_dir,
     )
-    ret.check_returncode()
+
+    # If the test failed, exit early with a non-zero error code, (but don't
+    # raise an exception, because the stack trace printed by that will just be
+    # noise in the failure output.
+    if ret.returncode != 0:
+        return ret.returncode
 
     if args.stamp_file:
         with open(args.stamp_file, "w") as f:
