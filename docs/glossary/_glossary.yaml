@@ -844,6 +844,17 @@
   related_guides: [""]
   area: ["General", "System"]
 
+- term: "FHO"
+  short_description: "Fuchsia Host Objects is a set of APIs connecting `ffx` with subtools."
+  full_description: "Fuchsia Host Objects is a set of APIs connecting `ffx` with subtools.
+  It acts as a compatibility layer between the program and a device or virtual machine
+  running Fuchsia, allowing the tool to ignore all the setup necessary to connect to the
+  device, establish FIDL channels to services on the device, and log useful information
+  about the interactions."
+  see_also: ["<a href=\"https://fuchsia.dev/fuchsia-src/development/tools/ffx/architecture/fho\">FHO</a>"]
+  related_guides: [""]
+  area: ["General", "System"]
+
 - term: "FilledRect"
   short_description: "A solid color rectangle can be attached to a
   <a href=\"/docs/glossary#transform\">Transform</a> in <a href=\"/docs/glossary#flatland\">Flatland</a>."

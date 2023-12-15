@@ -1,10 +1,10 @@
 # FHO subtool interface
 
-FHO is a set of library interfaces that connects `ffx` with subtools, whether
-compiled into the `ffx` cli binary or as separate binaries in the build tree or
-SDK. It's designed to allow for a ratcheting forward and backwards compatibility,
-allowing for binaries built with FHO to communicate with each other over large
-spans of versions.
+FHO (Fuchsia Host Objects) is a set of library interfaces that connects `ffx`
+with subtools, whether compiled into the `ffx` cli binary or as separate
+binaries in the build tree or SDK. It's designed to allow for a ratcheting
+forward and backwards compatibility, allowing for binaries built with FHO to
+communicate with each other over large spans of versions.
 
 Inside an ffx subtool (a top level command run with an ffx prefix), FHO is
 best thought of as a compatibility layer between the program and a device or
