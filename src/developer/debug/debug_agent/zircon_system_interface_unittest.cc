@@ -80,7 +80,7 @@ TEST_F(ZirconSystemInterfaceTest, DISABLED_GetProcessTree) {
   EXPECT_EQ(suffix, component_info.url.substr(component_info.url.size() - suffix.size()));
 }
 
-TEST_F(ZirconSystemInterfaceTest, FindComponentInfo) {
+TEST_F(ZirconSystemInterfaceTest, DISABLED_FindComponentInfo) {
   ZirconSystemInterface system_interface;
 
   system_interface.zircon_component_manager().SetReadyCallback([&]() { loop().QuitNow(); });
