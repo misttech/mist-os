@@ -11,11 +11,15 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
 fidl("fuchsia.power.broker") {
+  sdk_category = "internal"
   sources = [ "fidl/broker.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 
   # This is still experimental, so restricting visibility for now.
-  visibility = [ "//src/power/broker/*:*" ]
+  visibility = [
+    "//sdk/fidl/fuchsia.power.system/*:*",
+    "//src/power/broker/*:*",
+  ]
 }
 
 group("power-broker") {

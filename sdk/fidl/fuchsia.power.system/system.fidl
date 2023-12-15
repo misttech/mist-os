@@ -1,0 +1,112 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.power.system;
+using fuchsia.power.broker;
+using zx;
+
+/// Holds a token to the execution state power element.
+///
+/// The execution state power element represents the execution state of the
+/// hardware platform.
+///
+/// The execution state power element supports the following power levels:
+///   * 0: The hardware platform has little to no capability to execute code.
+///   * 1: The hardware platform is handling a wakeup event.
+///   * 2: The hardware platform is fully capable of executing code.
+type ExecutionState = resource table {
+    1: token fuchsia.power.broker.DependencyToken;
+};
+
+/// Holds a token to the execution resume latency power element and its
+/// supported resume latencies.
+///
+/// The execution resume latency power element represents the
+/// suspension-to-resume delay that must be met by the hardware platform.
+///
+/// The execution resume latency power element's power levels are platform and
+/// hardware dependent. The power levels supported by the power element match
+/// the index of the resume latency in the table, i.e. The item at index 0 in
+/// `resume_latencies` is represented by power level 0, the item at index 1 is
+/// represented by power level 1, and so on.
+type ExecutionResumeLatency = resource table {
+    1: token fuchsia.power.broker.DependencyToken;
+    2: resume_latencies vector<zx.Duration>:MAX;
+};
+
+/// Holds a token to the wake handling power element.
+///
+/// The wake handling power element represents the wake handling state of the
+/// hardware platform. Driver power elements are expected to claim the active
+/// power level of this power element until they have fully handled wake
+/// triggers during system resume.
+///
+/// The wake handling power element supports the following power levels:
+///   * 0: The hardware platform is not handling a wakeup event.
+///   * 1: The hardware platform is currently handling a wakeup event.
+type WakeHandling = resource table {
+    1: token fuchsia.power.broker.DependencyToken;
+};
+
+/// PowerElements holds all power elements that are supported by the activity
+/// governor.
+type PowerElements = resource table {
+    1: execution_state ExecutionState;
+    2: execution_resume_latency ExecutionResumeLatency;
+    3: wake_handling WakeHandling;
+};
+
+/// A listener for activity governor events.
+open protocol ActivityGovernorListener {
+    /// Called when the activity governor detects a system resume.
+    ///
+    /// This is only called when the wakeup reason returned by the platform
+    /// requires a full system resume.
+    /// The server is expected to respond once it has performed the operations
+    /// required to keep the system awake, if needed.
+    strict OnResume() -> ();
+
+    /// Called when the activity governor detects a system suspension.
+    ///
+    /// There is no guarantee the server will receive this message before
+    /// suspension is triggered by the platform.
+    flexible OnSuspend();
+};
+
+/// A service for exposing events and power elements managed by the system
+/// activity governor (SAG).
+///
+/// SAG is responsible for managing the execution state and resume-from-suspend
+/// latency of the hardware platform. The hardware platform consists of the
+/// components required to execute code on the device. This typically includes
+/// the CPU, memory, operating system, and other components required for these
+/// components to function (clock trees, power domains, etc.).
+@discoverable
+open protocol ActivityGovernor {
+    // TODO(b/315994898): Provide tokens more granularly once client usage
+    // patterns are better understood.
+
+    /// Gets the power elements owned by the activity governor.
+    ///
+    /// If an error occurs while the server is registering a power element with
+    /// the power broker or an error occurs while creating a token for a power
+    /// element, then the channel to `ActivityGovernor` will be closed by the
+    /// server and no response will be returned.
+    flexible GetPowerElements() -> (PowerElements);
+
+    /// Registers a listener for activity governor events.
+    ///
+    /// If there is an error in registering the listener, then the given
+    /// `ActivityGovernorListener` channel will be closed before the response
+    /// is sent.
+    ///
+    /// To unregister, close the `ActivityGovernorListener` channel.
+    flexible RegisterListener(resource table {
+        /// The client end of the service that receives activity governor events.
+        ///
+        /// Required.
+        1: listener client_end:ActivityGovernorListener;
+        // TODO(b/315994974): Handle filtering by wakeup reason.
+    }) -> ();
+};
