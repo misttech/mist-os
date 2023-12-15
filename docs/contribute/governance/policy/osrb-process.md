@@ -14,8 +14,8 @@ at all times.
 ## Process for adding external code to new repositories
 
 To host external code within a new repository that does not exist yet, or does
-not yet contain any code, submit an issue in Monorail using the
-[Open Source Review Board (OSRB) template](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Open+Source+Review+Board+).
+not yet contain any code, submit an issue in Issue Tracker using the
+[Open Source Review Board (OSRB) template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599).
 
 This issue lets Fuchsia’s OSRB review the code that you want to add, to ensure
 that the code that you want to add is in compliance with [Fuchsia Open Source Licensing Policies](/docs/contribute/governance/policy/open-source-licensing-policies.md).
@@ -28,9 +28,9 @@ to the requester.
 ## Process for adding external code to repositories with existing external code
 
 To add external code to an existing Fuchsia repository, create an issue in
-Monorail using the [Open Source Review Board (OSRB) template](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Open+Source+Review+Board+).
+Issue Tracker using the [Open Source Review Board (OSRB) template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599).
 
-This Monorail issue lets Fuchsia’s OSRB review the code that you want to add
+This Issue Tracker issue lets Fuchsia’s OSRB review the code that you want to add
 to ensure that the code that you want to add is in compliance with
 [Fuchsia Open Source Licensing Policies](/docs/contribute/governance/policy/open-source-licensing-policies.md).
 
@@ -52,7 +52,7 @@ In your email, include answers to the following questions:
 ## Process for modifying the stated Name, URL, License, or Usage of existing repositories
 
 To modify the Name, URL, License, or Usage of an existing Fuchsia repository,
-create an issue in Monorail using the [Open Source Review Board (OSRB) template](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Open+Source+Review+Board+).
+create an issue in Issue Tracker using the [Open Source Review Board (OSRB) template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599).
 
 Warning: You must receive approval from the OSRB _before_ pushing a commit to Gerrit that modifies the stated Name, URL, License, or Usage of existing repositories. Do not request a code review for  modifying the stated Name, URL, License, or Usage of existing repositories until you have approval from the OSRB.
 

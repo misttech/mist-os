@@ -82,7 +82,7 @@ To add an external crate, do the following:
 
    1. Request OSRB approval by doing the following:
       - Create an issue with the
-      [Open Source Review Board (OSRB) template](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Open+Source+Review+Board+).
+      [Open Source Review Board (OSRB) template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599).
       - In the issue, do the following:
          - Leave the **Owner** field blank.
             - The OSRB team meets regularly to review the issues.
@@ -164,7 +164,7 @@ To update an external crate, do the following:
       are these types of changes, you must go through the OSRB approval process.
       Request OSRB approval by doing the following:
       - Create an issue with the
-      [Open Source Review Board (OSRB) template](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Open+Source+Review+Board+).
+      [Open Source Review Board (OSRB) template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599).
       - In the issue, do the following:
          - Leave the **Owner** field blank.
             - The OSRB team meets regularly to review the issues.
