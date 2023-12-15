@@ -6,7 +6,7 @@ use crate::{
     device::{kobject::DeviceMetadata, DeviceMode},
     fs::tmpfs::TmpFs,
     task::CurrentTask,
-    vfs::{DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
+    vfs::{path, DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
 };
 use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 
@@ -44,19 +44,67 @@ pub fn devtmpfs_create_device(
     current_task: &CurrentTask,
     device: DeviceMetadata,
 ) -> Result<DirEntryHandle, Errno> {
-    let mode = match device.mode {
+    let separator_pos = device.name.iter().rposition(|&c| c == path::SEPARATOR);
+    let (device_path, device_name) = match separator_pos {
+        Some(pos) => device.name.split_at(pos + 1),
+        None => (&[] as &[u8], device.name.as_slice()),
+    };
+    let parent_dir = device_path
+        .split(|&c| c == path::SEPARATOR)
+        // Avoid EEXIST for 'foo//bar' and the last directory name.
+        .filter(|dir_name| dir_name.len() > 0)
+        .try_fold(dev_tmp_fs(current_task).root().clone(), |parent_dir, dir_name| {
+            devtmpfs_get_or_create_directory_at(current_task, parent_dir, dir_name)
+        })?;
+    devtmpfs_create_device_node(
+        current_task,
+        parent_dir,
+        device_name,
+        device.mode,
+        device.device_type,
+    )
+}
+
+pub fn devtmpfs_get_or_create_directory_at(
+    current_task: &CurrentTask,
+    parent_dir: DirEntryHandle,
+    dir_name: &FsStr,
+) -> Result<DirEntryHandle, Errno> {
+    parent_dir.get_or_create_entry(
+        current_task,
+        &MountInfo::detached(),
+        dir_name,
+        |dir, mount, name| {
+            dir.mknod(
+                current_task,
+                mount,
+                name,
+                mode!(IFDIR, 0o755),
+                DeviceType::NONE,
+                FsCred::root(),
+            )
+        },
+    )
+}
+
+fn devtmpfs_create_device_node(
+    current_task: &CurrentTask,
+    parent_dir: DirEntryHandle,
+    device_name: &FsStr,
+    device_mode: DeviceMode,
+    device_type: DeviceType,
+) -> Result<DirEntryHandle, Errno> {
+    let mode = match device_mode {
         DeviceMode::Char => mode!(IFCHR, 0o666),
         DeviceMode::Block => mode!(IFBLK, 0o666),
     };
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
-    dev_tmp_fs(current_task).root().create_entry(
+    parent_dir.create_entry(
         current_task,
         &MountInfo::detached(),
-        &device.name,
-        |dir, mount, name| {
-            dir.mknod(current_task, mount, name, mode, device.device_type, FsCred::root())
-        },
+        device_name,
+        |dir, mount, name| dir.mknod(current_task, mount, name, mode, device_type, FsCred::root()),
     )
 }
 

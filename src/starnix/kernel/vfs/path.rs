@@ -5,6 +5,8 @@
 pub type FsString = Vec<u8>;
 pub type FsStr = [u8];
 
+pub const SEPARATOR: u8 = b'/';
+
 // Helper that can be used to build paths backwards, from the tail to head.
 pub struct PathBuilder {
     // The path is kept in `data[pos..]`.
