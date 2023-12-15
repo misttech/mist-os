@@ -132,12 +132,10 @@ std::set<const Library*, LibraryComparator> Libraries::Unused() const {
 static size_t EditDistance(std::string_view sequence1, std::string_view sequence2) {
   size_t s1_length = sequence1.length();
   size_t s2_length = sequence2.length();
-  size_t row1[s1_length + 1];
-  size_t row2[s1_length + 1];
-  size_t* last_row = row1;
-  size_t* this_row = row2;
-  for (size_t i = 0; i <= s1_length; i++)
-    last_row[i] = i;
+  std::vector<size_t> row1(s1_length + 1);
+  std::vector<size_t> row2(s1_length + 1);
+  size_t* last_row = row1.data();
+  size_t* this_row = row2.data();
   for (size_t j = 0; j < s2_length; j++) {
     this_row[0] = j + 1;
     auto s2c = sequence2[j];
