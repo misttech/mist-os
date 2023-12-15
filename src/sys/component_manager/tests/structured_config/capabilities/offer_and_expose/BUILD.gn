@@ -11,6 +11,7 @@ test("bin") {
   sources = [ "test.cc" ]
   deps = [
     ":config_lib",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/zxtest",
   ]
 }
