@@ -4049,7 +4049,7 @@ zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,
     if (!ref) {
       return ZX_OK;
     }
-    LazyPageRequest page_request;
+    __UNINITIALIZED LazyPageRequest page_request;
     zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
     if (status == ZX_OK) {
       cur_offset = ref_offset + PAGE_SIZE;
