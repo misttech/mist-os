@@ -5,6 +5,7 @@
 static_library("debug") {
   public = [ "debug.h" ]
   sources = [ "debug.cc" ]
+  deps = [ "//zircon/system/ulib/zx" ]
 }
 
 # Library to request a backtrace.
