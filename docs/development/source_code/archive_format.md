@@ -9,6 +9,9 @@ from path names to file contents.
 Fuchsia archive files are sometimes referred to as FARs or FAR archives,
 and are given the filename extension `.far`.
 
+For a reference how to create and build Fuchsia packages, inspect package
+content etc, see [Developing with Fuchsia packages][pkg-dev].
+
 ## Format
 
 An archive is a sequence of bytes, divided into chunks:
@@ -114,3 +117,5 @@ directory.
 
 The data must be aligned on a 4096 byte boundary from the start of the archive
 and the data must be padded with zeros until the next 4096 byte boundary.
+
+[pkg-dev]: /docs/concepts/packages/package_update.md "Developing with Fuchsia packages"
