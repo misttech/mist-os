@@ -11,10 +11,7 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
     futures::future::{join_all, BoxFuture, FutureExt},
     runner::component::Controllable,
-    std::{
-        ops::DerefMut,
-        sync::{Arc, Mutex},
-    },
+    std::sync::Arc,
     tracing::{error, warn},
 };
 
@@ -49,9 +46,6 @@ pub struct ElfComponent {
 
     /// URL with which the component was launched.
     component_url: String,
-
-    /// A closure to be invoked when the object is dropped.
-    on_drop: Mutex<Option<Box<dyn FnOnce() + Send + 'static>>>,
 }
 
 impl ElfComponent {
@@ -72,22 +66,7 @@ impl ElfComponent {
             main_process_critical,
             tasks: Some(tasks),
             component_url,
-            on_drop: Mutex::new(None),
         }
-    }
-
-    /// Sets a closure to be invoked when the object is dropped. Can only be done once.
-    pub fn set_on_drop(&self, func: impl FnOnce() + Send + 'static) {
-        let mut on_drop = self.on_drop.lock().unwrap();
-        let previous = std::mem::replace(
-            on_drop.deref_mut(),
-            Some(Box::new(func) as Box<dyn FnOnce() + Send + 'static>),
-        );
-        assert!(previous.is_none());
-    }
-
-    pub fn get_url(&self) -> &String {
-        &self.component_url
     }
 
     /// Return a pointer to the Process, returns None if the component has no
@@ -98,7 +77,7 @@ impl ElfComponent {
 
     /// Return a handle to the Job containing the process for this component.
     ///
-    /// The rights of the job will be set such that the resulting handle will be appropriate to
+    /// The rights of the job will be set such that the resulting handle will be apppropriate to
     /// use for diagnostics-only purposes. Right now that is ZX_RIGHTS_BASIC (which includes
     /// INSPECT).
     pub fn copy_job_for_diagnostics(&self) -> Result<zx::Job, zx::Status> {
@@ -108,7 +87,7 @@ impl ElfComponent {
 
 #[async_trait]
 impl Controllable for ElfComponent {
-    async fn kill(&mut self) {
+    async fn kill(mut self) {
         if self.main_process_critical {
             warn!("killing a component with 'main_process_critical', so this will also kill component_manager and all of its components");
         }
@@ -208,10 +187,5 @@ impl Drop for ElfComponent {
     fn drop(&mut self) {
         // just in case we haven't killed the job already
         self.job.top().kill().unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
-
-        // notify others that this object is being dropped
-        if let Some(on_drop) = self.on_drop.lock().unwrap().take() {
-            on_drop();
-        }
     }
 }

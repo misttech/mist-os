@@ -395,7 +395,7 @@ fn get_pkg_and_lib_proxy<'a>(
 
 #[async_trait]
 impl runner::component::Controllable for ComponentRuntime {
-    async fn kill(&mut self) {
+    async fn kill(mut self) {
         if let Some(component) = &self.component {
             info!("kill request component: {}", component.url);
         }

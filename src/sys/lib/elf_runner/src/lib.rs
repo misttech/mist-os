@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod component;
-mod component_set;
 mod config;
 mod crash_handler;
 pub mod crash_info;
@@ -21,7 +20,7 @@ use {
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
     },
-    crate::{component_set::ComponentSet, crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
+    crate::{crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
     ::routing::policy::ScopedPolicyChecker,
     chrono::{DateTime, NaiveDateTime, Utc},
     fidl::endpoints::ControlHandle,
@@ -36,8 +35,8 @@ use {
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+    futures::channel::oneshot,
     futures::TryStreamExt,
-    futures::{channel::oneshot, lock::Mutex},
     moniker::Moniker,
     runner::component::ChannelEpitaph,
     runner::StartInfo,
@@ -86,9 +85,6 @@ pub struct ElfRunner {
     utc_clock: Option<Arc<zx::Clock>>,
 
     crash_records: CrashRecords,
-
-    /// Tracks the ELF components that are currently running under this runner.
-    components: Arc<ComponentSet>,
 }
 
 /// The job for a component.
@@ -120,13 +116,7 @@ impl ElfRunner {
         utc_clock: Option<Arc<zx::Clock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
-        ElfRunner {
-            job,
-            launcher_connector,
-            utc_clock,
-            crash_records,
-            components: ComponentSet::new(),
-        }
+        ElfRunner { job, launcher_connector, utc_clock, crash_records }
     }
 
     /// Returns a UTC clock handle.
@@ -608,9 +598,6 @@ async fn start(
     })
     .detach();
 
-    let elf_component = Arc::new(Mutex::new(elf_component));
-    runner.components.clone().add(elf_component.clone()).await;
-
     // Create a future which owns and serves the controller
     // channel. The `epitaph_fn` future completes when the
     // component's main process exits. The controller then sets the
@@ -905,7 +892,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_kill_component() -> Result<(), Error> {
-        let (job, mut component) = make_default_elf_component(None, false);
+        let (job, component) = make_default_elf_component(None, false);
 
         let job_info = job.info()?;
         assert!(!job_info.exited);
@@ -1532,88 +1519,5 @@ mod tests {
             .any(|handle_info| handle_info.handle.get_koid().unwrap() == clock_koid));
 
         Ok(())
-    }
-
-    /// Test visiting running components using [`ComponentSet`].
-    #[fuchsia::test]
-    async fn test_enumerate_components() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let start_info = lifecycle_startinfo(runtime_dir_server);
-
-        let runner = new_elf_runner_for_test();
-        let components = runner.components.clone();
-
-        // Initially there are zero components.
-        let count = Arc::new(AtomicUsize::new(0));
-        components
-            .clone()
-            .visit(&|_| {
-                count.fetch_add(1, Ordering::SeqCst);
-            })
-            .await;
-        assert_eq!(count.load(Ordering::SeqCst), 0);
-
-        // Run a component.
-        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::new(SecurityPolicy::default()),
-            Moniker::root(),
-        ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
-        runner.start(start_info, server_controller).await;
-
-        // There should now be one component in the set.
-        let count = Arc::new(AtomicUsize::new(0));
-        components
-            .clone()
-            .visit(&|elf_component: &ElfComponent| {
-                assert_eq!(
-                    elf_component.get_url().as_str(),
-                    "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
-                );
-                count.fetch_add(1, Ordering::SeqCst);
-            })
-            .await;
-        assert_eq!(count.load(Ordering::SeqCst), 1);
-
-        // Stop the component.
-        controller.stop().unwrap();
-        controller.on_closed().await.unwrap();
-
-        // There should now be zero components in the set.
-        // Keep retrying until the component is asynchronously deregistered.
-        loop {
-            let count = Arc::new(AtomicUsize::new(0));
-            components
-                .clone()
-                .visit(&|_| {
-                    count.fetch_add(1, Ordering::SeqCst);
-                })
-                .await;
-            let count = count.load(Ordering::SeqCst);
-            assert!(count == 0 || count == 1);
-            if count == 0 {
-                break;
-            }
-            // Yield to the executor once so that we are not starving the
-            // asynchronous deregistration task from running.
-            yield_to_executor().await;
-        }
-    }
-
-    async fn yield_to_executor() {
-        let mut done = false;
-        futures::future::poll_fn(|cx| {
-            if done {
-                Poll::Ready(())
-            } else {
-                done = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        })
-        .await;
     }
 }
