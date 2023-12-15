@@ -19,7 +19,7 @@ use crate::{
         PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
-    vfs::{FdNumber, FileHandle, MountNamespaceFile},
+    vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer},
 };
 use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
 use starnix_sync::MmDumpable;
@@ -1661,9 +1661,21 @@ pub fn sys_syslog(
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
     match action {
-        SyslogAction::Read => current_task.kernel().syslog.read(current_task, address, length),
+        SyslogAction::Read => {
+            if address.is_null() || length < 0 {
+                return error!(EINVAL);
+            }
+            let mut output_buffer =
+                UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
+            current_task.kernel().syslog.read(current_task, &mut output_buffer)
+        }
         SyslogAction::ReadAll => {
-            current_task.kernel().syslog.read_all(current_task, address, length)
+            if address.is_null() || length < 0 {
+                return error!(EINVAL);
+            }
+            let mut output_buffer =
+                UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
+            current_task.kernel().syslog.read_all(&mut output_buffer)
         }
         SyslogAction::SizeUnread => current_task.kernel().syslog.size_unread(current_task),
         SyslogAction::SizeBuffer => current_task.kernel().syslog.size_buffer(),

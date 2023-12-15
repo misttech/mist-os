@@ -109,3 +109,40 @@ TEST_F(SyslogTest, Read) {
 
   close(kmsg_fd);
 }
+
+TEST_F(SyslogTest, ReadProcKmsg) {
+  int kmsg_fd = open("/dev/kmsg", O_WRONLY);
+  if (kmsg_fd < 0) {
+    printf("Failed to open /dev/kmsg -> %s\n", strerror(errno));
+    FAIL();
+  }
+  dprintf(kmsg_fd, "ReadProcKmsg -- log one\n");
+
+  int proc_kmsg_fd = open("/proc/kmsg", O_RDONLY);
+  if (proc_kmsg_fd < 0) {
+    printf("Failed to open /proc/kmsg -> %s\n", strerror(errno));
+    FAIL();
+  }
+
+  // Read that first log we wrote.
+  char buf[4096];
+  do {
+    size_t size_read = read(proc_kmsg_fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+  } while (strstr(buf, "ReadProcKmsg -- log one") == nullptr);
+
+  // Write a second log.
+  dprintf(kmsg_fd, "ReadProcKmsg -- log two\n");
+  close(kmsg_fd);
+
+  // Check that the first log we read isn't present anymore.
+  std::fill_n(buf, 4096, 0);
+  do {
+    size_t size_read = read(proc_kmsg_fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+    EXPECT_EQ(strstr(buf, "ReadProcKmsg -- log one"), nullptr);
+
+  } while (strstr(buf, "ReadProcKmsg -- log two") == nullptr);
+
+  close(proc_kmsg_fd);
+}

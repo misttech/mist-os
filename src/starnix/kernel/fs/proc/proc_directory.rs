@@ -201,11 +201,10 @@ impl FileOps for ProcKmsgFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn OutputBuffer,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!("ProcKmsgFile.read() is stubbed.");
-        Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
-        error!(EAGAIN)
+        let bytes_written = current_task.kernel().syslog.read(current_task, data)?;
+        Ok(bytes_written as usize)
     }
 
     fn write(

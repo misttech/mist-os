@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{mm::MemoryAccessor, task::CurrentTask};
+use crate::{task::CurrentTask, vfs::OutputBuffer};
 use diagnostics_data::{Data, Logs, Severity};
 use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_diagnostics as fdiagnostics;
@@ -17,7 +17,6 @@ use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{CAP_SYSLOG, CAP_SYS_ADMIN},
     errors::{errno, error, Errno},
-    user_address::UserAddress,
 };
 use std::{
     cmp,
@@ -43,38 +42,26 @@ impl Syslog {
     pub fn read(
         &self,
         current_task: &CurrentTask,
-        address: UserAddress,
-        length: i32,
+        out: &mut dyn OutputBuffer,
     ) -> Result<i32, Errno> {
         Self::check_credentials(&current_task)?;
-        if address.is_null() || length < 0 {
-            return error!(EINVAL);
-        }
         let mut subscription = self.syscall_subscription.get().expect("syslog initialized").lock();
-        if let Some(data) = subscription.try_next()? {
-            let size_to_write = cmp::min(data.len(), length as usize);
-            current_task.write_memory(address, &data[..size_to_write])?;
+        if let Some(log) = subscription.try_next()? {
+            let size_to_write = cmp::min(log.len(), out.available() as usize);
+            out.write(&log[..size_to_write])?;
             return Ok(size_to_write as i32);
         }
         Ok(0)
     }
 
-    pub fn read_all(
-        &self,
-        current_task: &CurrentTask,
-        address: UserAddress,
-        length: i32,
-    ) -> Result<i32, Errno> {
-        if address.is_null() || length < 0 {
-            return error!(EINVAL);
-        }
+    pub fn read_all(&self, out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
         let mut subscription = LogSubscription::snapshot()?;
-        let mut buffer = ResultBuffer::new(length as usize);
+        let mut buffer = ResultBuffer::new(out.available());
         while let Some(log_result) = subscription.next() {
             buffer.push(log_result?);
         }
         let result: Vec<u8> = buffer.into();
-        current_task.write_memory(address, result.as_slice())?;
+        out.write(result.as_slice())?;
         Ok(result.len() as i32)
     }
 
