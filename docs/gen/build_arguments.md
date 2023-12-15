@@ -3293,7 +3293,7 @@ Use Fxfs's blob implementation
 Changes the flashing logic because the outputs changed.
 Toggles a bunch of tests to use fxfs.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/storage/fshost/generated_fshost_config.gni:17
 
