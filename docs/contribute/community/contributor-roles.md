@@ -104,8 +104,9 @@ In the worst case, this can drag out for two weeks. Keep writing patches! Even i
 where a nomination fails, the objection is usually something easy to address like "more patches" or
 "not enough people are familiar with this person's work."
 
-Once you get approval from the existing Committers, we'll send you instructions for write access to
-Git. You'll also be added to committers@fuchsia.dev.
+Once you get approval from the existing Committers, a Fuchsia Community Manager will add you to
+committers@fuchsia.dev and reach out with some additional information on submitting contributions
+as an external contributor.
 
 ### Try job access
 
