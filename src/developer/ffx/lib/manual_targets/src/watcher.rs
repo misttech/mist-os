@@ -126,6 +126,15 @@ pub struct ManualTarget {
     lifetime: Option<Duration>,
 }
 
+impl ManualTarget {
+    pub fn new(addr: SocketAddr, lifetime: Option<Duration>) -> Self {
+        Self { addr, lifetime }
+    }
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+}
+
 impl Display for ManualTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let lifetime = match self.lifetime {

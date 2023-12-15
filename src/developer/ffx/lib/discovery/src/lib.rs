@@ -6,6 +6,10 @@ use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::Stream;
+use manual_targets::watcher::{
+    recommended_watcher as manual_recommended_watcher, ManualTargetEvent, ManualTargetState,
+    ManualTargetWatcher,
+};
 use mdns_discovery::{recommended_watcher, MdnsWatcher};
 use std::fmt;
 use std::task::{ready, Context, Poll};
@@ -104,6 +108,9 @@ pub struct TargetStream {
     /// Watches for FastbootUsb events
     fastboot_usb_watcher: Option<FastbootUsbWatcher>,
 
+    /// Watches for ManualTarget events
+    manual_targets_watcher: Option<ManualTargetWatcher>,
+
     /// This is where results from the various watchers are published.
     queue: UnboundedReceiver<Result<TargetEvent>>,
 
@@ -165,6 +172,22 @@ where
         let _ = fastboot_sender.unbounded_send(event);
     })?;
 
+    // Manual Targets watcher
+    let manual_targets_sender = sender.clone();
+    let manual_targets_watcher =
+        manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
+            // Translate the result to a TargetEvent
+            tracing::trace!("discovery watcher got manual target event: {:#?}", res);
+            let event = match res {
+                Ok(r) => {
+                    let event: TargetEvent = r.into();
+                    Ok(event)
+                }
+                Err(e) => Err(anyhow!(e)),
+            };
+            let _ = manual_targets_sender.unbounded_send(event);
+        })?;
+
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
@@ -172,6 +195,7 @@ where
         notify_removed,
         mdns_watcher: Some(mdns_watcher),
         fastboot_usb_watcher: Some(fastboot_usb_watcher),
+        manual_targets_watcher: Some(manual_targets_watcher),
     })
 }
 
@@ -267,6 +291,36 @@ impl From<FastbootEvent> for TargetEvent {
     }
 }
 
+impl From<ManualTargetEvent> for TargetEvent {
+    fn from(manual_target_event: ManualTargetEvent) -> Self {
+        match manual_target_event {
+            ManualTargetEvent::Discovered(manual_target, manual_state) => {
+                let state = match manual_state {
+                    ManualTargetState::Disconnected => TargetState::Unknown,
+                    ManualTargetState::Product => TargetState::Product(manual_target.addr().into()),
+                    ManualTargetState::Fastboot => TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Tcp(manual_target.addr().into()),
+                    }),
+                };
+
+                let handle = TargetHandle {
+                    node_name: Some(manual_target.addr().to_string()),
+                    state: state,
+                };
+                TargetEvent::Added(handle)
+            }
+            ManualTargetEvent::Lost(manual_target) => {
+                let handle = TargetHandle {
+                    node_name: Some(manual_target.addr().to_string()),
+                    state: TargetState::Unknown,
+                };
+                TargetEvent::Removed(handle)
+            }
+        }
+    }
+}
+
 impl Stream for TargetStream {
     type Item = Result<TargetEvent>;
 
@@ -315,8 +369,9 @@ impl Stream for TargetStream {
 mod test {
     use super::*;
     use futures::StreamExt;
+    use manual_targets::watcher::ManualTarget;
     use pretty_assertions::assert_eq;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
 
     #[test]
     fn test_from_fastbootevent_for_targetevent() -> Result<()> {
@@ -517,6 +572,76 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn test_from_manual_target_event_for_target_event() -> Result<()> {
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Product,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Product(addr.into()),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+                8023,
+                0,
+                0,
+            ));
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Product,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("[::1]:8023".to_string()),
+                    state: TargetState::Product(addr.into()),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Fastboot,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Tcp(addr.into())
+                    }),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Lost(ManualTarget::new(addr, lifetime));
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Unknown,
+                })
+            );
+        }
+        Ok(())
+    }
+
     fn true_target_filter(_handle: &TargetHandle) -> bool {
         true
     }
@@ -536,6 +661,7 @@ mod test {
             filter: Some(Box::new(true_target_filter)),
             mdns_watcher: None,
             fastboot_usb_watcher: None,
+            manual_targets_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
@@ -579,6 +705,7 @@ mod test {
             filter: Some(Box::new(true_target_filter)),
             mdns_watcher: None,
             fastboot_usb_watcher: None,
+            manual_targets_watcher: None,
             queue,
             notify_added: false,
             notify_removed: true,
@@ -614,6 +741,7 @@ mod test {
             filter: Some(Box::new(true_target_filter)),
             mdns_watcher: None,
             fastboot_usb_watcher: None,
+            manual_targets_watcher: None,
             queue,
             notify_added: true,
             notify_removed: false,
@@ -649,6 +777,7 @@ mod test {
             filter: Some(Box::new(zedboot_target_filter)),
             mdns_watcher: None,
             fastboot_usb_watcher: None,
+            manual_targets_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
