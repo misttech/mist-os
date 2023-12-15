@@ -232,7 +232,7 @@ impl ConfigDomain {
     ///
     /// `known_states` will be updated with the new states if they've changed.
     pub fn needs_sdk_update(
-        &mut self,
+        &self,
         sdk_root: &sdk::SdkRoot,
         known_states: &mut FileStates,
     ) -> Option<Command> {

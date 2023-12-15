@@ -477,6 +477,16 @@ impl EnvironmentContext {
             _ => None,
         }
     }
+
+    /// Returns a mutable reference to the configuration domain for the current
+    /// invocation, if there is one. This can be used in bootstrapping to
+    /// refresh the project-local configuration.
+    pub fn get_config_domain_mut(&mut self) -> Option<&mut ConfigDomain> {
+        match &mut self.kind {
+            EnvironmentKind::ConfigDomain { domain, .. } => Some(domain),
+            _ => None,
+        }
+    }
 }
 
 /// Finds the executable path of the ffx binary being run, attempting to

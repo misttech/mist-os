@@ -175,10 +175,7 @@ fn sdk_tool_not_found_err(err: anyhow::Error) -> Exit {
     Exit { message: Box::new(err), code: SDK_TOOL_NOT_FOUND }
 }
 
-async fn load_domain_sdk_root(
-    env: &EnvironmentContext,
-    domain: &mut ConfigDomain,
-) -> Result<SdkRoot, Exit> {
+fn ensure_config(domain: &mut ConfigDomain) -> Result<(), Exit> {
     if let Some(cmd) = domain.needs_config_bootstrap() {
         // run the command
         tracing::trace!("Running bootstrap command: {cmd:?}");
@@ -192,6 +189,13 @@ async fn load_domain_sdk_root(
             });
         }
     }
+    Ok(())
+}
+
+async fn load_domain_sdk_root(
+    env: &EnvironmentContext,
+    domain: &ConfigDomain,
+) -> Result<SdkRoot, Exit> {
     // load details we need for the sdk updating process and check if we
     // need to and how
     let sdk_root = env.get_sdk_root().await.map_err(sdk_load_err)?;
@@ -223,12 +227,21 @@ async fn run(
     env: impl IntoIterator<Item = (String, String)>,
 ) -> Result<(), Exit> {
     let runner = SdkToolRunner::from_args(args)?;
-    let env = runner.ffx.load_context_with_env(MainFfx, HashMap::from_iter(env))?;
-    let sdk = if let Some(mut domain) = env.get_config_domain().cloned() {
-        load_domain_sdk_root(&env, &mut domain).await?.get_sdk().map_err(sdk_load_err)?
+    let mut env = runner.ffx.load_context_with_env(MainFfx, HashMap::from_iter(env))?;
+    // first ensure config exists with a mutable borrow so it can be updated
+    // after the check script.
+    if let Some(domain) = env.get_config_domain_mut() {
+        ensure_config(domain)?;
+    }
+    // then re-borrow immutably to verify the SDK, or just get the sdk root
+    // normally if we're not in a config domain.
+    let sdk_root = if let Some(domain) = env.get_config_domain() {
+        load_domain_sdk_root(&env, domain).await?
     } else {
-        env.get_sdk().await.map_err(sdk_load_err)?
+        env.get_sdk_root().await.map_err(sdk_load_err)?
     };
+    // and finally load the sdk for good.
+    let sdk = sdk_root.get_sdk().map_err(sdk_load_err)?;
 
     let mut command = sdk.get_host_tool_command(&runner.cmd).map_err(sdk_tool_not_found_err)?;
     command.args(&runner.args);
@@ -286,7 +299,8 @@ mod test {
             ConfigDomain::load_from_contents(root.join("fuchsia_env.toml"), fuchsia_env.clone())
                 .expect("to load domain");
 
-        load_domain_sdk_root(&test_env.context, &mut domain).await
+        ensure_config(&mut domain)?;
+        load_domain_sdk_root(&test_env.context, &domain).await
     }
 
     async fn set_sdk_root_config(test_env: &TestEnv) {
