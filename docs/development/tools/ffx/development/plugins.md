@@ -26,8 +26,10 @@ ffx_plugin("ffx_example") {
   edition = "2021"
   with_unit_tests = true
   deps = []
-  sources = [
+  args_sources = [
     "src/args.rs",
+  ]
+  sources = [
     "src/lib.rs",
   ]
 }
@@ -176,8 +178,10 @@ instructions in this section.
       deps = [
         "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
       ]
-      sources = [
+      args_sources = [
         "src/args.rs",
+      ]
+      sources = [
         "src/lib.rs",
       ]
     }
