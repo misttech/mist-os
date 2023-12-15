@@ -11,60 +11,66 @@ import(
     "//third_party/go/src/syscall/zx/fidl/fidl_test/conformance_test_files.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
-generated_dir = "$target_gen_dir"
-generated_source = "$generated_dir/conformance_test.go"
+if (is_host || has_board) {
+  generated_dir = "$target_gen_dir"
+  generated_source = "$generated_dir/conformance_test.go"
 
-gidl("conformance_suite") {
-  type = "conformance"
-  language = "go"
-  inputs = conformance_suite_gidl_files
-  fidl = conformance_suite_fidl_target
-  output = generated_source
-}
-
-copy("copy_test_utils") {
-  sources = []
-  foreach(filename, go_conformance_test_files) {
-    sources += [ "//third_party/go/src/syscall/zx/fidl/fidl_test/" + filename ]
+  gidl("conformance_suite") {
+    type = "conformance"
+    language = "go"
+    inputs = conformance_suite_gidl_files
+    fidl = conformance_suite_fidl_target
+    output = generated_source
   }
-  outputs = [ "${generated_dir}/{{source_file_part}}" ]
-}
 
-go_library("conformance_tests_library") {
-  testonly = true
-  name = "conformance_tests"
-  source_dir = generated_dir
+  copy("copy_test_utils") {
+    sources = []
+    foreach(filename, go_conformance_test_files) {
+      sources +=
+          [ "//third_party/go/src/syscall/zx/fidl/fidl_test/" + filename ]
+    }
+    outputs = [ "${generated_dir}/{{source_file_part}}" ]
+  }
 
-  sources =
-      rebase_path([ generated_source ] + get_target_outputs(":copy_test_utils"),
-                  generated_dir)
+  go_library("conformance_tests_library") {
+    testonly = true
+    name = "conformance_tests"
+    source_dir = generated_dir
 
-  non_go_deps = [
-    ":conformance_suite",
-    ":copy_test_utils",
-  ]
+    sources = rebase_path(
+            [ generated_source ] + get_target_outputs(":copy_test_utils"),
+            generated_dir)
 
-  deps = [ "${conformance_suite_fidl_target}_go(${go_toolchain})" ]
-}
+    non_go_deps = [
+      ":conformance_suite",
+      ":copy_test_utils",
+    ]
 
-go_test("fidl_go_conformance_tests") {
-  library = ":conformance_tests_library"
-  non_go_deps = [ ":conformance_suite" ]
+    deps = [ "${conformance_suite_fidl_target}_go(${go_toolchain})" ]
+  }
 
-  # This runs both on target device and as a host test.
-  # In both cases, it needs to build a go toolchain rather than using a prebuilt because
-  # it is testing the fidl package, which is implemented in the toolcahin itself.
-  use_prebuilt_go = false
-}
+  go_test("fidl_go_conformance_tests") {
+    library = ":conformance_tests_library"
+    non_go_deps = [ ":conformance_suite" ]
 
-fuchsia_unittest_package("fidl_go_conformance") {
-  deps = [ ":fidl_go_conformance_tests" ]
+    # This runs both on target device and as a host test.
+    # In both cases, it needs to build a go toolchain rather than using a prebuilt because
+    # it is testing the fidl package, which is implemented in the toolcahin itself.
+    use_prebuilt_go = false
+  }
+
+  fuchsia_unittest_package("fidl_go_conformance") {
+    deps = [ ":fidl_go_conformance_tests" ]
+  }
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":fidl_go_conformance",
-    ":fidl_go_conformance_tests($host_toolchain)",
-  ]
+  deps = [ ":fidl_go_conformance_tests($host_toolchain)" ]
+
+  # Don't include the _Fuchsia_ version of the test if there isn't a board
+  # defined.
+  if (has_board) {
+    deps += [ ":fidl_go_conformance" ]
+  }
 }
