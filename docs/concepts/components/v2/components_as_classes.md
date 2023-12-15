@@ -184,7 +184,7 @@ In various OOP languages, you would write this as follows:
   }
 
   // Create a class that implements the interface.
-  public class MallardDuck {
+  public class MallardDuck implements Duck {
     @Override
     public void Quack() { /* ... */ }
   }
