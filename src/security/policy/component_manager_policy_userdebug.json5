@@ -67,6 +67,8 @@
                 source_name: "fuchsia.kernel.InfoResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/bootstrap/pkg-drivers:**",
+
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",

@@ -110,6 +110,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/testing/vfs-compliance-tests:**",
+                    "/bootstrap/pkg-drivers:**",
 
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
