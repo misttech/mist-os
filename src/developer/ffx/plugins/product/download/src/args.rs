@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 /// Retrieve image data.
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(
     subcommand,
     name = "download",
@@ -31,11 +31,20 @@ pub struct DownloadCommand {
     #[argh(option, default = "AuthFlowChoice::Default")]
     pub auth: AuthFlowChoice,
 
-    /// url to the transfer manifest of the product bundle to download.
+    /// url to the transfer manifest of the product bundle to download, or the
+    /// product name to fetch.
     #[argh(positional)]
     pub manifest_url: String,
 
     /// local name of the product bundle directory.
     #[argh(positional)]
     pub product_dir: PathBuf,
+
+    /// where to look for product bundles manifest.
+    #[argh(option)]
+    pub base_url: Option<String>,
+
+    /// filter on products of <version>.
+    #[argh(option)]
+    pub version: Option<String>,
 }

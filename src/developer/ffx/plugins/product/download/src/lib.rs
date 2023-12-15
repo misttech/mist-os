@@ -10,8 +10,10 @@ use ::gcs::client::{Client, ProgressResponse, ProgressState};
 use anyhow::{anyhow, Context, Result};
 use async_fs::rename;
 use errors::ffx_bail;
+use ffx_config::sdk::SdkVersion;
 use ffx_core::ffx_plugin;
 use ffx_product_download_args::DownloadCommand;
+use ffx_product_list::pb_list_impl;
 use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
 use std::{
     io::{stderr, stdin, stdout},
@@ -27,6 +29,8 @@ pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+    let cmd = preprocess_cmd(cmd, &ui).await?;
 
     pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui).await
 }
@@ -95,6 +99,56 @@ pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     Ok(())
 }
 
+pub async fn preprocess_cmd<I: structured_ui::Interface + Sync>(
+    cmd: DownloadCommand,
+    ui: &I,
+) -> Result<DownloadCommand> {
+    // If the manifest_url is a transfer url, we don't need to preprocess.
+    if let Ok(_) = url::Url::parse(&cmd.manifest_url) {
+        return Ok(cmd);
+    };
+
+    // If the manifest_url look like a product name, we try to convert it into a
+    // transfer manifest url.
+    let version = match cmd.version {
+        Some(version) => version,
+        None => {
+            let sdk = ffx_config::global_env_context()
+                .context("loading global environment context")?
+                .get_sdk()
+                .await
+                .context("getting sdk env context")?;
+            match sdk.get_version() {
+                SdkVersion::Version(version) => version.to_string(),
+                SdkVersion::InTree => {
+                    ffx_bail!("Using in-tree sdk. Please specify the version through '--version'")
+                }
+                SdkVersion::Unknown => ffx_bail!("Unable to determine SDK version. Please specify the version through '--version'"),
+            }
+        }
+    };
+    let products = pb_list_impl(&cmd.auth, cmd.base_url.clone(), &version, ui)
+        .await?
+        .iter()
+        .cloned()
+        .filter(|x| x.name == cmd.manifest_url)
+        .collect::<Vec<_>>();
+
+    if products.len() != 1 {
+        ffx_bail!(
+            "Expected a single product entry while trying to download a product by name, found {}",
+            products.len()
+        );
+    }
+
+    let processed_cmd = DownloadCommand {
+        manifest_url: products[0].transfer_manifest_url.clone(),
+        version: Some(version),
+        ..cmd
+    };
+    Ok(processed_cmd)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -102,6 +156,8 @@ mod test {
         handler::{ForPath, StaticResponse},
         TestServer,
     };
+    use std::io::Write;
+    use temp_test_env::TempTestEnv;
     use tempfile;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -177,5 +233,38 @@ mod test {
             .await
             .expect("testing download");
         assert!(download_dir.join("foo").join("payload.txt").exists());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_preprocess_cmd() {
+        let test_dir = tempfile::TempDir::new().expect("temp dir");
+        let test_env = TempTestEnv::new().expect("test_env");
+        let mut f =
+            std::fs::File::create(test_env.home.join("product_bundles.json")).expect("file create");
+        f.write_all(
+            r#"[{
+            "name": "fake_name",
+            "product_version": "fake_version",
+            "transfer_manifest_url": "fake_url"
+            }]"#
+            .as_bytes(),
+        )
+        .expect("write_all");
+
+        let ui = structured_ui::MockUi::new();
+        let force = false;
+        let manifest_url = String::from("fake_name");
+        let auth = pbms::AuthFlowChoice::NoAuth;
+        let product_dir = test_dir.path().join("download");
+        let base_url = Some(format!("file:{}", test_env.home.display()));
+        let version = Some(String::from("fake_version"));
+        let cmd = DownloadCommand { force, auth, manifest_url, product_dir, base_url, version };
+
+        let processed_cmd = preprocess_cmd(cmd.clone(), &ui).await.expect("testing preprocess cmd");
+
+        assert_eq!(
+            DownloadCommand { manifest_url: String::from("fake_url"), ..cmd },
+            processed_cmd
+        );
     }
 }

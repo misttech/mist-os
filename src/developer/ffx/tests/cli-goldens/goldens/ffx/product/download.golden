@@ -32,6 +32,30 @@
       "short": null,
       "description": "use specific auth flow for oauth2 (see examples; default: pkce).",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "base-url"
+        }
+      },
+      "optionality": "optional",
+      "long": "--base-url",
+      "short": null,
+      "description": "where to look for product bundles manifest.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "version"
+        }
+      },
+      "optionality": "optional",
+      "long": "--version",
+      "short": null,
+      "description": "filter on products of <version>.",
+      "hidden": false
     }
   ],
   "notes": [],
@@ -39,7 +63,7 @@
   "positionals": [
     {
       "name": "manifest_url",
-      "description": "url to the transfer manifest of the product bundle to download.",
+      "description": "url to the transfer manifest of the product bundle to download, or the product name to fetch.",
       "optionality": "required",
       "hidden": false
     },
