@@ -79,7 +79,7 @@ bool SendPacketToGuest(NetworkDeviceClient& client, PortId port_id,
 class FakeNetwork : public fuchsia::net::virtualization::Control,
                     public fuchsia::net::virtualization::Network,
                     public fuchsia::net::virtualization::Interface,
-                    public component_testing::LocalComponent {
+                    public component_testing::LocalComponentImpl {
  public:
   explicit FakeNetwork(async::Loop& loop) : loop_(loop) {}
 
@@ -116,13 +116,10 @@ class FakeNetwork : public fuchsia::net::virtualization::Control,
                            loop_.dispatcher());
   }
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    // This class contains handles to the component's incoming and outgoing capabilities.
-    handles_ = std::move(handles);
-
-    ASSERT_EQ(handles_->outgoing()->AddPublicService(
-                  control_binding_set_.GetHandler(this, loop_.dispatcher())),
-              ZX_OK);
+  void OnStart() override {
+    ASSERT_EQ(
+        outgoing()->AddPublicService(control_binding_set_.GetHandler(this, loop_.dispatcher())),
+        ZX_OK);
   }
 
   std::optional<NetworkDeviceClient>& device_client() { return device_client_; }
@@ -130,7 +127,6 @@ class FakeNetwork : public fuchsia::net::virtualization::Control,
 
  private:
   async::Loop& loop_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
   fidl::BindingSet<fuchsia::net::virtualization::Control> control_binding_set_;
   fidl::BindingSet<fuchsia::net::virtualization::Network> network_binding_set_;
   fidl::BindingSet<fuchsia::net::virtualization::Interface> interface_binding_set_;
@@ -143,8 +139,7 @@ class VirtioNetTest : public TestWithDevice {
  protected:
   VirtioNetTest()
       : rx_queue_(phys_mem_, kVmoSize * kNumQueues, kQueueSize),
-        tx_queue_(phys_mem_, rx_queue_.end(), kQueueSize),
-        fake_network_(loop()) {}
+        tx_queue_(phys_mem_, rx_queue_.end(), kQueueSize) {}
 
   void SetUp() override {
     using component_testing::ChildRef;
@@ -156,8 +151,12 @@ class VirtioNetTest : public TestWithDevice {
 
     auto realm_builder = RealmBuilder::Create();
     realm_builder.AddChild(kComponentName, kComponentUrl);
-    realm_builder.AddLocalChild(kFakeNetwork, &fake_network_);
-
+    realm_builder.AddLocalChild(kFakeNetwork, [&loop = loop(), &fake_network = fake_network_] {
+      EXPECT_FALSE(fake_network);
+      auto new_fake_network = std::make_unique<FakeNetwork>(loop);
+      fake_network = new_fake_network.get();
+      return new_fake_network;
+    });
     realm_builder
         .AddRoute(Route{.capabilities =
                             {
@@ -221,13 +220,13 @@ class VirtioNetTest : public TestWithDevice {
     // Wait for virtio-net to connect to Netstack (i.e., us), add its device, and port
     // information to be fetched.
     RunLoopUntil([this] {
-      return fake_network_.device_client().has_value() && fake_network_.port_id().has_value();
+      return fake_network_->device_client().has_value() && fake_network_->port_id().has_value();
     });
 
     // Open a session with the network device.
     {
       std::optional<zx_status_t> result;
-      fake_network_.device_client()->OpenSession(
+      fake_network_->device_client()->OpenSession(
           "virtio_net_test", [&](zx_status_t status) { result = status; },
           [](const network::client::DeviceInfo& dev_info) -> network::client::SessionConfig {
             network::client::SessionConfig config =
@@ -245,8 +244,8 @@ class VirtioNetTest : public TestWithDevice {
     // Attach a port to the session.
     {
       std::optional<zx_status_t> result;
-      fake_network_.device_client()->AttachPort(
-          fake_network_.port_id().value(), {fuchsia_hardware_network::wire::FrameType::kEthernet},
+      fake_network_->device_client()->AttachPort(
+          fake_network_->port_id().value(), {fuchsia_hardware_network::wire::FrameType::kEthernet},
           [&](zx_status_t status) { result = status; });
       RunLoopUntil([&] { return result.has_value(); });
       ASSERT_EQ(*result, ZX_OK);
@@ -262,23 +261,24 @@ class VirtioNetTest : public TestWithDevice {
   fuchsia::virtualization::hardware::VirtioNetPtr net_;
   VirtioQueueFake rx_queue_;
   VirtioQueueFake tx_queue_;
-  FakeNetwork fake_network_;
+  // Pointer to the (last) FakeNetwork created.
+  FakeNetwork* fake_network_ = nullptr;
   std::optional<component_testing::RealmRoot> realm_;
 };
 
 TEST_F(VirtioNetTest, ConnectDisconnect) {
   // Ensure we are connected.
-  ASSERT_TRUE(fake_network_.device_client()->HasSession());
+  ASSERT_TRUE(fake_network_->device_client()->HasSession());
 
   // Kill the session, and wait for it to return.
-  ASSERT_EQ(fake_network_.device_client()->KillSession(), ZX_OK);
+  ASSERT_EQ(fake_network_->device_client()->KillSession(), ZX_OK);
   bool done = false;
-  fake_network_.device_client()->SetErrorCallback([&](zx_status_t status) { done = true; });
+  fake_network_->device_client()->SetErrorCallback([&](zx_status_t status) { done = true; });
   RunLoopUntil([&] { return done; });
-  fake_network_.device_client()->SetErrorCallback(nullptr);
+  fake_network_->device_client()->SetErrorCallback(nullptr);
 
   // Ensure the session completed.
-  ASSERT_FALSE(fake_network_.device_client()->HasSession());
+  ASSERT_FALSE(fake_network_->device_client()->HasSession());
 }
 
 TEST_F(VirtioNetTest, ConcurrentBidirectionalTransfers) {
@@ -293,7 +293,7 @@ TEST_F(VirtioNetTest, ConcurrentBidirectionalTransfers) {
   memcpy(tx_packet.data, kTxData, kTxDataSize);
 
   // "RX" here is from the perspective of the netstack.
-  fake_network_.device_client()->SetRxCallback([&](NetworkDeviceClient::Buffer buffer) {
+  fake_network_->device_client()->SetRxCallback([&](NetworkDeviceClient::Buffer buffer) {
     uint8_t received_data[kTxDataSize];
     buffer.data().Read(received_data, kTxDataSize);
     ASSERT_THAT(cpp20::span{received_data},
@@ -322,7 +322,7 @@ TEST_F(VirtioNetTest, ConcurrentBidirectionalTransfers) {
     net_->NotifyQueue(0);
 
     RunLoopUntil([&]() {
-      return SendPacketToGuest(*fake_network_.device_client(), *fake_network_.port_id(),
+      return SendPacketToGuest(*fake_network_->device_client(), *fake_network_->port_id(),
                                cpp20::span(kRxData, sizeof(kRxData)));
     });
 
@@ -354,7 +354,7 @@ TEST_F(VirtioNetTest, SendToGuest) {
   ASSERT_EQ(status, ZX_OK);
 
   // Transmit a packet to the guest.
-  ASSERT_TRUE(SendPacketToGuest(*fake_network_.device_client(), *fake_network_.port_id(),
+  ASSERT_TRUE(SendPacketToGuest(*fake_network_->device_client(), *fake_network_->port_id(),
                                 cpp20::span(expected_packet)));
 
   // Wait for the device to receive an interrupt.
@@ -374,7 +374,7 @@ TEST_F(VirtioNetTest, SendToGuest) {
 
 TEST_F(VirtioNetTest, ReceiveFromGuest) {
   std::vector<NetworkDeviceClient::Buffer> received;
-  fake_network_.device_client()->SetRxCallback(
+  fake_network_->device_client()->SetRxCallback(
       [&](NetworkDeviceClient::Buffer buffer) { received.push_back(std::move(buffer)); });
 
   // Add packet to virtio TX queue.
@@ -403,7 +403,7 @@ TEST_F(VirtioNetTest, ReceiveFromGuest) {
 TEST_F(VirtioNetTest, ResumesReceiveFromGuest) {
   std::mutex mutex;
   std::vector<NetworkDeviceClient::Buffer> received;  // guarded by `mutex`
-  fake_network_.device_client()->SetRxCallback([&](NetworkDeviceClient::Buffer buffer) {
+  fake_network_->device_client()->SetRxCallback([&](NetworkDeviceClient::Buffer buffer) {
     std::lock_guard guard(mutex);
     received.push_back(std::move(buffer));
   });

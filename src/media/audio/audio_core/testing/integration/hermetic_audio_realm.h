@@ -78,7 +78,7 @@ class HermeticAudioRealm {
  private:
   struct CtorArgs {
     component_testing::RealmRoot root;
-    std::vector<std::unique_ptr<component_testing::LocalComponent>> local_components;
+    std::vector<std::unique_ptr<component_testing::LocalComponentImpl>> local_components;
   };
   static CtorArgs BuildRealm(Options options, async_dispatcher* dispatcher);
 
@@ -86,7 +86,7 @@ class HermeticAudioRealm {
 
   component_testing::RealmRoot root_;
   fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control> virtual_audio_control_;
-  std::vector<std::unique_ptr<component_testing::LocalComponent>> local_components_;
+  std::vector<std::unique_ptr<component_testing::LocalComponentImpl>> local_components_;
 };
 
 }  // namespace media::audio::test

@@ -27,6 +27,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <string.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -223,6 +224,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromRelativeChild) {
   EXPECT_EQ(response, fidl::StringPtr("hello"));
 }
 
+#if __Fuchsia_API_level__ < 17
 class LocalEchoServerByPtr : public test::placeholders::Echo, public LocalComponent {
  public:
   explicit LocalEchoServerByPtr(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -242,6 +244,7 @@ class LocalEchoServerByPtr : public test::placeholders::Echo, public LocalCompon
   fidl::BindingSet<test::placeholders::Echo> bindings_;
   std::unique_ptr<LocalComponentHandles> handles_;
 };
+#endif
 
 class LocalEchoServer : public test::placeholders::Echo, public LocalComponentImpl {
  public:
@@ -287,6 +290,7 @@ class LocalEchoServer : public test::placeholders::Echo, public LocalComponentIm
   bool exit_after_serve_;
 };
 
+#if __Fuchsia_API_level__ < 17
 // Tests and demonstrates that the deprecated AddLocalChild(LocalComponent*)
 // still works.
 //
@@ -329,6 +333,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromLocalComponentRawPointer) {
   });
   RunLoopUntil([&]() { return was_called; });
 }
+#endif
 
 // Demonstrates the recommended pattern for implementing a restartable
 // LocalComponentImpl. A new LocalComponentImpl is returned when requested.
@@ -856,31 +861,6 @@ class SimpleComponent : public component_testing::LocalComponentImpl {
   fit::closure on_destruct_;
 };
 
-class SimpleComponentByPtr : public component_testing::LocalComponent {
- public:
-  SimpleComponentByPtr() = default;
-  explicit SimpleComponentByPtr(fit::closure on_destruct)
-      : on_destruct_(std::make_unique<fit::closure>(std::move(on_destruct))) {}
-
-  ~SimpleComponentByPtr() override {
-    if (on_destruct_) {
-      (*on_destruct_)();
-    }
-  }
-
-  void Start(std::unique_ptr<LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-    started_ = true;
-  }
-
-  bool IsStarted() const { return started_; }
-
- private:
-  bool started_ = false;
-  std::unique_ptr<fit::closure> on_destruct_;
-  std::unique_ptr<LocalComponentHandles> handles_;
-};
-
 // This test asserts that the LocalComponents are started, not stopped, and
 // are eventually destructed when destructing the realm.
 TEST_F(RealmBuilderTest, LocalComponentGetsDestructedOnExit) {
@@ -1235,6 +1215,7 @@ TEST(RealmBuilderUnittest, PanicsWhenArgsAreNullptr) {
       },
       "");
 
+#if __Fuchsia_API_level__ < 17
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   ASSERT_DEATH(
@@ -1244,6 +1225,7 @@ TEST(RealmBuilderUnittest, PanicsWhenArgsAreNullptr) {
       },
       "");
 #pragma clang diagnostic pop
+#endif
 }
 
 TEST(DirectoryContentsUnittest, PanicWhenGivenInvalidPath) {

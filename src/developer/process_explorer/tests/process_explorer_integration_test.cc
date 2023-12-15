@@ -15,6 +15,7 @@
 #include <fbl/unique_fd.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
+#include "lib/sys/component/cpp/testing/realm_builder_types.h"
 #include "src/developer/process_explorer/utils.h"
 #include "src/lib/fsl/socket/strings.h"
 
@@ -25,7 +26,7 @@ using namespace component_testing;
 
 class RealmBuilderTest : public gtest::RealLoopFixture {};
 
-class LocalRootJobImpl : public fuchsia::kernel::RootJob, public LocalComponent {
+class LocalRootJobImpl : public fuchsia::kernel::RootJob, public LocalComponentImpl {
  public:
   explicit LocalRootJobImpl(fit::closure quit_loop, async_dispatcher_t* dispatcher)
       : quit_loop_(std::move(quit_loop)), dispatcher_(dispatcher), called_(false) {}
@@ -69,14 +70,8 @@ class LocalRootJobImpl : public fuchsia::kernel::RootJob, public LocalComponent 
     return json;
   }
 
-  // Override `Start` from `LocalComponent` class.
-  void Start(std::unique_ptr<LocalComponentHandles> handles) override {
-    // Keep reference to `handles` in member variable.
-    // This class contains handles to the component's incoming
-    // and outgoing capabilities.
-    handles_ = std::move(handles);
-    EXPECT_EQ(handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)),
-              ZX_OK);
+  void OnStart() override {
+    EXPECT_EQ(outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
   }
 
   bool WasCalled() const { return called_; }
@@ -165,15 +160,19 @@ class LocalRootJobImpl : public fuchsia::kernel::RootJob, public LocalComponent 
   fit::closure quit_loop_;
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::kernel::RootJob> bindings_;
-  std::unique_ptr<LocalComponentHandles> handles_;
   bool called_;
 };
 
 TEST_F(RealmBuilderTest, RouteServiceToComponent) {
   auto builder = RealmBuilder::Create();
   builder.AddChild("process_explorer", "#meta/process_explorer.cm");
-  LocalRootJobImpl mock_root_job(QuitLoopClosure(), dispatcher());
-  builder.AddLocalChild("root_job", &mock_root_job);
+  LocalRootJobImpl* mock_root_job = nullptr;
+  builder.AddLocalChild("root_job", [this, &root_job = mock_root_job] {
+    EXPECT_FALSE(root_job);
+    auto new_root_job = std::make_unique<LocalRootJobImpl>(QuitLoopClosure(), dispatcher());
+    root_job = new_root_job.get();
+    return new_root_job;
+  });
 
   builder.AddRoute(Route{.capabilities = {Protocol{fuchsia::kernel::RootJob::Name_}},
                          .source = ChildRef{"root_job"},
@@ -200,8 +199,8 @@ TEST_F(RealmBuilderTest, RouteServiceToComponent) {
 
   std::string s;
   fsl::BlockingCopyToString(std::move(socket[1]), &s);
-  ASSERT_EQ(s, mock_root_job.ProcessesDataAsJson());
-  EXPECT_TRUE(mock_root_job.WasCalled());
+  ASSERT_EQ(s, mock_root_job->ProcessesDataAsJson());
+  EXPECT_TRUE(mock_root_job->WasCalled());
 }
 
 }  // namespace

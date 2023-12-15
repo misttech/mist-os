@@ -258,7 +258,7 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
   std::deque<Packet> packets_;
 };
 
-class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalComponent {
+class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalComponentImpl {
  public:
   explicit FakeAudio(async::Loop& loop) : loop_(loop) {}
 
@@ -273,24 +273,21 @@ class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalC
         std::make_unique<FakeAudioCapturer>(std::move(request), loop_.dispatcher()));
   }
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    // This class contains handles to the component's incoming and outgoing capabilities.
-    handles_ = std::move(handles);
-
-    ASSERT_EQ(
-        handles_->outgoing()->AddPublicService(binding_set_.GetHandler(this, loop_.dispatcher())),
-        ZX_OK);
+  void OnStart() override {
+    ASSERT_EQ(outgoing()->AddPublicService(binding_set_.GetHandler(this, loop_.dispatcher())),
+              ZX_OK);
+    has_started_ = true;
   }
 
-  bool HasStarted() const { return handles_ != nullptr; }
+  bool HasStarted() const { return has_started_; }
 
   std::vector<std::unique_ptr<FakeAudioRenderer>> renderers_;
   std::vector<std::unique_ptr<FakeAudioCapturer>> capturers_;
 
  private:
+  bool has_started_ = false;
   async::Loop& loop_;
   fidl::BindingSet<fuchsia::media::Audio> binding_set_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
 
 uint64_t bit(uint64_t n) { return 1ul << n; }
@@ -334,7 +331,7 @@ constexpr auto kTimeout = zx::sec(20);
 template <bool EnableInput>
 class VirtioSoundTestBase : public TestWithDevice {
  protected:
-  VirtioSoundTestBase() : audio_service_(loop()) {
+  VirtioSoundTestBase() {
     zx_gpaddr_t addr = 0;
     for (int k = 0; k < 4; k++) {
       queue_data_addrs_[k] = addr;
@@ -359,7 +356,12 @@ class VirtioSoundTestBase : public TestWithDevice {
 
     auto realm_builder = RealmBuilder::Create();
     realm_builder.AddChild(kComponentName, kComponentUrl);
-    realm_builder.AddLocalChild(kFakeAudio, &audio_service_);
+    realm_builder.AddLocalChild(kFakeAudio, [&loop = loop(), &audio_service = audio_service_] {
+      EXPECT_FALSE(audio_service);
+      auto new_audio_service = std::make_unique<FakeAudio>(loop);
+      audio_service = new_audio_service.get();
+      return new_audio_service;
+    });
 
     realm_builder
         .AddRoute(Route{.capabilities =
@@ -417,7 +419,8 @@ class VirtioSoundTestBase : public TestWithDevice {
     ASSERT_EQ(ZX_OK, sound_->Ready(0));
 
     // Wait until virtio_sound has connected to the mock object
-    RunLoopWithTimeoutOrUntil([&]() { return audio_service_.HasStarted(); }, kTimeout);
+    RunLoopWithTimeoutOrUntil([&]() { return audio_service_ && audio_service_->HasStarted(); },
+                              kTimeout);
   }
 
   void TearDown() override {
@@ -427,18 +430,18 @@ class VirtioSoundTestBase : public TestWithDevice {
   }
 
   FakeAudioRenderer* get_audio_renderer(size_t k) {
-    if (RunLoopWithTimeoutOrUntil([&]() { return audio_service_.renderers_.size() > k; },
+    if (RunLoopWithTimeoutOrUntil([&]() { return audio_service_->renderers_.size() > k; },
                                   kTimeout)) {
-      return audio_service_.renderers_[k].get();
+      return audio_service_->renderers_[k].get();
     }
 
     return nullptr;
   }
 
   FakeAudioCapturer* get_audio_capturer(size_t k) {
-    if (RunLoopWithTimeoutOrUntil([&]() { return audio_service_.capturers_.size() > k; },
+    if (RunLoopWithTimeoutOrUntil([&]() { return audio_service_->capturers_.size() > k; },
                                   kTimeout)) {
-      return audio_service_.capturers_[k].get();
+      return audio_service_->capturers_[k].get();
     }
 
     return nullptr;
@@ -568,7 +571,8 @@ class VirtioSoundTestBase : public TestWithDevice {
   std::array<std::unique_ptr<VirtioQueueFake>, 4> queues_;
   zx_gpaddr_t queue_data_addrs_[4];
   size_t phys_mem_size_;
-  FakeAudio audio_service_;
+  // Pointer to the (last) FakeAudio created.
+  FakeAudio* audio_service_ = nullptr;
   std::unordered_map<VirtioQueueFake*, std::unordered_set<uint32_t>> used_descriptors_;
   std::optional<component_testing::RealmRoot> realm_;
 };

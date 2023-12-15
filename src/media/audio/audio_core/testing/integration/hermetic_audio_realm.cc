@@ -144,7 +144,6 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   using component_testing::ChildRef;
   using component_testing::Directory;
   using component_testing::DirectoryContents;
-  using component_testing::LocalComponent;
   using component_testing::ParentRef;
   using component_testing::Protocol;
 

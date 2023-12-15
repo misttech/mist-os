@@ -66,7 +66,7 @@ class WaylandImporterMock : public fuchsia::virtualization::hardware::VirtioWayl
 };
 
 class ScenicAllocatorFake : public fuchsia::ui::composition::Allocator,
-                            public component_testing::LocalComponent {
+                            public component_testing::LocalComponentImpl {
  public:
   explicit ScenicAllocatorFake(async::Loop& loop) : loop_(loop) {}
   // Must set constraints on the given buffer collection token to allow the constraints
@@ -138,19 +138,13 @@ class ScenicAllocatorFake : public fuchsia::ui::composition::Allocator,
     callback(fpromise::ok());
   }
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    // This class contains handles to the component's incoming and outgoing capabilities.
-    handles_ = std::move(handles);
-
-    ASSERT_EQ(
-        handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, loop_.dispatcher())),
-        ZX_OK);
+  void OnStart() override {
+    ASSERT_EQ(outgoing()->AddPublicService(bindings_.GetHandler(this, loop_.dispatcher())), ZX_OK);
   }
 
  private:
   async::Loop& loop_;
   fidl::BindingSet<fuchsia::ui::composition::Allocator> bindings_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +154,7 @@ class VirtioMagmaTest : public TestWithDevice {
   VirtioMagmaTest()
       : out_queue_(phys_mem_, kDescriptorSize, kQueueSize),
         wayland_importer_mock_binding_(&wayland_importer_mock_),
-        wayland_importer_mock_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        scenic_allocator_fake_(loop()) {}
+        wayland_importer_mock_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
     using component_testing::ChildRef;
@@ -188,7 +181,9 @@ class VirtioMagmaTest : public TestWithDevice {
     auto realm_builder = RealmBuilder::Create();
 
     realm_builder.AddChild(kComponentName, kComponentUrl);
-    realm_builder.AddLocalChild(kFakeScenicAllocator, &scenic_allocator_fake_);
+    realm_builder.AddLocalChild(kFakeScenicAllocator, [&loop = loop()] {
+      return std::make_unique<ScenicAllocatorFake>(loop);
+    });
 
     realm_builder
         .AddRoute(
@@ -485,7 +480,6 @@ class VirtioMagmaTest : public TestWithDevice {
   fidl::Binding<fuchsia::virtualization::hardware::VirtioWaylandImporter>
       wayland_importer_mock_binding_;
   async::Loop wayland_importer_mock_loop_;
-  ScenicAllocatorFake scenic_allocator_fake_;
   std::optional<component_testing::RealmRoot> realm_;
 };
 

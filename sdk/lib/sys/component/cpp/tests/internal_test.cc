@@ -24,6 +24,7 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/component/cpp/tests/utils.h>
 #include <lib/sys/cpp/component_context.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <zircon/status.h>
 
@@ -52,23 +53,19 @@ namespace fio = fuchsia::io;
  * |component_testing::internal::LocalComponentRunner::Builder|.
  */
 
-class TestComponent : public LocalComponent {
+class TestComponent : public LocalComponentImpl {
  public:
   explicit TestComponent(fit::closure quit_loop) : quit_loop_(std::move(quit_loop)) {}
 
-  void Start(std::unique_ptr<LocalComponentHandles> mock_handles) override {
-    mock_handles_ = std::move(mock_handles);
+  void OnStart() override {
     called_ = true;
     quit_loop_();
   }
-
-  LocalComponentHandles* GetMockHandles() { return mock_handles_.get(); }
 
   bool WasCalled() const { return called_; }
 
  private:
   fit::closure quit_loop_;
-  std::unique_ptr<LocalComponentHandles> mock_handles_ = nullptr;
   bool called_ = false;
 };
 
@@ -76,15 +73,18 @@ class LocalComponentRunnerTest : public gtest::RealLoopFixture {
  public:
   void SetUp() override {
     auto builder = LocalComponentRunner::Builder();
-    test_component_ = std::make_unique<TestComponent>(QuitLoopClosure());
-    builder.Register(kTestComponentName, test_component_.get());
+    builder.Register(kTestComponentName, [this]() {
+      auto test_component = std::make_unique<TestComponent>(QuitLoopClosure());
+      FX_CHECK(test_component_ == nullptr);
+      test_component_ = test_component.get();
+      return test_component;
+    });
     local_component_runner_ = builder.Build(dispatcher());
     runner_proxy_.Bind(local_component_runner_->NewBinding());
   }
 
   void TearDown() override {
     local_component_runner_.reset();
-    test_component_.reset();
     default_component_controller_.Unbind();
     runner_proxy_.Unbind();
   }
@@ -102,7 +102,7 @@ class LocalComponentRunnerTest : public gtest::RealLoopFixture {
     CallStart(std::move(start_info), default_component_controller_.NewRequest(dispatcher()));
   }
 
-  TestComponent* GetTestComponent() { return test_component_.get(); }
+  TestComponent* GetTestComponent() { return test_component_; }
 
   static fuchsia::component::runner::ComponentStartInfo CreateValidStartInfo() {
     fuchsia::component::runner::ComponentStartInfo start_info;
@@ -123,7 +123,7 @@ class LocalComponentRunnerTest : public gtest::RealLoopFixture {
 
  private:
   std::unique_ptr<LocalComponentRunner> local_component_runner_ = nullptr;
-  std::unique_ptr<TestComponent> test_component_ = nullptr;
+  TestComponent* test_component_ = nullptr;
   fuchsia::component::runner::ComponentControllerPtr default_component_controller_;
   fuchsia::component::runner::ComponentRunnerPtr runner_proxy_;
 };
@@ -154,9 +154,7 @@ TEST_F(LocalComponentRunnerTest, RunnerGivesComponentItsOutgoingDir) {
   CallStart(std::move(start_info));
   RunLoop();
 
-  auto mock_handles = GetTestComponent()->GetMockHandles();
-  ASSERT_TRUE(mock_handles != nullptr);
-  ASSERT_EQ(mock_handles->outgoing()->AddPublicService<test::placeholders::Echo>(
+  ASSERT_EQ(GetTestComponent()->outgoing()->AddPublicService<test::placeholders::Echo>(
                 [&](fidl::InterfaceRequest<test::placeholders::Echo> request) {
                   echo_binding.Bind(std::move(request));
                 }),
@@ -184,9 +182,7 @@ TEST_F(LocalComponentRunnerTest, RunnerGivesComponentItsNamespace) {
   CallStart(std::move(start_info));
   RunLoop();
 
-  auto mock_handles = GetTestComponent()->GetMockHandles();
-  ASSERT_TRUE(mock_handles != nullptr);
-  EXPECT_TRUE(fdio_ns_is_bound(mock_handles->ns(), kNamespacePath));
+  EXPECT_TRUE(fdio_ns_is_bound(GetTestComponent()->ns(), kNamespacePath));
 }
 
 /*
