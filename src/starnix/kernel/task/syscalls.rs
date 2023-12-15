@@ -27,8 +27,8 @@ use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
     auth::{
-        Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYSLOG,
-        CAP_SYS_ADMIN, CAP_SYS_NICE, CAP_SYS_PTRACE,
+        Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
+        CAP_SYS_NICE, CAP_SYS_PTRACE,
     },
     c_int, clone_args, errno, error,
     errors::Errno,
@@ -1661,30 +1661,12 @@ pub fn sys_syslog(
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
     match action {
-        SyslogAction::Read => {
-            syslog_check_credentials(&current_task)?;
-            if address.is_null() || length < 0 {
-                return error!(EINVAL);
-            }
-            not_implemented!("syslog: read");
-            Ok(0)
-        }
+        SyslogAction::Read => current_task.kernel().syslog.read(current_task, address, length),
         SyslogAction::ReadAll => {
-            if address.is_null() || length < 0 {
-                return error!(EINVAL);
-            }
-            not_implemented!("syslog: read_all");
-            Ok(0)
+            current_task.kernel().syslog.read_all(current_task, address, length)
         }
-        SyslogAction::SizeUnread => {
-            syslog_check_credentials(&current_task)?;
-            not_implemented!("syslog: size_unread");
-            Ok(0)
-        }
-        SyslogAction::SizeBuffer => {
-            not_implemented!("syslog: size_buffer");
-            Ok(0)
-        }
+        SyslogAction::SizeUnread => current_task.kernel().syslog.size_unread(current_task),
+        SyslogAction::SizeBuffer => current_task.kernel().syslog.size_buffer(),
         SyslogAction::Close => {
             not_implemented!("syslog: close");
             Ok(0)
@@ -1714,14 +1696,6 @@ pub fn sys_syslog(
             Ok(0)
         }
     }
-}
-
-fn syslog_check_credentials(current_task: &CurrentTask) -> Result<(), Errno> {
-    let credentials = current_task.creds();
-    if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
-        return Ok(());
-    }
-    error!(EPERM)
 }
 
 #[cfg(test)]

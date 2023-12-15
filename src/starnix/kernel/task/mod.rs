@@ -16,6 +16,7 @@ mod ptrace;
 mod scheduler;
 mod seccomp;
 mod session;
+mod syslog;
 #[allow(clippy::module_inception)]
 mod task;
 mod thread_group;
@@ -37,6 +38,7 @@ pub use ptrace::*;
 pub use scheduler::*;
 pub use seccomp::*;
 pub use session::*;
+pub use syslog::*;
 pub use task::*;
 pub use thread_group::*;
 pub use timers::*;

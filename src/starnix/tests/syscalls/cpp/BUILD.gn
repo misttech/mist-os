@@ -125,6 +125,7 @@ test("syscalls_cpp_test_bin") {
     "sw_breakpoint_test.cc",
     "sysfs_kernel_test.cc",
     "sysfs_power_test.cc",
+    "syslog_test.cc",
     "task_test.cc",
     "terminal_test.cc",
     "test_helper_test.cc",

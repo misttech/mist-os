@@ -12,7 +12,7 @@ use crate::{
     power::PowerManager,
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
-        KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace,
+        KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, Syslog, UtsNamespace,
         UtsNamespaceHandle,
     },
     vdso::vdso_loader::Vdso,
@@ -209,6 +209,9 @@ pub struct Kernel {
 
     /// Proxy to the scheduler profile provider for adjusting task priorities.
     pub profile_provider: Option<ProfileProviderSynchronousProxy>,
+
+    /// The syslog manager.
+    pub syslog: Syslog,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -328,6 +331,7 @@ impl Kernel {
             stats: Arc::new(KernelStats::default()),
             delayed_releaser: Default::default(),
             profile_provider,
+            syslog: Syslog::default(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

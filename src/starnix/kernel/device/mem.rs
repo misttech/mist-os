@@ -7,17 +7,18 @@ use crate::{
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
-    task::CurrentTask,
+    task::{CurrentTask, EventHandler, LogSubscription, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef,
-        FsNodeInfo, NamespaceNode,
+        fileops_impl_seekless, Anon, FdEvents, FileHandle, FileObject, FileOps, FileWriteGuardRef,
+        FsNode, FsNodeInfo, NamespaceNode,
     },
 };
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
-use starnix_logging::log_info;
+use starnix_logging::{log_info, not_implemented};
+use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress,
@@ -209,19 +210,70 @@ impl FileOps for DevRandom {
     }
 }
 
-#[derive(Default)]
-struct DevKmsg;
+pub fn open_kmsg(
+    current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    let subscription = if flags.can_read() {
+        Some(Mutex::new(LogSubscription::snapshot_then_subscribe(
+            &current_task,
+            flags.contains(OpenFlags::NONBLOCK),
+        )?))
+    } else {
+        None
+    };
+    Ok(Box::new(DevKmsg(subscription)))
+}
+
+struct DevKmsg(Option<Mutex<LogSubscription>>);
+
 impl FileOps for DevKmsg {
-    fileops_impl_seekless!();
+    fn has_persistent_offsets(&self) -> bool {
+        false
+    }
+
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn wait_async(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _waiter: &Waiter,
+        _events: FdEvents,
+        _handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        not_implemented!("/dev/kmsg wait_async");
+        None
+    }
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &crate::task::CurrentTask,
+        _current_offset: starnix_uapi::off_t,
+        _target: crate::vfs::SeekTarget,
+    ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
+        not_implemented!("/dev/kmsg seek");
+        Ok(0)
+    }
 
     fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn OutputBuffer,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        Ok(0)
+        let result = match self.0.as_ref().unwrap().lock().next() {
+            Some(Ok(log)) => data.write(&log),
+            Some(Err(err)) => Err(err),
+            None => Ok(0),
+        };
+        result
     }
 
     fn write(
@@ -312,6 +364,6 @@ pub fn mem_device_init(system_task: &CurrentTask) {
             DeviceType::KMSG,
             DeviceMode::Char,
         ),
-        simple_device_ops::<DevKmsg>,
+        open_kmsg,
     );
 }
