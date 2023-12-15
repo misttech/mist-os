@@ -223,6 +223,8 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
 
   ASSERT_EQ(open(kChildTopoPath, O_RDWR), -1);
   ASSERT_EQ(errno, ENOENT);
+
+  ASSERT_OK(fidl::WireCall(chan_)->CompleteUnbind(child_id).status());
 }
 
 TEST_F(LifecycleTest, CloseAllConnectionsOnUnbind) {
