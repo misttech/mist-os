@@ -65,7 +65,7 @@ use crate::{
     ip::{
         device::nud::{
             LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NudConfigContext,
-            NudContext, NudHandler, NudSenderContext, NudState, NudTimerId,
+            NudContext, NudHandler, NudSenderContext, NudState, NudTimerId, NudUserConfig,
         },
         icmp::NdpCounters,
         types::RawMetric,
@@ -331,6 +331,14 @@ impl<
             x
         })
     }
+
+    fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+        let Self { device_id, sync_ctx } = self;
+        device::integration::with_ethernet_state(sync_ctx, device_id, |mut state| {
+            let x = state.read_lock::<crate::lock_ordering::NudConfig<Ipv6>>();
+            cb(&*x)
+        })
+    }
 }
 
 fn send_as_ethernet_frame_to_dst<S, C, SC>(
@@ -519,6 +527,8 @@ impl EthernetDeviceStateBuilder {
         EthernetDeviceState {
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
+            ipv4_nud_config: Default::default(),
+            ipv6_nud_config: Default::default(),
             static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
             tx_queue: Default::default(),
@@ -564,11 +574,44 @@ pub struct EthernetDeviceState<I: Instant, N: LinkResolutionNotifier<EthernetLin
     /// IPv6 NUD state.
     ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice, I, N>>,
 
+    ipv4_nud_config: RwLock<NudUserConfig>,
+
+    ipv6_nud_config: RwLock<NudUserConfig>,
+
     static_state: StaticEthernetDeviceState,
 
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
 
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+}
+
+impl<II: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> EthernetDeviceState<II, N> {
+    fn nud_config<I: Ip>(&self) -> &RwLock<NudUserConfig> {
+        let IpInvariant(nudconfig) = I::map_ip(
+            (),
+            |()| IpInvariant(&self.ipv4_nud_config),
+            |()| IpInvariant(&self.ipv6_nud_config),
+        );
+        nudconfig
+    }
+}
+
+impl<C: NonSyncContext, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
+{
+    type Data = NudUserConfig;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NudUserConfig>
+        where
+            Self: 'l;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NudUserConfig>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.link.nud_config::<I>().read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.link.nud_config::<I>().write()
+    }
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
@@ -1197,7 +1240,8 @@ impl<
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     ArpContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
-    type ConfigCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>;
+    type ConfigCtx<'a> =
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
 
     type ArpSenderCtx<'a> =
         SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
@@ -1264,17 +1308,26 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
             device_id,
             |mut state, sync_ctx| {
                 let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-                let mut locked = sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
+                };
                 cb(&mut arp, &mut locked)
             },
         )
     }
 }
 
-impl<C: NonSyncContext, L> ArpConfigContext for Locked<&SyncCtx<C>, L> {}
-impl<SC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>> ArpConfigContext
-    for SyncCtxWithDeviceId<'_, SC>
+impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>> ArpConfigContext
+    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
 {
+    fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+        let Self { device_id, sync_ctx } = self;
+        device::integration::with_ethernet_state(sync_ctx, device_id, |mut state| {
+            let x = state.read_lock::<crate::lock_ordering::NudConfig<Ipv4>>();
+            cb(&*x)
+        })
+    }
 }
 
 impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
@@ -1664,8 +1717,14 @@ mod tests {
         }
     }
 
+    impl<'a> ArpConfigContext for SyncCtxWithDeviceId<'a, FakeInnerCtx> {
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            cb(&NudUserConfig::default())
+        }
+    }
+
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        type ConfigCtx<'a> = FakeInnerCtx;
+        type ConfigCtx<'a> = SyncCtxWithDeviceId<'a, FakeInnerCtx>;
 
         type ArpSenderCtx<'a> = SyncCtxWithDeviceId<'a, FakeInnerCtx>;
 
@@ -1716,15 +1775,19 @@ mod tests {
             ) -> O,
         >(
             &mut self,
-            _device_id: &Self::DeviceId,
+            device_id: &Self::DeviceId,
             cb: F,
         ) -> O {
             let Self { outer, inner } = self;
-            cb(outer, inner)
+            cb(outer, &mut SyncCtxWithDeviceId { sync_ctx: inner, device_id })
         }
     }
 
-    impl ArpConfigContext for FakeInnerCtx {}
+    impl ArpConfigContext for FakeInnerCtx {
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            cb(&NudUserConfig::default())
+        }
+    }
 
     impl<'a> ArpSenderContext<EthernetLinkDevice, FakeNonSyncCtx>
         for SyncCtxWithDeviceId<'a, FakeInnerCtx>

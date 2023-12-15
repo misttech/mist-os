@@ -31,7 +31,7 @@ use crate::{
     ip::device::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
         LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler, NudSenderContext,
-        NudState, NudTimerId,
+        NudState, NudTimerId, NudUserConfig,
     },
     Instant, NonSyncContext, SyncCtx,
 };
@@ -223,6 +223,9 @@ pub(crate) trait ArpConfigContext {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
+
+    /// Calls the callback with an immutable reference to NUD configurations.
+    fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O;
 }
 
 impl<
@@ -273,6 +276,10 @@ impl<
 impl<SC: ArpConfigContext> NudConfigContext<Ipv4> for SC {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         self.retransmit_timeout()
+    }
+
+    fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+        ArpConfigContext::with_nud_user_config(self, cb)
     }
 }
 
@@ -802,8 +809,16 @@ mod tests {
         }
     }
 
-    impl ArpConfigContext for FakeArpConfigCtx {}
-    impl ArpConfigContext for FakeArpInnerCtx {}
+    impl ArpConfigContext for FakeArpConfigCtx {
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            cb(&NudUserConfig::default())
+        }
+    }
+    impl ArpConfigContext for FakeArpInnerCtx {
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            cb(&NudUserConfig::default())
+        }
+    }
 
     impl ArpSenderContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeArpInnerCtx {
         fn send_ip_packet_to_neighbor_link_addr<S>(

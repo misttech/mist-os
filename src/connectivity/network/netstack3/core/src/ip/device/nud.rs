@@ -16,7 +16,7 @@ use core::{
     hash::Hash,
     iter::Iterator,
     marker::PhantomData,
-    num::{NonZeroU32, NonZeroU8},
+    num::{NonZeroU16, NonZeroU32},
 };
 
 use assert_matches::assert_matches;
@@ -38,17 +38,19 @@ use crate::{
     Instant,
 };
 
-/// The maximum number of multicast solicitations as defined in [RFC 4861
+/// The default maximum number of multicast solicitations as defined in [RFC
+/// 4861 section 10].
+///
+/// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
+const DEFAULT_MAX_MULTICAST_SOLICIT: NonZeroU16 =
+    const_unwrap::const_unwrap_option(NonZeroU16::new(3));
+
+/// The default maximum number of unicast solicitations as defined in [RFC 4861
 /// section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const MAX_MULTICAST_SOLICIT: u8 = 3;
-
-/// The maximum number of unicast solicitations as defined in [RFC 4861 section
-/// 10].
-///
-/// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const MAX_UNICAST_SOLICIT: u8 = 3;
+const DEFAULT_MAX_UNICAST_SOLICIT: NonZeroU16 =
+    const_unwrap::const_unwrap_option(NonZeroU16::new(3));
 
 /// The maximum amount of time between retransmissions of neighbor probe
 /// messages as defined in [RFC 7048 section 4].
@@ -297,7 +299,7 @@ fn schedule_timer_if_should_retransmit<I, D, DeviceId, SC, C>(
     device_id: &DeviceId,
     neighbor: SpecifiedAddr<I::Addr>,
     event: NudEvent,
-    counter: &mut Option<NonZeroU8>,
+    counter: &mut Option<NonZeroU16>,
 ) -> bool
 where
     I: Ip,
@@ -308,7 +310,7 @@ where
 {
     match counter {
         Some(c) => {
-            *counter = NonZeroU8::new(c.get() - 1);
+            *counter = NonZeroU16::new(c.get() - 1);
             let retransmit_timeout = sync_ctx.retransmit_timeout();
             assert_eq!(
                 ctx.schedule_timer(
@@ -326,7 +328,7 @@ where
 #[derive(Debug, Derivative)]
 #[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Incomplete<D: LinkDevice, N: LinkResolutionNotifier<D>> {
-    transmit_counter: Option<NonZeroU8>,
+    transmit_counter: Option<NonZeroU16>,
     pending_frames: VecDeque<Buf<Vec<u8>>>,
     #[derivative(PartialEq = "ignore")]
     notifiers: Vec<N>,
@@ -374,7 +376,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         DeviceId: StrongId,
     {
         let mut this = Incomplete {
-            transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT),
+            transmit_counter: Some(sync_ctx.max_multicast_solicit()),
             pending_frames: [frame].into(),
             notifiers: Vec::new(),
             _marker: PhantomData,
@@ -402,7 +404,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         DeviceId: StrongId,
     {
         let mut this = Incomplete {
-            transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT),
+            transmit_counter: Some(sync_ctx.max_multicast_solicit()),
             pending_frames: VecDeque::new(),
             notifiers: [notifier].into(),
             _marker: PhantomData,
@@ -576,7 +578,10 @@ impl<D: LinkDevice> Delay<D> {
             None
         );
 
-        Probe { link_address, transmit_counter: NonZeroU8::new(MAX_UNICAST_SOLICIT - 1) }
+        Probe {
+            link_address,
+            transmit_counter: NonZeroU16::new(sync_ctx.max_unicast_solicit().get() - 1),
+        }
     }
 }
 
@@ -584,7 +589,7 @@ impl<D: LinkDevice> Delay<D> {
 #[cfg_attr(test, derivative(Clone, PartialEq, Eq))]
 pub(crate) struct Probe<D: LinkDevice> {
     link_address: D::Address,
-    transmit_counter: Option<NonZeroU8>,
+    transmit_counter: Option<NonZeroU16>,
 }
 
 impl<D: LinkDevice> Probe<D> {
@@ -1591,6 +1596,29 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, Self::
     );
 }
 
+/// NUD configurations.
+pub(crate) struct NudUserConfig {
+    /// The maximum number of unicast solicitations as defined in [RFC 4861
+    /// section 10].
+    ///
+    /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
+    pub(crate) max_unicast_solicitations: NonZeroU16,
+    /// The maximum number of multicast solicitations as defined in [RFC 4861
+    /// section 10].
+    ///
+    /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
+    pub(crate) max_multicast_solicitations: NonZeroU16,
+}
+
+impl Default for NudUserConfig {
+    fn default() -> Self {
+        NudUserConfig {
+            max_unicast_solicitations: DEFAULT_MAX_UNICAST_SOLICIT,
+            max_multicast_solicitations: DEFAULT_MAX_MULTICAST_SOLICIT,
+        }
+    }
+}
+
 /// The execution context for NUD that allows accessing NUD configuration (such
 /// as timer durations) for a particular device.
 pub(crate) trait NudConfigContext<I: Ip> {
@@ -1601,6 +1629,23 @@ pub(crate) trait NudConfigContext<I: Ip> {
     ///
     /// [RFC 4861 section 6.3.2]: https://datatracker.ietf.org/doc/html/rfc4861#section-6.3.2
     fn retransmit_timeout(&mut self) -> NonZeroDuration;
+
+    /// Calls the callback with an immutable reference to NUD configurations.
+    fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O;
+
+    /// Returns the maximum number of unicast solicitations.
+    fn max_unicast_solicit(&mut self) -> NonZeroU16 {
+        self.with_nud_user_config(|NudUserConfig { max_unicast_solicitations, .. }| {
+            *max_unicast_solicitations
+        })
+    }
+
+    /// Returns the maximum number of multicast solicitations.
+    fn max_multicast_solicit(&mut self) -> NonZeroU16 {
+        self.with_nud_user_config(|NudUserConfig { max_multicast_solicitations, .. }| {
+            *max_multicast_solicitations
+        })
+    }
 }
 
 /// The execution context for NUD for a link device that allows sending IP
@@ -2435,7 +2480,7 @@ where
 mod tests {
     use alloc::collections::HashSet;
     use alloc::{vec, vec::Vec};
-    use core::num::{NonZeroU16, NonZeroUsize};
+    use core::num::{NonZeroU16, NonZeroU8, NonZeroUsize};
 
     use ip_test_macro::ip_test;
     use lock_order::Locked;
@@ -2501,6 +2546,7 @@ mod tests {
 
     struct FakeConfigContext {
         retrans_timer: NonZeroDuration,
+        nud_config: NudUserConfig,
     }
 
     type FakeCtxImpl<I> = WrappedFakeSyncCtx<
@@ -2533,7 +2579,16 @@ mod tests {
     impl<I: Ip> FakeCtxImpl<I> {
         fn new() -> Self {
             Self::with_inner_and_outer_state(
-                FakeConfigContext { retrans_timer: ONE_SECOND },
+                FakeConfigContext {
+                    retrans_timer: ONE_SECOND,
+                    // Use different values from the defaults in tests so we get
+                    // coverage that the config is used everywhere and not the
+                    // defaults.
+                    nud_config: NudUserConfig {
+                        max_unicast_solicitations: NonZeroU16::new(4).unwrap(),
+                        max_multicast_solicitations: NonZeroU16::new(5).unwrap(),
+                    },
+                },
                 FakeNudContext { nud: NudState::default() },
             )
         }
@@ -2621,6 +2676,10 @@ mod tests {
         fn retransmit_timeout(&mut self) -> NonZeroDuration {
             self.retrans_timer
         }
+
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            cb(&self.nud_config)
+        }
     }
 
     impl<I: Ip> NudSenderContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeInnerCtxImpl<I> {
@@ -2641,6 +2700,10 @@ mod tests {
     impl<I: Ip> NudConfigContext<I> for FakeInnerCtxImpl<I> {
         fn retransmit_timeout(&mut self) -> NonZeroDuration {
             <FakeConfigContext as NudConfigContext<I>>::retransmit_timeout(self.get_mut())
+        }
+
+        fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
+            <FakeConfigContext as NudConfigContext<I>>::with_nud_user_config(self.get_mut(), cb)
         }
     }
 
@@ -2774,6 +2837,8 @@ mod tests {
             Ok(())
         );
 
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
+
         pending_frames.push_back(Buf::new(body.to_vec(), ..));
 
         assert_neighbor_state_with_ip(
@@ -2781,7 +2846,7 @@ mod tests {
             non_sync_ctx,
             neighbor,
             DynamicNeighborState::Incomplete(Incomplete {
-                transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: pending_frames.clone(),
                 notifiers: Vec::new(),
                 _marker: PhantomData,
@@ -2940,6 +3005,7 @@ mod tests {
         take_probe: bool,
     ) {
         init_delay_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address);
+        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
         assert_eq!(
             non_sync_ctx.trigger_timers_for(
                 DELAY_FIRST_PROBE_TIME.into(),
@@ -2953,7 +3019,7 @@ mod tests {
             ip_address,
             DynamicNeighborState::Probe(Probe {
                 link_address,
-                transmit_counter: NonZeroU8::new(MAX_UNICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_unicast_solicit - 1),
             }),
             Some(ExpectedEvent::Changed),
         );
@@ -2985,7 +3051,8 @@ mod tests {
     ) {
         init_probe_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address, false);
         let retransmit_timeout = sync_ctx.inner.retransmit_timeout();
-        for _ in 0..MAX_UNICAST_SOLICIT {
+        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
+        for _ in 0..max_unicast_solicit {
             assert_neighbor_probe_sent_for_ip(sync_ctx, ip_address, Some(LINK_ADDR1));
             assert_eq!(
                 non_sync_ctx.trigger_timers_for(
@@ -3693,13 +3760,12 @@ mod tests {
         expected_initial_event: NudEvent,
     ) {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::with_inner_and_outer_state(
-                FakeConfigContext { retrans_timer: ONE_SECOND },
-                FakeNudContext { nud: NudState::default() },
-            ));
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut sync_ctx, &mut non_sync_ctx, initial_state);
+
+        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
 
         // If the neighbor started in DELAY, then after DELAY_FIRST_PROBE_TIME, the
         // neighbor should transition to PROBE and send out a unicast probe.
@@ -3708,10 +3774,10 @@ mod tests {
         // neighbor should remain in PROBE and retransmit a unicast probe.
         let (time, transmit_counter) = match initial_state {
             InitialState::Delay => {
-                (DELAY_FIRST_PROBE_TIME, NonZeroU8::new(MAX_UNICAST_SOLICIT - 1))
+                (DELAY_FIRST_PROBE_TIME, NonZeroU16::new(max_unicast_solicit - 1))
             }
             InitialState::Probe => {
-                (sync_ctx.inner.get_ref().retrans_timer, NonZeroU8::new(MAX_UNICAST_SOLICIT - 2))
+                (sync_ctx.inner.get_ref().retrans_timer, NonZeroU16::new(max_unicast_solicit - 2))
             }
             other => unreachable!("test only covers DELAY and PROBE, got {:?}", other),
         };
@@ -3930,13 +3996,14 @@ mod tests {
                 Ok(())
             );
         }
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
         // Should have only sent out a single neighbor probe message.
         assert_neighbor_probe_sent(&mut sync_ctx, None);
         assert_neighbor_state(
             &sync_ctx,
             &mut non_sync_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
-                transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: expected_pending_frames.clone(),
                 notifiers: Vec::new(),
                 _marker: PhantomData,
@@ -3960,7 +4027,7 @@ mod tests {
             &sync_ctx,
             &mut non_sync_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
-                transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: expected_pending_frames.clone(),
                 notifiers: Vec::new(),
                 _marker: PhantomData,
@@ -4162,15 +4229,16 @@ mod tests {
             I::LOOKUP_ADDR1,
             NudEvent::RetransmitMulticastProbe,
         );
-        for i in 1..=MAX_MULTICAST_SOLICIT {
-            let FakeConfigContext { retrans_timer } = &sync_ctx.inner.get_ref();
-            let retrans_timer = retrans_timer.get();
 
+        let retrans_timer = sync_ctx.inner.retransmit_timeout().get();
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
+
+        for i in 1..=max_multicast_solicit {
             assert_neighbor_state(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 DynamicNeighborState::Incomplete(Incomplete {
-                    transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - i),
+                    transmit_counter: NonZeroU16::new(max_multicast_solicit - i),
                     pending_frames: pending_frames.clone(),
                     notifiers: Vec::new(),
                     _marker: PhantomData,
@@ -4212,15 +4280,14 @@ mod tests {
             I::LOOKUP_ADDR1,
             NudEvent::RetransmitUnicastProbe,
         );
-        for i in 1..=MAX_UNICAST_SOLICIT {
-            let FakeConfigContext { retrans_timer } = &sync_ctx.inner.get_ref();
-            let retrans_timer = retrans_timer.get();
-
+        let retrans_timer = sync_ctx.inner.retransmit_timeout().get();
+        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
+        for i in 1..=max_unicast_solicit {
             assert_neighbor_state(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 DynamicNeighborState::Probe(Probe {
-                    transmit_counter: NonZeroU8::new(MAX_UNICAST_SOLICIT - i),
+                    transmit_counter: NonZeroU16::new(max_unicast_solicit - i),
                     link_address: LINK_ADDR1,
                 }),
                 None,
@@ -4269,6 +4336,7 @@ mod tests {
             true,
         );
 
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
         let FakeNudContext { nud } = &sync_ctx.outer;
         assert_eq!(
             nud.neighbors,
@@ -4283,7 +4351,7 @@ mod tests {
                 (
                     I::LOOKUP_ADDR3,
                     NeighborState::Dynamic(DynamicNeighborState::Incomplete(Incomplete {
-                        transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                        transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                         pending_frames: pending_frames,
                         notifiers: Vec::new(),
                         _marker: PhantomData,
@@ -4420,13 +4488,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
+
         // We should have initialized an incomplete neighbor and sent a neighbor probe
         // to attempt resolution.
         assert_neighbor_state(
             &sync_ctx,
             &mut non_sync_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
-                transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: VecDeque::new(),
                 // NB: notifiers is not checked for equality.
                 notifiers: Vec::new(),
@@ -4509,13 +4579,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
+        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
+
         // We should have initialized an incomplete neighbor and sent a neighbor probe
         // to attempt resolution.
         assert_neighbor_state(
             &sync_ctx,
             &mut non_sync_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
-                transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: VecDeque::new(),
                 // NB: notifiers is not checked for equality.
                 notifiers: Vec::new(),
@@ -4529,9 +4601,8 @@ mod tests {
             ResolutionFailure::Timeout => {
                 // Wait until neighbor resolution exceeds its maximum probe retransmits and
                 // times out.
-                for _ in 1..=MAX_MULTICAST_SOLICIT {
-                    let FakeConfigContext { retrans_timer } = &sync_ctx.inner.get_ref();
-                    let retrans_timer = retrans_timer.get();
+                for _ in 1..=max_multicast_solicit {
+                    let retrans_timer = sync_ctx.inner.retransmit_timeout().get();
                     assert_eq!(
                         non_sync_ctx.trigger_timers_for(
                             retrans_timer,
@@ -5215,13 +5286,25 @@ mod tests {
                 assert_eq!(code, IcmpUnusedCode);
             }
         );
+
+        let max_multicast_solicit = NudContext::<Ipv6, EthernetLinkDevice, _>::with_nud_state_mut(
+            &mut Locked::new(sync_ctx),
+            &link_device_id,
+            |_, nud_config| {
+                // NB: Because we're using the real core context here and it
+                // implements NudConfigContext for both Ipv4 and Ipv6 we need to
+                // nudge the compiler to the IPv6 implementation.
+                NudConfigContext::<Ipv6>::max_multicast_solicit(nud_config).get()
+            },
+        );
+
         assert_neighbors::<Ipv6, _>(
             &sync_ctx,
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
                 NeighborState::Dynamic(DynamicNeighborState::Incomplete(Incomplete {
-                    transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
+                    transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                     pending_frames,
                     notifiers: Vec::new(),
                     _marker: PhantomData,

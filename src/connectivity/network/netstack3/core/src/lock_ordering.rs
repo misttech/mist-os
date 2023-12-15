@@ -161,6 +161,7 @@ pub(crate) enum Ipv6DeviceRouteDiscovery {}
 pub(crate) enum Ipv6DeviceLearnedParams {}
 pub(crate) enum Ipv6DeviceAddressDad {}
 pub(crate) enum Ipv6DeviceAddressState {}
+pub(crate) struct NudConfig<I>(PhantomData<I>, Never);
 
 // This is not a real lock level, but it is useful for writing bounds that
 // require "before IPv4" or "before IPv6".
@@ -261,7 +262,9 @@ impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
 impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);
 impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceLearnedParams);
-impl_lock_after!(Ipv6DeviceLearnedParams => EthernetDeviceDynamicState);
+impl_lock_after!(Ipv6DeviceLearnedParams => NudConfig<Ipv4>);
+impl_lock_after!(NudConfig<Ipv4> => NudConfig<Ipv6>);
+impl_lock_after!(NudConfig<Ipv6> => EthernetDeviceDynamicState);
 impl_lock_after!(EthernetDeviceDynamicState => EthernetTxQueue);
 
 impl_lock_after!(DeviceLayerState => DeviceSockets);
