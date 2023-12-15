@@ -8,7 +8,9 @@ using fuchsia.ui.test.conformance;
 using fuchsia.ui.test.input;
 using fuchsia.ui.composition;
 using fuchsia.ui.views;
+using fuchsia.testing.harness;
 
+// TODO(b/315480571): remove after all tests migrated to test realm factory.
 /// Manages the required component topology on behalf of a UI conformance
 /// test, and controls access to puppet and UI capabilities.
 ///
@@ -84,6 +86,7 @@ closed protocol Context {
     });
 };
 
+// TODO(b/315480571): remove after all tests migrated to test realm factory.
 /// Helper to create a `Context` on behalf of a test.
 @discoverable
 closed protocol Factory {
@@ -98,4 +101,13 @@ closed protocol Factory {
     strict Create(resource table {
         1: context_server server_end:<Context>;
     });
+};
+
+/// RealmFactory creates test realm for UI related tests, and give the realm
+/// proxy to test suite so that test suite can access protocols in test realm.
+@discoverable
+open protocol RealmFactory {
+    flexible CreateRealm(resource table {
+        1: realm_server server_end:fuchsia.testing.harness.RealmProxy;
+    }) -> () error fuchsia.testing.harness.OperationError;
 };

@@ -11,6 +11,7 @@ fidl("fuchsia.ui.test.context") {
   sources = [ "context.fidl" ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.testing.harness",
     "//sdk/fidl/fuchsia.ui.composition",
     "//sdk/fidl/fuchsia.ui.test.conformance",
     "//sdk/fidl/fuchsia.ui.test.input",
