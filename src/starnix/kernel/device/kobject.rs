@@ -38,7 +38,7 @@ pub enum KType {
     Test,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DeviceMetadata {
     pub bus: Option<Weak<KObject>>,
     pub class: Weak<KObject>,
@@ -69,6 +69,18 @@ impl DeviceMetadata {
 impl PartialEq for DeviceMetadata {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.device_type == other.device_type
+    }
+}
+
+impl std::fmt::Debug for DeviceMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DeviceMetadata {{ name: {}, device_type: {}, mode: {:?} }}",
+            String::from_utf8_lossy(&self.name),
+            self.device_type,
+            self.mode
+        )
     }
 }
 
