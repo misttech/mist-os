@@ -17,5 +17,9 @@
                 "test.sampler.RealmFactory",
             ],
         },
+        {
+            protocol: "fuchsia.component.Namespace",
+            from: "framework",
+        },
     ],
 }

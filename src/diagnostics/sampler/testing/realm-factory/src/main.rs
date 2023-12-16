@@ -9,7 +9,6 @@ use crate::realm_factory::*;
 use {
     anyhow::{Error, Result},
     fidl_test_sampler::{RealmFactoryRequest, RealmFactoryRequestStream},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     futures::{StreamExt, TryStreamExt},
     tracing::error,
@@ -25,24 +24,20 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
-    let mut task_group = fasync::TaskGroup::new();
+    let mut realms = vec![];
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                RealmFactoryRequest::CreateRealm { options, dict_server, responder } => {
                     let realm = create_realm(options).await?;
-                    let request_stream = realm_server.into_stream()?;
-                    task_group.spawn(async move {
-                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                    });
+                    realm.root.controller().get_exposed_dict(dict_server).await?.unwrap();
+                    realms.push(realm);
                     responder.send(Ok(()))?;
                 }
 
                 RealmFactoryRequest::_UnknownMethod { .. } => todo!(),
             }
         }
-
-        task_group.join().await;
         Ok(())
     }
     .await;

@@ -4,6 +4,7 @@
 
 library test.sampler;
 
+using fuchsia.component.sandbox;
 using fuchsia.testing.harness;
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
@@ -20,6 +21,6 @@ open protocol RealmFactory {
     /// Returns OperationError.INVALID if called more than once.
     flexible CreateRealm(resource struct {
         options RealmOptions;
-        realm_server server_end:fuchsia.testing.harness.RealmProxy;
+        dict_server server_end:fuchsia.component.sandbox.Dict;
     }) -> () error fuchsia.testing.harness.OperationError;
 };

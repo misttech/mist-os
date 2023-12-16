@@ -178,10 +178,11 @@ pub fn connect_to_protocol_sync_at<P: DiscoverableProtocolMarker>(
 
 /// Connect to a FIDL protocol using the provided path.
 pub fn connect_to_protocol_at_path<P: ProtocolMarker>(
-    protocol_path: &str,
+    protocol_path: impl AsRef<str>,
 ) -> Result<P::Proxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
-    let () = connect_channel_to_protocol_at_path(server_end.into_channel(), protocol_path)?;
+    let () =
+        connect_channel_to_protocol_at_path(server_end.into_channel(), protocol_path.as_ref())?;
     Ok(proxy)
 }
 

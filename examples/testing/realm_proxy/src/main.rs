@@ -20,7 +20,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
         .create_realm(options, dict_server)
         .await?
         .map_err(realm_proxy::Error::OperationError)?;
-    let ns = extend_namespace(dict_client).await?;
+    let ns = extend_namespace(realm_factory, dict_client).await?;
 
     Ok(ns)
 }

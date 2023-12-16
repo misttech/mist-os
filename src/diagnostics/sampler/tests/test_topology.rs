@@ -5,15 +5,15 @@
 use anyhow::*;
 use fidl::endpoints::create_endpoints;
 use fuchsia_component::client::connect_to_protocol;
-use realm_proxy::client::RealmProxyClient;
+use realm_proxy::client::{extend_namespace, InstalledNamespace};
 
-pub(crate) async fn create_realm() -> Result<RealmProxyClient, Error> {
+pub(crate) async fn create_realm() -> Result<InstalledNamespace, Error> {
     inner_create_realm(fidl_test_sampler::RealmOptions { ..Default::default() }).await
 }
 
 pub(crate) async fn create_realm_with_name(
     name: impl Into<String>,
-) -> Result<RealmProxyClient, Error> {
+) -> Result<InstalledNamespace, Error> {
     inner_create_realm(fidl_test_sampler::RealmOptions {
         sampler_component_name: Some(name.into()),
         ..Default::default()
@@ -23,12 +23,13 @@ pub(crate) async fn create_realm_with_name(
 
 async fn inner_create_realm(
     options: fidl_test_sampler::RealmOptions,
-) -> Result<RealmProxyClient, Error> {
+) -> Result<InstalledNamespace, Error> {
     let realm_factory = connect_to_protocol::<fidl_test_sampler::RealmFactoryMarker>()?;
-    let (client, server) = create_endpoints();
+    let (dict_client, dict_server) = create_endpoints();
     realm_factory
-        .create_realm(options, server)
+        .create_realm(options, dict_server)
         .await?
         .map_err(realm_proxy::Error::OperationError)?;
-    Ok(RealmProxyClient::from(client))
+    let ns = extend_namespace(realm_factory, dict_client).await?;
+    Ok(ns)
 }

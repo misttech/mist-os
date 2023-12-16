@@ -5,15 +5,21 @@
 use {
     anyhow::{bail, format_err, Error, Result},
     fdio::Namespace,
-    fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker},
+    fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy},
     fuchsia_component::client::connect_to_protocol,
+    std::fmt::Debug,
     uuid::Uuid,
 };
 
 pub struct InstalledNamespace {
     prefix: String,
+    /// This is not used, but it keeps the RealmFactory connection alive.
+    ///
+    /// The RealmFactory server may use this connection to pin the lifetime of the realm created
+    /// for the test.
+    _realm_factory: fidl::AsyncChannel,
 }
 
 impl InstalledNamespace {
@@ -32,7 +38,13 @@ impl Drop for InstalledNamespace {
 }
 
 /// Converts the given dict to a namespace and adds it this component's namespace.
-pub async fn extend_namespace(dict: ClientEnd<fsandbox::DictMarker>) -> Result<InstalledNamespace> {
+pub async fn extend_namespace<T>(
+    realm_factory: T,
+    dict: ClientEnd<fsandbox::DictMarker>,
+) -> Result<InstalledNamespace>
+where
+    T: Proxy + Debug,
+{
     let namespace_proxy = connect_to_protocol::<fcomponent::NamespaceMarker>()?;
     // TODO: What should we use for the namespace's unique id? Could also
     // consider an atomic counter, or the name of the test
@@ -62,7 +74,7 @@ pub async fn extend_namespace(dict: ClientEnd<fsandbox::DictMarker>) -> Result<I
         );
     }
     namespace.bind(&prefix, entry.directory.unwrap())?;
-    Ok(InstalledNamespace { prefix })
+    Ok(InstalledNamespace { prefix, _realm_factory: realm_factory.into_channel().unwrap() })
 }
 
 // RealmProxyClient is a client for fuchsia.testing.harness.RealmProxy.
