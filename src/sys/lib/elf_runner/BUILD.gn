@@ -62,6 +62,8 @@ rustc_library("elf_runner") {
     "src/crash_info.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/memory/mod.rs",
+    "src/memory/reporter.rs",
     "src/process_launcher.rs",
     "src/runtime_dir.rs",
     "src/stdout.rs",

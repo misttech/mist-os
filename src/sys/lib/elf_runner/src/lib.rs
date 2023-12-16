@@ -8,6 +8,7 @@ mod config;
 mod crash_handler;
 pub mod crash_info;
 mod error;
+mod memory;
 pub mod process_launcher;
 mod runtime_dir;
 mod stdout;
@@ -21,11 +22,12 @@ use {
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
     },
-    crate::{component_set::ComponentSet, crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
+    crate::{
+        component_set::ComponentSet, crash_info::CrashRecords, memory::reporter::MemoryReporter,
+        vdso_vmo::get_next_vdso_vmo,
+    },
     ::routing::policy::ScopedPolicyChecker,
     chrono::{DateTime, NaiveDateTime, Utc},
-    fidl::endpoints::ControlHandle,
-    fidl::endpoints::RequestStream,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
@@ -89,6 +91,8 @@ pub struct ElfRunner {
 
     /// Tracks the ELF components that are currently running under this runner.
     components: Arc<ComponentSet>,
+
+    memory_reporter: Arc<MemoryReporter>,
 }
 
 /// The job for a component.
@@ -120,13 +124,9 @@ impl ElfRunner {
         utc_clock: Option<Arc<zx::Clock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
-        ElfRunner {
-            job,
-            launcher_connector,
-            utc_clock,
-            crash_records,
-            components: ComponentSet::new(),
-        }
+        let components = ComponentSet::new();
+        let memory_reporter = Arc::new(MemoryReporter::new(components.clone()));
+        ElfRunner { job, launcher_connector, utc_clock, crash_records, components, memory_reporter }
     }
 
     /// Returns a UTC clock handle.
@@ -395,12 +395,12 @@ impl ElfRunner {
                 bin_path: &program_config.binary,
                 name,
                 options: program_config.process_options(),
-                args: Some(program_config.args),
+                args: Some(program_config.args.clone()),
                 ns,
                 job: Some(proc_job_dup),
                 handle_infos: Some(handle_infos),
                 name_infos: None,
-                environs: program_config.environ,
+                environs: program_config.environ.clone(),
                 launcher: &launcher,
                 loader_proxy_chan: None,
                 executable_vmo: None,
@@ -459,6 +459,7 @@ impl ElfRunner {
 
         Ok(ElfComponent::new(
             runtime_dir,
+            moniker,
             job,
             process,
             lifecycle_client,
@@ -476,9 +477,14 @@ impl ElfRunner {
     }
 
     pub fn serve_memory_reporter(&self, stream: freport::SnapshotProviderRequestStream) {
+        let memory_reporter = self.memory_reporter.clone();
         fasync::Task::spawn(async move {
-            // TODO(fxbug.dev/307580082): Implement.
-            stream.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+            match memory_reporter.serve(stream).await {
+                Err(err) => {
+                    tracing::error!("Error serving SnapshotProvider: {err}");
+                }
+                Ok(()) => {}
+            }
         })
         .detach();
     }
@@ -693,7 +699,7 @@ mod tests {
         Ok((dir, namespace))
     }
 
-    fn new_elf_runner_for_test() -> Arc<ElfRunner> {
+    pub fn new_elf_runner_for_test() -> Arc<ElfRunner> {
         Arc::new(ElfRunner::new(
             job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
             Box::new(process_launcher::BuiltInConnector {}),
@@ -784,7 +790,7 @@ mod tests {
     /// Creates start info for a component which runs until told to exit. The
     /// ComponentController protocol can be used to stop the component when the
     /// test is done inspecting the launched component.
-    fn lifecycle_startinfo(
+    pub fn lifecycle_startinfo(
         runtime_dir: ServerEnd<fio::DirectoryMarker>,
     ) -> fcrunner::ComponentStartInfo {
         let ns = vec![pkg_dir_namespace_entry()];
@@ -839,6 +845,7 @@ mod tests {
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("job handle duplication failed");
         let component = ElfComponent::new(
             RuntimeDirectory::empty(),
+            Moniker::default(),
             Job::Single(job_copy),
             process,
             lifecycle_client,
@@ -1550,7 +1557,7 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         components
             .clone()
-            .visit(&|_| {
+            .visit(|_, _| {
                 count.fetch_add(1, Ordering::SeqCst);
             })
             .await;
@@ -1569,7 +1576,7 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         components
             .clone()
-            .visit(&|elf_component: &ElfComponentInfo| {
+            .visit(|elf_component: &ElfComponentInfo, _| {
                 assert_eq!(
                     elf_component.get_url().as_str(),
                     "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
@@ -1589,7 +1596,7 @@ mod tests {
             let count = Arc::new(AtomicUsize::new(0));
             components
                 .clone()
-                .visit(&|_| {
+                .visit(|_, _| {
                     count.fetch_add(1, Ordering::SeqCst);
                 })
                 .await;

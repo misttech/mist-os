@@ -7,4 +7,17 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.memory.report") {
   sdk_category = "internal"
   sources = [ "report.fidl" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.mem",
+    "//zircon/vdso/zx",
+  ]
+
+  # TODO(fxbug.dev/307580082): This protocol is under construction.
+  visibility = [
+    "//examples/components/runner/colocated/*",
+    "//src/developer/memory/*",
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/elf_runner/*",
+  ]
 }

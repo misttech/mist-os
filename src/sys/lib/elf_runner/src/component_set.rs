@@ -31,14 +31,15 @@ impl ComponentSet {
     /// The component will remove itself from the set when it is dropped.
     pub async fn add(self: Arc<Self>, component: &mut ElfComponent) {
         let mut components = self.components.lock().await;
-        let id = Id::new();
         let component_set = Arc::downgrade(&self.clone());
+        let id = Id::new(component.info().get_moniker().clone());
+        let id_clone = id.clone();
         component.set_on_drop(move || {
             fasync::Task::spawn(async move {
                 let Some(component_set) = component_set.upgrade() else {
                     return;
                 };
-                component_set.remove(id).await;
+                component_set.remove(id_clone).await;
             })
             .detach()
         });
@@ -48,16 +49,13 @@ impl ComponentSet {
     /// Invokes `visitor` over all [`ElfComponentInfo`] objects corresponding to
     /// components that are currently running. Note that this is fundamentally racy
     /// as a component could be stopping imminently during or after the visit.
-    ///
-    /// TODO(fxbug.dev/307580082): Use this soon in `fuchsia.memory.report` server.
-    #[allow(dead_code)]
-    pub async fn visit(self: Arc<Self>, visitor: &dyn Fn(&ElfComponentInfo)) {
+    pub async fn visit(self: Arc<Self>, mut visitor: impl FnMut(&ElfComponentInfo, Id)) {
         let components = self.components.lock().await;
-        for (_, component) in components.iter() {
+        for (id, component) in components.iter() {
             let Some(component) = component.upgrade() else {
                 continue;
             };
-            visitor(&component);
+            visitor(&component, id.clone());
         }
     }
 
@@ -67,18 +65,34 @@ impl ComponentSet {
     }
 }
 
-/// A simple incrementing counter.
-mod id {
+/// An identifier for running components that is unique within an ELF runner.
+pub mod id {
+    use moniker::Moniker;
+    use std::fmt::Display;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    #[derive(Eq, Hash, PartialEq, Copy, Clone, Debug)]
-    pub struct Id(u64);
+    /// TODO(fxbug.dev/316036032): store a moniker token instead, to eliminate
+    /// ELF runner's visibility into component monikers.
+    #[derive(Eq, Hash, PartialEq, Clone, Debug)]
+    pub struct Id(Moniker, u64);
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
     impl Id {
-        pub fn new() -> Id {
-            Id(NEXT_ID.fetch_add(1, Ordering::SeqCst))
+        pub fn new(moniker: Moniker) -> Id {
+            Id(moniker, NEXT_ID.fetch_add(1, Ordering::SeqCst))
+        }
+    }
+
+    impl Display for Id {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_fmt(format_args!("{}, {}", self.0, self.1))
+        }
+    }
+
+    impl From<Id> for String {
+        fn from(value: Id) -> Self {
+            format!("{value}")
         }
     }
 
@@ -88,8 +102,8 @@ mod id {
 
         #[test]
         fn test_get_id() {
-            let id1 = Id::new();
-            let id2 = Id::new();
+            let id1 = Id::new(Moniker::try_from("foo/bar").unwrap());
+            let id2 = Id::new(Moniker::try_from("foo/bar").unwrap());
             assert_ne!(id1, id2);
         }
     }
@@ -100,6 +114,7 @@ mod tests {
     use super::*;
     use fuchsia_zircon as zx;
     use futures::FutureExt;
+    use moniker::Moniker;
     use std::{
         future,
         sync::atomic::{AtomicUsize, Ordering},
@@ -119,7 +134,7 @@ mod tests {
         let components_clone = components.clone();
         let mut fut = async {
             components_clone
-                .visit(&|_| {
+                .visit(|_, _| {
                     count.fetch_add(1, Ordering::SeqCst);
                 })
                 .await
@@ -138,7 +153,7 @@ mod tests {
         let components_clone = components.clone();
         let mut fut = async {
             components_clone
-                .visit(&|_| {
+                .visit(|_, _| {
                     count.fetch_add(1, Ordering::SeqCst);
                 })
                 .await
@@ -160,7 +175,7 @@ mod tests {
         let components_clone = components.clone();
         let mut fut = async {
             components_clone
-                .visit(&|_| {
+                .visit(|_, _| {
                     count.fetch_add(1, Ordering::SeqCst);
                 })
                 .await
@@ -180,6 +195,7 @@ mod tests {
         let component_url = "hello".to_string();
         let fake_component = ElfComponent::new(
             runtime_dir,
+            Moniker::default(),
             job,
             process,
             lifecycle_channel,

@@ -10,6 +10,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
     futures::future::{join_all, BoxFuture, FutureExt},
+    moniker::Moniker,
     runner::component::Controllable,
     std::{
         ops::DerefMut,
@@ -22,6 +23,9 @@ use {
 ///
 /// These information is shared with [`crate::ComponentSet`].
 pub struct ElfComponentInfo {
+    /// Moniker of the ELF component.
+    moniker: Moniker,
+
     /// Job in which the underlying process that represents the component is
     /// running.
     job: Arc<Job>,
@@ -37,6 +41,15 @@ pub struct ElfComponentInfo {
 impl ElfComponentInfo {
     pub fn get_url(&self) -> &String {
         &self.component_url
+    }
+
+    pub fn get_moniker(&self) -> &Moniker {
+        &self.moniker
+    }
+
+    /// Return a pointer to the Job.
+    pub fn copy_job(&self) -> Arc<Job> {
+        self.job.clone()
     }
 
     /// Return a handle to the Job containing the process for this component.
@@ -80,6 +93,7 @@ pub struct ElfComponent {
 impl ElfComponent {
     pub fn new(
         _runtime_dir: RuntimeDirectory,
+        moniker: Moniker,
         job: Job,
         process: Process,
         lifecycle_channel: Option<LifecycleProxy>,
@@ -90,6 +104,7 @@ impl ElfComponent {
         Self {
             _runtime_dir,
             info: Arc::new(ElfComponentInfo {
+                moniker,
                 job: Arc::new(job),
                 main_process_critical,
                 component_url,
