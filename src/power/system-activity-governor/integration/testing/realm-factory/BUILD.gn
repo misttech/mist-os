@@ -16,6 +16,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",

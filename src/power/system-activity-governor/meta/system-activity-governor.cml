@@ -9,12 +9,23 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.power.suspend.Stats" ],
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+        },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
         },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.power.suspend.Stats" ],
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
             from: "self",
         },
     ],

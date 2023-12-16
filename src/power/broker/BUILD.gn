@@ -19,6 +19,7 @@ fidl("fuchsia.power.broker") {
   visibility = [
     "//sdk/fidl/fuchsia.power.system/*:*",
     "//src/power/broker/*:*",
+    "//src/power/system-activity-governor/*:*",
   ]
 }
 

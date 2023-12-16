@@ -6,13 +6,16 @@ mod system_activity_governor;
 
 use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::Error;
+use fidl_fuchsia_power_broker as fbroker;
+use fuchsia_component::client::connect_to_protocol;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     tracing::info!("started");
 
     // Set up the SystemActivityGovernor.
-    let sag = SystemActivityGovernor::new();
+    let sag =
+        SystemActivityGovernor::new(&connect_to_protocol::<fbroker::TopologyMarker>()?).await?;
 
     // This future should never complete.
     let result = sag.run().await;

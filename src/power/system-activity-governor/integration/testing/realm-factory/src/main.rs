@@ -60,11 +60,42 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
         )
         .await?;
 
+    let power_broker_ref =
+        builder.add_child("power-broker", "#meta/power-broker.cm", ChildOptions::new()).await?;
+
+    // Expose capabilities from power-broker.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
+                .from(&power_broker_ref)
+                .to(Ref::parent()),
+        )
+        .await?;
+
+    // Expose capabilities from power-broker to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
+                .from(&power_broker_ref)
+                .to(&component_ref),
+        )
+        .await?;
+
     // Expose capabilities from system-activity-governor.
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
+                .from(&component_ref)
+                .to(Ref::parent()),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
                 .from(&component_ref)
                 .to(Ref::parent()),
         )
