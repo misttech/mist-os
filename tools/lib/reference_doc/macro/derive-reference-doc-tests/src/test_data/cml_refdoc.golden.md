@@ -5,6 +5,8 @@ A `.cml` file contains a single json5 object literal with the keys below.
 Where string values are expected, a list of valid values is generally documented.
 The following string value types are reused and must follow specific rules.
 
+The `.cml` file is compiled into a FIDL wire format (`.cm`) file.
+
 ## String types
 
 ### Names {#names}
