@@ -15,6 +15,7 @@
 #include <lib/fake-bti/bti.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <zircon/errors.h>
 
 #include <algorithm>
 
@@ -280,11 +281,21 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
             element8.type_specific()->endpoint()->type());
 
+  constexpr uint64_t kExpectedTopologyId = 1;
+  constexpr uint64_t kUnrecognizedTopologyId = 2;
   auto topology_result = signal_client->GetTopologies();
   ASSERT_TRUE(topology_result.is_ok());
   ASSERT_EQ(1, topology_result->topologies().size());
   auto& topology = topology_result->topologies()[0];
-  ASSERT_EQ(1, topology.id());
+  ASSERT_EQ(kExpectedTopologyId, topology.id());
+
+  auto set_topology_result = signal_client->SetTopology(kUnrecognizedTopologyId);
+  ASSERT_TRUE(set_topology_result.is_error());
+  ASSERT_TRUE(set_topology_result.error_value().is_domain_error());
+  ASSERT_EQ(set_topology_result.error_value().domain_error(), ZX_ERR_INVALID_ARGS);
+
+  set_topology_result = signal_client->SetTopology(kExpectedTopologyId);
+  ASSERT_TRUE(set_topology_result.is_ok());
 
   // Get edges for ring buffer and DAIs for all engines.
   constexpr size_t kNumberOfEdges = 6;
@@ -341,11 +352,17 @@ TEST_F(AmlG12CompositeTest, GetDaiFormats) {
   // Only ids 1, 2, and 3 provide DAI formats.
   {
     auto dai_formats_result = client_->GetDaiFormats(0);
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto dai_formats_result = client_->GetDaiFormats(4);
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto dai_formats_result = client_->GetDaiFormats(1);
@@ -369,12 +386,18 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(0, GetDefaultDaiFormat());
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(4, GetDefaultDaiFormat());
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(1, GetDefaultDaiFormat());
@@ -414,14 +437,20 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
     format.number_of_channels(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto format = GetDefaultDaiFormat();
     format.sample_format(fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto format = GetDefaultDaiFormat();
@@ -429,28 +458,40 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
         fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto format = GetDefaultDaiFormat();
     format.frame_rate(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto format = GetDefaultDaiFormat();
     format.bits_per_slot(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
     auto format = GetDefaultDaiFormat();
     format.bits_per_sample(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
-    ASSERT_FALSE(dai_formats_result.is_ok());
+    ASSERT_TRUE(dai_formats_result.is_error());
+    ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
+    ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
+                fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
 }
 

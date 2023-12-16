@@ -5,6 +5,7 @@
 #include "src/media/audio/drivers/aml-g12-tdm/composite-server.h"
 
 #include <lib/driver/component/cpp/driver_base.h>
+#include <zircon/errors.h>
 
 #include <algorithm>
 #include <numeric>
@@ -19,6 +20,22 @@ namespace audio::aml_g12 {
 template <typename Container, typename T>
 bool contains(Container c, T v) {
   return std::find(std::begin(c), std::end(c), v) != std::end(c);
+}
+
+// The Composite interface returns DriverError upon error, not zx_status_t, so convert any error.
+fuchsia_hardware_audio::DriverError ZxStatusToDriverError(zx_status_t status) {
+  switch (status) {
+    case ZX_ERR_NOT_SUPPORTED:
+      return fuchsia_hardware_audio::DriverError::kNotSupported;
+    case ZX_ERR_INVALID_ARGS:
+      return fuchsia_hardware_audio::DriverError::kInvalidArgs;
+    case ZX_ERR_WRONG_TYPE:
+      return fuchsia_hardware_audio::DriverError::kWrongType;
+    case ZX_ERR_SHOULD_WAIT:
+      return fuchsia_hardware_audio::DriverError::kShouldWait;
+    default:
+      return fuchsia_hardware_audio::DriverError::kInternalError;
+  }
 }
 
 AudioCompositeServer::AudioCompositeServer(
@@ -184,7 +201,7 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
 void AudioCompositeServer::Reset(ResetCompleter::Sync& completer) {
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     if (zx_status_t status = ResetEngine(i); status != ZX_OK) {
-      completer.Reply(zx::error(status));
+      completer.Reply(zx::error(ZxStatusToDriverError(status)));
       return;
     }
   }
@@ -202,6 +219,7 @@ void AudioCompositeServer::GetHealthState(GetHealthStateCompleter::Sync& complet
   completer.Reply(fuchsia_hardware_audio::HealthState{}.healthy(true));
 }
 
+// Note that if already bound, we close the NEW channel (not the one on which we were called).
 void AudioCompositeServer::SignalProcessingConnect(
     SignalProcessingConnectRequest& request, SignalProcessingConnectCompleter::Sync& completer) {
   if (signal_) {
@@ -233,7 +251,7 @@ void AudioCompositeServer::GetRingBufferFormats(GetRingBufferFormatsRequest& req
   if (ring_buffer == kRingBufferIds.end()) {
     FDF_LOG(ERROR, "Unknown Ring Buffer id (%lu) for format retrieval",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
   size_t ring_buffer_index = ring_buffer - kRingBufferIds.begin();
@@ -250,7 +268,7 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
       std::find(kRingBufferIds.begin(), kRingBufferIds.end(), request.processing_element_id());
   if (ring_buffer == kRingBufferIds.end()) {
     FDF_LOG(ERROR, "Unknown Ring Buffer id (%lu) for creation", request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
   size_t ring_buffer_index = ring_buffer - kRingBufferIds.begin();
@@ -259,7 +277,7 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (!request.format().pcm_format().has_value()) {
     FDF_LOG(ERROR, "No PCM formats provided for Ring Buffer id (%lu)",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
@@ -282,35 +300,35 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (!number_of_channels_found) {
     FDF_LOG(ERROR, "Ring Buffer number of channels for Ring Buffer id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(*supported.sample_formats(), requested.sample_format())) {
     FDF_LOG(ERROR, "Ring Buffer sample format for Ring Buffer id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(*supported.bytes_per_sample(), requested.bytes_per_sample())) {
     FDF_LOG(ERROR, "Ring Buffer bytes per sample for Ring Buffer id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(*supported.valid_bits_per_sample(), requested.valid_bits_per_sample())) {
     FDF_LOG(ERROR, "Ring Buffer valid bits per sample for Ring Buffer id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(*supported.frame_rates(), requested.frame_rate())) {
     FDF_LOG(ERROR, "Ring Buffer frame rate for Ring Buffer id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
@@ -331,7 +349,7 @@ void AudioCompositeServer::GetDaiFormats(GetDaiFormatsRequest& request,
   auto dai = std::find(kDaiIds.begin(), kDaiIds.end(), request.processing_element_id());
   if (dai == kDaiIds.end()) {
     FDF_LOG(ERROR, "Unknown DAI id (%lu) for GetDaiFormats", request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
   size_t dai_index = dai - kDaiIds.begin();
@@ -344,7 +362,7 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
   auto dai = std::find(kDaiIds.begin(), kDaiIds.end(), request.processing_element_id());
   if (dai == kDaiIds.end()) {
     FDF_LOG(ERROR, "Unknown DAI id (%lu) for SetDaiFormat", request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
   size_t dai_index = dai - kDaiIds.begin();
@@ -354,49 +372,49 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
   if (!contains(supported.number_of_channels(), request.format().number_of_channels())) {
     FDF_LOG(ERROR, "DAI format number of channels for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(supported.sample_formats(), request.format().sample_format())) {
     FDF_LOG(ERROR, "DAI format sample format for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(supported.frame_formats(), request.format().frame_format())) {
     FDF_LOG(ERROR, "DAI format frame format for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(supported.frame_rates(), request.format().frame_rate())) {
     FDF_LOG(ERROR, "DAI format frame rate for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(supported.bits_per_slot(), request.format().bits_per_slot())) {
     FDF_LOG(ERROR, "DAI format bits per slot for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   if (!contains(supported.bits_per_sample(), request.format().bits_per_sample())) {
     FDF_LOG(ERROR, "DAI format bits per sample for DAI id (%lu) not supported",
             request.processing_element_id());
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
   current_dai_formats_[dai_index] = request.format();
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     if (engines_[i].dai_index == dai_index) {
       if (zx_status_t status = ResetEngine(i); status != ZX_OK) {
-        completer.Reply(zx::error(status));
+        completer.Reply(zx::error(ZxStatusToDriverError(status)));
         return;
       }
     }
@@ -698,9 +716,9 @@ void AudioCompositeServer::WatchElementState(WatchElementStateRequest& request,
             std::move(endpoint_state)));
     completer.Reply(std::move(element_state));
   } else if (element.completer) {
-    // The client called WatchElement when another hanging get was pending.
+    // The client called WatchElementState when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
-    FDF_LOG(ERROR, "WatchElement was re-called while the previous call was still pending");
+    FDF_LOG(ERROR, "WatchElementState was re-called while the previous call was still pending");
     completer.Close(ZX_ERR_BAD_STATE);
   } else {
     // This completer is kept but never used since we are not updating the state of the elements.
@@ -714,7 +732,8 @@ void AudioCompositeServer::SetElementState(SetElementStateRequest& request,
   if (element_completer == element_completers_.end()) {
     FDF_LOG(ERROR, "Unknown process element id (%lu) for SetElementState",
             request.processing_element_id());
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    // Return an error, but no need to close down the entire protocol channel.
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
   // All elements are endpoints, no field is expected or acted upon.
@@ -766,9 +785,14 @@ void AudioCompositeServer::WatchTopology(WatchTopologyCompleter::Sync& completer
   }
 }
 
+// This device has only one signalprocessing topology.
 void AudioCompositeServer::SetTopology(SetTopologyRequest& request,
                                        SetTopologyCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  if (request.topology_id() == kTopologyId) {
+    completer.Reply(zx::ok());
+  } else {
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+  }
 }
 
 }  // namespace audio::aml_g12
