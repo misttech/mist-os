@@ -11,9 +11,43 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
     futures::future::{join_all, BoxFuture, FutureExt},
     runner::component::Controllable,
-    std::sync::Arc,
+    std::{
+        ops::DerefMut,
+        sync::{Arc, Mutex},
+    },
     tracing::{error, warn},
 };
+
+/// Immutable information about the component.
+///
+/// These information is shared with [`crate::ComponentSet`].
+pub struct ElfComponentInfo {
+    /// Job in which the underlying process that represents the component is
+    /// running.
+    job: Arc<Job>,
+
+    /// We need to remember if we marked the main process as critical, because if we're asked to
+    /// kill a component that has such a marking it'll bring down everything.
+    main_process_critical: bool,
+
+    /// URL with which the component was launched.
+    component_url: String,
+}
+
+impl ElfComponentInfo {
+    pub fn get_url(&self) -> &String {
+        &self.component_url
+    }
+
+    /// Return a handle to the Job containing the process for this component.
+    ///
+    /// The rights of the job will be set such that the resulting handle will be appropriate to
+    /// use for diagnostics-only purposes. Right now that is ZX_RIGHTS_BASIC (which includes
+    /// INSPECT).
+    pub fn copy_job_for_diagnostics(&self) -> Result<zx::Job, zx::Status> {
+        self.job.top().duplicate_handle(zx::Rights::BASIC)
+    }
+}
 
 /// Structure representing a running elf component.
 pub struct ElfComponent {
@@ -21,9 +55,8 @@ pub struct ElfComponent {
     /// keep the namespace alive.
     _runtime_dir: RuntimeDirectory,
 
-    /// Job in which the underlying process that represents the component is
-    /// running.
-    job: Arc<Job>,
+    /// Immutable information about the component.
+    info: Arc<ElfComponentInfo>,
 
     /// Process made for the program binary defined for this component.
     process: Option<Arc<Process>>,
@@ -33,10 +66,6 @@ pub struct ElfComponent {
     /// the protocol, this will be None.
     lifecycle_channel: Option<LifecycleProxy>,
 
-    /// We need to remember if we marked the main process as critical, because if we're asked to
-    /// kill a component that has such a marking it'll bring down everything.
-    main_process_critical: bool,
-
     /// Any tasks spawned to serve this component. For example, stdout and stderr
     /// listeners are Task objects that live for the duration of the component's
     /// lifetime.
@@ -44,8 +73,8 @@ pub struct ElfComponent {
     /// Stop will block on these to complete.
     tasks: Option<Vec<fasync::Task<()>>>,
 
-    /// URL with which the component was launched.
-    component_url: String,
+    /// A closure to be invoked when the object is dropped.
+    on_drop: Mutex<Option<Box<dyn FnOnce() + Send + 'static>>>,
 }
 
 impl ElfComponent {
@@ -60,13 +89,31 @@ impl ElfComponent {
     ) -> Self {
         Self {
             _runtime_dir,
-            job: Arc::new(job),
+            info: Arc::new(ElfComponentInfo {
+                job: Arc::new(job),
+                main_process_critical,
+                component_url,
+            }),
             process: Some(Arc::new(process)),
             lifecycle_channel,
-            main_process_critical,
             tasks: Some(tasks),
-            component_url,
+            on_drop: Mutex::new(None),
         }
+    }
+
+    /// Sets a closure to be invoked when the object is dropped. Can only be done once.
+    pub fn set_on_drop(&self, func: impl FnOnce() + Send + 'static) {
+        let mut on_drop = self.on_drop.lock().unwrap();
+        let previous = std::mem::replace(
+            on_drop.deref_mut(),
+            Some(Box::new(func) as Box<dyn FnOnce() + Send + 'static>),
+        );
+        assert!(previous.is_none());
+    }
+
+    /// Obtain immutable information about the component such as its job and URL.
+    pub fn info(&self) -> &Arc<ElfComponentInfo> {
+        &self.info
     }
 
     /// Return a pointer to the Process, returns None if the component has no
@@ -74,24 +121,16 @@ impl ElfComponent {
     pub fn copy_process(&self) -> Option<Arc<Process>> {
         self.process.clone()
     }
-
-    /// Return a handle to the Job containing the process for this component.
-    ///
-    /// The rights of the job will be set such that the resulting handle will be apppropriate to
-    /// use for diagnostics-only purposes. Right now that is ZX_RIGHTS_BASIC (which includes
-    /// INSPECT).
-    pub fn copy_job_for_diagnostics(&self) -> Result<zx::Job, zx::Status> {
-        self.job.top().duplicate_handle(zx::Rights::BASIC)
-    }
 }
 
 #[async_trait]
 impl Controllable for ElfComponent {
-    async fn kill(mut self) {
-        if self.main_process_critical {
+    async fn kill(&mut self) {
+        if self.info().main_process_critical {
             warn!("killing a component with 'main_process_critical', so this will also kill component_manager and all of its components");
         }
-        self.job
+        self.info()
+            .job
             .top()
             .kill()
             .unwrap_or_else(|error| error!(%error, "failed killing job during kill"));
@@ -103,18 +142,18 @@ impl Controllable for ElfComponent {
                 |error| error!(%error, "failed to stop lifecycle_chan during stop"),
             );
 
-            let job = self.job.clone();
+            let job = self.info().job.clone();
 
             // If the component's main process is critical we must watch for
             // the main process to exit, otherwise we could end up killing that
             // process and therefore killing the root job.
-            if self.main_process_critical {
+            if self.info().main_process_critical {
                 if self.process.is_none() {
                     // This is a bit strange because there's no process, but there is a lifecycle
                     // channel. Since there is no process it seems like killing it can't kill
                     // component manager.
                     warn!("killing job of component with 'main_process_critical' set because component has lifecycle channel, but no process main process.");
-                    self.job.top().kill().unwrap_or_else(|error| {
+                    self.info().job.top().kill().unwrap_or_else(|error| {
                         error!(%error, "failed killing job for component with no lifecycle channel")
                     });
                     return async {}.boxed();
@@ -159,15 +198,15 @@ impl Controllable for ElfComponent {
                 .boxed()
             }
         } else {
-            if self.main_process_critical {
+            if self.info().main_process_critical {
                 warn!(
                     "killing job of component {} marked with 'main_process_critical' because \
                 component does not implement Lifecycle, so this will also kill component_manager \
                 and all of its components",
-                    self.component_url
+                    self.info().get_url()
                 );
             }
-            self.job.top().kill().unwrap_or_else(|error| {
+            self.info().job.top().kill().unwrap_or_else(|error| {
                 error!(%error, "failed killing job for component with no lifecycle channel")
             });
             async {}.boxed()
@@ -186,6 +225,15 @@ impl Controllable for ElfComponent {
 impl Drop for ElfComponent {
     fn drop(&mut self) {
         // just in case we haven't killed the job already
-        self.job.top().kill().unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
+        self.info()
+            .job
+            .top()
+            .kill()
+            .unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
+
+        // notify others that this object is being dropped
+        if let Some(on_drop) = self.on_drop.lock().unwrap().take() {
+            on_drop();
+        }
     }
 }

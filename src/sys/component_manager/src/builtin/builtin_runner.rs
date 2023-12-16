@@ -317,7 +317,7 @@ impl Inner {
 
 #[async_trait]
 impl Controllable for ElfRunnerProgram {
-    async fn kill(mut self) {
+    async fn kill(&mut self) {
         warn!("Timed out stopping ElfRunner tasks");
         self.stop().await
     }

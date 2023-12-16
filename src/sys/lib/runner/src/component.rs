@@ -32,7 +32,7 @@ lazy_static! {
 pub trait Controllable {
     /// Should kill self and do cleanup.
     /// Should not return error or panic, should log error instead.
-    async fn kill(mut self);
+    async fn kill(&mut self);
 
     /// Stop the component. Once the component is stopped, the
     /// ComponentControllerControlHandle should be closed. If the component is
@@ -162,7 +162,7 @@ impl<C: Controllable> Controller<C> {
 
     /// Kill the job and shutdown control handle supplied to this function.
     async fn kill(&mut self) {
-        if let Some(controllable) = self.controllable.take() {
+        if let Some(mut controllable) = self.controllable.take() {
             controllable.kill().await;
         }
     }
@@ -455,7 +455,7 @@ mod tests {
         K: FnOnce() + std::marker::Send,
         J: FnOnce() + std::marker::Send,
     {
-        async fn kill(mut self) {
+        async fn kill(&mut self) {
             let func = self.onkill.take().unwrap();
             func();
         }
