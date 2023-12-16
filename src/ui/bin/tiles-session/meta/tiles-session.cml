@@ -97,6 +97,18 @@
             to: "#elements",
             availability: "same_as_target",
         },
+        {
+            directory: "dev-temperature",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
+        {
+            directory: "dev-thermal",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
 
         // Dependencies for element_manager
         {
