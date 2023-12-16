@@ -5,11 +5,33 @@
 import unittest
 
 from fuchsia_controller_py import Channel
+from fuchsia_controller_py import Event
 from fuchsia_controller_py import ZxStatus
 
 
 class ChannelTests(unittest.TestCase):
     """Channel tests."""
+
+    def test_event_access_denied(self):
+        e = Event()
+        with self.assertRaises(ZxStatus):
+            try:
+                # Attempt USER_0 signal.
+                e.signal_peer(0, 1 << 24)
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], ZxStatus.ZX_ERR_ACCESS_DENIED)
+                raise e
+
+    def test_eventpair_peer_closed(self):
+        e1, e2 = Event.create_pair()
+        del e2
+        with self.assertRaises(ZxStatus):
+            try:
+                # Attempt USER_0 signal.
+                e1.signal_peer(0, 1 << 24)
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], ZxStatus.ZX_ERR_PEER_CLOSED)
+                raise e
 
     def test_channel_write_then_read(self):
         (a, b) = Channel.create()

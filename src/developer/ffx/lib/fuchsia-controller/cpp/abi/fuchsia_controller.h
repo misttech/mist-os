@@ -81,7 +81,7 @@ extern zx_status_t ffx_eventpair_create(ffx_lib_context_t* ctx, uint32_t options
 extern zx_status_t ffx_object_signal(ffx_lib_context_t* ctx, zx_handle_t hdl, uint32_t clear_mask,
                                      uint32_t set_mask);
 extern zx_status_t ffx_object_signal_peer(ffx_lib_context_t* ctx, zx_handle_t hdl,
-                                          uint32_t clear_mask);
+                                          uint32_t clear_mask, uint32_t set_mask);
 // Attempts to poll the object for any of the following signals masked in "signals." This does not
 // have an analogue regarding zircon object syscalls, as this does not accept a timeout or something
 // similar. This is intended for higher level asynchronous programs to use. Similar to the other

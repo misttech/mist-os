@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <type_traits>
+#include <vector>
 
 #include "error.h"
 #include "fuchsia_controller.h"
@@ -17,6 +18,29 @@ extern struct PyModuleDef fuchsia_controller_internal;
 namespace {
 
 constexpr PyMethodDef SENTINEL = {nullptr, nullptr, 0, nullptr};
+
+/// Enum of python-mapped C++ types
+enum PythonTypeID : uint8_t {
+  kHandleTypeID = 0,
+  kChannelTypeID = 1,
+  kContextTypeID = 2,
+  kSocketTypeID = 3,
+  kIsolateDirTypeID = 4,
+  kEventTypeID = 5,
+};
+
+const std::vector<const char *> TypeStrings = {"Handle", "Channel",    "Context",
+                                               "Socket", "IsolateDir", "Event"};
+
+void SetDowncastError(PyObject *obj, const char *expected) {
+  py::Object repr(PyObject_Repr(obj));
+  PyErr_Format(PyExc_TypeError, "Failed casting \"%s\", expected %s",
+               PyUnicode_AsUTF8AndSize(repr.get(), nullptr), expected);
+}
+
+void SetUnknownIdError(PythonTypeID id, const char *expected) {
+  PyErr_Format(PyExc_TypeError, "Unable to cast from type %s to \"%s\"", TypeStrings[id], expected);
+}
 
 std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *config,
                                                                     const char *target) {
@@ -79,15 +103,6 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
   }
   return std::make_pair(std::move(ffx_config), config_len);
 }
-
-/// Enum of python-mapped C++ types
-enum PythonTypeID : uint8_t {
-  kHandleTypeID = 0,
-  kChannelTypeID = 1,
-  kContextTypeID = 2,
-  kSocketTypeID = 3,
-  kIsolateDirTypeID = 4,
-};
 
 /// Base class for Python objects to inherit from.
 class PythonObject {
@@ -175,6 +190,7 @@ class PythonChannel : public PythonObject {
   ~PythonChannel() {
     if (channel_) {
       ffx_close_handle(channel_);
+      channel_ = 0;
     }
   }
 
@@ -199,6 +215,31 @@ class PythonSocket : public PythonObject {
   ~PythonSocket() {
     if (handle() != 0) {
       ffx_close_handle(handle());
+      handle_ = 0;
+    }
+  }
+
+ private:
+  zx_handle_t handle_;
+};
+
+class PythonEvent : public PythonObject {
+ public:
+  explicit PythonEvent(zx_handle_t handle) : PythonObject(kEventTypeID), handle_(handle) {}
+
+  static constexpr PythonTypeID type_id = kEventTypeID;
+  zx_handle_t take() {
+    auto handle = handle_;
+    handle_ = 0;
+    return handle;
+  }
+
+  zx_handle_t handle() const { return handle_; }
+
+  ~PythonEvent() override {
+    if (handle() != 0) {
+      ffx_close_handle(handle());
+      handle_ = 0;
     }
   }
 
@@ -308,7 +349,7 @@ T *HandleCast(InternalHandle *handle) {
 /// which Python expects handles to be implicitly convertible into.
 PythonChannel *DowncastChannel(PyObject *object) {
   if (object->ob_type != InternalHandleType) {
-    // Object is not a valid handle.
+    SetDowncastError(object, "channel");
     return nullptr;
   }
   auto internal_handle = reinterpret_cast<InternalHandle *>(object);
@@ -316,16 +357,17 @@ PythonChannel *DowncastChannel(PyObject *object) {
   if (maybe_object) {
     return maybe_object;
   }
-
-  if (internal_handle->handle->GetTypeID() == kHandleTypeID) {
+  auto id = internal_handle->handle->GetTypeID();
+  if (id == kHandleTypeID) {
     return HandleCast<PythonChannel>(internal_handle);
   }
+  SetUnknownIdError(id, "channel");
   return nullptr;
 }
 
 PythonSocket *DowncastSocket(PyObject *object) {
   if (object->ob_type != InternalHandleType) {
-    // Object is not a valid handle.
+    SetDowncastError(object, "socket");
     return nullptr;
   }
   auto internal_handle = reinterpret_cast<InternalHandle *>(object);
@@ -333,9 +375,29 @@ PythonSocket *DowncastSocket(PyObject *object) {
   if (maybe_object) {
     return maybe_object;
   }
-  if (internal_handle->handle->GetTypeID() == kHandleTypeID) {
+  auto id = internal_handle->handle->GetTypeID();
+  if (id == kHandleTypeID) {
     return HandleCast<PythonSocket>(internal_handle);
   }
+  SetUnknownIdError(id, "socket");
+  return nullptr;
+}
+
+PythonEvent *DowncastEvent(PyObject *object) {
+  if (object->ob_type != InternalHandleType) {
+    SetDowncastError(object, "event");
+    return nullptr;
+  }
+  auto internal_handle = reinterpret_cast<InternalHandle *>(object);
+  auto maybe_object = internal_handle->handle->as<PythonEvent>();
+  if (maybe_object) {
+    return maybe_object;
+  }
+  auto id = internal_handle->handle->GetTypeID();
+  if (id == kEventTypeID) {
+    return HandleCast<PythonEvent>(internal_handle);
+  }
+  SetUnknownIdError(id, "event");
   return nullptr;
 }
 
@@ -576,8 +638,6 @@ PyObject *channel_write(PyObject *self, PyObject *args) {
   }
   auto channel = DowncastChannel(obj);
   if (!channel) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Channel.");
     return nullptr;
   }
   constexpr size_t max_handle_count = 64;
@@ -622,7 +682,6 @@ PyObject *channel_read(PyObject *self, PyObject *args) {
   }
   auto channel = DowncastChannel(obj);
   if (!channel) {
-    // Invalid handle type
     return nullptr;
   }
   // This is the max FIDL message size;
@@ -673,8 +732,6 @@ PyObject *socket_write(PyObject *self, PyObject *args) {
   }
   auto socket = DowncastSocket(obj);
   if (!socket) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Socket.");
     return nullptr;
   }
   Py_buffer view;
@@ -702,8 +759,6 @@ PyObject *socket_read(PyObject *self, PyObject *args) {
   }
   auto socket = DowncastSocket(obj);
   if (!socket) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Socket.");
     return nullptr;
   }
   constexpr static uint64_t c_buf_len = 65536;
@@ -728,8 +783,6 @@ PyObject *socket_as_int(PyObject *self, PyObject *args) {
   }
   auto socket = DowncastSocket(obj);
   if (!socket) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Socket.");
     return nullptr;
   }
   return PyLong_FromUnsignedLongLong(socket->handle());
@@ -742,8 +795,6 @@ PyObject *socket_take(PyObject *self, PyObject *args) {
   }
   auto socket = DowncastSocket(obj);
   if (!socket) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Socket.");
     return nullptr;
   }
   auto handle = socket->take();
@@ -788,7 +839,6 @@ PyObject *channel_as_int(PyObject *self, PyObject *args) {
   }
   auto channel = DowncastChannel(obj);
   if (!channel) {
-    // Invalid handle type
     return nullptr;
   }
   return PyLong_FromUnsignedLongLong(channel->channel());
@@ -801,7 +851,6 @@ PyObject *channel_take(PyObject *self, PyObject *args) {
   }
   auto channel = DowncastChannel(obj);
   if (!channel) {
-    // Invalid handle type
     return nullptr;
   }
   auto handle = channel->take();
@@ -827,6 +876,86 @@ PyObject *channel_from_int(PyObject *self, PyObject *args) {
     return nullptr;
   }
   return MakePyObject<PythonChannel>(handle);
+}
+
+PyObject *event_from_int(PyObject *self, PyObject *args) {
+  unsigned int handle = 0;
+  if (!PyArg_ParseTuple(args, "I", &handle)) {
+    return nullptr;
+  }
+  return MakePyObject<PythonEvent>(handle);
+}
+
+PyObject *event_signal_peer(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  unsigned int clear_mask;
+  unsigned int set_mask;
+  if (!PyArg_ParseTuple(args, "OII", &obj, &clear_mask, &set_mask)) {
+    return nullptr;
+  }
+  auto event = DowncastPyObject<PythonEvent>(obj);
+  if (!event) {
+    return nullptr;
+  }
+  zx_status_t status =
+      ffx_object_signal_peer(mod::get_module_state()->ctx, event->handle(), clear_mask, set_mask);
+  if (status != ZX_OK) {
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
+    return nullptr;
+  }
+  Py_RETURN_NONE;
+}
+
+PyObject *event_as_int(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &obj)) {
+    return nullptr;
+  }
+  auto event = DowncastEvent(obj);
+  if (!event) {
+    return nullptr;
+  }
+  return PyLong_FromUnsignedLongLong(event->handle());
+}
+
+PyObject *event_take(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &obj)) {
+    return nullptr;
+  }
+  auto event = DowncastEvent(obj);
+  if (!event) {
+    return nullptr;
+  }
+  auto handle = event->take();
+  return PyLong_FromUnsignedLongLong(handle);
+}
+
+PyObject *event_create(PyObject *self, PyObject *args) {
+  zx_handle_t hdl;
+  auto status = ffx_event_create(mod::get_module_state()->ctx, 0, &hdl);
+  if (status != ZX_OK) {
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
+    return nullptr;
+  }
+  return MakePyObject<PythonEvent>(hdl);
+}
+
+PyObject *event_create_pair(PyObject *self, PyObject *args) {
+  zx_handle_t hdl0;
+  zx_handle_t hdl1;
+  auto status = ffx_eventpair_create(mod::get_module_state()->ctx, 0, &hdl0, &hdl1);
+  if (status != ZX_OK) {
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
+    return nullptr;
+  }
+  py::Object tuple(PyTuple_New(2));
+  if (tuple == nullptr) {
+    return nullptr;
+  }
+  PyTuple_SetItem(tuple.get(), 0, MakePyObject<PythonEvent>(hdl0));
+  PyTuple_SetItem(tuple.get(), 1, MakePyObject<PythonEvent>(hdl1));
+  return tuple.take();
 }
 
 PyObject *socket_from_int(PyObject *self, PyObject *args) {
@@ -907,7 +1036,7 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"channel_write", reinterpret_cast<PyCFunction>(channel_write), METH_VARARGS, nullptr},
     {"channel_as_int", reinterpret_cast<PyCFunction>(channel_as_int), METH_VARARGS, nullptr},
     {"channel_take", reinterpret_cast<PyCFunction>(channel_take), METH_VARARGS, nullptr},
-    {"channel_create", reinterpret_cast<PyCFunction>(channel_create), METH_VARARGS, nullptr},
+    {"channel_create", reinterpret_cast<PyCFunction>(channel_create), METH_NOARGS, nullptr},
     {"channel_from_int", reinterpret_cast<PyCFunction>(channel_from_int), METH_VARARGS, nullptr},
 
     // v2 methods for socket
@@ -919,6 +1048,14 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"connect_handle_notifier", reinterpret_cast<PyCFunction>(connect_handle_notifier),
      METH_VARARGS, nullptr},
     {"socket_from_int", reinterpret_cast<PyCFunction>(socket_from_int), METH_VARARGS, nullptr},
+
+    // event methods
+    {"event_from_int", reinterpret_cast<PyCFunction>(event_from_int), METH_VARARGS, nullptr},
+    {"event_as_int", reinterpret_cast<PyCFunction>(event_as_int), METH_VARARGS, nullptr},
+    {"event_take", reinterpret_cast<PyCFunction>(event_take), METH_VARARGS, nullptr},
+    {"event_signal_peer", reinterpret_cast<PyCFunction>(event_signal_peer), METH_VARARGS, nullptr},
+    {"event_create", reinterpret_cast<PyCFunction>(event_create), METH_NOARGS, nullptr},
+    {"event_create_pair", reinterpret_cast<PyCFunction>(event_create_pair), METH_NOARGS, nullptr},
 
     // v2 methods for IsolateDir (create, get name)
     {"isolate_dir_create", reinterpret_cast<PyCFunction>(isolate_dir_create), METH_VARARGS,

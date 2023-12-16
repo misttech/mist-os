@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import os
 import typing
+
 from fuchsia_controller_internal import ZxStatus
 
 
@@ -15,43 +16,38 @@ def connect_handle_notifier() -> int:
 
 
 def encode_ints(ints) -> bytes:
-    """
-    Encodes an array-like object of int-like things to a byte buffer.
-    """
+    """Encodes an array-like object of int-like things to a byte buffer."""
     return b"".join([x.to_bytes(4, byteorder="little") for x in ints])
 
 
 class Handle:
-    """
-    Fuchsia controller FIDL handle. This is used to bootstrap processes for FIDL interactions.
+    """Fuchsia controller FIDL handle.
+
+    This is used to bootstrap processes for FIDL interactions.
     """
 
     def __init__(self, handle):
         self._handle = handle
 
     def as_int(self) -> int:
-        """
-        Returns the underlying handle as an integer.
-        """
+        """Returns the underlying handle as an integer."""
         return fuchsia_controller_internal.handle_as_int(self._handle)
 
     def take(self) -> int:
-        """
-        Takes the underlying fidl handle, setting it internally to zero (thus invalidating the
-        underlying channel). This is used for sending a handle through FIDL function calls.
+        """Takes the underlying fidl handle, setting it internally to zero.
+
+        This invalidates the underlying channel. Used for sending a handle
+        through FIDL function calls.
         """
         return fuchsia_controller_internal.handle_take(self._handle)
 
     def close(self):
-        """
-        Releases the underlying handle.
-        """
+        """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
     def create(cls) -> "Handle":
-        """
-        classmethod for creating a Fuchsia controller handle.
+        """Classmethod for creating a Fuchsia controller handle.
 
         Returns:
             A Handle object.
@@ -60,8 +56,7 @@ class Handle:
 
 
 class Socket:
-    """
-    Fuchsia controller Zircon socket. This can be read from and written to.
+    """Fuchsia controller Zircon socket. This can be read from and written to.
 
     Can be constructed from a Handle object, but keep in mind that this will mark
     the caller's handle invalid, leaving this socket to be the only owner of the underlying
@@ -77,8 +72,7 @@ class Socket:
             self._handle = handle
 
     def write(self, data) -> int:
-        """
-        Writes data to the socket.
+        """Writes data to the socket.
 
         Args:
             data: The data to write to the socket. This must be a tuple of two elements
@@ -93,34 +87,30 @@ class Socket:
         return fuchsia_controller_internal.socket_write(self._handle, data)
 
     def read(self) -> bytes:
-        """
-        Reads data from the socket.
-        """
+        """Reads data from the socket."""
         return fuchsia_controller_internal.socket_read(self._handle)
 
     def as_int(self) -> int:
-        """
-        Returns the underlying socket as an integer.
-        """
+        """Returns the underlying socket as an integer."""
         return fuchsia_controller_internal.socket_as_int(self._handle)
 
     def take(self) -> int:
-        """
-        Takes the underlying fidl handle, setting it internally to zero (thus invalidating the
-        underlying socket). This is used for sending a handle through FIDL function calls.
+        """Takes the underlying fidl handle, setting it internally to zero.
+
+        This invalidates the underlying socket. Used for sending a handle
+        through FIDL function calls.
         """
         return fuchsia_controller_internal.socket_take(self._handle)
 
     def close(self):
-        """
-        Releases the underlying handle.
-        """
+        """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
     def create(cls, options=None) -> tuple["Socket", "Socket"]:
-        """
-        classmethod for creating a pair of sockets. These are connected bidirectionally.
+        """Classmethod for creating a pair of socket.
+
+        The returned sockets are connected bidirectionally.
 
         Returns:
             A tuple of two Socket objects.
@@ -132,23 +122,28 @@ class Socket:
 
 
 class IsolateDir:
-    """
-    Fuchsia controller Isolate Directory. Represents an Isolate Directory path to be used by the fuchsia controller Context object. This object cleans up the Isolate Directory (if it exists) once it goes out of scope.
+    """Fuchsia controller Isolate Directory.
+
+    Represents an Isolate Directory path to be used by the fuchsia controller
+    Context object. This object cleans up the Isolate Directory (if it exists)
+    once it goes out of scope.
     """
 
     def __init__(self, dir: typing.Optional[str] = None) -> None:
         self._handle = fuchsia_controller_internal.isolate_dir_create(dir)
 
     def directory(self) -> str:
-        """
-        Returns a string representing the directory to which this IsolateDir points. The IsolateDir will create it upon initialization.
+        """Returns a string representing this object's directory.
+
+        The IsolateDir will create it upon initialization.
         """
         return fuchsia_controller_internal.isolate_dir_get_path(self._handle)
 
 
 class Context:
-    """
-    Fuchsia controller context. This is the necessary object for interacting with a Fuchsia device.
+    """Fuchsia controller context.
+
+    This is the necessary object for interacting with a Fuchsia device.
     """
 
     def __init__(
@@ -163,8 +158,7 @@ class Context:
         self._directory = isolate_dir
 
     def connect_daemon_protocol(self, marker: str) -> "Channel":
-        """
-        Connects to a Fuchsia daemon protocol.
+        """Connects to a Fuchsia daemon protocol.
 
         Args:
             marker: The marker of the protocol to connect to.
@@ -179,8 +173,7 @@ class Context:
         )
 
     def target_wait(self, timeout: float) -> bool:
-        """
-        Waits for the target to be ready.
+        """Waits for the target to be ready.
 
         Args:
             timeout: The timeout in seconds.
@@ -193,8 +186,7 @@ class Context:
         )
 
     def connect_target_proxy(self) -> "Channel":
-        """
-        Connects to the target proxy.
+        """Connects to the target proxy.
 
         Returns:
             A FIDL client for the target proxy.
@@ -224,8 +216,7 @@ class Context:
     def connect_device_proxy(
         self, moniker: str, capability_name: str
     ) -> "Channel":
-        """
-        Connects to a device proxy.
+        """Connects to a device proxy.
 
         Args:
             moniker: The component moniker to connect to
@@ -241,8 +232,7 @@ class Context:
         )
 
     def connect_remote_control_proxy(self) -> "Channel":
-        """
-        Connects to the remote control proxy.
+        """Connects to the remote control proxy.
 
         Returns:
             A FIDL client for the remote control proxy.
@@ -254,19 +244,16 @@ class Context:
         )
 
     def close(self):
-        """
-        Releases the underlying handle.
-        """
+        """Releases the underlying handle."""
         self._handle = None
 
 
 class Channel:
-    """
-    Fuchsia controller FIDL channel. This can be read from and written to.
+    """Fuchsia controller FIDL channel. This can be read from and written to.
 
-    Can be constructed from a Handle object, but keep in mind that this will mark
-    the caller's handle invalid, leaving this channel to be the only owner of the underlying
-    handle.
+    Can be constructed from a Handle object, but keep in mind that this will
+    mark the caller's handle invalid, leaving this channel to be the only owner
+    of the underlying handle.
     """
 
     def __init__(self, handle):
@@ -278,8 +265,7 @@ class Channel:
             self._handle = handle
 
     def write(self, data) -> int:
-        """
-        Writes data to the channel.
+        """Writes data to the channel.
 
         Args:
             data: The data to write to the channel. This must be a tuple of two elements
@@ -299,39 +285,91 @@ class Channel:
         )
 
     def read(self) -> typing.Tuple[bytes, typing.List[Handle]]:
-        """
-        Reads data from the channel.
-        """
+        """Reads data from the channel."""
         retval = fuchsia_controller_internal.channel_read(self._handle)
         # Convert internal Handle objects to Python Handle objects
         return (retval[0], list(map(Handle, retval[1])))
 
     def as_int(self) -> int:
-        """
-        Returns the underlying channel as an integer.
-        """
+        """Returns the underlying channel as an integer."""
         return fuchsia_controller_internal.channel_as_int(self._handle)
 
     def take(self) -> int:
-        """
-        Takes the underlying fidl handle, setting it internally to zero (thus invalidating the
-        underlying channel). This is used for sending a handle through FIDL function calls.
+        """Takes the underlying fidl handle, setting it internally to zero.
+
+        This invalidates the underlying channel. Used for sending a handle
+        through FIDL function calls.
         """
         return fuchsia_controller_internal.channel_take(self._handle)
 
     def close(self):
-        """
-        Releases the underlying handle.
-        """
+        """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
     def create(cls) -> tuple["Channel", "Channel"]:
-        """
-        classmethod for creating a pair of channels. These are connected bidirectionally.
+        """Classmethod for creating a pair of channels.
+
+        The returned channels are connected bidirectionally.
 
         Returns:
             A tuple of two Channel objects.
         """
         handles = fuchsia_controller_internal.channel_create()
         return (Channel(handles[0]), Channel(handles[1]))
+
+
+class Event:
+    """
+    Fuchsia controller zx Event object. This can signalled.
+
+    Can be constructed from a Handle object, but keep in mind that this will mark
+    the caller's handle invalid, leaving this channel to be the only owner of
+    the underlying handle.
+    """
+
+    def __init__(self, handle=None):
+        if handle is None:
+            self._handle = fuchsia_controller_internal.event_create()
+            return
+
+        if isinstance(handle, Handle):
+            handle = handle.take()
+        if isinstance(handle, int):
+            self._handle = fuchsia_controller_internal.event_from_int(handle)
+        else:
+            self._handle = handle
+
+    def signal_peer(self, clear_mask: int, set_mask: int) -> None:
+        """Attempts to signal a peer on the other side of this event."""
+        fuchsia_controller_internal.event_signal_peer(
+            self._handle, clear_mask, set_mask
+        )
+
+    def as_int(self) -> int:
+        """Returns the underlying channel as an integer."""
+        return fuchsia_controller_internal.event_as_int(self._handle)
+
+    def take(self) -> int:
+        """Takes the underlying fidl handle, setting it internally to zero.
+
+        This invalidates the underlying event. Used for sending a handle
+        through FIDL function calls.
+        """
+        return fuchsia_controller_internal.event_take(self._handle)
+
+    def close(self):
+        """Releases the underlying handle."""
+        self._handle = None
+
+    @classmethod
+    def create_pair(cls) -> tuple["Channel", "Channel"]:
+        """Classmethod for creating a pair of events.
+
+        The returned event objects are connected bidirectionally.
+
+        Returns:
+            A tuple of two event objects.
+        """
+        handles = fuchsia_controller_internal.event_create_pair()
+        return (Event(handles[0]), Event(handles[1]))
