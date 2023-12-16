@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -33,7 +34,7 @@ class SysmemDeviceWrapper {
   virtual const sysmem_protocol_t* proto() const = 0;
   virtual const zx_device_t* device() const = 0;
   virtual zx_status_t Bind() = 0;
-  virtual fidl::WireServer<fuchsia_sysmem2::DriverConnector>* DriverConnectorServer() = 0;
+  virtual fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() = 0;
 };
 
 // Convenient implementation of SysmemDeviceWrapper which can be used to wrap both
@@ -45,7 +46,7 @@ class SysmemDeviceWrapper {
 template <typename T>
 class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
  public:
-  static_assert(std::is_base_of_v<fidl::WireServer<fuchsia_sysmem2::DriverConnector>, T>);
+  static_assert(std::is_base_of_v<fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>, T>);
   explicit GenericSysmemDeviceWrapper(zx_device_t* parent)
       : sysmem_ctx_(std::make_unique<sysmem_driver::Driver>()),
         owned_sysmem_(std::make_unique<T>(parent, sysmem_ctx_.get())) {
@@ -54,7 +55,7 @@ class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
 
   const sysmem_protocol_t* proto() const override { return sysmem_->proto(); }
   const zx_device_t* device() const override { return sysmem_->device(); }
-  fidl::WireServer<fuchsia_sysmem2::DriverConnector>* DriverConnectorServer() override {
+  fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() override {
     return sysmem_;
   }
   zx_status_t Bind() override {

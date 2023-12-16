@@ -50,7 +50,8 @@ namespace sysmem_driver {
 
 class Device;
 using DdkDeviceType =
-    ddk::Device<Device, ddk::Messageable<fuchsia_sysmem2::DriverConnector>::Mixin, ddk::Unbindable>;
+    ddk::Device<Device, ddk::Messageable<fuchsia_hardware_sysmem::DriverConnector>::Mixin,
+                ddk::Unbindable>;
 
 class Driver;
 class BufferCollectionToken;

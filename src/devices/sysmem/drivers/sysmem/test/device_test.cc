@@ -218,7 +218,8 @@ class FakeDdkSysmem : public zxtest::Test {
     EXPECT_OK(allocator_endpoints);
     auto [allocator_client_end, allocator_server_end] = std::move(*allocator_endpoints);
 
-    zx::result connector_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
+    zx::result connector_endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_sysmem::DriverConnector>();
     EXPECT_OK(connector_endpoints);
     auto [connector_client_end, connector_server_end] = std::move(*connector_endpoints);
 

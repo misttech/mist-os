@@ -42,7 +42,7 @@ class FakeDisplayStack {
   fake_display::FakeDisplay* display() { return display_; }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
-  const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_client();
+  const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& sysmem_client();
 
   // Join all threads providing display and sysmem protocols, and remove all
   // the devices bound to the mock root device.
@@ -86,7 +86,7 @@ class FakeDisplayStack {
   std::optional<component::OutgoingDirectory> outgoing_;
 
   fidl::WireSyncClient<fuchsia_hardware_display::Provider> display_provider_client_;
-  fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector> sysmem_client_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector> sysmem_client_;
 };
 
 }  // namespace display

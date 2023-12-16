@@ -36,7 +36,7 @@ class TestBase : public testing::Test {
   Controller* controller() { return tree_->coordinator_controller(); }
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_fidl();
+  const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& sysmem_fidl();
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_fidl();
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }

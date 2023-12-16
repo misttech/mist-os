@@ -74,7 +74,7 @@ class FakeDisplayTest : public testing::Test {
 
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_fidl() {
+  const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& sysmem_fidl() {
     return tree_->sysmem_client();
   }
 

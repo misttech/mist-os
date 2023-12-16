@@ -44,12 +44,12 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   }
 
   sysmem_device_ = mock_root_->GetLatestChild();
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::DriverConnector>();
   fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server),
                    sysmem_->DriverConnectorServer());
   sysmem_loop_.StartThread("sysmem-server-thread");
-  sysmem_client_ =
-      fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>(std::move(sysmem_endpoints->client));
+  sysmem_client_ = fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>(
+      std::move(sysmem_endpoints->client));
 
   // Fragment for fake-display
   client = SetUpPDevFidlServer();
@@ -123,7 +123,8 @@ const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack
   return display_provider_client_;
 }
 
-const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& FakeDisplayStack::sysmem_client() {
+const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>&
+FakeDisplayStack::sysmem_client() {
   return sysmem_client_;
 }
 

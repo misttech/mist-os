@@ -1,10 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.sysmem2;
+library fuchsia.hardware.sysmem;
 
 using fuchsia.io;
 using fuchsia.sysmem;
+using fuchsia.sysmem2;
 
 /// Most clients of sysmem don't care about this protocol, as most clients get a
 /// connection to sysmem via their /svc directory.
@@ -15,7 +16,6 @@ using fuchsia.sysmem;
 /// requests for [`fuchsia.sysmem/Allocator`] or [`fuchsia.sysmem2/Allocator`].
 /// This interface then allows asynchronously sending the server end of an
 /// Allocator channel to sysmem, which will then be served by the sysmem driver.
-@available(added=HEAD)
 @discoverable
 closed protocol DriverConnector {
     /// This one-way message sends in the server end of a
@@ -33,7 +33,7 @@ closed protocol DriverConnector {
     /// `allocator_request` will be served by the sysmem driver (or the channel
     /// will close).
     strict ConnectV2(resource struct {
-        allocator_request server_end:Allocator;
+        allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 
     /// The sysmem driver won't be able to emit Cobalt metrics until a service

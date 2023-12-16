@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -75,7 +76,7 @@ zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocato
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_driver_v1() {
   fbl::unique_fd sysmem_dir(open(SYSMEM_CLASS_PATH, O_RDONLY));
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>> client_end;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::DriverConnector>> client_end;
   zx_status_t status = fdio_watch_directory(
       sysmem_dir.get(),
       [](int dirfd, int event, const char* fn, void* cookie) {
@@ -86,8 +87,9 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_dr
           return ZX_OK;
         }
         fdio_cpp::UnownedFdioCaller caller(dirfd);
-        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>>*>(cookie) =
-            component::ConnectAt<fuchsia_sysmem2::DriverConnector>(caller.directory(), fn);
+        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::DriverConnector>>*>(
+            cookie) =
+            component::ConnectAt<fuchsia_hardware_sysmem::DriverConnector>(caller.directory(), fn);
         return ZX_ERR_STOP;
       },
       ZX_TIME_INFINITE, &client_end);

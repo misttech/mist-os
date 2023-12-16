@@ -47,7 +47,7 @@ bool MockDdkSysmem::Init() {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> MockDdkSysmem::Connect() {
-  auto driver_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
+  auto driver_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::DriverConnector>();
   if (driver_endpoints.is_error()) {
     return zx::error(driver_endpoints.status_value());
   }
@@ -61,7 +61,7 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> MockDdkSysmem::Connect() 
 
   auto [allocator_client_end, allocator_server_end] = std::move(*allocator_endpoints);
 
-  fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector> driver_client(
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector> driver_client(
       std::move(driver_endpoints->client));
   fidl::Status result = driver_client->ConnectV1(std::move(allocator_server_end));
   if (!result.ok()) {

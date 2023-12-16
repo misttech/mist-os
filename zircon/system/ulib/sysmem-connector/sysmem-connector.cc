@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -84,7 +85,7 @@ class SysmemConnector : public sysmem_connector {
   // Only touched from process_queue_loop_'s one thread.
   //
 
-  fidl::ClientEnd<fuchsia_sysmem2::DriverConnector> driver_connector_client_;
+  fidl::ClientEnd<fuchsia_hardware_sysmem::DriverConnector> driver_connector_client_;
   async::WaitMethod<SysmemConnector, &SysmemConnector::OnSysmemPeerClosed> wait_sysmem_peer_closed_;
 
   //
@@ -163,7 +164,7 @@ zx_status_t SysmemConnector::DeviceAdded(int dirfd, int event, const char* filen
 
   {
     const fdio_cpp::UnownedFdioCaller caller(dirfd);
-    zx::result status = component::ConnectAt<fuchsia_sysmem2::DriverConnector>(
+    zx::result status = component::ConnectAt<fuchsia_hardware_sysmem::DriverConnector>(
         caller.borrow_as<fuchsia_io::Directory>(), filename);
     if (status.is_error()) {
       printf("sysmem-connector: component::ConnectAt(%s, %s): %s\n", sysmem_directory_path_,

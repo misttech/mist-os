@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_PROXY_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
@@ -30,8 +31,8 @@ namespace display {
 
 class SysmemProxyDevice;
 using DdkDeviceType2 =
-    ddk::Device<SysmemProxyDevice, ddk::Messageable<fuchsia_sysmem2::DriverConnector>::Mixin,
-                ddk::Unbindable>;
+    ddk::Device<SysmemProxyDevice,
+                ddk::Messageable<fuchsia_hardware_sysmem::DriverConnector>::Mixin, ddk::Unbindable>;
 
 // SysmemProxyDevice is a replacement for sysmem_driver::Device, intended for use in tests.  Instead
 // of instantiating a separate/hermetic Sysmem, SysmemProxyDevice connects to the allocator made
