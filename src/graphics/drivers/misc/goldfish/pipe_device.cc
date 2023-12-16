@@ -331,7 +331,7 @@ zx_status_t PipeDevice::RegisterSysmemHeap(uint64_t heap, zx::channel connection
   TRACE_DURATION("gfx", "PipeDevice::RegisterSysmemHeap");
 
   auto result = hardware_sysmem_->RegisterHeap(
-      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>(std::move(connection)));
+      heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(connection)));
   return result.status();
 }
 

@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MISC_GOLDFISH_CONTROL_HEAP_H_
 #define SRC_GRAPHICS_DRIVERS_MISC_GOLDFISH_CONTROL_HEAP_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
@@ -20,7 +21,7 @@
 namespace goldfish {
 
 class Control;
-using HeapServer = fidl::WireServer<fuchsia_sysmem2::Heap>;
+using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 
 using BufferKey = std::pair<uint64_t, uint32_t>;
 struct BufferKeyHash {
@@ -61,7 +62,7 @@ class Heap : public HeapServer, public fbl::DoublyLinkedListable<std::unique_ptr
   // given channel and send |heap_properties| to sysmem.
   void BindWithHeapProperties(zx::channel server_request,
                               std::unique_ptr<fidl::Arena<512>> allocator,
-                              fuchsia_sysmem2::wire::HeapProperties heap_properties);
+                              fuchsia_hardware_sysmem::wire::HeapProperties heap_properties);
 
   Control* control() const { return control_; }
 

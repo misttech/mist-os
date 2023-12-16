@@ -37,7 +37,7 @@
 
 class SimpleDisplay;
 using DeviceType = ddk::Device<SimpleDisplay>;
-using HeapServer = fidl::WireServer<fuchsia_sysmem2::Heap>;
+using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 using BufferKey = std::pair<uint64_t, uint32_t>;
 class SimpleDisplay : public DeviceType,
                       public HeapServer,

@@ -33,9 +33,9 @@ namespace {
 
 constexpr uint64_t kMiB = 1024ull * 1024;
 
-fuchsia_sysmem2::HeapProperties BuildHeapProperties(bool is_cpu_accessible) {
-  using fuchsia_sysmem2::CoherencyDomainSupport;
-  using fuchsia_sysmem2::HeapProperties;
+fuchsia_hardware_sysmem::HeapProperties BuildHeapProperties(bool is_cpu_accessible) {
+  using fuchsia_hardware_sysmem::CoherencyDomainSupport;
+  using fuchsia_hardware_sysmem::HeapProperties;
 
   CoherencyDomainSupport coherency_domain_support;
   coherency_domain_support.cpu_supported() = is_cpu_accessible;

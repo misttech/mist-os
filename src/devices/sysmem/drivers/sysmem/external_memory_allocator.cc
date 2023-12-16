@@ -11,9 +11,9 @@
 #include "macros.h"
 
 namespace sysmem_driver {
-ExternalMemoryAllocator::ExternalMemoryAllocator(MemoryAllocator::Owner* owner,
-                                                 fidl::WireSharedClient<fuchsia_sysmem2::Heap> heap,
-                                                 fuchsia_sysmem2::HeapProperties properties)
+ExternalMemoryAllocator::ExternalMemoryAllocator(
+    MemoryAllocator::Owner* owner, fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap,
+    fuchsia_hardware_sysmem::HeapProperties properties)
     : MemoryAllocator(properties), owner_(owner), heap_(std::move(heap)) {
   node_ = owner->heap_node()->CreateChild(
       fbl::StringPrintf("ExternalMemoryAllocator-%ld", id()).c_str());

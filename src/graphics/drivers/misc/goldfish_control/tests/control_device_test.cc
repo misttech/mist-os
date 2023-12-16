@@ -48,7 +48,7 @@ namespace {
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {
  public:
   struct HeapInfo {
-    fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_client_end;
+    fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_client_end;
     bool is_registered = false;
     bool cpu_supported = false;
     bool ram_supported = false;
@@ -154,7 +154,7 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
                           RegisterSysmemHeapCompleter::Sync& completer) override {
     heap_info_[request->heap] = {};
     heap_info_[request->heap].heap_client_end =
-        fidl::ClientEnd<fuchsia_sysmem2::Heap>(std::move(request->connection));
+        fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(request->connection));
     completer.ReplySuccess();
   }
 
@@ -199,21 +199,22 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
   }
 
  private:
-  class SysmemHeapEventHandler : public fidl::WireSyncEventHandler<fuchsia_sysmem2::Heap> {
+  class SysmemHeapEventHandler : public fidl::WireSyncEventHandler<fuchsia_hardware_sysmem::Heap> {
    public:
     SysmemHeapEventHandler() = default;
-    void OnRegister(fidl::WireEvent<fuchsia_sysmem2::Heap::OnRegister>* message) override {
+    void OnRegister(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) override {
       if (handler != nullptr) {
         handler(message);
       }
     }
     void SetOnRegisterHandler(
-        fit::function<void(fidl::WireEvent<fuchsia_sysmem2::Heap::OnRegister>*)> new_handler) {
+        fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)>
+            new_handler) {
       handler = std::move(new_handler);
     }
 
    private:
-    fit::function<void(fidl::WireEvent<fuchsia_sysmem2::Heap::OnRegister>*)> handler;
+    fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)> handler;
   };
 
   zx_status_t HandleSysmemEvents() {
@@ -221,7 +222,8 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
     for (auto& kv : heap_info_) {
       SysmemHeapEventHandler handler;
       handler.SetOnRegisterHandler(
-          [this, heap = kv.first](fidl::WireEvent<fuchsia_sysmem2::Heap::OnRegister>* message) {
+          [this,
+           heap = kv.first](fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) {
             auto& heap_info = heap_info_[heap];
             heap_info.is_registered = true;
             heap_info.cpu_supported =

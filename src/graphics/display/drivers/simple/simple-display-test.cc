@@ -374,7 +374,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
                                                                         kBanjoCollectionId));
 
-  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Heap>();
+  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Heap>();
   ASSERT_TRUE(heap_endpoints.is_ok());
   auto& [heap_client, heap_server] = heap_endpoints.value();
   auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MEMORY_ALLOCATOR_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MEMORY_ALLOCATOR_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fit/function.h>
@@ -40,7 +41,7 @@ class MemoryAllocator {
     virtual bool protected_ranges_disable_dynamic() const { return false; }
   };
 
-  explicit MemoryAllocator(fuchsia_sysmem2::HeapProperties properties);
+  explicit MemoryAllocator(fuchsia_hardware_sysmem::HeapProperties properties);
 
   virtual ~MemoryAllocator();
 
@@ -79,7 +80,9 @@ class MemoryAllocator {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const fuchsia_sysmem2::HeapProperties& heap_properties() const { return heap_properties_; }
+  const fuchsia_hardware_sysmem::HeapProperties& heap_properties() const {
+    return heap_properties_;
+  }
 
   // These avoid the possibility of trying to use a sysmem-configured secure
   // heap before the TEE has told the HW to make the physical range
@@ -106,7 +109,7 @@ class MemoryAllocator {
  private:
   // This is a unique ID for the allocator on this system.
   uint64_t id_{};
-  fuchsia_sysmem2::HeapProperties heap_properties_;
+  fuchsia_hardware_sysmem::HeapProperties heap_properties_;
 };
 
 }  // namespace sysmem_driver

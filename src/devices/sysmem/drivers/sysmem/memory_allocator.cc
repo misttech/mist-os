@@ -11,7 +11,7 @@
 
 namespace sysmem_driver {
 
-MemoryAllocator::MemoryAllocator(fuchsia_sysmem2::HeapProperties properties)
+MemoryAllocator::MemoryAllocator(fuchsia_hardware_sysmem::HeapProperties properties)
     : heap_properties_(std::move(properties)) {
   static std::atomic_uint64_t id;
   id_ = id++;

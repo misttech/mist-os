@@ -33,13 +33,13 @@ namespace {
 
 static const char* kTag = "goldfish-host-visible-heap";
 
-fuchsia_sysmem2::wire::HeapProperties GetHeapProperties(fidl::AnyArena& allocator) {
-  fuchsia_sysmem2::wire::CoherencyDomainSupport coherency_domain_support(allocator);
+fuchsia_hardware_sysmem::wire::HeapProperties GetHeapProperties(fidl::AnyArena& allocator) {
+  fuchsia_hardware_sysmem::wire::CoherencyDomainSupport coherency_domain_support(allocator);
   coherency_domain_support.set_cpu_supported(true)
       .set_ram_supported(true)
       .set_inaccessible_supported(false);
 
-  fuchsia_sysmem2::wire::HeapProperties heap_properties(allocator);
+  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties(allocator);
   heap_properties
       .set_coherency_domain_support(allocator, std::move(coherency_domain_support))
       // Allocated VMOs are not directly writeable since they are physical
@@ -397,7 +397,8 @@ void HostVisibleHeap::DeallocateVmo(BufferKey buffer_key) {
 
 void HostVisibleHeap::Bind(zx::channel server_request) {
   auto allocator = std::make_unique<fidl::Arena<512>>();
-  fuchsia_sysmem2::wire::HeapProperties heap_properties = GetHeapProperties(*allocator.get());
+  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties =
+      GetHeapProperties(*allocator.get());
   BindWithHeapProperties(std::move(server_request), std::move(allocator),
                          std::move(heap_properties));
 }

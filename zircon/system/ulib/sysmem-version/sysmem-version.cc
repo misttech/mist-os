@@ -1544,24 +1544,6 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
   return fpromise::ok(buffer_collection_info);
 }
 
-fuchsia_sysmem2::wire::CoherencyDomainSupport V2CloneCoherencyDomainSuppoort(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::CoherencyDomainSupport& src) {
-  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
-  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
-  // size than a custom clone, and avoids maintenance when adding a field.
-  auto src_natural = fidl::ToNatural(src);
-  return fidl::ToWire(allocator, src_natural);
-}
-
-fuchsia_sysmem2::wire::HeapProperties V2CloneHeapProperties(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::HeapProperties& src) {
-  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
-  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
-  // size than a custom clone, and avoids maintenance when adding a field.
-  auto src_natural = fidl::ToNatural(src);
-  return fidl::ToWire(allocator, src_natural);
-}
-
 fuchsia_sysmem2::wire::BufferCollectionConstraints V2CloneBufferCollectionConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferCollectionConstraints& src) {
   // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which

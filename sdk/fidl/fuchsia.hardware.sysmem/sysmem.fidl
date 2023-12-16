@@ -16,7 +16,7 @@ closed protocol Sysmem {
     /// fuchsia.sysmem2.Heap.
     strict RegisterHeap(resource struct {
         heap uint64;
-        heap_connection client_end:fuchsia.sysmem2.Heap;
+        heap_connection client_end:Heap;
     });
 
     /// Takes the client end of a FIDL connection that'll serve

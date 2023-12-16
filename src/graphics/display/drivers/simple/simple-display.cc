@@ -44,12 +44,12 @@ static constexpr uint64_t kRefreshRateHz = 30;
 
 static constexpr auto kVSyncInterval = zx::usec(1000000 / kRefreshRateHz);
 
-fuchsia_sysmem2::wire::HeapProperties GetHeapProperties(fidl::AnyArena& arena) {
-  fuchsia_sysmem2::wire::CoherencyDomainSupport coherency_domain_support(arena);
+fuchsia_hardware_sysmem::wire::HeapProperties GetHeapProperties(fidl::AnyArena& arena) {
+  fuchsia_hardware_sysmem::wire::CoherencyDomainSupport coherency_domain_support(arena);
   coherency_domain_support.set_cpu_supported(false)
       .set_ram_supported(true)
       .set_inaccessible_supported(false);
-  fuchsia_sysmem2::wire::HeapProperties heap_properties(arena);
+  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties(arena);
   heap_properties.set_coherency_domain_support(arena, std::move(coherency_domain_support))
       .set_need_clear(false);
   return heap_properties;
@@ -448,7 +448,7 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
 
   auto result = hardware_sysmem_->RegisterHeap(
       static_cast<uint64_t>(fuchsia_sysmem2::wire::HeapType::kFramebuffer),
-      fidl::ClientEnd<fuchsia_sysmem2::Heap>(std::move(heap_connection)));
+      fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(heap_connection)));
   if (!result.ok()) {
     printf("%s: failed to register sysmem heap: %s\n", name, result.status_string());
     return result.status();
@@ -461,16 +461,17 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
 
   // Start heap server.
   auto arena = std::make_unique<fidl::Arena<512>>();
-  fuchsia_sysmem2::wire::HeapProperties heap_properties = GetHeapProperties(*arena.get());
+  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties = GetHeapProperties(*arena.get());
   async::PostTask(
       loop_.dispatcher(),
-      [server_end = fidl::ServerEnd<fuchsia_sysmem2::Heap>(std::move(heap_request)),
+      [server_end = fidl::ServerEnd<fuchsia_hardware_sysmem::Heap>(std::move(heap_request)),
        arena = std::move(arena), heap_properties = std::move(heap_properties), this]() mutable {
-        auto binding = fidl::BindServer(loop_.dispatcher(), std::move(server_end), this,
-                                        [](SimpleDisplay* self, fidl::UnbindInfo info,
-                                           fidl::ServerEnd<fuchsia_sysmem2::Heap> server_end) {
-                                          OnHeapServerClose(info, server_end.TakeChannel());
-                                        });
+        auto binding =
+            fidl::BindServer(loop_.dispatcher(), std::move(server_end), this,
+                             [](SimpleDisplay* self, fidl::UnbindInfo info,
+                                fidl::ServerEnd<fuchsia_hardware_sysmem::Heap> server_end) {
+                               OnHeapServerClose(info, server_end.TakeChannel());
+                             });
         auto result = fidl::WireSendEvent(binding)->OnRegister(std::move(heap_properties));
         if (!result.ok()) {
           zxlogf(ERROR, "OnRegister() failed: %s", result.FormatDescription().c_str());

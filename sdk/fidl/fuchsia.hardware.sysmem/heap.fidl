@@ -1,8 +1,9 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.sysmem2;
+library fuchsia.hardware.sysmem;
 
+using fuchsia.sysmem2;
 using zx;
 
 /// Sysmem Heaps can have different support for different coherency
@@ -11,7 +12,6 @@ using zx;
 ///
 /// Each member property should correspond to a coherency domain defined
 /// in the CoherencyDomain enum.
-@available(added=HEAD)
 type CoherencyDomainSupport = table {
     /// Iff set and true, this heap supports the CPU domain.
     1: cpu_supported bool;
@@ -23,7 +23,6 @@ type CoherencyDomainSupport = table {
 
 /// Memory properties for a sysmem Heap.
 /// Heaps send the `HeapProperties` to sysmem device at registration time.
-@available(added=HEAD)
 type HeapProperties = table {
     /// Which coherency domains are supported by this heap.
     1: coherency_domain_support CoherencyDomainSupport;
@@ -35,7 +34,6 @@ type HeapProperties = table {
 };
 
 /// Manages resources on a specific sysmem heap.
-@available(added=HEAD)
 closed protocol Heap {
     /// Request a new memory allocation of `size` on heap. For heaps which don't
     /// permit CPU access to the buffer data, this will create a VMO with an
@@ -46,28 +44,28 @@ closed protocol Heap {
     /// sysmem-provided VMO that's derived from the returned `vmo` using
     /// [`fuchsia.sysmem2/Allocator.GetVmoInfo`].
     ///
-    /// The [`fuchsia.sysmem2/Heap`] server must ensure that if all handles to
-    /// `vmo` + descendents of `vmo` are closed, the [`fuchsia.sysmem2/Heap`]
-    /// server will clean up any state associated with `vmo` even in the absence
-    /// of any call to `DeleteVmo`.
+    /// The [`fuchsia.hardware.sysmem/Heap`] server must ensure that if all
+    /// handles to `vmo` + descendents of `vmo` are closed, the
+    /// [`fuchsia.hardware.sysmem/Heap`] server will clean up any state
+    /// associated with `vmo` even in the absence of any call to `DeleteVmo`.
     ///
-    /// The [`fuchsia.sysmem2/Heap`] server must create `vmo` as a
+    /// The [`fuchsia.hardware.sysmem/Heap`] server must create `vmo` as a
     /// ZX_VMO_CHILD_SLICE (or ZX_VMO_CHILD_REFERENCE) of a parent VMO retained
-    /// by the [`fuchsia.sysmem2/Heap`] server, with the
-    /// [`fuchsia.sysmem2/Heap`] server waiting on ZX_VMO_ZERO_CHILDREN to
-    /// trigger cleanup. The [`fuchsia.sysmem2/Heap`] server must not retain any
-    /// handles to `vmo` or descendents of `vmo` or VMAR mappings to `vmo` as
-    /// that would prevent ZX_VMO_ZERO_CHILDREN from being signaled. However,
-    /// the server is free to keep handles to the server's parent VMO, VMAR
-    /// mappings to the server's parent VMO, or similar via separate (from
+    /// by the [`fuchsia.hardware.sysmem/Heap`] server, with the
+    /// [`fuchsia.hardware.sysmem/Heap`] server waiting on ZX_VMO_ZERO_CHILDREN
+    /// to trigger cleanup. The [`fuchsia.hardware.sysmem/Heap`] server must not
+    /// retain any handles to `vmo` or descendents of `vmo` or VMAR mappings to
+    /// `vmo` as that would prevent ZX_VMO_ZERO_CHILDREN from being signaled.
+    /// However, the server is free to keep handles to the server's parent VMO,
+    /// VMAR mappings to the server's parent VMO, or similar via separate (from
     /// `vmo`) child VMOs, as long as those can be cleaned up synchronously
     /// during `DeleteVmo` (absent process failures).
     ///
     /// As long as the caller doesn't crash, the caller guarantees that
-    /// [`fuchsia.sysmem2/Heap.DeleteVmo`] will be passed `vmo` later with
-    /// ZX_VMO_ZERO_CHILDREN already signaled on `vmo`, and with `vmo` being the
-    /// only remaining handle to the VMO (assuming the heap server did not
-    /// itself retain any handle to `vmo`).
+    /// [`fuchsia.hardware.sysmem/Heap.DeleteVmo`] will be passed `vmo` later
+    /// with ZX_VMO_ZERO_CHILDREN already signaled on `vmo`, and with `vmo`
+    /// being the only remaining handle to the VMO (assuming the heap server did
+    /// not itself retain any handle to `vmo`).
     ///
     /// Upon noticing ZX_VMO_ZERO_CHILDREN on the server's parent VMO, the
     /// server should clean up any resources associated with `vmo`.
@@ -76,13 +74,13 @@ closed protocol Heap {
     /// hardware-specific resources) during this call, and clean them up upon
     /// noticing ZX_VMO_ZERO_CHILDREN on the parent VMO retained by the server.
     ///
-    /// The [`fuchsia.sysmem2/Heap`] channel client end closing should not
-    /// trigger any per-VMO cleanup. Instead, the ZX_VMO_ZERO_CHILDREN signal
-    /// should perform that cleanup. This way, all buffer-associated resources
-    /// stay valid until it's no longer possible for any client to be using or
-    /// referring to the buffer. The risk of cleaning up early is that a client
-    /// may still be using the buffer and/or an associated resource despite the
-    /// [`fuchsia.sysmem2/Heap`] client end closing.
+    /// The [`fuchsia.hardware.sysmem/Heap`] channel client end closing should
+    /// not trigger any per-VMO cleanup. Instead, the ZX_VMO_ZERO_CHILDREN
+    /// signal should perform that cleanup. This way, all buffer-associated
+    /// resources stay valid until it's no longer possible for any client to be
+    /// using or referring to the buffer. The risk of cleaning up early is that
+    /// a client may still be using the buffer and/or an associated resource
+    /// despite the [`fuchsia.hardware.sysmem/Heap`] client end closing.
     ///
     /// + request `size` The size in bytes, aligned up to a page boundary. In
     ///   contrast, `settings.buffer_settings.size_bytes` is the logical size in
@@ -90,18 +88,18 @@ closed protocol Heap {
     /// + request `settings` These are the sysmem settings applicable to the
     ///   buffer. A heap is encouraged to completely ignore this parameter
     ///   unless there is a specific need to look at this parameter.
-    ///   + For example, if a [`fuchsia.sysmem2/Heap`] server also allocates
-    ///     some sort of internal image resource to go with the allocated VMO,
-    ///     the heap server may need to look at
+    ///   + For example, if a [`fuchsia.hardware.sysmem/Heap`] server also
+    ///     allocates some sort of internal image resource to go with the
+    ///     allocated VMO, the heap server may need to look at
     ///     `settings.image_format_constraints`.
-    ///   + As another example, a [`fuchsia.sysmem2/Heap`] server may support
-    ///     both contiguous and non-contiguous allocations, in which case the
-    ///     heap server would need to look at
+    ///   + As another example, a [`fuchsia.hardware.sysmem/Heap`] server may
+    ///     support both contiguous and non-contiguous allocations, in which
+    ///     case the heap server would need to look at
     ///     `settings.buffer_settings.is_physically_contiguous`.
-    ///   + However, if a [`fuchsia.sysmem2/Heap`] server is allocating a buffer
-    ///     of size with no dependence on settings, the [`fuchsia.sysmem2/Heap`]
-    ///     server should just ignore settings (in contrast to validating
-    ///     settings or similar).
+    ///   + However, if a [`fuchsia.hardware.sysmem/Heap`] server is allocating
+    ///     a buffer of size with no dependence on settings, the
+    ///     [`fuchsia.hardware.sysmem/Heap`] server should just ignore settings
+    ///     (in contrast to validating settings or similar).
     /// + request `buffer_collection_id` This can be obtained later from a
     ///   sysmem provided VMO using [`fuchsia.sysmem2/Allocator.GetVmoInfo`], or
     ///   at any time from a [`fuchsia.sysmem2/BufferCollectionToken`],
@@ -123,7 +121,7 @@ closed protocol Heap {
     /// - response `vmo` The allocated VMO; see above for relevant requirements.
     strict AllocateVmo(struct {
         size uint64;
-        settings SingleBufferSettings;
+        settings fuchsia.sysmem2.SingleBufferSettings;
         buffer_collection_id uint64;
         buffer_index uint64;
     }) -> (resource struct {
@@ -135,16 +133,16 @@ closed protocol Heap {
     ///
     /// Sysmem guarantees that `vmo` is the only handle remaining to the VMO.
     ///
-    /// The call to [`fuchsia.sysmem2/Heap.DeleteVmo`] should fence the cleanup
-    /// of `vmo` and any associated resources before responding. Because the
-    /// last handle to `vmo` is passed in via
-    /// [`fuchsia.sysmem2/Heap.DeleteVmo`], the server can defer completion of
-    /// the [`fuchsia.sysmem2/Heap.DeleteVmo`] until ZX_VMO_ZERO_CHILDREN is
-    /// (very soon) triggered on the server's parent VMO due to the server
-    /// closing the passed-in `vmo`. FIDL server bindings support responding to
-    /// a request async. There is no requirement to process any other incoming
-    /// messages on this channel until [`fuchsia.sysmem2/Heap.DeleteVmo`] is
-    /// done.
+    /// The call to [`fuchsia.hardware.sysmem/Heap.DeleteVmo`] should fence the
+    /// cleanup of `vmo` and any associated resources before responding. Because
+    /// the last handle to `vmo` is passed in via
+    /// [`fuchsia.hardware.sysmem/Heap.DeleteVmo`], the server can defer
+    /// completion of the [`fuchsia.hardware.sysmem/Heap.DeleteVmo`] until
+    /// ZX_VMO_ZERO_CHILDREN is (very soon) triggered on the server's parent VMO
+    /// due to the server closing the passed-in `vmo`. FIDL server bindings
+    /// support responding to a request async. There is no requirement to
+    /// process any other incoming messages on this channel until
+    /// [`fuchsia.hardware.sysmem/Heap.DeleteVmo`] is done.
     ///
     /// The effectiveness of sysmem's
     /// [`fuchsia.sysmem2/BufferCollection.AttachLifetimeTracking`] mechanism
@@ -163,9 +161,9 @@ closed protocol Heap {
         vmo zx.Handle:<VMO>;
     }) -> ();
 
-    /// This event is triggered when the [`fuchsia.sysmem2/Heap`] is registered.
-    /// Properties of this `Heap` will be sent to the sysmem device in the
-    /// event.
+    /// This event is triggered when the [`fuchsia.hardware.sysmem/Heap`] is
+    /// registered. Properties of this `Heap` will be sent to the sysmem device
+    /// in the event.
     ///
     /// Implementations should guarantee that this event should be sent
     /// immediately when it binds to a channel, and this event should be

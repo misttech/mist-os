@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.sysmem") {
-  sources = [ "sysmem.fidl" ]
+  sources = [
+    "heap.fidl",
+    "sysmem.fidl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.sysmem",
     "//sdk/fidl/fuchsia.sysmem2",

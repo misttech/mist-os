@@ -16,8 +16,8 @@ namespace sysmem_driver {
 class ExternalMemoryAllocator : public MemoryAllocator {
  public:
   ExternalMemoryAllocator(MemoryAllocator::Owner* owner,
-                          fidl::WireSharedClient<fuchsia_sysmem2::Heap> heap,
-                          fuchsia_sysmem2::HeapProperties properties);
+                          fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap,
+                          fuchsia_hardware_sysmem::HeapProperties properties);
 
   ~ExternalMemoryAllocator() override;
 
@@ -29,7 +29,7 @@ class ExternalMemoryAllocator : public MemoryAllocator {
 
  private:
   MemoryAllocator::Owner* owner_;
-  fidl::WireSharedClient<fuchsia_sysmem2::Heap> heap_;
+  fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap_;
 
   struct BufferKey {
     uint64_t buffer_collection_id;

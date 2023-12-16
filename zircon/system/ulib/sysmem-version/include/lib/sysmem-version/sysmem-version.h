@@ -373,10 +373,6 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
                             const fuchsia_sysmem2::wire::BufferCollectionInfo& src,
                             uint32_t vmo_rights_mask);
 
-[[nodiscard]] fuchsia_sysmem2::wire::CoherencyDomainSupport V2CloneCoherencyDomainSuppoort(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::CoherencyDomainSupport& src);
-[[nodiscard]] fuchsia_sysmem2::wire::HeapProperties V2CloneHeapProperties(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::HeapProperties& src);
 [[nodiscard]] fuchsia_sysmem2::wire::BufferCollectionConstraints V2CloneBufferCollectionConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferCollectionConstraints& src);
 [[nodiscard]] fuchsia_sysmem2::wire::BufferUsage V2CloneBufferUsage(

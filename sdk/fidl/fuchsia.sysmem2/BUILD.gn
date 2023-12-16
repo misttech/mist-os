@@ -15,7 +15,6 @@ fidl("fuchsia.sysmem2") {
     "collection.fidl",
     "constraints.fidl",
     "driver_connector.fidl",
-    "heap.fidl",
     "overview.fidl",
     "results.fidl",
     "usages.fidl",

@@ -67,11 +67,11 @@ T AlignUp(T value, T divisor) {
 }
 
 // Helper function to build owned HeapProperties table with coherency domain support.
-fuchsia_sysmem2::HeapProperties BuildHeapPropertiesWithCoherencyDomainSupport(
+fuchsia_hardware_sysmem::HeapProperties BuildHeapPropertiesWithCoherencyDomainSupport(
     bool cpu_supported, bool ram_supported, bool inaccessible_supported, bool need_clear,
     bool need_flush) {
-  using fuchsia_sysmem2::CoherencyDomainSupport;
-  using fuchsia_sysmem2::HeapProperties;
+  using fuchsia_hardware_sysmem::CoherencyDomainSupport;
+  using fuchsia_hardware_sysmem::HeapProperties;
 
   CoherencyDomainSupport coherency_domain_support;
   coherency_domain_support.cpu_supported().emplace(cpu_supported);
@@ -739,7 +739,7 @@ zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
 }
 
 zx_status_t Device::CommonSysmemRegisterHeap(
-    uint64_t heap_param, fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_connection) {
+    uint64_t heap_param, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection) {
   // External heaps should not have bit 63 set but bit 60 must be set.
   if ((heap_param & 0x8000000000000000) || !(heap_param & 0x1000000000000000)) {
     DRIVER_ERROR("Invalid external heap");
@@ -747,9 +747,10 @@ zx_status_t Device::CommonSysmemRegisterHeap(
   }
   auto heap = safe_cast<fuchsia_sysmem2::HeapType>(heap_param);
 
-  class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_sysmem2::Heap> {
+  class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_hardware_sysmem::Heap> {
    public:
-    void OnRegister(::fidl::WireEvent<::fuchsia_sysmem2::Heap::OnRegister>* event) override {
+    void OnRegister(
+        ::fidl::WireEvent<::fuchsia_hardware_sysmem::Heap::OnRegister>* event) override {
       auto properties = fidl::ToNatural(event->properties);
       std::lock_guard checker(*device_->loop_checker_);
       // A heap should not be registered twice.
@@ -780,7 +781,7 @@ zx_status_t Device::CommonSysmemRegisterHeap(
         device_->allocators_.erase(heap_);
     }
 
-    static void Bind(Device* device, fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_client_end,
+    static void Bind(Device* device, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_client_end,
                      fuchsia_sysmem2::HeapType heap) {
       auto event_handler = std::unique_ptr<EventHandler>(new EventHandler(device, heap));
       event_handler->heap_client_.Bind(std::move(heap_client_end), device->dispatcher(),
@@ -791,7 +792,7 @@ zx_status_t Device::CommonSysmemRegisterHeap(
     EventHandler(Device* device, fuchsia_sysmem2::HeapType heap) : device_(device), heap_(heap) {}
 
     Device* const device_;
-    fidl::WireSharedClient<fuchsia_sysmem2::Heap> heap_client_;
+    fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap_client_;
     const fuchsia_sysmem2::HeapType heap_;
     std::weak_ptr<ExternalMemoryAllocator> weak_associated_allocator_;
   };
@@ -1046,7 +1047,7 @@ zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
 zx_status_t Device::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
   WarnOfDeprecatedSysmemBanjo(true);
   return CommonSysmemRegisterHeap(
-      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>{std::move(heap_connection)});
+      heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>{std::move(heap_connection)});
 }
 
 zx_status_t Device::SysmemRegisterSecureMem(zx::channel tee_connection) {
@@ -1156,7 +1157,7 @@ MemoryAllocator* Device::GetAllocator(const fuchsia_sysmem2::BufferMemorySetting
   return iter->second.get();
 }
 
-const fuchsia_sysmem2::HeapProperties& Device::GetHeapProperties(
+const fuchsia_hardware_sysmem::HeapProperties& Device::GetHeapProperties(
     fuchsia_sysmem2::HeapType heap) const {
   std::lock_guard checker(*loop_checker_);
   ZX_DEBUG_ASSERT(allocators_.find(heap) != allocators_.end());
@@ -1307,7 +1308,7 @@ zx_status_t BanjoDevice::SysmemConnect(zx::channel allocator_request) {
 zx_status_t BanjoDevice::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
   WarnOfDeprecatedSysmemBanjo(false);
   return sysmem_device_->CommonSysmemRegisterHeap(
-      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>{std::move(heap_connection)});
+      heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>{std::move(heap_connection)});
 }
 
 zx_status_t BanjoDevice::SysmemRegisterSecureMem(zx::channel tee_connection) {

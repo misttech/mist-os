@@ -89,7 +89,7 @@ class Device final : public DdkDeviceType,
   [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
   [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
   [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(
-      uint64_t heap, fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_connection);
+      uint64_t heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
   [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(
       fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
   [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
@@ -159,7 +159,7 @@ class Device final : public DdkDeviceType,
   // Get heap properties of a specific memory heap allocator.
   //
   // Clients should guarantee that the heap is valid and already registered to sysmem driver.
-  [[nodiscard]] const fuchsia_sysmem2::HeapProperties& GetHeapProperties(
+  [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties& GetHeapProperties(
       fuchsia_sysmem2::HeapType heap) const;
 
   [[nodiscard]] const sysmem_protocol_t* proto() const { return &in_proc_sysmem_protocol_; }
@@ -304,14 +304,14 @@ class Device final : public DdkDeviceType,
   std::deque<zx_koid_t> unfound_token_koids_ __TA_GUARDED(*loop_checker_);
 
   // This map contains all registered memory allocators.
-  std::map<fuchsia_sysmem2::HeapType, std::shared_ptr<MemoryAllocator>> allocators_
-      __TA_GUARDED(*loop_checker_);
+  std::map<fuchsia_sysmem2::HeapType, std::shared_ptr<MemoryAllocator>> allocators_ __TA_GUARDED(
+      *loop_checker_);
 
   // This map contains only the secure allocators, if any.  The pointers are owned by allocators_.
   //
   // TODO(dustingreen): Consider unordered_map for this and some of above.
-  std::map<fuchsia_sysmem2::HeapType, MemoryAllocator*> secure_allocators_
-      __TA_GUARDED(*loop_checker_);
+  std::map<fuchsia_sysmem2::HeapType, MemoryAllocator*> secure_allocators_ __TA_GUARDED(
+      *loop_checker_);
 
   struct SecureMemControl : public protected_ranges::ProtectedRangesCoreControl {
     // ProtectedRangesCoreControl implementation.  These are essentially backed by
@@ -344,8 +344,8 @@ class Device final : public DdkDeviceType,
     bool has_mod_protected_range{};
   };
   // This map has the secure_mem_ properties for each HeapType in secure_allocators_.
-  std::map<fuchsia_sysmem2::HeapType, SecureMemControl> secure_mem_controls_
-      __TA_GUARDED(*loop_checker_);
+  std::map<fuchsia_sysmem2::HeapType, SecureMemControl> secure_mem_controls_ __TA_GUARDED(
+      *loop_checker_);
 
   // This flag is used to determine if the closing of the current secure mem
   // connection is an error (true), or expected (false).
