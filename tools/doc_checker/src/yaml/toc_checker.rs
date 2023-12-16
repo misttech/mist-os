@@ -126,6 +126,7 @@ pub(crate) fn check_toc(
     project: &str,
     filename: &Path,
     yaml_value: &Value,
+    allow_fuchsia_src_links: bool,
 ) -> Option<Vec<DocCheckError>> {
     let doc_line = &DocLine { line_num: 1, file_name: filename.to_path_buf() };
     let result = serde_yaml::from_value::<Toc>(yaml_value.clone());
@@ -147,9 +148,14 @@ pub(crate) fn check_toc(
                     } else {
                         path.to_string()
                     };
-                    if let Some(e) =
-                        check_path(doc_line, root_dir, docs_folder, project, &path_to_check)
-                    {
+                    if let Some(e) = check_path(
+                        doc_line,
+                        root_dir,
+                        docs_folder,
+                        project,
+                        &path_to_check,
+                        allow_fuchsia_src_links,
+                    ) {
                         errors.push(e);
                     }
                 }
@@ -239,10 +245,18 @@ mod test {
         let docs_folder = PathBuf::from("/docs");
         let filename = PathBuf::from("_toc.yaml");
         let project = "some_test_project";
+        let allow_fuchsia_src_links = false;
         let toc = Toc { toc: vec![] };
 
         let yaml_value = serde_yaml::to_value(&toc)?;
-        if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
+        if let Some(result) = check_toc(
+            &root_dir,
+            &docs_folder,
+            project,
+            &filename,
+            &yaml_value,
+            allow_fuchsia_src_links,
+        ) {
             assert_eq!(result.len(), 1);
             if let Some(err) = result.get(0) {
                 let expected = DocCheckError::new_error(
@@ -263,6 +277,7 @@ mod test {
         let filename = PathBuf::from("_toc.yaml");
         let project = "some_test_project";
         let docs_folder = PathBuf::from("/docs");
+        let allow_fuchsia_src_links = false;
         let toc = Toc {
             toc: vec![TocEntry {
                 alternate_paths: None,
@@ -282,7 +297,14 @@ mod test {
             }],
         };
         let yaml_value = serde_yaml::to_value(&toc)?;
-        if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
+        if let Some(result) = check_toc(
+            &root_dir,
+            &docs_folder,
+            project,
+            &filename,
+            &yaml_value,
+            allow_fuchsia_src_links,
+        ) {
             if let Some(err) = result.get(0) {
                 panic!("Unexpected error: {:?}", err)
             }
@@ -297,6 +319,7 @@ mod test {
         let docs_folder = PathBuf::from("/docs");
         let filename = PathBuf::from("_toc.yaml");
         let project = "some_test_project";
+        let allow_fuchsia_src_links = false;
         let toc = Toc {
             toc: vec![TocEntry {
                 alternate_paths: None,
@@ -317,7 +340,14 @@ mod test {
         };
 
         let yaml_value = serde_yaml::to_value(&toc)?;
-        if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
+        if let Some(result) = check_toc(
+            &root_dir,
+            &docs_folder,
+            project,
+            &filename,
+            &yaml_value,
+            allow_fuchsia_src_links,
+        ) {
             assert_eq!(result.len(), 1);
             if let Some(err) = result.get(0) {
                 let expected = DocCheckError::new_error(
@@ -337,6 +367,7 @@ mod test {
         let docs_folder = PathBuf::from("/docs");
         let filename = PathBuf::from("_toc.yaml");
         let project = "some_test_project";
+        let allow_fuchsia_src_links = false;
         let toc = Toc {
             toc: vec![
                 TocEntry {
@@ -376,7 +407,14 @@ mod test {
             ],
         };
         let yaml_value = serde_yaml::to_value(&toc)?;
-        if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
+        if let Some(result) = check_toc(
+            &root_dir,
+            &docs_folder,
+            project,
+            &filename,
+            &yaml_value,
+            allow_fuchsia_src_links,
+        ) {
             panic!("Expected no errors, but got {:?}", result);
         }
         Ok(())
@@ -388,6 +426,7 @@ mod test {
         let docs_folder = PathBuf::from("/docs");
         let filename = PathBuf::from("_toc.yaml");
         let project = "some_test_project";
+        let allow_fuchsia_src_links = false;
 
         let toc = Toc {
             toc: vec![
@@ -554,7 +593,14 @@ mod test {
             ],
         };
         let yaml_value = serde_yaml::to_value(&toc)?;
-        if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
+        if let Some(result) = check_toc(
+            &root_dir,
+            &docs_folder,
+            project,
+            &filename,
+            &yaml_value,
+            allow_fuchsia_src_links,
+        ) {
             let expected_result =[
                  DocCheckError::new_error(
                     1,PathBuf::from("_toc.yaml"),

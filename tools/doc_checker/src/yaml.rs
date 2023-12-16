@@ -205,6 +205,7 @@ pub(crate) struct YamlChecker {
     docs_folder: PathBuf,
     project: String,
     check_external_links: bool,
+    allow_fuchsia_src_links: bool,
 }
 
 #[async_trait]
@@ -243,6 +244,7 @@ impl DocYamlCheck for YamlChecker {
                     &self.project,
                     filename,
                     yaml_value,
+                    self.allow_fuchsia_src_links,
                 ),
                 Some("_tools.yaml") => check_tools(filename, yaml_value),
                 Some(name) => todo!("Need to handle {} ({:?})", name, filename),
@@ -434,9 +436,10 @@ fn check_path(
     docs_folder: &Path,
     project: &str,
     path: &str,
+    allow_fuchsia_src_links: bool,
 ) -> Option<DocCheckError> {
     let root_dir = root_path.display().to_string();
-    match do_check_link(doc_line, path, project) {
+    match do_check_link(doc_line, path, project, allow_fuchsia_src_links) {
         Ok(Some(doc_error)) => return Some(doc_error),
         Err(e) => {
             return Some(DocCheckError::new_error(
@@ -699,6 +702,7 @@ pub fn register_yaml_checks(opt: &DocCheckerArgs) -> Result<Vec<Box<dyn DocYamlC
         docs_folder: opt.docs_folder.clone(),
         project: opt.project.clone(),
         check_external_links: !opt.local_links_only,
+        allow_fuchsia_src_links: opt.allow_fuchsia_src_links,
     };
 
     Ok(vec![Box::new(checker)])
@@ -715,6 +719,7 @@ mod test {
         let root_path = PathBuf::from("/some/root");
         let docs_folder = PathBuf::from("docs");
         let project = "fuchsia";
+        let allow_fuchsia_src_links = false;
 
         let test_data: [(&str, Option<DocCheckError>); 7] = [
             ("/CONTRIBUTING.md", None),
@@ -741,7 +746,14 @@ mod test {
         ];
 
         for (test_path, expected_result) in test_data {
-            let actual_result = check_path(doc_line, &root_path, &docs_folder, project, test_path);
+            let actual_result = check_path(
+                doc_line,
+                &root_path,
+                &docs_folder,
+                project,
+                test_path,
+                allow_fuchsia_src_links,
+            );
             assert_eq!(actual_result, expected_result);
         }
 

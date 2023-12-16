@@ -105,6 +105,12 @@ pub struct DocCheckerArgs {
     /// output in JSON format
     #[argh(switch)]
     pub json: bool,
+
+    /// allow links to fuchsia-src. Usually links to
+    /// fuchsia-src should be written as file paths
+    /// to /docs.
+    #[argh(switch)]
+    pub allow_fuchsia_src_links: bool,
 }
 
 #[fuchsia::main]
@@ -331,6 +337,7 @@ mod test {
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
             json: false,
+            allow_fuchsia_src_links: false,
         };
 
         // Set the current directory to the executable dir so the relative test paths WAI.

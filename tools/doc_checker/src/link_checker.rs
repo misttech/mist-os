@@ -91,6 +91,7 @@ struct LinkChecker {
     pub project: String,
     pub docs_folder: PathBuf,
     pub check_remote_links: bool,
+    pub allow_fuchsia_src_links: bool,
     links: Vec<LinkReference>,
 }
 
@@ -314,9 +315,14 @@ impl DocCheck for LinkChecker {
                     continue;
                 }
 
-                let saw_error = do_check_link(&element.doc_line(), &link_to_check, &self.project)?
-                    .map(|err| errors.push(err))
-                    .is_some();
+                let saw_error = do_check_link(
+                    &element.doc_line(),
+                    &link_to_check,
+                    &self.project,
+                    self.allow_fuchsia_src_links,
+                )?
+                .map(|err| errors.push(err))
+                .is_some();
 
                 let root_dir = self.root_dir.display().to_string();
                 match is_intree_link(&self.project, &root_dir, &self.docs_folder, &link_to_check) {
@@ -455,6 +461,7 @@ pub(crate) fn do_check_link(
     doc_line: &DocLine,
     link: &str,
     project_being_checked: &str,
+    allow_fuchsia_src_links: bool,
 ) -> Result<Option<DocCheckError>> {
     match link.parse::<Uri>() {
         Ok(uri) => {
@@ -465,7 +472,9 @@ pub(crate) fn do_check_link(
                 },
                 None => return Ok(None),
             }
-            if let Some(errors) = check_link_authority(doc_line, &uri, project_being_checked) {
+            if let Some(errors) =
+                check_link_authority(doc_line, &uri, project_being_checked, allow_fuchsia_src_links)
+            {
                 return Ok(Some(errors));
             }
 
@@ -549,6 +558,7 @@ fn check_link_authority(
     doc_line: &DocLine,
     uri: &Uri,
     project_being_checked: &str,
+    allow_fuchsia_src_links: bool,
 ) -> Option<DocCheckError> {
     let link_to_fuchsia_gerrit_host = match uri.authority() {
         Some(a) => *a == GERRIT_HOST,
@@ -616,7 +626,7 @@ fn check_link_authority(
         if !FILES_ALLOWED_TO_LINK_TO_PUBLISHED_DOCS.contains(&base_name.as_str()) {
             // If the link is to the published docs directory (fuchsia-src), then
             // a path should be used instead.
-            if parts.contains(&"fuchsia-src") {
+            if parts.contains(&"fuchsia-src") && !allow_fuchsia_src_links {
                 return Some(DocCheckError::new_error(
                     doc_line.line_num,
                     doc_line.file_name.clone(),
@@ -841,6 +851,7 @@ pub(crate) fn register_markdown_checks(opt: &DocCheckerArgs) -> Result<Vec<Box<d
         docs_folder: opt.docs_folder.clone(),
         check_remote_links: !opt.local_links_only,
         links: vec![],
+        allow_fuchsia_src_links: opt.allow_fuchsia_src_links,
     };
     Ok(vec![Box::new(checker)])
 }
@@ -858,6 +869,7 @@ mod tests {
             docs_folder: PathBuf::from("docs"),
             check_remote_links: false,
             links: vec![],
+            allow_fuchsia_src_links: false,
         };
         let filename = PathBuf::from("/my/root/fuchsia/docs/index.md");
 
@@ -911,6 +923,7 @@ mod tests {
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
             json: false,
+            allow_fuchsia_src_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -968,6 +981,7 @@ mod tests {
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
             json: false,
+            allow_fuchsia_src_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1118,6 +1132,7 @@ mod tests {
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
             json: false,
+            allow_fuchsia_src_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1176,6 +1191,57 @@ mod tests {
         ),
         ];
 
+        for (ctx, expected_errors) in test_data {
+            for ele in ctx {
+                let errors = checks[0].check(&ele)?;
+                if let Some(ref expected_list) = expected_errors {
+                    let mut expected_iter = expected_list.iter();
+                    if let Some(actual_errors) = errors {
+                        for actual in actual_errors {
+                            if let Some(expected) = expected_iter.next() {
+                                assert_eq!(&actual, expected);
+                            } else {
+                                panic!("Got unexpected error returned: {:?}", actual);
+                            }
+                        }
+                        let unused_errors: Vec<&DocCheckError> = expected_iter.collect();
+                        if !unused_errors.is_empty() {
+                            panic!("Expected more errors: {:?}", unused_errors);
+                        }
+                    } else if expected_errors.is_some() {
+                        panic!("No errors, but expected {:?}", expected_errors);
+                    }
+                } else if errors.is_some() {
+                    panic!("Got unexpected errors {:?}", errors.unwrap());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_allowing_fuchsia_src_links() -> Result<()> {
+        let opt = DocCheckerArgs {
+            root: PathBuf::from("/path/to/fuchsia/somewhere/else"),
+            project: "fuchsia".to_string(),
+            docs_folder: PathBuf::from("docs"),
+            local_links_only: true,
+            json: false,
+            allow_fuchsia_src_links: true,
+        };
+
+        let mut checks = register_markdown_checks(&opt)?;
+        assert_eq!(checks.len(), 1);
+
+        let test_data: Vec<(DocContext<'_>, Option<Vec<DocCheckError>>)> = vec![
+            (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                "This is a link to fuchsia docs as external url [something](https://fuchsia.dev/fuchsia-src/README.md)"
+            ),
+            None,
+        )];
         for (ctx, expected_errors) in test_data {
             for ele in ctx {
                 let errors = checks[0].check(&ele)?;
