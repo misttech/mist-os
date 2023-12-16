@@ -428,17 +428,15 @@ function track-command-execution {
 # Arguments:
 #   - args of `fx set`
 function _process-fx-set-command {
-  local target="$1"
-  shift
   while [[ $# -ne 0 ]]; do
     case $1 in
       --with)
         shift # remove "--with"
-        _add-fx-set-hit "$target" "fx-with" "$1"
+        _add-fx-set-hit "fx-with" "$1"
         ;;
       --with-base)
         shift # remove "--with-base"
-        _add-fx-set-hit "$target" "fx-with-base" "$1"
+        _add-fx-set-hit "fx-with-base" "$1"
         ;;
       *)
         ;;
@@ -448,20 +446,17 @@ function _process-fx-set-command {
 }
 
 # Arguments:
-#   - the product.board target for `fx set`
 #   - category name, either "fx-with" or "fx-with-base"
 #   - package(s) following "--with" or "--with-base" switch
 function _add-fx-set-hit {
-  target="$1"
-  category="$2"
-  packages="$3"
+  category="$1"
+  packages="$2"
   # Packages argument can be a comma-separated list.
   IFS=',' read -ra packages_parts <<< "$packages"
   for p in "${packages_parts[@]}"; do
     event_params=$(fx-command-run jq -c -n \
       --arg with_type "${category}" \
       --arg package_name "${p}" \
-      --arg target "${target}" \
       '$ARGS.named')
 
     _add-to-analytics-batch "set" "${event_params}"
