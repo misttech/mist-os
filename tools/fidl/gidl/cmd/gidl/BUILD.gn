@@ -19,6 +19,7 @@ go_library("main") {
     "//tools/fidl/gidl/backend/llcpp",
     "//tools/fidl/gidl/backend/reference",
     "//tools/fidl/gidl/backend/rust",
+    "//tools/fidl/gidl/backend/rust_codec",
     "//tools/fidl/gidl/lib/cli",
     "//tools/fidl/gidl/lib/ir",
   ]

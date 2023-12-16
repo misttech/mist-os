@@ -111,7 +111,10 @@ fuchsia_unittest_package("fidl-codec-tests") {
 group("tests") {
   testonly = true
 
-  deps = [ ":fidl-codec-tests" ]
+  deps = [
+    ":fidl-codec-tests",
+    "rust:tests",
+  ]
 }
 
 action("json_for_test") {

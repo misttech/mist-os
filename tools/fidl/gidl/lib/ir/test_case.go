@@ -81,6 +81,7 @@ const (
 	LanguageLlcpp        Language = "llcpp"
 	LanguageReference    Language = "reference"
 	LanguageRust         Language = "rust"
+	LanguageRustCodec    Language = "rust_codec"
 )
 
 func AllLanguages() []Language {
