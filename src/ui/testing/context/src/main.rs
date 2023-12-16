@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, ControlHandle},
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_scheduler::ProfileProviderMarker,
     fidl_fuchsia_sysmem::AllocatorMarker,
@@ -16,9 +16,10 @@ use {
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
     fidl_fuchsia_vulkan_loader::LoaderMarker,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_scenic as scenic,
+    fuchsia_scenic as scenic, fuchsia_zircon_status as zx_status,
     futures::{StreamExt, TryStreamExt},
 };
 
@@ -32,15 +33,64 @@ const AUXILIARY_PUPPET_FACTORY: &str = "auxiliary-puppet-factory";
 const AUXILIARY_PUPPET_FACTORY_URL: &str = "#meta/ui-puppet.cm";
 const AUXILIARY_PUPPET_FACTORY_SERVICE: &str = "auxiliary-puppet-factory-service";
 
+/// All FIDL services that are exposed by this component's ServiceFs.
+enum Service {
+    RealmFactoryServer(ui_test_context::RealmFactoryRequestStream),
+    FactoryServer(ui_test_context::FactoryRequestStream),
+}
+
 #[fuchsia::main(logging_tags = ["ui_launcher"])]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_fidl_service(std::convert::identity);
+    fs.dir("svc")
+        .add_fidl_service(Service::RealmFactoryServer)
+        .add_fidl_service(Service::FactoryServer);
     fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(None, run_factory_server).await;
+    fs.for_each_concurrent(None, |conn| async move {
+        match conn {
+            Service::RealmFactoryServer(stream) => run_realm_factory_server(stream).await,
+            Service::FactoryServer(stream) => run_factory_server(stream).await,
+        }
+    })
+    .await;
     Ok(())
 }
 
+async fn run_realm_factory_server(stream: ui_test_context::RealmFactoryRequestStream) {
+    stream
+        .try_for_each_concurrent(None, |request| async {
+            tracing::debug!("received a request: {:?}", &request);
+            let mut task_group = fasync::TaskGroup::new();
+            match request {
+                ui_test_context::RealmFactoryRequest::CreateRealm { payload, responder } => {
+                    let realm_server = payload.realm_server.expect("missing realm_server");
+
+                    // Create the puppet + ui stack for this test context.
+                    let realm = assemble_puppet_realm().await;
+
+                    let request_stream = realm_server.into_stream().expect("into stream");
+                    task_group.spawn(async move {
+                        realm_proxy::service::serve(realm, request_stream)
+                            .await
+                            .expect("invalid realm proxy server");
+                    });
+                    responder.send(Ok(())).expect("failed to response");
+                }
+                ui_test_context::RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
+                    tracing::warn!("realm factory receive an unknown request");
+                    control_handle.shutdown_with_epitaph(zx_status::Status::NOT_SUPPORTED);
+                    unimplemented!();
+                }
+            }
+
+            task_group.join().await;
+            Ok(())
+        })
+        .await
+        .expect("failed to serve test realm factory request stream");
+}
+
+// TODO(b/315480571): remove after all tests migrated to test realm factory.
 async fn run_factory_server(stream: ui_test_context::FactoryRequestStream) {
     stream
         .try_for_each_concurrent(None, |request| async {
@@ -62,7 +112,8 @@ async fn run_factory_server(stream: ui_test_context::FactoryRequestStream) {
         .expect("failed to serve test context factory request stream");
 }
 
-// Serve the test suite protocol.
+// TODO(b/315480571): remove after all tests migrated to test realm factory.
+/// Serve the test suite protocol.
 async fn run_context_server(
     mut stream: ui_test_context::ContextRequestStream,
 ) -> Result<(), Error> {
