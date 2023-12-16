@@ -193,11 +193,14 @@ class FFX:
                 connection.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            subprocess.TimeoutExpired: In case of FFX command timeout.
-            errors.FfxCommandError: In case of other FFX command failure.
+            errors.FfxConnectionError
         """
-        self.wait_for_rcs_connection(timeout=timeout)
+        try:
+            self.wait_for_rcs_connection(timeout=timeout)
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FfxConnectionError(
+                f"FFX connection check failed for {self._target_name} with err: {err}"
+            ) from err
 
     def get_target_information(
         self, timeout: float = _TIMEOUTS["FFX_CLI"]

@@ -7,7 +7,6 @@
 import ipaddress
 import logging
 
-import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types, errors
@@ -15,10 +14,8 @@ from honeydew.transports import ffx as ffx_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
-    "RemoteControl": custom_types.FidlEndpoint(
-        "/core/remote-control", "fuchsia.developer.remotecontrol.RemoteControl"
-    ),
+_TIMEOUTS: dict[str, float] = {
+    "TARGET_WAIT": 15,
 }
 
 
@@ -44,14 +41,17 @@ class FuchsiaController:
             self._target = str(self._ip_address)
         else:
             self._target = self._name
-        self._ctx: fuchsia_controller.Context
-        self.rcs_proxy: fd_remotecontrol.RemoteControl.Client
+        self.ctx: fuchsia_controller.Context
+
+        self.create_context()
 
     def create_context(self) -> None:
-        """Creates the fuchsia-controller context and any long-lived proxies.
+        """Creates the fuchsia-controller context and waits for the target to
+        be ready.
 
         Raises:
             errors.FuchsiaControllerError: On FIDL communication failure.
+            errors.FuchsiaControllerConnectionError: If target is not ready.
         """
         try:
             ffx_config: custom_types.FFXConfig = ffx_transport.get_config()
@@ -84,7 +84,7 @@ class FuchsiaController:
             if isolate_dir:
                 msg = f"{msg}, isolate_dir={isolate_dir.directory()}"
             _LOGGER.debug(msg)
-            self._ctx = fuchsia_controller.Context(
+            self.ctx = fuchsia_controller.Context(
                 config=config, isolate_dir=isolate_dir, target=self._target
             )
         except Exception as err:  # pylint: disable=broad-except
@@ -92,23 +92,37 @@ class FuchsiaController:
                 "Failed to create Fuchsia-Controller context"
             ) from err
 
-        try:
-            # TODO(fxb/128575): Make connect_remote_control_proxy() work, or
-            # remove it.
-            self.rcs_proxy = fd_remotecontrol.RemoteControl.Client(
-                self.connect_device_proxy(_FC_PROXIES["RemoteControl"])
-            )
-        except fuchsia_controller.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
-                "Failed to create RemoteControl proxy"
-            ) from status
+        self.check_connection()
 
-    def destroy_context(self) -> None:
-        """Destroys the fuchsia-controller context and any long-lived proxies,
-        closing the fuchsia-controller connection.
+    def check_connection(
+        self, timeout: float = _TIMEOUTS["TARGET_WAIT"]
+    ) -> None:
+        """Checks the Fuchsia-Controller connection from host to Fuchsia device.
+
+        Args:
+            timeout: How long in seconds to wait.
+
+        Raises:
+            errors.FuchsiaControllerConnectionError
         """
-        self._ctx = None
-        self.rcs_proxy = None
+        try:
+            _LOGGER.debug(
+                "Waiting for %s sec for Fuchsia-Controller to check the "
+                "connection from host to %s...",
+                timeout,
+                self._name,
+            )
+            self.ctx.target_wait(timeout)
+            _LOGGER.debug(
+                "Fuchsia-Controller completed the connection check from host "
+                "to %s...",
+                self._name,
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FuchsiaControllerConnectionError(
+                f"Fuchsia-Controller connection check failed for {self._name} "
+                f"with error: {err}"
+            )
 
     def connect_device_proxy(
         self, fidl_end_point: custom_types.FidlEndpoint
@@ -126,7 +140,7 @@ class FuchsiaController:
             FIDL channel to proxy.
         """
         try:
-            return self._ctx.connect_device_proxy(
+            return self.ctx.connect_device_proxy(
                 fidl_end_point.moniker, fidl_end_point.protocol
             )
         except fuchsia_controller.ZxStatus as status:

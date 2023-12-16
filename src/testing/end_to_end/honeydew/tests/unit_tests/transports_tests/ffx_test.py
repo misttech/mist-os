@@ -204,6 +204,21 @@ class FfxCliTests(unittest.TestCase):
 
     @mock.patch.object(
         ffx.FFX,
+        "wait_for_rcs_connection",
+        side_effect=errors.DeviceNotConnectedError(ffx._DEVICE_NOT_CONNECTED),
+        autospec=True,
+    )
+    def test_check_connection_raises(
+        self, mock_wait_for_rcs_connection
+    ) -> None:
+        """Test case for check_connection() raising errors.FfxConnectionError"""
+        with self.assertRaises(errors.FfxConnectionError):
+            self.ffx_obj_with_ip.check_connection()
+
+        mock_wait_for_rcs_connection.assert_called()
+
+    @mock.patch.object(
+        ffx.FFX,
         "run",
         return_value=_MOCK_ARGS["ffx_target_show_output"],
         autospec=True,

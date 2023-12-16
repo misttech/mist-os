@@ -81,7 +81,7 @@ class SSH:
             timeout: How long in sec to wait for SSH connection.
 
         Raises:
-            errors.SSHCommandError: If fails to establish SSH connection.
+            errors.SshConnectionError
         """
         start_time: float = time.time()
         end_time: float = start_time + timeout
@@ -94,8 +94,8 @@ class SSH:
             except Exception:  # pylint: disable=broad-except
                 time.sleep(1)
         else:
-            raise errors.SSHCommandError(
-                f"Failed to connect to '{self._name}' via SSH."
+            raise errors.SshConnectionError(
+                f"SSH connection check failed for {self._name}"
             )
         _LOGGER.debug("%s is available via ssh.", self._name)
 

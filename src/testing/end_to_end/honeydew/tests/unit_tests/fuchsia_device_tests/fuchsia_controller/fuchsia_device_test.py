@@ -97,42 +97,41 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         super().__init__(*args, **kwargs)
 
     @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
     )
     @mock.patch.object(
         base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
-        autospec=True,
-    )
-    @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.ffx_transport,
-        "get_config",
-        return_value=_MOCK_ARGS["ffx_config"],
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def setUp(
         self,
-        mock_ffx_get_config,
-        mock_fc_context,
+        mock_fc_create_context,
         mock_ssh_check_connection,
         mock_ffx_check_connection,
+        mock_fc_check_connection,
     ) -> None:
         self.fd_obj = fuchsia_device.FuchsiaDevice(
             device_name=_INPUT_ARGS["device_name"],
             ssh_private_key=_INPUT_ARGS["ssh_private_key"],
         )
 
-        mock_ffx_get_config.assert_called_once()
-        mock_fc_context.assert_called_once_with(
-            config=mock.ANY,
-            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
-            target=self.fd_obj.device_name,
+        mock_fc_create_context.assert_called_once_with(
+            self.fd_obj.fuchsia_controller
         )
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
         mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
+        mock_fc_check_connection.assert_called_once_with(
+            self.fd_obj.fuchsia_controller
+        )
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
@@ -199,6 +198,48 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
+
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
+        base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
+    )
+    @mock.patch.object(
+        base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
+    )
+    def test_health_check(
+        self,
+        mock_ssh_check_connection,
+        mock_ffx_check_connection,
+        mock_fc_check_connection,
+    ) -> None:
+        """Testcase for FuchsiaDevice.health_check()"""
+        self.fd_obj.health_check()
+        mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
+        mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
+        mock_fc_check_connection.assert_called_once_with(
+            self.fd_obj.fuchsia_controller
+        )
+
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
+        autospec=True,
+    )
+    def test_on_device_boot(
+        self, mock_fc_create_context, mock_health_check
+    ) -> None:
+        """Testcase for FuchsiaDevice._on_device_boot()"""
+        self.fd_obj.on_device_boot()
+
+        mock_fc_create_context.assert_called_once()
+        mock_health_check.assert_called_once()
 
     # List all the tests related to private properties in alphabetical order
     @mock.patch.object(
@@ -361,34 +402,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called_once()
 
     # List all the tests related to private methods in alphabetical order
-    @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
-    )
-    @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
-        autospec=True,
-    )
-    @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.ffx_transport,
-        "get_config",
-        return_value=_MOCK_ARGS["ffx_config"],
-        autospec=True,
-    )
-    def test_on_device_boot(
-        self, mock_ffx_get_config, mock_fc_context, mock_health_check
-    ) -> None:
-        """Testcase for FuchsiaDevice._on_device_boot()"""
-        self.fd_obj.on_device_boot()
-
-        mock_ffx_get_config.assert_called_once()
-        mock_fc_context.assert_called_once_with(
-            config=mock.ANY,
-            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
-            target=self.fd_obj.device_name,
-        )
-        mock_health_check.assert_called()
-
     @parameterized.expand(
         [
             (
@@ -416,14 +429,17 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fd_remotecontrol.RemoteControl.Client,
+        fuchsia_device.fd_remotecontrol.RemoteControl.Client,
         "log_message",
         new_callable=mock.AsyncMock,
     )
     def test_send_log_command(
-        self, parameterized_dict, mock_rcs_log_message
+        self,
+        parameterized_dict,
+        mock_rcs_log_message,
     ) -> None:
         """Testcase for FuchsiaDevice._send_log_command()"""
+        self.fd_obj.fuchsia_controller.ctx = mock.Mock()
         # pylint: disable=protected-access
         self.fd_obj._send_log_command(
             tag="test",
@@ -442,6 +458,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._send_log_command() when the log FIDL call
         raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        self.fd_obj.fuchsia_controller.ctx = mock.Mock()
+
         mock_rcs_log_message.side_effect = fuchsia_controller.ZxStatus(
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         )
@@ -456,11 +474,19 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "reboot",
         new_callable=mock.AsyncMock,
     )
-    def test_send_reboot_command(self, mock_admin_reboot) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    def test_send_reboot_command(
+        self, mock_fc_connect_device_proxy, mock_admin_reboot
+    ) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command()"""
         # pylint: disable=protected-access
         self.fd_obj._send_reboot_command()
 
+        mock_fc_connect_device_proxy.assert_called()
         mock_admin_reboot.assert_called()
 
     @mock.patch.object(
@@ -468,7 +494,14 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "reboot",
         new_callable=mock.AsyncMock,
     )
-    def test_send_reboot_command_error(self, mock_admin_reboot) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    def test_send_reboot_command_error(
+        self, mock_fc_connect_device_proxy, mock_admin_reboot
+    ) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a non-ZX_ERR_PEER_CLOSED error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -479,13 +512,21 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             # pylint: disable=protected-access
             self.fd_obj._send_reboot_command()
 
+        mock_fc_connect_device_proxy.assert_called()
+        mock_admin_reboot.assert_called()
+
     @mock.patch.object(
         fhp_statecontrol.Admin.Client,
         "reboot",
         new_callable=mock.AsyncMock,
     )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
     def test_send_reboot_command_error_is_peer_closed(
-        self, mock_admin_reboot
+        self, mock_fc_connect_device_proxy, mock_admin_reboot
     ) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a ZX_ERR_PEER_CLOSED error.  This error should not
@@ -496,6 +537,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         self.fd_obj._send_reboot_command()
 
+        mock_fc_connect_device_proxy.assert_called()
         mock_admin_reboot.assert_called()
 
     @mock.patch.object(
@@ -523,25 +565,35 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ],
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command()"""
         # pylint: disable=protected-access
         data = self.fd_obj._send_snapshot_command()
         self.assertEqual(len(data), 15)
 
-        mock_fc_context.assert_called()
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -553,17 +605,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ),
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command_get_snapshot_error(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the
         get_snapshot FIDL call raises an exception.
@@ -572,8 +633,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
 
-        mock_fc_context.assert_called()
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -590,17 +652,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ),
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command_get_attr_error(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
         FIDL call raises an exception.
@@ -608,8 +679,10 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
-        mock_fc_context.assert_called()
+
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -625,17 +698,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ),
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command_get_attr_status_not_ok(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
         FIDL call returns a non-OK status code.
@@ -643,8 +725,10 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
-        mock_fc_context.assert_called()
+
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -666,17 +750,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ),
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command_read_error(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the read
         FIDL call raises an exception.
@@ -684,8 +777,10 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
-        mock_fc_context.assert_called()
+
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -710,25 +805,36 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ],
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice,
         "health_check",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
-        "Context",
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "create_context",
         autospec=True,
     )
     def test_send_snapshot_command_size_mismatch(
-        self, mock_fc_context, mock_health_check, *unused_args
+        self,
+        mock_fc_create_context,
+        mock_health_check,
+        mock_fc_connect_device_proxy,
+        *unused_args,
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the number
         of bytes read from channel doesn't match the file's content size."""
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
-        mock_fc_context.assert_called()
+
+        mock_fc_create_context.assert_called()
         mock_health_check.assert_called()
+        mock_fc_connect_device_proxy.assert_called()
 
 
 if __name__ == "__main__":

@@ -189,7 +189,7 @@ class Sl4fTests(unittest.TestCase):
     )
     def test_check_connection_exception(self, mock_sl4f_run) -> None:
         """Testcase for SL4F.check_connection() raising exception"""
-        with self.assertRaises(errors.Sl4fError):
+        with self.assertRaises(errors.Sl4fConnectionError):
             self.sl4f_obj_wo_ip.check_connection()
 
         mock_sl4f_run.assert_called()

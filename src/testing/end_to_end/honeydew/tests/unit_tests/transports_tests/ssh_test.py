@@ -89,7 +89,7 @@ class SshTests(unittest.TestCase):
         self, mock_ssh_run, mock_time, mock_sleep
     ) -> None:
         """Testcase for SSH.check_connection() failure case"""
-        with self.assertRaises(errors.SSHCommandError):
+        with self.assertRaises(errors.SshConnectionError):
             self.ssh_obj_wo_ip.check_connection(timeout=2)
 
         mock_ssh_run.assert_called()

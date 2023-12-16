@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 import fidl.fuchsia_buildinfo as f_buildinfo
+import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fidl.fuchsia_diagnostics as f_diagnostics
 import fidl.fuchsia_feedback as f_feedback
 import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
@@ -101,8 +102,7 @@ class FuchsiaDevice(
         ssh_user: str | None = None,
     ) -> None:
         super().__init__(device_name, device_ip, ssh_private_key, ssh_user)
-        _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
-        self.fuchsia_controller.create_context()
+        _LOGGER.debug("Initialized Fuchsia-Controller based FuchsiaDevice")
 
     # List all the transports in alphabetical order
     @properties.Transport
@@ -193,9 +193,18 @@ class FuchsiaDevice(
     # List all the public methods in alphabetical order
     def close(self) -> None:
         """Clean up method."""
-        # Explicitly destroy the context to close the fuchsia controller
-        # connection.
-        self.fuchsia_controller.destroy_context()
+        return
+
+    def health_check(self) -> None:
+        """Ensure device is healthy.
+
+        Raises:
+            errors.SshConnectionError
+            errors.FfxConnectionError
+            errors.FuchsiaControllerConnectionError
+        """
+        super().health_check()
+        self.fuchsia_controller.check_connection()
 
     def on_device_boot(self) -> None:
         """Take actions after the device is rebooted.
@@ -298,8 +307,11 @@ class FuchsiaDevice(
             errors.FuchsiaControllerError: On FIDL communication failure.
         """
         try:
+            rcs_proxy = fd_remotecontrol.RemoteControl.Client(
+                self.fuchsia_controller.ctx.connect_remote_control_proxy()
+            )
             asyncio.run(
-                self.fuchsia_controller.rcs_proxy.log_message(
+                rcs_proxy.log_message(
                     tag=tag, message=message, severity=_LOG_SEVERITIES[level]
                 )
             )

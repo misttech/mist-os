@@ -27,28 +27,60 @@ class HoneyDewError(Exception):
         _LOGGER.debug(repr(self), exc_info=True)
 
 
-class HoneyDewTimeoutError(HoneyDewError):
-    """Exception for timeout based raised by HoneyDew."""
+class TransportError(HoneyDewError):
+    """Exception for errors raised by honeydew transports."""
 
 
-class FfxCommandError(HoneyDewError):
-    """Exception for errors raised by ffx commands running on host machine."""
-
-
-class HttpRequestError(HoneyDewError):
+class HttpRequestError(TransportError):
     """Exception for errors raised by HTTP requests running on host machine."""
 
 
-class SSHCommandError(HoneyDewError):
-    """Exception for errors raised by SSH commands running on host machine."""
-
-
-class Sl4fError(HoneyDewError):
+class Sl4fError(TransportError):
     """Exception for errors raised by SL4F requests."""
 
 
-class FuchsiaControllerError(HoneyDewError):
+class SSHCommandError(TransportError):
+    """Exception for errors raised by SSH commands running on host machine."""
+
+
+class FfxCommandError(TransportError):
+    """Exception for errors raised by ffx commands running on host machine."""
+
+
+class FuchsiaControllerError(TransportError):
     """Exception for errors raised by Fuchsia Controller requests."""
+
+
+class FastbootCommandError(HoneyDewError):
+    """Exception for errors raised by Fastboot commands."""
+
+
+class TransportConnectionError(HoneyDewError):
+    """Raised when transport's check_connection fails."""
+
+
+class Sl4fConnectionError(TransportConnectionError):
+    """Raised when FFX transport's check_connection fails."""
+
+
+class SshConnectionError(TransportConnectionError):
+    """Raised when SSH transport's check_connection fails."""
+
+
+class FfxConnectionError(TransportConnectionError):
+    """Raised when FFX transport's check_connection fails."""
+
+
+class FuchsiaControllerConnectionError(TransportConnectionError):
+    """Raised when Fuchsia-Controller transport's check_connection fails."""
+
+
+class FastbootConnectionError(TransportConnectionError):
+    """Raised when Fastboot transport's check_connection fails."""
+
+
+class HoneyDewTimeoutError(HoneyDewError):
+    """Exception for timeout based raised by HoneyDew."""
 
 
 class FuchsiaStateError(HoneyDewError):
@@ -57,10 +89,6 @@ class FuchsiaStateError(HoneyDewError):
 
 class FuchsiaDeviceError(HoneyDewError):
     """Base exception for errors raised by fuchsia device."""
-
-
-class FastbootCommandError(HoneyDewError):
-    """Exception for errors raised by Fastboot commands."""
 
 
 class SessionError(HoneyDewError):

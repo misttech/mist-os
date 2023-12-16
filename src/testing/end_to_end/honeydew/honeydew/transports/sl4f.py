@@ -93,17 +93,23 @@ class SL4F:
         """Check SL4F connection between host and SL4F server running on device.
 
         Raises:
-            errors.Sl4fError: If SL4F connection is not successful.
+            errors.Sl4fConnectionError
         """
-        get_device_name_resp: dict[str, Any] = self.run(
-            method=_SL4F_METHODS["GetDeviceName"]
-        )
-        device_name: str = get_device_name_resp["result"]
-
-        if device_name != self._name:
-            raise errors.Sl4fError(
-                f"Failed to start SL4F server on '{self._name}'."
+        try:
+            get_device_name_resp: dict[str, Any] = self.run(
+                method=_SL4F_METHODS["GetDeviceName"]
             )
+            device_name: str = get_device_name_resp["result"]
+
+            if device_name != self._name:
+                raise errors.Sl4fError(
+                    f"Device name expected: '{device_name}' but received: "
+                    f"'{self._name}'."
+                )
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.Sl4fConnectionError(
+                f"SL4F connection check failed for {self._name} with err: {err}"
+            ) from err
 
     def run(
         self,

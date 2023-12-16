@@ -200,7 +200,12 @@ class BaseFuchsiaDevice(
 
     # List all the public methods in alphabetical order
     def health_check(self) -> None:
-        """Ensure device is healthy."""
+        """Ensure device is healthy.
+
+        Raises:
+            errors.SshConnectionError
+            errors.FfxConnectionError
+        """
         if self._ssh_private_key:
             self.ssh.check_connection()
         self.ffx.check_connection()

@@ -100,7 +100,7 @@ class FuchsiaDevice(
         ssh_user: str | None = None,
     ) -> None:
         super().__init__(device_name, device_ip, ssh_private_key, ssh_user)
-        _LOGGER.debug("Initializing SL4F-based FuchsiaDevice")
+        _LOGGER.debug("Initialized SL4F-based FuchsiaDevice")
 
     # List all the transports in alphabetical order
     @properties.Transport
@@ -199,9 +199,9 @@ class FuchsiaDevice(
         """Ensure device is healthy.
 
         Raises:
-            errors.SSHCommandError: if SSH connection check fails
-            errors.FFXCommandError: if FFX connection check fails
-            errors.Sl4fError: if SL4F connection check fails
+            errors.SshConnectionError
+            errors.FfxConnectionError
+            errors.Sl4fConnectionError
         """
         super().health_check()
         self.sl4f.check_connection()
