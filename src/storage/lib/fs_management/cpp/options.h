@@ -38,9 +38,6 @@ struct MountOptions {
   // If set, run fsck after every transaction.
   bool fsck_after_every_transaction = false;
 
-  // If set and the filesystem supports it, enables writing delivery blobs as per RFC 0207.
-  bool allow_delivery_blobs = false;
-
   // If set, a callable that returns a handle to the crypt client.
   std::function<zx::channel()> crypt_client;
 

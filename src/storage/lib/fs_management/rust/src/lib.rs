@@ -140,7 +140,6 @@ pub struct Blobfs {
     pub write_compression_level: Option<i32>,
     pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
     pub component_type: ComponentType,
-    pub allow_delivery_blobs: bool,
 }
 
 impl Blobfs {
@@ -179,7 +178,6 @@ impl FSConfig for Blobfs {
                     write_compression_level: self.write_compression_level.unwrap_or(-1),
                     write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                     cache_eviction_policy_override: EvictionPolicyOverride::None,
-                    allow_delivery_blobs: self.allow_delivery_blobs,
                 };
                 if let Some(compression) = &self.write_compression_algorithm {
                     start_options.write_compression_algorithm = match compression {
@@ -254,7 +252,6 @@ impl FSConfig for Minfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -276,7 +273,6 @@ pub struct Fxfs {
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
     pub component_type: ComponentType,
-    pub allow_delivery_blobs: bool,
 }
 
 impl Default for Fxfs {
@@ -286,7 +282,6 @@ impl Default for Fxfs {
             readonly: false,
             fsck_after_every_transaction: false,
             component_type: Default::default(),
-            allow_delivery_blobs: true,
         }
     }
 }
@@ -325,7 +320,6 @@ impl FSConfig for Fxfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: self.allow_delivery_blobs,
             },
             component_type: self.component_type.clone(),
         }
@@ -381,7 +375,6 @@ impl FSConfig for F2fs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
             },
             component_type: self.component_type.clone(),
         }

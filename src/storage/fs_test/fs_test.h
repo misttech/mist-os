@@ -73,8 +73,6 @@ struct TestFilesystemOptions {
   blobfs::BlobLayoutFormat blob_layout_format = blobfs::BlobLayoutFormat::kCompactMerkleTreeAtEnd;
   // The compression algorithm blobfs should use for new files.
   std::optional<blobfs::CompressionAlgorithm> blob_compression_algorithm = std::nullopt;
-  // Allow RFC 0207 support for writing pre-compressed delivery blobs (offline compression).
-  bool allow_delivery_blobs = false;
 
   // If using ram_nand, the number of writes after which writes should fail.
   uint32_t fail_after;

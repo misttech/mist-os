@@ -30,7 +30,7 @@ impl FilesystemConfig for Blobfs {
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
         let blobfs = FsManagementFilesystemInstance::new(
-            fs_management::Blobfs { allow_delivery_blobs: true, ..Default::default() },
+            fs_management::Blobfs { ..Default::default() },
             block_device,
             /*as_blob=*/ false,
         )

@@ -84,8 +84,5 @@
 
         // If true, blobfs is stored on fxfs.
         fxfs_blob: { type: "bool" },
-
-        // Enable delivery blob support (RFC 0207) when mounting blobfs.
-        blobfs_allow_delivery_blobs: { type: "bool" },
     },
 }

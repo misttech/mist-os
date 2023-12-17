@@ -47,9 +47,6 @@ type StartOptions = resource struct {
     /// An optional eviction policy specifier for the filesystem to use for in-memory structures
     /// (if the filesystem supports it), specifically for pager-backed files.
     cache_eviction_policy_override EvictionPolicyOverride;
-
-    /// If true, enable RFC 0207 support for writing delivery blobs (if the filesystem supports it).
-    allow_delivery_blobs bool;
 };
 
 /// Options for how to format filesystems.

@@ -313,7 +313,6 @@ async fn wipe_storage_fvm(
     tracing::info!("Formatting Blobfs.");
     let mut blobfs_config = Blobfs {
         deprecated_padded_blobfs_format: config.blobfs_use_deprecated_padded_format,
-        allow_delivery_blobs: config.blobfs_allow_delivery_blobs,
         ..launcher.get_blobfs_config()
     };
     if config.blobfs_initial_inodes > 0 {

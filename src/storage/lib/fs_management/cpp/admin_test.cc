@@ -106,7 +106,6 @@ class OutgoingDirectoryFixture : public testing::Test {
           return *std::move(service);
         }
       };
-      options.allow_delivery_blobs = true;
       auto fs = MountMultiVolumeWithDefault(std::move(device.value()), *component_, options);
       ASSERT_TRUE(fs.is_ok()) << fs.status_string();
       fs_ = std::make_unique<StartedSingleVolumeMultiVolumeFilesystem>(std::move(*fs));

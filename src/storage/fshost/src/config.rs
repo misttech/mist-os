@@ -8,7 +8,6 @@ use crate::boot_args::BootArgs;
 pub fn default_config() -> fshost_config::Config {
     fshost_config::Config {
         blobfs: true,
-        blobfs_allow_delivery_blobs: false,
         blobfs_initial_inodes: 0,
         blobfs_max_bytes: 0,
         blobfs_use_deprecated_padded_format: false,

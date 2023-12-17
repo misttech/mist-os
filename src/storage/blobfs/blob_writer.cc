@@ -55,11 +55,7 @@ const size_t kSystemPageSize = zx_system_get_page_size();
 }  // namespace
 
 Blob::Writer::Writer(const Blob& blob, bool is_delivery_blob)
-    : blob_(blob), is_delivery_blob_(is_delivery_blob) {
-  if (is_delivery_blob) {
-    ZX_ASSERT(blobfs().allow_delivery_blobs());
-  }
-}
+    : blob_(blob), is_delivery_blob_(is_delivery_blob) {}
 
 zx::result<Blob::WrittenBlob> Blob::Writer::WriteNullBlob(Blob& blob) {
   ZX_DEBUG_ASSERT(&blob_ == &blob);

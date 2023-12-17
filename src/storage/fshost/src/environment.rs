@@ -923,7 +923,6 @@ impl FilesystemLauncher {
         Blobfs {
             write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
             cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
-            allow_delivery_blobs: self.config.blobfs_allow_delivery_blobs,
             ..Default::default()
         }
     }

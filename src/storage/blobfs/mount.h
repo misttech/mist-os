@@ -52,10 +52,6 @@ struct MountOptions {
 #ifndef NDEBUG
   bool fsck_at_end_of_every_transaction = false;
 #endif
-
-  // Enable support for delivery blobs. Allows writing blobs in the format specified by RFC 0207.
-  // If set, `streaming_writes` should also be enabled to reduce memory pressure when writing blobs.
-  bool allow_delivery_blobs = false;
 };
 
 struct ComponentOptions {

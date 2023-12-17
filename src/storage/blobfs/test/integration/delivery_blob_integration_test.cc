@@ -27,15 +27,9 @@ const std::unique_ptr<BlobInfo> kTestBlobs[] = {
     GenerateRealisticBlob("", 1ul << 16),             // Realistic 64k blob
 };
 
-TestFilesystemOptions BlobfsWithOfflineCompression() {
-  TestFilesystemOptions blobfs_with_offline_compression = TestFilesystemOptions::DefaultBlobfs();
-  blobfs_with_offline_compression.allow_delivery_blobs = true;
-  return blobfs_with_offline_compression;
-}
-
 class DeliveryBlobIntegrationTest : public BaseBlobfsTest {
  protected:
-  DeliveryBlobIntegrationTest() : BaseBlobfsTest(BlobfsWithOfflineCompression()) {}
+  DeliveryBlobIntegrationTest() : BaseBlobfsTest(TestFilesystemOptions::DefaultBlobfs()) {}
 };
 
 // Verify we can write uncompressed delivery blobs.
@@ -126,24 +120,6 @@ TEST_F(DeliveryBlobIntegrationTest, PathHandling) {
     fbl::unique_fd fd(open(delivery_path.c_str(), O_RDONLY));
     ASSERT_TRUE(fd) << strerror(errno);
   }
-}
-
-class DeliveryBlobDisabledTest : public BaseBlobfsTest {
- protected:
-  DeliveryBlobDisabledTest()
-      : BaseBlobfsTest(
-            // Delivery blobs are gated behind a feature flag which is disabled by default.
-            TestFilesystemOptions::DefaultBlobfs()) {}
-};
-
-// Test that creating delivery blobs fails with the correct error reason.
-TEST_F(DeliveryBlobDisabledTest, CreationFails) {
-  // Any Merkle root should suffice for this test.
-  const auto blob_path = std::filesystem::path(fs().mount_path()) / kNullBlobRoot;
-  const auto write_path = GetDeliveryBlobPath(blob_path.c_str());
-  const fbl::unique_fd fd(open(write_path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
-  ASSERT_FALSE(fd) << "open() succeeded unexpectedly";
-  ASSERT_EQ(errno, ENOTSUP) << strerror(errno);
 }
 
 }  // namespace

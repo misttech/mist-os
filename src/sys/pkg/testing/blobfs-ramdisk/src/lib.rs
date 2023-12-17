@@ -139,10 +139,7 @@ impl BlobfsRamdiskBuilder {
         let mut fs = match implementation {
             Implementation::CppBlobfs => fs_management::filesystem::Filesystem::new(
                 ramdisk_controller,
-                fs_management::Blobfs {
-                    allow_delivery_blobs: true,
-                    ..fs_management::Blobfs::dynamic_child()
-                },
+                fs_management::Blobfs { ..fs_management::Blobfs::dynamic_child() },
             ),
             Implementation::Fxblob => fs_management::filesystem::Filesystem::new(
                 ramdisk_controller,

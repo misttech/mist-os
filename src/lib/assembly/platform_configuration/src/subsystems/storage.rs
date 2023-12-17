@@ -150,7 +150,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;
             fshost_config_builder
                 .field("blobfs", true)?
-                .field("blobfs_allow_delivery_blobs", true)?
                 .field("blobfs_max_bytes", blobfs_max_bytes)?
                 .field("bootpart", true)?
                 .field("check_filesystems", true)?

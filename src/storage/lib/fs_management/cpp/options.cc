@@ -50,8 +50,6 @@ zx::result<fuchsia_fs_startup::wire::StartOptions> MountOptions::as_start_option
         fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone;
   }
 
-  options.allow_delivery_blobs = allow_delivery_blobs;
-
   return zx::ok(options);
 }
 

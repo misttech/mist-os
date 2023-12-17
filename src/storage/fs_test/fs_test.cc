@@ -439,8 +439,7 @@ std::vector<TestFilesystemOptions> AllTestFilesystems() {
                                                .use_fvm = false,
                                                .device_block_size = 512,
                                                .device_block_count = 196'608,
-                                               .filesystem = filesystem.get(),
-                                               .allow_delivery_blobs = false});
+                                               .filesystem = filesystem.get()});
     } else {
       for (rapidjson::SizeType i = 0; i < iter->value.Size(); ++i) {
         const auto& opt = iter->value[i];
@@ -452,7 +451,6 @@ std::vector<TestFilesystemOptions> AllTestFilesystems() {
             .device_block_count = ConfigGetOrDefault<uint64_t>(opt, "device_block_count", 196'608),
             .fvm_slice_size = 32'768,
             .filesystem = filesystem.get(),
-            .allow_delivery_blobs = ConfigGetOrDefault<bool>(opt, "allow_delivery_blobs", false),
         });
       }
     }

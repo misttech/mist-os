@@ -50,7 +50,6 @@ template("generated_fshost_config") {
     values = {
       # Defaults
       blobfs = true
-      blobfs_allow_delivery_blobs = true
       blobfs_max_bytes = 0
       bootpart = true
       check_filesystems = true

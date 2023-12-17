@@ -120,7 +120,7 @@ class JsonInstance : public FilesystemInstance {
       return zx::ok();
     }
     // Also check the volume, which requires re-mounting.
-    fs_management::MountOptions mount_options{.readonly = true, .allow_delivery_blobs = true};
+    fs_management::MountOptions mount_options{.readonly = true};
     if (filesystem_.GetTraits().uses_crypt) {
       mount_options.crypt_client = []() { return *GetCryptService(); };
     }

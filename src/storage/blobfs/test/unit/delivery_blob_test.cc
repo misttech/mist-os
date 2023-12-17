@@ -87,11 +87,7 @@ class DeliveryBlobTest : public BlobfsTestSetup,
         .blob_layout_format = GetParam().format,
     };
     ASSERT_EQ(FormatFilesystem(device.get(), filesystem_options), ZX_OK);
-
-    const MountOptions mount_options{
-        .allow_delivery_blobs = true,
-    };
-    ASSERT_EQ(ZX_OK, Mount(std::move(device), mount_options));
+    ASSERT_EQ(ZX_OK, Mount(std::move(device), {}));
     ASSERT_EQ(ZX_OK, blobfs()->OpenRootNode(&root_));
   }
 

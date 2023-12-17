@@ -25,7 +25,7 @@ zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
   if (device.is_error()) {
     return device.take_error();
   }
-  auto fs = MountMultiVolume(std::move(device.value()), component, {.allow_delivery_blobs = true});
+  auto fs = MountMultiVolume(std::move(device.value()), component, {});
   if (fs.is_error()) {
     std::cerr << "Could not mount to create default volume: " << fs.status_string() << std::endl;
     return fs.take_error();

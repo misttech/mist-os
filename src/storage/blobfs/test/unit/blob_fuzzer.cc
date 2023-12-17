@@ -77,7 +77,6 @@ class BlobfsInstance {
                                  .decompression_connector =
                                      &local_decompressor_creator_->GetDecompressorConnector(),
                                  .paging_threads = 1,
-                                 .allow_delivery_blobs = true,
                              })
                   .is_ok());
     auto root = GetRootDirectory(outgoing);

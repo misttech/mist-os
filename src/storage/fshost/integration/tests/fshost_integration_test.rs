@@ -23,7 +23,6 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_fs::node::OpenError,
     fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::FutureExt,
@@ -1035,35 +1034,10 @@ async fn verify_blobs() {
 }
 
 #[fuchsia::test]
-// Fxblob always enables delivery support.
 #[cfg_attr(feature = "fxblob", ignore)]
-
-async fn delivery_blob_support_disabled() {
+async fn delivery_blob_support() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("blobfs_allow_delivery_blobs", false);
-    builder.with_disk().format_volumes(volumes_spec());
-    let fixture = builder.build().await;
-    // Attempt to open a delivery blob for writing.
-    const HASH: &'static str = "f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf";
-    let open_error = fuchsia_fs::directory::open_file(
-        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
-        &delivery_blob_path(HASH),
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-    )
-    .await
-    .expect_err("Should fail to open delivery blob for writing when disabled.");
-    assert_matches!(open_error, OpenError::OpenError(zx::Status::NOT_SUPPORTED));
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
-async fn delivery_blob_support_enabled() {
-    let mut builder = new_builder();
-    builder
-        .fshost()
-        .set_config_value("blobfs_allow_delivery_blobs", true)
-        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
+    builder.fshost().set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
     // 65536 bytes of 0xff "small" f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf
@@ -1106,12 +1080,9 @@ async fn delivery_blob_support_enabled() {
 
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
-async fn delivery_blob_support_enabled_fxblob() {
+async fn delivery_blob_support_fxblob() {
     let mut builder = new_builder();
-    builder
-        .fshost()
-        .set_config_value("blobfs_allow_delivery_blobs", true)
-        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
+    builder.fshost().set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
