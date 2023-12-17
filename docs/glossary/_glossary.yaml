@@ -56,8 +56,7 @@
   configuration data. These elements are grouped together inside Assembly Input Bundles (AIBs) for
   inclusion together into the assembled product. All AIBs other than the Legacy AIBs are \"platform
   AIBs\".<p>"
-  see_also: ["<a href=\"/docs/glossary#software-assembly\">Software Assembly</a>",
-   "<a href=\"legacy-assembly-input-bundle\">Legacy AIB</a>"]
+  see_also: ["<a href=\"/docs/glossary#software-assembly\">Software Assembly</a>"]
   related_guides: [""]
   area: ["Software Assembly", "Developer"]
 
@@ -135,7 +134,7 @@
   loaded and parented by the platform bus."
   see_also: [
     "<a href=\"/docs/glossary#board\">Board</a>",
-    "<a href=\"/src/devices/board/drivers/\">//src/devices/board/drivers</a>",
+    "<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/devices/board/drivers/\">//src/devices/board/drivers</a>",
     "<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus\">Platform Bus</a>"
   ]
   related_guides: [""]
@@ -371,7 +370,7 @@
 - term: "Component declaration"
   short_description: "A FIDL table that includes information about a component."
   full_description: "A component declaration is a <a href=\"/docs/glossary#fidl\">fidl</a>
-  table (<a href=\"/sdk/fidl/fuchsia.sys2/decls/component_decl.fidl\">fuchsia.sys2.ComponentDecl</a>)
+  table (<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/fidl/fuchsia.sys2/decls/component_decl.fidl\">fuchsia.sys2.ComponentDecl</a>)
   that includes information about a <a href=\"/docs/glossary#component\">component</a>’s
   runtime configuration, <a href=\"/docs/glossary#capability\">capabilities</a> it
   <a href=\"/docs/glossary#expose\">exposes</a>, <a href=\"/docs/glossary#offer\">offers</a>,
@@ -651,7 +650,7 @@
   loaded into <a href=\"/docs/glossary#driver-host\">driver hosts</a> by the
   <a href=\"/docs/glossary#driver-manager\">driver manager</a>."
   see_also: ["<a href=\"/docs/development/drivers/developer_guide/driver-development.md\">Fuchsia driver development</a>",
-             "<a href=\"/src/devices\">Driver source code</a>",
+             "<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/devices\">Driver source code</a>",
              "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
@@ -817,7 +816,7 @@
   build Zircon device drivers. Device drivers are implemented as ELF shared libraries loaded by
   Zircon's driver manager."
   see_also: ["<a href=\"/docs/concepts/drivers/fdf.md\">Fuchsia driver framework</a>",
-             "<a href=\"/src/lib/ddk/include/ddk/\">FDF includes</a>"]
+             "<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/ddk/include/ddk/\">FDF includes</a>"]
   related_guides: [""]
   area: ["System", "Zircon"]
 
@@ -1151,7 +1150,7 @@
   table. For example, a <code>InputDeviceDescriptor</code> contains the keys available on the
   keyboard, and a <code>InputDeviceDescriptor::Touch</code> contains the maximum number of touch
   contacts and the range of <code>x-</code> and <code>y-</code> values each contact can take on."
-  see_also: ["<a href=\"/src/ui/lib/input/src/input_device.rs\"><code>enum InputDeviceDescriptor</code></a>",
+  see_also: ["<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/ui/lib/input/src/input_device.rs\"><code>enum InputDeviceDescriptor</code></a>",
              "<a href=\"https://fuchsia.dev/reference/fidl/fuchsia.input.report#DeviceDescriptor\"><code>fuchsia.input.report.DeviceDescriptor</code></a>"]
   related_guides: [""]
   area: ["Session", "Devices"]
@@ -2285,12 +2284,25 @@
   related_guides: [""]
   area: ["Zircon"]
 
+- term: "Zircon"
+  short_description: "Zircon is the
+  <a href=\"https://en.wikipedia.org/wiki/Kernel_(operating_system)\">kernel</a> and
+  lowest level userspace components (driver runtime environment, core drivers, libc, etc) at the
+  core of Fuchsia."
+  full_description: "In a traditional monolithic kernel, many of
+  the userspace components of Zircon would be part of the kernel itself."
+  see_also: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/README.md\">Zircon documentation</a>",
+             "<a href=\"/docs/concepts/kernel/concepts.md\">Zircon concepts</a>",
+             "<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/\">Source code</a>"]
+  related_guides: [""]
+  area: ["Zircon"]
+
 - term: "Zircon Boot Image"
   short_description: " A Zircon Boot Image (ZBI) contains everything needed during the boot process
   before any drivers are working."
   full_description: "This includes the kernel image and a
   <a href=\"/docs/glossary#bootfs\">RAM disk for the boot filesystem</a>."
-  see_also: ["<a href=\"/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h\">ZBI header file</a>"]
+  see_also: ["<a href=\"https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h\">ZBI header file</a>"]
   related_guides: [""]
   area: ["Zircon"]
 
@@ -2307,18 +2319,6 @@
   related_guides: [""]
   area: ["Zircon"]
 
-- term: "Zircon"
-  short_description: "Zircon is the
-  <a href=\"https://en.wikipedia.org/wiki/Kernel_(operating_system)\">kernel</a> and
-  lowest level userspace components (driver runtime environment, core drivers, libc, etc) at the
-  core of Fuchsia."
-  full_description: "In a traditional monolithic kernel, many of
-  the userspace components of Zircon would be part of the kernel itself."
-  see_also: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/README.md\">Zircon documentation</a>",
-             "<a href=\"/docs/concepts/kernel/concepts.md\">Zircon concepts</a>",
-             "<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/\">Source code</a>"]
-  related_guides: [""]
-  area: ["Zircon"]
 
 - term: "ZX"
   short_description: "An abbreviation of Zircon used in Zircon C APIs and ABIs
