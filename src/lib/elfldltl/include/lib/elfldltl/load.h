@@ -479,7 +479,7 @@ class LoadInfo {
 
     assert(relro_size <= segment.memsz());
     if (relro_size == segment.memsz()) {
-      return {relro_segment, {}};
+      return {std::move(relro_segment), std::nullopt};
     }
 
     auto offset = segment.offset() + relro_size;
@@ -488,14 +488,14 @@ class LoadInfo {
     auto filesz = segment.filesz() - relro_size;
 
     if (std::is_same_v<SegmentType, DataSegment>) {
-      return {relro_segment, DataSegment{offset, vaddr, memsz, filesz}};
+      return {std::move(relro_segment), DataSegment{offset, vaddr, memsz, filesz}};
     }
 
     assert((std::is_same_v<SegmentType, DataWithZeroFillSegment>));
     if (segment.filesz() - relro_size == 0) {
-      return {relro_segment, ZeroFillSegment{vaddr, memsz}};
+      return {std::move(relro_segment), ZeroFillSegment{vaddr, memsz}};
     }
-    return {relro_segment, DataWithZeroFillSegment{offset, vaddr, memsz, filesz}};
+    return {std::move(relro_segment), DataWithZeroFillSegment{offset, vaddr, memsz, filesz}};
   }
 
   // Complete ApplyRelro once the specific segment has been found.  This is
@@ -515,8 +515,13 @@ class LoadInfo {
   // mapped in before relocation can take place, so there is no efficiency to
   // be found using this.
   template <class Diagnostics, class SegmentType>
-  constexpr bool FixupRelro(Diagnostics& diagnostics, typename Container<Segment>::iterator it,
-                            SegmentType segment, size_type relro_size, bool merge_ro) {
+  constexpr bool FixupRelro(  //
+      Diagnostics& diagnostics,
+      // This iterator points to (the std::variant containing) this segment,
+      // but segment's type provides the deduced template parameter and saves
+      // repeating the iterator dereference and the std::get from the variant.
+      typename Container<Segment>::iterator it, const SegmentType& segment,  //
+      size_type relro_size, bool merge_ro) {
     auto [relro_segment, split_segment] = SplitRelro(segment, relro_size, merge_ro);
 
     auto merge = [this](auto it1, auto it2) {
@@ -531,7 +536,7 @@ class LoadInfo {
     };
 
     // Replace the current segment instead of erase + insert.
-    *it = relro_segment;
+    *it = std::move(relro_segment);
 
     if (it != segments().begin()) {
       it = merge(it - 1, it);
@@ -539,7 +544,8 @@ class LoadInfo {
 
     if (split_segment) {
       it += 1;
-      auto it_or_err = segments().emplace(diagnostics, internal::kTooManyLoads, it, *split_segment);
+      auto it_or_err =
+          segments().emplace(diagnostics, internal::kTooManyLoads, it, *std::move(split_segment));
       if (!it_or_err) {
         return false;
       }

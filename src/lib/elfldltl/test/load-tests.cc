@@ -508,7 +508,11 @@ struct PhdrCreator {
 
 using PhdrsPattern = std::initializer_list<SegmentType>;
 
-template <typename Elf>
+template <class Elf, template <class> class SegmentWrapper = elfldltl::NoSegmentWrapper>
+using RelroTestLoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container,
+                                             elfldltl::PhdrLoadPolicy::kBasic, SegmentWrapper>;
+
+template <typename Elf, template <class> class SegmentWrapper = elfldltl::NoSegmentWrapper>
 void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy, bool merge_ro,
                cpp20::source_location loc = cpp20::source_location::current()) {
   using Phdr = typename Elf::Phdr;
@@ -519,7 +523,7 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+  RelroTestLoadInfo<Elf, SegmentWrapper> loadInfo;
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag,
                                     cpp20::span<const Phdr>(input_phdrs.data(), input_phdrs.size()),
                                     loadInfo.GetPhdrObserver(kPageSize)));
@@ -533,11 +537,11 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
   }
 }
 
-template <typename Elf>
+template <typename Elf, template <class> class SegmentWrapper = elfldltl::NoSegmentWrapper>
 void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy,
                cpp20::source_location loc = cpp20::source_location::current()) {
-  RelroTest<Elf>(input, expected, strategy, true, loc);
-  RelroTest<Elf>(input, expected, strategy, false, loc);
+  RelroTest<Elf, SegmentWrapper>(input, expected, strategy, true, loc);
+  RelroTest<Elf, SegmentWrapper>(input, expected, strategy, false, loc);
 }
 
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroBasic) {
@@ -546,6 +550,36 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroBasic) {
   RelroTest<Elf>({RO}, {C, D}, D);
   RelroTest<Elf>({RO}, {C, DWZF}, DWZF);
   RelroTest<Elf>({RO}, {C, ZF}, ZF);
+}
+
+template <class Segment>
+class MoveOnlySegmentWrapper : public Segment {
+ public:
+  using Segment::Segment;
+
+  MoveOnlySegmentWrapper(const MoveOnlySegmentWrapper&) = delete;
+  constexpr MoveOnlySegmentWrapper(MoveOnlySegmentWrapper&&) = default;
+  constexpr MoveOnlySegmentWrapper& operator=(MoveOnlySegmentWrapper&&) = default;
+};
+
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroMoveOnly) {
+  using Elf = typename TestFixture::Elf;
+
+  using DefaultSegment = typename RelroTestLoadInfo<Elf>::LoadInfo::Segment;
+  static_assert(std::is_copy_constructible_v<DefaultSegment>);
+  static_assert(std::is_copy_assignable_v<DefaultSegment>);
+
+  using MoveOnlySegment =
+      typename RelroTestLoadInfo<Elf, MoveOnlySegmentWrapper>::LoadInfo::Segment;
+  static_assert(!std::is_copy_constructible_v<MoveOnlySegment>);
+  static_assert(!std::is_copy_assignable_v<MoveOnlySegment>);
+  static_assert(std::is_move_constructible_v<MoveOnlySegment>);
+  static_assert(std::is_move_assignable_v<MoveOnlySegment>);
+
+  RelroTest<Elf, MoveOnlySegmentWrapper>({RO}, {C}, {});
+  RelroTest<Elf, MoveOnlySegmentWrapper>({RO}, {C, D}, D);
+  RelroTest<Elf, MoveOnlySegmentWrapper>({RO}, {C, DWZF}, DWZF);
+  RelroTest<Elf, MoveOnlySegmentWrapper>({RO}, {C, ZF}, ZF);
 }
 
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroMergeRight) {
