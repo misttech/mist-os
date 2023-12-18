@@ -47,7 +47,7 @@ def to_fuchsia_os_name(target_os):
     """Convert Bazel OS name to Fuchsia cpu compatibel one.
 
     Args:
-        bazel_os: A Fuchsia- or Bazel-compatible operating system name,
+        target_os: A Fuchsia- or Bazel-compatible operating system name,
     Returns:
         A Fuchsia compatible operating system name string (e.g. "mac")
     """
@@ -98,7 +98,14 @@ all_target_tags = [
 ]
 
 def to_target_os_cpu_pair(target_tag):
-    """Convert a target tag string to (target_os, target_cpu) pair."""
+    """Convert a target tag string to (target_os, target_cpu) pair.
+
+    Args:
+        target_tag: a string identifiying a target (os,cpu) pair, using
+          either "-" or "_" as the separator.
+    Returns:
+        A target (os, cpu) string pair.
+    """
     target_os, sep, target_cpu = target_tag.replace("_", "-").partition("-")
     if sep != "-":
         fail("Invalid target tag value (<os>-<cpu> expected): " + target_tag)
@@ -124,9 +131,8 @@ def config_setting_label_for_target_tag(target_tag):
     """Return label of a config setting holding True for a specific "os-cpu" pair.
 
     Args:
-        target_os_cpu: A single string containing an OS name and a CPU name,
-           separated by either a dash or underscore, following either
-           Bazel or Fuchsia conventions (e.g. "mac-x64" or "macos_aarch64").
+        target_tag: a string identifiying a target (os,cpu) pair, using
+          either "-" or "_" as the separator.
     Returns:
         A label string pointing to a config_setting() value which will hold
         true when the current build configuration corresponds to
@@ -145,7 +151,7 @@ def target_tag_dict_to_select_keys(input_dict, add_default = None):
         add_default: If not None, add a //conditions:default clause matching
           this value.
 
-    Return:
+    Returns:
         A dictionary whose keys are config setting labels matching the
         target_tag keys from the input, associated with the corresponding
         input values.

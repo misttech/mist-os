@@ -6,7 +6,6 @@
 C++ toolchain definitions for Clang.
 """
 
-load("@prebuilt_clang//:generated_constants.bzl", clang_constants = "constants")
 load(
     "@fuchsia_sdk_common//:toolchains/clang/toolchain_utils.bzl",
     "generate_clang_cc_toolchain",
@@ -39,7 +38,6 @@ def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
         host_arch = bazel_arch,
         target_os = bazel_os,
         target_arch = "x86_64",
-        clang_constants = clang_constants,
         sysroot_files = sysroot_files_x64,
         sysroot_path = sysroot_path,
     )
@@ -50,7 +48,6 @@ def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
         host_arch = bazel_arch,
         target_os = bazel_os,
         target_arch = "aarch64",
-        clang_constants = clang_constants,
         sysroot_files = sysroot_files_arm64,
         sysroot_path = sysroot_path,
     )

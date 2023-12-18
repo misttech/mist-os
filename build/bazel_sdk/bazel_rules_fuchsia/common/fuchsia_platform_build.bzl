@@ -55,7 +55,7 @@ def _get_ninja_output_dir(repo_ctx):
     top_dir = repo_ctx.read(config_path).strip()
     num_fragments = len(top_dir.split("/"))
     result = ".."
-    for n in range(num_fragments):
+    for _ in range(num_fragments):
         result += "/.."
 
     if repo_ctx.attr.fuchsia_source_dir:

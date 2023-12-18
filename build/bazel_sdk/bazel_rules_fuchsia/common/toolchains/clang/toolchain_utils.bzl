@@ -16,7 +16,6 @@ load(
 load(
     "//:toolchains/clang/clang_utils.bzl",
     "format_labels_list_to_target_tag_native_glob_select",
-    "to_clang_target_tuple",
 )
 load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
@@ -309,7 +308,6 @@ def generate_clang_cc_toolchain(
         host_arch,
         target_os,
         target_arch,
-        clang_constants,
         clang_info = "//:clang_info",
         sysroot_files = [],
         sysroot_path = ""):
@@ -327,8 +325,6 @@ def generate_clang_cc_toolchain(
        host_arch: Host cpu architecture string, using Bazel conventions.
        target_os: Target os string, using Bazel conventions.
        target_arch: Target cpu architecture string, using Bazel conventions.
-
-       clang_constants: TBW
 
        clang_info: (optional) Label to a target providing a ClangInfo provider
            value. Default to //:clang_info.

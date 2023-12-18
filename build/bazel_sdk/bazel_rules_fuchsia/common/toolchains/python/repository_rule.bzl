@@ -42,6 +42,11 @@ Example usage:
 # Set to True to enable log messages.
 _LOG = False
 
+def log(message):
+    if _LOG:
+        # buildifier: disable=print
+        print(message)
+
 # Name of the environment variable used to check for a content-based hash
 # reflecting the content of the Python source toolchain, see documentation
 # for the compact_python_runtime_repository() repository rule below for
@@ -59,10 +64,9 @@ def _make_path_from_str(repo_ctx, path_str):
 def _record_path_dependency(repo_ctx, path_str):
     if path_str and not path_str.startswith("/"):
         repo_ctx.path(Label("@//:" + path_str))
-        if _LOG:
-            print("### Recording %s as path dependency for repository %s ###" % (path_str, repo_ctx.name))
-    elif _LOG:
-        print("### IGNORING %s AS PATH DEPENDENCY FOR REPOSITORY %s ####" % (path_str, repo_ctx.name))
+        log("### Recording %s as path dependency for repository %s ###" % (path_str, repo_ctx.name))
+    else:
+        log("### IGNORING %s AS PATH DEPENDENCY FOR REPOSITORY %s ####" % (path_str, repo_ctx.name))
 
 def _compact_python_runtime_impl(repo_ctx):
     # If content_hash_file is provided, make sure this repository rule

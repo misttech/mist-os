@@ -86,7 +86,7 @@ def to_clang_target_tuple(target_os, target_arch):
 
     Args:
       target_os: Target os name, following Fuchsia or Bazel conventions.
-      target_cpu: Target cpu name, following Fuchsia or Bazel conventions.
+      target_arch: Target cpu name, following Fuchsia or Bazel conventions.
     Returns:
       Clang target tuple string (e.g. "x86_64-unknown-linux-gnu")
     """
@@ -259,8 +259,8 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
 
     return select(target_tag_dict_to_select_keys(
         {
-            target_tag: native.glob(labels)
-            for target_tag, labels in format_labels_list_to_target_tag_dict(
+            target_tag: native.glob(target_labels)
+            for target_tag, target_labels in format_labels_list_to_target_tag_dict(
                 labels,
                 target_tags = target_tags,
                 extra_dict = extra_dict,

@@ -16,7 +16,6 @@ load(
     "to_fuchsia_os_name",
     "to_platform_cpu_constraint",
     "to_platform_os_constraint",
-    "to_target_os_cpu_pair",
 )
 
 def _test_to_fuchsia_os_name(env):
@@ -176,6 +175,8 @@ def _platforms_utils_test(ctx):
     _test_to_fuchsia_cpu_name(env)
     _test_to_bazel_os_name(env)
     _test_to_bazel_cpu_name(env)
+    _test_to_platform_os_constraint(env)
+    _test_to_platform_cpu_constraint(env)
     _test_config_setting_label_for_target_os_cpu(env)
     _test_config_setting_label_for_target_tag(env)
     _test_target_tag_dict_to_select_keys(env)
