@@ -41,6 +41,11 @@ fuchsia_component_manifest("conformance-manifest") {
   manifest = "meta/magma-conformance-tests.cml"
 }
 
+fuchsia_component_manifest("conformance_child_manifest") {
+  component_name = "magma_conformance_tests"
+  manifest = "meta/magma_conformance_tests_child.cml"
+}
+
 fuchsia_component_manifest("conformance-hermetic-manifest") {
   component_name = "magma-conformance-tests-hermetic"
   manifest = "meta/magma-conformance-tests-hermetic.cml"
@@ -203,6 +208,13 @@ fuchsia_structured_config_values("default_config") {
   }
 }
 
+fuchsia_structured_config_values("child_config") {
+  cm_label = ":conformance_child_manifest"
+  values = {
+    gpu_vendor_id = ""
+  }
+}
+
 fuchsia_structured_config_values("arm_config") {
   cm_label = ":conformance-manifest"
   values = {
@@ -218,8 +230,7 @@ fuchsia_structured_config_values("vsi_config") {
 }
 
 fuchsia_component("magma_conformance_tests_child_component") {
-  component_name = "magma_conformance_tests"
-  manifest = "meta/magma_conformance_tests_child.cml"
+  cm_label = ":conformance_child_manifest"
   deps = [ ":magma_conformance_tests" ]
 }
 
@@ -244,7 +255,10 @@ fuchsia_test_package("magma-conformance-tests") {
 }
 
 fuchsia_package("magma_conformance_tests_for_sdk") {
-  deps = [ ":magma_conformance_tests_child_component" ]
+  deps = [
+    ":child_config",
+    ":magma_conformance_tests_child_component",
+  ]
   validate_structured_config = false
 }
 

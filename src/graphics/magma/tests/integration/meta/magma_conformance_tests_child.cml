@@ -27,11 +27,14 @@
             rights: [ "r*" ],
             path: "/dev/class/gpu-performance-counters",
         },
-        {
-            from: "parent",
-            config: "fuchsia.gpu.test.GpuVendorId",
-            config_key: "gpu_vendor_id",
-            availability: "optional",
-        },
+
+        // TODO(b/316394088): Uncomment once we're ready to move away from Realm
+        // Builder and route structured config in cml.
+        // {
+        //     from: "parent",
+        //     config: "fuchsia.gpu.test.GpuVendorId",
+        //     config_key: "gpu_vendor_id",
+        //     availability: "optional",
+        // },
     ],
 }
