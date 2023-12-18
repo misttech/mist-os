@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Result},
+    anyhow::{bail, Context, Result},
     std::{
         collections::HashSet,
         fs::File,
@@ -46,6 +46,24 @@ fn matches_prefix(name: &String, prefixes: &HashSet<String>) -> Option<String> {
 }
 
 impl GoldenFile {
+    pub fn from_files<P: AsRef<Path>>(files: &Vec<P>) -> Result<Self> {
+        if files.is_empty() {
+            bail!("files must not be empty");
+        }
+        let mut golden = Self::open(&files[0])?;
+        for index in 1..files.len() {
+            golden.merge(Self::open(&files[index])?);
+        }
+        Ok(golden)
+    }
+
+    fn merge(&mut self, golden: GoldenFile) {
+        self.required.extend(golden.required);
+        self.optional.extend(golden.optional);
+        self.required_prefix.extend(golden.required_prefix);
+        self.optional_prefix.extend(golden.optional_prefix);
+    }
+
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let golden_file = File::open(path).context("failed to open golden file")?;
@@ -246,5 +264,22 @@ mod tests {
             "extra".to_string(),
         ]);
         assert_ne!(extra_entry_result, CompareResult::Matches);
+    }
+
+    #[test]
+    fn test_from_files() {
+        let mut golden_files = Vec::<PathBuf>::new();
+        for i in 0..3 {
+            let golden_path = tempdir().unwrap().into_path().join(format!("golden_{}.txt", i));
+            let mut golden_file = File::create(&golden_path).expect("failed to create golden");
+            writeln!(golden_file, "foo_{}", i).expect("failed to write");
+            drop(golden_file);
+            golden_files.push(golden_path);
+        }
+
+        let golden = GoldenFile::from_files(&golden_files).expect("failed to open goldens");
+        let result =
+            golden.compare(vec!["foo_0".to_string(), "foo_1".to_string(), "foo_2".to_string()]);
+        assert_eq!(result, CompareResult::Matches);
     }
 }

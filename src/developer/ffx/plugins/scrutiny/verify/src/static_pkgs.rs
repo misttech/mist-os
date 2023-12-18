@@ -24,7 +24,7 @@ struct Query {
     recovery: bool,
 }
 
-fn verify_static_pkgs(query: &Query, golden_file_path: PathBuf) -> Result<HashSet<PathBuf>> {
+fn verify_static_pkgs(query: &Query, golden_files: &Vec<PathBuf>) -> Result<HashSet<PathBuf>> {
     let command = CommandBuilder::new("static.pkgs").build();
     let plugins = vec!["AdditionalBootConfigPlugin".to_string(), "StaticPkgsPlugin".to_string()];
     let model = if query.recovery {
@@ -56,15 +56,13 @@ fn verify_static_pkgs(query: &Query, golden_file_path: PathBuf) -> Result<HashSe
         .map(|((name, _variant), _hash)| name.as_ref().to_string())
         .collect();
 
-    let golden_contents =
-        std::fs::read(golden_file_path.as_path()).context("Failed to read golden file")?;
-    let golden_file = GoldenFile::from_contents(golden_file_path.as_path(), golden_contents)
-        .context("Failed to parse golden file")?;
+    let golden_file =
+        GoldenFile::from_files(golden_files).context("Failed to parse golden files")?;
 
     match golden_file.compare(static_package_names) {
         CompareResult::Matches => {
             let mut deps = static_pkgs_result.deps;
-            deps.insert(golden_file_path.clone());
+            deps.extend(golden_files.clone());
             Ok(deps)
         }
         CompareResult::Mismatch { errors } => {
@@ -74,7 +72,7 @@ fn verify_static_pkgs(query: &Query, golden_file_path: PathBuf) -> Result<HashSe
                 println!("{}", error);
             }
             println!("");
-            println!("If you intended to change the static package contents, please acknowledge it by updating {:?} with the added or removed lines.", golden_file_path);
+            println!("If you intended to change the static package contents, please acknowledge it by updating {:?} with the added or removed lines.", golden_files[0]);
             println!("{}", SOFT_TRANSITION_MSG);
             Err(anyhow!("static file mismatch"))
         }
@@ -84,11 +82,5 @@ fn verify_static_pkgs(query: &Query, golden_file_path: PathBuf) -> Result<HashSe
 pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let product_bundle = cmd.product_bundle.clone();
     let query = Query { product_bundle, recovery };
-    let mut deps = HashSet::new();
-
-    for golden_file_path in cmd.golden.iter() {
-        deps.extend(verify_static_pkgs(&query, golden_file_path.clone())?);
-    }
-
-    Ok(deps)
+    Ok(verify_static_pkgs(&query, &cmd.golden)?)
 }

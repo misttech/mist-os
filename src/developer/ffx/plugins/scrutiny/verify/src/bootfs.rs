@@ -59,27 +59,25 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .filter(|filename| !unscrutinized_dirs.contains(&Path::new(filename).parent()))
         .collect::<Vec<String>>();
 
-    for golden_file_path in cmd.golden.iter() {
-        let golden_file =
-            GoldenFile::open(&golden_file_path).context("Failed to open the golden file")?;
-        match golden_file.compare(non_blob_files.clone()) {
-            CompareResult::Matches => Ok(()),
-            CompareResult::Mismatch { errors } => {
-                println!("Bootfs file mismatch\n");
-                for error in errors.iter() {
-                    println!("{}", error);
-                }
-                println!(
-                    "\nIf you intended to change the bootfs contents, please acknowledge it by updating {:?} with the added or removed lines",
-                    golden_file_path,
-                );
-                println!("{}", SOFT_TRANSITION_MSG);
-                Err(anyhow!("bootfs file mismatch"))
+    let golden_file =
+        GoldenFile::from_files(&cmd.golden).context("Failed to open the golden files")?;
+    match golden_file.compare(non_blob_files.clone()) {
+        CompareResult::Matches => Ok(()),
+        CompareResult::Mismatch { errors } => {
+            println!("Bootfs file mismatch\n");
+            for error in errors.iter() {
+                println!("{}", error);
             }
-        }?;
+            println!(
+                "\nIf you intended to change the bootfs contents, please acknowledge it by updating {:?} with the added or removed lines",
+                &cmd.golden[0],
+            );
+            println!("{}", SOFT_TRANSITION_MSG);
+            Err(anyhow!("bootfs file mismatch"))
+        }
+    }?;
 
-        deps.insert(golden_file_path.clone());
-    }
+    deps.extend(cmd.golden.clone());
 
     // TODO(fxbug.dev/97517) After the first bootfs package is migrated to a component, an
     // absence of a bootfs package index is an error.
@@ -98,27 +96,24 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .map(|((name, _variant), _hash)| name.as_ref().to_string())
         .collect();
 
-    for golden_packages_path in cmd.golden_packages.iter() {
-        let golden_packages = GoldenFile::open(&golden_packages_path)
-            .context("Failed to open the golden packages list")?;
-
-        match golden_packages.compare(bootfs_package_names.clone()) {
-            CompareResult::Matches => Ok(()),
-            CompareResult::Mismatch { errors } => {
-                println!("Bootfs package index mismatch \n");
-                for error in errors.iter() {
-                    println!("{}", error);
-                }
-                println!(
-                    "\nIf you intended to change the bootfs contents, please acknowledge it by updating {:?} with the added or removed lines.",
-                    golden_packages_path,
-                );
-                println!("{}", SOFT_TRANSITION_MSG);
-                Err(anyhow!("bootfs package index mismatch"))
+    let golden_packages = GoldenFile::from_files(&cmd.golden_packages)
+        .context("Failed to open the golden packages lists")?;
+    match golden_packages.compare(bootfs_package_names.clone()) {
+        CompareResult::Matches => Ok(()),
+        CompareResult::Mismatch { errors } => {
+            println!("Bootfs package index mismatch \n");
+            for error in errors.iter() {
+                println!("{}", error);
             }
-        }?;
-        deps.insert(golden_packages_path.clone());
-    }
+            println!(
+                "\nIf you intended to change the bootfs contents, please acknowledge it by updating {:?} with the added or removed lines.",
+                &cmd.golden_packages[0],
+            );
+            println!("{}", SOFT_TRANSITION_MSG);
+            Err(anyhow!("bootfs package index mismatch"))
+        }
+    }?;
+    deps.extend(cmd.golden_packages.clone());
 
     Ok(deps)
 }
