@@ -12,11 +12,10 @@ use crate::{
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{SignalDetail, SignalInfo, SignalState},
-    task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
+    task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard},
 };
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
-use starnix_sync::RwLockWriteGuard;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
@@ -88,7 +87,7 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> R
         } else {
             task_state.signals.enqueue(siginfo.clone());
         }
-        task.set_flags(&mut *task_state, TaskFlags::SIGNALS_AVAILABLE, true);
+        task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
     }
 
     drop(task_state);
@@ -103,10 +102,10 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> R
     // a stopped process.
     if siginfo.signal == SIGCONT {
         task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
-        task.set_stopped(&mut *task.write(), StopState::Waking, None);
+        task.write().set_stopped(StopState::Waking, None);
     } else if siginfo.signal == SIGKILL {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
-        task.set_stopped(&mut *task.write(), StopState::ForceWaking, None);
+        task.write().set_stopped(StopState::ForceWaking, None);
     }
 
     Ok(())
@@ -165,7 +164,7 @@ fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAc
 /// Dequeues and handles a pending signal for `current_task`.
 pub fn dequeue_signal(
     task: &Task,
-    mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
+    mut task_state: TaskWriteGuard<'_>,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
 ) {
@@ -191,7 +190,7 @@ pub fn dequeue_signal(
         } else {
             (TaskFlags::empty(), TaskFlags::SIGNALS_AVAILABLE)
         };
-        task.update_flags(&mut *task_state, clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
+        task_state.update_flags(clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
     };
 
     if let Some(ref siginfo) = siginfo {
@@ -199,11 +198,7 @@ pub fn dequeue_signal(
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.
-            task.set_stopped(
-                &mut *task_state,
-                StopState::SignalDeliveryStopping,
-                Some(siginfo.clone()),
-            );
+            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()));
             return;
         }
     }
@@ -218,7 +213,7 @@ pub fn dequeue_signal(
 
 pub fn deliver_signal(
     task: &Task,
-    mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
+    mut task_state: TaskWriteGuard<'_>,
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
@@ -274,7 +269,7 @@ pub fn deliver_signal(
                 task.thread_group.exit(ExitStatus::Kill(siginfo));
             }
             DeliveryAction::CoreDump => {
-                task.set_flags(&mut *task_state, TaskFlags::DUMP_ON_EXIT, true);
+                task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
                 task.thread_group.exit(ExitStatus::CoreDump(siginfo));
             }

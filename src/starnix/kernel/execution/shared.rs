@@ -264,7 +264,7 @@ fn block_while_stopped(current_task: &mut CurrentTask) {
         // waiters.
         if current_task.is_exitted() {
             current_task.thread_group.set_stopped(StopState::ForceAwake, None, false);
-            current_task.set_stopped(&mut *current_task.write(), StopState::ForceAwake, None);
+            current_task.write().set_stopped(StopState::ForceAwake, None);
             return;
         }
 

@@ -180,7 +180,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         return error!(EIO);
     }
 
-    if !tracee.can_accept_ptrace_commands(&state) && !detach {
+    if !state.can_accept_ptrace_commands() && !detach {
         return error!(ESRCH);
     }
 
@@ -205,7 +205,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         }
     }
 
-    tracee.set_stopped(&mut *state, StopState::Waking, None);
+    state.set_stopped(StopState::Waking, None);
 
     if detach {
         state.set_ptrace(None)?;
@@ -234,13 +234,9 @@ fn ptrace_interrupt(tracee: &Task) -> Result<(), Errno> {
             // "If the tracee was already stopped by a signal and PTRACE_LISTEN
             // was sent to it, the tracee stops with PTRACE_EVENT_STOP and
             // WSTOPSIG(status) returns the stop signal"
-            tracee.set_stopped(&mut state, StopState::PtraceEventStopped, signal);
+            state.set_stopped(StopState::PtraceEventStopped, signal);
         } else {
-            tracee.set_stopped(
-                &mut state,
-                StopState::PtraceEventStopped,
-                Some(SignalInfo::default(SIGTRAP)),
-            );
+            state.set_stopped(StopState::PtraceEventStopped, Some(SignalInfo::default(SIGTRAP)));
             drop(state);
             tracee.interrupt();
         }
@@ -323,7 +319,7 @@ pub fn ptrace_dispatch(
 
     // The remaining requests (to be added) require the thread to be stopped.
     let mut state = tracee.write();
-    if !tracee.can_accept_ptrace_commands(&state) {
+    if !state.can_accept_ptrace_commands() {
         return error!(ESRCH);
     }
 

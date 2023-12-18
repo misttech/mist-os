@@ -457,8 +457,7 @@ where
                         log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
                         let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
 
-                        current_task
-                            .set_exit_status(&mut *current_task.write(), exit_status.clone());
+                        current_task.write().set_exit_status(exit_status.clone());
                         Ok(exit_status)
                     }
                     ok => ok,

@@ -4,6 +4,7 @@
 
 use crate::{
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
+    mutable_state::{state_accessor, state_implementation},
     signals::{SignalInfo, SignalState},
     task::{
         set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
@@ -18,12 +19,12 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
+use macro_rules_attribute::apply;
 use once_cell::sync::OnceCell;
 use starnix_logging::{
     log_debug, log_warn, set_zx_name, {self},
 };
-use starnix_sync::{LockBefore, Locked, MmDumpable};
-use starnix_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock};
 use starnix_uapi::{
     auth::{
         Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
@@ -416,6 +417,74 @@ impl TaskMutableState {
     }
 }
 
+#[apply(state_implementation!)]
+impl TaskMutableState<Base = Task, BaseType = Task> {
+    pub fn set_stopped(&mut self, stopped: StopState, siginfo: Option<SignalInfo>) {
+        if stopped.ptrace_only() && self.ptrace.is_none() {
+            return;
+        }
+
+        if self.base.load_stopped().is_illegal_transition(stopped) {
+            return;
+        }
+
+        // TODO(https://g-issues.fuchsia.dev/issues/306438676): When task can be
+        // stopped inside user code, task will need to be either restarted or
+        // stopped here.
+        self.store_stopped(stopped);
+        if let Some(ref mut ptrace) = &mut self.ptrace {
+            ptrace.set_last_signal(siginfo);
+        }
+        if stopped == StopState::Waking || stopped == StopState::ForceWaking {
+            self.notify_ptracees();
+        }
+        if !stopped.is_in_progress() {
+            self.notify_ptracers();
+        }
+    }
+
+    pub fn can_accept_ptrace_commands(&mut self) -> bool {
+        !self.base.load_stopped().is_waking_or_awake()
+            && self.is_ptraced()
+            && !self.is_ptrace_listening()
+    }
+
+    fn store_stopped(&mut self, state: StopState) {
+        // We don't actually use the guard but we require it to enforce that the
+        // caller holds the thread group's mutable state lock (identified by
+        // mutable access to the thread group's mutable state).
+
+        self.base.stop_state.store(state, Ordering::Relaxed)
+    }
+
+    pub fn update_flags(&mut self, clear: TaskFlags, set: TaskFlags) {
+        // We don't actually use the guard but we require it to enforce that the
+        // caller holds the task's mutable state lock (identified by mutable
+        // access to the task's mutable state).
+
+        debug_assert_eq!(clear ^ set, clear | set);
+        let observed = self.base.flags();
+        let swapped = self.base.flags.swap((observed | set) & !clear, Ordering::Relaxed);
+        debug_assert_eq!(swapped, observed);
+    }
+
+    pub fn set_flags(&mut self, flag: TaskFlags, v: bool) {
+        let (clear, set) = if v { (TaskFlags::empty(), flag) } else { (flag, TaskFlags::empty()) };
+
+        self.update_flags(clear, set);
+    }
+
+    pub fn set_exit_status(&mut self, status: ExitStatus) {
+        self.set_flags(TaskFlags::EXITED, true);
+        self.exit_status = Some(status);
+    }
+
+    pub fn set_exit_status_if_not_already(&mut self, status: ExitStatus) {
+        self.set_flags(TaskFlags::EXITED, true);
+        self.exit_status.get_or_insert(status);
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStateCode {
     // Task is being executed.
@@ -616,41 +685,6 @@ impl Task {
         self.flags.load(Ordering::Relaxed)
     }
 
-    fn check_mutable_state_lock_held(&self, guard: &mut TaskMutableState) {
-        // We don't actually use the guard but we require it to enforce that the
-        // caller holds the task's mutable state lock (identified by mutable
-        // access to the task's mutable state).
-        let _ = guard;
-        // Ideally we would assert `!self.mutable_state.is_locked_exclusive()`
-        // but this tries to take the lock underneath which triggers a lock
-        // dependency check, resulting in a panic.
-    }
-
-    pub fn update_flags(&self, guard: &mut TaskMutableState, clear: TaskFlags, set: TaskFlags) {
-        self.check_mutable_state_lock_held(guard);
-
-        debug_assert_eq!(clear ^ set, clear | set);
-        let observed = self.flags();
-        let swapped = self.flags.swap((observed | set) & !clear, Ordering::Relaxed);
-        debug_assert_eq!(swapped, observed);
-    }
-
-    pub fn set_flags(&self, guard: &mut TaskMutableState, flag: TaskFlags, v: bool) {
-        let (clear, set) = if v { (TaskFlags::empty(), flag) } else { (flag, TaskFlags::empty()) };
-
-        self.update_flags(guard, clear, set);
-    }
-
-    pub fn set_exit_status(&self, guard: &mut TaskMutableState, status: ExitStatus) {
-        self.set_flags(guard, TaskFlags::EXITED, true);
-        guard.exit_status = Some(status);
-    }
-
-    pub fn set_exit_status_if_not_already(&self, guard: &mut TaskMutableState, status: ExitStatus) {
-        self.set_flags(guard, TaskFlags::EXITED, true);
-        guard.exit_status.get_or_insert(status);
-    }
-
     pub fn exit_status(&self) -> Option<ExitStatus> {
         self.is_exitted().then(|| self.read().exit_status.clone()).flatten()
     }
@@ -661,47 +695,6 @@ impl Task {
 
     pub fn load_stopped(&self) -> StopState {
         self.stop_state.load(Ordering::Relaxed)
-    }
-
-    fn store_stopped(&self, state: StopState, guard: &mut TaskMutableState) {
-        self.check_mutable_state_lock_held(guard);
-
-        self.stop_state.store(state, Ordering::Relaxed)
-    }
-
-    pub fn set_stopped(
-        &self,
-        guard: &mut TaskMutableState,
-        stopped: StopState,
-        siginfo: Option<SignalInfo>,
-    ) {
-        if stopped.ptrace_only() && guard.ptrace.is_none() {
-            return;
-        }
-
-        if self.load_stopped().is_illegal_transition(stopped) {
-            return;
-        }
-
-        // TODO(https://g-issues.fuchsia.dev/issues/306438676): When task can be
-        // stopped inside user code, task will need to be either restarted or
-        // stopped here.
-        self.store_stopped(stopped, guard);
-        if let Some(ref mut ptrace) = &mut guard.ptrace {
-            ptrace.set_last_signal(siginfo);
-        }
-        if stopped == StopState::Waking || stopped == StopState::ForceWaking {
-            guard.notify_ptracees();
-        }
-        if !stopped.is_in_progress() {
-            guard.notify_ptracers();
-        }
-    }
-
-    pub fn can_accept_ptrace_commands(&self, guard: &TaskMutableState) -> bool {
-        !self.load_stopped().is_waking_or_awake()
-            && guard.is_ptraced()
-            && !guard.is_ptrace_listening()
     }
 
     /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
@@ -780,15 +773,7 @@ impl Task {
         task
     }
 
-    /// Access mutable state with a read lock.
-    pub fn read(&self) -> RwLockReadGuard<'_, TaskMutableState> {
-        self.mutable_state.read()
-    }
-
-    /// Access mutable state with a write lock.
-    pub fn write(&self) -> RwLockWriteGuard<'_, TaskMutableState> {
-        self.mutable_state.write()
-    }
+    state_accessor!(Task, mutable_state, Task);
 
     pub fn add_file(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
         self.files.add_with_flags(self, file, flags)
@@ -1122,7 +1107,7 @@ impl Task {
     /// Sets the stop state (per set_stopped), and also notifies all listeners,
     /// including the parent process if appropriate.
     pub fn set_stopped_and_notify(&self, stopped: StopState, siginfo: Option<SignalInfo>) {
-        self.set_stopped(&mut *self.write(), stopped, siginfo);
+        self.write().set_stopped(stopped, siginfo);
 
         if !stopped.is_in_progress() {
             let parent = self.thread_group.read().parent.clone();
@@ -1142,7 +1127,7 @@ impl Task {
         {
             let signal = self.thread_group.read().last_signal.clone();
             // stopping because the thread group has stopped
-            self.set_stopped(&mut *self.write(), StopState::GroupStopped, signal);
+            self.write().set_stopped(StopState::GroupStopped, signal);
             return true;
         }
 
@@ -1185,7 +1170,7 @@ impl Task {
                 drop(group_state);
                 drop(task_state);
                 self.thread_group.set_stopped(new_state, None, false);
-                self.set_stopped(&mut *self.write(), new_state, None);
+                self.write().set_stopped(new_state, None);
                 return true;
             }
         }
@@ -1196,7 +1181,7 @@ impl Task {
             // signal or instructions from the tracer.
             group_state.stopped_waiters.wait_async(&waiter);
             task_state.wait_on_ptracer(&waiter);
-        } else if self.can_accept_ptrace_commands(&task_state) {
+        } else if task_state.can_accept_ptrace_commands() {
             // If we're stopped because a tracer has seen the stop and not taken
             // further action, wait for further instructions from the tracer.
             task_state.wait_on_ptracer(&waiter);

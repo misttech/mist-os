@@ -31,7 +31,6 @@ use starnix_sync::{
     EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, WakeReason,
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};
-use starnix_uapi::signals::SIGCHLD;
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN},
     device_type::DeviceType,
@@ -42,7 +41,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     ownership::{release_on_error, OwnedRef, Releasable, TempRef, WeakRef},
     pid_t,
-    signals::{SigSet, Signal, SIGBUS, SIGILL, SIGSEGV, SIGTRAP},
+    signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP},
     sock_filter, sock_fprog,
     user_address::{UserAddress, UserRef},
     BPF_MAXINSNS, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
@@ -51,8 +50,7 @@ use starnix_uapi::{
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
-use std::marker::PhantomData;
-use std::{ffi::CString, fmt, mem::MaybeUninit, sync::Arc};
+use std::{ffi::CString, fmt, marker::PhantomData, mem::MaybeUninit, sync::Arc};
 
 pub struct TaskBuilder {
     /// The underlying task object.
@@ -206,7 +204,7 @@ impl CurrentTask {
     {
         {
             let mut state = self.write();
-            self.set_flags(&mut *state, TaskFlags::TEMPORARY_SIGNAL_MASK, true);
+            state.set_flags(TaskFlags::TEMPORARY_SIGNAL_MASK, true);
             state.signals.set_temporary_mask(signal_mask);
         }
         wait_function(self)

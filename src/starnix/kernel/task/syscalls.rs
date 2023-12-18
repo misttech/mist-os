@@ -4,8 +4,7 @@
 
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
-use starnix_sync::RwLock;
-use starnix_sync::{LockBefore, Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, RwLock, Unlocked};
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
@@ -678,8 +677,7 @@ pub fn sys_exit(
 ) -> Result<(), Errno> {
     // Only change the current exit status if this has not been already set by exit_group, as
     // otherwise it has priority.
-    current_task
-        .set_exit_status_if_not_already(&mut *current_task.write(), ExitStatus::Exit(code as u8));
+    current_task.write().set_exit_status_if_not_already(ExitStatus::Exit(code as u8));
     Ok(())
 }
 

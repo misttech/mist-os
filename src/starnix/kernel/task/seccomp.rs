@@ -426,16 +426,10 @@ impl SeccompState {
                 let mut task_state = current_task.write();
 
                 if is_last_thread {
-                    current_task.set_flags(&mut *task_state, TaskFlags::DUMP_ON_EXIT, true);
-                    current_task.set_exit_status_if_not_already(
-                        &mut *task_state,
-                        ExitStatus::CoreDump(siginfo),
-                    );
+                    task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
+                    task_state.set_exit_status_if_not_already(ExitStatus::CoreDump(siginfo));
                 } else {
-                    current_task.set_exit_status_if_not_already(
-                        &mut *task_state,
-                        ExitStatus::Kill(siginfo),
-                    );
+                    task_state.set_exit_status_if_not_already(ExitStatus::Kill(siginfo));
                 }
                 Some(Err(errno_from_code!(0)))
             }
