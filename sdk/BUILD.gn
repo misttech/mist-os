@@ -166,6 +166,7 @@ sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
   deps = [
     ":core_cc_prebuilt_libraries",
     ":core_loadable_modules",
+    ":core_packages",
     ":core_sysroot",
   ]
 }
@@ -185,10 +186,8 @@ if (!sdk_inside_supported_api_sub_build) {
       # not specific to any API level.
       "//sdk/fidl",
 
-      # TODO(b/309679524): Move this to the `deps` section of
-      # `fuchsia_idk_atoms` once we can actually build the packages at
-      # individual API levels.
-      ":core_packages",
+      # TODO(b/309679524): Remove this once it is empty..
+      ":core_packages_built_at_head",
     ]
   }
 
@@ -421,8 +420,14 @@ sdk_molecule("core_bindlib") {
 }
 
 sdk_molecule("core_packages") {
+  deps =
+      [ "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk" ]
+}
+
+# TODO(b/309679524): Move the contents of this target to ":core_packages"
+# once they build at individual API levels.
+sdk_molecule("core_packages_built_at_head") {
   deps = [
-    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
   ]
