@@ -102,7 +102,8 @@ Sample code (modulo error handling):
 
 ```cpp
 // Create a discardable VMO.
-zx_handle_t vmo_handle;
+zx_handle_t vmo;
+uint64_t vmo_size = 5 * zx_system_get_page_size();
 zx_vmo_create(vmo_size, ZX_VMO_DISCARDABLE, &vmo);
 
 // Lock the VMO.
@@ -114,7 +115,7 @@ zx_vmo_op_range(vmo, ZX_VMO_OP_LOCK, 0, vmo_size, &lock_state,
 zx_vmo_read(vmo, buf, 0, sizeof(buf));
 
 // Unlock the VMO. The kernel is free to discard it now.
-vmo_op_range(vmo, ZX_VMO_OP_UNLOCK, 0, vmo_size, nullptr, 0);
+zx_vmo_op_range(vmo, ZX_VMO_OP_UNLOCK, 0, vmo_size, nullptr, 0);
 
 // Lock the VMO again before use.
 zx_vmo_op_range(vmo, ZX_VMO_OP_LOCK, 0, vmo_size, &lock_state,
