@@ -174,9 +174,14 @@ impl LogSubscription {
     fn try_next(&mut self) -> Result<Option<Vec<u8>>, Errno> {
         match self {
             Self::NonBlocking(receiver) => match receiver.try_next() {
-                Ok(Some(Err(err))) => Err(err),
+                // We got the next log.
                 Ok(Some(Ok(log))) => Ok(Some(log)),
-                _ => Ok(None),
+                // An error happened attempting to get the next log.
+                Ok(Some(Err(err))) => Err(err),
+                // The channel was closed and there's no more messages in the queue.
+                Ok(None) => Ok(None),
+                // No messages available but the channel hasn't closed.
+                Err(_) => Err(errno!(EAGAIN)),
             },
             Self::Blocking { iterator, pending } => loop {
                 while let Some(data) = pending.pop_front() {

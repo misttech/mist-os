@@ -146,3 +146,14 @@ TEST_F(SyslogTest, ReadProcKmsg) {
 
   close(proc_kmsg_fd);
 }
+
+TEST_F(SyslogTest, NonBlockingRead) {
+  int fd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
+  char buf[4096];
+  ssize_t size_read = 0;
+  while (size_read != -1) {
+    size_read = read(fd, buf, sizeof(buf));
+  }
+  EXPECT_EQ(errno, EAGAIN);
+  close(fd);
+}
