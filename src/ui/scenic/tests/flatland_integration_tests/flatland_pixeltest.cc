@@ -32,14 +32,14 @@ constexpr fuc::TransformId kRootTransform{.value = 1};
 constexpr auto kEpsilon = 1;
 constexpr auto kByterPerPixel = 4;
 
-fuc::ColorRgba GetColorInFloat(ui_testing::Pixel color) {
+fuc::ColorRgba GetColorInFloat(utils::Pixel color) {
   return {static_cast<float>(color.red) / 255.f, static_cast<float>(color.green) / 255.f,
           static_cast<float>(color.blue) / 255.f, static_cast<float>(color.alpha) / 255.f};
 }
 
 // Asserts whether the BGRA channel value difference between |actual| and |expected| is at most
 // |kEpsilon|.
-void CompareColor(ui_testing::Pixel actual, ui_testing::Pixel expected) {
+void CompareColor(utils::Pixel actual, utils::Pixel expected) {
   EXPECT_NEAR(actual.blue, expected.blue, kEpsilon);
   EXPECT_NEAR(actual.green, expected.green, kEpsilon);
   EXPECT_NEAR(actual.red, expected.red, kEpsilon);
@@ -115,8 +115,8 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
   // Note: |BlockingPresent| must be called after this function to present the rectangle on the
   // display.
   void DrawRectangle(fuc::FlatlandPtr& flatland, uint32_t width, uint32_t height, int32_t x,
-                     int32_t y, ui_testing::Pixel color,
-                     fuc::BlendMode blend_mode = fuc::BlendMode::SRC, float opacity = 1.f) {
+                     int32_t y, utils::Pixel color, fuc::BlendMode blend_mode = fuc::BlendMode::SRC,
+                     float opacity = 1.f) {
     const fuc::ContentId kFilledRectId = {get_next_resource_id()};
     const fuc::TransformId kTransformId = {get_next_resource_id()};
 
@@ -286,7 +286,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   BlockingPresent(this, root_flatland_);
 
   // TODO(fxbug.dev/65765): provide reasoning for why this is the correct expected color.
-  const ui_testing::Pixel expected_pixel(255, 85, 249, 255);
+  const utils::Pixel expected_pixel(255, 85, 249, 255);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
   auto histogram = screenshot.Histogram();
@@ -330,7 +330,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
                                  image_vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_base));
   EXPECT_EQ(ZX_OK, status);
 
-  const ui_testing::Pixel color = ui_testing::Screenshot::kBlue;
+  const utils::Pixel color = utils::kBlue;
   vmo_base += info.buffers[0].vmo_usable_start;
 
   for (uint32_t i = 0; i < num_pixels * kByterPerPixel; i += kByterPerPixel) {
@@ -393,10 +393,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_0_DEGREES),
-         {.top_left = ui_testing::Screenshot::kRed,
-          .top_right = ui_testing::Screenshot::kBlack,
-          .bottom_left = ui_testing::Screenshot::kBlue,
-          .bottom_right = ui_testing::Screenshot::kGreen}});
+         {.top_left = utils::kRed,
+          .top_right = utils::kBlack,
+          .bottom_left = utils::kBlue,
+          .bottom_right = utils::kGreen}});
 
     // Image flip: LEFT_RIGHT; Orientation: CCW_90.
     //
@@ -406,10 +406,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_90_DEGREES),
-         {.top_left = ui_testing::Screenshot::kBlack,
-          .top_right = ui_testing::Screenshot::kGreen,
-          .bottom_left = ui_testing::Screenshot::kRed,
-          .bottom_right = ui_testing::Screenshot::kBlue}});
+         {.top_left = utils::kBlack,
+          .top_right = utils::kGreen,
+          .bottom_left = utils::kRed,
+          .bottom_right = utils::kBlue}});
 
     // Image flip: LEFT_RIGHT; Orientation: CCW_180.
     //
@@ -419,10 +419,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_180_DEGREES),
-         {.top_left = ui_testing::Screenshot::kGreen,
-          .top_right = ui_testing::Screenshot::kBlue,
-          .bottom_left = ui_testing::Screenshot::kBlack,
-          .bottom_right = ui_testing::Screenshot::kRed}});
+         {.top_left = utils::kGreen,
+          .top_right = utils::kBlue,
+          .bottom_left = utils::kBlack,
+          .bottom_right = utils::kRed}});
 
     // Image flip: LEFT_RIGHT; Orientation: CCW_270.
     //
@@ -432,10 +432,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_270_DEGREES),
-         {.top_left = ui_testing::Screenshot::kBlue,
-          .top_right = ui_testing::Screenshot::kRed,
-          .bottom_left = ui_testing::Screenshot::kGreen,
-          .bottom_right = ui_testing::Screenshot::kBlack}});
+         {.top_left = utils::kBlue,
+          .top_right = utils::kRed,
+          .bottom_left = utils::kGreen,
+          .bottom_right = utils::kBlack}});
 
     // Image flip: UP_DOWN; Orientation: CCW_0.
     //
@@ -445,10 +445,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_0_DEGREES),
-         {.top_left = ui_testing::Screenshot::kGreen,
-          .top_right = ui_testing::Screenshot::kBlue,
-          .bottom_left = ui_testing::Screenshot::kBlack,
-          .bottom_right = ui_testing::Screenshot::kRed}});
+         {.top_left = utils::kGreen,
+          .top_right = utils::kBlue,
+          .bottom_left = utils::kBlack,
+          .bottom_right = utils::kRed}});
 
     // Image flip: UP_DOWN; Orientation: CCW_90.
     //
@@ -458,10 +458,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_90_DEGREES),
-         {.top_left = ui_testing::Screenshot::kBlue,
-          .top_right = ui_testing::Screenshot::kRed,
-          .bottom_left = ui_testing::Screenshot::kGreen,
-          .bottom_right = ui_testing::Screenshot::kBlack}});
+         {.top_left = utils::kBlue,
+          .top_right = utils::kRed,
+          .bottom_left = utils::kGreen,
+          .bottom_right = utils::kBlack}});
 
     // Image flip: UP_DOWN; Orientation: CCW_180.
     //
@@ -471,10 +471,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_180_DEGREES),
-         {.top_left = ui_testing::Screenshot::kRed,
-          .top_right = ui_testing::Screenshot::kBlack,
-          .bottom_left = ui_testing::Screenshot::kBlue,
-          .bottom_right = ui_testing::Screenshot::kGreen}});
+         {.top_left = utils::kRed,
+          .top_right = utils::kBlack,
+          .bottom_left = utils::kBlue,
+          .bottom_right = utils::kGreen}});
 
     // Image flip: UP_DOWN; Orientation: CCW_270.
     //
@@ -484,10 +484,10 @@ class ParameterizedFlipAndOrientationTest
     //
     expected_colors_map.insert(
         {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_270_DEGREES),
-         {.top_left = ui_testing::Screenshot::kBlack,
-          .top_right = ui_testing::Screenshot::kGreen,
-          .bottom_left = ui_testing::Screenshot::kRed,
-          .bottom_right = ui_testing::Screenshot::kBlue}});
+         {.top_left = utils::kBlack,
+          .top_right = utils::kGreen,
+          .bottom_left = utils::kRed,
+          .bottom_right = utils::kBlue}});
   }
 
   // Returns a color given the pixel index, to produce the following image:
@@ -504,9 +504,9 @@ class ParameterizedFlipAndOrientationTest
   //
   auto GetPixelColor(unsigned int pixel_index, unsigned int bytes_per_row,
                      uint64_t image_vmo_bytes) {
-    const ui_testing::Pixel color_quadrants[2][2] = {
-        {ui_testing::Screenshot::kBlack, ui_testing::Screenshot::kRed},
-        {ui_testing::Screenshot::kGreen, ui_testing::Screenshot::kBlue},
+    const utils::Pixel color_quadrants[2][2] = {
+        {utils::kBlack, utils::kRed},
+        {utils::kGreen, utils::kBlue},
     };
     int vertical_half_index = pixel_index < (image_vmo_bytes / 2) ? 0 : 1;
     int horizontal_half_index = (pixel_index % bytes_per_row) < (bytes_per_row / 2) ? 0 : 1;
@@ -520,10 +520,10 @@ class ParameterizedFlipAndOrientationTest
   };
 
   struct ExpectedColors {
-    ui_testing::Pixel top_left;
-    ui_testing::Pixel top_right;
-    ui_testing::Pixel bottom_left;
-    ui_testing::Pixel bottom_right;
+    utils::Pixel top_left;
+    utils::Pixel top_right;
+    utils::Pixel bottom_left;
+    utils::Pixel bottom_right;
   };
 
   std::unordered_map<std::pair<fuc::ImageFlip, fuc::Orientation>, ExpectedColors,
@@ -587,7 +587,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
 
   unsigned int bytes_per_row = image_width * kByterPerPixel;
   for (uint32_t i = 0; i < image_vmo_bytes; i += kByterPerPixel) {
-    const ui_testing::Pixel color = GetPixelColor(i, bytes_per_row, image_vmo_bytes);
+    const utils::Pixel color = GetPixelColor(i, bytes_per_row, image_vmo_bytes);
     // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the
     // blue
     // and the red channel respectively.
@@ -648,10 +648,10 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   auto histogram = screenshot.Histogram();
   const uint32_t pixel_color_count = num_pixels / 4;
   // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kBlue], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kGreen], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kBlack], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kRed], pixel_color_count, display_width_);
+  EXPECT_NEAR(histogram[utils::kBlue], pixel_color_count, display_width_);
+  EXPECT_NEAR(histogram[utils::kGreen], pixel_color_count, display_width_);
+  EXPECT_NEAR(histogram[utils::kBlack], pixel_color_count, display_width_);
+  EXPECT_NEAR(histogram[utils::kRed], pixel_color_count, display_width_);
 
   // Verify that the screenshot corners are the expected color.
   const auto expected_colors = expected_colors_map.find(std::make_pair(image_flip, orientation));
@@ -687,7 +687,7 @@ TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
   // Draw the rectangles in the quadrants.
   for (uint32_t i = 0; i < 2; i++) {
     for (uint32_t j = 0; j < 2; j++) {
-      ui_testing::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
+      utils::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
       DrawRectangle(root_flatland_, pane_width, pane_height, i * pane_width, j * pane_height,
                     color);
     }
@@ -695,37 +695,37 @@ TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
 
   // Draw the rectangle in the center.
   DrawRectangle(root_flatland_, view_width / 4, view_height / 4, 3 * view_width / 8,
-                3 * view_height / 8, ui_testing::Screenshot::kGreen);
+                3 * view_height / 8, utils::kGreen);
 
   BlockingPresent(this, root_flatland_);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
   // Check pixel content at all four corners.
-  EXPECT_EQ(screenshot.GetPixelAt(0, 0), ui_testing::Screenshot::kBlack);  // Top left
+  EXPECT_EQ(screenshot.GetPixelAt(0, 0), utils::kBlack);  // Top left
   EXPECT_EQ(screenshot.GetPixelAt(0, screenshot.height() - 1),
-            ui_testing::Screenshot::kBlue);  // Bottom left
+            utils::kBlue);  // Bottom left
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, 0),
-            ui_testing::Screenshot::kRed);  // Top right
+            utils::kRed);  // Top right
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, screenshot.height() - 1),
-            ui_testing::Screenshot::kMagenta);  // Bottom right
+            utils::kMagenta);  // Bottom right
 
   // Check pixel content at center of each rectangle.
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 4, screenshot.height() / 4),
-            ui_testing::Screenshot::kBlack);  // Top left
+            utils::kBlack);  // Top left
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 4, (3 * screenshot.height()) / 4),
-            ui_testing::Screenshot::kBlue);  // Bottom left
+            utils::kBlue);  // Bottom left
   EXPECT_EQ(screenshot.GetPixelAt((3 * screenshot.width()) / 4, screenshot.height() / 4),
-            ui_testing::Screenshot::kRed);  // Top right
+            utils::kRed);  // Top right
   EXPECT_EQ(screenshot.GetPixelAt((3 * screenshot.width()) / 4, (3 * screenshot.height()) / 4),
-            ui_testing::Screenshot::kMagenta);  // Bottom right
+            utils::kMagenta);  // Bottom right
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 2, screenshot.height() / 2),
-            ui_testing::Screenshot::kGreen);  // Center
+            utils::kGreen);  // Center
 }
 
 struct OpacityTestParams {
   float opacity;
-  ui_testing::Pixel expected_pixel;
+  utils::Pixel expected_pixel;
 };
 
 class ParameterizedOpacityPixelTest : public FlatlandPixelTestBase,
@@ -744,8 +744,8 @@ INSTANTIATE_TEST_SUITE_P(
 // This test first draws a rectangle of size |display_width_* display_height_| and then draws
 // another rectangle having same dimensions on the top.
 TEST_P(ParameterizedOpacityPixelTest, OpacityTest) {
-  ui_testing::Pixel background_color(ui_testing::Screenshot::kRed);
-  ui_testing::Pixel foreground_color(ui_testing::Screenshot::kGreen);
+  utils::Pixel background_color(utils::kRed);
+  utils::Pixel foreground_color(utils::kGreen);
 
   // Draw the background rectangle.
   DrawRectangle(root_flatland_, display_width_, display_height_, 0, 0, background_color);
@@ -820,19 +820,19 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   child->CreateTransform(kRootTransform);
   child->SetRootTransform(kRootTransform);
 
-  const ui_testing::Pixel default_color(0, 0, 0, 0);
+  const utils::Pixel default_color(0, 0, 0, 0);
 
   // The child view draws a rectangle partially outside of its view bounds.
-  DrawRectangle(child, 2 * child_width, child_height, 0, 0, ui_testing::Screenshot::kBlue);
+  DrawRectangle(child, 2 * child_width, child_height, 0, 0, utils::kBlue);
 
   // The child view draws a rectangle completely outside its view bounds.
   DrawRectangle(child, 2 * child_width, child_height, display_width_ / 2, display_height_ / 2,
-                ui_testing::Screenshot::kGreen);
+                utils::kGreen);
   BlockingPresent(this, child);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
-  EXPECT_EQ(screenshot.GetPixelAt(0, 0), ui_testing::Screenshot::kBlue);
-  EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), ui_testing::Screenshot::kBlue);
+  EXPECT_EQ(screenshot.GetPixelAt(0, 0), utils::kBlue);
+  EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), utils::kBlue);
 
   // The top left and bottom right corner of the display lies outside the child view's bounds so
   // we do not see any color there.
@@ -844,10 +844,10 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
 
   // The child view can only draw content inside its view bounds, hence we see |num_pixels/2| pixels
   // for the first rectangle.
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels / 2);
+  EXPECT_EQ(histogram[utils::kBlue], num_pixels / 2);
 
   // No pixels are seen for the second rectangle as it was drawn completely outside the view bounds.
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], 0u);
+  EXPECT_EQ(histogram[utils::kGreen], 0u);
   EXPECT_EQ(histogram[default_color], num_pixels / 2);
 }
 
@@ -877,7 +877,7 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   const fuc::TransformId kTransformId1 = {get_next_resource_id()};
 
   root_flatland_->CreateFilledRect(kFilledRectId1);
-  root_flatland_->SetSolidFill(kFilledRectId1, GetColorInFloat(ui_testing::Screenshot::kBlue),
+  root_flatland_->SetSolidFill(kFilledRectId1, GetColorInFloat(utils::kBlue),
                                {display_width_ / 2, display_height_ / 2});
 
   // Associate the rect with a transform.
@@ -893,7 +893,7 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   const fuc::TransformId kTransformId2 = {get_next_resource_id()};
 
   root_flatland_->CreateFilledRect(kFilledRectId2);
-  root_flatland_->SetSolidFill(kFilledRectId2, GetColorInFloat(ui_testing::Screenshot::kGreen),
+  root_flatland_->SetSolidFill(kFilledRectId2, GetColorInFloat(utils::kGreen),
                                {display_width_ / 2, display_height_ / 2});
 
   // Associate the rect with a transform.
@@ -906,7 +906,7 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   root_flatland_->AddChild(kTransformId1, kTransformId2);
   BlockingPresent(this, root_flatland_);
 
-  const ui_testing::Pixel default_color(0, 0, 0, 0);
+  const utils::Pixel default_color(0, 0, 0, 0);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
@@ -914,19 +914,18 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), default_color);
 
   // Top left corner of the first rectangle drawn.
-  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, 0), ui_testing::Screenshot::kBlue);
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, 0), utils::kBlue);
 
   // TOp left corner of the second rectangle drawn.
-  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, display_height_ / 2),
-            ui_testing::Screenshot::kGreen);
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, display_height_ / 2), utils::kGreen);
 
   const auto num_pixels = display_width_ * display_height_;
 
   auto histogram = screenshot.Histogram();
 
   EXPECT_EQ(histogram[default_color], num_pixels / 2);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels / 4);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], num_pixels / 4);
+  EXPECT_EQ(histogram[utils::kBlue], num_pixels / 4);
+  EXPECT_EQ(histogram[utils::kGreen], num_pixels / 4);
 }
 
 // This test zooms the entire content by a factor of 2 and verifies that only the top left quadrant
@@ -967,7 +966,7 @@ TEST_F(FlatlandPixelTestBase, ScaleTest) {
   // Draw the rectangles in the quadrants.
   for (uint32_t i = 0; i < 2; i++) {
     for (uint32_t j = 0; j < 2; j++) {
-      ui_testing::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
+      utils::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
       DrawRectangle(root_flatland_, pane_width, pane_height, i * pane_width, j * pane_height,
                     color);
     }
@@ -981,17 +980,16 @@ TEST_F(FlatlandPixelTestBase, ScaleTest) {
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
   // Only the top left quadrant is shown on the screen as the rest of the quadrant are clipped.
-  EXPECT_EQ(screenshot.GetPixelAt(0, 0), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(screenshot.GetPixelAt(display_width_ - 1, 0), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(screenshot.GetPixelAt(display_width_ - 1, display_height_ - 1),
-            ui_testing::Screenshot::kBlack);
+  EXPECT_EQ(screenshot.GetPixelAt(0, 0), utils::kBlack);
+  EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), utils::kBlack);
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ - 1, 0), utils::kBlack);
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ - 1, display_height_ - 1), utils::kBlack);
 
   auto histogram = screenshot.Histogram();
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], num_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], 0u);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], 0u);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], 0u);
+  EXPECT_EQ(histogram[utils::kBlack], num_pixels);
+  EXPECT_EQ(histogram[utils::kBlue], 0u);
+  EXPECT_EQ(histogram[utils::kRed], 0u);
+  EXPECT_EQ(histogram[utils::kMagenta], 0u);
 }
 
 // This test ensures that detaching a viewport ceases rendering the view.
@@ -1023,7 +1021,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   // Child view draws a solid filled rectangle.
   child->CreateTransform(kRootTransform);
   child->SetRootTransform(kRootTransform);
-  DrawRectangle(child, display_width_, display_height_, 0, 0, ui_testing::Screenshot::kBlue);
+  DrawRectangle(child, display_width_, display_height_, 0, 0, utils::kBlue);
   BlockingPresent(this, child);
 
   const auto num_pixels = display_width_ * display_height_;
@@ -1031,7 +1029,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   {
     auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
     auto histogram = screenshot.Histogram();
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels);
+    EXPECT_EQ(histogram[utils::kBlue], num_pixels);
   }
 
   // Root view releases the viewport.
@@ -1043,7 +1041,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   {
     auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
     auto histogram = screenshot.Histogram();
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], 0u);
+    EXPECT_EQ(histogram[utils::kBlue], 0u);
   }
 }
 
@@ -1087,7 +1085,7 @@ TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   // Child view draws a solid filled rectangle.
   child->CreateTransform(kRootTransform);
   child->SetRootTransform(kRootTransform);
-  DrawRectangle(child, display_width_, display_height_, 0, 0, ui_testing::Screenshot::kBlue);
+  DrawRectangle(child, display_width_, display_height_, 0, 0, utils::kBlue);
   BlockingPresent(this, child);
 
   // The size of the solid filled rectangle exceeds the child view's bounding box with
@@ -1096,7 +1094,7 @@ TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   const auto num_pixels = display_width_ * display_height_;
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
   auto histogram = screenshot.Histogram();
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels);
+  EXPECT_EQ(histogram[utils::kBlue], num_pixels);
 }
 
 }  // namespace integration_tests

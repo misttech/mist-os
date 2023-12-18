@@ -189,7 +189,7 @@ TEST_F(NullRendererIntegrationTest, ScreenshotIsAllZeroes) {
 
   // Verify that screenshot works and is all zeroes.
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
-  EXPECT_EQ(screenshot.Histogram()[ui_testing::Pixel(0, 0, 0, 0)],
+  EXPECT_EQ(screenshot.Histogram()[utils::Pixel(0, 0, 0, 0)],
             screenshot.width() * screenshot.height());
 }
 

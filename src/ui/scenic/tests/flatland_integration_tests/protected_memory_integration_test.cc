@@ -190,8 +190,7 @@ TEST_F(ProtectedMemoryIntegrationTest, ScreenshotReplacesProtectedImage) {
 
   // Verify that screenshot works and replaced the content with black.
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
-  EXPECT_EQ(screenshot.Histogram()[ui_testing::Screenshot::kBlack],
-            screenshot.width() * screenshot.height());
+  EXPECT_EQ(screenshot.Histogram()[utils::kBlack], screenshot.width() * screenshot.height());
 }
 
 }  // namespace integration_tests

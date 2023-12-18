@@ -31,6 +31,8 @@ source_set("utils") {
     "metrics_impl.h",
     "object_linker.cc",
     "object_linker.h",
+    "pixel.cc",
+    "pixel.h",
     "shader_warmup.cc",
     "shader_warmup.h",
     "task_utils.h",

@@ -139,23 +139,23 @@ TEST_P(DisplayPixelRatioTest, TestScale) {
   auto data = TakeScreenshot();
 
   // Check pixel content at all four corners.
-  EXPECT_EQ(data.GetPixelAt(0, 0), ui_testing::Screenshot::kBlack);                 // Top left
-  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), ui_testing::Screenshot::kBlue);  // Bottom left
-  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), ui_testing::Screenshot::kRed);    // Top right
+  EXPECT_EQ(data.GetPixelAt(0, 0), utils::kBlack);                 // Top left
+  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), utils::kBlue);  // Bottom left
+  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), utils::kRed);    // Top right
   EXPECT_EQ(data.GetPixelAt(data.width() - 1, data.height() - 1),
-            ui_testing::Screenshot::kMagenta);  // Bottom right
+            utils::kMagenta);  // Bottom right
 
   // Check pixel content at center of each rectangle.
   EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4),
-            ui_testing::Screenshot::kBlack);  // Top left
+            utils::kBlack);  // Top left
   EXPECT_EQ(data.GetPixelAt(data.width() / 4, (3 * data.height()) / 4),
-            ui_testing::Screenshot::kBlue);  // Bottom left
+            utils::kBlue);  // Bottom left
   EXPECT_EQ(data.GetPixelAt((3 * data.width()) / 4, data.height() / 4),
-            ui_testing::Screenshot::kRed);  // Top right
+            utils::kRed);  // Top right
   EXPECT_EQ(data.GetPixelAt((3 * data.width()) / 4, (3 * data.height()) / 4),
-            ui_testing::Screenshot::kMagenta);  // Bottom right
+            utils::kMagenta);  // Bottom right
   EXPECT_EQ(data.GetPixelAt(data.width() / 2, data.height() / 2),
-            ui_testing::Screenshot::kGreen);  // Center
+            utils::kGreen);  // Center
 }
 
 TEST_P(DisplayPixelRatioTest, TestPixelColorDistribution) {
@@ -176,11 +176,11 @@ TEST_P(DisplayPixelRatioTest, TestPixelColorDistribution) {
 
   auto histogram = data.Histogram();
 
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], expected_black_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], expected_blue_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], expected_red_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], expected_magenta_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], expected_green_pixels);
+  EXPECT_EQ(histogram[utils::kBlack], expected_black_pixels);
+  EXPECT_EQ(histogram[utils::kBlue], expected_blue_pixels);
+  EXPECT_EQ(histogram[utils::kRed], expected_red_pixels);
+  EXPECT_EQ(histogram[utils::kMagenta], expected_magenta_pixels);
+  EXPECT_EQ(histogram[utils::kGreen], expected_green_pixels);
 }
 
 }  // namespace integration_tests

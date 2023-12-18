@@ -183,6 +183,7 @@ device_test("virtio_gpu_device_tests") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//src/ui/scenic/lib/utils",
     "//src/ui/testing/test_graphical_presenter",
     "//src/ui/testing/ui_test_manager",
     "//zircon/system/ulib/virtio",

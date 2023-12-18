@@ -102,25 +102,25 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
   static void AssertScreenshot(const ui_testing::Screenshot& screenshot, uint64_t width,
                                uint64_t height) {
     // Check pixel content at all four corners.
-    EXPECT_EQ(screenshot.GetPixelAt(0, 0), ui_testing::Screenshot::kBlack);  // Top left
+    EXPECT_EQ(screenshot.GetPixelAt(0, 0), utils::kBlack);  // Top left
     EXPECT_EQ(screenshot.GetPixelAt(0, screenshot.height() - 1),
-              ui_testing::Screenshot::kBlue);  // Bottom left
+              utils::kBlue);  // Bottom left
     EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, 0),
-              ui_testing::Screenshot::kRed);  // Top right
+              utils::kRed);  // Top right
     EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, screenshot.height() - 1),
-              ui_testing::Screenshot::kMagenta);  // Bottom right
+              utils::kMagenta);  // Bottom right
 
     // Check pixel content at center of each rectangle.
     EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 4, screenshot.height() / 4),
-              ui_testing::Screenshot::kBlack);  // Top left
+              utils::kBlack);  // Top left
     EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 4, (3 * screenshot.height()) / 4),
-              ui_testing::Screenshot::kBlue);  // Bottom left
+              utils::kBlue);  // Bottom left
     EXPECT_EQ(screenshot.GetPixelAt((3 * screenshot.width()) / 4, screenshot.height() / 4),
-              ui_testing::Screenshot::kRed);  // Top right
+              utils::kRed);  // Top right
     EXPECT_EQ(screenshot.GetPixelAt((3 * screenshot.width()) / 4, (3 * screenshot.height()) / 4),
-              ui_testing::Screenshot::kMagenta);  // Bottom right
+              utils::kMagenta);  // Bottom right
     EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 2, screenshot.height() / 2),
-              ui_testing::Screenshot::kGreen);  // Center
+              utils::kGreen);  // Center
 
     // Width and height of the rectangle in the center is |width|/4 and
     // |height|/4.
@@ -137,11 +137,11 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
 
     auto histogram = screenshot.Histogram();
 
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], expected_black_pixels);
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], expected_blue_pixels);
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], expected_red_pixels);
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], expected_magenta_pixels);
-    EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], expected_green_pixels);
+    EXPECT_EQ(histogram[utils::kBlack], expected_black_pixels);
+    EXPECT_EQ(histogram[utils::kBlue], expected_blue_pixels);
+    EXPECT_EQ(histogram[utils::kRed], expected_red_pixels);
+    EXPECT_EQ(histogram[utils::kMagenta], expected_magenta_pixels);
+    EXPECT_EQ(histogram[utils::kGreen], expected_green_pixels);
   }
 
   float ClientViewScaleFactor() { return ui_test_manager_->ClientViewScaleFactor(); }

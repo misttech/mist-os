@@ -178,7 +178,7 @@ TEST_F(CpuRendererIntegrationTest, Renders) {
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
 
-  const ui_testing::Pixel color = ui_testing::Screenshot::kBlue;
+  const utils::Pixel color = utils::kBlue;
   flatland::MapHostPointer(
       info.buffers[0].vmo, flatland::HostPointerAccessMode::kWriteOnly,
       [&num_pixels, &color, &info](uint8_t* vmo_ptr, uint32_t num_bytes) {

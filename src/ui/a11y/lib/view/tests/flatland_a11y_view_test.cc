@@ -32,8 +32,7 @@ constexpr auto kViewProvider = "view-provider";
 constexpr auto kNestedViewProvider = "nested-view-provider";
 
 // The color used for a11y highlights.
-const ui_testing::Pixel kHighlightColor =
-    ui_testing::Pixel::from_unorm_bgra(0.242f, 0.0f, 0.9131f, 1.0f);
+const utils::Pixel kHighlightColor = utils::Pixel::FromUnormBgra(0.242f, 0.0f, 0.9131f, 1.0f);
 
 // This test fixture sets up a test realm with scenic and a11y manager.
 // The test fixture mocks the "scene owner" portion of the handshake by creating
@@ -198,17 +197,15 @@ TEST_F(CoordinateGridTest, TestSceneConnected) {
   auto data = ui_test_manager_->TakeScreenshot();
 
   // Spot-check the pixels at the center of each quadrant and the corners of the display.
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kBlue);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kMagenta);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), utils::kBlack);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4), utils::kBlue);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4), utils::kMagenta);
 
-  EXPECT_EQ(data.GetPixelAt(0, 0), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), ui_testing::Screenshot::kBlue);
-  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(data.width() - 1, data.height() - 1), ui_testing::Screenshot::kMagenta);
+  EXPECT_EQ(data.GetPixelAt(0, 0), utils::kBlack);
+  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), utils::kBlue);
+  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(data.width() - 1, data.height() - 1), utils::kMagenta);
 
   // Verify alignment based on pixel histogram data.
 
@@ -228,11 +225,11 @@ TEST_F(CoordinateGridTest, TestSceneConnected) {
 
   auto histogram = data.Histogram();
 
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], expected_black_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], expected_blue_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], expected_red_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], expected_magenta_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], expected_green_pixels);
+  EXPECT_EQ(histogram[utils::kBlack], expected_black_pixels);
+  EXPECT_EQ(histogram[utils::kBlue], expected_blue_pixels);
+  EXPECT_EQ(histogram[utils::kRed], expected_red_pixels);
+  EXPECT_EQ(histogram[utils::kMagenta], expected_magenta_pixels);
+  EXPECT_EQ(histogram[utils::kGreen], expected_green_pixels);
 }
 
 TEST_F(CoordinateGridTest, TestMagnification) {
@@ -252,17 +249,15 @@ TEST_F(CoordinateGridTest, TestMagnification) {
   auto data = ui_test_manager_->TakeScreenshot();
 
   // Spot-check the pixels at the center of each quadrant and the corners of the display.
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kGreen);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kRed);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4), utils::kGreen);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4), utils::kRed);
 
-  EXPECT_EQ(data.GetPixelAt(0, 0), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), ui_testing::Screenshot::kGreen);
-  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(data.width() - 1, data.height() - 1), ui_testing::Screenshot::kRed);
+  EXPECT_EQ(data.GetPixelAt(0, 0), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(0, data.height() - 1), utils::kGreen);
+  EXPECT_EQ(data.GetPixelAt(data.width() - 1, 0), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(data.width() - 1, data.height() - 1), utils::kRed);
 
   // Verify alignment based on pixel histogram data.
 
@@ -281,11 +276,11 @@ TEST_F(CoordinateGridTest, TestMagnification) {
 
   auto histogram = data.Histogram();
 
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], 0u);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], 0u);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], expected_red_pixels);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], 0u);
-  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], expected_green_pixels);
+  EXPECT_EQ(histogram[utils::kBlack], 0u);
+  EXPECT_EQ(histogram[utils::kBlue], 0u);
+  EXPECT_EQ(histogram[utils::kRed], expected_red_pixels);
+  EXPECT_EQ(histogram[utils::kMagenta], 0u);
+  EXPECT_EQ(histogram[utils::kGreen], expected_green_pixels);
 }
 
 class PlainBackgroundTest
@@ -304,8 +299,7 @@ TEST_F(PlainBackgroundTest, TestHighlight) {
 
   auto data = ui_test_manager_->TakeScreenshot();
 
-  EXPECT_EQ(data.GetPixelAt(data.width() * 1 / 2, data.height() * 1 / 2),
-            ui_testing::Screenshot::kGreen)
+  EXPECT_EQ(data.GetPixelAt(data.width() * 1 / 2, data.height() * 1 / 2), utils::kGreen)
       << "center pixel should be green";
 
   const int left = static_cast<int>(lround(left_f));
@@ -317,104 +311,103 @@ TEST_F(PlainBackgroundTest, TestHighlight) {
     const int middle = static_cast<int>(display_height_ / 2);
     // Example: If left=200, the pixels in the columns in the closed range [197, 202] should be
     // drawn.
-    EXPECT_EQ(data.GetPixelAt(left - 4, middle), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left - 4, middle), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(left - 3, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 2, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 1, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 0, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 1, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 2, middle), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(left + 3, middle), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left + 3, middle), utils::kGreen);
 
     // And if right=600, the pixels in the columns in the closed range [597, 602] should be drawn.
-    EXPECT_EQ(data.GetPixelAt(right - 4, middle), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right - 4, middle), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(right - 3, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 2, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 1, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 0, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 1, middle), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 2, middle), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(right + 3, middle), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right + 3, middle), utils::kGreen);
   }
 
   // Check a vertical slice.
   {
     const int middle = static_cast<int>(display_width_ / 2);
     // If top=200, the pixels in the rows in the closed range [197, 202] should be drawn.
-    EXPECT_EQ(data.GetPixelAt(middle, top - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(middle, top - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(middle, top - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, top - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, top - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, top + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, top + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, top + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(middle, top + 3), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(middle, top + 3), utils::kGreen);
 
     // And if bottom=600, the pixels in the rows in the closed range [597, 602] should be drawn.
-    EXPECT_EQ(data.GetPixelAt(middle, bottom - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(middle, bottom - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(middle, bottom - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, bottom - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, bottom - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, bottom + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, bottom + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(middle, bottom + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(middle, bottom + 3), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(middle, bottom + 3), utils::kGreen);
   }
 
   // Check the upper left corner.
   {
-    EXPECT_EQ(data.GetPixelAt(left - 4, top - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left - 4, top - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(left - 3, top - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 2, top - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 1, top - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 0, top + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 1, top + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 2, top + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(left + 3, top + 3), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left + 3, top + 3), utils::kGreen);
   }
 
   // Check the bottom right corner.
   {
-    EXPECT_EQ(data.GetPixelAt(right - 4, bottom - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right - 4, bottom - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(right - 3, bottom - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 2, bottom - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 1, bottom - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 0, bottom + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 1, bottom + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 2, bottom + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(right + 3, bottom + 3), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right + 3, bottom + 3), utils::kGreen);
   }
 
   // Check the upper right corner.
   {
-    EXPECT_EQ(data.GetPixelAt(right + 3, top - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right + 3, top - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(right + 2, top - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 1, top - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right + 0, top - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 1, top + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 2, top + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(right - 3, top + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(right - 4, top + 3), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(right - 4, top + 3), utils::kGreen);
   }
 
   // Check the bottom left corner.
   {
-    EXPECT_EQ(data.GetPixelAt(left + 3, bottom - 4), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left + 3, bottom - 4), utils::kGreen);
     EXPECT_EQ(data.GetPixelAt(left + 2, bottom - 3), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 1, bottom - 2), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left + 0, bottom - 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 1, bottom + 0), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 2, bottom + 1), kHighlightColor);
     EXPECT_EQ(data.GetPixelAt(left - 3, bottom + 2), kHighlightColor);
-    EXPECT_EQ(data.GetPixelAt(left - 4, bottom + 2), ui_testing::Screenshot::kGreen);
+    EXPECT_EQ(data.GetPixelAt(left - 4, bottom + 2), utils::kGreen);
   }
 }
 
 TEST_F(PlainBackgroundTest, TestClearHighlight) {
   {
     auto data = ui_test_manager_->TakeScreenshot();
-    EXPECT_EQ(data.GetPixelAt(data.width() * 3 / 8, data.height() * 3 / 8),
-              ui_testing::Screenshot::kGreen)
+    EXPECT_EQ(data.GetPixelAt(data.width() * 3 / 8, data.height() * 3 / 8), utils::kGreen)
         << "pixel at upper left of highlight rect should be green";
   }
 
@@ -441,8 +434,7 @@ TEST_F(PlainBackgroundTest, TestClearHighlight) {
 
   {
     auto data = ui_test_manager_->TakeScreenshot();
-    EXPECT_EQ(data.GetPixelAt(data.width() * 3 / 8, data.height() * 3 / 8),
-              ui_testing::Screenshot::kGreen)
+    EXPECT_EQ(data.GetPixelAt(data.width() * 3 / 8, data.height() * 3 / 8), utils::kGreen)
         << "pixel at upper left of highlight rect should be green again";
   }
 }
@@ -538,11 +530,11 @@ TEST_F(PlainBackgroundTest, TestHighlightWithMagnification) {
   // drawn.
   const int left = static_cast<int>(lround(display_width_ * 1 / 4));
   const int middle = static_cast<int>(display_height_ / 2);
-  EXPECT_EQ(data.GetPixelAt(left - 7, middle), ui_testing::Screenshot::kGreen);
+  EXPECT_EQ(data.GetPixelAt(left - 7, middle), utils::kGreen);
   for (int i = -6; i < 6; i++) {
     EXPECT_EQ(data.GetPixelAt(left + i, middle), kHighlightColor);
   }
-  EXPECT_EQ(data.GetPixelAt(left + 6, middle), ui_testing::Screenshot::kGreen);
+  EXPECT_EQ(data.GetPixelAt(left + 6, middle), utils::kGreen);
 }
 
 }  // namespace

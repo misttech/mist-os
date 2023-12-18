@@ -96,13 +96,11 @@ class PresentationTest : public gtest::RealLoopFixture {
 TEST_F(PresentationTest, RenderCoordinateGridPattern) {
   auto data = TakeScreenshot();
 
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), ui_testing::Screenshot::kBlack);
-  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kBlue);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), ui_testing::Screenshot::kRed);
-  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4),
-            ui_testing::Screenshot::kMagenta);
-  EXPECT_EQ(data.GetPixelAt(data.width() / 2, data.height() / 2), ui_testing::Screenshot::kGreen);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, data.height() / 4), utils::kBlack);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 4, 3 * data.height() / 4), utils::kBlue);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, data.height() / 4), utils::kRed);
+  EXPECT_EQ(data.GetPixelAt(3 * data.width() / 4, 3 * data.height() / 4), utils::kMagenta);
+  EXPECT_EQ(data.GetPixelAt(data.width() / 2, data.height() / 2), utils::kGreen);
 }
 
 }  // namespace integration_tests

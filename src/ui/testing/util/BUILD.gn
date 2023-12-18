@@ -62,6 +62,8 @@ source_set("screenshot_helper") {
     "screenshot_helper.h",
   ]
 
+  deps = [ "//src/ui/scenic/lib/utils" ]
+
   public_deps = [
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",

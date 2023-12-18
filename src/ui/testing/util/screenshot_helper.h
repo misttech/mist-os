@@ -12,59 +12,16 @@
 #include <map>
 #include <vector>
 
+#include "src/ui/scenic/lib/utils/pixel.h"
+
 namespace ui_testing {
 
-static uint8_t linear_to_srgb(const float val) {
-  // Function to convert from linear RGB to sRGB.
-  // (https://en.wikipedia.org/wiki/SRGB#From_CIE_XYZ_to_sRGB)
-  if (0.f <= val && val <= 0.0031308f) {
-    return static_cast<uint8_t>(roundf((val * 12.92f) * 255U));
-  } else {
-    return static_cast<uint8_t>(roundf(((std::powf(val, 1.0f / 2.4f) * 1.055f) - 0.055f) * 255U));
-  }
-}
-
-// Represents a Pixel in BGRA format.
-// Uses the sRGB color space.
-struct Pixel {
-  uint8_t blue = 0;
-  uint8_t green = 0;
-  uint8_t red = 0;
-  uint8_t alpha = 0;
-
-  Pixel(uint8_t blue, uint8_t green, uint8_t red, uint8_t alpha)
-      : blue(blue), green(green), red(red), alpha(alpha) {}
-
-  static Pixel from_unorm_bgra(float blue, float green, float red, float alpha) {
-    return Pixel{linear_to_srgb(blue), linear_to_srgb(green), linear_to_srgb(red),
-                 static_cast<uint8_t>(roundf(alpha * 255U))};
-  }
-
-  bool operator==(const Pixel& rhs) const {
-    return blue == rhs.blue && green == rhs.green && red == rhs.red && alpha == rhs.alpha;
-  }
-
-  inline bool operator!=(const Pixel& rhs) const { return !(*this == rhs); }
-
-  bool operator<(const Pixel& other) const {
-    return std::tie(blue, green, red, alpha) <
-           std::tie(other.blue, other.green, other.red, other.alpha);
-  }
-};
-
-std::ostream& operator<<(std::ostream& stream, const Pixel& pixel);
+using Pixel = utils::Pixel;
 
 // Helper class to get information about a screenshot returned by
 // |fuchsia.ui.composition.Screenshot| protocol.
 class Screenshot {
  public:
-  // BGRA format.
-  inline static const Pixel kBlack = Pixel(0, 0, 0, 255);
-  inline static const Pixel kBlue = Pixel(255, 0, 0, 255);
-  inline static const Pixel kRed = Pixel(0, 0, 255, 255);
-  inline static const Pixel kMagenta = Pixel(255, 0, 255, 255);
-  inline static const Pixel kGreen = Pixel(0, 255, 0, 255);
-
   // Params:-
   // |screenshot_vmo| - The VMO returned by |fuchsia.ui.composition.Screenshot.Take| representing
   //                    the screenshot data in BGRA.
