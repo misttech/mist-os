@@ -354,22 +354,6 @@ impl ThreadGroup {
         self.stop_state.load(Ordering::Relaxed)
     }
 
-    fn check_mutable_state_lock_held(&self, guard: &mut ThreadGroupMutableState) {
-        // We don't actually use the guard but we require it to enforce that the
-        // caller holds the thread group's mutable state lock (identified by
-        // mutable access to the thread group's mutable state).
-        let _ = guard;
-        // Ideally we would assert `!self.mutable_state.is_locked_exclusive()`
-        // but this tries to take the lock underneath which triggers a lock
-        // dependency check, resulting in a panic.
-    }
-
-    fn store_stopped(&self, state: StopState, guard: &mut ThreadGroupMutableState) {
-        self.check_mutable_state_lock_held(guard);
-
-        self.stop_state.store(state, Ordering::Relaxed)
-    }
-
     pub fn exit(self: &Arc<Self>, exit_status: ExitStatus) {
         let mut state = self.write();
         if state.terminating {
@@ -664,6 +648,25 @@ impl ThreadGroup {
         })
     }
 
+    /// Check whether the stop state is compatible with `new_stopped`. If it is return it,
+    /// otherwise, return None.
+    fn check_stopped_state(
+        self: &Arc<Self>,
+        new_stopped: StopState,
+        finalize_only: bool,
+    ) -> Option<StopState> {
+        let stopped = self.load_stopped();
+        if finalize_only && !stopped.is_stopping_or_stopped() {
+            return Some(stopped);
+        }
+
+        if stopped.is_illegal_transition(new_stopped) {
+            return Some(stopped);
+        }
+
+        return None;
+    }
+
     /// Set the stop status of the process.  If you pass |siginfo| of |None|,
     /// does not update the signal.  If |finalize_only| is set, will check that
     /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
@@ -676,56 +679,12 @@ impl ThreadGroup {
         siginfo: Option<SignalInfo>,
         finalize_only: bool,
     ) -> StopState {
-        let early_return_check = || {
-            let stopped = self.load_stopped();
-            if finalize_only && !stopped.is_stopping_or_stopped() {
-                return Some(stopped);
-            }
-
-            if stopped.is_illegal_transition(new_stopped) {
-                return Some(stopped);
-            }
-
-            return None;
-        };
-
         // Perform an early return check to see if we can avoid taking the lock.
-        if let Some(stopped) = early_return_check() {
+        if let Some(stopped) = self.check_stopped_state(new_stopped, finalize_only) {
             return stopped;
         }
 
-        let parent = {
-            let mut state = self.write();
-            // Perform the early return check again in case the stop state has
-            // changed.
-            if let Some(stopped) = early_return_check() {
-                return stopped;
-            }
-
-            // TODO(https://g-issues.fuchsia.dev/issues/306438676): When thread
-            // group can be stopped inside user code, tasks/thread groups will
-            // need to be either restarted or stopped here.
-            self.store_stopped(new_stopped, &mut *state);
-            if let Some(signal) = &siginfo {
-                // We don't want waiters to think the process was unstopped
-                // because of a sigkill.  They will get woken when the
-                // process dies.
-                if signal.signal != SIGKILL {
-                    state.last_signal = siginfo;
-                }
-            }
-            if new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking {
-                state.stopped_waiters.notify_all();
-            };
-
-            (!new_stopped.is_in_progress()).then(|| state.parent.clone()).flatten()
-        };
-
-        if let Some(parent) = parent {
-            parent.write().child_status_waiters.notify_all();
-        }
-
-        new_stopped
+        self.write().set_stopped(new_stopped, siginfo, finalize_only)
     }
 
     /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a
@@ -1338,6 +1297,57 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         // TODO(fxb/96632): Consider more than the main thread or the first thread in the thread group
         // to dispatch the signal.
         self.get_live_task().ok()
+    }
+
+    /// Set the stop status of the process.  If you pass |siginfo| of |None|,
+    /// does not update the signal.  If |finalize_only| is set, will check that
+    /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
+    /// before executing it.
+    ///
+    /// Returns the latest stop state after any changes.
+    pub fn set_stopped(
+        mut self,
+        new_stopped: StopState,
+        siginfo: Option<SignalInfo>,
+        finalize_only: bool,
+    ) -> StopState {
+        if let Some(stopped) = self.base.check_stopped_state(new_stopped, finalize_only) {
+            return stopped;
+        }
+
+        // TODO(https://g-issues.fuchsia.dev/issues/306438676): When thread
+        // group can be stopped inside user code, tasks/thread groups will
+        // need to be either restarted or stopped here.
+        self.store_stopped(new_stopped);
+        if let Some(signal) = &siginfo {
+            // We don't want waiters to think the process was unstopped
+            // because of a sigkill.  They will get woken when the
+            // process dies.
+            if signal.signal != SIGKILL {
+                self.last_signal = siginfo;
+            }
+        }
+        if new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking {
+            self.stopped_waiters.notify_all();
+        };
+
+        let parent = (!new_stopped.is_in_progress()).then(|| self.parent.clone()).flatten();
+
+        // Drop the lock before locking the parent.
+        std::mem::drop(self);
+        if let Some(parent) = parent {
+            parent.write().child_status_waiters.notify_all();
+        }
+
+        new_stopped
+    }
+
+    fn store_stopped(&mut self, state: StopState) {
+        // We don't actually use the guard but we require it to enforce that the
+        // caller holds the thread group's mutable state lock (identified by
+        // mutable access to the thread group's mutable state).
+
+        self.base.stop_state.store(state, Ordering::Relaxed)
     }
 }
 

@@ -13,7 +13,7 @@ impl Filter {
     fn matches(&self, function: &syn::ItemFn) -> bool {
         let signature_has_mutable_self =
             if let Some(syn::FnArg::Receiver(argument)) = function.sig.inputs.first() {
-                argument.mutability.is_some() && argument.reference.is_some()
+                argument.mutability.is_some()
             } else {
                 false
             };
