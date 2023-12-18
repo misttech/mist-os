@@ -475,28 +475,6 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
   }
 }
 
-zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
-    uint64_t banjo_display_id, uint32_t fmt_idx, audio_types_audio_stream_format_range_t* fmt_out) {
-  const DisplayId display_id = ToDisplayId(banjo_display_id);
-
-  fbl::AutoLock lock(mtx());
-  auto display = displays_.find(display_id);
-  if (!display.IsValid()) {
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  if (!display->edid.has_value()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  if (fmt_idx > display->edid->audio.size()) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  *fmt_out = display->edid->audio[fmt_idx];
-  return ZX_OK;
-}
-
 void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
                              uint32_t layer_stamp, ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();

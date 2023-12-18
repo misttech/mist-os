@@ -92,9 +92,6 @@ class Controller : public DeviceType,
                                                    size_t* display_info_actual);
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
-  zx_status_t DisplayControllerInterfaceGetAudioFormat(
-      uint64_t banjo_display_id, uint32_t fmt_idx,
-      audio_types_audio_stream_format_range_t* fmt_out);
 
   void DisplayCaptureInterfaceOnCaptureComplete();
   void OnClientDead(ClientProxy* client);

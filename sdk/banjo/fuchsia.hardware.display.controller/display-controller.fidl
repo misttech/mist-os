@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display.controller;
 
-using fuchsia.hardware.audiotypes;
 using fuchsia.hardware.i2cimpl;
 using zx;
 
@@ -33,7 +32,7 @@ type Image = struct {
 };
 
 const INVALID_DISPLAY_ID uint64 = 0;
-const INVALID_ID uint32 = 0;
+const INVALID_ID uint64 = 0;
 
 /// Indicates that a ConfigStamp is invalid.
 const INVALID_CONFIG_STAMP_VALUE uint64 = 0;
@@ -135,8 +134,8 @@ closed protocol DisplayControllerInterface {
     /// The driver should call this function when the callback is registered if any displays
     /// are present.
     strict OnDisplaysChanged(resource struct {
-        added_display vector<AddedDisplayArgs>:MAX;
-        removed_display vector<uint64>:MAX;
+        added_displays vector<AddedDisplayArgs>:MAX;
+        removed_display_ids vector<uint64>:MAX;
     }) -> (struct {
         display_info vector<AddedDisplayInfo>:MAX;
     });
@@ -162,14 +161,6 @@ closed protocol DisplayControllerInterface {
         timestamp zx.Time;
         config_stamp box<ConfigStamp>;
     }) -> ();
-
-    strict GetAudioFormat(struct {
-        display_id uint64;
-        fmt_idx uint32;
-    }) -> (struct {
-        s zx.Status;
-        fmt fuchsia.hardware.audiotypes.AudioTypesAudioStreamFormatRange;
-    });
 };
 
 @transport("Banjo")
