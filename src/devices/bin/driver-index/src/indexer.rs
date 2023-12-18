@@ -318,11 +318,11 @@ impl Indexer {
 
     pub async fn register_driver(
         &self,
-        pkg_url: String,
+        driver_url: String,
         resolver: &fresolution::ResolverProxy,
     ) -> Result<(), i32> {
-        let component_url = url::Url::parse(&pkg_url).map_err(|e| {
-            tracing::error!("Couldn't parse driver url: {}: error: {}", &pkg_url, e);
+        let component_url = url::Url::parse(&driver_url).map_err(|e| {
+            tracing::error!("Couldn't parse driver url: {}: error: {}", &driver_url, e);
             Status::ADDRESS_UNREACHABLE.into_raw()
         })?;
 

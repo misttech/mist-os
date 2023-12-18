@@ -218,7 +218,7 @@ async fn run_driver_registrar_server(
         .try_for_each(|request| async {
             let indexer = indexer.clone();
             match request {
-                fdr::DriverRegistrarRequest::Register { package_url, responder } => {
+                fdr::DriverRegistrarRequest::Register { driver_url, responder } => {
                     match full_resolver {
                         None => {
                             responder
@@ -228,7 +228,7 @@ async fn run_driver_registrar_server(
                         }
                         Some(resolver) => {
                             let register_result =
-                                indexer.register_driver(package_url, resolver).await;
+                                indexer.register_driver(driver_url, resolver).await;
 
                             responder
                                 .send(register_result)

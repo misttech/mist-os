@@ -5,7 +5,12 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.registrar") {
-  sources = [ "driver-registrar.fidl" ]
+  sdk_category = "partner"
+  api = "fuchsia.driver.registrar.api"
+  sources = [
+    "driver-registrar.fidl",
+    "overview.fidl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",

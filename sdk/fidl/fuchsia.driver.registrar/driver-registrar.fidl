@@ -28,6 +28,6 @@ open protocol DriverRegistrar {
     ///     * `ZX_ERR_UNAVAILABLE` if the package resolver could not be reached.
     ///     * `ZX_ERR_INTERNAL` if an unspecified error was encountered.
     flexible Register(struct {
-        package_url fuchsia.url.Url;
+        driver_url fuchsia.url.Url;
     }) -> () error zx.Status;
 };
