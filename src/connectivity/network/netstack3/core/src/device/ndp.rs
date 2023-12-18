@@ -152,9 +152,11 @@ mod tests {
             ethernet::MaxEthernetFrameSize,
             link::LinkAddress,
             remove_ethernet_device,
-            testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
-            update_ipv6_configuration, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
-            FrameDestination,
+            testutil::{
+                is_forwarding_enabled, receive_frame, set_forwarding_enabled,
+                update_ipv6_configuration,
+            },
+            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
         },
         ip::{
             device::{

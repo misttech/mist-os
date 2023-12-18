@@ -1041,7 +1041,7 @@ impl FakeEventDispatcherBuilder {
                 );
                 let id = eth_id.clone().into();
                 if let Some(ipv4_config) = ipv4_config {
-                    let _previous = crate::device::update_ipv4_configuration(
+                    let _previous = crate::device::testutil::update_ipv4_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &id,
@@ -1050,7 +1050,7 @@ impl FakeEventDispatcherBuilder {
                     .unwrap();
                 }
                 if let Some(ipv6_config) = ipv6_config {
-                    let _previous = crate::device::update_ipv6_configuration(
+                    let _previous = crate::device::testutil::update_ipv6_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &id,

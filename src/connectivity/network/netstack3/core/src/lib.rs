@@ -70,9 +70,9 @@ pub mod device {
         del_ip_addr, flush_neighbor_table, get_all_ip_addr_subnets,
         get_ipv4_configuration_and_flags, get_ipv6_configuration_and_flags, get_routing_metric,
         handle_queued_rx_packets, insert_static_neighbor_entry, inspect_devices, inspect_neighbors,
-        receive_frame, remove_ethernet_device, remove_loopback_device, remove_neighbor_table_entry,
+        new_ipv4_configuration_update, new_ipv6_configuration_update, receive_frame,
+        remove_ethernet_device, remove_loopback_device, remove_neighbor_table_entry,
         set_ip_addr_properties, set_tx_queue_configuration, transmit_queued_tx_frames,
-        update_ipv4_configuration, update_ipv6_configuration,
     };
     pub use ethernet::resolve_ethernet_link_addr;
 
@@ -170,7 +170,7 @@ pub mod ip {
             Ipv6DeviceConfiguration, Lifetime,
         },
         AddressRemovedReason, IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }

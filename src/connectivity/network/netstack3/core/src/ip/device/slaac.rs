@@ -1661,7 +1661,10 @@ mod tests {
             FakeCtx, FakeInstant, FakeInstantRange as _, FakeNonSyncCtx, FakeSyncCtx,
             FakeTimerCtxExt as _,
         },
-        device::{testutil::FakeDeviceId, update_ipv6_configuration, FrameDestination},
+        device::{
+            testutil::{update_ipv6_configuration, FakeDeviceId},
+            FrameDestination,
+        },
         ip::{
             device::{
                 testutil::with_assigned_ipv6_addr_subnets, IpDeviceConfigurationUpdate,

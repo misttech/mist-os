@@ -67,8 +67,8 @@ use net_types::{
 };
 use netstack3_core::{
     device::{
-        update_ipv4_configuration, update_ipv6_configuration, DeviceId, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, LoopbackDeviceId,
+        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
+        EthernetDeviceId, LoopbackDeviceId,
     },
     error::NetstackError,
     handle_timer,
@@ -982,28 +982,28 @@ impl Netstack {
         });
 
         let (sync_ctx, non_sync_ctx) = self.ctx.contexts_mut();
-        let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
-            sync_ctx,
-            non_sync_ctx,
-            &loopback,
-            Ipv4DeviceConfigurationUpdate { ip_config },
-        )
-        .unwrap();
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            sync_ctx,
-            non_sync_ctx,
-            &loopback,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(None),
-                max_router_solicitations: Some(None),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    temporary_address_configuration: None,
-                }),
-                ip_config,
-            },
-        )
-        .unwrap();
+        let _: Ipv4DeviceConfigurationUpdate =
+            netstack3_core::device::new_ipv4_configuration_update(
+                &loopback,
+                Ipv4DeviceConfigurationUpdate { ip_config },
+            )
+            .unwrap()
+            .apply(sync_ctx, non_sync_ctx);
+        let _: Ipv6DeviceConfigurationUpdate =
+            netstack3_core::device::new_ipv6_configuration_update(
+                &loopback,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(None),
+                    max_router_solicitations: Some(None),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: None,
+                    }),
+                    ip_config,
+                },
+            )
+            .unwrap()
+            .apply(sync_ctx, non_sync_ctx);
         add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
             .expect("error adding loopback addresses");
         add_loopback_routes(non_sync_ctx, &loopback).await;

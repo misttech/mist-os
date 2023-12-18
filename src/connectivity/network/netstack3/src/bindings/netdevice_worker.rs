@@ -18,10 +18,7 @@ use fuchsia_zircon as zx;
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
-    device::{
-        update_ipv4_configuration, update_ipv6_configuration, EthernetWeakDeviceId,
-        MaxEthernetFrameSize,
-    },
+    device::{EthernetWeakDeviceId, MaxEthernetFrameSize},
     ip::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
@@ -465,34 +462,34 @@ impl DeviceHandler {
             gmp_enabled: Some(true),
         });
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            sync_ctx,
-            non_sync_ctx,
-            &core_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(Some(
-                    Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
-                )),
-                max_router_solicitations: Some(Some(
-                    Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
-                )),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    temporary_address_configuration: Some(
-                        TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
-                    ),
-                }),
-                ip_config,
-            },
-        )
-        .unwrap();
-        let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
-            sync_ctx,
-            non_sync_ctx,
-            &core_id,
-            Ipv4DeviceConfigurationUpdate { ip_config },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate =
+            netstack3_core::device::new_ipv6_configuration_update(
+                &core_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(Some(
+                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
+                    )),
+                    max_router_solicitations: Some(Some(
+                        Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
+                    )),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: Some(
+                            TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
+                        ),
+                    }),
+                    ip_config,
+                },
+            )
+            .unwrap()
+            .apply(sync_ctx, non_sync_ctx);
+        let _: Ipv4DeviceConfigurationUpdate =
+            netstack3_core::device::new_ipv4_configuration_update(
+                &core_id,
+                Ipv4DeviceConfigurationUpdate { ip_config },
+            )
+            .unwrap()
+            .apply(sync_ctx, non_sync_ctx);
 
         non_sync_ctx.devices.add_device(binding_id, core_id.clone());
 

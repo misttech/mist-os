@@ -1266,30 +1266,31 @@ mod tests {
         let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                           non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            let _: Ipv6DeviceConfigurationUpdate = crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &device_id,
-                Ipv6DeviceConfigurationUpdate {
-                    // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
-                    // for a link-local address results in reports sent with a
-                    // specified source address.
-                    dad_transmits: Some(None),
-                    max_router_solicitations: Some(None),
-                    // Auto-generate a link-local address.
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
+            let _: Ipv6DeviceConfigurationUpdate =
+                crate::device::testutil::update_ipv6_configuration(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &device_id,
+                    Ipv6DeviceConfigurationUpdate {
+                        // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
+                        // for a link-local address results in reports sent with a
+                        // specified source address.
+                        dad_transmits: Some(None),
+                        max_router_solicitations: Some(None),
+                        // Auto-generate a link-local address.
+                        slaac_config: Some(SlaacConfiguration {
+                            enable_stable_addresses: true,
+                            ..Default::default()
+                        }),
+                        ip_config: Some(IpDeviceConfigurationUpdate {
+                            ip_enabled: Some(ip_enabled),
+                            gmp_enabled: Some(gmp_enabled),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
-                        ip_enabled: Some(ip_enabled),
-                        gmp_enabled: Some(gmp_enabled),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
+                    },
+                )
+                .unwrap();
         };
         let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                  specified_source: bool| {

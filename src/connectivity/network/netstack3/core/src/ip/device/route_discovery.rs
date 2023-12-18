@@ -271,8 +271,8 @@ mod tests {
             FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _,
         },
         device::{
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            update_ipv6_configuration, DeviceId, FrameDestination,
+            testutil::{update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId},
+            DeviceId, FrameDestination,
         },
         ip::{
             device::{

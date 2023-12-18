@@ -1493,8 +1493,10 @@ mod tests {
         device::{
             arp::ArpCounters,
             socket::Frame,
-            testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
-            update_ipv6_configuration, DeviceId,
+            testutil::{
+                set_forwarding_enabled, update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId,
+            },
+            DeviceId,
         },
         error::{ExistsError, NotFoundError},
         ip::{

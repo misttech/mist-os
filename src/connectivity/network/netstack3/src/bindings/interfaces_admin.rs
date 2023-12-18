@@ -50,11 +50,11 @@ use net_types::{
     SpecifiedAddr, Witness,
 };
 use netstack3_core::{
-    device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
+    device::DeviceId,
     ip::{
         AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
         Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
-        Lifetime,
+        Lifetime, UpdateIpConfigurationError,
     },
 };
 
@@ -826,106 +826,116 @@ fn set_configuration(
 
     let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
 
-    let is_loopback = match core_id {
-        DeviceId::Loopback(_) => true,
-        DeviceId::Ethernet(_) => false,
+    let ipv4_update = ipv4.map(
+        |fnet_interfaces_admin::Ipv4Configuration {
+             igmp,
+             multicast_forwarding,
+             forwarding,
+             __source_breaking,
+         }| {
+            if let Some(_) = igmp {
+                tracing::warn!("TODO(https://fxbug.dev/120293): support IGMP configuration changes")
+            }
+            if let Some(_) = multicast_forwarding {
+                tracing::warn!(
+                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+            )
+            }
+            Ipv4DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    forwarding_enabled: forwarding,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
+        },
+    );
+
+    let ipv6_update = ipv6.map(
+        |fnet_interfaces_admin::Ipv6Configuration {
+             mld,
+             multicast_forwarding,
+             forwarding,
+             __source_breaking,
+         }| {
+            if let Some(_) = mld {
+                tracing::warn!("TODO(https://fxbug.dev/120293): support MLD configuration changes")
+            }
+            if let Some(_) = multicast_forwarding {
+                tracing::warn!(
+                    "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+                )
+            }
+
+            Ipv6DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    forwarding_enabled: forwarding,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
+        },
+    );
+
+    let ipv4_update = ipv4_update
+        .map(|ipv4_update| {
+            netstack3_core::device::new_ipv4_configuration_update(&core_id, ipv4_update)
+        })
+        .transpose()
+        .map_err(|e| match e {
+            UpdateIpConfigurationError::ForwardingNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported
+            }
+        })?;
+    let ipv6_update = ipv6_update
+        .map(|ipv6_update| {
+            netstack3_core::device::new_ipv6_configuration_update(&core_id, ipv6_update)
+        })
+        .transpose()
+        .map_err(|e| match e {
+            UpdateIpConfigurationError::ForwardingNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported
+            }
+        })?;
+    // Apply both updates now that we have checked for errors and get the deltas
+    // back. If we didn't apply updates, use the default struct to construct the
+    // delta responses.
+    let ipv4 = {
+        let Ipv4DeviceConfigurationUpdate { ip_config } =
+            ipv4_update.map(|u| u.apply(sync_ctx, non_sync_ctx)).unwrap_or_default();
+        ip_config.map(
+            |IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ }| {
+                fnet_interfaces_admin::Ipv4Configuration {
+                    forwarding: forwarding_enabled,
+                    multicast_forwarding: None,
+                    igmp: None,
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }
+            },
+        )
     };
-
-    if let Some(fnet_interfaces_admin::Ipv4Configuration {
-        igmp,
-        multicast_forwarding,
-        forwarding,
-        ..
-    }) = ipv4.as_ref()
-    {
-        if let Some(_) = igmp {
-            tracing::warn!("TODO(https://fxbug.dev/120293): support IGMP configuration changes")
-        }
-        if let Some(_) = multicast_forwarding {
-            tracing::warn!(
-                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
-            )
-        }
-        if let Some(forwarding) = forwarding {
-            if *forwarding && is_loopback {
-                return Err(
-                    fnet_interfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported,
-                );
-            }
-        }
-    }
-    if let Some(fnet_interfaces_admin::Ipv6Configuration {
-        mld,
-        multicast_forwarding,
-        forwarding,
-        ..
-    }) = ipv6.as_ref()
-    {
-        if let Some(_) = mld {
-            tracing::warn!("TODO(https://fxbug.dev/120293): support MLD configuration changes")
-        }
-        if let Some(_) = multicast_forwarding {
-            tracing::warn!(
-                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
-            )
-        }
-        if let Some(forwarding) = forwarding {
-            if *forwarding && is_loopback {
-                return Err(
-                    fnet_interfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported,
-                );
-            }
-        }
-    }
-
+    let ipv6 = {
+        let Ipv6DeviceConfigurationUpdate {
+            ip_config,
+            dad_transmits: _,
+            max_router_solicitations: _,
+            slaac_config: _,
+        } = ipv6_update.map(|u| u.apply(sync_ctx, non_sync_ctx)).unwrap_or_default();
+        ip_config.map(
+            |IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ }| {
+                fnet_interfaces_admin::Ipv6Configuration {
+                    forwarding: forwarding_enabled,
+                    multicast_forwarding: None,
+                    mld: None,
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }
+            },
+        )
+    };
     Ok(fnet_interfaces_admin::Configuration {
-        ipv4: ipv4.map(|fnet_interfaces_admin::Ipv4Configuration { forwarding, .. }| {
-            fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: forwarding.and_then(|enable| {
-                    update_ipv4_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &core_id,
-                        Ipv4DeviceConfigurationUpdate {
-                            ip_config: Some(IpDeviceConfigurationUpdate {
-                                forwarding_enabled: Some(enable),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        },
-                    )
-                    .expect("checked supported configuration before calling")
-                    .ip_config
-                    .expect("IP configuration was updated")
-                    .forwarding_enabled
-                }),
-                ..Default::default()
-            }
-        }),
-        ipv6: ipv6.map(|fnet_interfaces_admin::Ipv6Configuration { forwarding, .. }| {
-            fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: forwarding.and_then(|enable| {
-                    update_ipv6_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &core_id,
-                        Ipv6DeviceConfigurationUpdate {
-                            ip_config: Some(IpDeviceConfigurationUpdate {
-                                forwarding_enabled: Some(enable),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        },
-                    )
-                    .expect("checked supported configuration before calling")
-                    .ip_config
-                    .expect("IP configuration was updated")
-                    .forwarding_enabled
-                }),
-                ..Default::default()
-            }
-        }),
-        ..Default::default()
+        ipv4,
+        ipv6,
+        __source_breaking: fidl::marker::SourceBreaking,
     })
 }
 
@@ -1754,34 +1764,28 @@ mod enabled {
             // The update functions from core are already capable of identifying
             // deltas and return the previous values for us. Log the deltas for
             // info.
-            let v4_was_enabled = netstack3_core::device::update_ipv4_configuration(
-                sync_ctx,
-                non_sync_ctx,
+            let v4_was_enabled = netstack3_core::device::new_ipv4_configuration_update(
                 &core_id,
                 Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
             )
-            .map(|update| {
-                update
-                    .ip_config
-                    .expect("ip config must be informed")
-                    .ip_enabled
-                    .expect("ip enabled must be informed")
-            })
-            .expect("changing ip_enabled should never fail");
-            let v6_was_enabled = netstack3_core::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
+            .expect("changing ip_enabled should never fail")
+            .apply(sync_ctx, non_sync_ctx)
+            .ip_config
+            .expect("ip config must be informed")
+            .ip_enabled
+            .expect("ip enabled must be informed");
+
+            let v6_was_enabled = netstack3_core::device::new_ipv6_configuration_update(
                 &core_id,
                 Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
             )
-            .map(|update| {
-                update
-                    .ip_config
-                    .expect("ip config must be informed")
-                    .ip_enabled
-                    .expect("ip enabled must be informed")
-            })
-            .expect("changing ip_enabled should never fail");
+            .expect("changing ip_enabled should never fail")
+            .apply(sync_ctx, non_sync_ctx)
+            .ip_config
+            .expect("ip config must be informed")
+            .ip_enabled
+            .expect("ip enabled must be informed");
+
             tracing::info!("updated core ip_enabled state to {dev_enabled}, prev v4={v4_was_enabled},v6={v6_was_enabled}");
         }
     }

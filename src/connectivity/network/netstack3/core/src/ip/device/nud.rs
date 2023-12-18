@@ -2519,9 +2519,8 @@ mod tests {
             ethernet::EthernetLinkDevice,
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-            testutil::FakeWeakDeviceId,
-            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
-            WeakDeviceId,
+            testutil::{update_ipv6_configuration, FakeWeakDeviceId},
+            EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, WeakDeviceId,
         },
         ip::{
             device::{

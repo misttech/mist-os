@@ -23,10 +23,7 @@ use net_types::{
     SpecifiedAddr, Witness as _,
 };
 use netstack3_core::{
-    device::{
-        insert_static_neighbor_entry, resolve_ethernet_link_addr, update_ipv6_configuration,
-        DeviceId,
-    },
+    device::{insert_static_neighbor_entry, resolve_ethernet_link_addr, DeviceId},
     error::AddressResolutionFailed,
     ip::{Ipv6DeviceConfigurationUpdate, STABLE_IID_SECRET_KEY_BYTES},
     neighbor::LinkResolutionResult,
@@ -517,16 +514,16 @@ impl TestSetupBuilder {
                     let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
                     let devices: &Devices<_> = non_sync_ctx.as_ref();
                     let device = devices.get_core_id(if_id).unwrap();
-                    let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &device,
-                        Ipv6DeviceConfigurationUpdate {
-                            dad_transmits: Some(None),
-                            ..Default::default()
-                        },
-                    )
-                    .unwrap();
+                    let _: Ipv6DeviceConfigurationUpdate =
+                        netstack3_core::device::new_ipv6_configuration_update(
+                            &device,
+                            Ipv6DeviceConfigurationUpdate {
+                                dad_transmits: Some(None),
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap()
+                        .apply(sync_ctx, non_sync_ctx);
                 });
                 if let Some(addr) = addr {
                     stack.with_ctx(|ctx| {
