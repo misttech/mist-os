@@ -288,6 +288,34 @@ struct SupplicantStaIfaceState {
     callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
 
+async fn handle_client_connect_transactions(stream: fidl_sme::ConnectTransactionEventStream) {
+    // The transaction stream will exit cleanly when the connection has fully terminated.
+    stream
+        .for_each_concurrent(None, |req| async {
+            match req {
+                Ok(fidl_sme::ConnectTransactionEvent::OnConnectResult { result: _ }) => {
+                    error!(
+                        "Received unexpected connect result after connection already established."
+                    );
+                }
+                Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
+                    // TODO(b/313994670): Notify wlanix clients on disconnect.
+                    info!("Connection terminated by disconnect: {:?}", info);
+                }
+                Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind: _ }) => {
+                    // TODO(b/316374668): Surface these RSSI values.
+                }
+                Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info }) => {
+                    info!("Connection switching to channel {}", info.new_channel);
+                }
+                Err(e) => {
+                    error!("Error on connect transaction event stream: {}", e);
+                }
+            }
+        })
+        .await;
+}
+
 async fn handle_supplicant_sta_network_request<C: ClientIface>(
     req: fidl_wlanix::SupplicantStaNetworkRequest,
     sta_network_state: Arc<Mutex<SupplicantStaNetworkState>>,
@@ -325,7 +353,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 let state = sta_network_state.lock();
                 (state.ssid.clone(), state.passphrase.clone(), state.bssid.clone())
             };
-            let result = match ssid {
+            let (result, connect_transaction_stream) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
                     Ok(connected_result) => {
                         info!("Connected to requested network");
@@ -342,16 +370,16 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             &sta_iface_state.lock().callbacks[..],
                             "on_state_changed",
                         );
-                        Ok(())
+                        (Ok(()), Some(connected_result.transaction_stream))
                     }
                     Err(e) => {
                         warn!("Connecting to network failed: {}", e);
-                        Err(zx::sys::ZX_ERR_INTERNAL)
+                        (Err(zx::sys::ZX_ERR_INTERNAL), None)
                     }
                 },
                 None => {
                     warn!("No SSID set. fidl_wlanix::SupplicantStaNetworkRequest::Select ignored");
-                    Err(zx::sys::ZX_ERR_BAD_STATE)
+                    (Err(zx::sys::ZX_ERR_BAD_STATE), None)
                 }
             };
             responder.send(result).context("send Select response")?;
@@ -374,6 +402,12 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         ..Default::default()
                     })
                     .context("Failed to send nl80211 Connect")?;
+            }
+            if let Some(stream) = connect_transaction_stream {
+                // Continue to process connection updates until the connection terminates.
+                // We can do this here because calls to this function are all executed
+                // concurrently, so it doesn't block other requests.
+                handle_client_connect_transactions(stream).await;
             }
         }
         fidl_wlanix::SupplicantStaNetworkRequest::_UnknownMethod { ordinal, .. } => {

@@ -79,10 +79,16 @@ impl IfaceManager for DeviceMonitorIfaceManager {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct ConnectedResult {
     pub ssid: Vec<u8>,
     pub bssid: Bssid,
+    pub transaction_stream: fidl_sme::ConnectTransactionEventStream,
+}
+
+impl std::fmt::Debug for ConnectedResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "ConnectedResult {{ ssid: {:?}, bssid: {:?} }}", self.ssid, self.bssid)
+    }
 }
 
 #[derive(Debug)]
@@ -216,8 +222,8 @@ impl ClientIface for SmeClientIface {
         self.sme_proxy.connect(&connect_req, Some(remote))?;
 
         info!("Waiting for connect result from SME");
-        let stream = connect_txn.take_event_stream();
-        let sme_result = wait_for_connect_result(stream)
+        let mut stream = connect_txn.take_event_stream();
+        let sme_result = wait_for_connect_result(&mut stream)
             .on_timeout(zx::Duration::from_seconds(30), || {
                 Err(format_err!("Timed out waiting for connect result from SME."))
             })
@@ -225,7 +231,7 @@ impl ClientIface for SmeClientIface {
 
         info!("Received connect result from SME: {:?}", sme_result);
         if sme_result.code == fidl_ieee80211::StatusCode::Success {
-            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid })
+            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid, transaction_stream: stream })
         } else {
             Err(format_err!("Connect failed with status code: {:?}", sme_result.code))
         }
@@ -235,7 +241,7 @@ impl ClientIface for SmeClientIface {
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
 /// TODO(fxbug.dev/134895): Function taken from wlancfg. Dedupe later.
 async fn wait_for_connect_result(
-    mut stream: fidl_sme::ConnectTransactionEventStream,
+    stream: &mut fidl_sme::ConnectTransactionEventStream,
 ) -> Result<fidl_sme::ConnectResult, Error> {
     loop {
         let stream_fut = stream.try_next();
@@ -308,6 +314,7 @@ pub mod test_utils {
         pub connected_ssid: Mutex<Option<Vec<u8>>>,
         pub connected_passphrase: Mutex<Option<Vec<u8>>>,
         pub connect_req_bssid: Mutex<Option<Bssid>>,
+        pub transaction_handle: Mutex<Option<fidl_sme::ConnectTransactionControlHandle>>,
         scan_end_receiver: Mutex<Option<oneshot::Receiver<Result<ScanEnd, Error>>>>,
     }
 
@@ -317,6 +324,7 @@ pub mod test_utils {
                 connected_ssid: Mutex::new(None),
                 connected_passphrase: Mutex::new(None),
                 connect_req_bssid: Mutex::new(None),
+                transaction_handle: Mutex::new(None),
                 scan_end_receiver: Mutex::new(None),
             }
         }
@@ -346,9 +354,17 @@ pub mod test_utils {
             *self.connected_ssid.lock() = Some(ssid.to_vec());
             *self.connected_passphrase.lock() = passphrase;
             *self.connect_req_bssid.lock() = bssid;
+            let (proxy, server) =
+                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
+                    .expect("Failed to create fidl endpoints");
+            let (_, handle) = server
+                .into_stream_and_control_handle()
+                .expect("Failed to get connect transaction control handle");
+            *self.transaction_handle.lock() = Some(handle);
             Ok(ConnectedResult {
                 ssid: ssid.to_vec(),
                 bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+                transaction_stream: proxy.take_event_stream(),
             })
         }
     }
