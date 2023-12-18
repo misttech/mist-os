@@ -26,5 +26,10 @@ fuchsia_unittest_package("devfs-test") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":devfs-test" ]
+
+  # TODO(fxbug.dev/316579125): Fix on coverage builders
+  public_deps = []
+  if (!is_coverage) {
+    public_deps += [ ":devfs-test" ]
+  }
 }
