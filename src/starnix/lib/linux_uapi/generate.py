@@ -169,6 +169,8 @@ REPLACEMENTS = [
     (r"([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)", "\\1 uref<\\3>"),
     # Convert atomic wrapper.
     (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
+    # Remove __bindgen_missing from the start of constants defined in missing_includes.h
+    (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
 ]
 
 INPUT_FILE = "src/starnix/lib/linux_uapi/wrapper.h"
