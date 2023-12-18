@@ -90,6 +90,10 @@ static_library("zstd") {
 
   configs += [ ":internal.config" ]
 
+  if (!is_fuchsia) {
+    libs = [ "pthread" ]
+  }
+
   # zstd is slow when compiled with optimize=none or optimize=debug (-O0
   # currently); enable default optimizations for just this library on both host
   # and target.
