@@ -8,11 +8,11 @@ use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
 use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
+use crate::timer::get_periodic_timer_stream;
 use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad, Watts};
 use crate::utils::get_current_timestamp;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::{
     future::{FutureExt, LocalBoxFuture},
@@ -257,7 +257,7 @@ impl ThermalPolicy {
     /// ThermalControllerParams.sample_interval. At each fire, `iterate_thermal_control` is called
     /// and any resulting errors are logged.
     fn periodic_thermal_loop<'a>(self: Rc<Self>) -> LocalBoxFuture<'a, ()> {
-        let mut periodic_timer = fasync::Interval::new(
+        let mut periodic_timer = get_periodic_timer_stream(
             self.config.policy_params.controller_params.sample_interval.into(),
         );
 
@@ -669,10 +669,7 @@ pub mod tests {
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use diagnostics_assertions::assert_data_tree;
-
-    pub fn get_sample_interval(thermal_policy: &ThermalPolicy) -> Seconds {
-        thermal_policy.config.policy_params.controller_params.sample_interval
-    }
+    use fuchsia_async as fasync;
 
     fn default_policy_params() -> ThermalPolicyParams {
         ThermalPolicyParams {
@@ -993,6 +990,11 @@ pub mod tests {
 
         impl<'a> TimeStepper<'a> {
             fn iterate_policy(&mut self) {
+                assert_eq!(
+                    futures::task::Poll::Pending,
+                    self.executor.run_until_stalled(&mut self.node_futures.next())
+                );
+
                 let wakeup_time = self.executor.wake_next_timer().unwrap();
                 self.executor.set_fake_time(wakeup_time);
 
@@ -1014,6 +1016,7 @@ pub mod tests {
             msg_eq!(LogPlatformMetric(PlatformMetric::ThrottlingResultShutdown)),
             msg_ok_return!(LogPlatformMetric),
         ));
+
         stepper.iterate_policy();
 
         // On a real system, the shutdown would have occured. But since the test continues executing

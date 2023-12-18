@@ -18,23 +18,57 @@ resource("shutdown-integration-test-resources") {
   outputs = [ "shutdown_test/{{source_file_part}}" ]
 }
 
+resource("cpu-thermal-model-integration-test-resources") {
+  sources = [ "config_files/cpu_thermal_model_test/node_config.json5" ]
+  outputs = [ "cpu_thermal_model_test/{{source_file_part}}" ]
+}
+
+resource("cpu-thermal-model-no-jitter-integration-test-resources") {
+  sources =
+      [ "config_files/cpu_thermal_model_no_jitter_test/node_config.json5" ]
+  outputs = [ "cpu_thermal_model_no_jitter_test/{{source_file_part}}" ]
+}
+
 rustc_test("integration-test") {
   name = "power_manager_integration_test"
   testonly = true
   edition = "2021"
   deps = [
+    "../../rkf45:lib",
+    "../../testing/fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_rust",
+    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fake-clock/fidl:fidl_rust",
+    "//src/lib/fake-clock/named-timer",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/test_util",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/power/power-manager/integration/lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:libm",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:serde_json5",
+    "//third_party/rust_crates:tracing",
   ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/test.rs",
+    "src/thermal_model_test.rs",
+  ]
+
+  sources += [ "../../src/types.rs" ]
 }
 
 fuchsia_unittest_package("power-manager-integration-test") {
   manifest = "meta/power-manager-integration-test.cml"
   deps = [
+    ":cpu-thermal-model-integration-test-resources",
+    ":cpu-thermal-model-no-jitter-integration-test-resources",
     ":integration-test",
     ":shutdown-integration-test-resources",
     ":thermal-client-service-integration-test-resources",
