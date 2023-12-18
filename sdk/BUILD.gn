@@ -456,6 +456,7 @@ sdk_molecule("core_dart_library") {
 sdk_molecule("core_cc_prebuilt_libraries") {
   deps = [
     "//sdk/lib/fdio:fdio_sdk",
+    "//sdk/lib/magma_client:magma_client_sdk",
     "//sdk/lib/svc:svc_sdk",
     "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
@@ -468,14 +469,6 @@ sdk_molecule("core_cc_prebuilt_libraries") {
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
     "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
   ]
-
-  if (!sdk_inside_supported_api_sub_build) {
-    deps += [
-      # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
-      # when targeting older API levels and move to the list above.
-      "//sdk/lib/magma_client:magma_client_sdk",
-    ]
-  }
 }
 
 # C++ code that is provided as source in the SDK. Must be buildable at each
