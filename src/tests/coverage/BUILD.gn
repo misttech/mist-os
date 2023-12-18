@@ -53,6 +53,7 @@ executable("clang_coverage_test_bin") {
     "-fprofile-instr-generate",
     "-fcoverage-mapping",
   ]
+  deps = [ "//zircon/system/ulib/zx" ]
   ldflags = cflags
   configs += [ ":disable_hwasan_globals" ]
 
