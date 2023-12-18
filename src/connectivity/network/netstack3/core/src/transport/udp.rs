@@ -904,6 +904,9 @@ impl<A: IpAddress, D: Clone + Debug>
 where
     A::Version: DualStackIpExt,
 {
+    // TODO(https://issues.fuchsia.dev/): Use sealed traits so we can remove
+    // this lint.
+    #[allow(private_interfaces)]
     fn from(c: ConnAddr<<A::Version as DualStackIpExt>::DualStackConnIpAddr<Udp>, D>) -> Self {
         fn to_ipv6_mapped(a: SpecifiedAddr<Ipv4Addr>) -> SpecifiedAddr<Ipv6Addr> {
             a.get().to_ipv6_mapped()

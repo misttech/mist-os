@@ -684,6 +684,7 @@ impl IntoErrno for tcp::socket::SetDeviceError {
             Self::Conflict => Errno::Eaddrinuse,
             Self::Unroutable => Errno::Ehostunreach,
             Self::ZoneChange => Errno::Einval,
+            Self::DualStackNotSupported => Errno::Eopnotsupp,
         }
     }
 }

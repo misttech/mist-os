@@ -45,7 +45,8 @@ pub enum NetstackError {
 }
 
 /// Error when something is not supported.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error, GenericOverIp)]
+#[generic_over_ip()]
 #[error("Not supported")]
 pub struct NotSupportedError;
 

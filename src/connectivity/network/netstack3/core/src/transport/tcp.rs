@@ -34,7 +34,7 @@ use crate::{
     },
     transport::tcp::{
         seqnum::{UnscaledWindowSize, WindowSize},
-        socket::{isn::IsnGenerator, Sockets},
+        socket::{isn::IsnGenerator, DualStackIpExt, Sockets},
         state::DEFAULT_MAX_SYN_RETRIES,
     },
 };
@@ -177,12 +177,12 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct TcpState<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub(crate) struct TcpState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     pub(crate) isn_generator: IsnGenerator<BT::Instant>,
     pub(crate) sockets: Sockets<I, D, BT>,
 }
 
-impl<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
+impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
     pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
         Self { isn_generator: IsnGenerator::new(now, rng), sockets: Sockets::new(rng) }
     }

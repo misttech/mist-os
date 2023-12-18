@@ -69,7 +69,7 @@ use net_types::{
 use crate::{
     device::WeakDeviceId,
     error::ZonedAddressError,
-    ip::{EitherDeviceId, IpExt},
+    ip::EitherDeviceId,
     sync::{RwLockReadGuard, RwLockWriteGuard},
     transport::{
         tcp::TcpState,
@@ -112,7 +112,7 @@ pub(crate) struct TransportLayerState<BT: BindingsTypes> {
 }
 
 impl<BT: BindingsTypes> TransportLayerState<BT> {
-    fn tcp_state<I: IpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
+    fn tcp_state<I: tcp::socket::DualStackIpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
     }
 

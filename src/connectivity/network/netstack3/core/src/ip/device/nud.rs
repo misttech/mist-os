@@ -5387,7 +5387,7 @@ mod tests {
     }
 
     fn bind_and_connect_sockets<
-        I: Ip + testutil::TestIpExt,
+        I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
         L: FakeNetworkLinks<
             EthernetWeakDeviceId<testutil::FakeNonSyncCtx>,
             EthernetDeviceId<testutil::FakeNonSyncCtx>,
@@ -5432,7 +5432,9 @@ mod tests {
     }
 
     #[ip_test]
-    fn upper_layer_confirmation_tcp_handshake<I: Ip + testutil::TestIpExt>()
+    fn upper_layer_confirmation_tcp_handshake<
+        I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
+    >()
     where
         for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
             DeviceIdContext<
@@ -5515,7 +5517,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt>()
+    fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt>()
     where
         for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
             DeviceIdContext<

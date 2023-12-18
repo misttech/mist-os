@@ -188,10 +188,10 @@ pub(crate) struct ListenerAddr<A, D> {
     pub(crate) device: Option<D>,
 }
 
-// The IP address and identifier (port) of a connected socket.
+/// The IP address and identifier (port) of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip(A, IpAddress)]
-pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
+pub struct ConnIpAddr<A: IpAddress, LI, RI> {
     pub(crate) local: (SocketIpAddr<A>, LI),
     pub(crate) remote: (SocketIpAddr<A>, RI),
 }
@@ -199,7 +199,7 @@ pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
 /// The address of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip()]
-pub(crate) struct ConnAddr<A, D> {
+pub struct ConnAddr<A, D> {
     pub(crate) ip: A,
     pub(crate) device: Option<D>,
 }

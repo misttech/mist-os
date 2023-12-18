@@ -1263,7 +1263,7 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use crate::testutil::Ctx;
 
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
 
     impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {

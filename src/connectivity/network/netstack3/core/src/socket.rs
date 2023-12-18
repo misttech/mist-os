@@ -33,11 +33,15 @@ use crate::{
 
 /// A dual stack IP extention trait that provides the `OtherVersion` associated
 /// type.
-pub(crate) trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
+// TODO(https://issues.fuchsia.dev/316412877): Use sealed traits so we can
+// remove this lint.
+#[allow(private_bounds)]
+pub trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
     /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
     type OtherVersion: IpLayerIpExt
         + IpDeviceStateIpExt
-        + datagram::DualStackIpExt<OtherVersion = Self>;
+        + datagram::DualStackIpExt<OtherVersion = Self>
+        + crate::transport::tcp::socket::DualStackIpExt<OtherVersion = Self>;
 }
 
 impl DualStackIpExt for Ipv4 {
@@ -55,8 +59,11 @@ impl DualStackIpExt for Ipv6 {
 /// Note that this type is not optimally type-safe, because `T` and `O` are not
 /// bound by `IP` and `IP::OtherVersion`, respectively. In many cases it may be
 /// more appropriate to define a one-off enum parameterized over `I: Ip`.
-pub(crate) enum EitherStack<T, O> {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EitherStack<T, O> {
+    /// In the current stack version.
     ThisStack(T),
+    /// In the other version of the stack.
     OtherStack(O),
 }
 
