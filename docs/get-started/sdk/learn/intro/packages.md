@@ -57,13 +57,13 @@ From the device shell prompt, you can confirm whether a known package is
 currently on the device:
 
 ```posix-terminal
-fssh pkgctl pkg-status fuchsia-pkg://fuchsia.com/spinning-square-rs
+ffx target ssh pkgctl pkg-status fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
 
 ```none {:.devsite-disable-click-to-copy}
 Package in registered TUF repo: yes (merkle=ef65e2ed...)
 Package on disk: no
-fssh ERROR: Error running ssh: exit status 2
+ffx target ssh ERROR: Error running ssh: exit status 2
 ```
 
 Note: The `pkgctl` command returns an error status when the package is not
@@ -81,7 +81,7 @@ server.
 From the device shell prompt, attempt to resolve the package:
 
 ```posix-terminal
-fssh pkgctl resolve fuchsia-pkg://fuchsia.com/spinning-square-rs
+ffx target ssh pkgctl resolve fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
 
 Notice the new lines added to the log output for `pkg-resolver`:
@@ -94,7 +94,7 @@ Notice the new lines added to the log output for `pkg-resolver`:
 From the device shell prompt, check the package status again on the device:
 
 ```posix-terminal
-fssh pkgctl pkg-status fuchsia-pkg://fuchsia.com/spinning-square-rs
+ffx target ssh pkgctl pkg-status fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
 
 ```none {:.devsite-disable-click-to-copy}
@@ -115,7 +115,7 @@ From the device shell prompt, use the `pkgctl get-hash` command to determine the
 package hash for `spinning-square`:
 
 ```posix-terminal
-fssh pkgctl get-hash fuchsia-pkg://fuchsia.com/spinning-square-rs
+ffx target ssh pkgctl get-hash fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
 
 ```none {:.devsite-disable-click-to-copy}
@@ -126,7 +126,7 @@ Provide the full package hash to the `pkgctl open` command to view the package
 contents:
 
 ```posix-terminal
-fssh pkgctl open ef65e2ed...
+ffx target ssh pkgctl open ef65e2ed...
 ```
 
 ```none {:.devsite-disable-click-to-copy}
