@@ -4,17 +4,40 @@
 
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator.h"
 
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fdf/dispatcher.h>
+#include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+
+#include <bind/fuchsia/cpp/bind.h>
+
+namespace {
+
+const std::string_view kDriverName = "aml-pwm-regulator";
+
+}  // namespace
 
 namespace aml_pwm_regulator {
+
+AmlPwmRegulator::AmlPwmRegulator(const PwmVregMetadataEntry& vreg_range,
+                                 fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client,
+                                 AmlPwmRegulatorDriver* driver, std::string_view name)
+    : pwm_index_(vreg_range.pwm_index()),
+      period_ns_(vreg_range.period_ns()),
+      min_voltage_uv_(vreg_range.min_voltage_uv()),
+      voltage_step_uv_(vreg_range.voltage_step_uv()),
+      num_steps_(vreg_range.num_steps()),
+      current_step_(vreg_range.num_steps()),
+      name_(name),
+      pwm_proto_client_(std::move(pwm_proto_client)),
+      compat_server_(driver->dispatcher(), driver->incoming(), driver->outgoing(),
+                     driver->node_name(), name_, std::string(kDriverName) + "/") {}
 
 void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
                                      SetVoltageStepCompleter::Sync& completer) {
   if (request->step >= num_steps_) {
-    zxlogf(ERROR, "Requested step (%u) is larger than allowed (total number of steps %u).",
-           request->step, num_steps_);
+    FDF_LOG(ERROR, "Requested step (%u) is larger than allowed (total number of steps %u).",
+            request->step, num_steps_);
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -36,12 +59,12 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
 
   auto result = pwm_proto_client_->SetConfig(cfg);
   if (!result.ok()) {
-    zxlogf(ERROR, "Unable to configure PWM. %s", result.status_string());
+    FDF_LOG(ERROR, "Unable to configure PWM. %s", result.status_string());
     completer.ReplyError(result.status());
     return;
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Unable to configure PWM. %s", zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Unable to configure PWM. %s", zx_status_get_string(result->error_value()));
     completer.ReplyError(result->error_value());
     return;
   }
@@ -58,126 +81,126 @@ void AmlPwmRegulator::GetRegulatorParams(GetRegulatorParamsCompleter::Sync& comp
   completer.Reply(min_voltage_uv_, voltage_step_uv_, num_steps_);
 }
 
-void AmlPwmRegulator::DdkInit(ddk::InitTxn txn) {
-  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
-  ZX_ASSERT(fdf_dispatcher);
-  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
-  outgoing_ = component::OutgoingDirectory(dispatcher);
+zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
+    const PwmVregMetadataEntry& metadata_entry, AmlPwmRegulatorDriver* driver) {
+  uint32_t idx = metadata_entry.pwm_index();
+  char name[20];
+  snprintf(name, sizeof(name), "pwm-%u", idx);
 
-  fuchsia_hardware_vreg::Service::InstanceHandler handler({
-      .vreg = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
-  });
-  auto result = outgoing_->AddService<fuchsia_hardware_vreg::Service>(std::move(handler));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
+  auto connect_result = driver->incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>(name);
+  if (connect_result.is_error()) {
+    FDF_LOG(ERROR, "Unable to connect to fidl protocol - status: %s",
+            connect_result.status_string());
+    return connect_result.take_error();
   }
 
-  result = outgoing_->Serve(std::move(outgoing_server_end_));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client(
+      std::move(connect_result.value()));
+  auto result = pwm_proto_client->Enable();
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Unable to enable PWM %u, %s", idx, result.status_string());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Unable to enable PWM %u, %s", idx, zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+  snprintf(name, sizeof(name), "pwm-%u-regulator", idx);
+
+  auto device =
+      std::make_unique<AmlPwmRegulator>(metadata_entry, std::move(pwm_proto_client), driver, name);
+
+  {
+    auto result = driver->outgoing()->AddService<fuchsia_hardware_vreg::Service>(
+        fuchsia_hardware_vreg::Service::InstanceHandler({
+            .vreg = device->bindings_.CreateHandler(
+                device.get(), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                fidl::kIgnoreBindingClosure),
+        }),
+        name);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
+      return result.take_error();
+    }
   }
 
-  txn.Reply(ZX_OK);
+  fidl::Arena arena;
+  auto offers = device->compat_server_.CreateOffers(arena);
+  offers.push_back(fdf::MakeOffer<fuchsia_hardware_vreg::Service>(arena, device->name_));
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 2);
+  properties[0] =
+      fdf::MakeProperty(arena, 0x0004 /* BIND_FIDL_PROTOCOL */, 17u /* ZX_FIDL_PROTOCOL_VREG */);
+  properties[1] = fdf::MakeProperty(arena, 0x0A50 /* BIND_PWM_ID */, idx);
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, name)
+                        .offers(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.take_error();
+  }
+
+  fidl::WireResult add_result =
+      fidl::WireCall(driver->node())->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!add_result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(add_result.status());
+  }
+
+  device->controller_.Bind(std::move(controller_endpoints->client));
+
+  return zx::ok(std::move(device));
 }
 
-zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
-  // Get Metadata
-  auto decoded =
-      ddk::GetEncodedMetadata<fuchsia_hardware_vreg::wire::Metadata>(parent, DEVICE_METADATA_VREG);
-  if (!decoded.is_ok()) {
-    return decoded.error_value();
+AmlPwmRegulatorDriver::AmlPwmRegulatorDriver(fdf::DriverStartArgs start_args,
+                                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+
+void AmlPwmRegulatorDriver::Start(fdf::StartCompleter completer) {
+  fidl::Arena arena;
+  auto decoded = compat::GetMetadata<fuchsia_hardware_vreg::wire::Metadata>(
+      incoming(), arena, DEVICE_METADATA_VREG, "pdev");
+  if (decoded.is_error()) {
+    FDF_LOG(ERROR, "Failed to get vreg metadata: %s", decoded.status_string());
+    completer(decoded.take_error());
+    return;
   }
 
   const auto& metadata = *decoded.value();
 
   // Validate
   if (!metadata.has_pwm_vreg()) {
-    zxlogf(ERROR, "Metadata incomplete");
-    return ZX_ERR_INTERNAL;
+    FDF_LOG(ERROR, "Metadata incomplete");
+    completer(zx::error(ZX_ERR_INTERNAL));
+    return;
   }
   for (const auto& pwm_vreg : metadata.pwm_vreg()) {
     if (!pwm_vreg.has_pwm_index() || !pwm_vreg.has_period_ns() || !pwm_vreg.has_min_voltage_uv() ||
         !pwm_vreg.has_voltage_step_uv() || !pwm_vreg.has_num_steps()) {
-      zxlogf(ERROR, "Metadata incomplete");
-      return ZX_ERR_INTERNAL;
+      FDF_LOG(ERROR, "Metadata incomplete");
+      completer(zx::error(ZX_ERR_INTERNAL));
+      return;
     }
   }
-
   // Build Voltage Regulators
   for (const auto& pwm_vreg : metadata.pwm_vreg()) {
-    uint32_t idx = pwm_vreg.pwm_index();
-    char name[20];
-    snprintf(name, sizeof(name), "pwm-%u", idx);
-
-    zx::result client_end =
-        DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, name);
-    if (client_end.is_error()) {
-      zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s", client_end.status_string());
-      return client_end.status_value();
+    auto regulator = AmlPwmRegulator::Create(pwm_vreg, this);
+    if (regulator.is_error()) {
+      completer(regulator.take_error());
+      return;
     }
-
-    fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client(std::move(client_end.value()));
-
-    auto result = pwm_proto_client->Enable();
-    if (!result.ok()) {
-      zxlogf(ERROR, "Unable to enable PWM %u, %s", idx, result.status_string());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "Unable to enable PWM %u, %s", idx,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-    fbl::AllocChecker ac;
-    std::unique_ptr<AmlPwmRegulator> device(
-        new (&ac) AmlPwmRegulator(parent, pwm_vreg, std::move(pwm_proto_client)));
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    snprintf(name, sizeof(name), "pwm-%u-regulator", idx);
-    zx_device_prop_t props[] = {
-        {BIND_PWM_ID, 0, idx},
-    };
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-
-    std::array offers = {
-        fuchsia_hardware_vreg::Service::Name,
-    };
-
-    device->outgoing_server_end_ = std::move(endpoints->server);
-
-    zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs(name)
-                                            .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                                            .set_props(props)
-                                            .set_fidl_service_offers(offers)
-                                            .set_outgoing_dir(endpoints->client.TakeChannel()));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "DdkAdd failed, status = %d", status);
-    }
-
-    // Let device runner take ownership of this object.
-    [[maybe_unused]] auto* dummy = device.release();
+    regulators_.push_back(std::move(*regulator));
   }
-
-  return ZX_OK;
+  completer(zx::ok());
 }
-
-static constexpr zx_driver_ops_t pwm_regulator_driver_ops = []() {
-  zx_driver_ops_t driver_ops = {};
-  driver_ops.version = DRIVER_OPS_VERSION;
-  driver_ops.bind = AmlPwmRegulator::Create;
-  return driver_ops;
-}();
 
 }  // namespace aml_pwm_regulator
 
-ZIRCON_DRIVER(aml_pwm_regulator, aml_pwm_regulator::pwm_regulator_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(aml_pwm_regulator::AmlPwmRegulatorDriver);
