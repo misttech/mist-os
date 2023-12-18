@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, Anon, FileHandle, FileObject, FileOps, FsNodeInfo, VmoFileObject,
+        fileops_impl_seekable, Anon, FileHandle, FileObject, FileOps, FsNodeInfo, VmoFileOperation,
     },
 };
 use fidl_fuchsia_ui_composition as fuicomp;
@@ -78,7 +78,7 @@ impl FileOps for ImageFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read(&self.vmo, file, offset, data)
+        VmoFileOperation::read(&self.vmo, file, offset, data)
     }
 
     fn write(
@@ -88,7 +88,7 @@ impl FileOps for ImageFile {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write(&self.vmo, file, current_task, offset, data)
+        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
     }
 
     fn get_vmo(
@@ -98,6 +98,6 @@ impl FileOps for ImageFile {
         _length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
+        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
     }
 }

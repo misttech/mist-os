@@ -16,6 +16,7 @@ pub use common::*;
 pub use features::*;
 pub use registry::*;
 
+pub mod ashmem;
 pub mod framebuffer;
 pub mod gralloc;
 pub mod input;

@@ -178,16 +178,9 @@ impl FsNodeOps for VmoFileNode {
     }
 }
 
-pub struct VmoFileObject {
-    pub vmo: Arc<zx::Vmo>,
-}
+pub struct VmoFileOperation {}
 
-impl VmoFileObject {
-    /// Create a file object based on a VMO.
-    pub fn new(vmo: Arc<zx::Vmo>) -> Self {
-        VmoFileObject { vmo }
-    }
-
+impl VmoFileOperation {
     pub fn read(
         vmo: &zx::Vmo,
         file: &FileObject,
@@ -308,6 +301,17 @@ impl VmoFileObject {
     }
 }
 
+pub struct VmoFileObject {
+    pub vmo: Arc<zx::Vmo>,
+}
+
+impl VmoFileObject {
+    /// Create a file object based on a VMO.
+    pub fn new(vmo: Arc<zx::Vmo>) -> Self {
+        VmoFileObject { vmo }
+    }
+}
+
 impl FileOps for VmoFileObject {
     fileops_impl_seekable!();
 
@@ -318,7 +322,7 @@ impl FileOps for VmoFileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read(&self.vmo, file, offset, data)
+        VmoFileOperation::read(&self.vmo, file, offset, data)
     }
 
     fn write(
@@ -328,7 +332,7 @@ impl FileOps for VmoFileObject {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write(&self.vmo, file, current_task, offset, data)
+        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
     }
 
     fn get_vmo(
@@ -338,7 +342,7 @@ impl FileOps for VmoFileObject {
         _length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
+        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
     }
 }
 

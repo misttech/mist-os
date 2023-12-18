@@ -121,6 +121,7 @@ rustc_library("starnix_core") {
     "arch/${current_cpu}/task.rs",
     "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
+    "device/ashmem.rs",
     "device/binder.rs",
     "device/common.rs",
     "device/features.rs",

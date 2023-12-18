@@ -94,6 +94,7 @@ test("syscalls_cpp_test_bin") {
   exclude_toolchain_tags = [ "asan" ]
   sources = [
     "abort_test.cc",
+    "ashmem_test.cc",
     "bpf_test.cc",
     "custom_artifact_test.cc",
     "epoll_test.cc",

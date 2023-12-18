@@ -4,8 +4,9 @@
 
 use crate::{
     device::{
-        framebuffer::fb_device_init, gralloc::gralloc_device_init, input::init_input_devices,
-        magma::magma_device_init, perfetto_consumer::start_perfetto_consumer_thread,
+        ashmem::ashmem_device_init, framebuffer::fb_device_init, gralloc::gralloc_device_init,
+        input::init_input_devices, magma::magma_device_init,
+        perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel},
 };
@@ -28,6 +29,8 @@ use fidl_fuchsia_ui_views as fuiviews;
 pub struct Features {
     /// Configures whether SELinux is fully enabled, faked, or unavailable.
     pub selinux: Option<security_server::Mode>,
+
+    pub ashmem: bool,
 
     pub framebuffer: bool,
 
@@ -81,6 +84,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 ))
             }
             ("custom_artifacts", _) => features.custom_artifacts = true,
+            ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
@@ -145,6 +149,9 @@ pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
             fuchsia_inspect_contrib::ProfileDuration::lazy_node_callback,
         );
         fuchsia_inspect_contrib::start_self_profiling();
+    }
+    if kernel.features.ashmem {
+        ashmem_device_init(system_task);
     }
     if !enabled_profiling {
         fuchsia_inspect_contrib::stop_self_profiling();
