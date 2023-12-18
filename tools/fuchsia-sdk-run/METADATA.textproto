@@ -4,13 +4,13 @@
 
 last_reviewed_date: {
   year: 2023
-  month: 9
-  day: 22
+  month: 12
+  day: 18
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Tools>ffx"
+    # Buganizer component id for `ffx` public component.
+  issue_tracker: {
+    component_id: 1378294
   }
 }
