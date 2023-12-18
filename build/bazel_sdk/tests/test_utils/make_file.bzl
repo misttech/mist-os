@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""file-making utilities."""
+
 def _make_file_impl(ctx):
     f = ctx.actions.declare_file(ctx.attr.filename)
     ctx.actions.write(f, ctx.attr.content)

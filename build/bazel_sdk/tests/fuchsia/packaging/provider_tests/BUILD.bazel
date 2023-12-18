@@ -2,9 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(":fuchsia_component_test.bzl", "fuchsia_component_test_suite")
 load(":fuchsia_package_resource_test.bzl", "fuchsia_package_resource_test_suite")
 load(":fuchsia_package_test.bzl", "fuchsia_package_test_suite")
-load(":fuchsia_component_test.bzl", "fuchsia_component_test_suite")
 
 test_suite(
     name = "tests",

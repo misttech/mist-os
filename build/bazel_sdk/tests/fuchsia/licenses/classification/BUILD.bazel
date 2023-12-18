@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load(
     "@fuchsia_sdk//fuchsia:licenses.bzl",
     "fuchsia_licenses_classification",
 )
-load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 
 fuchsia_licenses_classification(
     name = "actual_classification.json",

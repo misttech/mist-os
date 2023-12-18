@@ -4,9 +4,9 @@
 
 """ A test which verifies that driver binaries are built correctly. """
 
-load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
-load("@fuchsia_sdk//fuchsia/private:fuchsia_transition.bzl", "fuchsia_transition")
 load("@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl", "strip_resources")
+load("@fuchsia_sdk//fuchsia/private:fuchsia_transition.bzl", "fuchsia_transition")
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
 
 def _driver_binary_test_impl(ctx):
     # We normally strip the binary when we do our packaging but we don't need to

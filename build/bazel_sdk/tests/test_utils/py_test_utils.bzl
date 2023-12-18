@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Python test utilities."""
+
 # Tests that invoke a python binary to run their test must depend on these deps
 # to ensure that the interpreter and all dependent files are available during
 # test execution

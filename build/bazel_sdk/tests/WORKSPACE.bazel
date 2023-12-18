@@ -52,11 +52,11 @@ fuchsia_build_config_repository(
     fuchsia_source_dir = "../../..",
 )
 
+load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
     "@fuchsia_sdk//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
-load("@fuchsia_build_config//:defs.bzl", "build_config")
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",

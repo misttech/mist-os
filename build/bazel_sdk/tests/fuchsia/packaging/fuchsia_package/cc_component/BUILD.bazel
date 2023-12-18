@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("//test_utils:make_file.bzl", "make_file")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_binary", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
+load("//test_utils:make_file.bzl", "make_file")
 
 fuchsia_package(
     name = "pkg",

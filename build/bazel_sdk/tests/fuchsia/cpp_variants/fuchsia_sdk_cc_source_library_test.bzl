@@ -64,6 +64,7 @@ cc_std_version_transition = transition(
     ],
 )
 
+# buildifier: disable=function-docstring
 def fuchsia_sdk_cc_source_library_test(name, cc_version, copts = [], ignored_deps = [], **kwargs):
     driver_binary_name = name + "_variant_test"
     driver_src_name = driver_binary_name + ".cc"
@@ -99,7 +100,7 @@ def fuchsia_sdk_cc_source_library_test(name, cc_version, copts = [], ignored_dep
 
 def _gen_cpp_variants_test_driver_impl(ctx):
     includes_str = ""
-    for dep, includes in ctx.attr.allowed_deps.items():
+    for _, includes in ctx.attr.allowed_deps.items():
         for include in includes:
             includes_str += '#include "%s"\n' % include
 

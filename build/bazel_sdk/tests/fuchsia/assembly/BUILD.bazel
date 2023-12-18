@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
-load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
-load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "PARTITION_TYPE",
@@ -22,6 +19,9 @@ load(
     "tuf_repo",
     "tuf_repo_root",
 )
+load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
+load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
+load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
 
 fuchsia_prebuilt_package(
     name = "prebuilt_ams_light",
