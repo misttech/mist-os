@@ -56,6 +56,14 @@ executable("magma_system_dfv2_test_executable") {
 executable("magma_sys_driver_test_executable") {
   testonly = true
   output_name = "magma_sys_driver_test"
+
+  metadata = {
+    test_component_manifest_cml = [
+      {
+        include = [ "//sdk/lib/syslog/use.shard.cml" ]
+      },
+    ]
+  }
   deps = [
     ":magma_system_tests",
     "//src/lib/fxl/test:gtest_main",
@@ -65,6 +73,7 @@ executable("magma_sys_driver_test_executable") {
 
 fuchsia_unittest_package("magma_sys_driver_test") {
   deps = [ ":magma_sys_driver_test_executable" ]
+
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
