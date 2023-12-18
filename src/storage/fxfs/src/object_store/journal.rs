@@ -32,7 +32,7 @@ use {
         lsm_tree::cache::NullCache,
         object_handle::{ObjectHandle as _, ReadObjectHandle},
         object_store::{
-            allocator::{Allocator, SimpleAllocator},
+            allocator::Allocator,
             extent_record::{Checksums, ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID},
             graveyard::Graveyard,
             journal::{
@@ -533,7 +533,7 @@ impl Journal {
     pub async fn replay(
         &self,
         filesystem: Arc<FxFilesystem>,
-        on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
+        on_new_allocator: Option<Box<dyn Fn(Arc<Allocator>) + Send + Sync>>,
     ) -> Result<(), Error> {
         let block_size = filesystem.block_size();
 
@@ -544,7 +544,7 @@ impl Journal {
 
         self.objects.set_root_parent_store(root_parent.clone());
         let allocator =
-            Arc::new(SimpleAllocator::new(filesystem.clone(), super_block.allocator_object_id));
+            Arc::new(Allocator::new(filesystem.clone(), super_block.allocator_object_id));
         if let Some(on_new_allocator) = on_new_allocator {
             on_new_allocator(allocator.clone());
         }
@@ -961,8 +961,7 @@ impl Journal {
         );
         self.objects.set_root_parent_store(root_parent.clone());
 
-        let allocator =
-            Arc::new(SimpleAllocator::new(filesystem.clone(), INIT_ALLOCATOR_OBJECT_ID));
+        let allocator = Arc::new(Allocator::new(filesystem.clone(), INIT_ALLOCATOR_OBJECT_ID));
         self.objects.set_allocator(allocator.clone());
         self.objects.init_metadata_reservation()?;
 

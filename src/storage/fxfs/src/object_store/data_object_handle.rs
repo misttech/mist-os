@@ -11,7 +11,6 @@ use {
             ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
         },
         object_store::{
-            allocator::Allocator,
             extent_record::{Checksums, ExtentKey, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
@@ -1293,7 +1292,6 @@ mod tests {
             fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
             object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle},
             object_store::{
-                allocator::Allocator,
                 directory::replace_child,
                 object_record::{ObjectKey, ObjectValue, Timestamp},
                 transaction::{lock_keys, Mutation, Options},

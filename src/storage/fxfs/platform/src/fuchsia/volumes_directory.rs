@@ -29,7 +29,6 @@ use {
         log::*,
         metrics,
         object_store::{
-            allocator::Allocator,
             transaction::{lock_keys, LockKey, Options},
             volume::RootVolume,
             Directory, ObjectDescriptor, ObjectStore,
@@ -631,7 +630,7 @@ mod tests {
         futures::join,
         fxfs::{
             errors::FxfsError, filesystem::FxFilesystem, fsck::fsck,
-            object_store::allocator::SimpleAllocator, object_store::volume::root_volume,
+            object_store::allocator::Allocator, object_store::volume::root_volume,
         },
         fxfs_crypto::Crypt,
         fxfs_insecure_crypto::InsecureCrypt,
@@ -1319,14 +1318,14 @@ mod tests {
 
             volume_proxy.set_limit(BYTES_LIMIT_1).await.unwrap().expect("To set limits");
             {
-                let limits = (filesystem.allocator() as Arc<SimpleAllocator>).owner_byte_limits();
+                let limits = (filesystem.allocator() as Arc<Allocator>).owner_byte_limits();
                 assert_eq!(limits.len(), 1);
                 assert_eq!(limits[0].1, BYTES_LIMIT_1);
             }
 
             volume_proxy.set_limit(BYTES_LIMIT_2).await.unwrap().expect("To set limits");
             {
-                let limits = (filesystem.allocator() as Arc<SimpleAllocator>).owner_byte_limits();
+                let limits = (filesystem.allocator() as Arc<Allocator>).owner_byte_limits();
                 assert_eq!(limits.len(), 1);
                 assert_eq!(limits[0].1, BYTES_LIMIT_2);
             }
@@ -1349,13 +1348,13 @@ mod tests {
             .await
             .unwrap();
             {
-                let limits = (filesystem.allocator() as Arc<SimpleAllocator>).owner_byte_limits();
+                let limits = (filesystem.allocator() as Arc<Allocator>).owner_byte_limits();
                 assert_eq!(limits.len(), 1);
                 assert_eq!(limits[0].1, BYTES_LIMIT_2);
             }
             volumes_directory.remove_volume(VOLUME_NAME).await.expect("Volume deletion failed");
             {
-                let limits = (filesystem.allocator() as Arc<SimpleAllocator>).owner_byte_limits();
+                let limits = (filesystem.allocator() as Arc<Allocator>).owner_byte_limits();
                 assert_eq!(limits.len(), 0);
             }
             volumes_directory.terminate().await;
@@ -1367,7 +1366,7 @@ mod tests {
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
         fsck(filesystem.clone()).await.expect("Fsck");
-        let limits = (filesystem.allocator() as Arc<SimpleAllocator>).owner_byte_limits();
+        let limits = (filesystem.allocator() as Arc<Allocator>).owner_byte_limits();
         assert_eq!(limits.len(), 0);
     }
 

@@ -10,7 +10,7 @@ use {
         metrics,
         object_handle::INVALID_OBJECT_ID,
         object_store::{
-            allocator::{Allocator, Reservation, SimpleAllocator},
+            allocator::{Allocator, Reservation},
             directory::Directory,
             journal::{self, JournalCheckpoint},
             transaction::{
@@ -80,7 +80,7 @@ struct Inner {
     root_parent_store_object_id: u64,
     root_store_object_id: u64,
     allocator_object_id: u64,
-    allocator: Option<Arc<SimpleAllocator>>,
+    allocator: Option<Arc<Allocator>>,
 
     // Records dependencies on the journal for objects i.e. an entry for object ID 1, would mean it
     // has a dependency on journal records from that offset.
@@ -304,14 +304,14 @@ impl ObjectManager {
         inner.reservations.remove(&store_object_id);
     }
 
-    pub fn set_allocator(&self, allocator: Arc<SimpleAllocator>) {
+    pub fn set_allocator(&self, allocator: Arc<Allocator>) {
         let mut inner = self.inner.write().unwrap();
         assert!(!inner.stores.contains_key(&allocator.object_id()));
         inner.allocator_object_id = allocator.object_id();
         inner.allocator = Some(allocator.clone());
     }
 
-    pub fn allocator(&self) -> Arc<SimpleAllocator> {
+    pub fn allocator(&self) -> Arc<Allocator> {
         self.inner.read().unwrap().allocator.clone().unwrap()
     }
 

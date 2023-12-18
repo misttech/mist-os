@@ -652,7 +652,6 @@ mod tests {
             filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::ReadObjectHandle,
             object_store::{
-                allocator::Allocator,
                 journal::JournalCheckpoint,
                 transaction::{lock_keys, Options},
                 DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,

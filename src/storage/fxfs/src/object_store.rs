@@ -44,7 +44,7 @@ use {
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
-            allocator::SimpleAllocator,
+            allocator::Allocator,
             graveyard::Graveyard,
             journal::{JournalCheckpoint, JournaledTransaction},
             key_manager::KeyManager,
@@ -57,7 +57,6 @@ use {
         round::round_up,
         serialized_types::{Version, Versioned, VersionedLatest},
     },
-    allocator::Allocator,
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
     async_trait::async_trait,
@@ -1758,7 +1757,7 @@ impl ObjectStore {
             | last_object_id.cipher.as_ref().unwrap().encrypt(last_object_id.id as u32) as u64)
     }
 
-    fn allocator(&self) -> Arc<SimpleAllocator> {
+    fn allocator(&self) -> Arc<Allocator> {
         self.filesystem().allocator()
     }
 

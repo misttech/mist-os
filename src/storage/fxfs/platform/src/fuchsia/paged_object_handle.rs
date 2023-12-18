@@ -16,7 +16,7 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
-            allocator::{Allocator, Reservation, ReservationOwner, SimpleAllocator},
+            allocator::{Allocator, Reservation, ReservationOwner},
             transaction::{
                 lock_keys, AssocObj, LockKey, Mutation, Options, Transaction,
                 TRANSACTION_METADATA_MAX_AMOUNT,
@@ -187,11 +187,7 @@ impl Inner {
     }
 
     /// Takes all the dirty pages and returns a (<count of dirty pages>, <reservation>).
-    fn take(
-        &mut self,
-        allocator: Arc<SimpleAllocator>,
-        store_object_id: u64,
-    ) -> (u64, Reservation) {
+    fn take(&mut self, allocator: Arc<Allocator>, store_object_id: u64) -> (u64, Reservation) {
         let reservation = allocator.reserve_at_most(Some(store_object_id), 0);
         reservation.add(self.reservation());
         self.spare = 0;
@@ -291,7 +287,7 @@ impl PagedObjectHandle {
             .await
     }
 
-    fn allocator(&self) -> Arc<SimpleAllocator> {
+    fn allocator(&self) -> Arc<Allocator> {
         self.store().filesystem().allocator()
     }
 

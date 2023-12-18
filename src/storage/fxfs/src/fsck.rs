@@ -15,7 +15,7 @@ use {
         },
         object_handle::INVALID_OBJECT_ID,
         object_store::{
-            allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
+            allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
             load_store_info,
             transaction::{lock_keys, LockKey},

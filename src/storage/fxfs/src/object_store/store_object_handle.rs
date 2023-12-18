@@ -10,7 +10,6 @@ use {
         lsm_tree::types::{Item, ItemRef, LayerIterator},
         object_handle::ObjectHandle,
         object_store::{
-            allocator::Allocator,
             extent_record::{Checksums, ExtentKey, ExtentValue},
             object_manager::ObjectManager,
             object_record::{

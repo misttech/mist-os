@@ -7,7 +7,6 @@ use {
         errors::FxfsError,
         filesystem::FxFilesystem,
         object_store::{
-            allocator::Allocator,
             directory::Directory,
             load_store_info,
             transaction::{lock_keys, Options, Transaction},
@@ -198,7 +197,6 @@ mod tests {
             filesystem::{FxFilesystem, JournalingObject, SyncOptions},
             object_handle::{ObjectHandle, WriteObjectHandle},
             object_store::{
-                allocator::Allocator,
                 directory::Directory,
                 transaction::{lock_keys, Options},
                 LockKey,

@@ -10,7 +10,7 @@ use {
         log::*,
         metrics,
         object_store::{
-            allocator::{Allocator, Hold, Reservation, SimpleAllocator},
+            allocator::{Allocator, Hold, Reservation},
             directory::Directory,
             graveyard::Graveyard,
             journal::{
@@ -143,12 +143,13 @@ impl ApplyMode<'_, '_> {
     }
 }
 
+/// Objects that use journaling to track mutations (`Allocator` and `ObjectStore`) implement this.
+/// This is primarily used by `ObjectManager` and `SuperBlock` with flush calls used in a few tests.
 #[async_trait]
 pub trait JournalingObject: Send + Sync {
-    /// Objects that use the journaling system to track mutations should implement this trait.  This
-    /// method will get called when the transaction commits, which can either be during live
-    /// operation or during journal replay, in which case transaction will be None.  Also see
-    /// ObjectManager's apply_mutation method.
+    /// This method get called when the transaction commits, which can either be during live
+    /// operation (See `ObjectManager::apply_mutation`) or during journal replay, in which case
+    /// transaction will be None (See `super_block::read`).
     async fn apply_mutation(
         &self,
         mutation: Mutation,
@@ -225,7 +226,7 @@ pub struct FxFilesystemBuilder {
     trace: bool,
     options: Options,
     journal_options: JournalOptions,
-    on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
+    on_new_allocator: Option<Box<dyn Fn(Arc<Allocator>) + Send + Sync>>,
     on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
     fsck_after_every_transaction: bool,
 }
@@ -303,7 +304,7 @@ impl FxFilesystemBuilder {
     /// Sets a method to be called immediately after creating the allocator.
     pub fn on_new_allocator(
         mut self,
-        on_new_allocator: impl Fn(Arc<SimpleAllocator>) + Send + Sync + 'static,
+        on_new_allocator: impl Fn(Arc<Allocator>) + Send + Sync + 'static,
     ) -> Self {
         self.on_new_allocator = Some(Box::new(on_new_allocator));
         self
@@ -524,7 +525,7 @@ impl FxFilesystem {
         self.objects.root_store()
     }
 
-    pub fn allocator(&self) -> Arc<SimpleAllocator> {
+    pub fn allocator(&self) -> Arc<Allocator> {
         self.objects.allocator()
     }
 

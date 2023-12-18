@@ -142,93 +142,6 @@ use {
     },
 };
 
-/// Allocators must implement this.  An allocator is responsible for allocating ranges on behalf of
-/// an object-store. Methods often require an owner_object_id parameter, which represents the object
-/// under the root object store the data should be accounted for.
-#[async_trait]
-pub trait Allocator: ReservationOwner {
-    /// Returns the object ID for the allocator.
-    fn object_id(&self) -> u64;
-
-    /// Returns information about the allocator.
-    // Aside: This breaks encapsulation, but we probably won't have more than one allocator, so it
-    // seems OK.
-    fn info(&self) -> AllocatorInfo;
-
-    /// Tries to allocate enough space for |object_range| in the specified object and returns the
-    /// device range allocated.
-    /// The allocated range may be short (e.g. due to fragmentation), in which case the caller can
-    /// simply call allocate again until they have enough blocks.
-    ///
-    /// We also store the object store ID of the store that the allocation should be assigned to so
-    /// that we have a means to delete encrypted stores without needing the encryption key.
-    async fn allocate(
-        &self,
-        transaction: &mut Transaction<'_>,
-        owner_object_id: u64,
-        len: u64,
-    ) -> Result<Range<u64>, Error>;
-
-    /// Deallocates the given device range for the specified object.
-    async fn deallocate(
-        &self,
-        transaction: &mut Transaction<'_>,
-        owner_object_id: u64,
-        device_range: Range<u64>,
-    ) -> Result<u64, Error>;
-
-    /// Marks the given device range as allocated.  The main use case for this at this time is for
-    /// the super-block which needs to be at a fixed location on the device.
-    async fn mark_allocated(
-        &self,
-        transaction: &mut Transaction<'_>,
-        owner_object_id: u64,
-        device_range: Range<u64>,
-    ) -> Result<(), Error>;
-
-    /// Sets the limits for an owner object in terms of usage.
-    async fn set_bytes_limit(
-        &self,
-        transaction: &mut Transaction<'_>,
-        owner_object_id: u64,
-        bytes: u64,
-    ) -> Result<(), Error>;
-
-    /// Gets the bytes limit for an owner object.
-    async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64>;
-
-    /// Marks allocations associated with a given |owner_object_id| for deletion.
-    /// Does not necessarily perform the deletion straight away but if this is the case,
-    /// implementation should be invisible to the caller.
-    async fn mark_for_deletion(&self, transaction: &mut Transaction<'_>, owner_object_id: u64);
-
-    /// Called when the device has been flush and indicates what the journal log offset was when
-    /// that happened.
-    async fn did_flush_device(&self, flush_log_offset: u64);
-
-    /// Returns a reservation that can be used later, or None if there is insufficient space. The
-    /// |owner_object_id| indicates which object in the root object store the reservation is for.
-    fn reserve(self: Arc<Self>, owner_object_id: Option<u64>, amount: u64) -> Option<Reservation>;
-
-    /// Like reserve, but returns as much as available if not all of amount is available, which
-    /// could be zero bytes.
-    fn reserve_at_most(self: Arc<Self>, owner_object_id: Option<u64>, amount: u64) -> Reservation;
-
-    /// Returns the total number of allocated bytes.
-    fn get_allocated_bytes(&self) -> u64;
-
-    /// Returns the size of bytes available to allocate.
-    fn get_disk_bytes(&self) -> u64;
-
-    /// Returns the total number of allocated bytes per owner_object_id.
-    /// Note that this is quite an expensive operation as it copies the collection.
-    /// This is intended for use in fsck() and friends, not general use code.
-    fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64>;
-
-    /// Returns the number of allocated and reserved bytes.
-    fn get_used_bytes(&self) -> u64;
-}
-
 /// This trait is implemented by things that own reservations.
 pub trait ReservationOwner: Send + Sync {
     /// Report that bytes are being released from the reservation back to the the |ReservationOwner|
@@ -507,7 +420,7 @@ pub fn max_extent_size_for_block_size(block_size: u64) -> u64 {
 }
 
 #[derive(Default)]
-struct SimpleAllocatorCounters {
+struct AllocatorCounters {
     num_flushes: u64,
     last_flush_time: Option<std::time::SystemTime>,
     persistent_layer_file_sizes: Vec<u64>,
@@ -515,7 +428,7 @@ struct SimpleAllocatorCounters {
 
 // For now this just implements a simple strategy of returning the first gap it can find (no matter
 // the size).  This is a very naive implementation.
-pub struct SimpleAllocator {
+pub struct Allocator {
     filesystem: Weak<FxFilesystem>,
     block_size: u64,
     device_size: u64,
@@ -531,7 +444,7 @@ pub struct SimpleAllocator {
     temporary_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
-    counters: Mutex<SimpleAllocatorCounters>,
+    counters: Mutex<AllocatorCounters>,
     maximum_offset: AtomicU64,
 }
 
@@ -587,34 +500,34 @@ struct CommittedDeallocation {
 
 struct Inner {
     info: AllocatorInfo,
-    // The allocator can only be opened if there have been no allocations and it has not already
-    // been opened or initialized.
+    /// The allocator can only be opened if there have been no allocations and it has not already
+    /// been opened or initialized.
     opened: bool,
-    // When a transaction is dropped, we need to release the reservation, but that requires the use
-    // of async methods which we can't use when called from drop.  To workaround that, we keep an
-    // array of dropped_allocations and remove them from temporary_allocations the next time we
-    // try to allocate.
+    /// When a transaction is dropped, we need to release the reservation, but that requires the use
+    /// of async methods which we can't use when called from drop.  To workaround that, we keep an
+    /// array of dropped_allocations and remove them from temporary_allocations the next time we
+    /// try to allocate.
     dropped_allocations: Vec<AllocatorItem>,
-    // The per-owner counters for bytes at various stages of the data life-cycle. From initial
-    // reservation through until the bytes are unallocated and eventually uncommitted.
+    /// The per-owner counters for bytes at various stages of the data life-cycle. From initial
+    /// reservation through until the bytes are unallocated and eventually uncommitted.
     owner_bytes: BTreeMap<u64, ByteTracking>,
-    // This value is the number of bytes allocated to reservations but not tracked as part of a
-    // particular volume.
+    /// This value is the number of bytes allocated to reservations but not tracked as part of a
+    /// particular volume.
     unattributed_reserved_bytes: u64,
-    // Committed deallocations that we cannot use until they are flushed to the device.
+    /// Committed deallocations that we cannot use until they are flushed to the device.
     committed_deallocated: VecDeque<CommittedDeallocation>,
-    // A map of of |owner_object_id| to log offset and bytes allocated which indicates the object
-    // was deleted at that log offset.
-    // Once the journal has been flushed beyond 'log_offset', we replace entries here with
-    // an entry in AllocatorInfo to have all iterators ignore owner_object_id. That entry is
-    // then cleaned up at next (major) compaction time.
+    /// A map of of |owner_object_id| to log offset and bytes allocated which indicates the object
+    /// was deleted at that log offset.
+    /// Once the journal has been flushed beyond 'log_offset', we replace entries here with
+    /// an entry in AllocatorInfo to have all iterators ignore owner_object_id. That entry is
+    /// then cleaned up at next (major) compaction time.
     committed_marked_for_deletion: BTreeMap<u64, (/*log_offset:*/ u64, /*bytes:*/ u64)>,
-    // Bytes which are currently being trimmed.  These can still be allocated from, but the
-    // allocation will block until the current batch of trimming is finished.
+    /// Bytes which are currently being trimmed.  These can still be allocated from, but the
+    /// allocation will block until the current batch of trimming is finished.
     trim_reserved_bytes: u64,
-    // While a trim is being performed, this listener is set.  When the current batch of extents
-    // being trimmed have been released (and trim_reserved_bytes is 0), this is signaled.
-    // This should only be listened to while the allocation_mutex is held.
+    /// While a trim is being performed, this listener is set.  When the current batch of extents
+    /// being trimmed have been released (and trim_reserved_bytes is 0), this is signaled.
+    /// This should only be listened to while the allocation_mutex is held.
     trim_listener: Option<EventListener>,
 }
 
@@ -717,7 +630,7 @@ impl Inner {
 /// A container for a set of extents which are known to be free and can be trimmed.  Returned by
 /// `take_for_trimming`.  The extents will not be allocated while this object exists.
 pub struct TrimmableExtents<'a> {
-    allocator: &'a SimpleAllocator,
+    allocator: &'a Allocator,
     extents: Vec<Range<u64>>,
     // The allocator can subscribe to this event to wait until these extents are dropped.  This way,
     // we don't fail an allocation attempt if blocks are tied up for trimming; rather, we just wait
@@ -738,7 +651,7 @@ impl<'a> TrimmableExtents<'a> {
     }
 
     // Also returns an EventListener which is signaled when this is dropped.
-    fn new(allocator: &'a SimpleAllocator) -> (Self, EventListener) {
+    fn new(allocator: &'a Allocator) -> (Self, EventListener) {
         let drop_event = DropEvent::new();
         let listener = drop_event.listen();
         (Self { allocator, extents: vec![], _drop_event: drop_event }, listener)
@@ -767,10 +680,10 @@ impl<'a> Drop for TrimmableExtents<'a> {
     }
 }
 
-impl SimpleAllocator {
-    pub fn new(filesystem: Arc<FxFilesystem>, object_id: u64) -> SimpleAllocator {
+impl Allocator {
+    pub fn new(filesystem: Arc<FxFilesystem>, object_id: u64) -> Allocator {
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
-        SimpleAllocator {
+        Allocator {
             filesystem: Arc::downgrade(&filesystem),
             block_size: filesystem.block_size(),
             device_size: filesystem.device().size(),
@@ -790,7 +703,7 @@ impl SimpleAllocator {
                 trim_listener: None,
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
-            counters: Mutex::new(SimpleAllocatorCounters::default()),
+            counters: Mutex::new(AllocatorCounters::default()),
             maximum_offset: AtomicU64::new(0),
         }
     }
@@ -1137,7 +1050,7 @@ impl SimpleAllocator {
     }
 }
 
-impl Drop for SimpleAllocator {
+impl Drop for Allocator {
     fn drop(&mut self) {
         let inner = self.inner.lock().unwrap();
         // Uncommitted and reserved should be released back using RAII, so they should be zero.
@@ -1147,17 +1060,26 @@ impl Drop for SimpleAllocator {
 }
 
 #[fxfs_trace::trace]
-#[async_trait]
-impl Allocator for SimpleAllocator {
-    fn object_id(&self) -> u64 {
+impl Allocator {
+    /// Returns the object ID for the allocator.
+    pub fn object_id(&self) -> u64 {
         self.object_id
     }
 
-    fn info(&self) -> AllocatorInfo {
+    /// Returns information about the allocator such as the layer files storing persisted
+    /// allocations.
+    pub fn info(&self) -> AllocatorInfo {
         self.inner.lock().unwrap().info.clone()
     }
 
-    async fn allocate(
+    /// Tries to allocate enough space for |object_range| in the specified object and returns the
+    /// device range allocated.
+    /// The allocated range may be short (e.g. due to fragmentation), in which case the caller can
+    /// simply call allocate again until they have enough blocks.
+    ///
+    /// We also store the object store ID of the store that the allocation should be assigned to so
+    /// that we have a means to delete encrypted stores without needing the encryption key.
+    pub async fn allocate(
         &self,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
@@ -1320,7 +1242,9 @@ impl Allocator for SimpleAllocator {
         Ok(result)
     }
 
-    async fn mark_allocated(
+    /// Marks the given device range as allocated.  The main use case for this at this time is for
+    /// the super-block which needs to be at a fixed location on the device.
+    pub async fn mark_allocated(
         &self,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
@@ -1357,7 +1281,8 @@ impl Allocator for SimpleAllocator {
         Ok(())
     }
 
-    async fn set_bytes_limit(
+    /// Sets the limits for an owner object in terms of usage.
+    pub async fn set_bytes_limit(
         &self,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
@@ -1372,12 +1297,14 @@ impl Allocator for SimpleAllocator {
         Ok(())
     }
 
-    async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64> {
+    /// Gets the bytes limit for an owner object.
+    pub async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64> {
         self.inner.lock().unwrap().info.limit_bytes.get(&owner_object_id).copied()
     }
 
+    /// Deallocates the given device range for the specified object.
     #[trace]
-    async fn deallocate(
+    pub async fn deallocate(
         &self,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
@@ -1446,6 +1373,10 @@ impl Allocator for SimpleAllocator {
         Ok(deallocated)
     }
 
+    /// Marks allocations associated with a given |owner_object_id| for deletion.
+    ///
+    /// Note that the deletion does not necessarily occur straight away.
+    ///
     /// This is used as part of deleting encrypted volumes (ObjectStore) without having the keys.
     ///
     /// MarkForDeletion mutations eventually manipulates allocator metadata (AllocatorInfo) instead
@@ -1464,7 +1395,7 @@ impl Allocator for SimpleAllocator {
     ///
     /// After an allocator.flush() (i.e. a major compaction), we know that there is no data left
     /// in the layer files for this owner_object_id and we are able to clear `marked_for_deletion`.
-    async fn mark_for_deletion(&self, transaction: &mut Transaction<'_>, owner_object_id: u64) {
+    pub async fn mark_for_deletion(&self, transaction: &mut Transaction<'_>, owner_object_id: u64) {
         // Note that because the actual time of deletion (the next major compaction) is undefined,
         // |owner_object_id| should not be reused after this call.
         transaction.add(
@@ -1473,7 +1404,9 @@ impl Allocator for SimpleAllocator {
         );
     }
 
-    async fn did_flush_device(&self, flush_log_offset: u64) {
+    /// Called when the device has been flush and indicates what the journal log offset was when
+    /// that happened.
+    pub async fn did_flush_device(&self, flush_log_offset: u64) {
         // First take out the deallocations that we now know to be flushed.  The list is maintained
         // in order, so we can stop on the first entry that we find that should not be unreserved
         // yet.
@@ -1522,7 +1455,13 @@ impl Allocator for SimpleAllocator {
         }
     }
 
-    fn reserve(self: Arc<Self>, owner_object_id: Option<u64>, amount: u64) -> Option<Reservation> {
+    /// Returns a reservation that can be used later, or None if there is insufficient space. The
+    /// |owner_object_id| indicates which object in the root object store the reservation is for.
+    pub fn reserve(
+        self: Arc<Self>,
+        owner_object_id: Option<u64>,
+        amount: u64,
+    ) -> Option<Reservation> {
         {
             let mut inner = self.inner.lock().unwrap();
 
@@ -1541,7 +1480,9 @@ impl Allocator for SimpleAllocator {
         Some(Reservation::new(self, owner_object_id, amount))
     }
 
-    fn reserve_at_most(
+    /// Like reserve, but returns as much as available if not all of amount is available, which
+    /// could be zero bytes.
+    pub fn reserve_at_most(
         self: Arc<Self>,
         owner_object_id: Option<u64>,
         mut amount: u64,
@@ -1561,15 +1502,20 @@ impl Allocator for SimpleAllocator {
         Reservation::new(self, owner_object_id, amount)
     }
 
-    fn get_allocated_bytes(&self) -> u64 {
+    /// Returns the total number of allocated bytes.
+    pub fn get_allocated_bytes(&self) -> u64 {
         self.inner.lock().unwrap().allocated_bytes() as u64
     }
 
-    fn get_disk_bytes(&self) -> u64 {
+    /// Returns the size of bytes available to allocate.
+    pub fn get_disk_bytes(&self) -> u64 {
         self.device_size
     }
 
-    fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64> {
+    /// Returns the total number of allocated bytes per owner_object_id.
+    /// Note that this is quite an expensive operation as it copies the collection.
+    /// This is intended for use in fsck() and friends, not general use code.
+    pub fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64> {
         self.inner
             .lock()
             .unwrap()
@@ -1579,20 +1525,21 @@ impl Allocator for SimpleAllocator {
             .collect()
     }
 
-    fn get_used_bytes(&self) -> u64 {
+    /// Returns the number of allocated and reserved bytes.
+    pub fn get_used_bytes(&self) -> u64 {
         let inner = self.inner.lock().unwrap();
         inner.used_bytes()
     }
 }
 
-impl ReservationOwner for SimpleAllocator {
+impl ReservationOwner for Allocator {
     fn release_reservation(&self, owner_object_id: Option<u64>, amount: u64) {
         self.inner.lock().unwrap().remove_reservation(owner_object_id, amount);
     }
 }
 
 #[async_trait]
-impl JournalingObject for SimpleAllocator {
+impl JournalingObject for Allocator {
     async fn apply_mutation(
         &self,
         mutation: Mutation,
@@ -1982,7 +1929,6 @@ mod tests {
             object_store::{
                 allocator::{
                     merge::merge, Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
-                    SimpleAllocator,
                 },
                 transaction::{lock_keys, Options},
             },
@@ -2119,7 +2065,7 @@ mod tests {
         }
     }
 
-    async fn collect_allocations(allocator: &SimpleAllocator) -> Vec<Range<u64>> {
+    async fn collect_allocations(allocator: &Allocator) -> Vec<Range<u64>> {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
@@ -2137,7 +2083,7 @@ mod tests {
         allocations
     }
 
-    async fn check_allocations(allocator: &SimpleAllocator, expected_allocations: &[Range<u64>]) {
+    async fn check_allocations(allocator: &Allocator, expected_allocations: &[Range<u64>]) {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
@@ -2163,7 +2109,7 @@ mod tests {
         assert_eq!(found, expected_allocations.iter().map(|r| r.length().unwrap()).sum::<u64>());
     }
 
-    async fn test_fs() -> (OpenFxFilesystem, Arc<SimpleAllocator>) {
+    async fn test_fs() -> (OpenFxFilesystem, Arc<Allocator>) {
         let device = DeviceHolder::new(FakeDevice::new(4096, 4096));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let allocator = fs.allocator();

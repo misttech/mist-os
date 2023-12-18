@@ -15,7 +15,7 @@ use {
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
-            allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
+            allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
             transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
