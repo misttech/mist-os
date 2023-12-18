@@ -17,6 +17,9 @@ board_configuration("riscv64") {
 
     # TODO: b/299320231 - Remove when ring is supported on riscv64.
     "fuchsia::soft_crypto",
+
+    # See: b/308199171
+    "fuchsia::utc_start_at_startup",
   ]
 
   input_bundles = [

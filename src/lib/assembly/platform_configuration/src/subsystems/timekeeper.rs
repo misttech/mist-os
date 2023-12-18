@@ -4,7 +4,6 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::platform_config::BuildType;
 
 pub(crate) struct TimekeeperSubsystem;
 impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
@@ -18,24 +17,19 @@ impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
             .component("meta/timekeeper.cm")
             .context("while finding the timekeeper component")?;
 
-        let has_rtc = context.board_info.provides_feature("fuchsia::rtc");
-
         // This is an experimental feature that we want to deploy with care.
-        let utc_start_at_startup = match (has_rtc, context.build_type) {
-            // Don't change the behavior on any user builds, so that this change
-            // remains invisible to end users.
-            //
-            // Don't change on any builds that have the RTC feature, as having the RTC
-            // will take care of UTC clock startup.
-            (false, BuildType::User) | (false, BuildType::UserDebug) | (true, _) => false,
+        // We originally wanted to deploy on eng builds as well, but it proved
+        // to be confusing for debugging.
+        //
+        // See: b/308199171
+        let utc_start_at_startup =
+            context.board_info.provides_feature("fuchsia::utc_start_at_startup");
 
-            // Eng builds are OK to start UTC no matter the state of the network or
-            // the presence of RTC.  This will help us run some specific tests, and
-            // *may* become the overall default at some point in the future.
-            (false, BuildType::Eng) => true,
-        };
-
-        let has_soft_crypto = context.board_info.provides_feature("fuchsia::soft_crypto");
+        // Soft crypto boards don't yet have crypto support, so we exit timekeeper
+        // early instead of having it crash repeatedly.
+        //
+        // See: b/299320231
+        let early_exit = context.board_info.provides_feature("fuchsia::soft_crypto");
 
         config_builder
             .field("disable_delays", false)?
@@ -51,7 +45,7 @@ impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
             .field("monitor_uses_pull", false)?
             .field("back_off_time_between_pull_samples_sec", 300)?
             .field("utc_start_at_startup", utc_start_at_startup)?
-            .field("early_exit", has_soft_crypto)?;
+            .field("early_exit", early_exit)?;
 
         Ok(())
     }
