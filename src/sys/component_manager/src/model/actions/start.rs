@@ -292,17 +292,30 @@ fn get_config_field<'a>(
     })
 }
 
-// Make the structured configuration for a component. This will resolve any configuration
-// capabilities that the component has requested and use those values over the CVF file
-// provided by the resolver.
-async fn make_structured_config(
-    config: Option<ConfigFields>,
+/// Returns true if the decl uses configuration capabilities.
+fn has_config_capabilities(decl: &cm_rust::ComponentDecl) -> bool {
+    decl.uses.iter().find(|u| matches!(u, cm_rust::UseDecl::Config(_))).is_some()
+}
+
+/// Update the component's configuration fields.
+async fn update_component_config(
+    component: &Arc<ComponentInstance>,
+    config: ConfigFields,
+) -> Result<(), StartActionError> {
+    let mut resolved_state = component.lock_resolved_state().await.unwrap();
+    resolved_state.resolved_component.config = Some(config);
+    Ok(())
+}
+
+/// Update config fields with the values received through configuration
+/// capabilities.  This will perform routing on each of the configuration `use`
+/// decls to get the values. Updating the fields is fine because configuration
+/// capabilities take precedence over both the CVF value and "mutability: parent".
+async fn update_config_with_capabilities(
+    config: &mut ConfigFields,
     decl: &cm_rust::ComponentDecl,
     component: &Arc<ComponentInstance>,
-) -> Result<Option<fmem::Data>, StartActionError> {
-    let Some(mut config) = config else {
-        return Ok(None);
-    };
+) -> Result<(), StartActionError> {
     for field in config.fields.iter_mut() {
         let Some(use_config) = get_config_field(&field.key, decl) else {
             continue;
@@ -360,7 +373,14 @@ async fn make_structured_config(
         }
         field.value = cap.value;
     }
+    Ok(())
+}
 
+/// Encode the configuration into a VMO.
+async fn encode_config(
+    config: ConfigFields,
+    moniker: &Moniker,
+) -> Result<fmem::Data, StartActionError> {
     let (vmo, size) = (|| {
         let encoded = config.encode_as_fidl_struct();
         let size = encoded.len() as u64;
@@ -370,9 +390,9 @@ async fn make_structured_config(
     })()
     .map_err(|s| StartActionError::StructuredConfigError {
         err: StructuredConfigError::VmoCreateFailed(s),
-        moniker: component.moniker.clone(),
+        moniker: moniker.clone(),
     })?;
-    Ok(Some(fmem::Data::Buffer(fmem::Buffer { vmo, size })))
+    Ok(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
 }
 
 /// Returns a configured Runtime for a component and the start info (without actually starting
@@ -422,7 +442,17 @@ async fn make_execution_runtime(
         (None, None)
     };
 
-    let encoded_config = make_structured_config(config, decl, component).await?;
+    let encoded_config = match config {
+        Some(mut config) => {
+            if has_config_capabilities(decl) {
+                update_config_with_capabilities(&mut config, decl, component).await?;
+                update_component_config(component, config.clone()).await?;
+            }
+            Some(encode_config(config, &component.moniker).await?)
+        }
+        None => None,
+    };
+
     let runtime =
         ComponentRuntime::new(runtime_dir, start_reason, execution_controller_task, logger);
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
