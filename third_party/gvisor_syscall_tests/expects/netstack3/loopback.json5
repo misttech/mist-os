@@ -22,13 +22,6 @@
                 // SO_REUSEPORT for UDP sockets.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.NoReusePortFollowingReusePort/TCP",
 
-                // Netstack3 does not support dual-stack sockets.
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedLoopbackOnlyReservesV4/*",
-
                 // Netstack3 does not fully support TCP (yet).
                 "All/SocketInetLoopbackTest.TCP/*",
                 "All/SocketInetLoopbackTest.TCPInfoState/*",
@@ -106,6 +99,8 @@
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/TCP",
             ],
         },
         {
@@ -127,7 +122,6 @@
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
                 // SO_REUSEPORT for UDP sockets.
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
-                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Loopback_ConnectV4MappedLoopback",
 
                 // Cases fail on TCP.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrDoesNotReserveV4Any/*",
