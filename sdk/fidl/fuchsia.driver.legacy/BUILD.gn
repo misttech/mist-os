@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.legacy") {
-  sdk_category = "internal"
+  sdk_category = "partner"
 
   sources = [
     "legacy_types.fidl",
