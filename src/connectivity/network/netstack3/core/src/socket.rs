@@ -15,7 +15,7 @@ use core::{
 use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
-    ip::{Ip, IpAddress, Ipv4, Ipv6},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
     AddrAndZone, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 
@@ -82,6 +82,23 @@ pub(crate) enum MaybeDualStack<DS, NDS> {
     DualStack(DS),
     NotDualStack(NDS),
 }
+
+/// An error encountered while enabling or disabling dual-stack operation.
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
+pub enum SetDualStackEnabledError {
+    /// A socket can only have dual stack enabled or disabled while unbound.
+    SocketIsBound,
+    /// Similar to [`NotDualStackCapableError`]; the socket's protocol is not
+    /// dual stack capable.
+    NotCapable,
+}
+
+/// An error encountered when attempting to perform dual stack operations on
+/// socket with a non dual stack capable protocol.
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
+pub struct NotDualStackCapableError;
 
 /// Describes which direction(s) of the data path should be shut down.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]

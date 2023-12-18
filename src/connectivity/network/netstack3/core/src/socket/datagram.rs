@@ -4742,7 +4742,11 @@ pub(crate) fn get_ip_hop_limits<
     })
 }
 
-pub(crate) fn with_dual_stack_ip_options_mut<
+/// Calls the callback with mutable access to [`S::OtherStackIpOptions<I>`].
+///
+/// If the socket is bound, the callback is not called, and instead an
+/// `ExpectedUnboundError` is returned.
+pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     I: IpExt,
     SC: DatagramStateContext<I, C, S>,
     C: DatagramStateNonSyncContext<I, S>,
@@ -4753,15 +4757,22 @@ pub(crate) fn with_dual_stack_ip_options_mut<
     _ctx: &mut C,
     id: S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
-) -> R {
+) -> Result<R, ExpectedUnboundError> {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
-        let options = get_options_mut(sync_ctx, state, id);
-
-        cb(&mut options.other_stack)
+        let is_unbound = match state.get(id.get_key_index()).expect("socket not found") {
+            SocketState::Unbound(_) => true,
+            SocketState::Bound(_) => false,
+        };
+        if is_unbound {
+            let options = get_options_mut(sync_ctx, state, id);
+            Ok(cb(&mut options.other_stack))
+        } else {
+            Err(ExpectedUnboundError)
+        }
     })
 }
 
-pub(crate) fn with_dual_stack_ip_options<
+pub(crate) fn with_other_stack_ip_options<
     I: IpExt,
     SC: DatagramStateContext<I, C, S>,
     C: DatagramStateNonSyncContext<I, S>,

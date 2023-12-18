@@ -76,6 +76,15 @@ fixed-size portion of the socket's buffer.
 Note that like on other platforms, the value applied when setting these options
 is limited by system-defined minimums and maximums.
 
+### `IPV6_V6ONLY` on ICMPv6 sockets
+
+ICMP echo sockets do not support dual stack operations. As a result Netstack3
+has chosen to disallow setting the `IPV6_V6ONLY` (returning `ENOPROTOOPT`), and
+unconditionally return `true` when getting the value of `IPV6_V6ONLY` for IPv6
+ICMP sockets. This behavior diverges from Linux, which allows one to set the
+`IPV6_V6ONLY` option on IPv6 ICMP sockets, though doing so does not affect the
+socket's behavior in anyway.
+
 ### UDP Destination Port 0
 Like Linux, Netstack3 allows UDP sockets to connect to a remote address with
 port 0. Calling [`getpeername`] on such a socket results in `ENOTCONN`. However

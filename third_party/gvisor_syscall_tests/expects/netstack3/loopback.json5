@@ -24,7 +24,7 @@
 
                 // Netstack3 does not support dual-stack sockets.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedLoopbackOnlyReservesV4/*",
@@ -65,7 +65,7 @@
                 "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.PortReuseTwoSockets/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/TCP",
 
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
                 "All/DualStackAfMismatchTest.*/TCP",

@@ -18,8 +18,8 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
+        Ipv4Addr, Ipv6, Ipv6Addr,
     },
     MulticastAddr, SpecifiedAddr, Witness,
 };
@@ -64,8 +64,8 @@ use crate::{
             SocketsState as DatagramSocketsState,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
-        RemoveResult, SocketAddrType, SocketMapAddrSpec, SocketMapAddrStateSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec,
+        NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, SocketAddrType,
+        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -1525,11 +1525,6 @@ pub enum SendToError {
     RemoteUnexpectedlyNonMapped,
 }
 
-/// An error encountered while enabling or disabling dual-stack operation.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
-#[generic_over_ip()]
-pub struct NotDualStackCapableError;
-
 pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     fn create_udp(&mut self) -> SocketId<I>;
 
@@ -1555,7 +1550,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         ctx: &mut C,
         id: SocketId<I>,
         enabled: bool,
-    ) -> Result<(), NotDualStackCapableError>;
+    ) -> Result<(), SetDualStackEnabledError>;
 
     fn get_dual_stack_enabled(
         &mut self,
@@ -1689,8 +1684,8 @@ impl<
         ctx: &mut C,
         id: SocketId<I>,
         enabled: bool,
-    ) -> Result<(), NotDualStackCapableError> {
-        datagram::with_dual_stack_ip_options_mut(self, ctx, id, |other_stack| {
+    ) -> Result<(), SetDualStackEnabledError> {
+        datagram::with_other_stack_ip_options_mut_if_unbound(self, ctx, id, |other_stack| {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
             struct WrapOtherStack<'a, I: IpExt>(
@@ -1698,7 +1693,7 @@ impl<
             );
             I::map_ip(
                 (enabled, WrapOtherStack(other_stack)),
-                |(_enabled, _v4)| Err(NotDualStackCapableError),
+                |(_enabled, _v4)| Err(SetDualStackEnabledError::NotCapable),
                 |(enabled, WrapOtherStack(other_stack))| {
                     let DualStackSocketState { dual_stack_enabled } = other_stack;
                     *dual_stack_enabled = enabled;
@@ -1706,6 +1701,14 @@ impl<
                 },
             )
         })
+        .map_err(|ExpectedUnboundError| {
+            // NB: Match Linux and prefer to return `NotCapable` errors over
+            // `SocketIsBound` errors, for IPv4 sockets.
+            match I::VERSION {
+                IpVersion::V4 => SetDualStackEnabledError::NotCapable,
+                IpVersion::V6 => SetDualStackEnabledError::SocketIsBound,
+            }
+        })?
     }
 
     fn get_dual_stack_enabled(
@@ -1713,7 +1716,7 @@ impl<
         ctx: &mut C,
         id: SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError> {
-        datagram::with_dual_stack_ip_options(self, ctx, id, |other_stack| {
+        datagram::with_other_stack_ip_options(self, ctx, id, |other_stack| {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
             struct WrapOtherStack<'a, I: IpExt>(&'a I::OtherStackIpOptions<DualStackSocketState>);
@@ -2312,6 +2315,67 @@ pub fn get_udp_bound_device<I: Ip, C: crate::NonSyncContext>(
         },
     );
     device
+}
+
+/// Enable or disable dual stack operations on the given socket.
+///
+/// This is notionally the inverse of the `IPV6_V6ONLY` socket option.
+///
+/// # Errors
+///
+/// Returns an error if the socket does not support the `IPV6_V6ONLY` socket
+/// option (e.g. an IPv4 socket).
+///
+/// # Panics
+///
+/// Panics if `id` is not a valid `SocketId`.
+pub fn set_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+    enabled: bool,
+) -> Result<(), SetDualStackEnabledError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx, enabled)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx, enabled)), id)| {
+            SocketHandler::<Ipv4, _>::set_dual_stack_enabled(sync_ctx, ctx, id, enabled)
+        },
+        |(IpInvariant((sync_ctx, ctx, enabled)), id)| {
+            SocketHandler::<Ipv6, _>::set_dual_stack_enabled(sync_ctx, ctx, id, enabled)
+        },
+    )
+}
+
+/// Get the enabled state of dual stack operations on the given socket.
+///
+/// This is notionally the inverse of the `IPV6_V6ONLY` socket option.
+///
+/// # Errors
+///
+/// Returns an error if the socket does not support the `IPV6_V6ONLY` socket
+/// option (e.g. an IPv4 socket).
+///
+/// # Panics
+///
+/// Panics if `id` is not a valid `SocketId`.
+pub fn get_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+) -> Result<bool, NotDualStackCapableError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
+    let IpInvariant(enabled) = I::map_ip::<_, IpInvariant<Result<bool, NotDualStackCapableError>>>(
+        (IpInvariant((&mut sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::<Ipv4, _>::get_dual_stack_enabled(sync_ctx, ctx, id))
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::<Ipv6, _>::get_dual_stack_enabled(sync_ctx, ctx, id))
+        },
+    );
+    enabled
 }
 
 /// Sets the POSIX `SO_REUSEPORT` option for the specified socket.
@@ -7715,6 +7779,131 @@ mod tests {
             assert_matches!(
                 &non_sync_ctx.take_udp_received(socket)[..],
                 [packet] => assert_eq!(packet, HELLO)
+            );
+        }
+    }
+
+    enum OriginalSocketState {
+        Unbound,
+        Listener,
+        Connected,
+    }
+
+    impl OriginalSocketState {
+        fn create_socket<I: TestIpExt, SC: SocketHandler<I, C>, C>(
+            &self,
+            sync_ctx: &mut SC,
+            non_sync_ctx: &mut C,
+        ) -> SocketId<I> {
+            let socket = SocketHandler::<I, _>::create_udp(sync_ctx);
+            match self {
+                OriginalSocketState::Unbound => {}
+                OriginalSocketState::Listener => {
+                    SocketHandler::<I, _>::listen_udp(
+                        sync_ctx,
+                        non_sync_ctx,
+                        socket,
+                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                        Some(LOCAL_PORT),
+                    )
+                    .expect("listen should succeed");
+                }
+                OriginalSocketState::Connected => {
+                    SocketHandler::<I, _>::connect(
+                        sync_ctx,
+                        non_sync_ctx,
+                        socket,
+                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                        UdpRemotePort::Set(REMOTE_PORT),
+                    )
+                    .expect("connect should succeed");
+                }
+            }
+            socket
+        }
+    }
+
+    #[test_case(OriginalSocketState::Unbound; "unbound")]
+    #[test_case(OriginalSocketState::Listener; "listener")]
+    #[test_case(OriginalSocketState::Connected; "connected")]
+    fn set_get_dual_stack_enabled_v4(original_state: OriginalSocketState) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
+                vec![Ipv4::FAKE_CONFIG.local_ip],
+                vec![Ipv4::FAKE_CONFIG.remote_ip],
+            ));
+        let socket = original_state.create_socket(&mut sync_ctx, &mut non_sync_ctx);
+
+        for enabled in [true, false] {
+            assert_eq!(
+                SocketHandler::<Ipv4, _>::set_dual_stack_enabled(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    socket,
+                    enabled,
+                ),
+                Err(SetDualStackEnabledError::NotCapable)
+            );
+            assert_eq!(
+                SocketHandler::<Ipv4, _>::get_dual_stack_enabled(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    socket,
+                ),
+                Err(NotDualStackCapableError)
+            );
+        }
+    }
+
+    #[test_case(OriginalSocketState::Unbound, Ok(()); "unbound")]
+    #[test_case(OriginalSocketState::Listener, Err(SetDualStackEnabledError::SocketIsBound);
+        "listener")]
+    #[test_case(OriginalSocketState::Connected, Err(SetDualStackEnabledError::SocketIsBound);
+        "connected")]
+    fn set_get_dual_stack_enabled_v6(
+        original_state: OriginalSocketState,
+        expected_result: Result<(), SetDualStackEnabledError>,
+    ) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
+                vec![Ipv6::FAKE_CONFIG.local_ip],
+                vec![Ipv6::FAKE_CONFIG.remote_ip],
+            ));
+        let socket = original_state.create_socket(&mut sync_ctx, &mut non_sync_ctx);
+
+        // Expect dual stack to be enabled by default.
+        const ORIGINALLY_ENABLED: bool = true;
+        assert_eq!(
+            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+            ),
+            Ok(ORIGINALLY_ENABLED),
+        );
+
+        for enabled in [false, true] {
+            assert_eq!(
+                SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    socket,
+                    enabled,
+                ),
+                expected_result,
+            );
+            let expect_enabled = match expected_result {
+                Ok(_) => enabled,
+                // If the set was unsuccessful expect the state to be unchanged.
+                Err(_) => ORIGINALLY_ENABLED,
+            };
+            assert_eq!(
+                SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    socket,
+                ),
+                Ok(expect_enabled),
             );
         }
     }

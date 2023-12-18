@@ -40,6 +40,7 @@ use netstack3_core::{
             MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
             SetMulticastMembershipError, ShutdownType,
         },
+        NotDualStackCapableError, SetDualStackEnabledError,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp::{self, UdpBindingsContext},
@@ -306,6 +307,19 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: &Self::SocketId,
     ) -> Option<WeakDeviceId<C>>;
 
+    fn set_dual_stack_enabled<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        enabled: bool,
+    ) -> Result<(), SetDualStackEnabledError>;
+
+    fn get_dual_stack_enabled<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+    ) -> Result<bool, NotDualStackCapableError>;
+
     fn set_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
@@ -503,6 +517,23 @@ impl<I: IpExt> TransportState<I> for Udp {
                 Err(e)
             }
         }
+    }
+
+    fn set_dual_stack_enabled<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        enabled: bool,
+    ) -> Result<(), SetDualStackEnabledError> {
+        udp::set_udp_dual_stack_enabled(sync_ctx, ctx, id, enabled)
+    }
+
+    fn get_dual_stack_enabled<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+    ) -> Result<bool, NotDualStackCapableError> {
+        udp::get_udp_dual_stack_enabled(sync_ctx, ctx, id)
     }
 
     fn get_reuse_port<C: NonSyncContext>(
@@ -734,6 +765,35 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         id: &Self::SocketId,
     ) -> Option<WeakDeviceId<C>> {
         icmp::get_bound_device(sync_ctx, ctx, id)
+    }
+
+    fn set_dual_stack_enabled<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &mut C,
+        _id: &Self::SocketId,
+        _enabled: bool,
+    ) -> Result<(), SetDualStackEnabledError> {
+        // NB: Despite ICMP's lack of support for dual stack operations, Linux
+        // allows the `IPV6_V6ONLY` socket option to be set/unset. Here we
+        // disallow setting the option, which more accurately reflects that ICMP
+        // sockets do not support dual stack operations.
+        return Err(SetDualStackEnabledError::NotCapable);
+    }
+
+    fn get_dual_stack_enabled<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &mut C,
+        _id: &Self::SocketId,
+    ) -> Result<bool, NotDualStackCapableError> {
+        match I::VERSION {
+            IpVersion::V4 => Err(NotDualStackCapableError),
+            // NB: Despite ICMP's lack of support for dual stack operations,
+            // Linux allows the `IPV6_V6ONLY` socket option to be set/unset.
+            // Here we always report that the dual stack operations are
+            // disabled, which more accurately reflects that ICMP sockets do not
+            // support dual stack operations.
+            IpVersion::V6 => Ok(false),
+        }
     }
 
     fn set_reuse_port<C: NonSyncContext>(
@@ -1364,22 +1424,12 @@ where
                 respond_not_supported!(responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6Only { value, responder } => {
-                // TODO(https://fxbug.dev/21198): support dual-stack sockets.
-                responder
-                    .send(
-                        match I::VERSION {
-                            IpVersion::V6 => value,
-                            IpVersion::V4 => false,
-                        }
-                        .then_some(())
-                        .ok_or(fposix::Errno::Enoprotoopt),
-                    )
+                responder.send(self.set_dual_stack_enabled(!value))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6Only { responder } => {
-                // TODO(https://fxbug.dev/21198): support dual-stack
-                // sockets.
-                responder.send(Ok(true)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(self.get_dual_stack_enabled().map(|enabled| !enabled))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6TrafficClass {
                 value: _,
@@ -1971,6 +2021,37 @@ where
             .upgrade()
             .map(|core_id| Some(core_id.bindings_id().name.clone()))
             .ok_or(fposix::Errno::Enodev)
+    }
+
+    fn set_dual_stack_enabled(self, enabled: bool) -> Result<(), fposix::Errno> {
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
+        } = self;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        T::set_dual_stack_enabled(sync_ctx, non_sync_ctx, id, enabled)
+            .map_err(IntoErrno::into_errno)
+    }
+
+    fn get_dual_stack_enabled(self) -> Result<bool, fposix::Errno> {
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
+        } = self;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        T::get_dual_stack_enabled(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {

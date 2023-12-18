@@ -25,6 +25,7 @@ use netstack3_core::{
     socket::{
         address::SocketZonedIpAddr,
         datagram::{ConnectError, SetMulticastMembershipError},
+        NotDualStackCapableError, SetDualStackEnabledError,
     },
     transport::{tcp, udp},
 };
@@ -698,5 +699,20 @@ impl IntoErrno for NetstackError {
             NetstackError::NoRoute => Errno::Ehostunreach,
             NetstackError::Mtu => Errno::Emsgsize,
         }
+    }
+}
+
+impl IntoErrno for SetDualStackEnabledError {
+    fn into_errno(self) -> Errno {
+        match self {
+            SetDualStackEnabledError::SocketIsBound => Errno::Einval,
+            SetDualStackEnabledError::NotCapable => Errno::Enoprotoopt,
+        }
+    }
+}
+
+impl IntoErrno for NotDualStackCapableError {
+    fn into_errno(self) -> Errno {
+        Errno::Enoprotoopt
     }
 }
