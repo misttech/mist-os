@@ -42,7 +42,6 @@ exclude = [
     # Banjo types.
     "BssConfig",
     "CSsid",
-    "DiscoverySupport",
     "MacSublayerSupport",
     "SecuritySupport",
     "SpectrumManagementSupport",

@@ -453,8 +453,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
-        let ddk_support = self.ctx.device.discovery_support();
-        let support = ddk_converter::convert_ddk_discovery_support(ddk_support)?;
+        let support = device::try_query_discovery_support(&mut self.ctx.device)?;
         responder.respond(support);
         Ok(())
     }

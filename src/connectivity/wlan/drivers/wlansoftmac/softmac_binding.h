@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_H_
-#define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_H_
+#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
+#define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
@@ -76,7 +76,6 @@ class SoftmacBinding : public DeviceInterface,
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const discovery_support_t& GetDiscoverySupport() const final;
   const mac_sublayer_support_t& GetMacSublayerSupport() const final;
   const security_support_t& GetSecuritySupport() const final;
   const spectrum_management_support_t& GetSpectrumManagementSupport() const final;
@@ -169,7 +168,6 @@ class SoftmacBinding : public DeviceInterface,
   //                         calls have not been profiled, and this behavior is
   //                         not documented in the SDK. Moreover, caching
   //                         introduces opportunities for subtle bugs.
-  discovery_support_t discovery_support_ = {};
   mac_sublayer_support_t mac_sublayer_support_ = {};
   security_support_t security_support_ = {};
   spectrum_management_support_t spectrum_management_support_ = {};
@@ -195,4 +193,4 @@ class SoftmacBinding : public DeviceInterface,
 
 }  // namespace wlan::drivers::wlansoftmac
 
-#endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_H_
+#endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_

@@ -73,26 +73,6 @@ class ConvertTest : public LogTest {};
 
 // FIDL to banjo types tests.
 
-TEST_F(ConvertTest, ToBanjoDiscoverySuppport) {
-  log::Instance::Init(0);
-  wlan_common::DiscoverySupport in = {
-      .scan_offload =
-          {
-              .supported = kPopulaterBool,
-          },
-      .probe_response_offload =
-          {
-              .supported = kPopulaterBool,
-          },
-  };
-
-  discovery_support_t out;
-  ConvertDiscoverySuppport(in, &out);
-
-  EXPECT_EQ(kPopulaterBool, out.scan_offload.supported);
-  EXPECT_EQ(kPopulaterBool, out.probe_response_offload.supported);
-}
-
 TEST_F(ConvertTest, ToBanjoMacSublayerSupport) {
   log::Instance::Init(0);
   wlan_common::MacSublayerSupport in = {

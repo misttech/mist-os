@@ -6,7 +6,7 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::DeviceOps,
+        device::{self, DeviceOps},
         error::Error,
         WlanSoftmacBandCapabilityExt as _,
     },
@@ -151,7 +151,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     /// TODO(b/254290448): Remove 'pub' when all clients use enable/disable scanning.
     pub fn cancel_ongoing_scan(&mut self) -> Result<(), zx::Status> {
         if let Some(scan) = &self.scanner.ongoing_scan {
-            let discovery_support = self.ctx.device.discovery_support();
+            let discovery_support = self.ctx.device.discovery_support()?;
             if discovery_support.scan_offload.scan_cancel_supported {
                 self.ctx.device.cancel_scan(&fidl_softmac::WlanSoftmacBridgeCancelScanRequest {
                     scan_id: Some(scan.scan_id()),
@@ -185,7 +185,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             .device
             .wlan_softmac_query_response()
             .map_err(|status| Error::Status(String::from("Failed to query device."), status))?;
-        let discovery_support = self.ctx.device.discovery_support();
+        let discovery_support = device::try_query_discovery_support(&mut self.ctx.device)?;
 
         // The else of this branch is an "MLME scan" which is implemented by calling SetChannel
         // multiple times to visit each channel. It's only used in hw-sim tests and is not supported

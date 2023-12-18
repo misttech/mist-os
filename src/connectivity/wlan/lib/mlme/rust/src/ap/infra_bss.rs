@@ -10,7 +10,7 @@ use {
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
         buffer::{InBuf, OutBuf},
-        device::DeviceOps,
+        device::{self, DeviceOps},
         error::Error,
         key::KeyConfig,
         WlanTxPacketExt as _,
@@ -336,7 +336,11 @@ impl InfraBss {
 
         let mgmt_subtype = *&{ mgmt_hdr.frame_ctrl }.mgmt_subtype();
         if mgmt_subtype == mac::MgmtSubtype::PROBE_REQ {
-            if ctx.device.discovery_support().probe_response_offload.supported {
+            if device::try_query_discovery_support(&mut ctx.device)
+                .map_err(anyhow::Error::from)?
+                .probe_response_offload
+                .supported
+            {
                 // We expected the probe response to be handled by hardware.
                 return Err(Rejection::Error(format_err!(
                     "driver indicates probe response offload but MLME received a probe response!"

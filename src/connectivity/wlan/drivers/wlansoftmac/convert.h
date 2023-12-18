@@ -15,8 +15,6 @@
 namespace wlan {
 
 // FIDL to banjo conversions.
-void ConvertDiscoverySuppport(const fuchsia_wlan_common::wire::DiscoverySupport& in,
-                              discovery_support_t* out);
 zx_status_t ConvertMacSublayerSupport(const fuchsia_wlan_common::wire::MacSublayerSupport& in,
                                       mac_sublayer_support_t* out);
 void ConvertSecuritySupport(const fuchsia_wlan_common::wire::SecuritySupport& in,

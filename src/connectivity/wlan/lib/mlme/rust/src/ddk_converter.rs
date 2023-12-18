@@ -118,19 +118,6 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     }
 }
 
-pub fn convert_ddk_discovery_support(
-    support: banjo_common::DiscoverySupport,
-) -> Result<fidl_common::DiscoverySupport, Error> {
-    let scan_offload = fidl_common::ScanOffloadExtension {
-        supported: support.scan_offload.supported,
-        scan_cancel_supported: support.scan_offload.scan_cancel_supported,
-    };
-    let probe_response_offload = fidl_common::ProbeResponseOffloadExtension {
-        supported: support.probe_response_offload.supported,
-    };
-    Ok(fidl_common::DiscoverySupport { scan_offload, probe_response_offload })
-}
-
 pub fn convert_ddk_mac_sublayer_support(
     support: banjo_common::MacSublayerSupport,
 ) -> Result<fidl_common::MacSublayerSupport, Error> {
@@ -205,8 +192,7 @@ mod tests {
     use {
         super::*,
         crate::device::{
-            fake_discovery_support, fake_mac_sublayer_support, fake_security_support,
-            fake_spectrum_management_support,
+            fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support,
         },
     };
 
@@ -295,18 +281,6 @@ mod tests {
         );
         assert!(mlme_band_cap.ht_cap.is_some());
         assert!(mlme_band_cap.vht_cap.is_none());
-    }
-
-    #[test]
-    fn test_convert_ddk_discovery_support() {
-        let support_ddk = fake_discovery_support();
-        let support_fidl = convert_ddk_discovery_support(support_ddk)
-            .expect("Failed to convert discovery support");
-        assert_eq!(support_fidl.scan_offload.supported, support_ddk.scan_offload.supported);
-        assert_eq!(
-            support_fidl.probe_response_offload.supported,
-            support_ddk.probe_response_offload.supported
-        );
     }
 
     #[test]

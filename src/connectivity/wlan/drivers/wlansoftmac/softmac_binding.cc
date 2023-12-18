@@ -91,6 +91,14 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryDiscoverySupport> dispatcher =
+        [](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->QueryDiscoverySupport();
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
+
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
     Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
         [request](const auto& arena, const auto& client) {
@@ -256,9 +264,6 @@ zx_status_t WlanSoftmacHandle::Init(
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return AsDeviceInterface(device)->InstallKey(key);
       },
-      .get_discovery_support = [](void* device) -> discovery_support_t {
-        return AsDeviceInterface(device)->GetDiscoverySupport();
-      },
       .get_mac_sublayer_support = [](void* device) -> mac_sublayer_support_t {
         return AsDeviceInterface(device)->GetMacSublayerSupport();
       },
@@ -418,23 +423,6 @@ void SoftmacBinding::Init() {
     device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
     return;
   }
-
-  auto discovery_arena = fdf::Arena::Create(0, 0);
-  if (discovery_arena.is_error()) {
-    lerror("Failed to create arena: %s", discovery_arena.status_string());
-    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
-    return;
-  }
-
-  auto discovery_result =
-      client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
-  if (!discovery_result.ok()) {
-    lerror("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
-    device_init_reply(child_device_, discovery_result.status(), nullptr);
-    return;
-  }
-
-  ConvertDiscoverySuppport(discovery_result->value()->resp, &discovery_support_);
 
   auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
   if (mac_sublayer_arena.is_error()) {
@@ -832,10 +820,6 @@ void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, f
 }
 
 fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
-
-const discovery_support_t& SoftmacBinding::GetDiscoverySupport() const {
-  return discovery_support_;
-}
 
 const mac_sublayer_support_t& SoftmacBinding::GetMacSublayerSupport() const {
   return mac_sublayer_support_;

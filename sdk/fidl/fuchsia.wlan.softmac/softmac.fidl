@@ -464,6 +464,15 @@ closed protocol WlanSoftmacBridge {
     @selector("fuchsia.wlan.softmac/WlanSoftmac.Query")
     strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 
+    /// Gets information about the station discovery (e.g., scanning and
+    /// probing) features supported by the device. This method is safe to call
+    /// even when the SoftMAC has not yet started.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.QueryDiscoverySupport")
+    strict QueryDiscoverySupport() -> (struct {
+        resp fuchsia.wlan.common.DiscoverySupport;
+    }) error zx.Status;
+
     /// Set the primary radio channel, e.g. in response to a channel switch event.
     /// If successful, this will trigger the channel switch immediately. This may
     /// impact the transmission of any frames that are in-flight, and might also
@@ -628,10 +637,10 @@ closed protocol WlanSoftmac {
     @available(added=15, removed=HEAD)
     strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 
-    /// Query the underlying device for feature support related to station
-    /// discovery (e.g. scans and probes). Safe to call when the softmac is not
-    /// started.
-    @available(added=15)
+    /// Gets information about the station discovery (e.g., scanning and
+    /// probing) features supported by the device. This method is safe to call
+    /// even when the SoftMAC has not yet started.
+    @available(added=15, removed=HEAD)
     strict QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     }) error zx.Status;

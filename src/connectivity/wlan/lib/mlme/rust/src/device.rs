@@ -87,7 +87,7 @@ pub trait DeviceOps {
     fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>;
-    fn discovery_support(&mut self) -> banjo_common::DiscoverySupport;
+    fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status>;
     fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport;
     fn security_support(&mut self) -> banjo_common::SecuritySupport;
     fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport;
@@ -184,6 +184,14 @@ pub fn try_query_iface_mac(device: &mut impl DeviceOps) -> Result<MacAddr, Error
     })
 }
 
+pub fn try_query_discovery_support(
+    device: &mut impl DeviceOps,
+) -> Result<fidl_common::DiscoverySupport, Error> {
+    device.discovery_support().map_err(|status| {
+        Error::Status(String::from("Failed to query discovery support for device."), status)
+    })
+}
+
 impl DeviceOps for Device {
     fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
@@ -203,8 +211,11 @@ impl DeviceOps for Device {
         )
     }
 
-    fn discovery_support(&mut self) -> banjo_common::DiscoverySupport {
-        (self.raw_device.get_discovery_support)(self.raw_device.device)
+    fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+        Self::flatten_and_log_error(
+            "QueryDiscoverySupport",
+            self.wlan_softmac_bridge_proxy.query_discovery_support(zx::Time::INFINITE),
+        )
     }
 
     fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport {
@@ -511,8 +522,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Get discovery features supported by this WLAN interface
-    get_discovery_support: extern "C" fn(device: *mut c_void) -> banjo_common::DiscoverySupport,
     /// Get MAC sublayer features supported by this WLAN interface
     get_mac_sublayer_support:
         extern "C" fn(device: *mut c_void) -> banjo_common::MacSublayerSupport,
@@ -683,7 +692,7 @@ pub mod test_utils {
             Option<fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest>,
         pub captured_active_scan_request: Option<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
         pub query_response: fidl_softmac::WlanSoftmacQueryResponse,
-        pub discovery_support: banjo_common::DiscoverySupport,
+        pub discovery_support: fidl_common::DiscoverySupport,
         pub mac_sublayer_support: banjo_common::MacSublayerSupport,
         pub security_support: banjo_common::SecuritySupport,
         pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
@@ -802,8 +811,8 @@ pub mod test_utils {
             Ok(self.state.lock().unwrap().query_response.clone())
         }
 
-        fn discovery_support(&mut self) -> banjo_common::DiscoverySupport {
-            self.state.lock().unwrap().discovery_support
+        fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+            Ok(self.state.lock().unwrap().discovery_support)
         }
 
         fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport {
@@ -1024,15 +1033,13 @@ pub mod test_utils {
             .expect("Failed to convert softmac driver band capabilities.")
     }
 
-    pub fn fake_discovery_support() -> banjo_common::DiscoverySupport {
-        banjo_common::DiscoverySupport {
-            scan_offload: banjo_common::ScanOffloadExtension {
+    pub fn fake_discovery_support() -> fidl_common::DiscoverySupport {
+        fidl_common::DiscoverySupport {
+            scan_offload: fidl_common::ScanOffloadExtension {
                 supported: true,
                 scan_cancel_supported: false,
             },
-            probe_response_offload: banjo_common::ProbeResponseOffloadExtension {
-                supported: false,
-            },
+            probe_response_offload: fidl_common::ProbeResponseOffloadExtension { supported: false },
         }
     }
 
@@ -1171,15 +1178,15 @@ mod tests {
     fn fake_device_returns_expected_discovery_support() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, _) = FakeDevice::new(&exec);
-        let discovery_support = fake_device.discovery_support();
+        let discovery_support = fake_device.discovery_support().unwrap();
         assert_eq!(
             discovery_support,
-            banjo_common::DiscoverySupport {
-                scan_offload: banjo_common::ScanOffloadExtension {
+            fidl_common::DiscoverySupport {
+                scan_offload: fidl_common::ScanOffloadExtension {
                     supported: true,
                     scan_cancel_supported: false,
                 },
-                probe_response_offload: banjo_common::ProbeResponseOffloadExtension {
+                probe_response_offload: fidl_common::ProbeResponseOffloadExtension {
                     supported: false,
                 },
             }

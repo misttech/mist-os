@@ -84,10 +84,6 @@ typedef struct {
    */
   int32_t (*set_key)(void *device, wlan_key_configuration_t *key);
   /**
-   * Get discovery features supported by this WLAN interface
-   */
-  discovery_support_t (*get_discovery_support)(void *device);
-  /**
    * Get MAC sublayer features supported by this WLAN interface
    */
   mac_sublayer_support_t (*get_mac_sublayer_support)(void *device);

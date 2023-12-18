@@ -90,12 +90,6 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-void ConvertDiscoverySuppport(const fuchsia_wlan_common::wire::DiscoverySupport& in,
-                              discovery_support_t* out) {
-  out->scan_offload.supported = in.scan_offload.supported;
-  out->probe_response_offload.supported = in.probe_response_offload.supported;
-}
-
 zx_status_t ConvertMacSublayerSupport(const fuchsia_wlan_common::wire::MacSublayerSupport& in,
                                       mac_sublayer_support_t* out) {
   out->rate_selection_offload.supported = in.rate_selection_offload.supported;
