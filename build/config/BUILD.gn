@@ -333,6 +333,20 @@ config("no_remote_link") {
   }
 }
 
+config("download_outputs") {
+  # Override global settings that may disable downloading of outputs.
+  # This is useful for targets that are known to be needed for local actions.
+  if (rust_rbe_enable) {
+    rustflags = [ "--remote-flag=--download_outputs=true" ]
+  }
+  if (cxx_rbe_enable) {
+    cflags = [ "--remote-flag=--download_outputs=true" ]
+  }
+  if (link_rbe_enable) {
+    ldflags = [ "--remote-flag=--download_outputs=true" ]
+  }
+}
+
 # Each optimize_$optimize config below corresponds to a single setting that's
 # controlled by the optimize argument. The default_optimize level is set to
 # optimize_$optimize for convenience, but individual targets can override their
