@@ -1233,7 +1233,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
 
     info.cursor_configs =
-        fidl::VectorView<fhd::wire::CursorInfo>(arena, config->cursor_infos_.size());
+        fidl::VectorView<fhdt::wire::CursorInfo>(arena, config->cursor_infos_.size());
     for (size_t cursor_config_index = 0; cursor_config_index < info.cursor_configs.count();
          ++cursor_config_index) {
       info.cursor_configs[cursor_config_index] =

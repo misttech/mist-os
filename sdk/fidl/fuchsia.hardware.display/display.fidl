@@ -4,6 +4,7 @@
 library fuchsia.hardware.display;
 
 using fuchsia.images2;
+using fuchsia.hardware.display.types;
 
 /// Type of the internal value in [`fuchsia.hardware.display/DisplayId`].
 alias DisplayIdValue = uint64;
@@ -110,7 +111,7 @@ type Info = struct {
     /// A display config that uses a cursor layer configuration in this list may
     /// still be rejected by the driver, due to limitations that can't be
     /// covered by this API, such as total memory bandwidth constraints.
-    cursor_configs vector<CursorInfo>:MAX;
+    cursor_configs vector<fuchsia.hardware.display.types.CursorInfo>:MAX;
 
     /// Part of a display device identifier that persists across boot cycles.
     ///

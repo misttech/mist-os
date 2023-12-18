@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -67,7 +67,7 @@ CoordinatorCursorInfo::CreateFblVectorFromBanjoVector(
   return zx::ok(std::move(result));
 }
 
-fuchsia_hardware_display::wire::CursorInfo CoordinatorCursorInfo::ToFidl() const {
+fuchsia_hardware_display_types::wire::CursorInfo CoordinatorCursorInfo::ToFidl() const {
   return {
       .width = width,
       .height = height,

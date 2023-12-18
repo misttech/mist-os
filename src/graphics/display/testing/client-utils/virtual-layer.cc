@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/image-format/image_format.h>
@@ -22,6 +23,7 @@
 #include "src/graphics/display/testing/client-utils/utils.h"
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display_test {
 
@@ -379,7 +381,7 @@ CursorLayer::CursorLayer(Display* display) : VirtualLayer(display) {}
 CursorLayer::CursorLayer(const fbl::Vector<Display>& displays) : VirtualLayer(displays) {}
 
 bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
-  fhd::wire::CursorInfo info = displays_[0]->cursor();
+  fhdt::wire::CursorInfo info = displays_[0]->cursor();
   uint32_t bg_color = 0xffffffff;
 
   image_ = Image::Create(dc, info.width, info.height, info.pixel_format, Image::Pattern::kBorder,
@@ -420,7 +422,7 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 }
 
 void CursorLayer::StepLayout(int32_t frame_num) {
-  fhd::wire::CursorInfo info = displays_[0]->cursor();
+  fhdt::wire::CursorInfo info = displays_[0]->cursor();
 
   x_pos_ = interpolate(width_ + info.width, frame_num, kDestFrameBouncePeriod) - info.width;
   y_pos_ = interpolate(height_ + info.height, frame_num, kDestFrameBouncePeriod) - info.height;

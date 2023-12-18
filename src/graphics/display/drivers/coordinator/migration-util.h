@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_MIGRATION_UTIL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_MIGRATION_UTIL_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -62,7 +62,7 @@ struct CoordinatorCursorInfo {
 
   // Converts a CoordinatorCursorInfo to the FIDL fuchsia.hardware.
   // display.CursorInfo interface.
-  fuchsia_hardware_display::wire::CursorInfo ToFidl() const;
+  fuchsia_hardware_display_types::wire::CursorInfo ToFidl() const;
 
   uint32_t width;
   uint32_t height;

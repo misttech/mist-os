@@ -39,7 +39,7 @@ class TestFidlClient {
     DisplayId id_;
     fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
     fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
-    fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
+    fbl::Vector<fuchsia_hardware_display_types::wire::CursorInfo> cursors_;
 
     fbl::String manufacturer_name_;
     fbl::String monitor_name_;

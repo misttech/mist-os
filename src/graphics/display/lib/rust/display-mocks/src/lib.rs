@@ -67,7 +67,11 @@ impl MockCoordinator {
             return Err(MockCoordinatorError::DuplicateIds);
         }
 
-        let added: Vec<_> = map.iter().sorted().map(|(_, info)| info.clone()).collect();
+        let added: Vec<_> = map
+            .iter()
+            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+            .map(|(_, info)| info.clone())
+            .collect();
         let removed: Vec<display::DisplayId> =
             self.displays.iter().map(|(_, info)| info.id).collect();
         self.displays = map;

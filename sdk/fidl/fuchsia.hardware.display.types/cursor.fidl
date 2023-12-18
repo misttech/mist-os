@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.display;
+library fuchsia.hardware.display.types;
 
 using fuchsia.images2;
 
@@ -11,6 +11,6 @@ type CursorInfo = struct {
     width uint32;
     height uint32;
 
-    // Pixel format type (fuchsia.images2.PixelFormat) of the cursor buffer.
+    // Pixel format type of the cursor buffer.
     pixel_format fuchsia.images2.PixelFormat;
 };

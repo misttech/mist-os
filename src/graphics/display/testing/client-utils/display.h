@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/fidl/txn_header.h>
@@ -33,7 +34,7 @@ class Display {
 
   fuchsia_images2::wire::PixelFormat format() const { return pixel_formats_[format_idx_]; }
   fuchsia_hardware_display::wire::Mode mode() const { return modes_[mode_idx_]; }
-  fuchsia_hardware_display::wire::CursorInfo cursor() const { return cursors_[0]; }
+  fuchsia_hardware_display_types::wire::CursorInfo cursor() const { return cursors_[0]; }
   display::DisplayId id() const { return id_; }
 
   bool set_format_idx(uint32_t idx) {
@@ -60,7 +61,7 @@ class Display {
   display::DisplayId id_;
   fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
   fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
-  fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
+  fbl::Vector<fuchsia_hardware_display_types::wire::CursorInfo> cursors_;
 
   fbl::String manufacturer_name_;
   fbl::String monitor_name_;

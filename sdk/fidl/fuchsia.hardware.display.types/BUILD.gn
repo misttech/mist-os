@@ -7,7 +7,9 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.display.types") {
   sources = [
     "config.fidl",
+    "cursor.fidl",
     "overview.fidl",
   ]
+  public_deps = [ "//sdk/fidl/fuchsia.images2" ]
   enable_hlcpp = true
 }
