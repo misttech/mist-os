@@ -2919,6 +2919,7 @@
   submitted: '2023-05-22'
   reviewed: '2023-08-14'
 
+
 - name: 'RFC-0224'
   title: 'Userspace J-Extension Pointer Masking'
   short_description: 'Changes needed to accomodate the RISC-V pointer masking extension.'
@@ -3061,3 +3062,16 @@
   reviewers: ['mcgrathr@google.com', 'travisg@google.com']
   submitted: '2023-11-02'
   reviewed: '2023-11-17'
+
+- name: 'RFC-0235'
+  title: 'Component dictionaries'
+  short_description: 'A proposal for introducing a dictionary type to component framework for capability bundling.'
+  authors: ['geb@google.com']
+  file: '0235_component_dictionaries.md'
+  area: ['Component Framework']
+  issue: ['298246710']
+  gerrit_change_id: ['910123']
+  status: 'Pending'
+  reviewers: ['abarth@google.com', 'crjohns@google.com', 'markdittmer@google.com', 'miguelfrde@google.com', 'phosek@google.com', 'surajmalhotra@google.com', 'ypomortsev@google.com']
+  submitted: '2023-10-16'
+  reviewed: ''
