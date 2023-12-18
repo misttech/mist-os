@@ -27,6 +27,7 @@ FuchsiaProductConfigInfo = provider(
     doc = "A product-info used to containing the product_config.json and deps.",
     fields = {
         "product_config": "The JSON product configuration file.",
+        "build_type": "The build type of the product.",
     },
 )
 
@@ -99,6 +100,7 @@ FuchsiaProductImageInfo = provider(
         "images_out": "images out directory",
         "product_assembly_out": "product assembly out directory",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
+        "build_type": "The build type of the product",
     },
 )
 
@@ -114,6 +116,7 @@ FuchsiaProductAssemblyInfo = provider(
     fields = {
         "product_assembly_out": "product assembly out directory",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
+        "build_type": "The build type of the product",
     },
 )
 

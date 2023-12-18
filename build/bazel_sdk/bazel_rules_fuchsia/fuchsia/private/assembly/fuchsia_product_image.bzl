@@ -98,6 +98,7 @@ def _fuchsia_product_assembly_impl(ctx):
 
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
+    build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
 
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
         mode_arg = "--mode " + ctx.attr.mode if ctx.attr.mode else "",
@@ -165,6 +166,7 @@ def _fuchsia_product_assembly_impl(ctx):
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
             platform_aibs = platform_aibs_file,
+            build_type = build_type,
         ),
     ]
 
@@ -221,6 +223,7 @@ def _fuchsia_product_create_system_impl(ctx):
 
     # Assembly create-system
     product_assembly_out = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].product_assembly_out
+    build_type = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].build_type
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_assembly
@@ -260,6 +263,7 @@ def _fuchsia_product_create_system_impl(ctx):
             images_out = out_dir,
             platform_aibs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].platform_aibs,
             product_assembly_out = product_assembly_out,
+            build_type = build_type,
         ),
     ]
 

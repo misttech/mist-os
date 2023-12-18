@@ -54,6 +54,8 @@ def _collect_file_deps(dep):
 def _fuchsia_product_configuration_impl(ctx):
     product_config = json.decode(ctx.attr.product_config)
     replace_labels_with_files(product_config, ctx.attr.product_config_labels)
+    platform = product_config.get("platform", {})
+    build_type = platform.get("build_type")
     product = product_config.get("product", {})
     packages = {}
 
@@ -114,6 +116,7 @@ def _fuchsia_product_configuration_impl(ctx):
         DefaultInfo(files = depset(direct = output_files + ctx.files.product_config_labels + ctx.files.deps)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
+            build_type = build_type,
         ),
     ]
 
