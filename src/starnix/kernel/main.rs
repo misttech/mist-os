@@ -145,6 +145,7 @@ async fn main() -> Result<(), Error> {
             format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
         );
     }
+    inspector.root().record_lazy_child("not_found", starnix_logging::not_found_lazy_node_callback);
     inspector
         .root()
         .record_lazy_child("not_implemented", starnix_logging::not_implemented_lazy_node_callback);

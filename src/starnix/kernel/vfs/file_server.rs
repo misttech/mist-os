@@ -213,11 +213,7 @@ impl StarnixNodeConnection {
         &self,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
-        self.task().await?.lookup_parent(
-            &mut LookupContext::default(),
-            self.file.name.clone(),
-            path,
-        )
+        self.task().await?.lookup_parent(&mut LookupContext::default(), &self.file.name, path)
     }
 
     /// Implementation of `vfs::directory::entry::DirectoryEntry::open`.

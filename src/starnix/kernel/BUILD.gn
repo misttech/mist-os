@@ -492,6 +492,7 @@ rustc_library("starnix_logging") {
     "logging/core_dump_list.rs",
     "logging/lib.rs",
     "logging/logging.rs",
+    "logging/not_found.rs",
     "logging/not_implemented.rs",
     "logging/trace.rs",
   ]
@@ -506,8 +507,11 @@ rustc_library("starnix_logging") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:tracing",
   ]
+
+  test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
 
   features = []
   if (starnix_disable_logging) {

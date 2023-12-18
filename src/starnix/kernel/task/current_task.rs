@@ -26,7 +26,7 @@ use fuchsia_zircon::{
     sys::zx_thread_state_general_regs_t,
     {self as zx},
 };
-use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name};
+use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name, track_file_not_found};
 use starnix_sync::{
     EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, WakeReason,
 };
@@ -312,7 +312,7 @@ impl CurrentTask {
     fn resolve_open_path(
         &self,
         context: &mut LookupContext,
-        dir: NamespaceNode,
+        dir: &NamespaceNode,
         path: &FsStr,
         mode: FileMode,
         flags: OpenFlags,
@@ -348,7 +348,7 @@ impl CurrentTask {
                     match name.readlink(self)? {
                         SymlinkTarget::Path(path) => {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
-                            self.resolve_open_path(context, dir, &path, mode, flags)
+                            self.resolve_open_path(context, &dir, &path, mode, flags)
                         }
                         SymlinkTarget::Node(node) => Ok((node, false)),
                     }
@@ -435,7 +435,15 @@ impl CurrentTask {
 
         let mut context = LookupContext::new(symlink_mode);
         context.must_be_directory = flags.contains(OpenFlags::DIRECTORY);
-        let (name, created) = self.resolve_open_path(&mut context, dir, path, mode, flags)?;
+        let (name, created) = match self.resolve_open_path(&mut context, &dir, path, mode, flags) {
+            Ok((n, c)) => (n, c),
+            Err(e) => {
+                let mut abs_path = dir.path(&self.task);
+                abs_path.extend(path);
+                track_file_not_found(abs_path);
+                return Err(e);
+            }
+        };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
             name.create_tmpfile(self, mode.with_type(FileMode::IFREG), flags)?
@@ -507,7 +515,7 @@ impl CurrentTask {
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
         let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
-        self.lookup_parent(context, dir, path)
+        self.lookup_parent(context, &dir, path)
     }
 
     /// Lookup the parent of a namespace node.
@@ -527,12 +535,12 @@ impl CurrentTask {
     pub fn lookup_parent<'a>(
         &self,
         context: &mut LookupContext,
-        dir: NamespaceNode,
+        dir: &NamespaceNode,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
         context.update_for_path(path);
 
-        let mut current_node = dir;
+        let mut current_node = dir.clone();
         let mut it = path.split(|c| *c == b'/').filter(|p| !p.is_empty());
         let mut current_path_component = it.next().unwrap_or(b"");
         for next_path_component in it {
@@ -554,7 +562,7 @@ impl CurrentTask {
         dir: NamespaceNode,
         path: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
-        let (parent, basename) = self.lookup_parent(context, dir, path)?;
+        let (parent, basename) = self.lookup_parent(context, &dir, path)?;
         parent.lookup_child(self, context, basename)
     }
 
