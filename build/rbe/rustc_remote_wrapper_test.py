@@ -888,6 +888,59 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
+    def test_run_local_downloads_inputs_if_needed(self):
+        exec_root = Path("/home/project")
+        working_dir = exec_root / "build-here"
+        compiler = Path("../tools/bin/rustc")
+        shlib = Path("tools/lib/librusteze.so")
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        source = Path("../foo/src/lib.rs")
+        rlib = Path("obj/foo.rlib")
+        input_rlib = Path("libintermediate.rlib")
+        deps = [Path("../foo/src/other.rs")]
+        depfile_path = Path("obj/foo.rlib.d")
+        depfile_contents = [str(d) + ":" for d in deps]
+        command = _strs(
+            [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
+        )
+        r = rustc_remote_wrapper.RustRemoteAction(
+            [f"--inputs={input_rlib}", "--"] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+
+        prepare_mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in prepare_mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([compiler, shlib_rel, source, input_rlib] + deps)
+        )
+        self.assertEqual(remote_output_files, {rlib, depfile_path})
+
+        with mock.patch.object(
+            remote_action.RemoteAction, "download_inputs", return_value={}
+        ) as mock_download_inputs:
+            with mock.patch.object(
+                subprocess, "call", return_value=0
+            ) as mock_call:
+                run_status = r.run_local()
+
+        mock_call.assert_called_once()
+        self.assertEqual(run_status, 0)
+        mock_download_inputs.assert_called_once()
+
     def test_post_run_actions(self):
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"

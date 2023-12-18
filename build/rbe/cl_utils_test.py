@@ -950,6 +950,26 @@ class BlockingFileLockTests(unittest.TestCase):
             self.assertEqual(sorted(counts), list(range(N + 1, 2 * N + 1)))
 
 
+class SubprocessResultTests(unittest.TestCase):
+    def test_defaults(self):
+        result = cl_utils.SubprocessResult(3)
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(result.stdout, [])
+        self.assertEqual(result.stderr, [])
+        self.assertEqual(result.stdout_text, "")
+        self.assertEqual(result.stderr_text, "")
+
+    def test_with_output(self):
+        result = cl_utils.SubprocessResult(
+            1, stdout=["foo", "bar"], stderr=["baz"]
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, ["foo", "bar"])
+        self.assertEqual(result.stderr, ["baz"])
+        self.assertEqual(result.stdout_text, "foo\nbar")
+        self.assertEqual(result.stderr_text, "baz")
+
+
 class SubprocessCallTests(unittest.TestCase):
     def test_success(self):
         result = cl_utils.subprocess_call(["echo", "hello"])

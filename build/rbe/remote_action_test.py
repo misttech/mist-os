@@ -2108,13 +2108,19 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 with mock.patch.object(
                     remote_action.RemoteAction, "_cleanup"
                 ) as mock_cleanup:
-                    self.assertEqual(
-                        action.run(), local_status
-                    )  # fallback success
+                    with mock.patch.object(
+                        remote_action.RemoteAction,
+                        "downloader",
+                        return_value=_FAKE_DOWNLOADER,
+                    ) as mock_downloader:
+                        self.assertEqual(
+                            action.run(), local_status
+                        )  # fallback success
 
         mock_remote.assert_called_with()
         mock_local.assert_called_with()
         mock_cleanup.assert_called_with()
+        mock_downloader.assert_called_once_with()
 
     def test_strategy_local_fallback_different_command_succeeds(self):
         self._test_local_execution_strategy(
@@ -2141,16 +2147,19 @@ class RemoteActionConstructionTests(unittest.TestCase):
         )
 
 
-class DownloadStubsTests(unittest.TestCase):
-    @property
-    def downloader(self) -> remotetool.RemoteTool:
-        return remotetool.RemoteTool(
-            reproxy_cfg={
-                "service": "foo.buildservice:443",
-                "instance": "my-project/remote/instances/default",
-            }
-        )
+def _fake_downloader() -> remotetool.RemoteTool:
+    return remotetool.RemoteTool(
+        reproxy_cfg={
+            "service": "foo.buildservice:443",
+            "instance": "my-project/remote/instances/default",
+        }
+    )
 
+
+_FAKE_DOWNLOADER = _fake_downloader()
+
+
+class DownloadStubsTests(unittest.TestCase):
     def test_create_stub_for_nonexistent_ignored(self):
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
@@ -2217,7 +2226,7 @@ remote_metadata: {{
                 with mock.patch.object(Path, "rename") as mock_rename:
                     remote_action.download_from_stub(
                         destination,
-                        downloader=self.downloader,
+                        downloader=_FAKE_DOWNLOADER,
                         working_dir_abs=tdp,
                     )
 
@@ -2267,7 +2276,7 @@ remote_metadata: {{
                 with mock.patch.object(Path, "rename") as mock_rename:
                     remote_action.download_from_stub(
                         destination,
-                        downloader=self.downloader,
+                        downloader=_FAKE_DOWNLOADER,
                         working_dir_abs=tdp,
                     )
             mock_rename.assert_called_with(destination)
@@ -2336,7 +2345,7 @@ remote_metadata: {{
                             return_value=False,
                         ) as mock_is_stub:
                             status = stub.download(
-                                downloader=self.downloader,
+                                downloader=_FAKE_DOWNLOADER,
                                 working_dir_abs=working_dir,
                                 dest=dest,
                             )
@@ -2377,7 +2386,7 @@ remote_metadata: {{
                             return_value=True,
                         ) as mock_is_stub:
                             status = stub.download(
-                                downloader=self.downloader,
+                                downloader=_FAKE_DOWNLOADER,
                                 working_dir_abs=working_dir,
                                 dest=dest,
                             )
@@ -2418,7 +2427,7 @@ remote_metadata: {{
         ) as mock_download:
             with mock.patch.object(Path, "rename") as mock_rename:
                 status = stub.download(
-                    downloader=self.downloader,
+                    downloader=_FAKE_DOWNLOADER,
                     working_dir_abs=Path("/root/work"),
                 )
         self.assertEqual(status.returncode, download_status)
@@ -2462,7 +2471,7 @@ remote_metadata: {{
                 remotetool.RemoteTool, "download_blob", new=fake_download_file
             ) as mock_download:
                 status = stub.download(
-                    downloader=self.downloader, working_dir_abs=tdp
+                    downloader=_FAKE_DOWNLOADER, working_dir_abs=tdp
                 )
 
             # path points to a non-stub
@@ -2551,21 +2560,25 @@ remote_metadata: {{
             remote_action, "_reproxy_log_dir", return_value=logdir
         ) as mock_log_dir:
             with mock.patch.object(
-                remote_action.ReproxyLogEntry,
-                "parse_action_log",
-                return_value=fake_log_record,
-            ) as mock_parse_log:
+                remote_action.RemoteAction, "download_inputs", return_value={}
+            ) as mock_download_inputs:
                 with mock.patch.object(
-                    remote_action.ReproxyLogEntry, "make_download_stubs"
-                ) as mock_stub:
+                    remote_action.ReproxyLogEntry,
+                    "parse_action_log",
+                    return_value=fake_log_record,
+                ) as mock_parse_log:
                     with mock.patch.object(
-                        remote_action.RemoteAction,
-                        "_run_maybe_remotely",
-                        return_value=cl_utils.SubprocessResult(0),
-                    ) as mock_run:
-                        exit_code = action.run()
-            self.assertEqual(exit_code, 0)
+                        remote_action.ReproxyLogEntry, "make_download_stubs"
+                    ) as mock_stub:
+                        with mock.patch.object(
+                            remote_action.RemoteAction,
+                            "_run_maybe_remotely",
+                            return_value=cl_utils.SubprocessResult(0),
+                        ) as mock_run:
+                            exit_code = action.run()
+                self.assertEqual(exit_code, 0)
         mock_run.assert_called()
+        mock_download_inputs.assert_called_once()
         mock_log_dir.assert_called_once()
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_called_with(
@@ -2573,6 +2586,61 @@ remote_metadata: {{
             dirs=[],
             build_id=Path(logdir).name,
         )
+
+    def test_download_inputs_for_local_execution(self):
+        exec_root = Path("/home/project")
+        build_dir = Path("build-out")
+        working_dir = exec_root / build_dir
+        p = remote_action._MAIN_ARG_PARSER
+        command = ["echo"]
+        input_file = Path("in.in")  # pretend this is a download stub
+        output = "out.out"
+        main_args, other = p.parse_known_args(
+            ["--exec_strategy=local", "--"] + command
+        )
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            inputs=[Path(input_file)],
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_only_command, command)
+        options = action.options
+
+        fake_stub_info = remote_action.DownloadStubInfo(
+            path=input_file,
+            type="file",
+            blob_digest="8760ad0b/992",
+            action_digest="12987e0d8a77/43",
+            build_id="random-id12391",
+        )
+        with mock.patch.object(
+            remote_action.RemoteAction,
+            "downloader",
+            return_value=_FAKE_DOWNLOADER,
+        ) as mock_downloader:
+            with mock.patch.object(
+                remote_action, "is_download_stub_file", return_value=True
+            ) as mock_check_stub:
+                with mock.patch.object(
+                    remote_action.DownloadStubInfo,
+                    "read_from_file",
+                    return_value=fake_stub_info,
+                ) as mock_download_stub:
+                    with mock.patch.object(
+                        remote_action, "_download_for_mp", new=_fake_download
+                    ) as mock_download:  # success
+                        download_statuses = action.download_inputs(
+                            lambda path: True
+                        )
+
+        self.assertIn(input_file, download_statuses)
+        self.assertEqual(download_statuses[input_file].returncode, 0)
+        mock_downloader.assert_called_once_with()
+        mock_check_stub.assert_called_once_with(input_file)
+        mock_download_stub.assert_called_once_with(input_file)
 
     def test_no_download_stubs_for_local_execution(self):
         exec_root = Path("/home/project")
@@ -2610,12 +2678,18 @@ remote_metadata: {{
             ) as mock_stub:
                 with mock.patch.object(
                     remote_action.RemoteAction,
-                    "_run_maybe_remotely",
-                    return_value=cl_utils.SubprocessResult(0),
-                ) as mock_run:
-                    exit_code = action.run()
+                    "download_inputs",
+                    return_value={},
+                ) as mock_download_inputs:
+                    with mock.patch.object(
+                        remote_action.RemoteAction,
+                        "_run_maybe_remotely",
+                        return_value=cl_utils.SubprocessResult(0),
+                    ) as mock_run:
+                        exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
+        mock_download_inputs.assert_called_once()
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_not_called()
 
@@ -2651,16 +2725,20 @@ remote_metadata: {{
             return_value=fake_log_record,
         ) as mock_parse_log:
             with mock.patch.object(
-                remote_action.ReproxyLogEntry, "make_download_stubs"
-            ) as mock_stub:
+                remote_action.RemoteAction, "download_inputs", return_value={}
+            ) as mock_download_inputs:
                 with mock.patch.object(
-                    remote_action.RemoteAction,
-                    "_run_maybe_remotely",
-                    return_value=cl_utils.SubprocessResult(0),
-                ) as mock_run:
-                    exit_code = action.run()
+                    remote_action.ReproxyLogEntry, "make_download_stubs"
+                ) as mock_stub:
+                    with mock.patch.object(
+                        remote_action.RemoteAction,
+                        "_run_maybe_remotely",
+                        return_value=cl_utils.SubprocessResult(0),
+                    ) as mock_run:
+                        exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
+        mock_download_inputs.assert_called_once()
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_not_called()
 
@@ -2697,16 +2775,20 @@ remote_metadata: {{
             return_value=fake_log_record,
         ) as mock_parse_log:
             with mock.patch.object(
-                remote_action.ReproxyLogEntry, "make_download_stubs"
-            ) as mock_stub:
+                remote_action.RemoteAction, "download_inputs", return_value={}
+            ) as mock_download_inputs:
                 with mock.patch.object(
-                    remote_action.RemoteAction,
-                    "_run_maybe_remotely",
-                    return_value=cl_utils.SubprocessResult(0),
-                ) as mock_run:
-                    exit_code = action.run()
+                    remote_action.ReproxyLogEntry, "make_download_stubs"
+                ) as mock_stub:
+                    with mock.patch.object(
+                        remote_action.RemoteAction,
+                        "_run_maybe_remotely",
+                        return_value=cl_utils.SubprocessResult(0),
+                    ) as mock_run:
+                        exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
+        mock_download_inputs.assert_called_once()
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_not_called()
 
@@ -2993,7 +3075,7 @@ remote_metadata: {{
                             with mock.patch.object(
                                 remote_action.RemoteAction,
                                 "downloader",
-                                return_value=self.downloader,
+                                return_value=_FAKE_DOWNLOADER,
                             ) as mock_downloader:
                                 exit_code = action.run()
         self.assertEqual(exit_code, 0)
@@ -3075,7 +3157,7 @@ completion_status: STATUS_CACHE_HIT
                         with mock.patch.object(
                             remote_action.RemoteAction,
                             "downloader",
-                            return_value=self.downloader,
+                            return_value=_FAKE_DOWNLOADER,
                         ) as mock_downloader:
                             exit_code = action.run()
             self.assertEqual(exit_code, 0)
@@ -3170,13 +3252,17 @@ class RbeDiagnosticsTests(unittest.TestCase):
             return_value=cl_utils.SubprocessResult(1),
         ) as mock_run:
             with mock.patch.object(
-                remote_action.RemoteAction, "_cleanup"
-            ) as mock_cleanup:
+                remote_action.RemoteAction, "download_inputs", return_value={}
+            ) as mock_download_inputs:
                 with mock.patch.object(
-                    remote_action, "analyze_rbe_logs"
-                ) as mock_analyze:
-                    self.assertEqual(action.run(), 1)
+                    remote_action.RemoteAction, "_cleanup"
+                ) as mock_cleanup:
+                    with mock.patch.object(
+                        remote_action, "analyze_rbe_logs"
+                    ) as mock_analyze:
+                        self.assertEqual(action.run(), 1)
 
+        mock_download_inputs.assert_called_once()
         mock_cleanup.assert_called_once()
         mock_run.assert_called_once()
         mock_analyze.assert_not_called()

@@ -1402,7 +1402,7 @@ class RemoteAction(object):
             return self.local_launch_command
         return self.remote_launch_command
 
-    def _process_download_stubs(self):
+    def _process_download_stubs(self) -> Dict[Path, int]:
         """Create download stubs so artifacts can be retrieved later."""
         self.vmsg(f"Reading remote action log from {self._action_log}.")
         log_record = ReproxyLogEntry.parse_action_log(self._action_log)
@@ -1413,7 +1413,7 @@ class RemoteAction(object):
             "STATUS_LOCAL_FALLBACK",
             "STATUS_RACING_LOCAL",
         }:
-            return
+            return {}
 
         self.vmsg("Creating download stubs for remote outputs.")
         # Create stubs, even for artifacts that are always_download-ed.
@@ -1431,30 +1431,55 @@ class RemoteAction(object):
             self._update_stub(stub_info)
 
         if not self.always_download:
-            return
+            return {}
 
+        always_download = set(self.always_download)
         # Download outputs that were explicitly requested.
         # Download actions here do not need to be locked because
         # this remote action (as a step of a full build)
         # is the sole producer of its outputs.
-        downloader = self.downloader()
+
         # Declared outputs are not required to exist remotely.
-        available_downloads = [
-            path for path in self.always_download if path in stub_infos
-        ]
+        available_downloads = {
+            path: stub_info
+            for path, stub_info in stub_infos.items()
+            if path in always_download
+        }
+        return self._download_batch(available_downloads.values())
+
+    def _download_batch(
+        self, stub_infos: Sequence[DownloadStubInfo]
+    ) -> Dict[Path, int]:
+        downloader = self.downloader()
         download_args = [
-            (self, stub_infos[path], downloader)  # for _download_for_mp
-            for path in available_downloads
+            (self, stub_info, downloader)  # for _download_for_mp
+            for stub_info in stub_infos
         ]
         try:
             with multiprocessing.Pool() as pool:
                 statuses = pool.map(_download_for_mp, download_args)
         except OSError:  # in case /dev/shm is not writeable (required)
-            if len(self.always_download) > 1:
+            if len(download_args) > 1:
                 msg("Warning: downloading sequentially instead of in parallel.")
             statuses = map(_download_for_mp, download_args)
 
         return {path: status for path, status in statuses}
+
+    def download_inputs(
+        self, keep_filter: Callable[[Path], bool]
+    ) -> Dict[Path, int]:
+        """Downloading inputs is useful for running local actions whose inputs
+        may have come from the outputs of remote actions that opted to
+        not download their outputs.
+        """
+        download_args = [
+            DownloadStubInfo.read_from_file(path)
+            for path in self.inputs_relative_to_working_dir
+            if keep_filter(path) and is_download_stub_file(path)
+        ]
+        paths = [stub.path for stub in download_args]
+        self.vmsg(f"Downloading inputs: {paths}")
+        return self._download_batch(download_args)
 
     def _update_stub(self, stub_info: DownloadStubInfo):
         """Write a download stub (or not, depending on conditions)."""
@@ -1675,6 +1700,31 @@ class RemoteAction(object):
             return 1
 
         try:
+            # If any local execution is involved, we need to make sure
+            # any inputs that came from remote execution without downloading
+            # are fetched locally first.
+            # Unfortunately, for remote_local_fallback and racing modes,
+            # this means always paying the cost of downloading inputs up front.
+            exec_strategy = self.exec_strategy or "remote"  # rewrapper default
+            if exec_strategy in {
+                "local",
+                "remote_local_fallback",
+                "racing",
+            }:
+                # Paths based at exec_root_rel are sources or prebuilts
+                # that cannot come from the outputs of any remote action.
+                download_statuses = self.download_inputs(
+                    lambda path: not str(path).startswith(
+                        str(self.exec_root_rel)
+                    )
+                )
+                for path, result in download_statuses.items():
+                    if result.returncode != 0:
+                        msg(
+                            f"Downloading local action input {path} failed:\n{result.stderr_text}"
+                        )
+                        return result.returncode
+
             result = self._run_maybe_remotely()
 
             # Under certain error conditions, do a one-time retry

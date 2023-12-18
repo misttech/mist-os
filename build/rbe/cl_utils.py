@@ -630,6 +630,14 @@ class SubprocessResult(object):
         self.stderr = stderr or []
         self.pid = pid if pid is not None else -1
 
+    @property
+    def stdout_text(self) -> str:
+        return "\n".join(self.stdout)
+
+    @property
+    def stderr_text(self) -> str:
+        return "\n".join(self.stderr)
+
 
 async def _read_stream(stream: io.TextIOBase, callback: Callable[[str], None]):
     while True:

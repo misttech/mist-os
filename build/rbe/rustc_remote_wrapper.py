@@ -939,6 +939,30 @@ class RustRemoteAction(object):
             self._cleanup()
 
     def run_local(self) -> int:
+        # Even if this is running locally, some of intermediate inputs
+        # have have come from remote actions that opted not to
+        # download their outputs (and left only download stubs).
+        # To be safe, verify the inputs and download as needed.
+
+        prepare_status = self.prepare()
+        if prepare_status != 0:
+            return prepare_status
+
+        # We know in our build system configuration that the following
+        # file suffixes could have come from remote builds.
+        # It is ok for this set to be conservatively inclusive.
+        # Eliminate inputs that come from the project root ../..,
+        # because those are sources or prebuilts.
+        remote_artifact_suffixes = {".o", ".a", ".so", ".dylib", ".rlib"}
+        download_statuses = self.remote_action.download_inputs(
+            lambda path: path.suffix in remote_artifact_suffixes
+            and not str(path).startswith(str(self.remote_action.exec_root_rel))
+        )
+        for path, status in download_statuses.items():
+            if status.returncode != 0:
+                msg(f"Failed to download input: {path}\n{status.stderr_text}")
+                return status.returncode
+
         # don't bother with remote action preparation
         # or any of the remote action features.
         export_dir = self.miscomparison_export_dir
