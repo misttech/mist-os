@@ -9,6 +9,7 @@ if (is_host) {
     main_source = "update_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",
+      "compute_content_hash.py",
       "update_workspace.py",
     ]
     libraries = [ "//third_party/parameterized" ]

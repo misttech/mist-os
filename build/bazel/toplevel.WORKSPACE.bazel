@@ -236,6 +236,7 @@ load(
 fuchsia_clang_repository(
     name = "fuchsia_clang",
     local_path = "prebuilt/third_party/clang/" + fuchsia_host_tag,
+    local_version_file = "//:generated_repository_hashes/fuchsia_clang.hash",
 )
 
 # buildifier: disable=load-on-top

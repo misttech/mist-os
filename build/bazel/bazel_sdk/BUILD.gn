@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
+import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/sdk/config.gni")
 import("//build/sdk/generate_final_idk.gni")
 import("//build/sdk/sdk_collection.gni")
@@ -29,6 +30,29 @@ generate_final_idk("idk") {
     # on older API levels.
     extra_api_levels = []
   }
+}
+
+# Generate content hash files for python and Clang toolchains.
+#
+# These will be used to trigger new runs of the bazel_sdk_test_xxx targets
+# if the content of these directory changes. And the
+# //build/bazel_sdk/tests/script/bazel_test.py script will ensure that their
+# values are passed to the test workspace.
+#
+_prebuilt_python_content_hash = "$target_out_dir/prebuilt_python.content_hash"
+_prebuilt_clang_content_hash = "$target_out_dir/prebuilt_clang.content_hash"
+
+generate_prebuilt_dir_content_hash("prebuilt_python_content_hash") {
+  source_dir = "//prebuilt/third_party/python3/${host_os}-${host_cpu}"
+  output = _prebuilt_python_content_hash
+  cipd_name = "cpython3"
+  exclude_suffixes = [ ".pyc" ]
+}
+
+generate_prebuilt_dir_content_hash("prebuilt_clang_content_hash") {
+  source_dir = "//prebuilt/third_party/clang/${host_os}-${host_cpu}"
+  output = _prebuilt_clang_content_hash
+  cipd_name = "clang"
 }
 
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
@@ -139,6 +163,16 @@ template("bazel_sdk_tests_for") {
       ]
       deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
     }
+    args += [
+      "--prebuilt-python-version-file",
+      rebase_path(_prebuilt_python_content_hash, root_build_dir),
+      "--prebuilt-clang-version-file",
+      rebase_path(_prebuilt_clang_content_hash, root_build_dir),
+    ]
+    deps += [
+      ":prebuilt_clang_content_hash",
+      ":prebuilt_python_content_hash",
+    ]
     pool = "//:console"
     hermetic_deps = false
     no_output_dir_leaks = true

@@ -34,7 +34,6 @@ old ones are removed.
 import argparse
 import difflib
 import errno
-import hashlib
 import json
 import os
 import shutil
@@ -44,6 +43,7 @@ import sys
 from typing import Sequence
 
 import check_ninja_build_plan
+import compute_content_hash
 
 
 def get_host_platform() -> str:
@@ -262,11 +262,7 @@ def generate_fuchsia_build_config(fuchsia_dir):
 
 
 def md5_all_files(paths):
-    h = hashlib.new("md5")
-    for p in paths:
-        with open(p, "rb") as f:
-            h.update(f.read())
-    return h.hexdigest()
+    return compute_content_hash.content_hash_for_files(paths)
 
 
 def all_sdk_metas(sdk_root):
@@ -295,17 +291,9 @@ def all_sdk_metas(sdk_root):
 
 def find_clang_content_files(clang_install_dir):
     """Return a list of content hashing input files for Clang."""
-    version_file = os.path.join(
-        clang_install_dir, ".versions", "clang.cipd_version"
+    return compute_content_hash.find_content_files(
+        clang_install_dir, cipd_name="clang"
     )
-    if os.path.exists(version_file):
-        return [version_file]
-
-    # This directory does not come from CIPD, this can happen when
-    # experimenting with local Clang installation. Return the path of the
-    # main Clang binary, hoping its unique hash will differ between different
-    # releases of the whole toolchain.
-    return [os.path.join(clang_install_bin, "bin", "clang")]
 
 
 class GeneratedFiles(object):

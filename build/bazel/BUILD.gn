@@ -87,8 +87,9 @@ action("generate_main_workspace") {
     # The script reads this configuration file
     "//build/bazel/config/main_workspace_top_dir",
 
-    # The script imports this python file
+    # The script imports these python files
     "//build/bazel/scripts/check_ninja_build_plan.py",
+    "//build/bazel/scripts/compute_content_hash.py",
 
     # The script reads RBE configs
     rewrapper_config_file,
@@ -121,6 +122,7 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_sdk.hash",
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/internal_sdk.hash",
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/prebuilt_clang.hash",
+    "${bazel_main_top_dir}/workspace/generated_repository_hashes/prebuilt_python.hash",
 
     # LINT.ThenChange(scripts/update-workspace.py)
   ]
