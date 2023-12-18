@@ -96,6 +96,10 @@
             startup: "eager",
         },
         {
+            name: "role_manager",
+            url: "fuchsia-boot:///role_manager#meta/role_manager.cm",
+        },
+        {
             name: "sysinfo",
             url: "fuchsia-boot:///sysinfo#meta/sysinfo.cm",
         },
@@ -355,6 +359,14 @@
         {
             directory: "boot",
             from: "parent",
+            as: "config-profiles",
+            to: "#role_manager",
+            rights: [ "r*" ],
+            subdir: "config/profiles",
+        },
+        {
+            directory: "boot",
+            from: "parent",
             as: "boot-data",
             to: [ "#virtual_console" ],
             rights: [ "r*" ],
@@ -556,6 +568,11 @@
                 "#fshost",
                 "#pkg-cache",
             ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.ProfileResource" ],
+            from: "parent",
+            to: [ "#role_manager" ],
         },
         {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
@@ -954,6 +971,7 @@
                 "#power_manager",
                 "#ptysvc",
                 "#pwrbtn-monitor",
+                "#role_manager",
                 "#shutdown_shim",
                 "#svchost",
                 "#sysinfo",
@@ -963,7 +981,7 @@
         {
             protocol: [ "fuchsia.kernel.RootJob" ],
             from: "parent",
-            to: "#pwrbtn-monitor",
+            to: [ "#pwrbtn-monitor" ],
         },
         {
             protocol: [ "fuchsia.power.button.Monitor" ],
@@ -1253,6 +1271,10 @@
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "#svchost",
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "#role_manager",
         },
         {
             resolver: "base_resolver",

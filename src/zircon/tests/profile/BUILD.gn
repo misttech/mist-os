@@ -34,7 +34,7 @@ test("profile-config") {
   deps = [
     ":profile-config-files",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/profile:config-test",
+    "//zircon/system/ulib/profile:config",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

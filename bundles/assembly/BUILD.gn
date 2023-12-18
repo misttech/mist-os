@@ -119,6 +119,7 @@ assembly_input_bundle("bootstrap") {
     "//src/sys/bootstrap:package",
     "//src/sys/root:package",
     "//src/sys/startup:package",
+    "//src/zircon/bin/role_manager:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
