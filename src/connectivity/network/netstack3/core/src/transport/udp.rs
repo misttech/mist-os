@@ -7190,8 +7190,9 @@ mod tests {
             datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
                 remote_ip.into(),
-                |device_config| {
-                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                [FakeDeviceId {}],
+                |device_configs| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new(device_configs))
                 },
             );
 
@@ -7251,8 +7252,9 @@ mod tests {
             datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
                 remote_ip.into(),
-                |device_config| {
-                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                [FakeDeviceId {}],
+                |device_configs| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new(device_configs))
                 },
             );
 
@@ -7324,8 +7326,9 @@ mod tests {
             datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
-                |device_config| {
-                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                [FakeDeviceId {}],
+                |device_configs| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new(device_configs))
                 },
             );
 
@@ -7401,8 +7404,9 @@ mod tests {
             datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
                 original_remote_ip.into(),
-                |device_config| {
-                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                [FakeDeviceId {}],
+                |device_configs| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new(device_configs))
                 },
             );
 
