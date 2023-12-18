@@ -2,6 +2,89 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! # The Allocator
+//!
+//! The allocator in Fxfs is filesystem-wide entity responsible for managing the allocation of
+//! regions of the device to "owners" (which are `ObjectStore`).
+//!
+//! Allocations are tracked in an LSMTree with coalescing used to merge neighboring allocations
+//! with the same properties (owner and reference count). As of writing, reference counting is not
+//! used. (Reference counts are intended for future use if/when snapshot support is implemented.)
+//!
+//! There are a number of important implementation features of the allocator that warrant further
+//! documentation.
+//!
+//! ## Byte limits
+//!
+//! Fxfs is a multi-volume filesystem. Fuchsia with fxblob currently uses two primary volumes -
+//! an unencrypted volume for blob storage and an encrypted volume for data storage.
+//! Byte limits ensure that no one volume can consume all available storage. This is important
+//! as software updates must always be possible (blobs) and conversely configuration data should
+//! always be writable (data).
+//!
+//! ## Reservation tracking
+//!
+//! Fxfs on Fuchsia leverages write-back caching which allows us to buffer writes in RAM until
+//! memory pressure, an explicit flush or a file close requires us to persist data to storage.
+//!
+//! To ensure that we do not over-commit in such cases (e.g. by writing many files to RAM only to
+//! find out tha there is insufficient disk to store them all), the allocator includes a simple
+//! reservation tracking mechanism.
+//!
+//! Reservation tracking is implemented hierarchically such that a reservation can portion out
+//! sub-reservations, each of which may be "reserved" or "forgotten" when it comes time to actually
+//! allocate space.
+//!
+//! ## Fixed locations
+//!
+//! The only fixed location files in Fxfs are the first 512kiB extents of the two superblocks that
+//! exist as the first things on the disk (i.e. The first 1MiB). The allocator manages these
+//! locations, but does so using a 'mark_allocated' method distinct from all other allocations in
+//! which the location is left up to the allocator.
+//!
+//! ## Deallocated unusable regions
+//!
+//! It is not legal to reuse a deallocated disk region until after a flush. Transactions
+//! are not guaranteed to be persisted until after a successful flush so any reuse of
+//! a region before then followed by power loss may lead to corruption.
+//!
+//! e.g. Consider if we deallocate a file, reuse its extent for another file, then crash after
+//! writing to the new file but not yet flushing the journal. At next mount we will have lost the
+//! transaction despite overwriting the original file's data, leading to inconsistency errors (data
+//! corruption).
+//!
+//! These regions are currently tracked in RAM in the allocator.
+//!
+//! ## TRIMed unusable regions
+//!
+//! TRIM notifies the SSD controller of regions of the disk that are not used. This helps with SSD
+//! performance and longevity because wear leveling and ECC need not be performed on logical blocks
+//! that don't contain useful data. Fxfs performs batch TRIM passes periodically in the background
+//! by walking over unallocated regions of the disk and performing trim() operations on unused
+//! regions. These operations are asynchronous and therefore these regions are unusable until
+//! the operation completes.
+//!
+//! These are tracked as "temporary allocations" in the current allocator implementation.
+//!
+//! ## Volume deletion
+//!
+//! We make use of an optimisation in the case where an entire volume is deleted. In such cases,
+//! rather than individually deallocate all disk regions associated with that volume, we make
+//! note of the deletion and perform special merge operation on the next LSMTree compaction that
+//! filters out allocations for the deleted volume.
+//!
+//! This is designed to make dropping of volumes significantly cheaper, but it does add some
+//! additional complexity if implementing an allocator that implements data structures to track
+//! free space (rather than just allocated space).
+//!
+//! ## Image generation
+//!
+//! The Fuchsia build process requires building an initial filesystem image. In the case of
+//! fxblob-based boards, this is an Fxfs filesystem containing a volume with the base set of
+//! blobs required to bootstrap the system. When we build such an image, we want it to be as compact
+//! as possible as we're potentially packaging it up for distribution. To that end, our allocation
+//! strategy should differ between image generation and "live" use cases.
+
 pub mod merge;
 
 use {
