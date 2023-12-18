@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
@@ -358,21 +359,23 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // Get the latest applied config stamp. This will be used to compare against the config
     // stamp in the OnSync callback function used by the display. If the two stamps match,
     // then we know that the vsync has completed and it is safe to do readbacks.
-    fuchsia::hardware::display::ConfigStamp pending_config_stamp;
+    fuchsia::hardware::display::types::ConfigStamp pending_config_stamp;
     auto status = (*display_coordinator.get())->GetLatestAppliedConfigStamp(&pending_config_stamp);
     ASSERT_TRUE(status == ZX_OK);
 
     // The callback will switch this bool to |true| if the two configs match. It is initialized
     // to |false| and blocks the main thread below.
     bool configs_are_equal = false;
-    display->SetVsyncCallback([&pending_config_stamp, &configs_are_equal](
-                                  zx::time timestamp,
-                                  fuchsia::hardware::display::ConfigStamp applied_config_stamp) {
-      if (pending_config_stamp.value == applied_config_stamp.value &&
-          applied_config_stamp.value != fuchsia::hardware::display::INVALID_CONFIG_STAMP_VALUE) {
-        configs_are_equal = true;
-      }
-    });
+    display->SetVsyncCallback(
+        [&pending_config_stamp, &configs_are_equal](
+            zx::time timestamp,
+            fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
+          if (pending_config_stamp.value == applied_config_stamp.value &&
+              applied_config_stamp.value !=
+                  fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE) {
+            configs_are_equal = true;
+          }
+        });
 
     // Run loop until the configs match.
     ASSERT_TRUE(RunLoopWithTimeoutOrUntil([&configs_are_equal] { return configs_are_equal; },

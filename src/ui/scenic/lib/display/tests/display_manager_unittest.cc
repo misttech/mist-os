@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 
@@ -83,7 +84,7 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
 
   display_manager()->default_display()->SetVsyncCallback(
       [&num_vsync_display_received](zx::time timestamp,
-                                    fuchsia::hardware::display::ConfigStamp stamp) {
+                                    fuchsia::hardware::display::types::ConfigStamp stamp) {
         ++num_vsync_display_received;
       });
 

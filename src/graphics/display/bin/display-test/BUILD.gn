@@ -11,6 +11,7 @@ executable("display-test") {
   deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/component/incoming/cpp",

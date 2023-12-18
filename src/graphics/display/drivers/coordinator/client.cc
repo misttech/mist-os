@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -59,6 +60,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 
 namespace {
 
@@ -618,7 +620,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
 }
 
 void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
-  fhd::wire::ConfigResult res;
+  fhdt::wire::ConfigResult res;
   std::vector<fhd::wire::ClientCompositionOp> ops;
 
   pending_config_valid_ = CheckConfig(&res, &ops);
@@ -859,10 +861,10 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
   }
 }
 
-bool Client::CheckConfig(fhd::wire::ConfigResult* res,
+bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
                          std::vector<fhd::wire::ClientCompositionOp>* ops) {
   if (res && ops) {
-    *res = fhd::wire::ConfigResult::kOk;
+    *res = fhdt::wire::ConfigResult::kOk;
     ops->clear();
   }
   if (configs_.size() == 0) {
@@ -952,7 +954,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
 
   if (config_fail) {
     if (res) {
-      *res = fhd::wire::ConfigResult::kInvalidConfig;
+      *res = fhdt::wire::ConfigResult::kInvalidConfig;
     }
     // If the config is invalid, there's no point in sending it to the impl driver.
     return false;
@@ -966,8 +968,8 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
     if (res) {
       *res = display_cfg_result == CONFIG_CHECK_RESULT_TOO_MANY
-                 ? fhd::wire::ConfigResult::kTooManyDisplays
-                 : fhd::wire::ConfigResult::kUnsupportedDisplayModes;
+                 ? fhdt::wire::ConfigResult::kTooManyDisplays
+                 : fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
     }
     return false;
   }
@@ -987,7 +989,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   if (!(res && ops)) {
     return false;
   }
-  *res = fhd::wire::ConfigResult::kUnsupportedConfig;
+  *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
 
   // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
   // comments to make sure that any change of type Client in

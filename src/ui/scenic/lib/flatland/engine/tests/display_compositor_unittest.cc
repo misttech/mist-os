@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 
 #include <memory>
 
@@ -161,7 +162,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_->enable_display_composition_ = !force_renderer_only;
   }
 
-  void SendOnVsyncEvent(fuchsia::hardware::display::ConfigStamp stamp) {
+  void SendOnVsyncEvent(fuchsia::hardware::display::types::ConfigStamp stamp) {
     display_compositor_->OnVsync(zx::time(), stamp);
   }
 
@@ -238,8 +239,8 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -330,7 +331,7 @@ TEST_F(DisplayCompositorTest,
              MockDisplayCoordinator::ImportImageCallback callback) { callback(ZX_OK); }));
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        callback(fuchsia::hardware::display::ConfigResult::OK, /*ops=*/{});
+        callback(fuchsia::hardware::display::types::ConfigResult::OK, /*ops=*/{});
       }));
 
   // Set renderer constraints.
@@ -454,7 +455,7 @@ TEST_F(DisplayCompositorTest,
           }));
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        callback(fuchsia::hardware::display::ConfigResult::OK, /*ops=*/{});
+        callback(fuchsia::hardware::display::types::ConfigResult::OK, /*ops=*/{});
       }));
 
   // Set renderer constraints.
@@ -540,7 +541,7 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        callback(fuchsia::hardware::display::ConfigResult::OK, /*ops=*/{});
+        callback(fuchsia::hardware::display::types::ConfigResult::OK, /*ops=*/{});
       }));
 
   // Set renderer constraints.
@@ -619,8 +620,8 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -698,8 +699,8 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -854,8 +855,8 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -882,8 +883,8 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillRepeatedly(
           testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-            fuchsia::hardware::display::ConfigResult result =
-                fuchsia::hardware::display::ConfigResult::OK;
+            fuchsia::hardware::display::types::ConfigResult result =
+                fuchsia::hardware::display::types::ConfigResult::OK;
             std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
             callback(result, ops);
           }));
@@ -893,7 +894,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCallback callback) {
-            fuchsia::hardware::display::ConfigStamp stamp = {kConfigStamp1};
+            fuchsia::hardware::display::types::ConfigStamp stamp = {kConfigStamp1};
             callback(stamp);
           }));
   display_compositor_->RenderFrame(1, zx::time(1), {}, {}, [](const scheduling::Timestamps&) {});
@@ -902,7 +903,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCallback callback) {
-            fuchsia::hardware::display::ConfigStamp stamp = {kConfigStamp2};
+            fuchsia::hardware::display::types::ConfigStamp stamp = {kConfigStamp2};
             callback(stamp);
           }));
   display_compositor_->RenderFrame(2, zx::time(2), {}, {}, [](const scheduling::Timestamps&) {});
@@ -1132,8 +1133,8 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(false, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -1149,7 +1150,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCallback callback) {
-            fuchsia::hardware::display::ConfigStamp stamp = {1};
+            fuchsia::hardware::display::types::ConfigStamp stamp = {1};
             callback(stamp);
           }));
 
@@ -1164,8 +1165,8 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -1325,8 +1326,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(false, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -1342,7 +1343,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCallback callback) {
-            fuchsia::hardware::display::ConfigStamp stamp = {1};
+            fuchsia::hardware::display::types::ConfigStamp stamp = {1};
             callback(stamp);
           }));
 
@@ -1357,8 +1358,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -1616,8 +1617,8 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(true, _))
       .WillRepeatedly(
           testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-            fuchsia::hardware::display::ConfigResult result =
-                fuchsia::hardware::display::ConfigResult::OK;
+            fuchsia::hardware::display::types::ConfigResult result =
+                fuchsia::hardware::display::types::ConfigResult::OK;
             std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
             callback(result, ops);
           }));
@@ -1660,8 +1661,8 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_, SetLayerImage(FidlEquals(layers[0]), _, _, _)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(false, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
@@ -1669,7 +1670,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCallback callback) {
-            fuchsia::hardware::display::ConfigStamp stamp = {1};
+            fuchsia::hardware::display::types::ConfigStamp stamp = {1};
             callback(stamp);
           }));
 
@@ -1728,8 +1729,8 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
+        fuchsia::hardware::display::types::ConfigResult result =
+            fuchsia::hardware::display::types::ConfigResult::OK;
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));

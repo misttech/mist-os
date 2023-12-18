@@ -4,6 +4,7 @@
 
 #include <endian.h>
 #include <errno.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
@@ -42,6 +43,7 @@
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 namespace sysmem = fuchsia_sysmem;
 namespace sysinfo = fuchsia_sysinfo;
 
@@ -222,14 +224,14 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   return true;
 }
 
-std::optional<fhd::wire::ConfigStamp> apply_config() {
+std::optional<fhdt::wire::ConfigStamp> apply_config() {
   auto result = dc->CheckConfig(false);
   if (!result.ok()) {
     printf("Failed to make check call: %s\n", result.FormatDescription().c_str());
     return std::nullopt;
   }
 
-  if (result.value().res != fhd::wire::ConfigResult::kOk) {
+  if (result.value().res != fhdt::wire::ConfigResult::kOk) {
     printf("Config not valid (%d)\n", static_cast<uint32_t>(result.value().res));
     for (const auto& op : result.value().ops) {
       printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
@@ -252,10 +254,10 @@ std::optional<fhd::wire::ConfigStamp> apply_config() {
   return config_stamp_result.value().stamp;
 }
 
-zx_status_t wait_for_vsync(fhd::wire::ConfigStamp expected_stamp) {
+zx_status_t wait_for_vsync(fhdt::wire::ConfigStamp expected_stamp) {
   class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
    public:
-    explicit EventHandler(fhd::wire::ConfigStamp expected_stamp)
+    explicit EventHandler(fhdt::wire::ConfigStamp expected_stamp)
         : expected_stamp_(expected_stamp) {}
 
     zx_status_t status() const { return status_; }
@@ -286,7 +288,7 @@ zx_status_t wait_for_vsync(fhd::wire::ConfigStamp expected_stamp) {
     }
 
    private:
-    fhd::wire::ConfigStamp expected_stamp_;
+    fhdt::wire::ConfigStamp expected_stamp_;
     zx_status_t status_ = ZX_OK;
   };
 
@@ -1113,7 +1115,7 @@ int main(int argc, const char* argv[]) {
     // in order to observe any tearing effects
     zx_nanosleep(zx_deadline_after(ZX_MSEC(delay)));
 
-    fhd::wire::ConfigStamp expected_stamp = {.value = fhd::wire::kInvalidConfigStampValue};
+    fhdt::wire::ConfigStamp expected_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
     if (!max_apply_configs || i < max_apply_configs) {
       for (uint32_t cpv = 0; cpv < configs_per_vsync; cpv++) {
         auto maybe_expected_stamp = apply_config();

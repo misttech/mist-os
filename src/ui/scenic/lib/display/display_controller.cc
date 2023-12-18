@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_controller.h"
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace scenic_impl {
@@ -17,7 +18,8 @@ Display2::Display2(fuchsia::hardware::display::DisplayId display_id,
       display_modes_(std::move(display_modes)),
       pixel_formats_(std::move(pixel_formats)) {}
 
-void Display2::OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp config_stamp) {
+void Display2::OnVsync(zx::time timestamp,
+                       fuchsia::hardware::display::types::ConfigStamp config_stamp) {
   if (on_vsync_callback_) {
     on_vsync_callback_(timestamp, config_stamp);
   }

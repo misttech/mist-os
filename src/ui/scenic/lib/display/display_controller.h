@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/fit/function.h>
 
 #include <cstdint>
@@ -28,8 +29,8 @@ using DisplayCoordinatorUniquePtr =
     std::unique_ptr<DisplayCoordinator, std::function<void(DisplayCoordinator*)>>;
 using OnDisplayRemovedCallback = fit::function<void(fuchsia::hardware::display::DisplayId)>;
 using OnDisplayAddedCallback = fit::function<void(Display2*)>;
-using OnVsyncCallback =
-    fit::function<void(zx::time timestamp, fuchsia::hardware::display::ConfigStamp config_stamp)>;
+using OnVsyncCallback = fit::function<void(
+    zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp config_stamp)>;
 
 // Display metadata, as well as a registration point for vsync events for the display.
 class Display2 {
@@ -50,7 +51,7 @@ class Display2 {
   }
 
   // Invokes Vsync callback. Should only be called by DisplayManager or during testing.
-  void OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp config_stamp);
+  void OnVsync(zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp config_stamp);
 
  private:
   fuchsia::hardware::display::DisplayId display_id_;

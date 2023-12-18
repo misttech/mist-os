@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async-testing/test_loop.h>
@@ -298,10 +299,10 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
-  fuchsia::hardware::display::ConfigResult result;
+  fuchsia::hardware::display::types::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
   (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
-  EXPECT_EQ(result, fuchsia::hardware::display::ConfigResult::OK);
+  EXPECT_EQ(result, fuchsia::hardware::display::types::ConfigResult::OK);
   status = (*display_coordinator.get())->ApplyConfig();
   EXPECT_EQ(status, ZX_OK);
 
@@ -320,7 +321,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Apply the config to display the second image.
   (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
-  EXPECT_EQ(result, fuchsia::hardware::display::ConfigResult::OK);
+  EXPECT_EQ(result, fuchsia::hardware::display::types::ConfigResult::OK);
   status = (*display_coordinator.get())->ApplyConfig();
   EXPECT_EQ(status, ZX_OK);
 

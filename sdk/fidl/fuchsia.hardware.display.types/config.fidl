@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.display;
+library fuchsia.hardware.display.types;
 
 /// The result of checking a draft display config.
 ///
@@ -25,14 +25,11 @@ type ConfigResult = strict enum : uint32 {
     UNSUPPORTED_DISPLAY_MODES = 4;
 };
 
-/// Maximum number of fences supported by
-/// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
-const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
-
 /// Identifies an accepted display config.
 ///
 /// This is a type-safe wrapper for a
-/// [`fuchsia.hardware.display/ConfigStampValue`], which is a raw numeric value.
+/// [`fuchsia.hardware.display.types/ConfigStampValue`], which is a raw numeric
+/// value.
 ///
 /// Each successful call to [`fuchsia.hardware.display/Coordinator.ApplyConfig`]
 /// generates a valid value. Values are reported in
@@ -41,13 +38,13 @@ const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
 /// Generated values are strictly increasing (unique, strictly monotonic) within
 /// the lifetime of a [`fuchsia.display/Coordinator`] connection.
 ///
-/// [`fuchsia.hardware.display/INVALID_CONFIG_STAMP_VALUE`] represents an
+/// [`fuchsia.hardware.display.types/INVALID_CONFIG_STAMP_VALUE`] represents an
 /// invalid value.
 type ConfigStamp = struct {
     value ConfigStampValue;
 };
 
-/// See [`fuchsia.hardware.display/ConfigStamp`].
+/// See [`fuchsia.hardware.display.types/ConfigStamp`].
 alias ConfigStampValue = uint64;
 
 const INVALID_CONFIG_STAMP_VALUE ConfigStampValue = 0;

@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_controller_listener.h"
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
@@ -262,11 +263,11 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
   fuchsia::hardware::display::DisplayId last_display_id = {
       .value = fuchsia::hardware::display::INVALID_DISP_ID};
   uint64_t last_timestamp = 0u;
-  fuchsia::hardware::display::ConfigStamp last_config_stamp = {
-      .value = fuchsia::hardware::display::INVALID_CONFIG_STAMP_VALUE};
+  fuchsia::hardware::display::types::ConfigStamp last_config_stamp = {
+      .value = fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE};
 
   auto vsync_cb = [&](fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
-                      fuchsia::hardware::display::ConfigStamp stamp, uint64_t cookie) {
+                      fuchsia::hardware::display::types::ConfigStamp stamp, uint64_t cookie) {
     last_display_id = display_id;
     last_timestamp = timestamp;
     last_config_stamp = std::move(stamp);
@@ -279,9 +280,9 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
   constexpr fuchsia::hardware::display::DisplayId kTestDisplayId = {.value = 1};
   constexpr fuchsia::hardware::display::DisplayId kInvalidDisplayId = {.value = 2};
   const uint64_t kTestTimestamp = 111111u;
-  const fuchsia::hardware::display::ConfigStamp kConfigStamp = {.value = 2u};
+  const fuchsia::hardware::display::types::ConfigStamp kConfigStamp = {.value = 2u};
   mock_display_coordinator()->events().OnVsync(kTestDisplayId, kTestTimestamp, kConfigStamp, 0);
-  ASSERT_EQ(fuchsia::hardware::display::INVALID_CONFIG_STAMP_VALUE, last_config_stamp.value);
+  ASSERT_EQ(fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE, last_config_stamp.value);
   RunLoopUntilIdle();
   EXPECT_EQ(kTestDisplayId.value, last_display_id.value);
   EXPECT_EQ(kTestTimestamp, last_timestamp);

@@ -39,6 +39,7 @@ executable("unittests") {
 
   public_deps = [
     ":testing_deps",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//src/lib/fsl",
     "//src/ui/scenic/lib/flatland:flatland_types",
     "//zircon/system/ulib/async-default",

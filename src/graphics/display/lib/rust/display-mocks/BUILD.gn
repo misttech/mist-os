@@ -20,6 +20,7 @@ rustc_library("display-mocks") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_rust",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:itertools",

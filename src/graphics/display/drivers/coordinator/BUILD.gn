@@ -78,6 +78,7 @@ source_set("shared") {
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",

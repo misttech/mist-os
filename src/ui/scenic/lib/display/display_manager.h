@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
@@ -56,7 +57,7 @@ class DisplayManager {
   // stomps previous callbacks may not be what we want.
   using VsyncCallback =
       fit::function<void(fuchsia::hardware::display::DisplayId display_id, zx::time timestamp,
-                         fuchsia::hardware::display::ConfigStamp applied_config_stamp)>;
+                         fuchsia::hardware::display::types::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback);
 
  private:
@@ -66,7 +67,8 @@ class DisplayManager {
                          std::vector<fuchsia::hardware::display::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);
   void OnVsync(fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
-               fuchsia::hardware::display::ConfigStamp applied_config_stamp, uint64_t cookie);
+               fuchsia::hardware::display::types::ConfigStamp applied_config_stamp,
+               uint64_t cookie);
 
   std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator_;
   std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener_;

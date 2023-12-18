@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_hardware_display::{ClientCompositionOp, ClientCompositionOpcode, ConfigResult},
+    fidl_fuchsia_hardware_display::{ClientCompositionOp, ClientCompositionOpcode},
+    fidl_fuchsia_hardware_display_types::ConfigResult,
     fuchsia_zircon as zx,
     futures::channel::mpsc,
     thiserror::Error,

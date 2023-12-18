@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_controller.h"
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
@@ -30,7 +31,7 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
   display.OnVsync(zx::time(1), {.value = 1});
   bool invoked_vsync_callback = false;
   display.set_on_vsync_callback(
-      [&](zx::time timestamp, fuchsia::hardware::display::ConfigStamp stamp) {
+      [&](zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp stamp) {
         invoked_vsync_callback = true;
         EXPECT_EQ(zx::time(2), timestamp);
         EXPECT_EQ(2u, stamp.value);

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+using fuchsia.hardware.display.types;
 using fuchsia.images2;
 using fuchsia.sysmem;
 using zx;
@@ -11,6 +12,10 @@ using zx;
 
 /// Invalid id for displays, images, and events.
 const INVALID_DISP_ID DisplayIdValue = 0;
+
+/// Maximum number of fences supported by
+/// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
+const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
 
 /// Interface for accessing the display hardware.
 ///
@@ -314,7 +319,7 @@ closed protocol Coordinator {
     strict CheckConfig(struct {
         discard bool;
     }) -> (struct {
-        res ConfigResult;
+        res fuchsia.hardware.display.types.ConfigResult;
         ops vector<ClientCompositionOp>:MAX;
     });
 
@@ -336,7 +341,7 @@ closed protocol Coordinator {
     /// because of pending image availability or pending layer changes.
     /// If no configuration was applied before, returns `INVALID_CONFIG_STAMP_VALUE`.
     strict GetLatestAppliedConfigStamp() -> (struct {
-        stamp ConfigStamp;
+        stamp fuchsia.hardware.display.types.ConfigStamp;
     });
 
     /// Applies any pending changes to the current configuration. This will
@@ -430,7 +435,7 @@ closed protocol Coordinator {
     strict -> OnVsync(resource struct {
         display_id DisplayId;
         timestamp uint64;
-        applied_config_stamp ConfigStamp;
+        applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
         cookie uint64;
     });
 

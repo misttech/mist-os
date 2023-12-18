@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CLIENT_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CLIENT_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -351,7 +352,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
-  bool CheckConfig(fuchsia_hardware_display::wire::ConfigResult* res,
+  bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res,
                    std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
 
   // The state of the FIDL binding. See comments on

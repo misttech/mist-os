@@ -5,7 +5,7 @@
 use {
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId},
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_hardware_display_types as display_types, fidl_fuchsia_io as fio,
     fuchsia_async::{DurationExt as _, TimeoutExt as _},
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::directory::{WatchEvent, Watcher},
@@ -60,7 +60,7 @@ pub struct VsyncEvent {
     pub timestamp: zx::Time,
 
     /// The stamp of the latest fully applied display configuration.
-    pub config: display::ConfigStamp,
+    pub config: display_types::ConfigStamp,
 }
 
 impl Coordinator {
@@ -248,7 +248,7 @@ impl Coordinator {
         }
 
         let (result, ops) = proxy.check_config(false).await?;
-        if result != display::ConfigResult::Ok {
+        if result != display_types::ConfigResult::Ok {
             return Err(ConfigError::invalid(result, ops));
         }
 
@@ -338,7 +338,7 @@ impl CoordinatorInner {
         &mut self,
         display_id: DisplayId,
         timestamp: u64,
-        applied_config_stamp: display::ConfigStamp,
+        applied_config_stamp: display_types::ConfigStamp,
         cookie: u64,
     ) -> Result<()> {
         self.proxy.acknowledge_vsync(cookie)?;
@@ -415,6 +415,7 @@ mod tests {
         assert_matches::assert_matches,
         display_mocks::{create_proxy_and_mock, MockCoordinator},
         fidl_fuchsia_hardware_display as display,
+        fidl_fuchsia_hardware_display_types as display_types,
         fuchsia_async::TestExecutor,
         futures::{pin_mut, select, task::Poll, FutureExt, StreamExt},
     };
@@ -504,7 +505,7 @@ mod tests {
         let mut vsync = coordinator.add_vsync_listener(None)?;
 
         const ID: DisplayId = DisplayId(1);
-        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
+        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
         let event_handlers = async {
             select! {
                 event = vsync.next() => event.ok_or(format_err!("did not receive vsync event")),
@@ -540,7 +541,7 @@ mod tests {
 
         const ID1: DisplayId = DisplayId(1);
         const ID2: DisplayId = DisplayId(2);
-        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
+        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
 
         // Queue multiple events.
         mock.emit_vsync_event(ID1.0, STAMP)?;
@@ -583,7 +584,7 @@ mod tests {
 
         const ID1: DisplayId = DisplayId(1);
         const ID2: DisplayId = DisplayId(2);
-        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
+        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
 
         // Listen to events from ID2.
         let mut vsync = coordinator.add_vsync_listener(Some(ID2))?;

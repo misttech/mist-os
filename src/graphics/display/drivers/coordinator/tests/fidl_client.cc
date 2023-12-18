@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
@@ -285,13 +286,13 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   }
 
   if (auto reply = dc_->CheckConfig(false);
-      !reply.ok() || reply.value().res != fhd::wire::ConfigResult::kOk) {
+      !reply.ok() || reply.value().res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
     return reply.ok() ? ZX_ERR_INVALID_ARGS : reply.status();
   }
   return dc_->ApplyConfig().status();
 }
 
-fuchsia_hardware_display::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
+fuchsia_hardware_display_types::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
   fbl::AutoLock lock(mtx());
   EXPECT_TRUE(dc_);
   auto result = dc_->GetLatestAppliedConfigStamp();

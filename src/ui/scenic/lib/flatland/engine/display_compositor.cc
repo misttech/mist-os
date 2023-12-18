@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
@@ -593,29 +594,29 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
 bool DisplayCompositor::CheckConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::CheckConfig");
-  fuchsia::hardware::display::ConfigResult result;
+  fuchsia::hardware::display::types::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
   (*display_coordinator_)->CheckConfig(/*discard*/ false, &result, &ops);
-  return result == fuchsia::hardware::display::ConfigResult::OK;
+  return result == fuchsia::hardware::display::types::ConfigResult::OK;
 }
 
 void DisplayCompositor::DiscardConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::DiscardConfig");
   pending_images_in_config_.clear();
-  fuchsia::hardware::display::ConfigResult result;
+  fuchsia::hardware::display::types::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
   (*display_coordinator_)->CheckConfig(/*discard*/ true, &result, &ops);
 }
 
-fuchsia::hardware::display::ConfigStamp DisplayCompositor::ApplyConfig() {
+fuchsia::hardware::display::types::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   {
     const auto status = (*display_coordinator_)->ApplyConfig();
     FX_DCHECK(status == ZX_OK);
   }
-  fuchsia::hardware::display::ConfigStamp pending_config_stamp;
+  fuchsia::hardware::display::types::ConfigStamp pending_config_stamp;
   {
     const auto status = (*display_coordinator_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
     FX_DCHECK(status == ZX_OK);
@@ -823,8 +824,8 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
   return true;
 }
 
-void DisplayCompositor::OnVsync(zx::time timestamp,
-                                fuchsia::hardware::display::ConfigStamp applied_config_stamp) {
+void DisplayCompositor::OnVsync(
+    zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "Flatland::DisplayCompositor::OnVsync");
 
@@ -934,8 +935,8 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   // Add vsync callback on display. Note that this will overwrite the existing callback on
   // |display| and other clients won't receive any, i.e. gfx.
   display->SetVsyncCallback(
-      [weak_ref = weak_from_this()](zx::time timestamp,
-                                    fuchsia::hardware::display::ConfigStamp applied_config_stamp) {
+      [weak_ref = weak_from_this()](
+          zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
         if (auto ref = weak_ref.lock())
           ref->OnVsync(timestamp, applied_config_stamp);
       });

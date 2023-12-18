@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/event.h>
 #include <zircon/types.h>
@@ -35,7 +36,7 @@ class Display {
   virtual ~Display() = default;
 
   using VsyncCallback = fit::function<void(
-      zx::time timestamp, fuchsia::hardware::display::ConfigStamp applied_config_stamp)>;
+      zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback) { vsync_callback_ = std::move(callback); }
 
   using DPRCallback = fit::function<void(const glm::vec2& dpr)>;
@@ -76,7 +77,8 @@ class Display {
   const zx::event& ownership_event() const { return ownership_event_; }
 
   // Called by DisplayManager, other users of Display should probably not call this.  Except tests.
-  void OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp applied_config_stamp);
+  void OnVsync(zx::time timestamp,
+               fuchsia::hardware::display::types::ConfigStamp applied_config_stamp);
 
  protected:
   std::shared_ptr<scheduling::VsyncTiming> vsync_timing_;

@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
@@ -42,7 +43,7 @@ void Display::Unclaim() {
 }
 
 void Display::OnVsync(zx::time timestamp,
-                      fuchsia::hardware::display::ConfigStamp applied_config_stamp) {
+                      fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
   zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
 
   if (vsync_timing_->last_vsync_time() != zx::time(0)) {

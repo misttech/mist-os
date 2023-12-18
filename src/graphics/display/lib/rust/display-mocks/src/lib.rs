@@ -9,7 +9,7 @@
 use {
     fidl::endpoints::{RequestStream, ServerEnd},
     fidl_fuchsia_hardware_display::{self as display, CoordinatorMarker, CoordinatorRequestStream},
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx,
     itertools::Itertools,
     std::collections::HashMap,
     thiserror::Error,
@@ -84,7 +84,7 @@ impl MockCoordinator {
     pub fn emit_vsync_event(
         &self,
         display_id_value: u64,
-        stamp: display::ConfigStamp,
+        stamp: display_types::ConfigStamp,
     ) -> Result<()> {
         self.control_handle
             .send_on_vsync(

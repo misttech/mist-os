@@ -58,6 +58,7 @@ test("api-types-cpp-tests-bin") {
     ":api-types-cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp" ]
 }
 
 fuchsia_unittest_package("api-types-cpp-tests") {

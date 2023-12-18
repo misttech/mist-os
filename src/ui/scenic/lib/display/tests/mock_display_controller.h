@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -30,7 +31,7 @@ DisplayCoordinatorObjects CreateMockDisplayCoordinator();
 class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
  public:
   using CheckConfigFn =
-      std::function<void(bool, fuchsia::hardware::display::ConfigResult*,
+      std::function<void(bool, fuchsia::hardware::display::types::ConfigResult*,
                          std::vector<fuchsia::hardware::display::ClientCompositionOp>*)>;
   using SetDisplayColorConversionFn =
       std::function<void(fuchsia::hardware::display::DisplayId, std::array<float, 3>,
@@ -131,7 +132,8 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   void set_check_config_fn(CheckConfigFn fn) { check_config_fn_ = std::move(fn); }
 
   void CheckConfig(bool discard, CheckConfigCallback callback) override {
-    fuchsia::hardware::display::ConfigResult result = fuchsia::hardware::display::ConfigResult::OK;
+    fuchsia::hardware::display::types::ConfigResult result =
+        fuchsia::hardware::display::types::ConfigResult::OK;
     std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
     ++check_config_count_;
     if (check_config_fn_) {

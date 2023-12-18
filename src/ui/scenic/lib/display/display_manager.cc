@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_manager.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
@@ -124,7 +125,7 @@ void DisplayManager::SetVsyncCallback(VsyncCallback callback) {
 }
 
 void DisplayManager::OnVsync(fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
-                             fuchsia::hardware::display::ConfigStamp applied_config_stamp,
+                             fuchsia::hardware::display::types::ConfigStamp applied_config_stamp,
                              uint64_t cookie) {
   if (cookie) {
     (*default_display_coordinator_)->AcknowledgeVsync(cookie);
