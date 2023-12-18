@@ -60,15 +60,196 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 def _fake_download(
     packed_args: Tuple[
-        remote_action.RemoteAction,
         remote_action.DownloadStubInfo,
         remotetool.RemoteTool,
+        Path,
+        bool,
     ]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     # For mocking remote_action._download_for_mp.
     # defined because multiprocessing cannot serialize mocks
-    action, stub_info, downloader = packed_args
+    stub_info, downloader, working_dir_abs, verbose = packed_args
+    # Don't actually try to download.
     return (stub_info.path, cl_utils.SubprocessResult(0))
+
+
+def _fake_download_fail(
+    packed_args: Tuple[
+        remote_action.DownloadStubInfo,
+        remotetool.RemoteTool,
+        Path,
+        bool,
+    ]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking remote_action._download_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    stub_info, downloader, working_dir_abs, verbose = packed_args
+    # Don't actually try to download.
+    return (stub_info.path, cl_utils.SubprocessResult(1))
+
+
+class PathsToDownloadStubsTests(unittest.TestCase):
+    def test_is_stub(self):
+        path = Path("obj/stubby.stub")
+        fake_stub_info = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="0a97a6sbed/7711",
+            action_digest="bed977abaac/32",
+            build_id="random-id0348718",
+        )
+        with mock.patch.object(
+            remote_action, "is_download_stub_file", return_value=True
+        ) as mock_check_stub:
+            with mock.patch.object(
+                remote_action.DownloadStubInfo,
+                "read_from_file",
+                return_value=fake_stub_info,
+            ) as mock_read_stub:
+                stubs = remote_action.paths_to_download_stubs([path])
+        self.assertEqual(stubs, [fake_stub_info])
+        mock_check_stub.assert_called_once_with(path)
+        mock_read_stub.assert_called_once_with(path)
+
+    def test_not_stub(self):
+        path = Path("not/stubby.o")
+        with mock.patch.object(
+            remote_action, "is_download_stub_file", return_value=False
+        ) as mock_check_stub:
+            stubs = remote_action.paths_to_download_stubs([path])
+
+        self.assertEqual(stubs, [])
+        mock_check_stub.assert_called_once_with(path)
+
+
+class UndownloadTests(unittest.TestCase):
+    def test_undownload_non_stub_ignored(self):
+        path = Path("foo/barf.baz")
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            (tdp / path.parent).mkdir(parents=True)
+            (tdp / path).write_text("bye\n")
+            # path points to a non-stub
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+            remote_action.undownload(tdp / path)
+            # nothing changes
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+
+    def test_undownload_restored(self):
+        path = Path("foo/barf.baz")
+        stub = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="82828abf872/453",
+            action_digest="2332df093d1/98",
+            build_id="random-id777",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            stub.create(tdp)
+            # Pretend to download first.
+            download_status = 0
+
+            def fake_download_file(
+                downloader_self, path: Path, digest: str, **kwargs
+            ):
+                path.write_text("greetings\n")
+                return cl_utils.SubprocessResult(download_status)
+
+            with mock.patch.object(
+                remotetool.RemoteTool, "download_blob", new=fake_download_file
+            ) as mock_download:
+                status = stub.download(
+                    downloader=_FAKE_DOWNLOADER, working_dir_abs=tdp
+                )
+
+            # path points to a non-stub
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+
+            remote_action.undownload(tdp / path)
+            # now path points to a restored stub
+            self.assertTrue(remote_action.is_download_stub_file(tdp / path))
+
+
+class DownloadStubInfosBatchTests(unittest.TestCase):
+    def test_empty_list(self):
+        statuses = remote_action.download_stub_infos_batch(
+            downloader=_FAKE_DOWNLOADER,
+            stub_infos=[],
+            working_dir_abs=Path("."),
+        )
+        self.assertEqual(statuses, {})
+
+    def test_one_download_stub_downloaded_success(self):
+        path = Path("foo/bar.o")
+        fake_stub_info = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="1112313123/912",
+            action_digest="a7a77ed7f98/332",
+            build_id="random-id987198129",
+        )
+        with mock.patch.object(
+            remote_action, "_download_for_mp", new=_fake_download
+        ) as mock_download:  # success
+            statuses = remote_action.download_stub_infos_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_infos=[fake_stub_info],
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path].returncode, 0)
+
+    def test_one_download_stub_downloaded_failure(self):
+        path = Path("foo/bar.o")
+        fake_stub_info = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="1112313123/912",
+            action_digest="a7a77ed7f98/332",
+            build_id="random-id987198129",
+        )
+        with mock.patch.object(
+            remote_action, "_download_for_mp", new=_fake_download_fail
+        ) as mock_download:
+            statuses = remote_action.download_stub_infos_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_infos=[fake_stub_info],
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path].returncode, 1)
+
+    def test_multiple_download_stub_downloaded_success(self):
+        path1 = Path("foo/bar.o")
+        path2 = Path("baz/quux.o")
+        fake_stub_infos = [
+            remote_action.DownloadStubInfo(
+                path=path1,
+                type="file",
+                blob_digest="767676767a767/912",
+                action_digest="a7a77ed7f98/332",
+                build_id="random-id0010129",
+            ),
+            remote_action.DownloadStubInfo(
+                path=path2,
+                type="file",
+                blob_digest="3e3e3e3e3e/712",
+                action_digest="1122777eecca/32",
+                build_id="random-id0012397",
+            ),
+        ]
+        with mock.patch.object(
+            remote_action, "_download_for_mp", new=_fake_download
+        ) as mock_download:  # success
+            statuses = remote_action.download_stub_infos_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_infos=fake_stub_infos,
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path1].returncode, 0)
+        self.assertEqual(statuses[path2].returncode, 0)
 
 
 class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
@@ -2434,53 +2615,6 @@ remote_metadata: {{
         mock_download.assert_called_once()
         mock_rename.assert_not_called()
 
-    def test_undownload_non_stub_ignored(self):
-        path = Path("foo/barf.baz")
-        with tempfile.TemporaryDirectory() as td:
-            tdp = Path(td)
-            (tdp / path.parent).mkdir(parents=True)
-            (tdp / path).write_text("bye\n")
-            # path points to a non-stub
-            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
-            remote_action.undownload(tdp / path)
-            # nothing changes
-            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
-
-    def test_undownload_restored(self):
-        path = Path("foo/barf.baz")
-        stub = remote_action.DownloadStubInfo(
-            path=path,
-            type="file",
-            blob_digest="82828abf872/453",
-            action_digest="2332df093d1/98",
-            build_id="random-id777",
-        )
-        with tempfile.TemporaryDirectory() as td:
-            tdp = Path(td)
-            stub.create(tdp)
-            # Pretend to download first.
-            download_status = 0
-
-            def fake_download_file(
-                downloader_self, path: Path, digest: str, **kwargs
-            ):
-                path.write_text("greetings\n")
-                return cl_utils.SubprocessResult(download_status)
-
-            with mock.patch.object(
-                remotetool.RemoteTool, "download_blob", new=fake_download_file
-            ) as mock_download:
-                status = stub.download(
-                    downloader=_FAKE_DOWNLOADER, working_dir_abs=tdp
-                )
-
-            # path points to a non-stub
-            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
-
-            remote_action.undownload(tdp / path)
-            # now path points to a restored stub
-            self.assertTrue(remote_action.is_download_stub_file(tdp / path))
-
     def test_made_download_stubs_for_remote_execution(self):
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -2622,25 +2756,24 @@ remote_metadata: {{
             return_value=_FAKE_DOWNLOADER,
         ) as mock_downloader:
             with mock.patch.object(
-                remote_action, "is_download_stub_file", return_value=True
-            ) as mock_check_stub:
+                remote_action,
+                "paths_to_download_stubs",
+                return_value=[fake_stub_info],
+            ) as mock_make_stubs:
                 with mock.patch.object(
-                    remote_action.DownloadStubInfo,
-                    "read_from_file",
-                    return_value=fake_stub_info,
-                ) as mock_download_stub:
-                    with mock.patch.object(
-                        remote_action, "_download_for_mp", new=_fake_download
-                    ) as mock_download:  # success
-                        download_statuses = action.download_inputs(
-                            lambda path: True
-                        )
+                    remote_action,
+                    "download_stub_infos_batch",
+                    return_value={input_file: cl_utils.SubprocessResult(0)},
+                ) as mock_download:
+                    download_statuses = action.download_inputs(
+                        lambda path: True
+                    )
 
         self.assertIn(input_file, download_statuses)
         self.assertEqual(download_statuses[input_file].returncode, 0)
         mock_downloader.assert_called_once_with()
-        mock_check_stub.assert_called_once_with(input_file)
-        mock_download_stub.assert_called_once_with(input_file)
+        mock_make_stubs.assert_called_once_with([input_file])
+        mock_download.assert_called_once()
 
     def test_no_download_stubs_for_local_execution(self):
         exec_root = Path("/home/project")
@@ -3065,25 +3198,22 @@ remote_metadata: {{
                     remote_action.DownloadStubInfo, "create"
                 ) as mock_write_stub:
                     with mock.patch.object(
-                        remote_action, "_download_for_mp", new=_fake_download
+                        remote_action.RemoteAction,
+                        "_download_batch",
+                        return_value={output: cl_utils.SubprocessResult(0)},
                     ) as mock_download:
                         with mock.patch.object(
                             remote_action.RemoteAction,
                             "_run_maybe_remotely",
                             return_value=cl_utils.SubprocessResult(0),
                         ) as mock_run:
-                            with mock.patch.object(
-                                remote_action.RemoteAction,
-                                "downloader",
-                                return_value=_FAKE_DOWNLOADER,
-                            ) as mock_downloader:
-                                exit_code = action.run()
+                            exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
         mock_log_dir.assert_called_with()
         mock_write_stub.assert_called_with(working_dir)
         mock_parse_log.assert_called_with(Path(str(output) + ".rrpl"))
-        mock_downloader.assert_called_with()
+        mock_download.assert_called_once()
 
     def test_explicit_always_download_with_real_proxy_logdir(self):
         with tempfile.TemporaryDirectory() as td:
@@ -3148,21 +3278,18 @@ completion_status: STATUS_CACHE_HIT
                 remote_action, "_reproxy_log_dir", return_value=logdir
             ) as mock_log_dir:
                 with mock.patch.object(
-                    remote_action, "_download_for_mp", new=_fake_download
+                    remote_action.RemoteAction,
+                    "_download_batch",
+                    return_value={},
                 ) as mock_download:
                     with mock.patch(
                         "remote_action.RemoteAction._run_maybe_remotely",
                         new=fake_run_remote,
                     ) as mock_run:
-                        with mock.patch.object(
-                            remote_action.RemoteAction,
-                            "downloader",
-                            return_value=_FAKE_DOWNLOADER,
-                        ) as mock_downloader:
-                            exit_code = action.run()
+                        exit_code = action.run()
             self.assertEqual(exit_code, 0)
             mock_log_dir.assert_called_once()
-            mock_downloader.assert_called_with()
+            mock_download.assert_called_once()
 
 
 class RbeDiagnosticsTests(unittest.TestCase):

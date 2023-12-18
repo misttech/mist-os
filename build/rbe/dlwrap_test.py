@@ -96,30 +96,52 @@ class DownloadArtifactsTests(unittest.TestCase):
         )
 
     def test_success(self):
-        path = "road/to/perdition.obj"
+        path = Path("road/to/perdition.obj")
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         download_status = 0
         with mock.patch.object(
-            dlwrap, "_download_for_mp", new=_fake_download
-        ) as mock_download:
-            status = dlwrap.download_artifacts(
-                [path], downloader=_fake_downloader, working_dir_abs=working_dir
-            )
+            remote_action,
+            "paths_to_download_stubs",
+            return_value=[self._stub_info(path)],
+        ) as mock_make_stubs:
+            with mock.patch.object(
+                remote_action,
+                "download_stub_infos_batch",
+                return_value={path: cl_utils.SubprocessResult(download_status)},
+            ) as mock_download:
+                status = dlwrap.download_artifacts(
+                    [path],
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir,
+                )
         self.assertEqual(status, download_status)
+        mock_make_stubs.assert_called_once_with([path])
+        mock_download.assert_called_once()
 
     def test_failure(self):
-        path = "highway/to/hell.obj"
+        path = Path("highway/to/hell.obj")
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         download_status = 1
         with mock.patch.object(
-            dlwrap, "_download_for_mp", new=_fake_download_fail
-        ) as mock_download:
-            status = dlwrap.download_artifacts(
-                [path], downloader=_fake_downloader, working_dir_abs=working_dir
-            )
+            remote_action,
+            "paths_to_download_stubs",
+            return_value=[self._stub_info(path)],
+        ) as mock_make_stubs:
+            with mock.patch.object(
+                remote_action,
+                "download_stub_infos_batch",
+                return_value={path: cl_utils.SubprocessResult(download_status)},
+            ) as mock_download:
+                status = dlwrap.download_artifacts(
+                    [path],
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir,
+                )
         self.assertEqual(status, download_status)
+        mock_make_stubs.assert_called_once_with([path])
+        mock_download.assert_called_once()
 
 
 class MainTests(unittest.TestCase):

@@ -88,23 +88,6 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def _download_for_mp(
-    packed_args: Tuple[Path, remotetool.RemoteTool, Path]
-) -> Tuple[Path, cl_utils.SubprocessResult]:
-    """multiprocessing requires functions to be pickle-able,
-    thus this function must exist at the module-level scope.
-    """
-    stub_path, downloader, working_dir_abs = packed_args
-    return (
-        stub_path,
-        remote_action.download_from_stub(
-            stub=stub_path,
-            downloader=downloader,
-            working_dir_abs=working_dir_abs,
-        ),
-    )
-
-
 def download_artifacts(
     stub_paths: Iterable[Path],
     downloader: remotetool.RemoteTool,
@@ -118,26 +101,19 @@ def download_artifacts(
       stub_paths: paths that point to either download stubs or real artifacts.
         Real artifacts are ignored automatically.
     """
-    download_args = [
-        # for _download_for_mp()
-        (path, downloader, working_dir_abs)
-        for path in stub_paths
-    ]
-    try:
-        with multiprocessing.Pool() as pool:
-            download_statuses = pool.map(_download_for_mp, download_args)
-    except OSError:  # in case /dev/shm is not write-able (required)
-        if len(download_args) > 1:
-            msg("Warning: downloading sequentially instead of in parallel.")
-        download_statuses = map(_download_for_mp, download_args)
+    stub_infos = remote_action.paths_to_download_stubs(stub_paths)
+    download_statuses = remote_action.download_stub_infos_batch(
+        downloader=downloader,
+        stub_infos=stub_infos,
+        working_dir_abs=working_dir_abs,
+        verbose=verbose,
+    )
 
     final_status = 0
-    for path, status in download_statuses:
+    for path, status in download_statuses.items():
         if status.returncode != 0:
             final_status = status.returncode
-            msg(f"Error downloading {path}.  stderr was:")
-            for line in status.stderr:
-                print(line, file=sys.stderr)
+            msg(f"Error downloading {path}.  stderr was:\n{status.stderr_text}")
 
     if final_status != 0:
         msg("At least one download failed.")

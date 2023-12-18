@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import difflib
+import errno
 import filecmp
 import hashlib
 import multiprocessing
@@ -810,6 +811,16 @@ def is_download_stub_file(path: Path) -> bool:
         return _file_starts_with(path, _RBE_DOWNLOAD_STUB_IDENTIFIER)
 
 
+def paths_to_download_stubs(
+    paths: Iterable[Path],
+) -> Sequence[DownloadStubInfo]:
+    return [
+        DownloadStubInfo.read_from_file(path)
+        for path in paths
+        if is_download_stub_file(path)
+    ]
+
+
 def undownload(path: Path) -> bool:
     """If a backup download stub exists, restore it (for debugging).
 
@@ -1402,7 +1413,7 @@ class RemoteAction(object):
             return self.local_launch_command
         return self.remote_launch_command
 
-    def _process_download_stubs(self) -> Dict[Path, int]:
+    def _process_download_stubs(self) -> Dict[Path, cl_utils.SubprocessResult]:
         """Create download stubs so artifacts can be retrieved later."""
         self.vmsg(f"Reading remote action log from {self._action_log}.")
         log_record = ReproxyLogEntry.parse_action_log(self._action_log)
@@ -1449,34 +1460,28 @@ class RemoteAction(object):
 
     def _download_batch(
         self, stub_infos: Sequence[DownloadStubInfo]
-    ) -> Dict[Path, int]:
+    ) -> Dict[Path, cl_utils.SubprocessResult]:
         downloader = self.downloader()
-        download_args = [
-            (self, stub_info, downloader)  # for _download_for_mp
-            for stub_info in stub_infos
-        ]
-        try:
-            with multiprocessing.Pool() as pool:
-                statuses = pool.map(_download_for_mp, download_args)
-        except OSError:  # in case /dev/shm is not writeable (required)
-            if len(download_args) > 1:
-                msg("Warning: downloading sequentially instead of in parallel.")
-            statuses = map(_download_for_mp, download_args)
-
-        return {path: status for path, status in statuses}
+        return download_stub_infos_batch(
+            downloader=downloader,
+            stub_infos=stub_infos,
+            working_dir_abs=self.working_dir,
+            verbose=self.verbose,
+        )
 
     def download_inputs(
         self, keep_filter: Callable[[Path], bool]
-    ) -> Dict[Path, int]:
+    ) -> Dict[Path, cl_utils.SubprocessResult]:
         """Downloading inputs is useful for running local actions whose inputs
         may have come from the outputs of remote actions that opted to
         not download their outputs.
         """
-        download_args = [
-            DownloadStubInfo.read_from_file(path)
+        filtered_inputs = [
+            path
             for path in self.inputs_relative_to_working_dir
-            if keep_filter(path) and is_download_stub_file(path)
+            if keep_filter(path)
         ]
+        download_args = paths_to_download_stubs(filtered_inputs)
         paths = [stub.path for stub in download_args]
         self.vmsg(f"Downloading inputs: {paths}")
         return self._download_batch(download_args)
@@ -2051,18 +2056,51 @@ class RemoteAction(object):
         return 0
 
 
+# For multiprocessing, mapped function must be serializable.
+# Module-scope functions are serializable.
 def _download_for_mp(
-    packed_args: Tuple[RemoteAction, DownloadStubInfo, remotetool.RemoteTool]
+    packed_args: Tuple[DownloadStubInfo, remotetool.RemoteTool, Path, bool]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
-    action, stub_info, downloader = packed_args
+    stub_info, downloader, working_dir_abs, verbose = packed_args
     path = stub_info.path
-    action.vmsg(f"Downloading {path}")
+    if verbose:
+        msg(f"Downloading {path}")
     status = stub_info.download(
-        downloader=downloader, working_dir_abs=action.working_dir
+        downloader=downloader, working_dir_abs=working_dir_abs
     )
     if status.returncode != 0:  # alert, but do not fail
         msg(f"Unable to download {path}.")
     return path, status
+
+
+def download_stub_infos_batch(
+    downloader: remotetool.RemoteTool,
+    stub_infos: Sequence[DownloadStubInfo],
+    working_dir_abs: Path,
+    verbose: bool = False,
+) -> Dict[Path, cl_utils.SubprocessResult]:
+    """Downloads artifacts from a collection of stubs in parallel."""
+    download_args = [
+        # args for _download_for_mp
+        (stub_info, downloader, working_dir_abs, verbose)
+        for stub_info in stub_infos
+    ]
+    if not download_args:
+        return {}
+    try:
+        with multiprocessing.Pool() as pool:
+            statuses = pool.map(_download_for_mp, download_args)
+    except OSError as e:  # in case /dev/shm is not writeable (required)
+        if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
+            e.errno == errno.EROFS
+        ):
+            if len(download_args) > 1:
+                msg("Warning: downloading sequentially instead of in parallel.")
+            statuses = map(_download_for_mp, download_args)
+        else:
+            raise e  # Some other error
+
+    return {path: status for path, status in statuses}
 
 
 def _rewrapper_arg_parser() -> argparse.ArgumentParser:
