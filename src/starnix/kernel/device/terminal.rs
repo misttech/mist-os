@@ -186,24 +186,24 @@ impl Terminal {
     }
 
     /// Sets the terminal configuration.
-    pub fn set_termios(self: &Arc<Self>, termios: uapi::termios) {
+    pub fn set_termios(&self, termios: uapi::termios) {
         let signals = self.write().set_termios(termios);
         self.send_signals(signals);
     }
 
     /// `close` implementation of the main side of the terminal.
-    pub fn main_close(self: &Arc<Self>) {
+    pub fn main_close(&self) {
         self.write().main_close();
     }
 
     /// Called when a new reference to the replica side of this terminal is made.
-    pub fn main_open(self: &Arc<Self>) {
+    pub fn main_open(&self) {
         self.write().main_open();
     }
 
     /// `wait_async` implementation of the main side of the terminal.
     pub fn main_wait_async(
-        self: &Arc<Self>,
+        &self,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
@@ -212,13 +212,13 @@ impl Terminal {
     }
 
     /// `query_events` implementation of the main side of the terminal.
-    pub fn main_query_events(self: &Arc<Self>) -> FdEvents {
+    pub fn main_query_events(&self) -> FdEvents {
         self.read().main_query_events()
     }
 
     /// `read` implementation of the main side of the terminal.
     pub fn main_read(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -229,7 +229,7 @@ impl Terminal {
 
     /// `write` implementation of the main side of the terminal.
     pub fn main_write(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -239,18 +239,18 @@ impl Terminal {
     }
 
     /// `close` implementation of the replica side of the terminal.
-    pub fn replica_close(self: &Arc<Self>) {
+    pub fn replica_close(&self) {
         self.write().replica_close();
     }
 
     /// Called when a new reference to the replica side of this terminal is made.
-    pub fn replica_open(self: &Arc<Self>) {
+    pub fn replica_open(&self) {
         self.write().replica_open();
     }
 
     /// `wait_async` implementation of the replica side of the terminal.
     pub fn replica_wait_async(
-        self: &Arc<Self>,
+        &self,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
@@ -259,13 +259,13 @@ impl Terminal {
     }
 
     /// `query_events` implementation of the replica side of the terminal.
-    pub fn replica_query_events(self: &Arc<Self>) -> FdEvents {
+    pub fn replica_query_events(&self) -> FdEvents {
         self.read().replica_query_events()
     }
 
     /// `read` implementation of the replica side of the terminal.
     pub fn replica_read(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -276,7 +276,7 @@ impl Terminal {
 
     /// `write` implementation of the replica side of the terminal.
     pub fn replica_write(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -286,7 +286,7 @@ impl Terminal {
     }
 
     /// Send the pending signals to the associated foreground process groups if they exist.
-    fn send_signals(self: &Arc<Self>, signals: PendingSignals) {
+    fn send_signals(&self, signals: PendingSignals) {
         for is_input in &[false, true] {
             let signals = signals.signals(*is_input);
             if !signals.is_empty() {
@@ -302,7 +302,7 @@ impl Terminal {
         }
     }
 
-    pub fn device(self: &Arc<Self>) -> DeviceType {
+    pub fn device(&self) -> DeviceType {
         get_device_type_for_pts(self.id)
     }
 

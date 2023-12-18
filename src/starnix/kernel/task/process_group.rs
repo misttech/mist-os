@@ -92,23 +92,23 @@ impl ProcessGroup {
 
     state_accessor!(ProcessGroup, mutable_state);
 
-    pub fn insert(self: &Arc<Self>, thread_group: &Arc<ThreadGroup>) {
+    pub fn insert(&self, thread_group: &Arc<ThreadGroup>) {
         self.write().thread_groups.insert(thread_group.leader, Arc::downgrade(thread_group));
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.
-    pub fn remove(self: &Arc<Self>, thread_group: &ThreadGroup) -> bool {
+    pub fn remove(&self, thread_group: &ThreadGroup) -> bool {
         self.write().remove(thread_group)
     }
 
-    pub fn send_signals(self: &Arc<Self>, signals: &[Signal]) {
+    pub fn send_signals(&self, signals: &[Signal]) {
         let thread_groups = self.read().thread_groups().collect::<Vec<_>>();
         Self::send_signals_to_thread_groups(signals, thread_groups);
     }
 
     /// Check whether the process group became orphaned. If this is the case, send signals to its
     /// members if at least one is stopped.
-    pub fn check_orphaned(self: &Arc<Self>) {
+    pub fn check_orphaned(&self) {
         let thread_groups = {
             let state = self.read();
             if state.orphaned {
@@ -122,7 +122,7 @@ impl ProcessGroup {
                 None => return,
                 Some(parent) => {
                     let parent_state = parent.read();
-                    if &parent_state.process_group != self
+                    if parent_state.process_group.as_ref() != self
                         && parent_state.process_group.session == self.session
                     {
                         return;

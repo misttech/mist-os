@@ -98,19 +98,19 @@
 //!     }
 //!
 //!     #[allow(dead_code)]
-//!     pub fn read<'a>(self: &'a Arc<Foo>) -> FooReadGuard<'a> {
+//!     pub fn read<'a>(self: &'a Foo) -> FooReadGuard<'a> {
 //!         ReadGuard::new(self, self.mutable_state.read())
 //!     }
 //!     #[allow(dead_code)]
-//!     pub fn write<'a>(self: &'a Arc<Foo>) -> FooWriteGuard<'a> {
+//!     pub fn write<'a>(self: &'a Foo) -> FooWriteGuard<'a> {
 //!         WriteGuard::new(self, self.mutable_state.write())
 //!     }
 //! }
 //!
 //! #[allow(dead_code)]
-//! pub type FooReadGuard<'guard_lifetime> = ReadGuard<'guard_lifetime, Arc<Foo>, FooMutableState>;
+//! pub type FooReadGuard<'guard_lifetime> = ReadGuard<'guard_lifetime, Foo, FooMutableState>;
 //! #[allow(dead_code)]
-//! pub type FooWriteGuard<'guard_lifetime> = WriteGuard<'guard_lifetime, Arc<Foo>, FooMutableState>;
+//! pub type FooWriteGuard<'guard_lifetime> = WriteGuard<'guard_lifetime, Foo, FooMutableState>;
 //! #[allow(dead_code)]
 //! pub type FooStateRef<'ref_lifetime> = StateRef<'ref_lifetime, Foo, FooMutableState>;
 //! #[allow(dead_code)]
@@ -169,7 +169,7 @@ macro_rules! state_accessor {
         }
     };
     ($base_name:ident, $field_name:ident) => {
-        state_accessor!($base_name, $field_name, std::sync::Arc<$base_name>);
+        state_accessor!($base_name, $field_name, $base_name);
     };
 }
 
@@ -181,7 +181,7 @@ macro_rules! state_implementation {
         )*
     }) => {
         state_implementation! {
-            impl $mutable_name<Base = $base_name, BaseType = std::sync::Arc<$base_name>> {
+            impl $mutable_name<Base = $base_name, BaseType = $base_name> {
                 $($tt)*
             }
         }
@@ -258,7 +258,6 @@ mod test {
     use super::*;
     use macro_rules_attribute::apply;
     use starnix_sync::RwLock;
-    use std::sync::Arc;
 
     pub struct FooMutableState {
         y: i32,
@@ -328,7 +327,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_generation() {
-        let foo = Arc::new(Foo::new());
+        let foo = Foo::new();
 
         assert_eq!(foo.read().x_and_y(), 5);
         assert_eq!(foo.read().pub_x_and_y(), 5);

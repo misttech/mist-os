@@ -450,7 +450,7 @@ impl Mount {
         *stored_flags = flags;
     }
 
-    state_accessor!(Mount, state);
+    state_accessor!(Mount, state, Arc<Mount>);
 }
 
 impl MountState {
@@ -492,7 +492,7 @@ impl MountState {
 }
 
 #[apply(state_implementation!)]
-impl MountState<Base = Mount> {
+impl MountState<Base = Mount, BaseType = Arc<Mount>> {
     /// Add a child mount *without propagating it to the peer group*. For internal use only.
     fn add_submount_internal(&mut self, dir: &DirEntryHandle, mount: MountHandle) {
         if !dir.is_descendant_of(&self.base.root) {

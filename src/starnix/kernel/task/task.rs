@@ -418,7 +418,7 @@ impl TaskMutableState {
 }
 
 #[apply(state_implementation!)]
-impl TaskMutableState<Base = Task, BaseType = Task> {
+impl TaskMutableState<Base = Task> {
     pub fn set_stopped(&mut self, stopped: StopState, siginfo: Option<SignalInfo>) {
         if stopped.ptrace_only() && self.ptrace.is_none() {
             return;
@@ -773,7 +773,7 @@ impl Task {
         task
     }
 
-    state_accessor!(Task, mutable_state, Task);
+    state_accessor!(Task, mutable_state);
 
     pub fn add_file(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
         self.files.add_with_flags(self, file, flags)

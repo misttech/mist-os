@@ -348,7 +348,7 @@ impl ThreadGroup {
         thread_group
     }
 
-    state_accessor!(ThreadGroup, mutable_state);
+    state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
 
     pub fn load_stopped(&self) -> StopState {
         self.stop_state.load(Ordering::Relaxed)
@@ -1055,7 +1055,7 @@ impl ThreadGroup {
 }
 
 #[apply(state_implementation!)]
-impl ThreadGroupMutableState<Base = ThreadGroup> {
+impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
     pub fn leader(&self) -> pid_t {
         self.base.leader
     }
