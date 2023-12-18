@@ -147,7 +147,11 @@ class Context:
         self.cwd = args.project_root
         self._ffx_runner = FfxRunner(args.ffx, env_root=args.project_root)
         self.out_dir = Context.get_out_dir(args, self.cwd)
+        self.project_name = os.path.basename(self.cwd)
         self.sdk_id = Context.get_sdk_id(args, self._ffx_runner)
+        self.sdk_path = os.path.join(
+            self.cwd, f"bazel-{self.project_name}", "external/fuchsia_sdk"
+        )
         self.pb_name = args.product
         self.pb_path = os.path.join(
             self.out_dir, "product_bundles", f"{self.pb_name}.{self.sdk_id}"
@@ -238,6 +242,9 @@ class SetDefaults(Step):
             f"Setting 'devhost.fuchsia.com' as the default package repository"
         )
         set_nested_key("repository.default", "devhost.fuchsia.com")
+
+        ctx.log(f"Setting the sdk.root to {ctx.sdk_path}")
+        set_nested_key("sdk.root", ctx.sdk_path)
 
         with open(build_config_file, "w") as f:
             f.write(json.dumps(build_config, indent=4))
