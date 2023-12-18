@@ -16,6 +16,7 @@ rustc_binary("bin") {
   deps = [
     "../fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -34,7 +35,7 @@ fuchsia_component("wlan-hw-sim-component") {
   component_name = "wlan-hw-sim"
   manifest = "meta/wlan-hw-sim.cml"
   deps = [
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:driver_test_realm_component",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/location/regulatory_region:regulatory_region_component",
     "//src/connectivity/network/drivers/network-device",

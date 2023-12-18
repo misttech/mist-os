@@ -10,6 +10,7 @@ use {
         Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref,
         Route,
     },
+    fuchsia_driver_test::DriverTestRealmBuilder,
     tracing::info,
 };
 
@@ -93,7 +94,7 @@ async fn setup_wlandevicemonitor(
         .add_route(
             Route::new()
                 .capability(Capability::directory("dev-class").subdir("wlanphy").as_("dev-wlanphy"))
-                .from(wlan_components)
+                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                 .to(&wlandevicemonitor),
         )
         .await?;
@@ -176,6 +177,7 @@ async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInsta
         params = params.realm_name(name);
     }
     let builder = RealmBuilder::with_params(params).await?;
+    builder.driver_test_realm_setup().await?;
 
     let wlan_components = builder
         .add_child("wlan-hw-sim", "#meta/wlan-hw-sim.cm", ChildOptions::new().eager())
@@ -200,11 +202,8 @@ async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInsta
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
                 .capability(Capability::protocol_by_name("fuchsia.wlan.policy.ClientProvider"))
                 .capability(Capability::protocol_by_name("fuchsia.wlan.policy.AccessPointProvider"))
-                .capability(Capability::directory("dev-topological"))
-                .capability(Capability::directory("dev-class"))
                 .from(&wlan_components)
                 .to(Ref::parent()),
         )

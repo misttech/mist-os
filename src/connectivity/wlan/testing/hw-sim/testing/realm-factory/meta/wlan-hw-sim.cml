@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//sdk/lib/driver_test_realm/meta/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "syslog/client.shard.cml" ],
     children: [
         {
             name: "stash",
@@ -65,20 +62,6 @@
                 "fuchsia.wlan.policy.ClientProvider",
             ],
             from: "#wlancfg",
-        },
-        {
-            protocol: "fuchsia.driver.test.Realm",
-            from: "#driver_test_realm",
-        },
-        {
-            directory: "dev-topological",
-            from: "#driver_test_realm",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-class",
-            from: "#driver_test_realm",
-            rights: [ "r*" ],
         },
     ],
 }
