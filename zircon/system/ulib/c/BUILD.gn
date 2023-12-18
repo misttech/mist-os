@@ -318,6 +318,11 @@ if (zircon_toolchain == false) {
     # worthwhile to have PLT entries for main or __libc_start_main, since
     # they are always used eagerly anyway.
     cflags = [ "-fno-plt" ]
+
+    # The C runtime is needed for Go builds and the SDK, so always download this locally.
+    if (cxx_rbe_enable && !cxx_rbe_download_obj_files) {
+      configs += [ "//build/config:download_outputs" ]
+    }
   }
 }
 
