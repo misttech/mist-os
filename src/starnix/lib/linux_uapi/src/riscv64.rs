@@ -486,6 +486,14 @@ pub const SCM_TIMESTAMP: u32 = 29;
 pub const SCM_TIMESTAMPNS: u32 = 35;
 pub const SCM_TIMESTAMPING: u32 = 37;
 pub const STAT_HAVE_NSEC: u32 = 1;
+pub const ASHMEM_NAME_LEN: u32 = 256;
+pub const ASHMEM_NAME_DEF: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"dev/ashmem\0") };
+pub const ASHMEM_NOT_PURGED: u32 = 0;
+pub const ASHMEM_WAS_PURGED: u32 = 1;
+pub const ASHMEM_IS_UNPINNED: u32 = 0;
+pub const ASHMEM_IS_PINNED: u32 = 1;
+pub const __ASHMEMIOC: u32 = 119;
 pub const B_TYPE_LARGE: u32 = 133;
 pub const BINDER_CURRENT_PROTOCOL_VERSION: u32 = 8;
 pub const EM_NONE: u32 = 0;
@@ -5155,6 +5163,12 @@ impl Default for ucontext {
             s.assume_init()
         }
     }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct ashmem_pin {
+    pub offset: __u32,
+    pub len: __u32,
 }
 pub const BINDER_TYPE_BINDER: _bindgen_ty_1 = 1935813253;
 pub const BINDER_TYPE_WEAK_BINDER: _bindgen_ty_1 = 2002922117;
@@ -12620,6 +12634,17 @@ pub const UI_END_FF_UPLOAD: __u32 = 1080579529;
 pub const UI_BEGIN_FF_ERASE: __u32 = 3222033866;
 pub const UI_END_FF_ERASE: __u32 = 1074550219;
 pub const UI_GET_VERSION: __u32 = 2147767597;
+pub const ASHMEM_SET_NAME: __u32 = 1090549505;
+pub const ASHMEM_GET_NAME: __u32 = 2164291330;
+pub const ASHMEM_SET_SIZE: __u32 = 1074296579;
+pub const ASHMEM_GET_SIZE: __u32 = 30468;
+pub const ASHMEM_SET_PROT_MASK: __u32 = 1074296581;
+pub const ASHMEM_GET_PROT_MASK: __u32 = 30470;
+pub const ASHMEM_PIN: __u32 = 1074296583;
+pub const ASHMEM_UNPIN: __u32 = 1074296584;
+pub const ASHMEM_GET_PIN_STATUS: __u32 = 30473;
+pub const ASHMEM_PURGE_ALL_CACHES: __u32 = 30474;
+pub const ASHMEM_GET_FILE_ID: __u32 = 2148038411;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct xt_match {

@@ -15,6 +15,7 @@
 #include <asm/socket.h>
 #include <asm/stat.h>
 #include <asm/ucontext.h>
+#include <linux/ashmem.h>
 #include <linux/android/binder.h>
 #include <linux/audit.h>
 #include <linux/auxvec.h>
