@@ -6,15 +6,20 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <cmath>
 #include <cstdint>
 #include <optional>
 
+#include "fuchsia/sysmem/cpp/fidl.h"
 #include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/lib/utils/pixel.h"
 
 namespace flatland {
+
+const std::vector<uint8_t> kTransparent = {0, 0, 0, 0};
 
 bool CpuRenderer::ImportBufferCollection(
     allocation::GlobalBufferCollectionId collection_id,
@@ -180,34 +185,61 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     FX_DCHECK(render_target_map_itr_ != image_map_.end());
     auto render_target_constraints = render_target_map_itr_->second.second;
 
-    // The image and render_target should have the same format.
-    ImageRect rectangle = rectangles[0];
-    FX_DCHECK(image_constraints.pixel_format.type == render_target_constraints.pixel_format.type);
+    // The image and render_target should be BGRA32 or R8G8B8A8.
+    fuchsia::sysmem::PixelFormatType image_type = image_constraints.pixel_format.type;
+    fuchsia::sysmem::PixelFormatType render_type = render_target_constraints.pixel_format.type;
+    FX_DCHECK(utils::Pixel::IsFormatSupported(image_type));
+    FX_DCHECK(utils::Pixel::IsFormatSupported(render_type));
+    FX_LOGS(ERROR) << "rendering image with type: " << static_cast<uint32_t>(image_type)
+                   << " into target with type:" << static_cast<uint32_t>(render_type);
 
-    // The rectangle, image, and render_target should be compatible, e.g. same
-    // dimensions.
+    // The rectangle, image, and render_target should be compatible, e.g. the image dimensions are
+    // equal to the rectangle dimensions and less than or equal to the render target dimensions.
+    ImageRect rectangle = rectangles[0];
     FX_DCHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
     uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
     uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
-    FX_DCHECK(rectangle_width == render_target.width);
-    FX_DCHECK(rectangle_height == render_target.height);
+    FX_DCHECK(rectangle_width <= render_target.width);
+    FX_DCHECK(rectangle_height <= render_target.height);
     FX_DCHECK(rectangle_width == image.width);
     FX_DCHECK(rectangle_height == image.height);
     FX_DCHECK(rectangle.origin.x == 0);
     FX_DCHECK(rectangle.origin.y == 0);
-    FX_DCHECK(utils::GetBytesPerRow(image_constraints, image.width) ==
-              utils::GetBytesPerRow(render_target_constraints, render_target.width));
+
+    auto image_pixels_per_row = utils::GetPixelsPerRow(image_constraints, image.width);
+    auto render_target_pixels_per_row =
+        utils::GetPixelsPerRow(render_target_constraints, render_target.width);
 
     // Copy the image vmo into the render_target vmo.
-    MapHostPointer(render_target_map_itr_->second.first, HostPointerAccessMode::kWriteOnly,
-                   [&image_map_itr_](uint8_t* render_target_ptr, uint32_t render_target_num_bytes) {
-                     MapHostPointer(image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
-                                    [render_target_ptr, render_target_num_bytes](
-                                        uint8_t* image_ptr, uint32_t image_num_bytes) {
-                                      FX_DCHECK(image_num_bytes <= render_target_num_bytes);
-                                      memcpy(render_target_ptr, image_ptr, image_num_bytes);
-                                    });
-                   });
+    MapHostPointer(
+        render_target_map_itr_->second.first, HostPointerAccessMode::kWriteOnly,
+        [&image_map_itr_, image, render_target, image_pixels_per_row, render_target_pixels_per_row,
+         image_type, render_type](uint8_t* render_target_ptr, uint32_t render_target_num_bytes) {
+          MapHostPointer(image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
+                         [render_target_ptr, render_target_num_bytes, image, render_target,
+                          image_pixels_per_row, render_target_pixels_per_row, image_type,
+                          render_type](const uint8_t* image_ptr, uint32_t image_num_bytes) {
+                           FX_DCHECK(image_num_bytes <= render_target_num_bytes);
+                           uint32_t min_height = std::min(image.height, render_target.height);
+                           uint32_t min_width = std::min(image.width, render_target.width);
+                           for (uint32_t y = 0; y < min_height; y++) {
+                             // Copy image pixels into the render target.
+                             //
+                             // Note that the stride of the buffer may be different
+                             // than the width of the image due to memory alignment, so we use the
+                             // pixels per row instead.
+                             for (uint32_t x = 0; x < min_width; x++) {
+                               utils::Pixel pixel = utils::Pixel::FromVmo(
+                                   image_ptr, image_pixels_per_row, x, y, image_type);
+                               std::vector<uint8_t> color = pixel.ToFormat(render_type);
+                               uint32_t start = y * render_target_pixels_per_row * 4 + x * 4;
+                               for (uint32_t offset = 0; offset < 4; offset++) {
+                                 render_target_ptr[start + offset] = color[offset];
+                               }
+                             }
+                           }
+                         });
+        });
   }
 
   // Fire all of the release fences.

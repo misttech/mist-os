@@ -96,6 +96,9 @@ uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_for
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                          uint32_t image_width);
 
+uint32_t GetPixelsPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
+                         uint32_t image_width);
+
 }  // namespace utils
 
 #endif  // SRC_UI_SCENIC_LIB_UTILS_HELPERS_H_
