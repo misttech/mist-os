@@ -25,7 +25,7 @@ To run perfcompare on a Gerrit CL, do the following:
     results will be under **"compare perf test results without and
     with CL" -> "stdout" (or "raw")** on the build page.
 
-One perfcompare builder is currently available and supported for
+These perfcompare builders are currently available and supported for
 running `fuchsia.git`'s performance tests:
 
 *   `terminal.x64-release-perfcompare`
@@ -34,10 +34,6 @@ running `fuchsia.git`'s performance tests:
     (x64). This is the perfcompare version of the
     `terminal.x64-release` builder (i.e. it runs the same set of
     performance tests as that builder).
-
-The following builder worked in the past but is not currently
-supported, because VIM3 is not fully supported on Fuchsia Infra at the
-moment:
 
 *   `terminal.vim3-release-perfcompare`
     ([recent builds](https://ci.chromium.org/p/fuchsia/builders/try/terminal.vim3-release-perfcompare)):
