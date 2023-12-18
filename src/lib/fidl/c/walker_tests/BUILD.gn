@@ -44,7 +44,10 @@ if (is_fuchsia) {
     }
     testonly = true
     sources = []
-    deps = [ ":test_sources" ]
+    deps = [
+      ":test_sources",
+      "//sdk/lib/fdio",
+    ]
   }
 
   fuchsia_unittest_package("fidl-walker-tests") {
