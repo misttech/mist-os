@@ -64,6 +64,10 @@ void FillGeneralRegisters(std::vector<debug::RegisterValue>* out) {
   out->push_back(CreateRegister(RegisterID::kX64_rbx, 8, 2));
 }
 
+// These two helper functions are only used by FormatRegisters.AllRegisters,
+// which only runs on x64, so only define them there to avoid unused code
+// warnings.
+#ifdef __x86_64__
 void FillFloatingPointRegisters(std::vector<debug::RegisterValue>* out) {
   out->push_back(CreateRegister(RegisterID::kX64_st0, 16, 4));
   out->push_back(CreateRegister(RegisterID::kX64_st1, 16, 4));
@@ -84,6 +88,7 @@ void FillVectorRegisters(std::vector<debug::RegisterValue>* out) {
   // This one is out-of-order to force testing the sorting.
   out->push_back(CreateRegister(RegisterID::kX64_xmm0, 16, 1));
 }
+#endif
 
 }  // namespace
 
@@ -205,6 +210,9 @@ TEST(FormatRegisters, VectorRegistersX64) {
       FormatRegisters(options, registers).AsString());
 }
 
+#if __x86_64__
+// This test involves formatting long doubles, which are not supported on ARM
+// where sizeof(long double) == sizeof(double)
 TEST(FormatRegisters, AllRegisters) {
   std::vector<debug::RegisterValue> registers;
   FillGeneralRegisters(&registers);
@@ -244,6 +252,7 @@ TEST(FormatRegisters, AllRegisters) {
       "\n",
       FormatRegisters(options, registers).AsString());
 }
+#endif
 
 TEST(FormatRegisters, WithRflags) {
   std::vector<debug::RegisterValue> registers;
