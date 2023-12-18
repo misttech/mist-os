@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <fidl/fuchsia.pkg/cpp/wire.h>
 
 #include "src/devices/bin/driver_manager/v1/package_resolver.h"
 #include "zircon/errors.h"

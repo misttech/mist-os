@@ -7,7 +7,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <fidl/fuchsia.pkg/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/receiver.h>

@@ -58,7 +58,7 @@ pub struct Indexer {
 
     // Contains the list of driver package urls that are disabled, which means that it should not
     // be returned as part of future match requests.
-    disabled_driver_urls: RefCell<HashSet<fidl_fuchsia_pkg::PackageUrl>>,
+    disabled_driver_urls: RefCell<HashSet<String>>,
 }
 
 impl Indexer {
@@ -101,9 +101,7 @@ impl Indexer {
 
     // Checks if the given driver is in the disabled list.
     fn is_disabled(&self, driver: &ResolvedDriver) -> bool {
-        if self.disabled_driver_urls.borrow().contains(&fidl_fuchsia_pkg::PackageUrl {
-            url: driver.component_url.as_str().to_string(),
-        }) {
+        if self.disabled_driver_urls.borrow().contains(driver.component_url.as_str()) {
             return true;
         }
 
@@ -370,9 +368,9 @@ impl Indexer {
         Ok(())
     }
 
-    pub fn disable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) {
+    pub fn disable_driver(&self, driver_url: String) {
         self.disabled_driver_urls.borrow_mut().insert(driver_url.clone());
-        let rebind_result = self.rebind_composites_with_driver(driver_url.url);
+        let rebind_result = self.rebind_composites_with_driver(driver_url);
         if let Err(e) = rebind_result {
             tracing::error!(
                 "Failed to rebind composites with the driver being disabled: {}.",
@@ -381,7 +379,7 @@ impl Indexer {
         }
     }
 
-    pub fn re_enable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) -> Result<(), i32> {
+    pub fn re_enable_driver(&self, driver_url: String) -> Result<(), i32> {
         let removed = self.disabled_driver_urls.borrow_mut().remove(&driver_url);
         if removed {
             Ok(())

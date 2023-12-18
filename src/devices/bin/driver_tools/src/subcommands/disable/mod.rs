@@ -7,7 +7,7 @@ pub mod args;
 use {
     anyhow::{format_err, Result},
     args::DisableCommand,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_driver_development as fdd,
     fuchsia_zircon_status::Status,
     std::io::Write,
 };
@@ -19,9 +19,7 @@ pub async fn disable(
 ) -> Result<()> {
     writeln!(writer, "Disabling {} and restarting driver hosts with rematching enabled.", cmd.url)?;
 
-    driver_development_proxy
-        .disable_match_with_driver_url(&fpkg::PackageUrl { url: cmd.url.to_string() })
-        .await?;
+    driver_development_proxy.disable_match_with_driver_url(&cmd.url).await?;
 
     let restart_result = driver_development_proxy
         .restart_driver_hosts(

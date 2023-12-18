@@ -1126,9 +1126,7 @@ mod tests {
 
             // Disable driver-1.
             development_proxy
-                .disable_match_with_driver_url(&fidl_fuchsia_pkg::PackageUrl {
-                    url: "fuchsia-boot:///#meta/driver-1.cm".to_string(),
-                })
+                .disable_match_with_driver_url("fuchsia-boot:///#meta/driver-1.cm")
                 .await
                 .unwrap();
 
@@ -1154,9 +1152,7 @@ mod tests {
             }
 
             development_proxy
-                .re_enable_match_with_driver_url(&fidl_fuchsia_pkg::PackageUrl {
-                    url: "fuchsia-boot:///#meta/driver-1.cm".to_string(),
-                })
+                .re_enable_match_with_driver_url("fuchsia-boot:///#meta/driver-1.cm")
                 .await
                 .unwrap()
                 .unwrap();

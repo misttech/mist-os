@@ -6,7 +6,6 @@ library fuchsia.driver.development;
 using fuchsia.component.decl;
 using fuchsia.driver.framework;
 using fuchsia.driver.legacy;
-using fuchsia.pkg;
 using fuchsia.url;
 using zx;
 
@@ -185,7 +184,7 @@ open protocol DriverIndex {
     /// have to match existing drivers, it will apply even if the driver appears afterwards,
     /// for example through a |fuchsia.driver.registrar.Register| operation.
     flexible DisableMatchWithDriverUrl(struct {
-        driver_url fuchsia.pkg.PackageUrl;
+        driver_url fuchsia.url.Url;
     }) -> ();
 
     /// Re-enables a given driver url, that was previously disabled with
@@ -193,7 +192,7 @@ open protocol DriverIndex {
     /// were previously disabled.
     /// Will return ZX_ERR_NOT_FOUND if the `driver_url` was not previously disabled.
     flexible ReEnableMatchWithDriverUrl(struct {
-        driver_url fuchsia.pkg.PackageUrl;
+        driver_url fuchsia.url.Url;
     }) -> () error zx.Status;
 };
 

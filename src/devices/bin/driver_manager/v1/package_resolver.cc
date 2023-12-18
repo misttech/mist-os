@@ -5,7 +5,6 @@
 #include "src/devices/bin/driver_manager/v1/package_resolver.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <fidl/fuchsia.pkg/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 
