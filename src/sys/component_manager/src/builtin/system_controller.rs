@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::model::Model,
+    crate::model::{actions::ShutdownType, model::Model},
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_sys2::*,
     fuchsia_async::{self as fasync},
     fuchsia_zircon as zx,
     futures::prelude::*,
     std::{sync::Weak, time::Duration},
-    tracing::info,
+    tracing::*,
 };
 
 pub struct SystemController {
@@ -45,15 +45,16 @@ impl SystemController {
                         panic!("Component manager did not complete shutdown in allowed time.");
                     })
                     .detach();
+                    info!("Component manager is shutting down the system");
                     let root =
                         self.model.upgrade().ok_or(format_err!("model is dropped"))?.root().clone();
-                    root.shutdown()
+                    root.shutdown(ShutdownType::System)
                         .await
                         .context("got error waiting for shutdown action to complete")?;
                     match responder.send() {
                         Ok(()) => {}
                         Err(e) => {
-                            info!(%e, "Error sending response to shutdown requester. Shut down proceeding");
+                            warn!(%e, "Error sending response to shutdown requester. Shut down proceeding");
                         }
                     }
                 }

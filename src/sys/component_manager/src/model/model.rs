@@ -201,7 +201,7 @@ pub mod tests {
     use {
         crate::model::{
             actions::test_utils::is_discovered,
-            actions::{ActionSet, ShutdownAction, UnresolveAction},
+            actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
             testing::test_helpers::{
                 component_decl_with_test_runner, ActionsTest, TestEnvironmentBuilder,
                 TestModelResult,
@@ -234,8 +234,11 @@ pub mod tests {
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
         // This returns a Future that does not need to be polled.
-        let _ =
-            model.root().lock_actions().await.register_inner(&model.root, ShutdownAction::new());
+        let _ = model
+            .root()
+            .lock_actions()
+            .await
+            .register_inner(&model.root, ShutdownAction::new(ShutdownType::Instance));
 
         model.start(Dict::new()).await;
     }

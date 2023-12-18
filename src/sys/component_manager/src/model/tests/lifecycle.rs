@@ -6,7 +6,7 @@ use {
     crate::{
         builtin_environment::BuiltinEnvironment,
         model::{
-            actions::{ActionSet, ShutdownAction, StartAction, StopAction},
+            actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
             component::{ComponentInstance, InstanceState, StartReason},
             error::{ModelError, StartActionError},
             events::registry::EventSubscription,
@@ -652,7 +652,9 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
         .unwrap();
     let component =
         test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
-    ActionSet::register(component.clone(), ShutdownAction::new()).await.unwrap();
+    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
+        .await
+        .unwrap();
     assert!(!test.model.top_instance().has_reboot_task().await);
 }
 

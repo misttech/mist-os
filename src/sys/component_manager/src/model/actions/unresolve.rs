@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{Action, ActionKey, ActionSet, ShutdownAction},
+        actions::{Action, ActionKey, ActionSet, ShutdownAction, ShutdownType},
         component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
         error::UnresolveActionError,
         hooks::{Event, EventPayload},
@@ -40,7 +40,7 @@ impl Action for UnresolveAction {
 // an Unresolved event. Unresolve the component's resolved children if any.
 async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), UnresolveActionError> {
     // Shut down the component, preventing new starts or resolves during the UnresolveAction.
-    ActionSet::register(component.clone(), ShutdownAction::new()).await?;
+    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance)).await?;
 
     if component.lock_execution().await.runtime.is_some() {
         return Err(UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() });
@@ -98,7 +98,7 @@ pub mod tests {
     use {
         crate::model::{
             actions::test_utils::{is_destroyed, is_discovered, is_resolved},
-            actions::{ActionSet, ShutdownAction, UnresolveAction},
+            actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
             error::UnresolveActionError,
             events::{registry::EventSubscription, stream::EventStream},
@@ -332,9 +332,12 @@ pub mod tests {
             start_collection(durability).await;
 
         // Stop the collection.
-        ActionSet::register(component_container.clone(), ShutdownAction::new())
-            .await
-            .expect("shutdown failed");
+        ActionSet::register(
+            component_container.clone(),
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .expect("shutdown failed");
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
         ActionSet::register(component_container.clone(), UnresolveAction::new())

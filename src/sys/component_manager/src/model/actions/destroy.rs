@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{
             Action, ActionKey, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
-            ShutdownAction, StartAction,
+            ShutdownAction, ShutdownType, StartAction,
         },
         component::{ComponentInstance, InstanceState, StartReason},
         error::DestroyActionError,
@@ -57,7 +57,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
     // NOTE: This will recursively shut down the whole subtree. If this component has children,
     // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
     // the parent's subtree was shutdown, this shutdown is a no-op.
-    ActionSet::register(component.clone(), ShutdownAction::new())
+    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .map_err(|e| DestroyActionError::ShutdownFailed { err: Box::new(e) })?;
 
@@ -170,7 +170,7 @@ pub mod tests {
         assert!(component_a.is_started().await);
 
         // Register shutdown first because DestroyChild requires the component to be shut down.
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         // Register destroy child action, and wait for it. Component should be destroyed.
@@ -280,7 +280,7 @@ pub mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         assert!(execution_is_shut_down(&component_a.clone()).await);
@@ -607,7 +607,7 @@ pub mod tests {
             }
             _ => panic!("not resolved"),
         };
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
 
@@ -662,7 +662,7 @@ pub mod tests {
         };
 
         // Register destroy action on "a", and wait for it.
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         ActionSet::register(
@@ -740,7 +740,7 @@ pub mod tests {
         // Register destroy action on "a", and wait for it. This should cause all components
         // in "a"'s component to be shut down and destroyed, in bottom-up order, but "x" is still
         // running.
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         ActionSet::register(
@@ -858,7 +858,7 @@ pub mod tests {
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // that were started to be destroyed, in bottom-up order.
-        ActionSet::register(component_a.clone(), ShutdownAction::new())
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         ActionSet::register(

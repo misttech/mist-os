@@ -152,7 +152,9 @@ pub mod tests {
     use {
         crate::model::{
             actions::test_utils::{is_resolved, is_stopped},
-            actions::{ActionSet, ResolveAction, ShutdownAction, StartAction, StopAction},
+            actions::{
+                ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+            },
             component::StartReason,
             error::ResolveActionError,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -199,7 +201,9 @@ pub mod tests {
         )
         .await
         .unwrap();
-        ActionSet::register(component_a.clone(), ShutdownAction::new()).await.unwrap();
+        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+            .await
+            .unwrap();
 
         // Error to resolve a shut-down component.
         assert_matches!(

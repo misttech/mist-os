@@ -476,7 +476,8 @@ mod tests {
     use {
         crate::model::{
             actions::{
-                start::should_return_early, ActionSet, ShutdownAction, StartAction, StopAction,
+                start::should_return_early, ActionSet, ShutdownAction, ShutdownType, StartAction,
+                StopAction,
             },
             component::{
                 Component, ComponentInstance, ComponentRuntime, ExecutionState, InstanceState,
@@ -513,9 +514,12 @@ mod tests {
     impl Hook for ShutdownOnStartHook {
         async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
             fasync::Task::spawn(async move {
-                ActionSet::register(self.component.clone(), ShutdownAction::new())
-                    .await
-                    .expect("shutdown failed");
+                ActionSet::register(
+                    self.component.clone(),
+                    ShutdownAction::new(ShutdownType::Instance),
+                )
+                .await
+                .expect("shutdown failed");
                 self.done.lock().unwrap().try_send(()).unwrap();
             })
             .detach();

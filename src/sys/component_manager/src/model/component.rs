@@ -12,7 +12,7 @@ use {
                 build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
             },
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
-            ShutdownAction, StartAction, StopAction, UnresolveAction,
+            ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
         },
         context::ModelContext,
         environment::Environment,
@@ -649,8 +649,11 @@ impl ComponentInstance {
 
     /// Shuts down this component. This means the component and its subrealm are stopped and never
     /// allowed to restart again.
-    pub async fn shutdown(self: &Arc<Self>) -> Result<(), StopActionError> {
-        ActionSet::register(self.clone(), ShutdownAction::new()).await
+    pub async fn shutdown(
+        self: &Arc<Self>,
+        shutdown_type: ShutdownType,
+    ) -> Result<(), StopActionError> {
+        ActionSet::register(self.clone(), ShutdownAction::new(shutdown_type)).await
     }
 
     /// Performs the stop protocol for this component instance. `shut_down` determines whether the
@@ -2382,9 +2385,12 @@ pub mod tests {
 
         // Verify that a parent of the exited component can still be stopped
         // properly.
-        ActionSet::register(test.look_up(a_moniker.clone()).await, ShutdownAction::new())
-            .await
-            .expect("Couldn't trigger shutdown");
+        ActionSet::register(
+            test.look_up(a_moniker.clone()).await,
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .expect("Couldn't trigger shutdown");
         // Check that we get a stop even which corresponds to the parent.
         let parent_stop = stop_event_stream
             .wait_until(EventType::Stopped, a_moniker.clone())

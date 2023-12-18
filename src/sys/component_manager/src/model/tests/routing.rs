@@ -16,7 +16,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
+            actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction, ShutdownType},
             component::StartReason,
             error::{
                 ModelError, ResolveActionError, RouteAndOpenCapabilityError, StartActionError,
@@ -2053,7 +2053,9 @@ async fn use_from_destroyed_but_not_removed() {
     // Destroy `b` but keep alive its reference from the parent.
     // TODO: If we had a "pre-destroy" event we could delete the child through normal means and
     // block on the event instead of explicitly registering actions.
-    ActionSet::register(component_b.clone(), ShutdownAction::new()).await.expect("shutdown failed");
+    ActionSet::register(component_b.clone(), ShutdownAction::new(ShutdownType::Instance))
+        .await
+        .expect("shutdown failed");
     ActionSet::register(component_b, DestroyAction::new()).await.expect("destroy failed");
     test.check_use(
         vec!["c"].try_into().unwrap(),

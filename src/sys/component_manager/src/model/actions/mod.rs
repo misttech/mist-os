@@ -63,7 +63,8 @@ mod unresolve;
 // Re-export the actions
 pub use {
     destroy_child::DestroyChildAction, discover::DiscoverAction, resolve::ResolveAction,
-    shutdown::ShutdownAction, start::StartAction, stop::StopAction, unresolve::UnresolveAction,
+    shutdown::ShutdownAction, shutdown::ShutdownType, start::StartAction, stop::StopAction,
+    unresolve::UnresolveAction,
 };
 
 // Limit visibility of internal actions
@@ -437,7 +438,7 @@ pub mod tests {
         register_action_in_new_task(DestroyAction::new(), component.clone(), tx1, Ok(())).await;
         let (tx2, rx2) = oneshot::channel();
         register_action_in_new_task(
-            ShutdownAction::new(),
+            ShutdownAction::new(ShutdownType::Instance),
             component.clone(),
             tx2,
             Err(StopActionError::GetParentFailed), // Some random error.
