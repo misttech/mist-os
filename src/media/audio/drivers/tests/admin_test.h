@@ -32,9 +32,13 @@ class AdminTest : public TestBase {
   void TearDown() override;
   void DropRingBuffer();
 
+  void ResetAndExpectResponse();
+  void SetBridgedMode(bool bridged_mode);
+  void RequestCodecStartAndExpectResponse();
+  void RequestCodecStopAndExpectResponse();
+
   void RequestRingBufferChannelWithMinFormat();
   void RequestRingBufferChannelWithMaxFormat();
-
   void CalculateRingBufferFrameSize();
 
   void RequestRingBufferProperties();

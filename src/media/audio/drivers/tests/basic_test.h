@@ -32,29 +32,42 @@ class BasicTest : public TestBase {
   void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
 
   void RetrieveProperties();
+  void ValidateProperties();
 
   void WatchGainStateAndExpectUpdate();
   void WatchGainStateAndExpectNoUpdate();
-
   void RequestSetGain();
 
   void WatchPlugStateAndExpectUpdate();
   void WatchPlugStateAndExpectNoUpdate();
 
-  void ValidateRingBufferFormatSets();
-
  private:
-  static constexpr size_t kUniqueIdLength = 16;
+  void ValidatePlugState(const fuchsia::hardware::audio::PlugState& plug_state);
 
-  // BasicTest cannot permanently change device state. Optionals ensure we fetch stream props and
-  // initial gain state (to later restore it), before calling any method that alters device state.
-  // We will repurpose properties_ to contain properties for all driver types (Codec, Composite,
-  // Dai) not just StreamConfig.
-  std::optional<fuchsia::hardware::audio::StreamProperties> properties_;
-  std::optional<fuchsia::hardware::audio::GainState> previous_gain_state_;
+  void DisplayBaseProperties();
+  // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
+  struct BaseProperties {
+    //       On codec/composite/dai/stream, member is   (o)ptional (r)equired (.)absent
+    std::optional<bool> is_input;                                   // o.rr
+    std::optional<std::array<uint8_t, kUniqueIdLength>> unique_id;  // oooo
+    std::optional<std::string> manufacturer;                        // oooo
+    std::optional<std::string> product;                             // oooo
+    std::optional<uint32_t> clock_domain;                           // .rrr
 
-  bool changed_gain_state_ = false;
-  fuchsia::hardware::audio::PlugState plug_state_;
+    std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>
+        plug_detect_capabilities;       // r..r
+    std::optional<bool> can_mute;       // ...o
+    std::optional<bool> can_agc;        // ...o
+    std::optional<float> min_gain_db;   // ...r
+    std::optional<float> max_gain_db;   // ...r
+    std::optional<float> gain_step_db;  // ...r
+  };
+  std::optional<BaseProperties> properties_;
+
+  // BasicTest cannot permanently change device state. Optionals ensure we fetch initial gain
+  // state (to later restore it), before calling any method that alters device gain.
+  std::optional<fuchsia::hardware::audio::GainState> initial_gain_state_;
+  bool set_gain_state_ = false;
 };
 
 }  // namespace media::audio::drivers::test

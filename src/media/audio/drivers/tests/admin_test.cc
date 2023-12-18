@@ -19,6 +19,63 @@
 
 namespace media::audio::drivers::test {
 
+void AdminTest::TearDown() {
+  DropRingBuffer();
+
+  TestBase::TearDown();
+}
+
+void AdminTest::RequestCodecStartAndExpectResponse() {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  zx_time_t received_start_time = ZX_TIME_INFINITE_PAST;
+  zx_time_t pre_start_time = zx::clock::get_monotonic().get();
+  codec()->Start(AddCallback("Codec::Start", [&received_start_time](int64_t start_time) {
+    received_start_time = start_time;
+  }));
+
+  ExpectCallbacks();
+  if (!HasFailure()) {
+    EXPECT_GT(received_start_time, pre_start_time);
+    EXPECT_LT(received_start_time, zx::clock::get_monotonic().get());
+  }
+}
+
+void AdminTest::RequestCodecStopAndExpectResponse() {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  zx_time_t received_stop_time = ZX_TIME_INFINITE_PAST;
+  zx_time_t pre_stop_time = zx::clock::get_monotonic().get();
+  codec()->Stop(AddCallback(
+      "Codec::Stop", [&received_stop_time](int64_t stop_time) { received_stop_time = stop_time; }));
+
+  ExpectCallbacks();
+  if (!HasFailure()) {
+    EXPECT_GT(received_stop_time, pre_stop_time);
+    EXPECT_LT(received_stop_time, zx::clock::get_monotonic().get());
+  }
+}
+
+// SetBridgedMode returns no response; WaitForError() afterward if this is the last FIDL command.
+void AdminTest::SetBridgedMode(bool bridged_mode) {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  codec()->SetBridgedMode(bridged_mode);
+}
+
+// Request that the driver reset, expecting a response.
+// TODO(fxbug.dev/124865): Test Reset for Composite and Dai as well (Reset closes any RingBuffer).
+// TODO(fxbug.dev/126734): When we add SignalProcessing testing, check that this resets that state.
+void AdminTest::ResetAndExpectResponse() {
+  if (device_entry().isCodec()) {
+    codec()->Reset(AddCallback("Codec::Reset"));
+  } else {
+    FAIL() << "Unexpected device type";
+    __UNREACHABLE;
+  }
+  ExpectCallbacks();
+}
+
 // For the channelization and sample_format that we've set for the ring buffer, determine the size
 // of each frame. This method assumes that CreateRingBuffer has already been sent to the driver.
 void AdminTest::CalculateRingBufferFrameSize() {
@@ -29,6 +86,8 @@ void AdminTest::CalculateRingBufferFrameSize() {
 }
 
 void AdminTest::RequestRingBufferChannel() {
+  ASSERT_FALSE(device_entry().isCodec());
+
   fuchsia::hardware::audio::Format rb_format = {};
   rb_format.set_pcm_format(ring_buffer_pcm_format_);
 
@@ -71,20 +130,36 @@ void AdminTest::RequestRingBufferChannel() {
 // Request that driver set format to the lowest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
 void AdminTest::RequestRingBufferChannelWithMinFormat() {
+  ASSERT_FALSE(device_entry().isCodec());
+
+  if (ring_buffer_pcm_formats().empty() && device_entry().isComposite()) {
+    GTEST_SKIP() << "*** this audio device returns no ring_buffer_formats. Skipping this test. ***";
+    __UNREACHABLE;
+  }
   ASSERT_GT(ring_buffer_pcm_formats().size(), 0u);
 
-  SetMinRingBufferFormat(ring_buffer_pcm_format_);
-  SetMinDaiFormat(dai_format_);
+  ring_buffer_pcm_format_ = min_ring_buffer_format();
+  if (device_entry().isComposite() || device_entry().isDai()) {
+    GetMinDaiFormat(dai_format_);
+  }
   RequestRingBufferChannel();
 }
 
 // Request that driver set the highest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
 void AdminTest::RequestRingBufferChannelWithMaxFormat() {
+  ASSERT_FALSE(device_entry().isCodec());
+
+  if (ring_buffer_pcm_formats().empty() && device_entry().isComposite()) {
+    GTEST_SKIP() << "*** this audio device returns no ring_buffer_formats. Skipping this test. ***";
+    __UNREACHABLE;
+  }
   ASSERT_GT(ring_buffer_pcm_formats().size(), 0u);
 
-  SetMaxRingBufferFormat(ring_buffer_pcm_format_);
-  SetMaxDaiFormat(dai_format_);
+  ring_buffer_pcm_format_ = max_ring_buffer_format();
+  if (device_entry().isComposite() || device_entry().isDai()) {
+    GetMaxDaiFormat(dai_format_);
+  }
   RequestRingBufferChannel();
 }
 
@@ -93,6 +168,8 @@ void AdminTest::RequestRingBufferChannelWithMaxFormat() {
 // Request the RingBufferProperties, at the current format (relies on the ring buffer channel).
 // Validate the four fields that might be returned (only one is currently required).
 void AdminTest::RequestRingBufferProperties() {
+  ASSERT_FALSE(device_entry().isCodec());
+
   ring_buffer_->GetProperties(AddCallback(
       "RingBuffer::GetProperties", [this](fuchsia::hardware::audio::RingBufferProperties props) {
         ring_buffer_props_ = std::move(props);
@@ -120,6 +197,8 @@ void AdminTest::RequestRingBufferProperties() {
 // `RequestRingBufferProperties` must be called before `RequestBuffer`.
 void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
                               uint32_t notifications_per_ring = 0) {
+  ASSERT_FALSE(device_entry().isCodec());
+
   ASSERT_TRUE(ring_buffer_props_) << "RequestBuffer was called before RequestRingBufferChannel";
 
   min_ring_buffer_frames_ = min_ring_buffer_frames;
@@ -199,8 +278,9 @@ void AdminTest::ActivateChannels(uint64_t active_channels_bitmask, bool expect_s
 // Request that the driver start the ring buffer engine, responding with the start_time.
 // This method assumes that GetVmo has previously been called and we are not already started.
 void AdminTest::RequestRingBufferStart() {
-  // Any position notifications that arrive before the RingBufferStart callback should cause
-  // failures.
+  ASSERT_GT(ring_buffer_frames_, 0u) << "GetVmo must be called before RingBuffer::Start()";
+
+  // Any position notifications that arrive before RingBuffer::Start callback should cause failures.
   FailOnPositionNotifications();
 
   auto send_time = zx::clock::get_monotonic();
@@ -225,6 +305,7 @@ void AdminTest::RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_e
 
 // Request that driver stop the ring buffer. This assumes that GetVmo has previously been called.
 void AdminTest::RequestRingBufferStop() {
+  ASSERT_GT(ring_buffer_frames_, 0u) << "GetVmo must be called before RingBuffer::Stop()";
   ring_buffer_->Stop(AddCallback("RingBuffer::Stop"));
 
   ExpectCallbacks();
@@ -252,6 +333,7 @@ void AdminTest::PositionNotificationCallback(
   // If this is an unexpected callback, fail and exit.
   if (fail_on_position_notification_) {
     FAIL() << "Unexpected position notification";
+    __UNREACHABLE;
   }
   ASSERT_GT(notifications_per_ring(), 0u)
       << "Position notification received: notifications_per_ring() cannot be zero";
@@ -292,14 +374,10 @@ void AdminTest::ValidateExternalDelay() {
   }
 }
 
-void AdminTest::TearDown() {
-  DropRingBuffer();
-
-  TestBase::TearDown();
-}
-
 void AdminTest::DropRingBuffer() {
-  ring_buffer_.Unbind();
+  if (ring_buffer_.is_bound()) {
+    ring_buffer_.Unbind();
+  }
 
   // When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially
   // immediately executing other tests); insert a 100-ms wait. This wait is even more important for
@@ -325,6 +403,45 @@ void AdminTest::DropRingBuffer() {
 // Test cases that target each of the various admin commands
 //
 // Any case not ending in disconnect/error should WaitForError, in case the channel disconnects.
+
+// Verify that a Reset() returns a valid completion.
+DEFINE_ADMIN_TEST_CLASS(Reset, { ResetAndExpectResponse(); });
+
+DEFINE_ADMIN_TEST_CLASS(BridgedMode, {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveIsBridgeable());
+  if (!CanBeBridged()) {
+    GTEST_SKIP() << "This codec does not support bridged mode";
+    __UNREACHABLE;
+  }
+
+  SetBridgedMode(true);
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(NonBridgedMode, {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  SetBridgedMode(false);
+  WaitForError();
+});
+
+// Start-while-started should always succeed, so we test this twice.
+DEFINE_ADMIN_TEST_CLASS(CodecStart, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestCodecStartAndExpectResponse());
+
+  RequestCodecStartAndExpectResponse();
+  WaitForError();
+});
+
+// Stop-while-stopped should always succeed, so we test this twice.
+DEFINE_ADMIN_TEST_CLASS(CodecStop, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestCodecStopAndExpectResponse());
+
+  RequestCodecStopAndExpectResponse();
+  WaitForError();
+});
 
 // Verify valid responses: ring buffer properties
 DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
@@ -571,7 +688,13 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
   }
 
   if (device_entry.isCodec()) {
-    // Nothing to do, for now.
+    REGISTER_ADMIN_TEST(Reset, device_entry);
+
+    REGISTER_ADMIN_TEST(BridgedMode, device_entry);
+    REGISTER_ADMIN_TEST(NonBridgedMode, device_entry);
+
+    REGISTER_ADMIN_TEST(CodecStop, device_entry);
+    REGISTER_ADMIN_TEST(CodecStart, device_entry);
   } else if (device_entry.isComposite()) {
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
@@ -645,5 +768,18 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     FAIL() << "Unknown device type";
   }
 }
+
+// TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
+
+// TODO(fxbug.dev/124865): Add more testing for Composite protocol (e.g. Reset, SetDaiFormat).
+
+// TODO(b/302704556): Add tests for Watch-while-still-pending (specifically delay and position).
+
+// TODO(fxbug.dev/124865): Add remaining tests for Codec protocol methods.
+//
+// SetDaiFormatUnsupported
+//    Codec::SetDaiFormat with bad format returns the expected ZX_ERR_INVALID_ARGS.
+//    Codec should still be usable (protocol channel still open), after an error is returned.
+// SetDaiFormatWhileUnplugged (not testable in automated environment)
 
 }  // namespace media::audio::drivers::test

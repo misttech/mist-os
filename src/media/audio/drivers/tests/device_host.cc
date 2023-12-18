@@ -149,8 +149,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
   }
 }
 
-// Optionally called during DetectDevices. Create virtual_audio instances (StreamConfig input and
-// output, Dai input and output, and Composite) using the
+// Optionally called during DetectDevices. Create virtual_audio instances (all four types) using the
 // default configuration settings (which should pass all tests).
 void DeviceHost::AddVirtualDevices() {
   const std::string kControlNodePath =
@@ -169,20 +168,20 @@ void DeviceHost::AddVirtualDevices() {
       << num_unspecified_direction
       << " virtual_audio devices with unspecified direction already exist (should be 0)";
 
-  // Composite has no directionality; is_input = true is unused.
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
+  // Composite has no directionality; for this testing, Codec directionality is not applicable.
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
 
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::DAI, dai_input_);
-  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::DAI, dai_output_);
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::DAI, dai_input_, true);
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::DAI, dai_output_, false);
 
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_input_);
-  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_output_);
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_input_, true);
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_output_, false);
 }
 
-void DeviceHost::AddVirtualDevice(bool is_input,
-                                  const fuchsia::virtualaudio::DeviceType device_type,
-                                  fuchsia::virtualaudio::DevicePtr& device_ptr) {
-  const char* direction = is_input ? "input" : "output";
+void DeviceHost::AddVirtualDevice(const fuchsia::virtualaudio::DeviceType device_type,
+                                  fuchsia::virtualaudio::DevicePtr& device_ptr,
+                                  std::optional<bool> is_input) {
+  const char* direction = is_input ? (*is_input ? "input" : "output") : "NONE";
   const char* type;
   switch (device_type) {
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
@@ -201,7 +200,11 @@ void DeviceHost::AddVirtualDevice(bool is_input,
       ZX_ASSERT(0);
   }
   fuchsia::virtualaudio::Direction configuration_direction;
-  configuration_direction.set_is_input(is_input);
+  if (is_input) {
+    configuration_direction.set_is_input(*is_input);
+  } else {
+    configuration_direction.clear_is_input();
+  }
 
   fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
   zx_status_t status = controller_->GetDefaultConfiguration(

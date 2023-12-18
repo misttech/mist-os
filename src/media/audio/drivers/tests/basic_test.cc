@@ -7,10 +7,15 @@
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fdio/fdio.h>
+#include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <cstring>
-#include <string_view>
+#include <optional>
+#include <string>
+
+#include <gtest/gtest.h>
+
+#include "src/media/audio/drivers/tests/test_base.h"
 
 namespace media::audio::drivers::test {
 
@@ -30,11 +35,11 @@ void LogGainState(std::string_view prologue,
 }
 
 void BasicTest::TearDown() {
-  // Restore previous_gain_state_, if we changed the gain in this test case.
-  if (stream_config().is_bound() && previous_gain_state_ && changed_gain_state_) {
-    LogGainState("Restoring previous gain: ", *previous_gain_state_);
-    stream_config()->SetGain(std::move(*previous_gain_state_));
-    previous_gain_state_.reset();
+  // Restore initial_gain_state_, if we changed the gain in this test case.
+  if (stream_config().is_bound() && initial_gain_state_ && set_gain_state_) {
+    LogGainState("Restoring previous gain: ", *initial_gain_state_);
+    stream_config()->SetGain(std::move(*initial_gain_state_));
+    initial_gain_state_.reset();
   }
 
   TestBase::TearDown();
@@ -65,301 +70,317 @@ void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateC
 
 // Basic (non-privileged) requests
 //
-// Request stream properties including unique ID (which must be unique between input and output).
-// TODO(mpuryear): actually ensure that this differs between input and output.
+// Request properties including unique ID (which should be unique across instances).
+// The FIDL table for properties differs across Codec/Composite/Dai/StreamConfig.
+// Extract these into a common struct so that subsequent code can be shared.
 void BasicTest::RetrieveProperties() {
-  stream_config()->GetProperties(AddCallback(
-      "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties prop) {
-        properties_ = std::move(prop);
-
-        if (properties_->has_unique_id()) {
-          char id_buf[2 * kUniqueIdLength + 1];
-          std::snprintf(id_buf, sizeof(id_buf),
-                        "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                        properties_->unique_id()[0], properties_->unique_id()[1],
-                        properties_->unique_id()[2], properties_->unique_id()[3],
-                        properties_->unique_id()[4], properties_->unique_id()[5],
-                        properties_->unique_id()[6], properties_->unique_id()[7],
-                        properties_->unique_id()[8], properties_->unique_id()[9],
-                        properties_->unique_id()[10], properties_->unique_id()[11],
-                        properties_->unique_id()[12], properties_->unique_id()[13],
-                        properties_->unique_id()[14], properties_->unique_id()[15]);
-          FX_LOGS(DEBUG) << "Received unique_id " << id_buf;
-        }
-
-        ASSERT_TRUE(properties_->has_is_input());
-        if (driver_type() == DriverType::StreamConfigInput) {
-          ASSERT_TRUE(prop.is_input());
-        } else {
-          ASSERT_FALSE(prop.is_input());
-        }
-
-        if (properties_->has_can_mute()) {
-          *properties_->mutable_can_mute() = properties_->can_mute();
-        }
-        if (properties_->has_can_agc()) {
-          *properties_->mutable_can_agc() = properties_->can_agc();
-        }
-
-        ASSERT_TRUE(properties_->has_min_gain_db());
-        ASSERT_TRUE(properties_->has_max_gain_db());
-        ASSERT_TRUE(properties_->has_gain_step_db());
-        ASSERT_TRUE(properties_->min_gain_db() <= properties_->max_gain_db());
-        ASSERT_TRUE(properties_->gain_step_db() >= 0);
-        if (properties_->max_gain_db() > properties_->min_gain_db()) {
-          EXPECT_GE(properties_->gain_step_db(), 0.0f);
-        } else {
-          EXPECT_EQ(properties_->gain_step_db(), 0.0f);
-        }
-
-        ASSERT_TRUE(properties_->has_plug_detect_capabilities());
-
-        if (properties_->has_manufacturer()) {
-          FX_LOGS(DEBUG) << "Received manufacturer " << properties_->manufacturer();
-        }
-        if (properties_->has_product()) {
-          FX_LOGS(DEBUG) << "Received product " << properties_->product();
-        }
-
-        ASSERT_TRUE(properties_->has_clock_domain());
-      }));
+  properties_.reset();
+  // TODO(b/315049103): actually ensure that this differs between input and output.
+  if (device_entry().isCodec()) {
+    codec()->GetProperties(AddCallback(
+        "Codec::GetProperties", [this](fuchsia::hardware::audio::CodecProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id.emplace();
+            std::memcpy(properties_->unique_id->data(), props.unique_id().data(), 16);
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_plug_detect_capabilities()) {
+            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
+          }
+        }));
+  } else if (device_entry().isComposite()) {
+    composite()->GetProperties(AddCallback(
+        "Composite::GetProperties", [this](fuchsia::hardware::audio::CompositeProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_unique_id()) {
+            properties_->unique_id.emplace(props.unique_id());
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+        }));
+  } else if (device_entry().isDai()) {
+    dai()->GetProperties(
+        AddCallback("Dai::GetProperties", [this](fuchsia::hardware::audio::DaiProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id = props.unique_id();
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product_name()) {  // Note: not 'product'
+            properties_->product = props.product_name();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+        }));
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->GetProperties(AddCallback(
+        "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id = props.unique_id();
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+          if (props.has_plug_detect_capabilities()) {
+            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
+          }
+          if (props.has_can_mute()) {
+            properties_->can_mute = props.can_mute();
+          }
+          if (props.has_can_agc()) {
+            properties_->can_agc = props.can_agc();
+          }
+          if (props.has_min_gain_db()) {
+            properties_->min_gain_db = props.min_gain_db();
+          }
+          if (props.has_max_gain_db()) {
+            properties_->max_gain_db = props.max_gain_db();
+          }
+          if (props.has_gain_step_db()) {
+            properties_->gain_step_db = props.gain_step_db();
+          }
+        }));
+  }
   ExpectCallbacks();
+  EXPECT_TRUE(properties_.has_value()) << "No GetProperties completion was received";
 }
 
-// Fail if the returned formats are not complete, unique and within ranges.
-void BasicTest::ValidateRingBufferFormatSets() {
-  for (size_t i = 0; i < ring_buffer_pcm_formats().size(); ++i) {
-    SCOPED_TRACE(testing::Message() << "ring_buffer_pcm_format[" << i << "]");
-    auto& format_set = ring_buffer_pcm_formats()[i];
+// For debugging purposes
+void BasicTest::DisplayBaseProperties() {
+  ASSERT_TRUE(properties_);
 
-    ASSERT_TRUE(format_set.has_channel_sets());
-    ASSERT_TRUE(format_set.has_sample_formats());
-    ASSERT_TRUE(format_set.has_bytes_per_sample());
-    ASSERT_TRUE(format_set.has_valid_bits_per_sample());
-    ASSERT_TRUE(format_set.has_frame_rates());
+  FX_LOGS(INFO) << driver_type() << " is_input: "
+                << (properties_->is_input ? std::to_string(*properties_->is_input) : "NONE");
+  FX_LOGS(INFO) << driver_type() << " manufacturer is "
+                << (properties_->manufacturer ? "'" + *properties_->manufacturer + "'" : "NONE");
+  FX_LOGS(INFO) << driver_type() << " product is "
+                << (properties_->product ? "'" + *properties_->product + "'" : "NONE");
+  FX_LOGS(INFO) << driver_type() << " unique_id is " << properties_->unique_id;
+  FX_LOGS(INFO) << driver_type() << " clock domain is "
+                << (properties_->clock_domain ? std::to_string(*properties_->clock_domain)
+                                              : "NONE");
+  FX_LOGS(INFO) << driver_type() << " plug_detect is " << properties_->plug_detect_capabilities;
+  FX_LOGS(INFO) << driver_type() << " min_gain_db is "
+                << (properties_->min_gain_db ? std::to_string(*properties_->min_gain_db) : "NONE");
+  FX_LOGS(INFO) << driver_type() << " max_gain_db is "
+                << (properties_->max_gain_db ? std::to_string(*properties_->max_gain_db) : "NONE");
+  FX_LOGS(INFO) << driver_type() << " gain_step_db is "
+                << (properties_->gain_step_db ? std::to_string(*properties_->gain_step_db)
+                                              : "NONE");
+  FX_LOGS(INFO) << driver_type() << " can_mute is "
+                << (properties_->can_mute ? std::to_string(*properties_->can_mute) : "NONE");
+  FX_LOGS(INFO) << driver_type() << " can_agc is "
+                << (properties_->can_agc ? std::to_string(*properties_->can_agc) : "NONE");
+}
 
-    ASSERT_FALSE(format_set.channel_sets().empty());
-    ASSERT_FALSE(format_set.sample_formats().empty());
-    ASSERT_FALSE(format_set.bytes_per_sample().empty());
-    ASSERT_FALSE(format_set.valid_bits_per_sample().empty());
-    ASSERT_FALSE(format_set.frame_rates().empty());
+void BasicTest::ValidateProperties() {
+  ASSERT_TRUE(properties_);
 
-    EXPECT_LE(format_set.channel_sets().size(), fuchsia::hardware::audio::MAX_COUNT_CHANNEL_SETS);
-    EXPECT_LE(format_set.sample_formats().size(),
-              fuchsia::hardware::audio::MAX_COUNT_SUPPORTED_SAMPLE_FORMATS);
-    EXPECT_LE(format_set.bytes_per_sample().size(),
-              fuchsia::hardware::audio::MAX_COUNT_SUPPORTED_BYTES_PER_SAMPLE);
-    EXPECT_LE(format_set.valid_bits_per_sample().size(),
-              fuchsia::hardware::audio::MAX_COUNT_SUPPORTED_VALID_BITS_PER_SAMPLE);
-    EXPECT_LE(format_set.frame_rates().size(), fuchsia::hardware::audio::MAX_COUNT_SUPPORTED_RATES);
+  // Just check that required fields are present
+  if (device_entry().isCodec()) {
+    EXPECT_TRUE(properties_->plug_detect_capabilities);
+  } else if (device_entry().isComposite()) {
+    EXPECT_TRUE(properties_->clock_domain);
+  } else if (device_entry().isDai()) {
+    EXPECT_TRUE(properties_->is_input);
+    EXPECT_TRUE(properties_->clock_domain);
+  } else if (device_entry().isStreamConfig()) {
+    ASSERT_TRUE(properties_->is_input);
+    EXPECT_TRUE(properties_->clock_domain);
+    EXPECT_TRUE(properties_->plug_detect_capabilities);
+    ASSERT_TRUE(properties_->min_gain_db);
+    ASSERT_TRUE(properties_->max_gain_db);
+    ASSERT_TRUE(properties_->gain_step_db);
 
-    for (size_t j = 0; j < format_set.channel_sets().size(); ++j) {
-      SCOPED_TRACE(testing::Message() << "channel_set[" << j << "]");
-      auto& channel_set = format_set.channel_sets()[j];
-
-      ASSERT_TRUE(channel_set.has_attributes());
-      ASSERT_FALSE(channel_set.attributes().empty());
-      EXPECT_LE(channel_set.attributes().size(),
-                fuchsia::hardware::audio::MAX_COUNT_CHANNELS_IN_RING_BUFFER);
-
-      // Ensure each `ChannelSet` contains a unique number of channels.
-      for (size_t k = j + 1; k < format_set.channel_sets().size(); ++k) {
-        size_t other_channel_set_size = format_set.channel_sets()[k].attributes().size();
-        EXPECT_NE(channel_set.attributes().size(), other_channel_set_size)
-            << "same channel count as channel_set[" << k << "]: " << other_channel_set_size;
-      }
-
-      for (size_t k = 0; k < channel_set.attributes().size(); ++k) {
-        SCOPED_TRACE(testing::Message() << "attributes[" << k << "]");
-        auto& attribs = channel_set.attributes()[k];
-
-        // Ensure channel_set.attributes are within the required range.
-        if (attribs.has_min_frequency()) {
-          EXPECT_LT(attribs.min_frequency(), fuchsia::media::MAX_PCM_FRAMES_PER_SECOND);
-        }
-        if (attribs.has_max_frequency()) {
-          EXPECT_GT(attribs.max_frequency(), fuchsia::media::MIN_PCM_FRAMES_PER_SECOND);
-          EXPECT_LE(attribs.max_frequency(), fuchsia::media::MAX_PCM_FRAMES_PER_SECOND);
-          if (attribs.has_min_frequency()) {
-            EXPECT_LE(attribs.min_frequency(), attribs.max_frequency());
-          }
-        }
-      }
-    }
-
-    // Ensure sample_formats are unique.
-    for (size_t j = 0; j < format_set.sample_formats().size(); ++j) {
-      for (size_t k = j + 1; k < format_set.sample_formats().size(); ++k) {
-        EXPECT_NE(static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[j])),
-                  static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[k])))
-            << "sample_formats[" << j << "] ("
-            << static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[j]))
-            << ") must not equal sample_formats[" << k << "] ("
-            << static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[k])) << ")";
-      }
-    }
-
-    // Ensure bytes_per_sample are unique and listed in ascending order.
-    uint16_t max_bytes = 0;
-    for (size_t j = 0; j < format_set.bytes_per_sample().size(); ++j) {
-      EXPECT_GT(format_set.bytes_per_sample()[j], 0)
-          << "bytes_per_sample[" << j << "] ("
-          << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
-          << ") must be greater than zero";
-      if (j > 0) {
-        EXPECT_GT(format_set.bytes_per_sample()[j], format_set.bytes_per_sample()[j - 1])
-            << "bytes_per_sample[" << j << "] ("
-            << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
-            << ") must exceed bytes_per_sample[" << j - 1 << "] ("
-            << static_cast<uint16_t>(format_set.bytes_per_sample()[j - 1]) << ")";
-      }
-      max_bytes = std::max(max_bytes, static_cast<uint16_t>(format_set.bytes_per_sample()[j]));
-    }
-
-    // Ensure valid_bits_per_sample are unique and listed in ascending order.
-    for (size_t j = 0; j < format_set.valid_bits_per_sample().size(); ++j) {
-      EXPECT_GT(format_set.valid_bits_per_sample()[j], 0)
-          << "valid_bits_per_sample[" << j << "] ("
-          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
-          << ") must be greater than zero";
-      if (j > 0) {
-        EXPECT_GT(format_set.valid_bits_per_sample()[j], format_set.valid_bits_per_sample()[j - 1])
-            << "valid_bits_per_sample[" << j << "] ("
-            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
-            << ") must exceed than valid_bits_per_sample[" << j - 1 << "] ("
-            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j - 1]) << ")";
-      }
-      EXPECT_LE(format_set.valid_bits_per_sample()[j], max_bytes * 8)
-          << "valid_bits_per_sample[" << j << "] ("
-          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
-          << ") must fit into the maximum bytes_per_sample (" << max_bytes << ")";
-    }
-
-    // Ensure frame_rates are in range and unique and listed in ascending order.
-    for (size_t j = 0; j < format_set.frame_rates().size(); ++j) {
-      EXPECT_GE(format_set.frame_rates()[j], fuchsia::media::MIN_PCM_FRAMES_PER_SECOND)
-          << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
-          << ") cannot be less than MIN_PCM_FRAMES_PER_SECOND ("
-          << fuchsia::media::MIN_PCM_FRAMES_PER_SECOND << ")";
-      EXPECT_LE(format_set.frame_rates()[j], fuchsia::media::MAX_PCM_FRAMES_PER_SECOND)
-          << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
-          << ") cannot exceed MAX_PCM_FRAMES_PER_SECOND ("
-          << fuchsia::media::MAX_PCM_FRAMES_PER_SECOND << ")";
-
-      if (j > 0) {
-        EXPECT_GT(format_set.frame_rates()[j], format_set.frame_rates()[j - 1])
-            << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
-            << ") must exceed frame_rates[" << j - 1 << "] (" << format_set.frame_rates()[j - 1]
-            << ")";
-      }
-    }
+    // For StreamConfig, we can do additional data validity/range checks.
+    EXPECT_EQ(*properties_->is_input, driver_type() == DriverType::StreamConfigInput);
+    ASSERT_TRUE(std::isfinite(*properties_->min_gain_db)) << "irregular min_gain_db";
+    ASSERT_TRUE(std::isfinite(*properties_->max_gain_db)) << "irregular max_gain_db";
+    ASSERT_TRUE(std::isfinite(*properties_->gain_step_db)) << "irregular gain_step_db";
+    EXPECT_LE(*properties_->min_gain_db, *properties_->max_gain_db) << "max_gain_db too small";
+    EXPECT_GE(*properties_->gain_step_db, 0.0f) << "gain_step_db too small";
+    EXPECT_LE(*properties_->gain_step_db, *properties_->max_gain_db - *properties_->min_gain_db)
+        << "gain_step_db too large";
+  } else {
+    FAIL() << "Unknown device type";
   }
 }
 
 // Request that the driver return its gain capabilities and current state, expecting a response.
+// TODO(b/315051281): If possible, combine this with the corresponding check of the signalprocessing
+// gain element, once that test exists.
 void BasicTest::WatchGainStateAndExpectUpdate() {
   ASSERT_TRUE(properties_);
+  ASSERT_TRUE(device_entry().isStreamConfig());
 
   // We reconnect the stream every time we run a test, and by driver interface definition the driver
   // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
   stream_config()->WatchGainState(
       AddCallback("WatchGainState", [this](fuchsia::hardware::audio::GainState gain_state) {
-        EXPECT_TRUE(gain_state.has_gain_db());
-        EXPECT_GE(gain_state.gain_db(), properties_->min_gain_db());
-        EXPECT_LE(gain_state.gain_db(), properties_->max_gain_db());
+        LogGainState((initial_gain_state_ ? "Received gain update:  " : "Storing previous gain: "),
+                     gain_state);
+
+        ASSERT_TRUE(gain_state.has_gain_db());
+        EXPECT_GE(gain_state.gain_db(), *properties_->min_gain_db);
+        EXPECT_LE(gain_state.gain_db(), *properties_->max_gain_db);
 
         // If we're muted, then we must be capable of muting.
-        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || properties_->can_mute());
+        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || *properties_->can_mute);
         // If AGC is enabled, then we must be capable of AGC.
         EXPECT_TRUE(!gain_state.has_agc_enabled() || !gain_state.agc_enabled() ||
-                    properties_->can_agc());
-
-        LogGainState((previous_gain_state_ ? "Storing previous gain: " : "Received new gain: "),
-                     gain_state);
-        if (!previous_gain_state_) {
-          previous_gain_state_ = std::move(gain_state);
+                    *properties_->can_agc);
+        if (!initial_gain_state_.has_value()) {
+          initial_gain_state_ = std::move(gain_state);
         }
       }));
   ExpectCallbacks();
 }
 
 // Request that the driver return its current gain state, expecting no response (no change).
+// TODO(b/315051281): If possible, combine this with the corresponding check of the signalprocessing
+// gain element, once that test exists.
 void BasicTest::WatchGainStateAndExpectNoUpdate() {
-  ASSERT_TRUE(properties_);
-  ASSERT_TRUE(previous_gain_state_);
+  ASSERT_TRUE(device_entry().isStreamConfig());
+
   stream_config()->WatchGainState([](fuchsia::hardware::audio::GainState gain_state) {
-    LogGainState("Unexpected gain update received: ", gain_state);
-    FAIL();
+    FAIL() << "Unexpected gain update received";
   });
 }
 
 // Determine an appropriate gain state to request, then call other method to request that driver set
 // gain. This method assumes that the driver already successfully responded to a GetInitialGainState
 // request. If this device's gain is fixed and cannot be changed, then SKIP the test.
+// TODO(b/315051281): If possible, combine this with the corresponding check of the signalprocessing
+// gain element, once that test exists.
 void BasicTest::RequestSetGain() {
-  // We reconnect the stream every time we run a test. By interface definition a driver must reply
-  // to the first watch request, so we get gain state by issuing a watch FIDL call before this case.
+  ASSERT_TRUE(device_entry().isStreamConfig()) << __func__ << ": device_entry is not StreamConfig";
   ASSERT_TRUE(properties_);
-  ASSERT_TRUE(previous_gain_state_);
-
-  if (properties_->max_gain_db() == properties_->min_gain_db() && !properties_->can_mute() &&
-      !properties_->can_agc()) {
+  if (*properties_->max_gain_db == *properties_->min_gain_db && !*properties_->can_mute &&
+      !*properties_->can_agc) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
-                 << previous_gain_state_->gain_db()
+                 << initial_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
   }
-  changed_gain_state_ = true;
 
-  // Base our new gain settings on the old ones: avoid existing values.
-  fuchsia::hardware::audio::GainState set_gain_state;
-  EXPECT_EQ(previous_gain_state_->Clone(&set_gain_state), ZX_OK);
+  // Ensure we've retrieved initial gain settings, so we can restore them after this test case.
+  ASSERT_TRUE(initial_gain_state_);
+
+  // Base our new gain settings on the old ones, to avoid existing values.
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  ASSERT_EQ(initial_gain_state_->Clone(&gain_state_to_set), ZX_OK);
+  // Base our new gain settings on the old ones: avoid existing values so this Set is a change.
+  // If we got this far, we know we can change something (even if it isn't gain_db).
   // Change to a different gain_db.
-  *set_gain_state.mutable_gain_db() = properties_->min_gain_db();
-  if (previous_gain_state_->gain_db() == properties_->min_gain_db()) {
-    *set_gain_state.mutable_gain_db() += properties_->gain_step_db();
-  }
+  *gain_state_to_set.mutable_gain_db() =
+      (initial_gain_state_->gain_db() == *properties_->min_gain_db ? *properties_->max_gain_db
+                                                                   : *properties_->min_gain_db);
   // Toggle muted if we can change it (explicitly set it to false, if we can't).
-  *set_gain_state.mutable_muted() =
-      properties_->can_mute() && !(set_gain_state.has_muted() && set_gain_state.muted());
-
+  *gain_state_to_set.mutable_muted() =
+      *properties_->can_mute && !(gain_state_to_set.has_muted() && gain_state_to_set.muted());
   // Toggle AGC if we can change it (explicitly set it to false, if we can't).
-  *set_gain_state.mutable_agc_enabled() =
-      properties_->can_agc() && !(set_gain_state.has_agc_enabled() && set_gain_state.agc_enabled());
+  *gain_state_to_set.mutable_agc_enabled() =
+      *properties_->can_agc &&
+      !(gain_state_to_set.has_agc_enabled() && gain_state_to_set.agc_enabled());
 
-  LogGainState("Setting gain: ", set_gain_state);
-  stream_config()->SetGain(std::move(set_gain_state));
+  set_gain_state_ = true;
+  LogGainState("SetGain about to set:  ", gain_state_to_set);
+  stream_config()->SetGain(std::move(gain_state_to_set));
+}
+
+// TODO(b/315051014): If possible, combine this with the corresponding plug check of the
+// signalprocessing endpoint element, once that test exists.
+void BasicTest::ValidatePlugState(const fuchsia::hardware::audio::PlugState& plug_state) {
+  ASSERT_TRUE(plug_state.has_plugged());
+  if (!plug_state.plugged()) {
+    ASSERT_TRUE(properties_);
+    ASSERT_TRUE(properties_->plug_detect_capabilities);
+    EXPECT_NE(*properties_->plug_detect_capabilities,
+              fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED)
+        << "Device reported plug capabilities as HARDWIRED, but now reports as unplugged";
+  }
+
+  EXPECT_TRUE(plug_state.has_plug_state_time());
+  EXPECT_GE(plug_state.plug_state_time(), 0u);
+  EXPECT_LT(plug_state.plug_state_time(), zx::clock::get_monotonic().get());
 }
 
 // Request that the driver return its current plug state, expecting a valid response.
+// TODO(b/315051014): If possible, combine this with the corresponding plug check of the
+// signalprocessing endpoint element, once that test exists.
 void BasicTest::WatchPlugStateAndExpectUpdate() {
+  ASSERT_TRUE(properties_);
+
   // Since we reconnect to the audio stream every time we run this test and we are guaranteed by
   // the audio driver interface definition that the driver will reply to the first watch request,
   // we can get the plug state by issuing a watch FIDL call.
-  stream_config()->WatchPlugState(
-      AddCallback("WatchPlugState", [this](fuchsia::hardware::audio::PlugState state) {
-        plug_state_ = std::move(state);
-
-        ASSERT_TRUE(plug_state_.has_plugged());
-        if (!plug_state_.plugged()) {
-          ASSERT_TRUE(properties_);
-          ASSERT_TRUE(properties_->has_plug_detect_capabilities());
-          EXPECT_NE(properties_->plug_detect_capabilities(),
-                    fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED)
-              << "Device reported plug capabilities as HARDWIRED, but now reports as unplugged";
-        }
-
-        EXPECT_TRUE(plug_state_.has_plug_state_time());
-        EXPECT_LT(plug_state_.plug_state_time(), zx::clock::get_monotonic().get());
-        FX_LOGS(DEBUG) << "Plug_state_time: " << plug_state_.plug_state_time();
-      }));
+  fuchsia::hardware::audio::PlugState initial_plug_state;
+  if (device_entry().isCodec()) {
+    codec()->WatchPlugState(AddCallback(
+        "Codec::WatchPlugState", [&initial_plug_state](fuchsia::hardware::audio::PlugState state) {
+          initial_plug_state = std::move(state);
+        }));
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->WatchPlugState(
+        AddCallback("StreamConfig::WatchPlugState",
+                    [&initial_plug_state](fuchsia::hardware::audio::PlugState state) {
+                      initial_plug_state = std::move(state);
+                    }));
+  } else {
+    FAIL() << "Wrong device type for " << __func__;
+  }
   ExpectCallbacks();
+  if (!HasFailure()) {
+    ValidatePlugState(initial_plug_state);
+  }
 }
 
 // Request that the driver return its current plug state, expecting no response (no change).
+// TODO(b/315051014): If possible, combine this with the corresponding plug check of the
+// signalprocessing endpoint element, once that test exists.
 void BasicTest::WatchPlugStateAndExpectNoUpdate() {
-  stream_config()->WatchPlugState([](fuchsia::hardware::audio::PlugState state) {
-    FAIL() << "Unexpected plug update received";
-  });
+  if (device_entry().isCodec()) {
+    codec()->WatchPlugState([](fuchsia::hardware::audio::PlugState state) {
+      FAIL() << "Codec::WatchPlugState: unexpected plug update received";
+    });
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->WatchPlugState([](fuchsia::hardware::audio::PlugState state) {
+      FAIL() << "StreamConfig::WatchPlugState: unexpected plug update received";
+    });
+  } else {
+    FAIL() << "Wrong device type for " << __func__;
+  }
 }
 
 #define DEFINE_BASIC_TEST_CLASS(CLASS_NAME, CODE)                               \
@@ -375,7 +396,10 @@ void BasicTest::WatchPlugStateAndExpectNoUpdate() {
 DEFINE_BASIC_TEST_CLASS(Health, { RequestHealthAndExpectHealthy(); });
 
 // Verify a valid unique_id, manufacturer, product and gain capabilities is successfully received.
-DEFINE_BASIC_TEST_CLASS(StreamProperties, { RetrieveProperties(); });
+DEFINE_BASIC_TEST_CLASS(GetProperties, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ValidateProperties();
+});
 
 // Verify the initial WatchGainState responses are successfully received.
 DEFINE_BASIC_TEST_CLASS(GetInitialGainState, {
@@ -407,8 +431,13 @@ DEFINE_BASIC_TEST_CLASS(SetGain, {
 DEFINE_BASIC_TEST_CLASS(RingBufferFormats, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  WaitForError();
+});
 
-  ValidateRingBufferFormatSets();
+// Verify that format-retrieval responses are successfully received and are complete and valid.
+DEFINE_BASIC_TEST_CLASS(DaiFormats, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveDaiFormats());
   WaitForError();
 });
 
@@ -419,8 +448,9 @@ DEFINE_BASIC_TEST_CLASS(GetInitialPlugState, {
   WatchPlugStateAndExpectUpdate();
   WaitForError();
 
-  // Someday: determine how to trigger the driver's internal hardware-detect mechanism, so it emits
-  // unsolicited PLUG/UNPLUG events -- otherwise driver plug detect updates are not fully testable.
+  // Someday: determine how to trigger the driver's internal hardware-detect mechanism, so it
+  // emits unsolicited PLUG/UNPLUG events -- otherwise driver plug detect updates are not fully
+  // testable.
 });
 
 // Verify that no response is received, for a subsequent WatchPlugState request.
@@ -429,6 +459,11 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   ASSERT_NO_FAILURE_OR_SKIP(WatchPlugStateAndExpectUpdate());
 
   WatchPlugStateAndExpectNoUpdate();
+  WaitForError();
+});
+
+DEFINE_BASIC_TEST_CLASS(IsBridgeable, {
+  RetrieveIsBridgeable();
   WaitForError();
 });
 
@@ -448,14 +483,25 @@ DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   if (device_entry.isCodec()) {
     REGISTER_BASIC_TEST(Health, device_entry);
+    REGISTER_BASIC_TEST(GetProperties, device_entry);
+    REGISTER_BASIC_TEST(IsBridgeable, device_entry);
+    REGISTER_BASIC_TEST(DaiFormats, device_entry);
+    REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
+    REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else if (device_entry.isComposite()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(Topology, device_entry);
+    REGISTER_BASIC_TEST(GetProperties, device_entry);
+    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
+    REGISTER_BASIC_TEST(DaiFormats, device_entry);
   } else if (device_entry.isDai()) {
     REGISTER_BASIC_TEST(Health, device_entry);
+    REGISTER_BASIC_TEST(GetProperties, device_entry);
+    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
+    REGISTER_BASIC_TEST(DaiFormats, device_entry);
   } else if (device_entry.isStreamConfig()) {
     REGISTER_BASIC_TEST(Health, device_entry);
-    REGISTER_BASIC_TEST(StreamProperties, device_entry);
+    REGISTER_BASIC_TEST(GetProperties, device_entry);
     REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
     REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
     REGISTER_BASIC_TEST(SetGain, device_entry);
@@ -467,13 +513,7 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   }
 }
 
-// TODO(fxbug.dev/124865): Add tests for Codec protocol methods (specifically Reset, Start, Stop,
-//   IsBridgeable, SetBridgeMode, GetDaiFormats, SetDaiFormat, WatchPlugState and GetProperties).
-
 // TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
-
-// TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
-//   GetProperties, GetDaiFormats and GetRingBufferFormats).
 
 // TODO(b/302704556): Add tests for Watch-while-still-pending (specifically WatchGainState,
 //   WatchPlugState, WatchClockRecoveryPositionInfo, WatchDelayInfo, WatchElementState and
@@ -593,79 +633,5 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
 //    Else set a static var for this driver instance that SignalProcessing is supported.
 //    WatchElementState pends until SetElementState is called.
 //    Upon change, returns callback with values that match SetElementState.
-
-// Codec channel requests
-//
-// TODO(fxbug.dev/124865): Add tests for Codec protocol methods.
-// Proposed test cases listed below:
-//
-// BasicTest cases:
-// GetProperties -
-//    Codec::GetProperties must return callback.  plug_detect_capabilities is required.
-//    Shareable with Dai::GetDaiFormats?
-//
-// InitialPlugState
-//    Codec::WatchPlugState immediately return from first call.
-//    .plug_state and .plug_change_time are always required.
-//    Returned value must match GetProperties.plug_detect_capabilities.
-// SubsequentPlugState (only for virtual drivers where we can inject plug changes)
-//    WatchPlugState doesn't return until VAD plug state change.
-//    .plug_state and .plug_change_time are always required.
-//    Returned value must match GetProperties.plug_detect_capabilities.
-//    .plug_change_time > time of VAD plug state change, but < now.
-//    Presumably this is OK for a BasicTest to change, since this is an ephemeral virtual
-//    instance.
-//
-// GetFormats
-//    Codec::GetDaiFormats returns a vector with [1, 64] DaiSupportedFormats entries.
-//    For each entry:
-//      .number_of_channels has at least 1 value, these are distinct (and increasing?).
-//      .sample_formats has at least 1 value, these are distinct.
-//      .frame_formats has at least 1 value, these are distinct.
-//      .frame_rates has at least 1 value, these are distinct and increasing.
-//      .bits_per_slot has at least 1 value, these are distinct and increasing.
-//      .bits_per_sample has at least 1 value, these are distinct and increasing.
-//      .bits_per_sample <= .bits_per_slot max value.
-//    (Is there ANY scenario in which we expect ERROR instead of valid response?)
-//
-// CheckIsBridgeable
-//    Codec::IsBridgeable returns a callback, with `supports_bridged_mode` that we save for later.
-
-// AdminTest cases:
-// SetBridgeModeFalse
-//    Codec::SetBridgeMode(false) returns ZX_OK and does not close channel.
-// SetBridgeModeTrue
-//    GTEST_SKIP if Codec::IsBridgeable returned FALSE earlier.
-//    Else, Codec::SetBridgeMode(true) returns ZX_OK and does not close channel.
-//    (Does any other observable change occur?)
-//    Presumably this is OK for a BasicTest to change, as long as we restore the previous value.
-//
-// SetFormatSupported
-//    Codec::SetDaiFormat returns a CodecFormatInfo that matches the earlier DaiSupportedFormats.
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// SetFormatUnsupported
-//    Codec::SetDaiFormat returns the expected zx_status_t (what is expected?).
-//    Codec should still be usable, after an error is returned.
-//
-// Reset
-//    Codec::Reset returns a callback.
-//    (Does this reset SignalProcessing state?  What other observable state is reset?)
-//    Shareable with Dai::Reset?
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-//
-// Start
-//    Codec::Start returns a callback, with `start_time` > when Start was called, but < now.
-//    (Does any other observable change occur?)
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// StartWhileStarted
-//    (We should define what we expect in this error case. Return callback? Don't close channel?)
-//    Codec should still be usable, after an error is returned.
-//
-// Stop
-//    Codec::Stop returns a callback, with `stop_time` > when Stop was called, but < now.
-//    (Does any other observable change occur?)
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// StopWhileStopped
-//    Codec::Stop returns a callback, and does not close channel.
 
 }  // namespace media::audio::drivers::test

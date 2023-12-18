@@ -9,6 +9,7 @@
 #include <lib/async-loop/cpp/loop.h>
 
 #include <atomic>
+#include <optional>
 
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/drivers/tests/test_base.h"
@@ -36,8 +37,9 @@ class DeviceHost {
   // Optionally called during DetectDevices. Create virtual_audio instances for each device type
   // using the default configurations settings (which should always pass all tests).
   void AddVirtualDevices();
-  void AddVirtualDevice(bool is_input, fuchsia::virtualaudio::DeviceType device_type,
-                        fuchsia::virtualaudio::DevicePtr& device_ptr);
+  void AddVirtualDevice(fuchsia::virtualaudio::DeviceType device_type,
+                        fuchsia::virtualaudio::DevicePtr& device_ptr,
+                        std::optional<bool> is_input = std::nullopt);
 
   std::set<DeviceEntry>& device_entries() { return device_entries_; }
   std::vector<std::unique_ptr<fsl::DeviceWatcher>>& device_watchers() { return device_watchers_; }

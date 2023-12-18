@@ -221,6 +221,7 @@ void VirtualAudioComposite::SetDaiFormat(SetDaiFormatRequest& request,
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
+  completer.Reply(zx::ok());
 }
 
 void VirtualAudioComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
