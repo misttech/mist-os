@@ -4,6 +4,7 @@
 
 #include "src/media/audio/drivers/aml-g12-tdm/composite.h"
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
@@ -116,6 +117,63 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> bindings_;
 };
 
+// Fake clock for power management test.
+class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
+ public:
+  FakeClock() = default;
+
+  bool IsFakeClockEnabled() { return enabled_; }
+  fuchsia_hardware_clock::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_clock::Service::InstanceHandler({
+        .clock = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                         fidl::kIgnoreBindingClosure),
+    });
+  }
+
+ protected:
+  void Enable(EnableCompleter::Sync& completer) override {
+    enabled_ = true;
+    completer.Reply(zx::ok());
+  }
+  void Disable(DisableCompleter::Sync& completer) override {
+    enabled_ = false;
+    completer.Reply(zx::ok());
+  }
+  void IsEnabled(IsEnabledCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void SetRate(::fuchsia_hardware_clock::wire::ClockSetRateRequest* request,
+               SetRateCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  void QuerySupportedRate(::fuchsia_hardware_clock::wire::ClockQuerySupportedRateRequest* request,
+                          QuerySupportedRateCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void GetRate(GetRateCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  void SetInput(::fuchsia_hardware_clock::wire::ClockSetInputRequest* request,
+                SetInputCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  void GetNumInputs(GetNumInputsCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  void GetInput(GetInputCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+ private:
+  bool enabled_ = false;
+  fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
+};
+
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
@@ -144,6 +202,16 @@ class AmlG12CompositeTest : public zxtest::Test {
               platform_device_.GetInstanceHandler());
       EXPECT_TRUE(add_platform_result.is_ok());
 
+      auto add_clock_gate_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_clock::Service>(
+              clock_gate_server_.GetInstanceHandler(), "clock-gate");
+      ASSERT_TRUE(add_clock_gate_result.is_ok());
+
+      auto add_clock_pll_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_clock::Service>(
+              clock_pll_server_.GetInstanceHandler(), "clock-pll");
+      ASSERT_TRUE(add_clock_pll_result.is_ok());
+
       driver_start_args = std::move(start_args_result->start_args);
     });
 
@@ -168,6 +236,8 @@ class AmlG12CompositeTest : public zxtest::Test {
  protected:
   fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
   FakePlatformDevice platform_device_;
+  FakeClock clock_gate_server_;
+  FakeClock clock_pll_server_;
 
   fuchsia_hardware_audio::DaiFormat GetDefaultDaiFormat() {
     return fuchsia_hardware_audio::DaiFormat(
@@ -183,6 +253,14 @@ class AmlG12CompositeTest : public zxtest::Test {
     fuchsia_hardware_audio::Format format;
     format.pcm_format(std::move(pcm_format));
     return format;
+  }
+  bool IsFakeClockGateEnabled() { return clock_gate_server_.IsFakeClockEnabled(); }
+  bool IsFakeClockPllEnabled() { return clock_pll_server_.IsFakeClockEnabled(); }
+  void StopSocPower() {
+    dut_.SyncCall([](auto* dut) { return (*dut)->StopSocPower(); });
+  }
+  void StartSocPower() {
+    dut_.SyncCall([](auto* dut) { return (*dut)->StartSocPower(); });
   }
 
  private:
@@ -574,6 +652,17 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
+}
+
+TEST_F(AmlG12CompositeTest, PowerSuspendResume) {
+  EXPECT_TRUE(IsFakeClockGateEnabled());
+  EXPECT_TRUE(IsFakeClockPllEnabled());
+  StopSocPower();
+  EXPECT_FALSE(IsFakeClockGateEnabled());
+  EXPECT_FALSE(IsFakeClockPllEnabled());
+  StartSocPower();
+  EXPECT_TRUE(IsFakeClockGateEnabled());
+  EXPECT_TRUE(IsFakeClockPllEnabled());
 }
 
 class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {

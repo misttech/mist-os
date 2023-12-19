@@ -40,8 +40,13 @@ fuchsia_hardware_audio::DriverError ZxStatusToDriverError(zx_status_t status) {
 
 AudioCompositeServer::AudioCompositeServer(
     std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
-    async_dispatcher_t* dispatcher)
-    : dispatcher_(dispatcher), bti_(std::move(bti)) {
+    async_dispatcher_t* dispatcher,
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
+    : dispatcher_(dispatcher),
+      bti_(std::move(bti)),
+      clock_gate_(std::move(clock_gate_client)),
+      pll_(std::move(pll_client)) {
   for (auto& dai : kDaiIds) {
     element_completers_[dai].first_response_sent = false;
     element_completers_[dai].completer = {};
@@ -72,6 +77,8 @@ AudioCompositeServer::AudioCompositeServer(
         supported_dai_formats_[i].bits_per_slot()[1],  // Take 32 bits for default I2S.
         supported_dai_formats_[i].bits_per_sample()[0]);
   }
+
+  ZX_ASSERT(StartSocPower() == ZX_OK);
 
   // Output engines.
   ZX_ASSERT(ConfigEngine(0, 0, false, std::move(mmios[0].value())) == ZX_OK);
@@ -422,6 +429,72 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
   completer.Reply(zx::ok());
 }
 
+zx_status_t AudioCompositeServer::StartSocPower() {
+  // TODO(b/309153055): Use this method when we integrate with Power Framework.
+  // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
+  // Each driver instance (audio or any other) may vote independently.
+  if (soc_power_started_ == true) {
+    return ZX_OK;
+  }
+  fidl::WireResult clock_gate_result = clock_gate_->Enable();
+  if (!clock_gate_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send request to enable clock gate: %s",
+            clock_gate_result.status_string());
+    return clock_gate_result.status();
+  }
+  if (clock_gate_result->is_error()) {
+    FDF_LOG(ERROR, "Send request to enable clock gate error: %s",
+            zx_status_get_string(clock_gate_result->error_value()));
+    return clock_gate_result->error_value();
+  }
+  fidl::WireResult pll_result = pll_->Enable();
+  if (!pll_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send request to enable PLL: %s", pll_result.status_string());
+    return pll_result.status();
+  }
+  if (pll_result->is_error()) {
+    FDF_LOG(ERROR, "Send request to enable PLL error: %s",
+            zx_status_get_string(pll_result->error_value()));
+    return pll_result->error_value();
+  }
+  soc_power_started_ = true;
+  return ZX_OK;
+}
+
+zx_status_t AudioCompositeServer::StopSocPower() {
+  // TODO(b/309153055): Use this method when we integrate with Power Framework.
+  // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
+  // Each driver instance (audio or any other) may vote independently.
+  if (soc_power_started_ == false) {
+    return ZX_OK;
+  }
+  // MMIO access is still valid after clock gating the audio subsystem.
+  fidl::WireResult clock_gate_result = clock_gate_->Disable();
+  if (!clock_gate_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send request to disable clock gate: %s",
+            clock_gate_result.status_string());
+    return clock_gate_result.status();
+  }
+  if (clock_gate_result->is_error()) {
+    FDF_LOG(ERROR, "Send request to disable clock gate error: %s",
+            zx_status_get_string(clock_gate_result->error_value()));
+    return clock_gate_result->error_value();
+  }
+  // MMIO access is still valid after disableing the PLL used.
+  fidl::WireResult pll_result = pll_->Disable();
+  if (!pll_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send request to disable PLL: %s", pll_result.status_string());
+    return pll_result.status();
+  }
+  if (pll_result->is_error()) {
+    FDF_LOG(ERROR, "Send request to disable PLL error: %s",
+            zx_status_get_string(pll_result->error_value()));
+    return pll_result->error_value();
+  }
+  soc_power_started_ = false;
+  return ZX_OK;
+}
+
 // static
 std::unique_ptr<RingBufferServer> RingBufferServer::CreateRingBufferServer(
     async_dispatcher_t* dispatcher, AudioCompositeServer& owner, Engine& engine,
@@ -657,7 +730,18 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 void RingBufferServer::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
+#if 0
+  // TODO(b/309153055): Active channels for one ring buffer should not control whole SoC audio
+  // power usage, use this only for testing via CLI before integration with Power Framework.
+  if (request.active_channels_bitmask()) {
+    owner_.StartSocPower();
+  } else {
+    owner_.StopSocPower();
+  }
+  completer.Reply(zx::ok(zx::clock::get_monotonic().get()));
+#else
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+#endif
 }
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {

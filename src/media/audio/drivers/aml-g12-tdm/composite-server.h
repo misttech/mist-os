@@ -5,6 +5,7 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_SERVER_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zx/result.h>
@@ -90,13 +91,18 @@ class AudioCompositeServer
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
   AudioCompositeServer(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
-                       zx::bti bti, async_dispatcher_t* dispatcher);
+                       zx::bti bti, async_dispatcher_t* dispatcher,
+                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client);
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   zx::bti& bti() { return bti_; }
   fuchsia_hardware_audio::DaiFormat& current_dai_formats(size_t dai_index) {
     ZX_ASSERT(current_dai_formats_[dai_index].has_value());
     return *current_dai_formats_[dai_index];
   }
+  // TODO(b/309153055): Public for testing before we have the interface with power framework.
+  zx_status_t StartSocPower();
+  zx_status_t StopSocPower();
 
  protected:
   // FIDL natural C++ methods for fuchsia.hardware.audio.Composite.
@@ -162,6 +168,10 @@ class AudioCompositeServer
       supported_dai_formats_;
   std::array<std::optional<fuchsia_hardware_audio::DaiFormat>, kNumberOfPipelines>
       current_dai_formats_;
+
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
+  bool soc_power_started_ = false;
 };
 
 }  // namespace audio::aml_g12

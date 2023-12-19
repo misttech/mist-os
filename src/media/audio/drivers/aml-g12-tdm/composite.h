@@ -30,6 +30,10 @@ class Driver : public fdf::DriverBase {
 
   zx::result<> Start() override;
 
+  // TODO(b/309153055): Public for testing before we have the interface with power framework.
+  zx_status_t StopSocPower() { return server_->StopSocPower(); }
+  zx_status_t StartSocPower() { return server_->StartSocPower(); }
+
  private:
   zx::result<> CreateDevfsNode();
   void Serve(fidl::ServerEnd<fuchsia_hardware_audio::Composite> server) {

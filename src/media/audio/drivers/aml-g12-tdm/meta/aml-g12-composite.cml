@@ -15,6 +15,7 @@
         {
             service: [
                 'fuchsia.driver.compat.Service',
+                'fuchsia.hardware.clock.Service',
                 'fuchsia.hardware.platform.device.Service',
             ],
         },

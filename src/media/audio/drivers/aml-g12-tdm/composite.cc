@@ -105,8 +105,28 @@ zx::result<> Driver::Start() {
             zx_status_get_string(get_bti_result->error_value()));
     return zx::error(get_bti_result->error_value());
   }
+
+  zx::result clock_gate_result =
+      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-gate");
+  if (clock_gate_result.is_error() || !clock_gate_result->is_valid()) {
+    FDF_LOG(ERROR, "Connect to clock-gate failed: %s", clock_gate_result.status_string());
+    return zx::error(clock_gate_result.error_value());
+  }
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> gate_client(
+      std::move(clock_gate_result.value()));
+
+  zx::result clock_pll_result =
+      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-pll");
+  if (clock_pll_result.is_error() || !clock_pll_result->is_valid()) {
+    FDF_LOG(ERROR, "Connect to clock-pll failed: %s", clock_pll_result.status_string());
+    return zx::error(clock_pll_result.error_value());
+  }
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client(
+      std::move(clock_pll_result.value()));
+
   server_ = std::make_unique<AudioCompositeServer>(std::move(mmios),
-                                                   std::move((*get_bti_result)->bti), dispatcher());
+                                                   std::move((*get_bti_result)->bti), dispatcher(),
+                                                   std::move(gate_client), std::move(pll_client));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
