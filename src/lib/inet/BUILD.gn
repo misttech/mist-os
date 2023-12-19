@@ -16,6 +16,7 @@ static_library("inet") {
   ]
 
   public_deps = [
+    "////sdk/lib/syslog/cpp",
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//src/lib/fxl",
   ]
