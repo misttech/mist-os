@@ -14,6 +14,7 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.ui.test.context.Factory",
+                "fuchsia.ui.test.context.RealmFactory",
             ],
         },
     ],
