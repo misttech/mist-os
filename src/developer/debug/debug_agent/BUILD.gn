@@ -315,6 +315,7 @@ source_set("test_lib") {
 
   public_deps = [
     ":lib",
+    "//sdk/lib/syslog/cpp",
     "//src/developer/debug/shared:test_support",
   ]
 
