@@ -485,10 +485,10 @@
   area: ["Component Framework"]
 
 - term: "Component URL"
-  short_description: "URL that identifies a component."
-  full_description: "<a href=\"/docs/concepts/components/component_urls.md\">URL</a>
-  that identifies a component, most often used when instantiating a component, for example
-  <code>fuchsia-pkg://fuchsia.com/stash#meta/stash_secure.cm</code>."
+  short_description: "URL that identifies a component's declaration and package."
+  full_description: "URL that identifies a component's declaration and package,
+  most often used when instantiating a component.
+  Example: <code>fuchsia-pkg://fuchsia.com/stash#meta/stash_secure.cm</code>."
   see_also: ["<a href=\"/docs/glossary#fuchsia-pkg-url\">fuchsia-pkg URL</a>"]
   related_guides: [""]
   area: ["Component Framework"]
