@@ -50,6 +50,8 @@ source_set("source_set") {
     "driver.cc",
     "softmac_binding.cc",
     "softmac_binding.h",
+    "softmac_bridge.cc",
+    "softmac_bridge.h",
   ]
 
   public_deps = [
@@ -57,6 +59,8 @@ source_set("source_set") {
     ":wlansoftmac_convert",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/fidl_driver",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
     "//src/connectivity/wlan/lib/common/cpp:common",

@@ -45,303 +45,6 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer) {
-  auto* buffer = owned_buffer.release();
-  return wlansoftmac_in_buf_t{
-      .free_buffer = [](void* raw) { std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset(); },
-      .raw = buffer,
-      .data = buffer->data(),
-      .len = buffer->capacity(),
-  };
-}
-
-wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
-    .get_buffer = [](size_t min_len) -> wlansoftmac_in_buf_t {
-      // Note: Once Rust MLME supports more than sending WLAN frames this needs
-      // to change.
-      auto buffer = GetBuffer(min_len);
-      ZX_DEBUG_ASSERT(buffer != nullptr);
-      return IntoRustInBuf(std::move(buffer));
-    },
-};
-
-WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
-    : device_(device),
-      inner_handle_(nullptr),
-      wlan_softmac_bridge_server_loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  ldebug(0, nullptr, "Entering.");
-}
-
-WlanSoftmacHandle::~WlanSoftmacHandle() {
-  ldebug(0, nullptr, "Entering.");
-  if (inner_handle_ != nullptr) {
-    delete_sta(inner_handle_);
-  }
-}
-
-// WlanSoftmacBridgeImpl hosts methods migrated from Banjo data structures
-// to FIDL data structures. This server implementation was modeled after
-// https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server.
-class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
- public:
-  explicit WlanSoftmacBridgeImpl(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client)
-      : client_(std::move(client)) {}
-
-  void Query(QueryCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::Query> dispatcher =
-        [](const auto& arena, const auto& client) { return client.sync().buffer(arena)->Query(); };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryDiscoverySupport> dispatcher =
-        [](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->QueryDiscoverySupport();
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport> dispatcher =
-        [](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->QueryMacSublayerSupport();
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySecuritySupport> dispatcher =
-        [](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->QuerySecuritySupport();
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void QuerySpectrumManagementSupport(
-      QuerySpectrumManagementSupportCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySpectrumManagementSupport> dispatcher =
-        [](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->QuerySpectrumManagementSupport();
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->SetChannel(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
-                                 NotifyAssociationCompleteCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::NotifyAssociationComplete> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->NotifyAssociationComplete(request->assoc_cfg);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void ClearAssociation(ClearAssociationRequestView request,
-                        ClearAssociationCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::ClearAssociation> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->ClearAssociation(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void StartPassiveScan(StartPassiveScanRequestView request,
-                        StartPassiveScanCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartPassiveScan> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->StartPassiveScan(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void StartActiveScan(StartActiveScanRequestView request,
-                       StartActiveScanCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartActiveScan> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->StartActiveScan(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::CancelScan> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->CancelScan(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void EnableBeaconing(EnableBeaconingRequestView request,
-                       EnableBeaconingCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
-        [request](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->EnableBeaconing(*request);
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) override {
-    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
-        [](const auto& arena, const auto& client) {
-          return client.sync().buffer(arena)->DisableBeaconing();
-        };
-    DispatchAndComplete(__func__, dispatcher, completer);
-  }
-
-  static void BindSelfManagedServer(
-      async_dispatcher_t* dispatcher,
-      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client,
-      fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
-    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(std::move(client));
-    fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
-                     &WlanSoftmacBridgeImpl::OnUnbound);
-  }
-
-  // TODO(issues.fuchsia.dev/306181180): This method should probably trigger
-  // shutdown of the device if called outside of a normal shutdown sequence.
-  static void OnUnbound([[maybe_unused]] WlanSoftmacBridgeImpl* impl_ptr, fidl::UnbindInfo info,
-                        fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
-    if (info.is_user_initiated()) {
-      // This is part of the normal shutdown sequence.
-    } else if (info.is_peer_closed()) {
-      linfo("WlanSoftmacBridge client disconnected");
-    } else {
-      lerror("WlanSoftmacBridge server error: %s", info.status_string());
-    }
-  }
-
- private:
-  template <typename, typename = void>
-  static constexpr bool has_value_type = false;
-  template <typename T>
-  static constexpr bool has_value_type<T, std::void_t<typename T::value_type>> = true;
-
-  template <typename FidlMethod>
-  static fidl::WireResultUnwrapType<FidlMethod> FlattenAndLogError(
-      const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result) {
-    if (!result.ok()) {
-      lerror("%s failed (FIDL error %s)", method_name.c_str(), result.status_string());
-      return fit::error(result.status());
-    }
-    if (result->is_error()) {
-      lerror("%s failed (status %s)", method_name.c_str(),
-             zx_status_get_string(result->error_value()));
-      return fit::error(result->error_value());
-    }
-
-    if constexpr (has_value_type<fidl::WireResultUnwrapType<FidlMethod>>) {
-      return fit::success(std::move(result->value()));
-    } else
-      return fit::ok();
-  }
-
-  template <typename FidlMethod>
-  using Dispatcher = std::function<fdf::WireUnownedResult<FidlMethod>(
-      const fdf::Arena&, const fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&)>;
-
-  template <typename Completer, typename FidlMethod>
-  void DispatchAndComplete(const std::string& method_name, Dispatcher<FidlMethod> dispatcher,
-                           Completer& completer) {
-    auto arena = fdf::Arena::Create(0, 0);
-    if (arena.is_error()) {
-      lerror("Arena creation failed: %s", arena.status_string());
-      completer.ReplyError(ZX_ERR_INTERNAL);
-      return;
-    }
-
-    auto result = FlattenAndLogError(method_name, dispatcher(*std::move(arena), client_));
-    completer.Reply(std::move(result));
-  }
-
-  fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
-};
-
-zx::result<std::unique_ptr<WlanSoftmacHandle>> WlanSoftmacHandle::New(
-    std::unique_ptr<StartStaCompleter> completer, DeviceInterface* device,
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& client) {
-  auto softmac_handle = std::unique_ptr<WlanSoftmacHandle>(new WlanSoftmacHandle(device));
-
-  rust_device_interface_t wlansoftmac_rust_ops = {
-      .device = static_cast<void*>(softmac_handle->device_),
-      .start = [](void* device, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
-                  zx_handle_t* out_sme_channel) -> zx_status_t {
-        zx::channel channel;
-        zx_status_t result = DeviceInterface::from(device)->Start(ifc, &channel);
-        *out_sme_channel = channel.release();
-        return result;
-      },
-      .deliver_eth_frame = [](void* device, const uint8_t* data, size_t len) -> zx_status_t {
-        return DeviceInterface::from(device)->DeliverEthernet({data, len});
-      },
-      .queue_tx = [](void* device, uint32_t options, wlansoftmac_out_buf_t buf,
-                     wlan_tx_info_t tx_info) -> zx_status_t {
-        return DeviceInterface::from(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
-      },
-      .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
-        return DeviceInterface::from(device)->SetEthernetStatus(status);
-      },
-      .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
-        return DeviceInterface::from(device)->InstallKey(key);
-      },
-      .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
-        return DeviceInterface::from(device)->JoinBss(cfg);
-      },
-  };
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
-  if (endpoints.is_error()) {
-    lerror("Failed to create WlanSoftmacBridge endpoints: %s", endpoints.status_string());
-    return endpoints.take_error();
-  }
-  WlanSoftmacBridgeImpl::BindSelfManagedServer(
-      softmac_handle->wlan_softmac_bridge_server_loop_.dispatcher(), std::move(client),
-      std::move(endpoints->server));
-  softmac_handle->wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
-
-  softmac_handle->inner_handle_ = start_sta(
-      completer.release(),
-      [](void* ctx, zx_status_t status) {
-        auto completer = static_cast<StartStaCompleter*>(ctx);
-        if (completer == nullptr) {
-          lerror("Received NULL StartStaCompleter pointer!");
-          return;
-        }
-        // Skip the check for whether completer has already been
-        // called.  This is the only location where completer is
-        // called, and its deallocated immediately after. Thus, such a
-        // check would be a use-after-free violation.
-        (*completer)(status);
-        delete completer;
-      },
-      wlansoftmac_rust_ops, rust_buffer_provider, endpoints->client.TakeHandle().release());
-  return fit::success(std::move(softmac_handle));
-}
-
-zx_status_t WlanSoftmacHandle::StopMainLoop() {
-  if (inner_handle_ == nullptr) {
-    return ZX_ERR_BAD_STATE;
-  }
-  stop_sta(inner_handle_);
-  return ZX_OK;
-}
-
-void WlanSoftmacHandle::QueueEthFrameTx(eth::BorrowedOperation<> op) {
-  if (inner_handle_ == nullptr) {
-    op.Complete(ZX_ERR_BAD_STATE);
-    return;
-  }
-
-  wlan_span_t span{.data = op.operation()->data_buffer, .size = op.operation()->data_size};
-  op.Complete(sta_queue_eth_frame_tx(inner_handle_, span));
-}
-
 SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
     : device_(device),
       main_driver_dispatcher_(std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)) {
@@ -396,15 +99,6 @@ zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
   return fit::success(std::move(softmac_binding));
 }
 
-void SoftmacBinding::ShutdownMainLoop() {
-  if (main_loop_dead_) {
-    lerror("ShutdownMainLoop called while main loop was not running");
-    return;
-  }
-  softmac_handle_->StopMainLoop();
-  main_loop_dead_ = true;
-}
-
 // ddk ethernet_impl_protocol_ops methods
 
 void SoftmacBinding::Init() {
@@ -448,19 +142,19 @@ void SoftmacBinding::Init() {
           device_init_reply(child_device, status, nullptr);
         });
       });
-  auto softmac_handle = WlanSoftmacHandle::New(std::move(completer), this, client_.Clone());
-  if (softmac_handle.is_error()) {
-    lerror("Failed to create WlanSoftmacHandle: %s", softmac_handle.status_string());
-    device_init_reply(child_device_, softmac_handle.error_value(), nullptr);
+  auto softmac_bridge = SoftmacBridge::New(std::move(completer), this, client_.Clone());
+  if (softmac_bridge.is_error()) {
+    lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
+    device_init_reply(child_device_, softmac_bridge.error_value(), nullptr);
     return;
   }
-  softmac_handle_ = std::move(*softmac_handle);
+  softmac_bridge_ = std::move(*softmac_bridge);
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
-  ShutdownMainLoop();
+  softmac_bridge_->StopSta();
   client_dispatcher_.ShutdownAsync();
 }
 
@@ -538,7 +232,7 @@ void SoftmacBinding::EthernetImplStop() {
 void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                          ethernet_impl_queue_tx_callback callback, void* cookie) {
   eth::BorrowedOperation<> op(netbuf, callback, cookie, sizeof(ethernet_netbuf_t));
-  softmac_handle_->QueueEthFrameTx(std::move(op));
+  softmac_bridge_->QueueEthFrameTx(std::move(op));
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
@@ -584,7 +278,7 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
                     softmac_ifc_server_binding_ =
                         std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
                             main_driver_dispatcher_->get(), std::move(server_endpoint), this,
-                            [&](fidl::UnbindInfo info) {
+                            [](fidl::UnbindInfo info) {
                               if (info.is_user_initiated()) {
                                 linfo("WlanSoftmacIfc server closed.");
                               } else {

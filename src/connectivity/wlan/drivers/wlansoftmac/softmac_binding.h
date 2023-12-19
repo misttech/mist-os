@@ -30,30 +30,12 @@
 
 #include "buffer_allocator.h"
 #include "device_interface.h"
+#include "softmac_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
 #define PRE_ALLOC_RECV_BUFFER_SIZE 2000
-
-using StartStaCompleter = fit::callback<void(zx_status_t status)>;
-
-class WlanSoftmacHandle {
- public:
-  static zx::result<std::unique_ptr<WlanSoftmacHandle>> New(
-      std::unique_ptr<StartStaCompleter> completer, DeviceInterface* device,
-      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& client);
-  ~WlanSoftmacHandle();
-
-  zx_status_t StopMainLoop();
-  void QueueEthFrameTx(eth::BorrowedOperation<> op);
-
- private:
-  explicit WlanSoftmacHandle(DeviceInterface* device);
-  DeviceInterface* device_;
-  wlansoftmac_handle_t* inner_handle_;
-  async::Loop wlan_softmac_bridge_server_loop_;
-};
 
 class SoftmacBinding : public DeviceInterface,
                        public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
@@ -162,7 +144,7 @@ class SoftmacBinding : public DeviceInterface,
 
   fbl::RefPtr<DeviceState> state_;
 
-  std::unique_ptr<WlanSoftmacHandle> softmac_handle_;
+  std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
