@@ -118,17 +118,6 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     }
 }
 
-pub fn convert_ddk_security_support(
-    support: banjo_common::SecuritySupport,
-) -> Result<fidl_common::SecuritySupport, Error> {
-    let mfp = fidl_common::MfpFeature { supported: support.mfp.supported };
-    let sae = fidl_common::SaeFeature {
-        driver_handler_supported: support.sae.driver_handler_supported,
-        sme_handler_supported: support.sae.sme_handler_supported,
-    };
-    Ok(fidl_common::SecuritySupport { sae, mfp })
-}
-
 pub fn convert_ddk_spectrum_management_support(
     support: banjo_common::SpectrumManagementSupport,
 ) -> Result<fidl_common::SpectrumManagementSupport, Error> {
@@ -151,10 +140,7 @@ pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::device::{fake_security_support, fake_spectrum_management_support},
-    };
+    use {super::*, crate::device::fake_spectrum_management_support};
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
         banjo_wlan_softmac::WlanRxInfo {
@@ -241,19 +227,6 @@ mod tests {
         );
         assert!(mlme_band_cap.ht_cap.is_some());
         assert!(mlme_band_cap.vht_cap.is_none());
-    }
-
-    #[test]
-    fn test_convert_ddk_security_support() {
-        let support_ddk = fake_security_support();
-        let support_fidl =
-            convert_ddk_security_support(support_ddk).expect("Failed to convert security support");
-        assert_eq!(
-            support_fidl.sae.driver_handler_supported,
-            support_ddk.sae.driver_handler_supported
-        );
-        assert_eq!(support_fidl.sae.sme_handler_supported, support_ddk.sae.sme_handler_supported);
-        assert_eq!(support_fidl.mfp.supported, support_ddk.mfp.supported);
     }
 
     #[test]

@@ -90,13 +90,6 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-void ConvertSecuritySupport(const fuchsia_wlan_common::wire::SecuritySupport& in,
-                            security_support_t* out) {
-  out->sae.driver_handler_supported = in.sae.driver_handler_supported;
-  out->sae.sme_handler_supported = in.sae.sme_handler_supported;
-  out->mfp.supported = in.mfp.supported;
-}
-
 void ConvertSpectrumManagementSupport(
     const fuchsia_wlan_common::wire::SpectrumManagementSupport& in,
     spectrum_management_support_t* out) {

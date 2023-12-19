@@ -42,7 +42,6 @@ exclude = [
     # Banjo types.
     "BssConfig",
     "CSsid",
-    "SecuritySupport",
     "SpectrumManagementSupport",
     "WlanSoftmacStartActiveScanRequest",
     "WlanSoftmacStartPassiveScanRequest",
@@ -74,7 +73,6 @@ exclude = [
 "CSsid" = "cssid_t"
 "DiscoverySupport" = "discovery_support_t"
 "MacSublayerSupport" = "mac_sublayer_support_t"
-"SecuritySupport" = "security_support_t"
 "SpectrumManagementSupport" = "spectrum_management_support_t"
 "WlanSoftmacStartActiveScanRequest" = "wlan_softmac_start_active_scan_request_t"
 "WlanSoftmacStartPassiveScanRequest" = "wlan_softmac_start_passive_scan_request_t"

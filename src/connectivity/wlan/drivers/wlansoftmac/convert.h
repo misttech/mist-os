@@ -15,8 +15,6 @@
 namespace wlan {
 
 // FIDL to banjo conversions.
-void ConvertSecuritySupport(const fuchsia_wlan_common::wire::SecuritySupport& in,
-                            security_support_t* out);
 void ConvertSpectrumManagementSupport(
     const fuchsia_wlan_common::wire::SpectrumManagementSupport& in,
     spectrum_management_support_t* out);

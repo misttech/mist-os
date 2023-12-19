@@ -89,7 +89,7 @@ pub trait DeviceOps {
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>;
     fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status>;
     fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status>;
-    fn security_support(&mut self) -> banjo_common::SecuritySupport;
+    fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status>;
     fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport;
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
     fn send_wlan_frame(&mut self, buf: OutBuf, tx_flags: u32) -> Result<(), zx::Status>;
@@ -200,6 +200,14 @@ pub fn try_query_mac_sublayer_support(
     })
 }
 
+pub fn try_query_security_support(
+    device: &mut impl DeviceOps,
+) -> Result<fidl_common::SecuritySupport, Error> {
+    device.security_support().map_err(|status| {
+        Error::Status(String::from("Failed to query security support for device."), status)
+    })
+}
+
 impl DeviceOps for Device {
     fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
@@ -233,8 +241,11 @@ impl DeviceOps for Device {
         )
     }
 
-    fn security_support(&mut self) -> banjo_common::SecuritySupport {
-        (self.raw_device.get_security_support)(self.raw_device.device)
+    fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
+        Self::flatten_and_log_error(
+            "QuerySecuritySupport",
+            self.wlan_softmac_bridge_proxy.query_security_support(zx::Time::INFINITE),
+        )
     }
 
     fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport {
@@ -533,8 +544,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Get security features supported by this WLAN interface
-    get_security_support: extern "C" fn(device: *mut c_void) -> banjo_common::SecuritySupport,
     /// Get spectrum management features supported by this WLAN interface
     get_spectrum_management_support:
         extern "C" fn(device: *mut c_void) -> banjo_common::SpectrumManagementSupport,
@@ -702,7 +711,7 @@ pub mod test_utils {
         pub query_response: fidl_softmac::WlanSoftmacQueryResponse,
         pub discovery_support: fidl_common::DiscoverySupport,
         pub mac_sublayer_support: fidl_common::MacSublayerSupport,
-        pub security_support: banjo_common::SecuritySupport,
+        pub security_support: fidl_common::SecuritySupport,
         pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
         pub join_bss_request: Option<banjo_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
@@ -827,8 +836,8 @@ pub mod test_utils {
             Ok(self.state.lock().unwrap().mac_sublayer_support)
         }
 
-        fn security_support(&mut self) -> banjo_common::SecuritySupport {
-            self.state.lock().unwrap().security_support
+        fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
+            Ok(self.state.lock().unwrap().security_support)
         }
 
         fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport {
@@ -1065,10 +1074,10 @@ pub mod test_utils {
         }
     }
 
-    pub fn fake_security_support() -> banjo_common::SecuritySupport {
-        banjo_common::SecuritySupport {
-            mfp: banjo_common::MfpFeature { supported: false },
-            sae: banjo_common::SaeFeature {
+    pub fn fake_security_support() -> fidl_common::SecuritySupport {
+        fidl_common::SecuritySupport {
+            mfp: fidl_common::MfpFeature { supported: false },
+            sae: fidl_common::SaeFeature {
                 driver_handler_supported: false,
                 sme_handler_supported: false,
             },
@@ -1226,12 +1235,12 @@ mod tests {
     fn fake_device_returns_expected_security_support() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, _) = FakeDevice::new(&exec);
-        let security_support = fake_device.security_support();
+        let security_support = fake_device.security_support().unwrap();
         assert_eq!(
             security_support,
-            banjo_common::SecuritySupport {
-                mfp: banjo_common::MfpFeature { supported: false },
-                sae: banjo_common::SaeFeature {
+            fidl_common::SecuritySupport {
+                mfp: fidl_common::MfpFeature { supported: false },
+                sae: fidl_common::SaeFeature {
                     driver_handler_supported: false,
                     sme_handler_supported: false,
                 },

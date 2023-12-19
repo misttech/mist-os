@@ -67,28 +67,6 @@ class ConvertTest : public LogTest {};
 
 // FIDL to banjo types tests.
 
-TEST_F(ConvertTest, ToBanjoSecuritySupport) {
-  log::Instance::Init(0);
-  wlan_common::SecuritySupport in = {
-      .sae =
-          {
-              .driver_handler_supported = kPopulaterBool,
-              .sme_handler_supported = kPopulaterBool,
-          },
-      .mfp =
-          {
-              .supported = kPopulaterBool,
-          },
-  };
-
-  security_support_t out;
-  ConvertSecuritySupport(in, &out);
-
-  EXPECT_EQ(kPopulaterBool, out.sae.driver_handler_supported);
-  EXPECT_EQ(kPopulaterBool, out.sae.sme_handler_supported);
-  EXPECT_EQ(kPopulaterBool, out.mfp.supported);
-}
-
 TEST_F(ConvertTest, ToBanjoSpectrumManagementSupport) {
   log::Instance::Init(0);
   wlan_common::SpectrumManagementSupport in = {

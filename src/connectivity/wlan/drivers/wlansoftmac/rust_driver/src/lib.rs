@@ -234,8 +234,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
             return;
         }
     };
-    let security_support = match wlan_mlme::convert_ddk_security_support(device.security_support())
-    {
+    let security_support = match device::try_query_security_support(&mut device) {
         Ok(s) => s,
         Err(e) => {
             startup_sender

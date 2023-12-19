@@ -316,8 +316,7 @@ impl<D: DeviceOps> Ap<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
-        let ddk_support = self.ctx.device.security_support();
-        let support = ddk_converter::convert_ddk_security_support(ddk_support)?;
+        let support = device::try_query_security_support(&mut self.ctx.device)?;
         responder.respond(support);
         Ok(())
     }

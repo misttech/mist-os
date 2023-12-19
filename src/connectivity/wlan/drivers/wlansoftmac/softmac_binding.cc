@@ -107,6 +107,14 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySecuritySupport> dispatcher =
+        [](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->QuerySecuritySupport();
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
+
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
     Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
         [request](const auto& arena, const auto& client) {
@@ -272,9 +280,6 @@ zx_status_t WlanSoftmacHandle::Init(
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return AsDeviceInterface(device)->InstallKey(key);
       },
-      .get_security_support = [](void* device) -> security_support_t {
-        return AsDeviceInterface(device)->GetSecuritySupport();
-      },
       .get_spectrum_management_support = [](void* device) -> spectrum_management_support_t {
         return AsDeviceInterface(device)->GetSpectrumManagementSupport();
       },
@@ -428,22 +433,6 @@ void SoftmacBinding::Init() {
     device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
     return;
   }
-
-  auto security_arena = fdf::Arena::Create(0, 0);
-  if (security_arena.is_error()) {
-    lerror("Failed to create arena: %s", security_arena.status_string());
-    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
-    return;
-  }
-
-  auto security_result = client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
-  if (!security_result.ok()) {
-    lerror("Failed getting security result (FIDL error %s)", security_result.status_string());
-    device_init_reply(child_device_, security_result.status(), nullptr);
-    return;
-  }
-
-  ConvertSecuritySupport(security_result->value()->resp, &security_support_);
 
   auto spectrum_management_arena = fdf::Arena::Create(0, 0);
   if (spectrum_management_arena.is_error()) {
@@ -796,8 +785,6 @@ void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, f
 }
 
 fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
-
-const security_support_t& SoftmacBinding::GetSecuritySupport() const { return security_support_; }
 
 const spectrum_management_support_t& SoftmacBinding::GetSpectrumManagementSupport() const {
   return spectrum_management_support_;
