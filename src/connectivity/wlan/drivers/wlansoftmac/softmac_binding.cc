@@ -348,22 +348,16 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
-  // Create a dispatcher to wait on the runtime channel.
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
-      [&](fdf_dispatcher_t*) { device_unbind_reply(child_device_); });
-
-  if (dispatcher.is_error()) {
-    ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                  zx_status_get_string(dispatcher.status_value()));
-  }
-
-  server_dispatcher_ = *std::move(dispatcher);
 
   // Create a dispatcher for Wlansoftmac device as a FIDL client.
-  dispatcher = fdf::SynchronizedDispatcher::Create(
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
-      [&](fdf_dispatcher_t*) { server_dispatcher_.ShutdownAsync(); });
+      [&](fdf_dispatcher_t*) {
+        async::PostTask(main_driver_dispatcher_->async_dispatcher(), [&]() {
+          softmac_ifc_server_binding_.reset();
+          device_unbind_reply(child_device_);
+        });
+      });
 
   if (dispatcher.is_error()) {
     ZX_ASSERT_MSG(false, "Creating client dispatcher error: %s",
@@ -584,7 +578,21 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
     return endpoints.status_value();
   }
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+  // Asynchronously bind the WlanSoftmacIfc server on the main driver dispatcher.
+  async::PostTask(main_driver_dispatcher_->async_dispatcher(),
+                  [&, server_endpoint = std::move(endpoints->server)]() mutable {
+                    softmac_ifc_server_binding_ =
+                        std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
+                            main_driver_dispatcher_->get(), std::move(server_endpoint), this,
+                            [&](fidl::UnbindInfo info) {
+                              if (info.is_user_initiated()) {
+                                linfo("WlanSoftmacIfc server closed.");
+                              } else {
+                                lerror("WlanSoftmacIfc unexpectedly closed: %s",
+                                       info.lossy_description());
+                              }
+                            });
+                  });
 
   // The protocol functions are stored in this class, which will act as
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
