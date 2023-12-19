@@ -159,12 +159,6 @@ class SoftmacBinding : public DeviceInterface,
   std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;
   std::unique_ptr<wlan_softmac_ifc_protocol_t> wlan_softmac_ifc_protocol_;
 
-  // TODO(fxbug.dev/135358): Do not cache feature support in the generic driver.
-  //                         This will cause more queries into the vendor
-  //                         driver, but these calls seem inexpensive, these
-  //                         calls have not been profiled, and this behavior is
-  //                         not documented in the SDK. Moreover, caching
-  //                         introduces opportunities for subtle bugs.
   fbl::RefPtr<DeviceState> state_;
 
   std::unique_ptr<WlanSoftmacHandle> softmac_handle_;

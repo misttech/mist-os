@@ -409,38 +409,8 @@ void SoftmacBinding::Init() {
     device_init_reply(child_device_, status, nullptr);
     return;
   }
-
-  linfo("Connected to WlanSoftmac service.");
-
   client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
-
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Failed to create arena: %s", arena.status_string());
-    device_init_reply(child_device_, arena.status_value(), nullptr);
-    return;
-  }
-
-  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
-  if (!query_result.ok()) {
-    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
-    device_init_reply(child_device_, query_result.status(), nullptr);
-    return;
-  }
-  if (query_result->is_error()) {
-    zx_status_t status = query_result->error_value();
-    lerror("Failed getting query result (status %s)", zx_status_get_string(status));
-    device_init_reply(child_device_, status, nullptr);
-    return;
-  }
-  // Take ownership of the data in the wire representation's arena.
-  if (!query_result->value()->has_sta_addr()) {
-    lerror("Query result missing sta_addr.");
-    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
-    return;
-  }
-
-  /* End of data type conversion. */
+  linfo("Connected to WlanSoftmac service.");
 
   linfo("Initializing Rust WlanSoftmac...");
   softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
