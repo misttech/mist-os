@@ -11,6 +11,7 @@ executable("async-watchdog-unittests") {
 
   deps = [
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/async-watchdog",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
