@@ -9,7 +9,21 @@ mod arrays;
 mod extensible_bitmap;
 mod symbols;
 
-use {arrays::*, error::*, extensible_bitmap::*, metadata::*, symbols::*};
+use {
+    arrays::{
+        AccessVectors, ConditionalNodes, DeprecatedFilenameTransitions, FilenameTransitionList,
+        FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes, InfinitiBandEndPorts,
+        InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports, RangeTranslations,
+        RoleAllow, RoleTransition, SimpleArray, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
+    },
+    error::ParseError,
+    extensible_bitmap::ExtensibleBitmap,
+    metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature},
+    symbols::{
+        Categories, Classes, CommonSymbols, ConditionalBooleans, Roles, Sensitivities, SymbolList,
+        Types, Users,
+    },
+};
 
 use anyhow::Context as _;
 use once_cell::sync::Lazy;

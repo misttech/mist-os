@@ -34,6 +34,8 @@ rustc_binary("starnix_runner_bin") {
   ]
 
   sources = [ "main.rs" ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_component_manifest("starnix_runner_component_manifest") {

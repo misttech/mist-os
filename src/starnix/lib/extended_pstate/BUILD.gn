@@ -37,6 +37,8 @@ rustc_library("lib") {
   } else if (target_cpu == "riscv64") {
     sources += [ "src/riscv64.rs" ]
   }
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 rustc_binary("bin") {
@@ -56,6 +58,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:criterion",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_component("component") {

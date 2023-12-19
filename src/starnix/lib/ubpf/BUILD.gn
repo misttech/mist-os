@@ -27,6 +27,8 @@ rustc_library("ubpf") {
     "//third_party/rust_crates:thiserror",
     "//third_party/ubpf",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_package("ubpf-tests") {

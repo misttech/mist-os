@@ -58,6 +58,8 @@ rustc_library("starnix-uapi") {
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_package("starnix-uapi-tests") {

@@ -10,6 +10,7 @@ rustc_library("range_map") {
   with_unit_tests = true
   sources = [ "src/lib.rs" ]
   test_deps = [ "//src/lib/fuchsia" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_component("unittests_component") {

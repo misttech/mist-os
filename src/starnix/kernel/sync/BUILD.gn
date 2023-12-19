@@ -30,6 +30,8 @@ rustc_library("starnix-sync") {
     "src/locks.rs",
     "src/port_event.rs",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_package("starnix-sync-tests") {

@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use linux_uapi::*;
+use linux_uapi::{
+    bpf_insn, sock_filter, BPF_A, BPF_ABS, BPF_ADD, BPF_ALU, BPF_AND, BPF_DIV, BPF_DW, BPF_EXIT,
+    BPF_IMM, BPF_JA, BPF_JMP, BPF_JMP32, BPF_K, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MISC,
+    BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_SUB, BPF_TAX, BPF_TXA, BPF_X,
+    BPF_XOR,
+};
 use std::collections::HashMap;
 
 use crate::{UbpfError, UbpfError::*};

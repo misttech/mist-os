@@ -13,3 +13,8 @@ resource("starnix.profiles") {
   sources = [ "starnix.profiles" ]
   outputs = "config/profiles/starnix.profiles"
 }
+
+# Add lints here which should apply to all Starnix Rust targets.
+config("starnix_clippy_lints") {
+  rustflags = [ "-Wclippy::wildcard_imports" ]
+}

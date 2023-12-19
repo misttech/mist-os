@@ -6,7 +6,6 @@
 #![allow(clippy::too_many_arguments)]
 // TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
-#![warn(clippy::wildcard_imports)]
 
 // Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
 // unconditional dependency for rustdoc generation.

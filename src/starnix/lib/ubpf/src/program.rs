@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use linux_uapi::*;
+use linux_uapi::{bpf_insn, c_void, sock_filter};
 
 use crate::{
     converter::cbpf_to_ebpf,

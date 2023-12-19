@@ -14,4 +14,5 @@ rustc_library("parse_starnix_inspect") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [ "//src/lib/diagnostics/data/rust" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

@@ -12,4 +12,6 @@ rustc_library("magma") {
   ]
 
   deps = [ "//third_party/rust_crates:zerocopy" ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

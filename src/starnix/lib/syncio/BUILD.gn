@@ -34,6 +34,8 @@ rustc_library("syncio") {
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_package("syncio-tests") {

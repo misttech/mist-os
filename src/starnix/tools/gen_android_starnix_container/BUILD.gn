@@ -88,6 +88,8 @@ if (is_host) {
       "src/remote_bundle.rs",
     ]
     rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
+
+    configs += [ "//src/starnix/config:starnix_clippy_lints" ]
   }
 
   group("tests") {

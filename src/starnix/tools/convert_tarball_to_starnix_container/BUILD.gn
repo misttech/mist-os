@@ -64,6 +64,8 @@ if (is_host) {
       "DEFAULT_INIT_X64_PATH=" +
           rebase_path(_default_init_x64_path, root_build_dir),
     ]
+
+    configs += [ "//src/starnix/config:starnix_clippy_lints" ]
   }
 
   group("tests") {

@@ -94,6 +94,7 @@ rustc_binary("starnix_kernel_bin") {
   sources = [ "main.rs" ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   disable_rustdoc = false
 }
@@ -451,6 +452,8 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 rustc_library("starnix_lifecycle") {
@@ -479,6 +482,8 @@ rustc_library("starnix_lifecycle") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 rustc_library("starnix_logging") {
@@ -526,6 +531,8 @@ rustc_library("starnix_logging") {
   if (starnix_enable_trace_and_debug_logs_in_release) {
     features += [ "trace_and_debug_logs_in_release" ]
   }
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 rustc_library("starnix_sync") {
@@ -558,6 +565,8 @@ rustc_library("starnix_sync") {
     "sync/locks.rs",
     "sync/port_event.rs",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 rust_proto_library("perfetto_consumer_proto") {

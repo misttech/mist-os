@@ -122,6 +122,7 @@ rustc_library("usercopy") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:test-case",
   ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_test_component("usercopy-unittests-component") {

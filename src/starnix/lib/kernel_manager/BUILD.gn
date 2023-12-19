@@ -18,4 +18,6 @@ rustc_library("kernel_manager") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:rand",
   ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

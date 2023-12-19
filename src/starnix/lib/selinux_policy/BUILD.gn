@@ -25,6 +25,7 @@ rustc_library("selinux_policy") {
     "src/metadata.rs",
     "src/symbols.rs",
   ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
 fuchsia_unittest_package("selinux_policy-tests") {
