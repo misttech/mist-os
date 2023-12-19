@@ -15,7 +15,7 @@ type WlanScanType = flexible enum : uint8 {
 
 /// Max length for vendor IEs to be added to the association request. This is currently
 /// used for WPA.
-const WLAN_VIE_MAX_LEN uint32 = 510;
+const WLAN_VIE_MAX_LEN uint32 = 514;
 
 type WlanAuthType = flexible enum : uint8 {
     OPEN_SYSTEM = 1;
@@ -35,7 +35,7 @@ type WlanFullmacAssocInd = struct {
     listen_interval uint16;
     ssid ieee80211.CSsid;
     rsne_len uint64;
-    rsne array<uint8, ieee80211.WLAN_IE_BODY_MAX_LEN>;
+    rsne array<uint8, ieee80211.WLAN_IE_MAX_LEN>;
     vendor_ie_len uint64;
     vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
 };
