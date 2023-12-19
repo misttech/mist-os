@@ -47,10 +47,6 @@ static constexpr wlan_common::WlanKeyType kFakeFidlKeyType = wlan_common::WlanKe
 static constexpr wlan_common::BssType kFakeFidlBssType = wlan_common::BssType::kMesh;
 static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
     wlan_common::WlanTxResultCode::kSuccess;
-static constexpr wlan_common::DataPlaneType kFakeFidlDataPlaneType =
-    wlan_common::DataPlaneType::kEthernetDevice;
-static constexpr wlan_common::MacImplementationType kFakeFidlMacImplementationType =
-    wlan_common::MacImplementationType::kFullmac;
 static constexpr wlan_softmac::WlanRxInfoFlags kFakeRxFlags =
     wlan_softmac::WlanRxInfoFlags::TruncatingUnknown(kRandomPopulaterUint32);
 static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
@@ -64,43 +60,12 @@ static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
 static constexpr uint8_t kFakeBanjoKeyType = WLAN_KEY_TYPE_GROUP;
 static constexpr uint32_t kFakeBanjoBssType = BSS_TYPE_MESH;
 static constexpr uint8_t kFakeBanjoTxResultCode = WLAN_TX_RESULT_CODE_SUCCESS;
-static constexpr uint8_t kFakeBanjoDataPlaneType = DATA_PLANE_TYPE_ETHERNET_DEVICE;
-static constexpr uint8_t kFakeBanjoMacImplementationType = MAC_IMPLEMENTATION_TYPE_FULLMAC;
 
 /* Test cases*/
 
 class ConvertTest : public LogTest {};
 
 // FIDL to banjo types tests.
-
-TEST_F(ConvertTest, ToBanjoMacSublayerSupport) {
-  log::Instance::Init(0);
-  wlan_common::MacSublayerSupport in = {
-      .rate_selection_offload =
-          {
-              .supported = kPopulaterBool,
-          },
-      .data_plane =
-          {
-              .data_plane_type = kFakeFidlDataPlaneType,
-          },
-      .device =
-          {
-              .is_synthetic = kPopulaterBool,
-              .mac_implementation_type = kFakeFidlMacImplementationType,
-              .tx_status_report_supported = kPopulaterBool,
-          },
-  };
-
-  mac_sublayer_support_t out;
-  ConvertMacSublayerSupport(in, &out);
-
-  EXPECT_EQ(kPopulaterBool, out.rate_selection_offload.supported);
-  EXPECT_EQ(kFakeBanjoDataPlaneType, out.data_plane.data_plane_type);
-  EXPECT_EQ(kPopulaterBool, out.device.is_synthetic);
-  EXPECT_EQ(kFakeBanjoMacImplementationType, out.device.mac_implementation_type);
-  EXPECT_EQ(kPopulaterBool, out.device.tx_status_report_supported);
-}
 
 TEST_F(ConvertTest, ToBanjoSecuritySupport) {
   log::Instance::Init(0);

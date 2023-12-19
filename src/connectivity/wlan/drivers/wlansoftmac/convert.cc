@@ -90,40 +90,6 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-zx_status_t ConvertMacSublayerSupport(const fuchsia_wlan_common::wire::MacSublayerSupport& in,
-                                      mac_sublayer_support_t* out) {
-  out->rate_selection_offload.supported = in.rate_selection_offload.supported;
-  switch (in.data_plane.data_plane_type) {
-    case fuchsia_wlan_common::wire::DataPlaneType::kEthernetDevice:
-      out->data_plane.data_plane_type = DATA_PLANE_TYPE_ETHERNET_DEVICE;
-      break;
-    case fuchsia_wlan_common::wire::DataPlaneType::kGenericNetworkDevice:
-      out->data_plane.data_plane_type = DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE;
-      break;
-    default:
-      lerror("DataPlaneType is not supported: %hhu",
-             static_cast<uint8_t>(in.data_plane.data_plane_type));
-      return ZX_ERR_INVALID_ARGS;
-  }
-
-  out->device.is_synthetic = in.device.is_synthetic;
-  switch (in.device.mac_implementation_type) {
-    case fuchsia_wlan_common::wire::MacImplementationType::kSoftmac:
-      out->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_SOFTMAC;
-      break;
-    case fuchsia_wlan_common::wire::MacImplementationType::kFullmac:
-      out->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
-      break;
-    default:
-      lerror("MacImplementationType is not supported: %hhu",
-             static_cast<uint8_t>(in.device.mac_implementation_type));
-      return ZX_ERR_INVALID_ARGS;
-  }
-
-  out->device.tx_status_report_supported = in.device.tx_status_report_supported;
-  return ZX_OK;
-}
-
 void ConvertSecuritySupport(const fuchsia_wlan_common::wire::SecuritySupport& in,
                             security_support_t* out) {
   out->sae.driver_handler_supported = in.sae.driver_handler_supported;

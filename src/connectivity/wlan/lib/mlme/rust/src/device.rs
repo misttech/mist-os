@@ -88,7 +88,7 @@ pub trait DeviceOps {
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>;
     fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status>;
-    fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport;
+    fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status>;
     fn security_support(&mut self) -> banjo_common::SecuritySupport;
     fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport;
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
@@ -192,6 +192,14 @@ pub fn try_query_discovery_support(
     })
 }
 
+pub fn try_query_mac_sublayer_support(
+    device: &mut impl DeviceOps,
+) -> Result<fidl_common::MacSublayerSupport, Error> {
+    device.mac_sublayer_support().map_err(|status| {
+        Error::Status(String::from("Failed to query MAC sublayer support for device."), status)
+    })
+}
+
 impl DeviceOps for Device {
     fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
@@ -218,8 +226,11 @@ impl DeviceOps for Device {
         )
     }
 
-    fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport {
-        (self.raw_device.get_mac_sublayer_support)(self.raw_device.device)
+    fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
+        Self::flatten_and_log_error(
+            "QueryMacSublayerSupport",
+            self.wlan_softmac_bridge_proxy.query_mac_sublayer_support(zx::Time::INFINITE),
+        )
     }
 
     fn security_support(&mut self) -> banjo_common::SecuritySupport {
@@ -522,9 +533,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Get MAC sublayer features supported by this WLAN interface
-    get_mac_sublayer_support:
-        extern "C" fn(device: *mut c_void) -> banjo_common::MacSublayerSupport,
     /// Get security features supported by this WLAN interface
     get_security_support: extern "C" fn(device: *mut c_void) -> banjo_common::SecuritySupport,
     /// Get spectrum management features supported by this WLAN interface
@@ -693,7 +701,7 @@ pub mod test_utils {
         pub captured_active_scan_request: Option<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
         pub query_response: fidl_softmac::WlanSoftmacQueryResponse,
         pub discovery_support: fidl_common::DiscoverySupport,
-        pub mac_sublayer_support: banjo_common::MacSublayerSupport,
+        pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: banjo_common::SecuritySupport,
         pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
         pub join_bss_request: Option<banjo_common::JoinBssRequest>,
@@ -815,8 +823,8 @@ pub mod test_utils {
             Ok(self.state.lock().unwrap().discovery_support)
         }
 
-        fn mac_sublayer_support(&mut self) -> banjo_common::MacSublayerSupport {
-            self.state.lock().unwrap().mac_sublayer_support
+        fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
+            Ok(self.state.lock().unwrap().mac_sublayer_support)
         }
 
         fn security_support(&mut self) -> banjo_common::SecuritySupport {
@@ -1043,17 +1051,15 @@ pub mod test_utils {
         }
     }
 
-    pub fn fake_mac_sublayer_support() -> banjo_common::MacSublayerSupport {
-        banjo_common::MacSublayerSupport {
-            rate_selection_offload: banjo_common::RateSelectionOffloadExtension {
-                supported: false,
+    pub fn fake_mac_sublayer_support() -> fidl_common::MacSublayerSupport {
+        fidl_common::MacSublayerSupport {
+            rate_selection_offload: fidl_common::RateSelectionOffloadExtension { supported: false },
+            data_plane: fidl_common::DataPlaneExtension {
+                data_plane_type: fidl_common::DataPlaneType::EthernetDevice,
             },
-            data_plane: banjo_common::DataPlaneExtension {
-                data_plane_type: banjo_common::DataPlaneType::ETHERNET_DEVICE,
-            },
-            device: banjo_common::DeviceExtension {
+            device: fidl_common::DeviceExtension {
                 is_synthetic: true,
-                mac_implementation_type: banjo_common::MacImplementationType::SOFTMAC,
+                mac_implementation_type: fidl_common::MacImplementationType::Softmac,
                 tx_status_report_supported: true,
             },
         }
@@ -1197,19 +1203,19 @@ mod tests {
     fn fake_device_returns_expected_mac_sublayer_support() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, _) = FakeDevice::new(&exec);
-        let mac_sublayer_support = fake_device.mac_sublayer_support();
+        let mac_sublayer_support = fake_device.mac_sublayer_support().unwrap();
         assert_eq!(
             mac_sublayer_support,
-            banjo_common::MacSublayerSupport {
-                rate_selection_offload: banjo_common::RateSelectionOffloadExtension {
+            fidl_common::MacSublayerSupport {
+                rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
                     supported: false,
                 },
-                data_plane: banjo_common::DataPlaneExtension {
-                    data_plane_type: banjo_common::DataPlaneType::ETHERNET_DEVICE,
+                data_plane: fidl_common::DataPlaneExtension {
+                    data_plane_type: fidl_common::DataPlaneType::EthernetDevice,
                 },
-                device: banjo_common::DeviceExtension {
+                device: fidl_common::DeviceExtension {
                     is_synthetic: true,
-                    mac_implementation_type: banjo_common::MacImplementationType::SOFTMAC,
+                    mac_implementation_type: fidl_common::MacImplementationType::Softmac,
                     tx_status_report_supported: true,
                 },
             }

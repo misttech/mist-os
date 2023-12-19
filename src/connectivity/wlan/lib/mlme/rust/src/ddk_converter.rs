@@ -118,44 +118,6 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     }
 }
 
-pub fn convert_ddk_mac_sublayer_support(
-    support: banjo_common::MacSublayerSupport,
-) -> Result<fidl_common::MacSublayerSupport, Error> {
-    let rate_selection_offload = fidl_common::RateSelectionOffloadExtension {
-        supported: support.rate_selection_offload.supported,
-    };
-    let mac_implementation_type = match support.device.mac_implementation_type {
-        banjo_common::MacImplementationType::SOFTMAC => fidl_common::MacImplementationType::Softmac,
-        banjo_common::MacImplementationType::FULLMAC => fidl_common::MacImplementationType::Fullmac,
-        _ => {
-            return Err(format_err!(
-                "Unexpected banjo_comon::MacImplementationType value {}",
-                support.device.mac_implementation_type.0
-            ))
-        }
-    };
-    let device = fidl_common::DeviceExtension {
-        is_synthetic: support.device.is_synthetic,
-        tx_status_report_supported: support.device.tx_status_report_supported,
-        mac_implementation_type: mac_implementation_type,
-    };
-
-    let data_plane_type = match support.data_plane.data_plane_type {
-        banjo_common::DataPlaneType::ETHERNET_DEVICE => fidl_common::DataPlaneType::EthernetDevice,
-        banjo_common::DataPlaneType::GENERIC_NETWORK_DEVICE => {
-            fidl_common::DataPlaneType::GenericNetworkDevice
-        }
-        _ => {
-            return Err(format_err!(
-                "Unexpected banjo_comon::DataPlaneType value {}",
-                support.data_plane.data_plane_type.0
-            ))
-        }
-    };
-    let data_plane = fidl_common::DataPlaneExtension { data_plane_type: data_plane_type };
-    Ok(fidl_common::MacSublayerSupport { rate_selection_offload, data_plane, device })
-}
-
 pub fn convert_ddk_security_support(
     support: banjo_common::SecuritySupport,
 ) -> Result<fidl_common::SecuritySupport, Error> {
@@ -191,9 +153,7 @@ pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
 mod tests {
     use {
         super::*,
-        crate::device::{
-            fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support,
-        },
+        crate::device::{fake_security_support, fake_spectrum_management_support},
     };
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
@@ -281,30 +241,6 @@ mod tests {
         );
         assert!(mlme_band_cap.ht_cap.is_some());
         assert!(mlme_band_cap.vht_cap.is_none());
-    }
-
-    #[test]
-    fn test_convert_ddk_mac_sublayer_support() {
-        let support_ddk = fake_mac_sublayer_support();
-        let support_fidl = convert_ddk_mac_sublayer_support(support_ddk)
-            .expect("Failed to convert MAC sublayer support");
-        assert_eq!(
-            support_fidl.rate_selection_offload.supported,
-            support_ddk.rate_selection_offload.supported
-        );
-        assert_eq!(
-            support_fidl.data_plane.data_plane_type,
-            fidl_common::DataPlaneType::EthernetDevice
-        );
-        assert_eq!(support_fidl.device.is_synthetic, support_ddk.device.is_synthetic);
-        assert_eq!(
-            support_fidl.device.mac_implementation_type,
-            fidl_common::MacImplementationType::Softmac
-        );
-        assert_eq!(
-            support_fidl.device.tx_status_report_supported,
-            support_ddk.device.tx_status_report_supported
-        );
     }
 
     #[test]

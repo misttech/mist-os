@@ -99,6 +99,14 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport> dispatcher =
+        [](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->QueryMacSublayerSupport();
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
+
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
     Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
         [request](const auto& arena, const auto& client) {
@@ -264,9 +272,6 @@ zx_status_t WlanSoftmacHandle::Init(
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return AsDeviceInterface(device)->InstallKey(key);
       },
-      .get_mac_sublayer_support = [](void* device) -> mac_sublayer_support_t {
-        return AsDeviceInterface(device)->GetMacSublayerSupport();
-      },
       .get_security_support = [](void* device) -> security_support_t {
         return AsDeviceInterface(device)->GetSecuritySupport();
       },
@@ -424,29 +429,6 @@ void SoftmacBinding::Init() {
     return;
   }
 
-  auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
-  if (mac_sublayer_arena.is_error()) {
-    lerror("Failed to create arena: %s", mac_sublayer_arena.status_string());
-    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
-    return;
-  }
-
-  auto mac_sublayer_result =
-      client_.sync().buffer(*std::move(mac_sublayer_arena))->QueryMacSublayerSupport();
-  if (!mac_sublayer_result.ok()) {
-    lerror("Failed getting mac sublayer result (FIDL error %s)",
-           mac_sublayer_result.status_string());
-    device_init_reply(child_device_, mac_sublayer_result.status(), nullptr);
-    return;
-  }
-
-  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer_support_);
-  if (status != ZX_OK) {
-    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
-    device_init_reply(child_device_, status, nullptr);
-    return;
-  }
-
   auto security_arena = fdf::Arena::Create(0, 0);
   if (security_arena.is_error()) {
     lerror("Failed to create arena: %s", security_arena.status_string());
@@ -542,23 +524,17 @@ zx_status_t SoftmacBinding::EthernetImplQuery(uint32_t options, ethernet_info_t*
   common::MacAddr(query_result->value()->sta_addr().data()).CopyTo(info->mac);
   info->features = ETHERNET_FEATURE_WLAN;
 
-  auto mac_sublayer_result = client_.sync().buffer(*std::move(arena))->QueryMacSublayerSupport();
-  if (!mac_sublayer_result.ok()) {
+  auto query_mac_sublayer_result =
+      client_.sync().buffer(*std::move(arena))->QueryMacSublayerSupport();
+  if (!query_mac_sublayer_result.ok()) {
     lerror("Failed getting mac sublayer result (FIDL error %s)",
-           mac_sublayer_result.status_string());
-    return mac_sublayer_result.status();
+           query_mac_sublayer_result.status_string());
+    return query_mac_sublayer_result.status();
   }
-
-  mac_sublayer_support_t mac_sublayer;
-  zx_status_t status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer);
-  if (status != ZX_OK) {
-    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
-    return status;
-  }
-
-  if (mac_sublayer.device.is_synthetic) {
+  if (query_mac_sublayer_result->value()->resp.device.is_synthetic) {
     info->features |= ETHERNET_FEATURE_SYNTH;
   }
+
   info->mtu = 1500;
   info->netbuf_size = eth::BorrowedOperation<>::OperationSize(sizeof(ethernet_netbuf_t));
 
@@ -820,10 +796,6 @@ void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, f
 }
 
 fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
-
-const mac_sublayer_support_t& SoftmacBinding::GetMacSublayerSupport() const {
-  return mac_sublayer_support_;
-}
 
 const security_support_t& SoftmacBinding::GetSecuritySupport() const { return security_support_; }
 

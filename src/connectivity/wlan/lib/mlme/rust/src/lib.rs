@@ -169,7 +169,7 @@ pub enum DriverEvent {
     TxResultReport { tx_result: banjo_common::WlanTxResult },
 }
 
-fn should_enable_minstrel(mac_sublayer: &banjo_common::MacSublayerSupport) -> bool {
+fn should_enable_minstrel(mac_sublayer: &fidl_common::MacSublayerSupport) -> bool {
     mac_sublayer.device.tx_status_report_supported && !mac_sublayer.rate_selection_offload.supported
 }
 
@@ -190,26 +190,22 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     startup_sender: oneshot::Sender<Result<(), Error>>,
 ) {
-    let device_mac_sublayer_support = device.mac_sublayer_support();
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
-    let update_interval = if device_mac_sublayer_support.device.is_synthetic {
-        MINSTREL_UPDATE_INTERVAL_HW_SIM
-    } else {
-        MINSTREL_UPDATE_INTERVAL
-    };
-    let minstrel = if should_enable_minstrel(&device_mac_sublayer_support) {
-        let timer_manager = MinstrelTimer { timer: minstrel_timer, current_timer: None };
-        let probe_sequence = probe_sequence::ProbeSequence::random_new();
-        let minstrel = Arc::new(Mutex::new(minstrel::MinstrelRateSelector::new(
-            timer_manager,
-            update_interval,
-            probe_sequence,
-        )));
-        device.set_minstrel(minstrel.clone());
-        Some(minstrel)
-    } else {
-        None
-    };
+    let minstrel = device.mac_sublayer_support().ok().filter(should_enable_minstrel).map(
+        |mac_sublayer_support| {
+            let minstrel = Arc::new(Mutex::new(minstrel::MinstrelRateSelector::new(
+                MinstrelTimer { timer: minstrel_timer, current_timer: None },
+                if mac_sublayer_support.device.is_synthetic {
+                    MINSTREL_UPDATE_INTERVAL_HW_SIM
+                } else {
+                    MINSTREL_UPDATE_INTERVAL
+                },
+                probe_sequence::ProbeSequence::random_new(),
+            )));
+            device.set_minstrel(minstrel.clone());
+            minstrel
+        },
+    );
     let (timer, time_stream) = common::timer::create_timer();
 
     // Failure to create MLME likely indicates a problem querying the device. There is no recovery

@@ -462,8 +462,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
-        let ddk_support = self.ctx.device.mac_sublayer_support();
-        let support = ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
+        let support = device::try_query_mac_sublayer_support(&mut self.ctx.device)?;
         responder.respond(support);
         Ok(())
     }

@@ -76,7 +76,6 @@ class SoftmacBinding : public DeviceInterface,
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const mac_sublayer_support_t& GetMacSublayerSupport() const final;
   const security_support_t& GetSecuritySupport() const final;
   const spectrum_management_support_t& GetSpectrumManagementSupport() const final;
 
@@ -168,7 +167,6 @@ class SoftmacBinding : public DeviceInterface,
   //                         calls have not been profiled, and this behavior is
   //                         not documented in the SDK. Moreover, caching
   //                         introduces opportunities for subtle bugs.
-  mac_sublayer_support_t mac_sublayer_support_ = {};
   security_support_t security_support_ = {};
   spectrum_management_support_t spectrum_management_support_ = {};
   fbl::RefPtr<DeviceState> state_;

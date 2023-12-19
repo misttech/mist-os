@@ -214,27 +214,26 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    let mac_sublayer_support =
-        match wlan_mlme::convert_ddk_mac_sublayer_support(device.mac_sublayer_support()) {
-            Ok(s) => {
-                if s.device.mac_implementation_type != fidl_common::MacImplementationType::Softmac {
-                    startup_sender
-                        .send(Err(format_err!(
-                            "Wrong MAC implementation type: {:?}",
-                            s.device.mac_implementation_type
-                        )))
-                        .unwrap();
-                    return;
-                }
-                s
-            }
-            Err(e) => {
+    let mac_sublayer_support = match device::try_query_mac_sublayer_support(&mut device) {
+        Ok(s) => {
+            if s.device.mac_implementation_type != fidl_common::MacImplementationType::Softmac {
                 startup_sender
-                    .send(Err(format_err!("Failed to parse device mac sublayer support: {}", e)))
+                    .send(Err(format_err!(
+                        "Wrong MAC implementation type: {:?}",
+                        s.device.mac_implementation_type
+                    )))
                     .unwrap();
                 return;
             }
-        };
+            s
+        }
+        Err(e) => {
+            startup_sender
+                .send(Err(format_err!("Failed to parse device mac sublayer support: {}", e)))
+                .unwrap();
+            return;
+        }
+    };
     let security_support = match wlan_mlme::convert_ddk_security_support(device.security_support())
     {
         Ok(s) => s,
@@ -357,7 +356,6 @@ async fn wlansoftmac_thread<D: DeviceOps>(
 mod tests {
     use {
         super::*,
-        banjo_fuchsia_wlan_common as banjo_common,
         fidl::endpoints::Proxy,
         pin_utils::pin_mut,
         std::task::Poll,
@@ -461,7 +459,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device_state.lock().unwrap().mac_sublayer_support.device.is_synthetic = true;
         fake_device_state.lock().unwrap().mac_sublayer_support.device.mac_implementation_type =
-            banjo_common::MacImplementationType::FULLMAC;
+            fidl_common::MacImplementationType::Fullmac;
         run_wlansoftmac_setup_with_device(&mut exec, fake_device)
             .expect_err("Softmac setup should fail");
     }
