@@ -24,7 +24,7 @@ class TestDai : public TestDaiDeviceType,
     loop_.StartThread("test-dai-driver");
   }
 
-  void DdkRelease() {}
+  void DdkRelease() { delete this; }
 
  protected:
   // FIDL LLCPP method for fuchsia.hardware.audio.DaiConnector.
@@ -142,13 +142,10 @@ zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void test_release(void* ctx) { delete reinterpret_cast<audio::TestDai*>(ctx); }
-
 static constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
   ops.bind = test_bind;
-  ops.release = test_release;
   return ops;
 }();
 
