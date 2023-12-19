@@ -9,10 +9,10 @@
 
 namespace inspect {
 
-// TreeServerSendPreference describes how the VMO should be served.
+/// TreeServerSendPreference describes how the VMO should be served.
 class TreeServerSendPreference {
  public:
-  // Default behavior is to send a Frozen VMO; on failure, it will send a Live VMO.
+  /// Default behavior is to send a Frozen VMO; on failure, it will send a Live VMO.
   TreeServerSendPreference() = default;
 
   enum class Type {
@@ -21,18 +21,18 @@ class TreeServerSendPreference {
     DeepCopy,
   };
 
-  // Freeze the VMO if possible. On failure, do `failure`.
-  // `failure` should not be Type::Frozen.
+  /// Freeze the VMO if possible. On failure, do `failure`.
+  /// `failure` should not be Type::Frozen.
   static constexpr TreeServerSendPreference Frozen(Type failure) {
     return TreeServerSendPreference(Type::Frozen, failure);
   }
 
-  // Send a live VMO.
+  /// Send a live VMO.
   static constexpr TreeServerSendPreference Live() {
     return TreeServerSendPreference(Type::Live, cpp17::nullopt);
   }
 
-  // Send a true copy of the VMO.
+  /// Send a true copy of the VMO.
   static constexpr TreeServerSendPreference DeepCopy() {
     return TreeServerSendPreference(Type::DeepCopy, cpp17::nullopt);
   }
@@ -49,7 +49,7 @@ class TreeServerSendPreference {
 };
 
 struct TreeHandlerSettings {
-  // Control the way a VMO is served for snapshotting.
+  /// Control the way a VMO is served for snapshotting.
   TreeServerSendPreference snapshot_behavior;
 };
 

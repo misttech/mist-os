@@ -11,21 +11,22 @@
 
 namespace inspect {
 
-// Read all of the child names from a TreeNameIterator into a vector.
-//
-// This function continually calls GetNext on the iterator until all child names have been returned.
-//
-// Returns a promise for the vector of child names names.
+/// Read all of the child names from a TreeNameIterator into a vector.
+///
+/// This function continually calls GetNext on the iterator until all child names have been
+/// returned.
+///
+/// Returns a promise for the vector of child names names.
 fpromise::promise<std::vector<std::string>> ReadAllChildNames(
     fuchsia::inspect::TreeNameIteratorPtr iterator);
 
-// Read a full inspect::Hierarchy from a fuchsia.inspect.Tree.
-//
-// fuchsia.inspect.Tree provides lookup support for Link nodes stored in a hierarchy. This function
-// uses the protocol to lookup linked data as needed to create a complete view of the entire tree,
-// including dynamically generated subtrees.
-//
-// Returns a promise for the hierarchy parsed from the Tree.
+/// Read a full inspect::Hierarchy from a fuchsia.inspect.Tree.
+///
+/// fuchsia.inspect.Tree provides lookup support for Link nodes stored in a hierarchy. This function
+/// uses the protocol to lookup linked data as needed to create a complete view of the entire tree,
+/// including dynamically generated subtrees.
+///
+/// Returns a promise for the hierarchy parsed from the Tree.
 fpromise::promise<Hierarchy> ReadFromTree(fuchsia::inspect::TreePtr tree);
 
 }  // namespace inspect

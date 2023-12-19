@@ -16,31 +16,31 @@
 
 namespace inspect {
 
-// TreeServer is an implementation of the fuchsia.inspect.Tree protocol.
-//
-// Generally, it is not necessary to use this directly. See `inspect::ComponentInspector`.
-//
-// This class can be used directly if the client wishes to manage protocol registration
-// details manually.
-//
-// For an example of usage, see the constructor for `inspect::ComponentInspector`.
+/// TreeServer is an implementation of the fuchsia.inspect.Tree protocol.
+///
+/// Generally, it is not necessary to use this directly. See `inspect::ComponentInspector`.
+///
+/// This class can be used directly if the client wishes to manage protocol registration
+/// details manually.
+///
+/// For an example of usage, see the constructor for `inspect::ComponentInspector`.
 class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
  public:
-  // Starts a new server. The implementation deletes itself during teardown after an unbind.
+  /// Starts a new server. The implementation deletes itself during teardown after an unbind.
   static void StartSelfManagedServer(Inspector inspector, TreeHandlerSettings settings,
                                      async_dispatcher_t* dispatcher,
                                      fidl::ServerEnd<fuchsia_inspect::Tree>&& request);
 
-  // Get the VMO handle for the Inspector handled by this server.
+  /// Get the VMO handle for the Inspector handled by this server.
   void GetContent(GetContentCompleter::Sync& completer) override;
 
-  // Start a server for handling the lazy child whose name is passed.
+  /// Start a server for handling the lazy child whose name is passed.
   void OpenChild(OpenChildRequestView request, OpenChildCompleter::Sync& completer) override;
 
-  // Start a server that furnishes the names of this Tree's children.
-  //
-  // The names provided by the server this method starts are valid values to be passed to
-  // `OpenChild`.
+  /// Start a server that furnishes the names of this Tree's children.
+  ///
+  /// The names provided by the server this method starts are valid values to be passed to
+  /// `OpenChild`.
   void ListChildNames(ListChildNamesRequestView request,
                       ListChildNamesCompleter::Sync& completer) override;
 

@@ -11,10 +11,10 @@
 
 namespace inspect {
 
-// Returns a handler for fuchsia.inspect.Tree connections on the given Inspector.
-//
-// This is meant to be used to construct a vfs::Service Node to serve the given Inspector as a
-// fuchsia.inspect.Tree.
+/// Returns a handler for fuchsia.inspect.Tree connections on the given Inspector.
+///
+/// This is meant to be used to construct a vfs::Service Node to serve the given Inspector as a
+/// fuchsia.inspect.Tree.
 fidl::InterfaceRequestHandler<fuchsia::inspect::Tree> MakeTreeHandler(
     const inspect::Inspector* inspector, async_dispatcher_t* dispatcher = nullptr,
     TreeHandlerSettings settings = {});
