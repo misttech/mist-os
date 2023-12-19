@@ -91,6 +91,7 @@ executable("virtual_camera_agent_unittest_bin") {
   deps = [
     ":virtual_camera_agent",
     "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/syslog/cpp",
     "//src/camera/lib/stream_utils:stream_configs",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

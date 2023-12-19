@@ -20,6 +20,7 @@ source_set("cobalt_logger") {
 
   deps = [
     "//sdk/fidl/fuchsia.camera2:fuchsia.camera2_hlcpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
 
