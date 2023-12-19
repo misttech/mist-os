@@ -35,6 +35,7 @@ use {
         },
     },
     fxfs_crypto::Crypt,
+    fxfs_trace::{trace_future_args, TraceFutureExt},
     rustc_hash::FxHashMap as HashMap,
     std::{
         collections::hash_map::Entry::Occupied,
@@ -455,62 +456,71 @@ impl VolumesDirectory {
         Ok(())
     }
 
-    /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO.
-    ///
-    /// Note that this function may await flush tasks.
-    pub async fn report_pager_dirty(&self, num_bytes: u64) {
-        let mut total_dirty = self.pager_dirty_bytes_count.load(Ordering::Acquire);
-
-        let mut mem_pressure = self
+    fn is_flush_required_to_dirty(&self, byte_count: u64) -> bool {
+        let mem_pressure = self
             .mem_monitor
             .as_ref()
             .map(|mem_monitor| mem_monitor.level())
             .unwrap_or(MemoryPressureLevel::Normal);
-
-        if matches!(mem_pressure, MemoryPressureLevel::Critical)
-            && total_dirty + num_bytes >= Self::get_max_pager_dirty_when_mem_critical()
-        {
-            let volumes = self.mounted_volumes.lock().await;
-
-            mem_pressure = self
-                .mem_monitor
-                .as_ref()
-                .map(|mem_monitor| mem_monitor.level())
-                .unwrap_or(MemoryPressureLevel::Normal);
-
-            // Re-check the number of outstanding pager dirty bytes because another thread could
-            // have raced and flushed the volumes first.
-            total_dirty = self.pager_dirty_bytes_count.load(Ordering::Acquire);
-            if matches!(mem_pressure, MemoryPressureLevel::Critical)
-                && total_dirty + num_bytes >= Self::get_max_pager_dirty_when_mem_critical()
-            {
-                debug!(
-                    "Flushing all volumes. Memory pressure is critical & dirty pager bytes \
-                    ({} MiB) >= limit ({} MiB)",
-                    total_dirty / MEBIBYTE,
-                    Self::get_max_pager_dirty_when_mem_critical() / MEBIBYTE
-                );
-
-                let flushes = FuturesUnordered::new();
-                for vol_and_root in volumes.values() {
-                    let vol = vol_and_root.volume().clone();
-                    flushes.push(async move {
-                        vol.flush_all_files().await;
-                    });
-                }
-
-                flushes.collect::<Vec<_>>().await;
-            }
+        if !matches!(mem_pressure, MemoryPressureLevel::Critical) {
+            return false;
         }
 
-        self.pager_dirty_bytes_count.fetch_add(num_bytes, Ordering::AcqRel);
+        let total_dirty = self.pager_dirty_bytes_count.load(Ordering::Acquire);
+        total_dirty + byte_count >= Self::get_max_pager_dirty_when_mem_critical()
+    }
+
+    /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO. If the memory
+    /// pressure level is critical and fxfs has lots of dirty pages then a new task will be spawned
+    /// in `volume` to flush the dirty pages before `mark_dirty` is called. If the memory pressure
+    /// level is not critical then `mark_dirty` will be synchronously called.
+    pub fn report_pager_dirty(
+        self: Arc<Self>,
+        byte_count: u64,
+        volume: Arc<FxVolume>,
+        mark_dirty: impl FnOnce() + Send + 'static,
+    ) {
+        if !self.is_flush_required_to_dirty(byte_count) {
+            self.pager_dirty_bytes_count.fetch_add(byte_count, Ordering::AcqRel);
+            mark_dirty();
+        } else {
+            volume.spawn(
+                async move {
+                    let volumes = self.mounted_volumes.lock().await;
+
+                    // Re-check the number of outstanding pager dirty bytes because another thread
+                    // could have raced and flushed the volumes first.
+                    if self.is_flush_required_to_dirty(byte_count) {
+                        debug!(
+                            "Flushing all volumes. Memory pressure is critical & dirty pager bytes \
+                            ({} MiB) >= limit ({} MiB)",
+                            self.pager_dirty_bytes_count.load(Ordering::Acquire) / MEBIBYTE,
+                            Self::get_max_pager_dirty_when_mem_critical() / MEBIBYTE
+                        );
+
+                        let flushes = FuturesUnordered::new();
+                        for vol_and_root in volumes.values() {
+                            let vol = vol_and_root.volume().clone();
+                            flushes.push(async move {
+                                vol.flush_all_files().await;
+                            });
+                        }
+
+                        flushes.collect::<()>().await;
+                    }
+                    self.pager_dirty_bytes_count.fetch_add(byte_count, Ordering::AcqRel);
+                    mark_dirty();
+                }
+                .trace(trace_future_args!("flush-before-mark-dirty")),
+            )
+        }
     }
 
     /// Reports that a certain number of bytes were cleaned in a pager-backed VMO.
-    pub fn report_pager_clean(&self, num_bytes: u64) {
-        let prev_dirty = self.pager_dirty_bytes_count.fetch_sub(num_bytes, Ordering::AcqRel);
+    pub fn report_pager_clean(&self, byte_count: u64) {
+        let prev_dirty = self.pager_dirty_bytes_count.fetch_sub(byte_count, Ordering::AcqRel);
 
-        if prev_dirty < num_bytes {
+        if prev_dirty < byte_count {
             // An unlikely scenario, but if there was an underflow, reset the pager dirty bytes to
             // zero.
             self.pager_dirty_bytes_count.store(0, Ordering::Release);

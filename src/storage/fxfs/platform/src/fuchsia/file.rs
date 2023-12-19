@@ -18,15 +18,15 @@ use {
     fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::future::BoxFuture,
     fxfs::{
-        filesystem::SyncOptions,
+        filesystem::{SyncOptions, MAX_FILE_SIZE},
         log::*,
         object_handle::{ObjectHandle, ReadObjectHandle},
         object_store::{
             transaction::{lock_keys, LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
+        range::RangeExt,
     },
-    fxfs_trace::TraceFutureExt,
     std::{
         ops::Range,
         sync::{
@@ -491,6 +491,7 @@ impl File for FxFile {
     }
 }
 
+#[fxfs_trace::trace]
 #[async_trait]
 impl PagerBacked for FxFile {
     fn pager(&self) -> &crate::pager::Pager {
@@ -509,9 +510,23 @@ impl PagerBacked for FxFile {
         default_page_in(self, range)
     }
 
+    #[trace]
     fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
-        self.handle.owner().clone().spawn(async move {
-            self.handle.mark_dirty(range).trace(fxfs_trace::trace_future_args!("mark_dirty")).await;
+        let (valid_pages, invalid_pages) = range.split(MAX_FILE_SIZE);
+        if let Some(invalid_pages) = invalid_pages {
+            self.pager().report_failure(self.vmo(), invalid_pages, zx::Status::FILE_BIG);
+        }
+        let range = match valid_pages {
+            Some(range) => range,
+            None => return,
+        };
+
+        let byte_count = range.end - range.start;
+        self.handle.owner().clone().report_pager_dirty(byte_count, move || {
+            if let Err(_) = self.handle.mark_dirty(range) {
+                // Undo the report of the dirty pages since mark_dirty failed.
+                self.handle.owner().report_pager_clean(byte_count);
+            }
         });
     }
 

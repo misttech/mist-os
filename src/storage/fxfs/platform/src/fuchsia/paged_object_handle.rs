@@ -24,6 +24,7 @@ use {
             AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
             Timestamp,
         },
+        range::RangeExt,
         round::{how_many, round_up},
     },
     scopeguard::ScopeGuard,
@@ -148,21 +149,6 @@ fn reservation_needed(page_count: u64) -> u64 {
     let pages_per_transaction = FLUSH_BATCH_SIZE / page_size;
     let transaction_count = how_many(page_count, pages_per_transaction);
     transaction_count * TRANSACTION_METADATA_MAX_AMOUNT + page_count * page_size
-}
-
-/// Splits the half-open range `[range.start, range.end)` into the ranges `[range.start,
-/// split_point)` and `[split_point, range.end)`. If either of the new ranges would be empty then
-/// `None` is returned in its place and `Some(range)` is returned for the other. `range` must not be
-/// empty.
-fn split_range(range: Range<u64>, split_point: u64) -> (Option<Range<u64>>, Option<Range<u64>>) {
-    debug_assert!(!range.is_empty());
-    if split_point <= range.start {
-        (None, Some(range))
-    } else if split_point >= range.end {
-        (Some(range), None)
-    } else {
-        (Some(range.start..split_point), Some(split_point..range.end))
-    }
 }
 
 /// Returns the number of pages spanned by `range`. `range` must be page aligned.
@@ -310,21 +296,7 @@ impl PagedObjectHandle {
         Ok(buffer)
     }
 
-    pub async fn mark_dirty(&self, page_range: Range<u64>) {
-        let vmo = self.vmo();
-        let (valid_pages, invalid_pages) = split_range(page_range, MAX_FILE_SIZE);
-        if let Some(invalid_pages) = invalid_pages {
-            self.pager().report_failure(vmo, invalid_pages, zx::Status::FILE_BIG);
-        }
-        let page_range = match valid_pages {
-            Some(page_range) => page_range,
-            None => return,
-        };
-
-        // This must occur before making the reservation because this call may trigger a flush
-        // that would consume the reservation.
-        self.owner().report_pager_dirty(page_range.end - page_range.start).await;
-
+    pub fn mark_dirty(&self, page_range: Range<u64>) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().unwrap();
         let new_inner = Inner {
             dirty_page_count: inner.dirty_page_count + page_count(page_range.clone()),
@@ -345,15 +317,14 @@ impl PagedObjectHandle {
                     reservation.forget();
                 }
                 None => {
-                    // Undo the report of the dirty pages since this has failed.
-                    self.owner().report_pager_clean(page_range.end - page_range.start);
-                    self.pager().report_failure(vmo, page_range, zx::Status::NO_SPACE);
-                    return;
+                    self.pager().report_failure(self.vmo(), page_range, zx::Status::NO_SPACE);
+                    return Err(zx::Status::NO_SPACE);
                 }
             }
         }
         *inner = new_inner;
-        self.pager().dirty_pages(vmo, page_range);
+        self.pager().dirty_pages(self.vmo(), page_range);
+        Ok(())
     }
 
     /// Queries the VMO to see if it was modified since the last time this function was called.
@@ -420,7 +391,7 @@ impl PagedObjectHandle {
             // safe because the pages will be zeroed before they are written to and it would be
             // wrong to write zeroed data.
             let (range, past_content_size_page_range) =
-                split_range(modified_range.range(), page_aligned_content_size);
+                modified_range.range().split(page_aligned_content_size);
 
             if let Some(past_content_size_page_range) = past_content_size_page_range {
                 if !modified_range.is_zero_range() {
@@ -1000,7 +971,7 @@ impl FlushBatch {
         }
 
         let split_point = range.range.start + (FLUSH_BATCH_SIZE - self.dirty_byte_count);
-        let (range, remaining) = split_range(range.range, split_point);
+        let (range, remaining) = range.range.split(split_point);
 
         if let Some(range) = range {
             let range = FlushRange { range, is_zero_range: false };
@@ -1589,18 +1560,6 @@ mod tests {
 
         close_file_checked(file).await;
         fixture.close().await;
-    }
-
-    #[test]
-    fn test_split_range() {
-        assert_eq!(split_range(10..20, 0), (None, Some(10..20)));
-        assert_eq!(split_range(10..20, 9), (None, Some(10..20)));
-        assert_eq!(split_range(10..20, 10), (None, Some(10..20)));
-        assert_eq!(split_range(10..20, 11), (Some(10..11), Some(11..20)));
-        assert_eq!(split_range(10..20, 15), (Some(10..15), Some(15..20)));
-        assert_eq!(split_range(10..20, 19), (Some(10..19), Some(19..20)));
-        assert_eq!(split_range(10..20, 20), (Some(10..20), None));
-        assert_eq!(split_range(10..20, 25), (Some(10..20), None));
     }
 
     #[test]
@@ -2241,9 +2200,7 @@ mod tests {
             }
 
             fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
-                self.handle.owner().clone().spawn(async move {
-                    self.handle.mark_dirty(range).await;
-                });
+                self.handle.mark_dirty(range).unwrap();
             }
 
             fn on_zero_children(self: Arc<Self>) {}

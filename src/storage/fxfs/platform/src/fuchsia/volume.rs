@@ -361,16 +361,22 @@ impl FxVolume {
     /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO.
     ///
     /// Note that this function may await flush tasks.
-    pub async fn report_pager_dirty(&self, num_bytes: u64) {
+    pub fn report_pager_dirty(
+        self: Arc<Self>,
+        byte_count: u64,
+        mark_dirty: impl FnOnce() + Send + 'static,
+    ) {
         if let Some(parent) = self.parent.upgrade() {
-            parent.report_pager_dirty(num_bytes).await;
+            parent.report_pager_dirty(byte_count, self, mark_dirty);
+        } else {
+            mark_dirty();
         }
     }
 
     /// Reports that a certain number of bytes were cleaned in a pager-backed VMO.
-    pub fn report_pager_clean(&self, num_bytes: u64) {
+    pub fn report_pager_clean(&self, byte_count: u64) {
         if let Some(parent) = self.parent.upgrade() {
-            parent.report_pager_clean(num_bytes);
+            parent.report_pager_clean(byte_count);
         }
     }
 
