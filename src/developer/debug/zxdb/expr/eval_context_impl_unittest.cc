@@ -343,9 +343,9 @@ TEST_F(EvalContextImplTest, ExternVariable) {
   // The variable needs to have a unit that references the module to provide the symbol context
   // in which to evaluate the location expression. This will convert the kRelativeValAddress to
   // kAbsoluteValAddress.
-  auto unit =
-      fxl::MakeRefCounted<CompileUnit>(module_symbols->GetWeakPtr(), fxl::RefPtr<DwarfUnit>(),
-                                       DwarfLang::kC, "file.cc", std::nullopt);
+  auto unit = fxl::MakeRefCounted<CompileUnit>(DwarfTag::kCompileUnit, module_symbols->GetWeakPtr(),
+                                               fxl::RefPtr<DwarfUnit>(), DwarfLang::kC, "file.cc",
+                                               std::nullopt);
   SymbolTestParentSetter var_parent(real_variable, unit);
 
   // A reference to the same variable, marked "external" with no location.

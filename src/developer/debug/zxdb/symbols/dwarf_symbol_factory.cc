@@ -161,7 +161,8 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeSymbol(const llvm::DWARFDie& die) 
       symbol = DecodeCallSiteParameter(die);
       break;
     case DwarfTag::kCompileUnit:
-      symbol = DecodeCompileUnit(die);
+    case DwarfTag::kSkeletonUnit:
+      symbol = DecodeCompileUnit(die, tag);
       break;
     case DwarfTag::kEnumerationType:
       symbol = DecodeEnum(die);
@@ -601,7 +602,8 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCollection(const llvm::DWARFDie& d
   return result;
 }
 
-fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCompileUnit(const llvm::DWARFDie& die) const {
+fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCompileUnit(const llvm::DWARFDie& die,
+                                                          DwarfTag tag) const {
   DwarfDieDecoder decoder(GetLLVMContext());
 
   std::optional<const char*> name;
@@ -624,17 +626,12 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCompileUnit(const llvm::DWARFDie& 
   if (language && *language >= 0 && *language < static_cast<int>(DwarfLang::kLast))
     lang_enum = static_cast<DwarfLang>(*language);
 
-  // Convert addr_base to std optional.
-  std::optional<uint64_t> addr_base_opt;
-  if (addr_base)
-    addr_base_opt = *addr_base;
-
   fxl::RefPtr<DwarfUnit> dwarf_unit =
       fxl::MakeRefCounted<DwarfUnitImpl>(delegate_->GetDwarfBinaryImpl(), die.getDwarfUnit());
 
   // We know the delegate_ is valid, that was checked on entry to CreateSymbol().
-  return fxl::MakeRefCounted<CompileUnit>(delegate_->GetModuleSymbols(), std::move(dwarf_unit),
-                                          lang_enum, std::move(name_str), addr_base_opt);
+  return fxl::MakeRefCounted<CompileUnit>(tag, delegate_->GetModuleSymbols(), std::move(dwarf_unit),
+                                          lang_enum, std::move(name_str), addr_base);
 }
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeDataMember(const llvm::DWARFDie& die) const {

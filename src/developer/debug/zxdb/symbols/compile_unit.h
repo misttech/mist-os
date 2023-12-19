@@ -15,8 +15,9 @@ namespace zxdb {
 
 class ModuleSymbols;
 
-// Represents a DWARF "unit" DIE. This is the root of all other Debug Information Entries (DIEs) in
-// the unit, and is contained inside the DwarfUnit object.
+// Represents a DWARF "unit" DIE, both regular ones and the "skeleton" ones (skeleton units are
+// in the main binary and refer to a .dwo file containing the unit info). This is the root of all
+// other Debug Information Entries (DIEs) in the unit, and is contained inside the DwarfUnit object.
 //
 // See the DwarfUnit object which contains the other unit-related stuff like line tables (see that
 // class for a longer discussion). Usually "unit" offsets are relative to the DwarfUnit and NOT this
@@ -26,6 +27,10 @@ class CompileUnit final : public Symbol {
   // Module. This can be null if the module was unloaded while somebody held onto this symbol. It
   // is also null in many unit testing situations where mock symbols are created.
   const fxl::WeakPtr<ModuleSymbols>& module() const { return module_; }
+
+  // Skeleton units refer a .dwo file containing the debug symbols. But they have the same basic
+  // attributes as a regular compilation unit.
+  bool is_skeleton() const { return tag() == DwarfTag::kSkeletonUnit; }
 
   // See class comment above. Can be null for synthetic symbols and for testing.
   DwarfUnit* dwarf_unit() const { return dwarf_unit_.get(); }
@@ -51,8 +56,9 @@ class CompileUnit final : public Symbol {
   FRIEND_REF_COUNTED_THREAD_SAFE(CompileUnit);
   FRIEND_MAKE_REF_COUNTED(CompileUnit);
 
-  explicit CompileUnit(fxl::WeakPtr<ModuleSymbols> module, fxl::RefPtr<DwarfUnit> dwarf_unit,
-                       DwarfLang lang, std::string name, const std::optional<uint64_t>& addr_base);
+  explicit CompileUnit(DwarfTag tag, fxl::WeakPtr<ModuleSymbols> module,
+                       fxl::RefPtr<DwarfUnit> dwarf_unit, DwarfLang lang, std::string name,
+                       const std::optional<uint64_t>& addr_base);
   ~CompileUnit() override;
 
   fxl::WeakPtr<ModuleSymbols> module_;

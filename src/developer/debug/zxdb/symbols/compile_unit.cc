@@ -6,9 +6,10 @@
 
 namespace zxdb {
 
-CompileUnit::CompileUnit(fxl::WeakPtr<ModuleSymbols> module, fxl::RefPtr<DwarfUnit> dwarf_unit,
-                         DwarfLang lang, std::string name, const std::optional<uint64_t>& addr_base)
-    : Symbol(DwarfTag::kCompileUnit),
+CompileUnit::CompileUnit(DwarfTag tag, fxl::WeakPtr<ModuleSymbols> module,
+                         fxl::RefPtr<DwarfUnit> dwarf_unit, DwarfLang lang, std::string name,
+                         const std::optional<uint64_t>& addr_base)
+    : Symbol(tag),
       module_(std::move(module)),
       dwarf_unit_(std::move(dwarf_unit)),
       language_(lang),

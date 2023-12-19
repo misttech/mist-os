@@ -79,7 +79,7 @@ class DwarfSymbolFactory : public SymbolFactory {
   fxl::RefPtr<Symbol> DecodeCallSite(const llvm::DWARFDie& die) const;
   fxl::RefPtr<Symbol> DecodeCallSiteParameter(const llvm::DWARFDie& die) const;
   fxl::RefPtr<Symbol> DecodeCollection(const llvm::DWARFDie& die) const;
-  fxl::RefPtr<Symbol> DecodeCompileUnit(const llvm::DWARFDie& die) const;
+  fxl::RefPtr<Symbol> DecodeCompileUnit(const llvm::DWARFDie& die, DwarfTag tag) const;
   fxl::RefPtr<Symbol> DecodeDataMember(const llvm::DWARFDie& die) const;
   fxl::RefPtr<Symbol> DecodeEnum(const llvm::DWARFDie& die) const;
   fxl::RefPtr<Symbol> DecodeFunctionType(const llvm::DWARFDie& die) const;

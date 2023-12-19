@@ -92,8 +92,9 @@ Identifier GetSymbolScopePrefix(const Symbol* symbol) {
 fxl::RefPtr<Collection> MakeRustTuple(const std::string& name,
                                       const std::vector<fxl::RefPtr<Type>>& members) {
   auto coll = fxl::MakeRefCounted<Collection>(DwarfTag::kStructureType, name);
-  auto unit = fxl::MakeRefCounted<CompileUnit>(fxl::WeakPtr<ModuleSymbols>(), nullptr,
-                                               DwarfLang::kRust, "<no file>", std::nullopt);
+  auto unit =
+      fxl::MakeRefCounted<CompileUnit>(DwarfTag::kCompileUnit, fxl::WeakPtr<ModuleSymbols>(),
+                                       nullptr, DwarfLang::kRust, "<no file>", std::nullopt);
   coll->set_parent(UncachedLazySymbol::MakeUnsafe(unit));
 
   uint32_t offset = 0;
