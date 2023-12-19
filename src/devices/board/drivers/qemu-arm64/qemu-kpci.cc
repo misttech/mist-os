@@ -30,14 +30,13 @@ zx_status_t QemuArm64::PciInit() {
   }
   auto* arg = reinterpret_cast<zx_pci_init_arg_t*>(buf.get());
 
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_add_subtract_io_range(get_root_resource(parent()), true /* mmio */,
+  status = zx_pci_add_subtract_io_range(get_mmio_resource(parent()), true /* mmio */,
                                         PCIE_MMIO_BASE_PHYS, PCIE_MMIO_SIZE, true /* add */);
   if (status != ZX_OK) {
     return status;
   }
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_add_subtract_io_range(get_root_resource(parent()), false /* pio */,
+
+  status = zx_pci_add_subtract_io_range(get_mmio_resource(parent()), false /* pio */,
                                         PCIE_PIO_BASE_PHYS, PCIE_PIO_SIZE, true /* add */);
   if (status != ZX_OK) {
     return status;
