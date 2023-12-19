@@ -23,6 +23,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_hlcpp",
     "//sdk/fidl/fuchsia.ui.activity.control:fuchsia.ui.activity.control_hlcpp",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -44,6 +45,7 @@ executable("activity_bin") {
   deps = [
     ":lib",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
   ]
 }
 

@@ -21,6 +21,7 @@ executable("gesture_recognizers_v2_tests") {
 
   deps = [
     "mocks",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/ui/a11y/lib/gesture_manager/arena",

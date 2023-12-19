@@ -62,6 +62,7 @@ executable("time-zone-info-service-lib-test-bin") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/sys/service/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fostr/fidl/fuchsia.intl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/icu:lib",
