@@ -9,6 +9,7 @@ executable("paper_shader_compiler") {
 
   deps = [
     # Shader precompiler should always be built with glslang.
+    "//sdk/lib/syslog/cpp",
     "//src/ui/lib/escher:escher_with_glslang",
     "//src/ui/lib/escher/shaders/util:shader_utils",
     "//third_party/glm",

@@ -16,6 +16,7 @@ source_set("util") {
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
 
