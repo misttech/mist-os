@@ -29,6 +29,7 @@ source_set("use_media_decoder_source_set") {
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
     "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_hlcpp",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//src/media/lib/codec_impl:fourcc",
     "//third_party/boringssl:crypto",
