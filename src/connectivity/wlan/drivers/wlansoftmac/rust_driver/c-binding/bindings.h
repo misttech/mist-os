@@ -127,9 +127,10 @@ typedef struct {
   uintptr_t size;
 } wlan_span_t;
 
-extern "C" wlansoftmac_handle_t *start_sta(rust_device_interface_t device,
-                                           wlansoftmac_buffer_provider_ops_t buf_provider,
-                                           zx_handle_t wlan_softmac_bridge_client_handle);
+extern "C" wlansoftmac_handle_t *start_sta(
+    void *completer, void (*run_completer)(void *completer, zx_status_t status),
+    rust_device_interface_t device, wlansoftmac_buffer_provider_ops_t buf_provider,
+    zx_handle_t wlan_softmac_bridge_client_handle);
 
 extern "C" void stop_sta(wlansoftmac_handle_t *softmac);
 

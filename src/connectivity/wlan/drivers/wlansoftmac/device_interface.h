@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/wlan/common/c/banjo.h>
+#include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <zircon/types.h>
 
 #include <cstdint>

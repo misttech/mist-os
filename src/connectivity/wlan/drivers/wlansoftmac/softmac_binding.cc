@@ -11,8 +11,10 @@
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
@@ -261,10 +263,13 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 };
 
-zx_status_t WlanSoftmacHandle::Init(
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client) {
+void WlanSoftmacHandle::Init(std::unique_ptr<StartStaCompleter> completer,
+                             fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client) {
   if (inner_handle_ != nullptr) {
-    return ZX_ERR_BAD_STATE;
+    auto status = ZX_ERR_BAD_STATE;
+    lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
+    (*completer)(status);
+    return;
   }
 
   rust_device_interface_t wlansoftmac_rust_ops = {
@@ -299,10 +304,22 @@ zx_status_t WlanSoftmacHandle::Init(
                                                std::move(client), std::move(endpoints->server));
   wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
 
-  inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider,
-                            endpoints->client.TakeHandle().release());
-
-  return ZX_OK;
+  inner_handle_ = start_sta(
+      completer.release(),
+      [](void* ctx, zx_status_t status) {
+        auto completer = static_cast<StartStaCompleter*>(ctx);
+        if (completer == nullptr) {
+          lerror("Received NULL StartStaCompleter pointer!");
+          return;
+        }
+        // Skip the check for whether completer has already been
+        // called.  This is the only location where completer is
+        // called, and its deallocated immediately after. Thus, such a
+        // check would be a use-after-free violation.
+        (*completer)(status);
+        delete completer;
+      },
+      wlansoftmac_rust_ops, rust_buffer_provider, endpoints->client.TakeHandle().release());
 }
 
 zx_status_t WlanSoftmacHandle::StopMainLoop() {
@@ -323,7 +340,9 @@ void WlanSoftmacHandle::QueueEthFrameTx(eth::BorrowedOperation<> op) {
   op.Complete(sta_queue_eth_frame_tx(inner_handle_, span));
 }
 
-SoftmacBinding::SoftmacBinding(zx_device_t* device) : device_(device) {
+SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
+    : device_(device),
+      main_driver_dispatcher_(std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)) {
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
@@ -356,11 +375,13 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device) : device_(device) {
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
-zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(zx_device_t* device)
-    __TA_NO_THREAD_SAFETY_ANALYSIS {
+zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
+    zx_device_t* device,
+    fdf::UnownedDispatcher&& main_driver_dispatcher) __TA_NO_THREAD_SAFETY_ANALYSIS {
   ldebug(0, nullptr, "Entering.");
   linfo("Binding...");
-  auto softmac_binding = std::unique_ptr<SoftmacBinding>(new SoftmacBinding(device));
+  auto softmac_binding = std::unique_ptr<SoftmacBinding>(
+      new SoftmacBinding(device, std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)));
 
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
@@ -414,19 +435,25 @@ void SoftmacBinding::Init() {
 
   linfo("Initializing Rust WlanSoftmac...");
   softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
-  status = softmac_handle_->Init(client_.Clone());
-  if (status != ZX_OK) {
-    lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
-    device_init_reply(child_device_, status, nullptr);
-    return;
-  }
-  linfo("Initialized Rust WlanSoftmac.");
+  auto completer = std::make_unique<StartStaCompleter>(
+      [dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+       child_device = child_device_](zx_status_t status) {
+        if (status == ZX_OK) {
+          linfo("Initialized Rust WlanSoftmac.");
+        } else {
+          lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
+        }
 
-  // Specify empty device_init_reply_args_t since SoftmacBinding
-  // does not currently support power or performance state
-  // information.
-  device_init_reply_args_t args = {};
-  device_init_reply(child_device_, ZX_OK, &args);
+        // device_init_reply() must be called on a driver framework managed
+        // dispatcher
+        async::PostTask(dispatcher, [child_device, status]() {
+          // Specify empty device_init_reply_args_t since SoftmacBinding
+          // does not currently support power or performance state
+          // information.
+          device_init_reply(child_device, status, nullptr);
+        });
+      });
+  softmac_handle_->Init(std::move(completer), client_.Clone());
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.

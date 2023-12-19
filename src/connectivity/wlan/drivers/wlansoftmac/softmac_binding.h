@@ -36,12 +36,15 @@ namespace wlan::drivers::wlansoftmac {
 
 #define PRE_ALLOC_RECV_BUFFER_SIZE 2000
 
+using StartStaCompleter = fit::callback<void(zx_status_t status)>;
+
 class WlanSoftmacHandle {
  public:
   explicit WlanSoftmacHandle(DeviceInterface* device);
   ~WlanSoftmacHandle();
 
-  zx_status_t Init(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client);
+  void Init(std::unique_ptr<StartStaCompleter> completer,
+            fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client);
   zx_status_t StopMainLoop();
   void QueueEthFrameTx(eth::BorrowedOperation<> op);
 
@@ -59,7 +62,8 @@ class WlanSoftmacHandle {
 class SoftmacBinding : public DeviceInterface,
                        public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
-  static zx::result<std::unique_ptr<SoftmacBinding>> New(zx_device_t* device);
+  static zx::result<std::unique_ptr<SoftmacBinding>> New(
+      zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
   ~SoftmacBinding() override = default;
 
   static constexpr inline SoftmacBinding* AsSoftmacBinding(void* ctx) {
@@ -85,13 +89,14 @@ class SoftmacBinding : public DeviceInterface,
 
  private:
   // Private constructor to require use of New().
-  explicit SoftmacBinding(zx_device_t* device);
+  explicit SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
   zx_device_t* device_ = nullptr;
 
   /////////////////////////////////////
   // Member variables and methods to implement a child device
   // supporting the ZX_PROTOCOL_ETHERNET_IMPL custom protocol.
   zx_device_t* child_device_ = nullptr;
+  fdf::UnownedDispatcher main_driver_dispatcher_;
   void Init();
   void Unbind();
   void Release();

@@ -8,6 +8,7 @@
 
 use {
     fuchsia_zircon as zx,
+    std::ffi::c_void,
     tracing::error,
     wlan_mlme::{buffer::BufferProvider, device::DeviceInterface},
     wlan_span::CSpan,
@@ -16,14 +17,20 @@ use {
 
 #[no_mangle]
 pub extern "C" fn start_sta(
+    completer: *mut c_void,
+    run_completer: extern "C" fn(completer: *mut c_void, status: zx::zx_status_t),
     device: DeviceInterface,
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> *mut WlanSoftmacHandle {
     match start_wlansoftmac(device, buf_provider, wlan_softmac_bridge_client_handle) {
-        Ok(handle) => Box::into_raw(Box::new(handle)),
+        Ok(handle) => {
+            run_completer(completer, zx::Status::OK.into_raw());
+            Box::into_raw(Box::new(handle))
+        }
         Err(e) => {
             error!("Failed to start WLAN Softmac STA: {}", e);
+            run_completer(completer, zx::Status::INTERNAL.into_raw());
             std::ptr::null_mut()
         }
     }
