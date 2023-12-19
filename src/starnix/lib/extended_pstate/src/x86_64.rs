@@ -5,19 +5,20 @@
 use once_cell::sync::Lazy;
 use static_assertions::const_assert_eq;
 
+#[derive(Clone, Copy)]
 pub struct State {
     buffer: XSaveArea,
     strategy: Strategy,
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 #[repr(C)]
 struct X87MMXState {
     low: u64,
     high: u64,
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 #[repr(C)]
 struct SSERegister {
     low: u64,
@@ -25,6 +26,7 @@ struct SSERegister {
 }
 
 // [intel/vol1] Table 10-2. Format of an FXSAVE Area
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct X86LegacySaveArea {
     fcw: u16,
@@ -46,6 +48,7 @@ struct X86LegacySaveArea {
 
 const_assert_eq!(std::mem::size_of::<X86LegacySaveArea>(), 416);
 
+#[derive(Clone, Copy)]
 #[repr(C, align(16))]
 struct FXSaveArea {
     x86_legacy_save_area: X86LegacySaveArea,
@@ -76,6 +79,7 @@ impl Default for FXSaveArea {
     }
 }
 
+#[derive(Clone, Copy)]
 #[repr(C, align(64))]
 struct XSaveArea {
     fxsave_area: FXSaveArea,

@@ -957,7 +957,6 @@ impl ThreadGroup {
                 .ptrace
                 .as_ref()
                 .map_or(false, |ptrace| ptrace.is_waitable(task_ref.load_stopped(), options))
-                || process_state.is_waitable()
             {
                 // We've identified a potential target.  Need to return either
                 // the process's information (if we are in group-stop) or the
@@ -1115,7 +1114,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         return self.last_signal.is_some() && !self.base.load_stopped().is_in_progress();
     }
 
-    fn get_waitable_zombie(
+    pub fn get_waitable_zombie(
         &mut self,
         selector: ProcessSelector,
         options: &WaitingOptions,

@@ -3,27 +3,35 @@
 // found in the LICENSE file.
 
 use crate::{
-    mm::{DumpPolicy, MemoryAccessorExt},
+    arch::execution::new_syscall_from_state,
+    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt},
     signals::{
         send_signal_first, send_standard_signal, syscalls::WaitingOptions, SignalDetail,
         SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
     },
-    task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
+    task::{
+        waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, TaskMutableState, ThreadGroup,
+        ThreadState,
+    },
     vfs::parse_unsigned_file,
 };
+use bitflags::bitflags;
 use starnix_logging::not_implemented;
 use starnix_sync::{LockBefore, Locked, MmDumpable};
+use starnix_syscalls::{decls::SyscallDecl, SyscallResult};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
     errors::Errno,
     ownership::{OwnedRef, WeakRef},
-    pid_t,
+    pid_t, ptrace_syscall_info,
     signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP, SIGTRAP},
     user_address::{UserAddress, UserRef},
     PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_STOP, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK,
-    PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_PEEKDATA, PTRACE_PEEKTEXT,
-    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
+    PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_O_TRACESYSGOOD,
+    PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS,
+    PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY,
+    PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 use std::sync::{atomic::Ordering, Arc};
 use zerocopy::FromBytes;
@@ -47,6 +55,12 @@ pub enum PtraceStatus {
     Listening,
 }
 
+impl PtraceStatus {
+    pub fn is_continuing(&self) -> bool {
+        *self == PtraceStatus::Continuing
+    }
+}
+
 /// Indicates the way that ptrace attached to the task.
 #[derive(Copy, Clone, PartialEq)]
 pub enum PtraceAttachType {
@@ -54,6 +68,22 @@ pub enum PtraceAttachType {
     Attach,
     /// Attached with PTRACE_SEIZE
     Seize,
+}
+
+bitflags! {
+     #[repr(transparent)]
+    pub struct PtraceOptions: u32 {
+        const EXITKILL =starnix_uapi::PTRACE_O_EXITKILL;
+        const TRACECLONE =starnix_uapi::PTRACE_O_TRACECLONE;
+        const TRACEEXEC =starnix_uapi::PTRACE_O_TRACEEXEC;
+        const TRACEEXIT =starnix_uapi::PTRACE_O_TRACEEXIT;
+        const TRACEFORK =starnix_uapi::PTRACE_O_TRACEFORK;
+        const TRACESYSGOOD =starnix_uapi::PTRACE_O_TRACESYSGOOD;
+        const TRACEVFORK =starnix_uapi::PTRACE_O_TRACEVFORK;
+        const TRACEVFORKDONE =starnix_uapi::PTRACE_O_TRACEVFORKDONE;
+        const TRACESECCOMP =starnix_uapi::PTRACE_O_TRACESECCOMP;
+        const SUSPEND_SECCOMP =starnix_uapi::PTRACE_O_SUSPEND_SECCOMP;
+    }
 }
 
 /// Per-task ptrace-related state
@@ -84,6 +114,16 @@ pub struct PtraceState {
     /// Indicates whether the last ptrace call put this thread into a state with
     /// special semantics for stopping behavior.
     pub stop_status: PtraceStatus,
+
+    /// The thread state of the target task.  This is copied out when the thread
+    /// stops; if the thread is not fully stopped, it is None.
+    tracee_thread_state: Option<ThreadState>,
+
+    /// The options set by PTRACE_SETOPTIONS
+    pub options: PtraceOptions,
+
+    /// For SYSCALL_INFO_EXIT
+    pub last_syscall_was_error: bool,
 }
 
 impl PtraceState {
@@ -96,6 +136,9 @@ impl PtraceState {
             last_signal_waitable: false,
             attach_type,
             stop_status: PtraceStatus::default(),
+            tracee_thread_state: None,
+            options: PtraceOptions::empty(),
+            last_syscall_was_error: false,
         }
     }
 
@@ -134,6 +177,92 @@ impl PtraceState {
         self.last_signal_waitable = keep_signal_waitable;
         self.last_signal.clone()
     }
+
+    pub fn copy_state_from(&mut self, current_task: &CurrentTask) {
+        self.tracee_thread_state = Some(current_task.thread_state.extended_snapshot())
+    }
+
+    pub fn clear_state(&mut self) {
+        self.tracee_thread_state = None;
+    }
+
+    pub fn has_option(&self, option: PtraceOptions) -> bool {
+        self.options.contains(option)
+    }
+
+    /// Returns an (i32, ptrace_syscall_info) pair.  The ptrace_syscall_info is
+    /// the info associated with the syscall that the target task is currently
+    /// blocked on, The i32 is (per ptrace(2)) "the number of bytes available to
+    /// be written by the kernel.  If the size of the data to be written by the
+    /// kernel exceeds the size specified by the addr argument, the output data
+    /// is truncated."; ptrace(PTRACE_GET_SYSCALL_INFO) returns that value"
+    pub fn get_target_syscall(
+        &self,
+        target: &Task,
+        state: &TaskMutableState,
+    ) -> Result<(i32, ptrace_syscall_info), Errno> {
+        #[cfg(target_arch = "x86_64")]
+        let arch = starnix_uapi::AUDIT_ARCH_X86_64;
+        #[cfg(target_arch = "aarch64")]
+        let arch = starnix_uapi::AUDIT_ARCH_AARCH64;
+        #[cfg(target_arch = "riscv64")]
+        let arch = starnix_uapi::AUDIT_ARCH_RISCV64;
+
+        let mut info = ptrace_syscall_info { arch, ..Default::default() };
+        let mut info_len = memoffset::offset_of!(ptrace_syscall_info, __bindgen_anon_1);
+
+        match &state.ptrace {
+            Some(PtraceState { tracee_thread_state: Some(thread_state), .. }) => {
+                let registers = thread_state.registers;
+                info.instruction_pointer = registers.instruction_pointer_register();
+                info.stack_pointer = registers.stack_pointer_register();
+                match target.load_stopped() {
+                    StopState::SyscallEnterStopped => {
+                        let syscall_decl = SyscallDecl::from_number(registers.syscall_register());
+                        let syscall = new_syscall_from_state(syscall_decl, &thread_state);
+                        info.op = PTRACE_SYSCALL_INFO_ENTRY as u8;
+                        let entry = linux_uapi::ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1 {
+                            nr: syscall.decl.number,
+                            args: [
+                                syscall.arg0.raw(),
+                                syscall.arg1.raw(),
+                                syscall.arg2.raw(),
+                                syscall.arg3.raw(),
+                                syscall.arg4.raw(),
+                                syscall.arg5.raw(),
+                            ],
+                        };
+                        info_len += memoffset::offset_of!(
+                            linux_uapi::ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1,
+                            args
+                        ) + std::mem::size_of_val(&entry.args);
+                        info.__bindgen_anon_1.entry = entry;
+                    }
+                    StopState::SyscallExitStopped => {
+                        info.op = PTRACE_SYSCALL_INFO_EXIT as u8;
+                        let exit = linux_uapi::ptrace_syscall_info__bindgen_ty_1__bindgen_ty_2 {
+                            rval: registers.return_register() as i64,
+                            is_error: state
+                                .ptrace
+                                .as_ref()
+                                .map_or(0, |ptrace| ptrace.last_syscall_was_error as u8),
+                            ..Default::default()
+                        };
+                        info_len += memoffset::offset_of!(
+                            linux_uapi::ptrace_syscall_info__bindgen_ty_1__bindgen_ty_2,
+                            is_error
+                        ) + std::mem::size_of_val(&exit.is_error);
+                        info.__bindgen_anon_1.exit = exit;
+                    }
+                    _ => {
+                        info.op = PTRACE_SYSCALL_INFO_NONE as u8;
+                    }
+                };
+            }
+            _ => (),
+        }
+        Ok((info_len as i32, info))
+    }
 }
 
 /// Scope definitions for Yama.  For full details, see ptrace(2).
@@ -160,6 +289,9 @@ pub enum PtraceAllowedPtracers {
 }
 
 /// Continues the target thread, optionally detaching from it.
+/// |data| is treated as it is in PTRACE_CONT.
+/// |new_status| is the PtraceStatus to set for this trace.
+/// |detach| will cause the tracer to detach from the tracee.
 fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Errno> {
     let data = data.ptr() as u64;
     let new_state;
@@ -205,7 +337,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         }
     }
 
-    state.set_stopped(StopState::Waking, None);
+    state.set_stopped(StopState::Waking, None, None);
 
     if detach {
         state.set_ptrace(None)?;
@@ -234,9 +366,13 @@ fn ptrace_interrupt(tracee: &Task) -> Result<(), Errno> {
             // "If the tracee was already stopped by a signal and PTRACE_LISTEN
             // was sent to it, the tracee stops with PTRACE_EVENT_STOP and
             // WSTOPSIG(status) returns the stop signal"
-            state.set_stopped(StopState::PtraceEventStopped, signal);
+            state.set_stopped(StopState::PtraceEventStopped, signal, None);
         } else {
-            state.set_stopped(StopState::PtraceEventStopped, Some(SignalInfo::default(SIGTRAP)));
+            state.set_stopped(
+                StopState::PtraceEventStopped,
+                Some(SignalInfo::default(SIGTRAP)),
+                None,
+            );
             drop(state);
             tracee.interrupt();
         }
@@ -280,7 +416,7 @@ pub fn ptrace_dispatch(
     pid: pid_t,
     addr: UserAddress,
     data: UserAddress,
-) -> Result<(), Errno> {
+) -> Result<SyscallResult, Errno> {
     let weak_init = current_task.kernel().pids.read().get_task(pid);
     let tracee = weak_init.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
@@ -297,22 +433,28 @@ pub fn ptrace_dispatch(
             let mut siginfo = SignalInfo::default(SIGKILL);
             siginfo.code = (linux_uapi::SIGTRAP | PTRACE_KILL << 8) as i32;
             send_standard_signal(&tracee, siginfo);
-            return Ok(());
+            return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_INTERRUPT => {
             ptrace_interrupt(tracee.as_ref())?;
-            return Ok(());
+            return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_LISTEN => {
             ptrace_listen(&tracee)?;
-            return Ok(());
+            return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_CONT => {
             ptrace_cont(&tracee, &data, false)?;
-            return Ok(());
+            return Ok(starnix_syscalls::SUCCESS);
+        }
+        PTRACE_SYSCALL => {
+            tracee.trace_syscalls.store(true, std::sync::atomic::Ordering::Relaxed);
+            ptrace_cont(&tracee, &data, false)?;
+            return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
-            return ptrace_detach(current_task.thread_group.as_ref(), tracee.as_ref(), &data)
+            ptrace_detach(current_task.thread_group.as_ref(), tracee.as_ref(), &data)?;
+            return Ok(starnix_syscalls::SUCCESS);
         }
         _ => {}
     }
@@ -332,13 +474,13 @@ pub fn ptrace_dispatch(
 
             let dst: UserRef<usize> = UserRef::from(data);
             current_task.mm().write_object(dst, &val)?;
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_POKEDATA | PTRACE_POKETEXT => {
             let ptr: UserRef<usize> = UserRef::from(addr);
             let val = data.ptr() as usize;
             tracee.mm().vmo_write_object(ptr, &val)?;
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_SETSIGMASK => {
             // addr is the size of the buffer pointed to
@@ -351,7 +493,7 @@ pub fn ptrace_dispatch(
             let val = current_task.mm().read_object(src)?;
             state.signals.set_mask(val);
 
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_GETSIGMASK => {
             // addr is the size of the buffer pointed to
@@ -363,7 +505,7 @@ pub fn ptrace_dispatch(
             let dst: UserRef<SigSet> = UserRef::from(data);
             let val = state.signals.mask();
             current_task.mm().write_object(dst, &val)?;
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_GETSIGINFO => {
             let dst: UserRef<u8> = UserRef::from(data);
@@ -374,7 +516,7 @@ pub fn ptrace_dispatch(
                     return error!(EINVAL);
                 }
             }
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_SETSIGINFO => {
             // Rust will let us do this cast in a const assignment but not in a
@@ -400,7 +542,41 @@ pub fn ptrace_dispatch(
             if let Some(ref mut ptrace) = &mut state.ptrace {
                 ptrace.last_signal = Some(siginfo);
             }
-            Ok(())
+            Ok(starnix_syscalls::SUCCESS)
+        }
+        PTRACE_GET_SYSCALL_INFO => {
+            if let Some(ptrace) = &state.ptrace {
+                let (size, info) = ptrace.get_target_syscall(&tracee, &state)?;
+                let dst: UserRef<ptrace_syscall_info> = UserRef::from(data);
+                let len = std::cmp::min(std::mem::size_of::<ptrace_syscall_info>(), addr.ptr());
+                // SAFETY: ptrace_syscall_info does not implement FromBytes/AsBytes,
+                // so this has to happen manually.
+                let src = unsafe {
+                    std::slice::from_raw_parts(
+                        &info as *const ptrace_syscall_info as *const u8,
+                        len as usize,
+                    )
+                };
+                current_task.mm().write_memory(dst.addr(), src)?;
+                Ok(size.into())
+            } else {
+                error!(ESRCH)
+            }
+        }
+        PTRACE_SETOPTIONS => {
+            let mask = data.ptr() as u32;
+            // This is what we currently support.
+            if mask != 0 && mask != PTRACE_O_TRACESYSGOOD {
+                return error!(ENOSYS);
+            }
+            if let Some(ref mut ptrace) = &mut state.ptrace {
+                if let Some(options) = PtraceOptions::from_bits(data.ptr() as u32) {
+                    ptrace.options = options;
+                } else {
+                    return error!(EINVAL);
+                }
+            }
+            Ok(starnix_syscalls::SUCCESS)
         }
         _ => {
             not_implemented!("ptrace", request);
@@ -436,14 +612,15 @@ fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result
     Ok(())
 }
 
-pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
+pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, Errno> {
     let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
     check_caps_for_attach(ptrace_scope, current_task)?;
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
         let task_ref = OwnedRef::temp(&current_task.task);
-        do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach)
+        do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach)?;
+        Ok(starnix_syscalls::SUCCESS)
     } else {
         error!(EPERM)
     }
@@ -454,7 +631,7 @@ pub fn ptrace_attach<L>(
     current_task: &mut CurrentTask,
     pid: pid_t,
     attach_type: PtraceAttachType,
-) -> Result<(), Errno>
+) -> Result<SyscallResult, Errno>
 where
     L: LockBefore<MmDumpable>,
 {
@@ -503,7 +680,7 @@ where
     if attach_type == PtraceAttachType::Attach {
         send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
     }
-    Ok(())
+    Ok(starnix_syscalls::SUCCESS)
 }
 
 pub fn ptrace_set_scope(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
@@ -535,6 +712,60 @@ pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
     let mut scope = kernel.ptrace_scope.load(Ordering::Relaxed).to_string();
     scope.push('\n');
     scope.into_bytes()
+}
+
+#[inline(never)]
+pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
+    let block = {
+        let mut state = current_task.write();
+        if state.ptrace.is_some() {
+            current_task.trace_syscalls.store(false, Ordering::Relaxed);
+            let mut sig = SignalInfo::default(SIGTRAP);
+            if state
+                .ptrace
+                .as_ref()
+                .map_or(false, |ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
+            {
+                sig.signal.set_ptrace_syscall_bit();
+            }
+            state.set_stopped(StopState::SyscallEnterStopping, Some(sig), None);
+            true
+        } else {
+            false
+        }
+    };
+    if block {
+        current_task.block_while_stopped();
+    }
+}
+
+#[inline(never)]
+pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
+    let block = {
+        let mut state = current_task.write();
+        current_task.trace_syscalls.store(false, Ordering::Relaxed);
+        if state.ptrace.is_some() {
+            let mut sig = SignalInfo::default(SIGTRAP);
+            if state
+                .ptrace
+                .as_ref()
+                .map_or(false, |ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
+            {
+                sig.signal.set_ptrace_syscall_bit();
+            }
+
+            state.set_stopped(StopState::SyscallExitStopping, Some(sig), None);
+            if let Some(ref mut ptrace) = &mut state.ptrace {
+                ptrace.last_syscall_was_error = is_error;
+            }
+            true
+        } else {
+            false
+        }
+    };
+    if block {
+        current_task.block_while_stopped();
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@
 use core::arch::asm;
 use static_assertions::const_assert_eq;
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct State {
     // [arm/v8]: A1.3.1 Execution state
     // 32 registers, 128 bits each

@@ -5,7 +5,7 @@
 use core::arch::asm;
 use static_assertions::const_assert_eq;
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct State {
     // Floating-point registers from the F and D extensions.
     pub fp_registers: [u64; 32usize],

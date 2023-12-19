@@ -1111,7 +1111,7 @@ pub fn sys_ptrace(
     pid: pid_t,
     addr: UserAddress,
     data: UserAddress,
-) -> Result<(), Errno> {
+) -> Result<SyscallResult, Errno> {
     match request {
         PTRACE_TRACEME => ptrace_traceme(current_task),
         PTRACE_ATTACH => ptrace_attach(locked, current_task, pid, PtraceAttachType::Attach),

@@ -4,6 +4,7 @@
 
 #include <signal.h>
 #include <sys/ptrace.h>
+#include <syscall.h>
 #include <time.h>
 
 #include <gtest/gtest.h>
@@ -19,7 +20,7 @@ TEST(PtraceTest, SetSigInfo) {
   helper.OnlyWaitForForkedChildren();
   pid_t child_pid = helper.RunInForkedProcess([] {
     struct sigaction sa = {};
-    sa.sa_sigaction = +[](int sig, siginfo_t* info, void* ucontext) {
+    sa.sa_sigaction = +[](int sig, siginfo_t *info, void *ucontext) {
       if (sig != kInjectedSigno) {
         _exit(1);
       }
@@ -114,4 +115,116 @@ TEST(PtraceTest, InterruptAfterListen) {
 
   // Allow the tracer to proceed normally.
   EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0) << strerror(errno);
+}
+
+// None of this seems to be defined in our x64 and ARM sysroots.
+#ifndef PTRACE_GET_SYSCALL_INFO
+#define PTRACE_GET_SYSCALL_INFO 0x420e
+#define PTRACE_SYSCALL_INFO_NONE 0
+#define PTRACE_SYSCALL_INFO_ENTRY 1
+#define PTRACE_SYSCALL_INFO_EXIT 2
+#define PTRACE_SYSCALL_INFO_SECCOMP 3
+
+struct ptrace_syscall_info {
+  uint8_t op;
+  uint8_t pad[3];
+  uint32_t arch;
+  uint64_t instruction_pointer;
+  uint64_t stack_pointer;
+  union {
+    struct {
+      uint64_t nr;
+      uint64_t args[6];
+    } entry;
+    struct {
+      int64_t rval;
+      uint8_t is_error;
+    } exit;
+    struct {
+      uint64_t nr;
+      uint64_t args[6];
+      uint32_t ret_data;
+    } seccomp;
+  };
+};
+#else
+// In our RISC-V sysroot, this is called __ptrace_syscall_info
+using ptrace_syscall_info = __ptrace_syscall_info;
+#endif
+
+TEST(PtraceTest, TraceSyscall) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  pid_t child_pid = helper.RunInForkedProcess([] {
+    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    raise(SIGSTOP);
+    struct timespec req = {.tv_sec = 0, .tv_nsec = 0};
+    nanosleep(&req, nullptr);
+  });
+
+  int status;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACESYSGOOD))
+      << "error " << strerror(errno);
+
+  ptrace_syscall_info info;
+  const int kExpectedNoneSize =
+      reinterpret_cast<uint8_t *>(&info.entry) - reinterpret_cast<uint8_t *>(&info);
+  const int kExpectedEntrySize =
+      reinterpret_cast<uint8_t *>(&info.entry.args[6]) - reinterpret_cast<uint8_t *>(&info);
+  const int kExpectedExitSize =
+      reinterpret_cast<uint8_t *>(&info.exit.is_error + 1) - reinterpret_cast<uint8_t *>(&info);
+
+  // We are not at a syscall entry
+  EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+                   sizeof(ptrace_syscall_info), &info),
+            kExpectedNoneSize);
+  EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_NONE);
+
+  bool found = false;
+  // We want to make sure we hit the "nanosleep" syscall.  There can be various
+  // "hidden" syscalls in the tracee, depending on the implementation of "raise"
+  // and "nanosleep".  So, we just keep trying until we hit nanosleep or exit.
+  for (int i = 0; i < 10; i++) {
+    EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+    EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+    if (!WIFSTOPPED(status) || WSTOPSIG(status) != (SIGTRAP | 0x80)) {
+      break;
+    }
+
+    // We are now at a syscall entry
+    EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+                     sizeof(ptrace_syscall_info), &info),
+              kExpectedEntrySize);
+
+    EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_ENTRY);
+    switch (info.entry.nr) {
+      case __NR_clock_nanosleep:
+      case __NR_nanosleep:
+        found = true;
+        break;
+      case __NR_exit:
+      case __NR_exit_group:
+        goto exit_loop;
+    }
+
+    EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+    EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP | 0x80))
+        << "WIFSTOPPED(status) " << WIFSTOPPED(status) << " WSTOPSIG(status) " << WSTOPSIG(status);
+
+    // We are now at a syscall exit
+    EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+                     sizeof(ptrace_syscall_info), &info),
+              kExpectedExitSize);
+
+    EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_EXIT);
+    EXPECT_EQ(info.exit.rval, 0);
+    EXPECT_EQ(info.exit.is_error, 0);
+  }
+exit_loop:
+
+  EXPECT_EQ(found, true) << "Never found nanosleep call";
+  EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
 }

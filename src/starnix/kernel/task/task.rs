@@ -35,7 +35,7 @@ use starnix_uapi::{
     from_status_like_fdio,
     ownership::{OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef},
     pid_t, robust_list_head,
-    signals::{SigSet, Signal, UncheckedSignal, SIGCONT, SIGTRAP},
+    signals::{SigSet, Signal, UncheckedSignal, SIGCONT},
     stats::TaskTimeStats,
     ucred,
     user_address::{UserAddress, UserRef},
@@ -49,7 +49,7 @@ use std::{
     fmt,
     mem::MaybeUninit,
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
 };
@@ -133,7 +133,7 @@ impl AtomicStopState {
 
 /// This enum describes the state that a task or thread group can be in when being stopped.
 /// The names are taken from ptrace(2).
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum StopState {
     /// In this state, the process has been told to wake up, but has not yet been woken.
@@ -163,6 +163,12 @@ pub enum StopState {
     PtraceEventStopping,
     /// Same as the last one, but has stopped
     PtraceEventStopped,
+    /// In this state, we have stopped before executing a syscall
+    SyscallEnterStopping,
+    SyscallEnterStopped,
+    /// In this state, we have stopped after executing a syscall
+    SyscallExitStopping,
+    SyscallExitStopped,
     // TODO: Other states.
 }
 
@@ -177,7 +183,9 @@ impl StopState {
         match *self {
             StopState::GroupStopping
             | StopState::SignalDeliveryStopping
-            | StopState::PtraceEventStopping => true,
+            | StopState::PtraceEventStopping
+            | StopState::SyscallEnterStopping
+            | StopState::SyscallExitStopping => true,
             _ => false,
         }
     }
@@ -187,7 +195,9 @@ impl StopState {
         match *self {
             StopState::GroupStopped
             | StopState::SignalDeliveryStopped
-            | StopState::PtraceEventStopped => true,
+            | StopState::PtraceEventStopped
+            | StopState::SyscallEnterStopped
+            | StopState::SyscallExitStopped => true,
             _ => false,
         }
     }
@@ -200,6 +210,8 @@ impl StopState {
             StopState::PtraceEventStopping => Ok(StopState::PtraceEventStopped),
             StopState::Waking => Ok(StopState::Awake),
             StopState::ForceWaking => Ok(StopState::ForceAwake),
+            StopState::SyscallEnterStopping => Ok(StopState::SyscallEnterStopped),
+            StopState::SyscallExitStopping => Ok(StopState::SyscallExitStopped),
             _ => Err(()),
         }
     }
@@ -208,7 +220,9 @@ impl StopState {
         match *self {
             StopState::GroupStopped => *new_state == StopState::GroupStopping,
             StopState::SignalDeliveryStopped => *new_state == StopState::SignalDeliveryStopping,
-            StopState::PtraceEventStopped => *new_state == StopState::PtraceEventStopped,
+            StopState::PtraceEventStopped => *new_state == StopState::PtraceEventStopping,
+            StopState::SyscallEnterStopped => *new_state == StopState::SyscallEnterStopping,
+            StopState::SyscallExitStopped => *new_state == StopState::SyscallExitStopping,
             StopState::Awake => *new_state == StopState::Waking,
             _ => false,
         }
@@ -229,6 +243,8 @@ impl StopState {
             || *self == StopState::GroupStopping
             || *self == StopState::SignalDeliveryStopping
             || *self == StopState::PtraceEventStopping
+            || *self == StopState::SyscallEnterStopping
+            || *self == StopState::SyscallExitStopping
     }
 
     pub fn ptrace_only(&self) -> bool {
@@ -389,7 +405,7 @@ impl TaskMutableState {
 
     pub fn ptrace_on_signal_consume(&mut self) -> bool {
         self.ptrace.as_mut().map_or(false, |ptrace: &mut PtraceState| {
-            if ptrace.stop_status == PtraceStatus::Continuing {
+            if ptrace.stop_status.is_continuing() {
                 ptrace.stop_status = PtraceStatus::Default;
                 false
             } else {
@@ -419,7 +435,12 @@ impl TaskMutableState {
 
 #[apply(state_implementation!)]
 impl TaskMutableState<Base = Task> {
-    pub fn set_stopped(&mut self, stopped: StopState, siginfo: Option<SignalInfo>) {
+    pub fn set_stopped(
+        &mut self,
+        stopped: StopState,
+        siginfo: Option<SignalInfo>,
+        current_task: Option<&CurrentTask>,
+    ) {
         if stopped.ptrace_only() && self.ptrace.is_none() {
             return;
         }
@@ -433,6 +454,13 @@ impl TaskMutableState<Base = Task> {
         // stopped here.
         self.store_stopped(stopped);
         if let Some(ref mut ptrace) = &mut self.ptrace {
+            if stopped.is_stopped() {
+                if let Some(ref current_task) = current_task {
+                    ptrace.copy_state_from(current_task);
+                }
+            } else {
+                ptrace.clear_state();
+            }
             ptrace.set_last_signal(siginfo);
         }
         if stopped == StopState::Waking || stopped == StopState::ForceWaking {
@@ -663,6 +691,9 @@ pub struct Task {
 
     /// Used to ensure that all logs related to this task carry the same metadata about the task.
     logging_span: OnceCell<starnix_logging::Span>,
+
+    /// Tell you whether you are tracing syscall entry / exit without a lock.
+    pub trace_syscalls: AtomicBool,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -764,6 +795,7 @@ impl Task {
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
             logging_span: OnceCell::new(),
+            trace_syscalls: AtomicBool::new(false),
         };
         #[cfg(any(test, debug_assertions))]
         {
@@ -1102,99 +1134,6 @@ impl Task {
             // TODO(fxbug.dev/127682): How can we calculate system time?
             system_time: zx::Duration::default(),
         }
-    }
-
-    /// Sets the stop state (per set_stopped), and also notifies all listeners,
-    /// including the parent process if appropriate.
-    pub fn set_stopped_and_notify(&self, stopped: StopState, siginfo: Option<SignalInfo>) {
-        self.write().set_stopped(stopped, siginfo);
-
-        if !stopped.is_in_progress() {
-            let parent = self.thread_group.read().parent.clone();
-            if let Some(parent) = parent {
-                parent.write().child_status_waiters.notify_all();
-            }
-        }
-    }
-
-    /// If the task is stopping, set it as stopped. return whether the caller
-    /// should stop.
-    pub fn finalize_stop_state(&self) -> bool {
-        // Stopping because the thread group is stopping.
-        // Try to flip to GroupStopped - will fail if we shouldn't.
-        if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
-            == StopState::GroupStopped
-        {
-            let signal = self.thread_group.read().last_signal.clone();
-            // stopping because the thread group has stopped
-            self.write().set_stopped(StopState::GroupStopped, signal);
-            return true;
-        }
-
-        // Stopping because the task is stopping
-        let stopped = self.load_stopped();
-        if stopped.is_stopping_or_stopped() {
-            if let Ok(stopped) = stopped.finalize() {
-                self.set_stopped_and_notify(stopped, None);
-            }
-            return true;
-        }
-
-        false
-    }
-
-    /// If waking, promotes from waking to awake.  If not waking, make waiter async
-    /// wait until woken.  Returns true if woken.
-    pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
-        let group_state = self.thread_group.read();
-        let mut task_state = self.write();
-
-        // Wake up if
-        //   a) we should wake up, meaning:
-        //      i) we're in group stop, and the thread group has exited group stop, or
-        //      ii) we're waking up,
-        //   b) and ptrace isn't stopping us from waking up, but
-        //   c) always wake up if we got a SIGKILL.
-        let task_stop_state = self.load_stopped();
-        let group_stop_state = self.thread_group.load_stopped();
-        if ((task_stop_state == StopState::GroupStopped && group_stop_state.is_waking_or_awake())
-            || task_stop_state.is_waking_or_awake())
-            && (!task_state.is_ptrace_listening() || task_stop_state.is_force())
-        {
-            let new_state = if task_stop_state.is_waking_or_awake() {
-                task_stop_state.finalize()
-            } else {
-                group_stop_state.finalize()
-            };
-            if let Ok(new_state) = new_state {
-                drop(group_state);
-                drop(task_state);
-                self.thread_group.set_stopped(new_state, None, false);
-                self.write().set_stopped(new_state, None);
-                return true;
-            }
-        }
-
-        // We will wait.
-        if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
-            // If we've stopped or PTRACE_LISTEN has been sent, wait for a
-            // signal or instructions from the tracer.
-            group_state.stopped_waiters.wait_async(&waiter);
-            task_state.wait_on_ptracer(&waiter);
-        } else if task_state.can_accept_ptrace_commands() {
-            // If we're stopped because a tracer has seen the stop and not taken
-            // further action, wait for further instructions from the tracer.
-            task_state.wait_on_ptracer(&waiter);
-        } else if task_state.is_ptrace_listening() {
-            // A PTRACE_LISTEN is a state where we can get signals and notify a
-            // ptracer, but otherwise remain blocked.
-            if let Some(ref mut ptrace) = &mut task_state.ptrace {
-                ptrace.set_last_signal(Some(SignalInfo::default(SIGTRAP)));
-            }
-            task_state.wait_on_ptracer(&waiter);
-            task_state.notify_ptracers();
-        }
-        false
     }
 
     pub fn logging_span(&self) -> starnix_logging::Span {

@@ -69,6 +69,11 @@ impl Signal {
         UNBLOCKABLE_SIGNALS.has_signal(*self)
     }
 
+    /// Used exclusively for PTRACE_O_TRACESYSGOOD
+    pub fn set_ptrace_syscall_bit(&mut self) {
+        self.number |= 0x80
+    }
+
     /// The number of signals, also the highest valid signal number.
     pub const NUM_SIGNALS: u32 = 64;
 }

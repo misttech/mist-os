@@ -102,10 +102,10 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> R
     // a stopped process.
     if siginfo.signal == SIGCONT {
         task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
-        task.write().set_stopped(StopState::Waking, None);
+        task.write().set_stopped(StopState::Waking, None, None);
     } else if siginfo.signal == SIGKILL {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
-        task.write().set_stopped(StopState::ForceWaking, None);
+        task.write().set_stopped(StopState::ForceWaking, None, None);
     }
 
     Ok(())
@@ -198,7 +198,7 @@ pub fn dequeue_signal(
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.
-            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()));
+            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()), None);
             return;
         }
     }

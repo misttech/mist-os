@@ -16,7 +16,7 @@ mod aarch64;
 #[cfg(target_arch = "riscv64")]
 mod riscv64;
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct ExtendedPstateState {
     #[cfg(target_arch = "x86_64")]
     state: x86_64::State,

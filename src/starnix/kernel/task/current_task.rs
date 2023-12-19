@@ -13,7 +13,8 @@ use crate::{
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
         Kernel, PidTable, ProcessGroup, SeccompFilter, SeccompFilterContainer,
-        SeccompNotifierHandle, SeccompState, SeccompStateValue, Task, TaskFlags, ThreadGroup,
+        SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState, Task, TaskFlags,
+        ThreadGroup, Waiter,
     },
     vfs::{
         FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
@@ -135,6 +136,14 @@ impl ThreadState {
             syscall_restart_func: None,
         }
     }
+
+    pub fn extended_snapshot(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+            extended_pstate: self.extended_pstate.clone(),
+            syscall_restart_func: None,
+        }
+    }
 }
 
 type SyscallRestartFunc =
@@ -208,6 +217,65 @@ impl CurrentTask {
             state.signals.set_temporary_mask(signal_mask);
         }
         wait_function(self)
+    }
+
+    /// If waking, promotes from waking to awake.  If not waking, make waiter async
+    /// wait until woken.  Returns true if woken.
+    pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
+        let group_state = self.thread_group.read();
+        let mut task_state = self.write();
+
+        // Wake up if
+        //   a) we should wake up, meaning:
+        //      i) we're in group stop, and the thread group has exited group stop, or
+        //      ii) we're waking up,
+        //   b) and ptrace isn't stopping us from waking up, but
+        //   c) always wake up if we got a SIGKILL.
+        let task_stop_state = self.load_stopped();
+        let group_stop_state = self.thread_group.load_stopped();
+        if ((task_stop_state == StopState::GroupStopped && group_stop_state.is_waking_or_awake())
+            || task_stop_state.is_waking_or_awake())
+            && (!task_state.is_ptrace_listening() || task_stop_state.is_force())
+        {
+            let new_state = if task_stop_state.is_waking_or_awake() {
+                task_stop_state.finalize()
+            } else {
+                group_stop_state.finalize()
+            };
+            if let Ok(new_state) = new_state {
+                task_state.set_stopped(new_state, None, Some(self));
+                drop(group_state);
+                drop(task_state);
+                // It is possible for the stop state to be changed by another
+                // thread between when it is checked above and the following
+                // invocation, but set_stopped does sufficient checking while
+                // holding the lock to make sure that such a change won't result
+                // in corrupted state.
+                self.thread_group.set_stopped(new_state, None, false);
+                return true;
+            }
+        }
+
+        // We will wait.
+        if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
+            // If we've stopped or PTRACE_LISTEN has been sent, wait for a
+            // signal or instructions from the tracer.
+            group_state.stopped_waiters.wait_async(&waiter);
+            task_state.wait_on_ptracer(&waiter);
+        } else if task_state.can_accept_ptrace_commands() {
+            // If we're stopped because a tracer has seen the stop and not taken
+            // further action, wait for further instructions from the tracer.
+            task_state.wait_on_ptracer(&waiter);
+        } else if task_state.is_ptrace_listening() {
+            // A PTRACE_LISTEN is a state where we can get signals and notify a
+            // ptracer, but otherwise remain blocked.
+            if let Some(ref mut ptrace) = &mut task_state.ptrace {
+                ptrace.set_last_signal(Some(SignalInfo::default(SIGTRAP)));
+            }
+            task_state.wait_on_ptracer(&waiter);
+            task_state.notify_ptracers();
+        }
+        false
     }
 
     /// Set the RunState for the current task to the given value and then call the given callback.
@@ -1354,6 +1422,83 @@ impl CurrentTask {
         }
 
         Ok(child)
+    }
+
+    /// Sets the stop state (per set_stopped), and also notifies all listeners,
+    /// including the parent process if appropriate.
+    pub fn set_stopped_and_notify(&self, stopped: StopState, siginfo: Option<SignalInfo>) {
+        {
+            let mut state = self.write();
+            if let Some(ref mut ptrace) = &mut state.ptrace {
+                ptrace.copy_state_from(self);
+            }
+            state.set_stopped(stopped, siginfo, Some(self));
+        }
+
+        if !stopped.is_in_progress() {
+            let parent = self.thread_group.read().parent.clone();
+            if let Some(parent) = parent {
+                parent.write().child_status_waiters.notify_all();
+            }
+        }
+    }
+
+    /// If the task is stopping, set it as stopped. return whether the caller
+    /// should stop.
+    pub fn finalize_stop_state(&self) -> bool {
+        // Stopping because the thread group is stopping.
+        // Try to flip to GroupStopped - will fail if we shouldn't.
+        if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
+            == StopState::GroupStopped
+        {
+            let signal = self.thread_group.read().last_signal.clone();
+            // stopping because the thread group has stopped
+            self.write().set_stopped(StopState::GroupStopped, signal, Some(self));
+            return true;
+        }
+
+        // Stopping because the task is stopping
+        let stopped = self.load_stopped();
+        if stopped.is_stopping_or_stopped() {
+            if let Ok(stopped) = stopped.finalize() {
+                self.set_stopped_and_notify(stopped, None);
+            }
+            return true;
+        }
+
+        false
+    }
+
+    /// Block the execution of `current_task` as long as the task is stopped and
+    /// not terminated.
+    pub fn block_while_stopped(&mut self) {
+        // Upgrade the state from stopping to stopped if needed. Return if the task
+        // should not be stopped.
+        if !self.finalize_stop_state() {
+            return;
+        }
+
+        let waiter = Waiter::new_ignoring_signals();
+        loop {
+            // If we've exited, unstop the threads and return without notifying
+            // waiters.
+            if self.is_exitted() {
+                self.thread_group.set_stopped(StopState::ForceAwake, None, false);
+                self.write().set_stopped(StopState::ForceAwake, None, Some(self));
+                return;
+            }
+
+            if self.wake_or_wait_until_unstopped_async(&waiter) {
+                return;
+            }
+
+            // Do the wait. Result is not needed, as this is not in a syscall.
+            let _: Result<(), Errno> = waiter.wait(self);
+
+            // Maybe go from stopping to stopped, if we are currently stopping
+            // again.
+            self.finalize_stop_state();
+        }
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the

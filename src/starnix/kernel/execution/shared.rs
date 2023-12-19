@@ -19,8 +19,7 @@ use crate::{
     signals::{dequeue_signal, prepare_to_restart_syscall},
     syscalls::table::dispatch_syscall,
     task::{
-        CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
-        ThreadState, Waiter,
+        CurrentTask, ExitStatus, Kernel, SeccompStateValue, TaskFlags, ThreadGroup, ThreadState,
     },
     vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions},
 };
@@ -153,7 +152,7 @@ pub fn process_completed_restricted_exit(
     } else {
         // Block a stopped process after it's had a chance to handle signals, since a signal might
         // cause it to stop.
-        block_while_stopped(current_task);
+        current_task.block_while_stopped();
 
         Ok(None)
     }
@@ -250,41 +249,10 @@ pub fn create_filesystem_from_spec<'a>(
     Ok((mount_point.as_bytes(), fs))
 }
 
-/// Block the execution of `current_task` as long as the task is stopped and not terminated.
-fn block_while_stopped(current_task: &mut CurrentTask) {
-    // Upgrade the state from stopping to stopped if needed. Return if the task
-    // should not be stopped.
-    if !current_task.finalize_stop_state() {
-        return;
-    }
-
-    let waiter = Waiter::new_ignoring_signals();
-    loop {
-        // If we've exited, unstop the threads and return without notifying
-        // waiters.
-        if current_task.is_exitted() {
-            current_task.thread_group.set_stopped(StopState::ForceAwake, None, false);
-            current_task.write().set_stopped(StopState::ForceAwake, None);
-            return;
-        }
-
-        if current_task.wake_or_wait_until_unstopped_async(&waiter) {
-            return;
-        }
-
-        // Do the wait. Result is not needed, as this is not in a syscall.
-        let _: Result<(), Errno> = waiter.wait(current_task);
-
-        // Maybe go from stopping to stopped, if we are currently stopping
-        // again.
-        current_task.finalize_stop_state();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{signals::SignalInfo, testing::*};
+    use crate::{signals::SignalInfo, task::StopState, testing::*};
     use starnix_uapi::signals::{SIGCONT, SIGSTOP};
 
     #[::fuchsia::test]
@@ -292,7 +260,7 @@ mod tests {
         let (_kernel, mut task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is not stopped.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
 
         // Stop the task.
         task.thread_group.set_stopped(
@@ -320,13 +288,13 @@ mod tests {
         });
 
         // Block until continued.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
 
         // Join the thread, which will ensure set_stopped terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked anymore.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
     }
 
     #[::fuchsia::test]
@@ -334,7 +302,7 @@ mod tests {
         let (_kernel, mut task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is neither stopped nor exited.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
 
         // Stop the task.
         task.thread_group.set_stopped(
@@ -358,12 +326,12 @@ mod tests {
         });
 
         // Block until continued.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
 
         // Join the task, which will ensure thread_group.exit terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked because it is stopped.
-        block_while_stopped(&mut task);
+        task.block_while_stopped();
     }
 }
