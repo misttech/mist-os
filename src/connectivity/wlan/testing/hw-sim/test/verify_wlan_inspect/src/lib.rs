@@ -76,8 +76,7 @@ async fn verify_wlan_inspect() {
     )
     .await;
 
-    let policy_moniker =
-        format!("test_realm_factory/realm_builder\\:{}/wlan-hw-sim/wlancfg", REALM_NAME);
+    let policy_moniker = format!("test_realm_factory/realm_builder\\:{}/wlancfg", REALM_NAME);
     let devicemonitor_moniker =
         format!("test_realm_factory/realm_builder\\:{}/wlandevicemonitor", REALM_NAME);
 
