@@ -10,12 +10,12 @@ load(
     _fuchsia_sdk_repository = "fuchsia_sdk_repository",
 )
 load(
-    "//fuchsia/workspace:rules_fuchsia_deps.bzl",
-    _rules_fuchsia_deps = "rules_fuchsia_deps",
-)
-load(
     "//fuchsia/workspace:python_runtime_repository.bzl",
     _python_runtime_repository = "python_runtime_repository",
+)
+load(
+    "//fuchsia/workspace:rules_fuchsia_deps.bzl",
+    _rules_fuchsia_deps = "rules_fuchsia_deps",
 )
 
 # See corresponding `.bzl` files in fuchsia/private for documentation.

@@ -4,8 +4,8 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
-load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
+load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename

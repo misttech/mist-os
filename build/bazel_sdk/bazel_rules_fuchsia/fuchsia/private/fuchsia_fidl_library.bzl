@@ -4,9 +4,9 @@
 
 """Rule for declaring a FIDL library"""
 
-load(":providers.bzl", "FuchsiaFidlLibraryInfo")
-load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
+load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
+load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 
 def _gather_dependencies(deps):
     info = []

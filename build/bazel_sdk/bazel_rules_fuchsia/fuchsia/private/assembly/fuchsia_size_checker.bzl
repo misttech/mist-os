@@ -5,20 +5,20 @@
 """Rule for running size checker on product and package."""
 
 load(
-    "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
-    "fuchsia_product_size_check",
-)
-load(
     "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_package_size_check.bzl",
     "fuchsia_package_size_check",
 )
 load(
-    "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_update_package_size_check.bzl",
-    "fuchsia_update_package_size_check",
+    "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
+    "fuchsia_product_size_check",
 )
 load(
     "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_size_report_aggregator.bzl",
     "fuchsia_size_report_aggregator",
+)
+load(
+    "@fuchsia_sdk//fuchsia/private/assembly:fuchsia_update_package_size_check.bzl",
+    "fuchsia_update_package_size_check",
 )
 
 def fuchsia_size_checker(

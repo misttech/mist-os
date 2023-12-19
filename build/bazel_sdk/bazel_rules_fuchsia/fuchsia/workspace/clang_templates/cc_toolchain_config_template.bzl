@@ -6,6 +6,7 @@
 Clang toolchain configuration.
 """
 
+load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "tool_path",
@@ -15,7 +16,6 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("@fuchsia_clang//:cc_features.bzl", "features", "sanitizer_features")
 
 def _cc_toolchain_config_impl(ctx):

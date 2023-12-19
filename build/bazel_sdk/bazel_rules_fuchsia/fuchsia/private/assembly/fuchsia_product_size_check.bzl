@@ -4,8 +4,8 @@
 
 """Rule for running size checker on given image."""
 
-load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 
 # Command for running ffx assembly size-check product.
 _SIZE_CHECKER_RUNNER_SH = """

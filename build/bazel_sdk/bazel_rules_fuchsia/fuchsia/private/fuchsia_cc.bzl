@@ -13,11 +13,10 @@ cc_binary & cc_test wrappers:
  - fuchsia_wrap_cc_test
 """
 
-load(":utils.bzl", "forward_providers", "get_runfiles", "is_lib", "make_resource_struct", "rule_variant", "rule_variants")
-load(":fuchsia_select.bzl", "if_fuchsia")
 load(":fuchsia_component.bzl", "fuchsia_test_component")
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_package_resource.bzl", "fuchsia_package_resource")
+load(":fuchsia_select.bzl", "if_fuchsia")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -25,6 +24,7 @@ load(
     "FuchsiaPackageResourcesInfo",
     "FuchsiaUnitTestComponentInfo",
 )
+load(":utils.bzl", "forward_providers", "get_runfiles", "is_lib", "make_resource_struct", "rule_variant", "rule_variants")
 
 KNOWN_PROVIDERS = [
     CcInfo,

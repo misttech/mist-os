@@ -19,13 +19,13 @@ How it works
 6. The verified JSON is passed as an output, which is then read by `fuchsia_licenses_spdx`.
 """
 
-load("common.bzl", "bool_dict", "check_is_target", "is_same_package", "is_target", "to_file_path", "to_label_str", "to_package_str")
-load("collection_policy.bzl", "ignore_policy", "is_3p_target")
-load("providers.bzl", "LicensesCollectionInfo")
 load(
     "@rules_license//rules:providers.bzl",
     "LicenseInfo",
 )
+load("collection_policy.bzl", "ignore_policy", "is_3p_target")
+load("common.bzl", "bool_dict", "check_is_target", "is_same_package", "is_target", "to_file_path", "to_label_str", "to_package_str")
+load("providers.bzl", "LicensesCollectionInfo")
 
 _VisitedTargetInfo = provider(
     doc = "Information about a target visited by the collecting aspect",

@@ -4,8 +4,8 @@
 
 """fuchsia_archivist_pipeline_test() rule."""
 
-load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_component.bzl", "fuchsia_test_component")
+load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_package.bzl", "fuchsia_test_package")
 
 CML = """{{

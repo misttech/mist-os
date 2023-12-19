@@ -5,8 +5,8 @@
 """Utilities for changing the build configuration to fuchsia."""
 
 load("//:api_version.bzl", "DEFAULT_TARGET_API")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME")
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",

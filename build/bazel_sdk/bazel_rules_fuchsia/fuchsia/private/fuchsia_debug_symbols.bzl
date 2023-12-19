@@ -4,9 +4,9 @@
 
 """Utilities for extracting, creating, and manipulating debug symbols."""
 
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load(":providers.bzl", "FuchsiaDebugSymbolInfo")
 load(":utils.bzl", "flatten", "make_resource_struct")
-load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 def strip_resources(ctx, resources):
     """Strips resources and returns FuchsiaDebugSymbolInfo.

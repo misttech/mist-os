@@ -4,8 +4,8 @@
 
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
-load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "sdk_id_from_manifests")
 load("//fuchsia/workspace:utils.bzl", "workspace_path")
+load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "sdk_id_from_manifests")
 
 # Environment variable used to set a local Fuchsia Platform tree build output
 # directory. If this variable is set, it should point to

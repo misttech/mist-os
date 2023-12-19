@@ -9,6 +9,10 @@ load(
     _fuchsia_licenses_classification = "fuchsia_licenses_classification",
 )
 load(
+    "//fuchsia/private/licenses:fuchsia_licenses_collection.bzl",
+    _fuchsia_licenses_collection = "fuchsia_licenses_collection",
+)
+load(
     "//fuchsia/private/licenses:fuchsia_licenses_notice.bzl",
     _fuchsia_licenses_notice = "fuchsia_licenses_notice",
 )
@@ -19,10 +23,6 @@ load(
 load(
     "//fuchsia/private/licenses:fuchsia_licenses_spdx.bzl",
     _fuchsia_licenses_spdx = "fuchsia_licenses_spdx",
-)
-load(
-    "//fuchsia/private/licenses:fuchsia_licenses_collection.bzl",
-    _fuchsia_licenses_collection = "fuchsia_licenses_collection",
 )
 
 fuchsia_licenses_classification = _fuchsia_licenses_classification

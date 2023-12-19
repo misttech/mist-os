@@ -7,6 +7,23 @@
 Documentation for all rules exported by this file is located at docs/defs.md"""
 
 load(
+    "//fuchsia/constraints/platforms:supported_platforms.bzl",
+    _fuchsia_platforms = "fuchsia_platforms",
+)
+load(
+    "//fuchsia/private:compilation_database.bzl",
+    _clangd_compilation_database = "clangd_compilation_database",
+)
+load(
+    "//fuchsia/private:fuchsia_archivist_pipeline_test.bzl",
+    _fuchsia_archivist_pipeline_test = "fuchsia_archivist_pipeline_test",
+    _fuchsia_archivist_pipeline_test_manifest = "fuchsia_archivist_pipeline_test_manifest",
+)
+load(
+    "//fuchsia/private:fuchsia_bind_cc_library.bzl",
+    _fuchsia_bind_cc_library = "fuchsia_bind_cc_library",
+)
+load(
     "//fuchsia/private:fuchsia_bind_library.bzl",
     _fuchsia_bind_library = "fuchsia_bind_library",
 )
@@ -33,38 +50,29 @@ load(
     _fuchsia_component_manifest_shard = "fuchsia_component_manifest_shard",
 )
 load(
-    "//fuchsia/private:fuchsia_fidl_library.bzl",
-    _fuchsia_fidl_library = "fuchsia_fidl_library",
-)
-load(
-    "//fuchsia/private:fuchsia_fidl_bind_library.bzl",
-    _fuchsia_fidl_bind_library = "fuchsia_fidl_bind_library",
-)
-load(
-    "//fuchsia/private:fuchsia_bind_cc_library.bzl",
-    _fuchsia_bind_cc_library = "fuchsia_bind_cc_library",
-)
-load(
-    "//fuchsia/private:legacy_fuchsia_fidl_cc_library.bzl",
-    _fuchsia_fidl_hlcpp_library = "fuchsia_fidl_hlcpp_library",
-    _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",
-)
-load(
-    "//fuchsia/private:fuchsia_driver_bind_rules.bzl",
-    _fuchsia_driver_bind_bytecode = "fuchsia_driver_bind_bytecode",
+    "//fuchsia/private:fuchsia_cpu_select.bzl",
+    _fuchsia_cpu_filter_dict = "fuchsia_cpu_filter_dict",
+    _fuchsia_cpu_select = "fuchsia_cpu_select",
 )
 load(
     "//fuchsia/private:fuchsia_debug_symbols.bzl",
     _fuchsia_debug_symbols = "fuchsia_debug_symbols",
 )
 load(
+    "//fuchsia/private:fuchsia_driver_bind_rules.bzl",
+    _fuchsia_driver_bind_bytecode = "fuchsia_driver_bind_bytecode",
+)
+load(
     "//fuchsia/private:fuchsia_driver_tool.bzl",
     _fuchsia_driver_tool = "fuchsia_driver_tool",
 )
 load(
-    "//fuchsia/private:fuchsia_archivist_pipeline_test.bzl",
-    _fuchsia_archivist_pipeline_test = "fuchsia_archivist_pipeline_test",
-    _fuchsia_archivist_pipeline_test_manifest = "fuchsia_archivist_pipeline_test_manifest",
+    "//fuchsia/private:fuchsia_fidl_bind_library.bzl",
+    _fuchsia_fidl_bind_library = "fuchsia_fidl_bind_library",
+)
+load(
+    "//fuchsia/private:fuchsia_fidl_library.bzl",
+    _fuchsia_fidl_library = "fuchsia_fidl_library",
 )
 load(
     "//fuchsia/private:fuchsia_package.bzl",
@@ -75,6 +83,15 @@ load(
     _get_driver_component_manifests = "get_driver_component_manifests",
 )
 load(
+    "//fuchsia/private:fuchsia_package_group.bzl",
+    _fuchsia_package_group = "fuchsia_package_group",
+)
+load(
+    "//fuchsia/private:fuchsia_package_resource.bzl",
+    _fuchsia_package_resource = "fuchsia_package_resource",
+    _fuchsia_package_resource_group = "fuchsia_package_resource_group",
+)
+load(
     "//fuchsia/private:fuchsia_prebuilt_package.bzl",
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
@@ -83,31 +100,14 @@ load(
     _fuchsia_wrap_rust_binary = "fuchsia_wrap_rust_binary",
 )
 load(
-    "//fuchsia/private:fuchsia_package_resource.bzl",
-    _fuchsia_package_resource = "fuchsia_package_resource",
-    _fuchsia_package_resource_group = "fuchsia_package_resource_group",
-)
-load(
-    "//fuchsia/private:fuchsia_package_group.bzl",
-    _fuchsia_package_group = "fuchsia_package_group",
-)
-load(
     "//fuchsia/private:fuchsia_select.bzl",
     _fuchsia_select = "fuchsia_select",
     _if_fuchsia = "if_fuchsia",
 )
 load(
-    "//fuchsia/private:fuchsia_cpu_select.bzl",
-    _fuchsia_cpu_filter_dict = "fuchsia_cpu_filter_dict",
-    _fuchsia_cpu_select = "fuchsia_cpu_select",
-)
-load(
-    "//fuchsia/private:compilation_database.bzl",
-    _clangd_compilation_database = "clangd_compilation_database",
-)
-load(
-    "//fuchsia/constraints/platforms:supported_platforms.bzl",
-    _fuchsia_platforms = "fuchsia_platforms",
+    "//fuchsia/private:legacy_fuchsia_fidl_cc_library.bzl",
+    _fuchsia_fidl_hlcpp_library = "fuchsia_fidl_hlcpp_library",
+    _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",
 )
 
 # Workspace-dependent rules.

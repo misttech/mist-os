@@ -3,13 +3,13 @@
 # found in the LICENSE file.
 """Rule for creating an update package."""
 
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyConfigInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaUpdatePackageInfo",
 )
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 def _fuchsia_update_package_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]

@@ -2,14 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
-load("//fuchsia/private/workflows:providers.bzl", "FuchsiaProductBundleInfo")
-load("//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl", "fuchsia_task_fetch_product_bundle", "fuchsia_task_remove_product_bundle")
 load(
     "//fuchsia/private/workflows:fuchsia_package_repository_tasks.bzl",
     "fuchsia_task_repository_delete",
 )
+load("//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl", "fuchsia_task_fetch_product_bundle", "fuchsia_task_remove_product_bundle")
 load("//fuchsia/private/workflows:fuchsia_task_verbs.bzl", "make_help_executable", "verbs")
+
+# buildifier: disable=module-docstring
+load("//fuchsia/private/workflows:providers.bzl", "FuchsiaProductBundleInfo")
 
 def fuchsia_remote_product_bundle(
         name,

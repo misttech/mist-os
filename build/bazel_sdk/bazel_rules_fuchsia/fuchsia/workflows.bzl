@@ -7,18 +7,14 @@
 Documentation for all rules exported by this file is located at docs/workflows.md"""
 
 load(
-    "//fuchsia/private/workflows:fuchsia_task.bzl",
-    _fuchsia_task = "fuchsia_task",
-    _fuchsia_task_rule = "fuchsia_task_rule",
-)
-load(
-    "//fuchsia/private/workflows:fuchsia_workflow.bzl",
-    _fuchsia_workflow = "fuchsia_workflow",
-)
-load(
     "//fuchsia/private/workflows:fuchsia_shell_task.bzl",
     _fuchsia_shell_task = "fuchsia_shell_task",
     _shell_task_rule = "shell_task_rule",
+)
+load(
+    "//fuchsia/private/workflows:fuchsia_task.bzl",
+    _fuchsia_task = "fuchsia_task",
+    _fuchsia_task_rule = "fuchsia_task_rule",
 )
 load(
     "//fuchsia/private/workflows:fuchsia_task_ffx.bzl",
@@ -46,6 +42,11 @@ load("//fuchsia/private/workflows:fuchsia_task_verbs.bzl", _verbs = "verbs")
 #     "//fuchsia/private/workflows:fuchsia_task_run_component.bzl",
 #     _fuchsia_task_run_component = "fuchsia_task_run_component",
 # )
+
+load(
+    "//fuchsia/private/workflows:fuchsia_workflow.bzl",
+    _fuchsia_workflow = "fuchsia_workflow",
+)
 
 # Workflow build rules.
 fuchsia_task = _fuchsia_task

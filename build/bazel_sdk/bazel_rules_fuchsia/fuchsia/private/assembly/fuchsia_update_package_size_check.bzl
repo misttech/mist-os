@@ -4,8 +4,8 @@
 
 """Rule for running size checker on non-blobfs package."""
 
-load(":providers.bzl", "FuchsiaSizeCheckerInfo", "FuchsiaUpdatePackageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load(":providers.bzl", "FuchsiaSizeCheckerInfo", "FuchsiaUpdatePackageInfo")
 
 UPDATE_BUDGET_TEMPLATE = """{
     "package_set_budgets": [

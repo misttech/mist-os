@@ -4,8 +4,8 @@
 
 """Base task rule and utilities."""
 
-load(":workflow_entity.bzl", "workflow_entity_rule")
 load(":providers.bzl", "FuchsiaTaskEntityInfo", "FuchsiaWorkflowInfo")
+load(":workflow_entity.bzl", "workflow_entity_rule")
 
 def fuchsia_task_rule(*, implementation, **kwargs):
     """Starlark higher-order rule for creating task primitives."""
