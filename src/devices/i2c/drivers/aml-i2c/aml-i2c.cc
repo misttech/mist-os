@@ -93,19 +93,17 @@ zx_status_t AmlI2c::WaitTransferComplete() const {
   return ZX_OK;
 }
 
-zx_status_t AmlI2c::Write(cpp20::span<uint8_t> src, const bool stop) const {
+zx_status_t AmlI2c::Write(const uint8_t* buff, uint32_t len, const bool stop) const {
   TRACE_DURATION("i2c", "aml-i2c Write");
-  ZX_DEBUG_ASSERT(src.size() <= kMaxTransferSize);
+  ZX_DEBUG_ASSERT(len <= kMaxTransferSize);
 
   TokenList tokens = TokenList::Get().FromValue(0);
   tokens.Push(TokenList::Token::kStart);
   tokens.Push(TokenList::Token::kTargetAddrWr);
 
-  auto remaining = src.size();
-  auto offset = 0;
-  while (remaining > 0) {
-    const bool is_last_iter = remaining <= WriteData::kMaxWriteBytesPerTransfer;
-    const auto tx_size = is_last_iter ? remaining : WriteData::kMaxWriteBytesPerTransfer;
+  while (len > 0) {
+    const bool is_last_iter = len <= WriteData::kMaxWriteBytesPerTransfer;
+    const uint32_t tx_size = is_last_iter ? len : WriteData::kMaxWriteBytesPerTransfer;
     for (uint32_t i = 0; i < tx_size; i++) {
       tokens.Push(TokenList::Token::kData);
     }
@@ -118,7 +116,7 @@ zx_status_t AmlI2c::Write(cpp20::span<uint8_t> src, const bool stop) const {
 
     WriteData wdata = WriteData::Get().FromValue(0);
     for (uint32_t i = 0; i < tx_size; i++) {
-      wdata.Push(src[offset + i]);
+      wdata.Push(buff[i]);
     }
 
     wdata.WriteTo(&regs_iobuff_);
@@ -130,26 +128,24 @@ zx_status_t AmlI2c::Write(cpp20::span<uint8_t> src, const bool stop) const {
       return status;
     }
 
-    remaining -= tx_size;
-    offset += tx_size;
+    len -= tx_size;
+    buff += tx_size;
   }
 
   return ZX_OK;
 }
 
-zx_status_t AmlI2c::Read(cpp20::span<uint8_t> dst, const bool stop) const {
-  ZX_DEBUG_ASSERT(dst.size() <= kMaxTransferSize);
+zx_status_t AmlI2c::Read(uint8_t* buff, uint32_t len, const bool stop) const {
+  ZX_DEBUG_ASSERT(len <= kMaxTransferSize);
   TRACE_DURATION("i2c", "aml-i2c Read");
 
   TokenList tokens = TokenList::Get().FromValue(0);
   tokens.Push(TokenList::Token::kStart);
   tokens.Push(TokenList::Token::kTargetAddrRd);
 
-  size_t remaining = dst.size();
-  size_t offset = 0;
-  while (remaining > 0) {
-    const bool is_last_iter = remaining <= ReadData::kMaxReadBytesPerTransfer;
-    const size_t rx_size = is_last_iter ? remaining : ReadData::kMaxReadBytesPerTransfer;
+  while (len > 0) {
+    const bool is_last_iter = len <= ReadData::kMaxReadBytesPerTransfer;
+    const uint32_t rx_size = is_last_iter ? len : ReadData::kMaxReadBytesPerTransfer;
 
     for (uint32_t i = 0; i < (rx_size - 1); i++) {
       tokens.Push(TokenList::Token::kData);
@@ -179,12 +175,12 @@ zx_status_t AmlI2c::Read(cpp20::span<uint8_t> dst, const bool stop) const {
 
     rdata.ReadFrom(&regs_iobuff_);
 
-    for (size_t i = 0; i < rx_size; i++) {
-      dst[offset + i] = rdata.Pop();
+    for (uint32_t i = 0; i < rx_size; i++) {
+      buff[i] = rdata.Pop();
     }
 
-    remaining -= rx_size;
-    offset += rx_size;
+    len -= rx_size;
+    buff += rx_size;
   }
 
   return ZX_OK;
@@ -222,68 +218,36 @@ zx_status_t AmlI2c::SetClockDelay(const aml_i2c_delay_values& delay,
   return ZX_OK;
 }
 
-void AmlI2c::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
+zx_status_t AmlI2c::I2cImplGetMaxTransferSize(size_t* out_size) {
+  *out_size = kMaxTransferSize;
+  return ZX_OK;
 }
 
-fuchsia_hardware_i2cimpl::Service::InstanceHandler AmlI2c::GetI2cImplInstanceHandler(
-    fdf_dispatcher_t* dispatcher) {
-  return fuchsia_hardware_i2cimpl::Service::InstanceHandler(
-      {.device = i2cimpl_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure)});
-}
+zx_status_t AmlI2c::I2cImplSetBitrate(uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
 
-void AmlI2c::GetMaxTransferSize(fdf::Arena& arena, GetMaxTransferSizeCompleter::Sync& completer) {
-  completer.buffer(arena).ReplySuccess(kMaxTransferSize);
-}
-
-void AmlI2c::SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
-                        SetBitrateCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void AmlI2c::Transact(TransactRequestView request, fdf::Arena& arena,
-                      TransactCompleter::Sync& completer) {
+zx_status_t AmlI2c::I2cImplTransact(const i2c_impl_op_t* rws, size_t count) {
   TRACE_DURATION("i2c", "aml-i2c Transact");
-  for (const auto& op : request->op) {
-    if ((op.type.is_read_size() && op.type.read_size() > kMaxTransferSize) ||
-        (op.type.is_write_data() && op.type.write_data().count() > kMaxTransferSize)) {
-      completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
-      return;
+  for (size_t i = 0; i < count; ++i) {
+    if (rws[i].data_size > kMaxTransferSize) {
+      return ZX_ERR_OUT_OF_RANGE;
     }
   }
 
-  std::vector<fuchsia_hardware_i2cimpl::wire::ReadData> reads;
-  for (const auto& op : request->op) {
-    SetTargetAddr(op.address);
+  for (size_t i = 0; i < count; ++i) {
+    SetTargetAddr(rws[i].address);
 
     zx_status_t status;
-    if (op.type.is_read_size()) {
-      if (op.type.read_size() > 0) {
-        auto dst = fidl::VectorView<uint8_t>{arena, op.type.read_size()};
-        status = Read(dst.get(), op.stop);
-        reads.push_back({dst});
-      } else {
-        // Avoid allocating an empty vector because allocating 0 bytes causes an asan error.
-        status = Read({}, op.stop);
-        reads.push_back({});
-      }
+    if (rws[i].is_read) {
+      status = Read(rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size), rws[i].stop);
     } else {
-      status = Write(op.type.write_data().get(), op.stop);
+      status = Write(rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size), rws[i].stop);
     }
     if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
+      return status;
     }
   }
 
-  if (reads.empty()) {
-    // Avoid allocating an empty vector because allocating 0 bytes causes an asan error.
-    completer.buffer(arena).ReplySuccess({});
-  } else {
-    completer.buffer(arena).ReplySuccess({arena, reads});
-  }
+  return ZX_OK;
 }
 
 zx::result<std::unique_ptr<AmlI2c>> AmlI2c::Create(ddk::PDevFidl& pdev,

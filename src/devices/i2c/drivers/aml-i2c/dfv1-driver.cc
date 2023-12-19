@@ -52,44 +52,14 @@ zx_status_t Dfv1Driver::Bind(void* ctx, zx_device_t* parent) {
     return aml_i2c.status_value();
   }
 
-  auto dispatcher = fdf::Dispatcher::GetCurrent();
-  fdf::OutgoingDirectory outgoing;
-
-  auto handler = aml_i2c->GetI2cImplInstanceHandler(dispatcher->get());
-
-  zx::result result = outgoing.AddService<fuchsia_hardware_i2cimpl::Service>(
-      aml_i2c->GetI2cImplInstanceHandler(dispatcher->get()));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
-    return result.status_value();
-  }
-
-  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (outgoing_endpoints.is_error()) {
-    return outgoing_endpoints.status_value();
-  }
-
-  result = outgoing.Serve(std::move(outgoing_endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory");
-    return result.status_value();
-  }
-
-  auto driver =
-      std::make_unique<Dfv1Driver>(parent, std::move(aml_i2c.value()), std::move(outgoing));
+  auto driver = std::make_unique<Dfv1Driver>(parent, std::move(aml_i2c.value()));
 
   zx_device_prop_t props[] = {
-      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_I2C_IMPL},
-  };
-  std::array offers = {
-      fuchsia_hardware_i2cimpl::Service::Name,
+      {BIND_PROTOCOL, 0, ZX_PROTOCOL_I2C_IMPL},
   };
   zx_status_t status =
-      driver->DdkAdd(ddk::DeviceAddArgs("aml-i2c")
-                         .set_fidl_service_offers(offers)
-                         .set_props(props)
-                         .set_outgoing_dir(outgoing_endpoints->client.TakeChannel())
-                         .forward_metadata(parent, DEVICE_METADATA_I2C_CHANNELS));
+      driver->DdkAdd(ddk::DeviceAddArgs("aml-i2c").set_props(props).forward_metadata(
+          parent, DEVICE_METADATA_I2C_CHANNELS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "device_add failed");
     return status;
@@ -99,9 +69,8 @@ zx_status_t Dfv1Driver::Bind(void* ctx, zx_device_t* parent) {
   return status;
 }
 
-Dfv1Driver::Dfv1Driver(zx_device_t* parent, std::unique_ptr<AmlI2c> aml_i2c,
-                       fdf::OutgoingDirectory outgoing)
-    : DeviceType(parent), aml_i2c_(std::move(aml_i2c)), outgoing_(std::move(outgoing)) {
+Dfv1Driver::Dfv1Driver(zx_device_t* parent, std::unique_ptr<AmlI2c> aml_i2c)
+    : DeviceType(parent), aml_i2c_(std::move(aml_i2c)) {
   // Set role for IRQ thread.
   const char* kRoleName = "fuchsia.devices.i2c.drivers.aml-i2c.interrupt";
   zx_status_t status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(aml_i2c_->irqthrd()),
@@ -109,6 +78,17 @@ Dfv1Driver::Dfv1Driver(zx_device_t* parent, std::unique_ptr<AmlI2c> aml_i2c,
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
   }
+}
+
+zx_status_t Dfv1Driver::DdkGetProtocol(uint32_t proto_id, void* out) {
+  if (proto_id != ZX_PROTOCOL_I2C_IMPL) {
+    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+  }
+
+  i2c_impl_protocol_t* proto = static_cast<i2c_impl_protocol_t*>(out);
+  proto->ops = static_cast<const i2c_impl_protocol_ops_t*>(aml_i2c_->get_ops());
+  proto->ctx = aml_i2c_.get();
+  return ZX_OK;
 }
 
 }  // namespace aml_i2c
