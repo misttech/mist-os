@@ -25,7 +25,7 @@ curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?for
 cd fuchsia
 
 .jiri_root/bin/jiri import -name=integration flower https://fuchsia.googlesource.com/integration
-.jiri_root/bin/jiri update
+.jiri_root/bin/jiri update -fetch-packages-timeout=120 -hook-timeout=24
 
 echo "Done creating a Platform Source Tree at \"$(pwd)\"."
 echo "Recommended: export PATH=\"$(pwd)/.jiri_root/bin:\$PATH\""

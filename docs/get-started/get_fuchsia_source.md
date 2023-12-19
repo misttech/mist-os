@@ -98,6 +98,12 @@ To download the Fuchsia source, do the following:
     bootstrapping process, see [Authentication error](#authentication-error) for
     help.
 
+    If you have a slower internet connection and run into timeouts, you may wish
+    to download the bootstrap script directly and increase the values of
+    `-fetch-packages-timeout` and `-hook-timeout`. These timeouts are in
+    minutes, and indicate a 2 hour timeout for package downloads. (The
+    `-hook-timeout` value is multiplied by 5 when downloading CIPD packages.)
+
 ## 4. Set up environment variables {#set-up-environment-variables}
 
 Fuchsia recommends that you update your shell profile to include the following
