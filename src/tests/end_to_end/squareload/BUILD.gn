@@ -43,7 +43,4 @@ python_perf_test("power_squareload_test_fc") {
 
   params_source = "squareload_test_params.yaml"
   transport = "fuchsia-controller"
-
-  # Match the host test's infra timeout with the underlying hermetic test's.
-  timeout_secs = 600
 }
