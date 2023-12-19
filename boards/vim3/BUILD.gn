@@ -214,12 +214,6 @@ board_input_bundle("main_bundle") {
     },
     {
       package_target =
-          "//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-g12-tdm.cm" ]
-    },
-    {
-      package_target =
           "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-g12-composite.cm" ]
