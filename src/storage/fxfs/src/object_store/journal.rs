@@ -270,6 +270,12 @@ struct Inner {
     // The last offset we flushed to the journal file.
     flushed_offset: u64,
 
+    // The last offset that should be considered valid in the journal file.  Most of the time, this
+    // will be the same as `flushed_offset` but at mount time, this could be less and will only be
+    // up to the end of the last valid transaction; it won't include transactions that follow that
+    // have been discarded.
+    valid_to: u64,
+
     // If, after replaying, we have to discard a number of mutations (because they don't validate),
     // this offset specifies where we need to discard back to.  This is so that when we next replay,
     // we ignore those mutations and continue with new good mutations.
@@ -386,6 +392,7 @@ impl Journal {
                 compaction_running: false,
                 sync_waker: None,
                 flushed_offset: 0,
+                valid_to: 0,
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
             }),
@@ -729,6 +736,7 @@ impl Journal {
             inner.flushed_offset = writer_checkpoint.file_offset;
             inner.writer.seek(writer_checkpoint);
             inner.output_reset_version = true;
+            inner.valid_to = last_checkpoint.file_offset;
             if last_checkpoint.file_offset < inner.flushed_offset {
                 inner.discard_offset = Some(last_checkpoint.file_offset);
             }
@@ -1088,7 +1096,7 @@ impl Journal {
         let mut reader = JournalReader::new(handle, &checkpoint);
         // Record the current end offset and only read to there, so we don't accidentally read any
         // partially flushed blocks.
-        let end_offset = self.inner.lock().unwrap().flushed_offset;
+        let end_offset = self.inner.lock().unwrap().valid_to;
         self.read_transactions(&mut reader, Some(end_offset)).await.map(|mut r| {
             r.transactions.retain(|t| t.mutations.iter().any(|(oid, _)| *oid == object_id));
             r.transactions
@@ -1528,6 +1536,7 @@ impl Journal {
             waker.wake();
         }
         inner.flushed_offset = offset + len;
+        inner.valid_to = inner.flushed_offset;
         Ok(())
     }
 
