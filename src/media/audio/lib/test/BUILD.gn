@@ -55,6 +55,7 @@ source_set("test_fixture") {
   public_deps = [
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/testing/loop_fixture",
   ]
 }
