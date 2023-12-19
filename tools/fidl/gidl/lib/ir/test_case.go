@@ -70,18 +70,19 @@ type Benchmark struct {
 type Language string
 
 const (
-	LanguageCpp          Language = "cpp"
-	LanguageDart         Language = "dart"
-	LanguageDriverCpp    Language = "driver_cpp"
-	LanguageDriverLlcpp  Language = "driver_llcpp"
-	LanguageDynfidl      Language = "dynfidl"
-	LanguageFuzzerCorpus Language = "fuzzer_corpus"
-	LanguageGo           Language = "go"
-	LanguageHlcpp        Language = "hlcpp"
-	LanguageLlcpp        Language = "llcpp"
-	LanguageReference    Language = "reference"
-	LanguageRust         Language = "rust"
-	LanguageRustCodec    Language = "rust_codec"
+	LanguageCpp               Language = "cpp"
+	LanguageDart              Language = "dart"
+	LanguageDriverCpp         Language = "driver_cpp"
+	LanguageDriverLlcpp       Language = "driver_llcpp"
+	LanguageDynfidl           Language = "dynfidl"
+	LanguageFuchsiaController Language = "fuchsia_controller"
+	LanguageFuzzerCorpus      Language = "fuzzer_corpus"
+	LanguageGo                Language = "go"
+	LanguageHlcpp             Language = "hlcpp"
+	LanguageLlcpp             Language = "llcpp"
+	LanguageReference         Language = "reference"
+	LanguageRust              Language = "rust"
+	LanguageRustCodec         Language = "rust_codec"
 )
 
 func AllLanguages() []Language {
@@ -91,6 +92,7 @@ func AllLanguages() []Language {
 		LanguageDriverCpp,
 		LanguageDriverLlcpp,
 		LanguageDynfidl,
+		LanguageFuchsiaController,
 		LanguageFuzzerCorpus,
 		LanguageGo,
 		LanguageHlcpp,

@@ -29,6 +29,7 @@ from typing import (
 )
 
 from fidl_codec import add_ir_path
+from fidl_codec import encode_fidl_object
 from fuchsia_controller_py import Context
 
 from ._client import EventHandlerBase
@@ -521,22 +522,21 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
             continue
         member_name = member["name"]
         member_type_name = member_name + "_type"
-        member_type = dataclasses.make_dataclass(
-            member_type_name,
-            [
-                (
-                    "value",
-                    type_annotation(member["type"], root_ir, recurse_guard),
-                )
-            ],
-        )
-        setattr(member_type, "__doc__", docstring(member))
-        setattr(member_type, "__repr__", lambda self: self.value.__repr__())
+        member_constructor_name = member_name + "_variant"
+
+        @classmethod
+        def ctor(cls, value, member_name=member_name):
+            res = cls()
+            setattr(res, member_name, value)
+            return res
+
         setattr(
             base,
             member_type_name,
             type_annotation(member["type"], root_ir, recurse_guard),
         )
+        setattr(ctor, "__doc__", docstring(member))
+        setattr(base, member_constructor_name, ctor)
         setattr(base, member_name, None)
     return base
 
@@ -1102,6 +1102,14 @@ class FIDLLibraryModule(types.ModuleType):
         self.__all__.append(c.name)
 
     def export_type(self, t):
+        def encode_func(obj):
+            library = obj.__module__
+            library = library.removeprefix("fidl.")
+            library = library.replace("_", ".")
+            type_name = f"{library}/{type(obj).__name__}"
+            return encode_fidl_object(obj, library, type_name)
+
         setattr(t, "__module__", self.fullname)
+        setattr(t, "encode", encode_func)
         setattr(self, t.__name__, t)
         self.__all__.append(t.__name__)

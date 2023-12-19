@@ -21,6 +21,8 @@ namespace converter {
 //
 // If no attr was found, return Py_None. If found, it will return a PyObject
 // pointer as a new reference.
+//
+// Returns a NEW reference object.
 PyObject* GetAttr(PyObject* target, std::string_view attr) {
   auto name_obj =
       py::Object(PyUnicode_FromStringAndSize(attr.data(), static_cast<Py_ssize_t>(attr.size())));
@@ -43,9 +45,9 @@ bool ObjectConverter::HandleNone(const fidl_codec::Type* type) {
   if (obj_ != Py_None) {
     return false;
   }
-
   if (!type->Nullable()) {
-    PyErr_SetString(PyExc_TypeError, "Converting None to non-nullable FIDL value");
+    PyErr_Format(PyExc_TypeError, "Converting None to non-nullable FIDL value: %s",
+                 type->ToString().c_str());
   } else {
     result_ = std::make_unique<fidl_codec::NullValue>();
   }
@@ -63,23 +65,39 @@ void ObjectConverter::VisitStringType(const fidl_codec::StringType* type) {
 }
 
 void ObjectConverter::VisitInteger(bool is_signed) {
-  int overflow;
-  auto repr = PyLong_AsLongLongAndOverflow(obj_, &overflow);
-  if (overflow != 0 && repr == -1) {
+  if (obj_ == Py_None) {
+    PyErr_SetString(PyExc_TypeError, "Received NoneType object. Unable to convert to integer");
     return;
   }
-  if (repr == -1 && PyErr_Occurred()) {
-    return;
+  if (is_signed) {
+    int overflow;
+    auto repr = PyLong_AsLongLongAndOverflow(obj_, &overflow);
+    if (overflow != 0 && repr == -1) {
+      auto repr = py::Object(PyObject_Repr(obj_));
+      PyErr_Format(PyExc_OverflowError, "converting \"%s\" to an integer.",
+                   PyUnicode_AsUTF8AndSize(repr.get(), nullptr));
+      return;
+    }
+    if (repr == -1 && PyErr_Occurred()) {
+      return;
+    }
+    bool negate = is_signed && repr < 0;
+    if (negate) {
+      repr = -repr;
+    }
+    result_ = std::make_unique<fidl_codec::IntegerValue>(static_cast<uint64_t>(repr), negate);
+  } else {
+    auto repr = convert::PyLong_AsU64(obj_);
+    if (repr == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
+      return;
+    }
+    result_ = std::make_unique<fidl_codec::IntegerValue>(static_cast<uint64_t>(repr), false);
   }
-  bool negate = is_signed && repr < 0;
-  if (negate) {
-    repr = -repr;
-  }
-  result_ = std::make_unique<fidl_codec::IntegerValue>(static_cast<uint64_t>(repr), negate);
 }
 
 void ObjectConverter::VisitBoolType(const fidl_codec::BoolType* type) {
-  if (!PyBool_Check(obj_)) {
+  if (!PyObject_IsSubclass(reinterpret_cast<PyObject*>(&PyBool_Type),
+                           reinterpret_cast<PyObject*>(Py_TYPE(obj_)))) {
     PyErr_SetString(PyExc_TypeError, "expected bool type");
     return;
   }
@@ -153,14 +171,13 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
   if (HandleNone(type)) {
     return;
   }
-
   for (const auto& member : type->union_definition().members()) {
-    if (!member) {
+    if (!member || member->reserved()) {
       continue;
     }
     auto child_value = py::Object(GetAttr(obj_, member->name()));
     if (child_value == nullptr) {
-      continue;
+      return;
     }
     if (child_value == Py_None) {
       continue;
@@ -171,7 +188,8 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     }
     return;
   }
-  PyErr_SetString(PyExc_TypeError, "Unkown union variant.");
+  PyErr_Format(PyExc_TypeError, "Unknown union variant '%s': %s", type->Name().c_str(),
+               type->ToString().c_str());
 }
 
 void ObjectConverter::VisitType(const fidl_codec::Type* type) {

@@ -129,7 +129,7 @@ class PythonObject {
   /// Gets the type of this object.
   PythonTypeID GetTypeID() { return type_id_; }
 
-  virtual ~PythonObject() {}
+  virtual ~PythonObject() = default;
 
  private:
   PythonTypeID type_id_;
@@ -150,7 +150,7 @@ class PythonHandle : public PythonObject {
     return ret;
   }
 
-  ~PythonHandle() {
+  ~PythonHandle() override {
     if (handle_) {
       ffx_close_handle(handle_);
     }
@@ -413,6 +413,14 @@ T *DowncastPyObject(PyObject *object) {
   return internal_handle->handle->as<T>();
 }
 
+PyObject *handle_from_int(PyObject *self, PyObject *args) {
+  unsigned int handle = 0;
+  if (!PyArg_ParseTuple(args, "I", &handle)) {
+    return nullptr;
+  }
+  return MakePyObject<PythonHandle>(handle);
+}
+
 PyObject *handle_as_int(PyObject *self, PyObject *args) {
   PyObject *object;
   if (!PyArg_ParseTuple(args, "O", &object)) {
@@ -494,8 +502,6 @@ PyObject *context_connect_daemon_protocol(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   zx_handle_t handle;
@@ -514,8 +520,6 @@ PyObject *context_connect_target_proxy(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   zx_handle_t handle;
@@ -534,8 +538,6 @@ PyObject *context_connect_remote_control_proxy(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   zx_handle_t handle;
@@ -556,8 +558,6 @@ PyObject *context_connect_device_proxy(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   zx_handle_t handle;
@@ -578,7 +578,6 @@ PyObject *context_config_get_string(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   uint64_t buf_size = 4096;
@@ -617,8 +616,6 @@ PyObject *context_target_wait(PyObject *self, PyObject *args) {
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
     return nullptr;
   }
   zx_status_t status = ffx_target_wait(context->context(), seconds);
@@ -987,8 +984,6 @@ PyObject *isolate_dir_get_path(PyObject *self, PyObject *args) {
   }
   auto directory = DowncastPyObject<IsolateDir>(obj);
   if (!directory) {
-    // Invalid handle type
-    PyErr_SetString(PyExc_TypeError, "Invalid handle type");
     return nullptr;
   }
   return PyUnicode_FromString(directory->directory().c_str());
@@ -1012,6 +1007,7 @@ PyTypeObject *InternalHandleType = nullptr;
 
 PyMethodDef FuchsiaControllerMethods[] = {
     // v2 methods for handle
+    {"handle_from_int", reinterpret_cast<PyCFunction>(handle_from_int), METH_VARARGS, nullptr},
     {"handle_as_int", reinterpret_cast<PyCFunction>(handle_as_int), METH_VARARGS, nullptr},
     {"handle_take", reinterpret_cast<PyCFunction>(handle_take), METH_VARARGS, nullptr},
     {"handle_create", reinterpret_cast<PyCFunction>(handle_create), METH_VARARGS, nullptr},
@@ -1092,6 +1088,9 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   create_ffx_lib_context(&state->ctx, state->ERR_SCRATCH, mod::ERR_SCRATCH_LEN);
   if (PyModule_AddObject(m.get(), "ZxStatus", PyObjCast(zx_status_type)) < 0) {
     Py_DECREF(zx_status_type);
+    return nullptr;
+  }
+  if (PyModule_AddObject(m.get(), "InternalHandle", PyObjCast(InternalHandleType)) < 0) {
     return nullptr;
   }
   return m.take();

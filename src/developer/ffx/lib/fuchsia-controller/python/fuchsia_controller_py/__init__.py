@@ -11,6 +11,26 @@ import typing
 from fuchsia_controller_internal import ZxStatus
 
 
+class HandleTypeError(TypeError):
+    """Error for reporting an error with an unrecognized handle type."""
+
+    def __init__(self, handle):
+        super().__init__(
+            f"Handle '{handle}' of type '{type(handle).__name__}' not recognized as a handle type object"
+        )
+
+
+def _is_handle_type(obj):
+    """Determines if this is some kind of usable handle type."""
+
+    # This can probably be made simpler with some kind of inheritance scheme.
+    return (
+        isinstance(obj, Handle)
+        or isinstance(obj, Socket)
+        or isinstance(obj, Channel)
+    )
+
+
 def connect_handle_notifier() -> int:
     return fuchsia_controller_internal.connect_handle_notifier()
 
@@ -27,7 +47,14 @@ class Handle:
     """
 
     def __init__(self, handle):
-        self._handle = handle
+        if _is_handle_type(handle):
+            handle = handle.take()
+        if isinstance(handle, int):
+            self._handle = fuchsia_controller_internal.handle_from_int(handle)
+        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
+            self._handle = handle
+        else:
+            raise HandleTypeError(handle)
 
     def as_int(self) -> int:
         """Returns the underlying handle as an integer."""
@@ -64,12 +91,14 @@ class Socket:
     """
 
     def __init__(self, handle):
-        if isinstance(handle, Handle):
+        if _is_handle_type(handle):
             handle = handle.take()
         if isinstance(handle, int):
             self._handle = fuchsia_controller_internal.socket_from_int(handle)
-        else:
+        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
             self._handle = handle
+        else:
+            raise HandleTypeError(handle)
 
     def write(self, data) -> int:
         """Writes data to the socket.
@@ -257,12 +286,14 @@ class Channel:
     """
 
     def __init__(self, handle):
-        if isinstance(handle, Handle):
+        if _is_handle_type(handle):
             handle = handle.take()
         if isinstance(handle, int):
             self._handle = fuchsia_controller_internal.channel_from_int(handle)
-        else:
+        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
             self._handle = handle
+        else:
+            raise HandleTypeError(handle)
 
     def write(self, data) -> int:
         """Writes data to the channel.
@@ -333,12 +364,14 @@ class Event:
             self._handle = fuchsia_controller_internal.event_create()
             return
 
-        if isinstance(handle, Handle):
+        if _is_handle_type(handle):
             handle = handle.take()
         if isinstance(handle, int):
-            self._handle = fuchsia_controller_internal.event_from_int(handle)
-        else:
+            self._handle = fuchsia_controller_internal.channel_from_int(handle)
+        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
             self._handle = handle
+        else:
+            raise HandleTypeError(handle)
 
     def signal_peer(self, clear_mask: int, set_mask: int) -> None:
         """Attempts to signal a peer on the other side of this event."""
@@ -363,7 +396,7 @@ class Event:
         self._handle = None
 
     @classmethod
-    def create_pair(cls) -> tuple["Channel", "Channel"]:
+    def create(cls) -> tuple["Channel", "Channel"]:
         """Classmethod for creating a pair of events.
 
         The returned event objects are connected bidirectionally.

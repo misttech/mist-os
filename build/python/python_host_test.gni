@@ -57,6 +57,9 @@ import("//build/testing/host_test_data.gni")
 #    Type: string
 #    Default: unittest.main
 #
+#  test_data_deps (optional)
+#    The dependencies used only at runtime for this test.
+#
 #  deps
 #  environments
 #  visibility
@@ -69,6 +72,7 @@ template("python_host_test") {
                            [
                              "main_source",
                              "sources",
+                             "deps",
                            ])
 
     testonly = true
@@ -80,8 +84,11 @@ template("python_host_test") {
       main_callable = invoker.main_callable
     }
 
+    if (!defined(deps)) {
+      deps = []
+    }
     if (defined(invoker.libraries)) {
-      deps = invoker.libraries
+      deps += invoker.libraries
     }
   }
 
@@ -101,6 +108,12 @@ template("python_host_test") {
     deps = [ ":${_python_binary_target}" ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
+    }
+    if (!defined(data_deps)) {
+      data_deps = []
+    }
+    if (defined(invoker.test_data_deps)) {
+      data_deps += invoker.test_data_deps
     }
   }
 

@@ -6,6 +6,8 @@ import unittest
 
 from fuchsia_controller_py import Channel
 from fuchsia_controller_py import Event
+from fuchsia_controller_py import Handle
+from fuchsia_controller_py import Socket
 from fuchsia_controller_py import ZxStatus
 
 
@@ -23,7 +25,7 @@ class ChannelTests(unittest.TestCase):
                 raise e
 
     def test_eventpair_peer_closed(self):
-        e1, e2 = Event.create_pair()
+        e1, e2 = Event.create()
         del e2
         with self.assertRaises(ZxStatus):
             try:
@@ -32,6 +34,11 @@ class ChannelTests(unittest.TestCase):
             except ZxStatus as e:
                 self.assertEqual(e.args[0], ZxStatus.ZX_ERR_PEER_CLOSED)
                 raise e
+
+    def test_as_int(self):
+        self.assertEqual(Handle(1).as_int(), 1)
+        self.assertEqual(Channel(2).as_int(), 2)
+        self.assertEqual(Socket(3).as_int(), 3)
 
     def test_channel_write_then_read(self):
         (a, b) = Channel.create()

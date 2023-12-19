@@ -13,6 +13,7 @@ go_library("main") {
     "//tools/fidl/gidl/backend/driver_cpp",
     "//tools/fidl/gidl/backend/driver_llcpp",
     "//tools/fidl/gidl/backend/dynfidl",
+    "//tools/fidl/gidl/backend/fuchsia_controller",
     "//tools/fidl/gidl/backend/fuzzer_corpus",
     "//tools/fidl/gidl/backend/golang",
     "//tools/fidl/gidl/backend/hlcpp",

@@ -8,6 +8,8 @@ namespace encode {
 
 PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds);
 extern PyMethodDef encode_fidl_message_py_def;
+PyObject *encode_fidl_object(PyObject *self, PyObject *args, PyObject *kwds);
+extern PyMethodDef encode_fidl_object_py_def;
 
 }  // namespace encode
 

@@ -21,6 +21,7 @@ PyMethodDef FidlCodecMethods[] = {
     decode::decode_fidl_response_py_def,
     decode::decode_fidl_request_py_def,
     encode::encode_fidl_message_py_def,
+    encode::encode_fidl_object_py_def,
     ir::add_ir_path_py_def,
     ir::add_ir_paths_py_def,
     ir::get_ir_path_py_def,

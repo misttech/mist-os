@@ -27,6 +27,8 @@ class Encoder : public Visitor {
                               uint8_t dynamic_flags, uint8_t magic, const Value* object,
                               const Type* type);
 
+  static Result EncodeObject(const Value* object, const Type* type);
+
   // Write a literal value into our buffer.
   template <typename T>
   void WriteValue(T value) {

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_CONVERT_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_CONVERT_H_
+#include <inttypes.h>
 #include <zircon/types.h>
 
 #include <sstream>
@@ -18,9 +19,7 @@ static_assert(sizeof(unsigned long long) == sizeof(uint64_t));  // NOLINT
 inline uint32_t PyLong_AsU32(PyObject *py_long) {
   auto res = PyLong_AsUnsignedLongLong(py_long);
   if (res > static_cast<uint64_t>(MINUS_ONE_U32)) {
-    std::stringstream ss;
-    ss << "Value " << res << " too large for u32";
-    PyErr_SetString(PyExc_OverflowError, ss.str().c_str());
+    PyErr_Format(PyExc_OverflowError, "Value %" PRIu64 " too large for u32", res);
     return MINUS_ONE_U32;
   }
   return static_cast<uint32_t>(res);

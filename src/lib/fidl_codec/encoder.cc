@@ -20,7 +20,16 @@ class NullVisitor : public TypeVisitor {
 
  private:
   void VisitType(const Type* type) override {
-    FX_LOGS_OR_CAPTURE(FATAL) << "Type " << type->Name() << " can't be null.";
+    FX_LOGS_OR_CAPTURE(FATAL) << "Type '" << type->Name() << "' can't be null. "
+                              << (type->Nullable()
+                                      ? " This type IS nullable, however. There may be a "
+                                        "missing encoder implementation."
+                                      : "");
+  }
+
+  void VisitHandleType(const HandleType* type) override {
+    FX_DCHECK(type->Nullable());
+    encoder_->WriteValue<uint32_t>(0);
   }
 
   void VisitStringType(const StringType* type) override {
@@ -31,9 +40,9 @@ class NullVisitor : public TypeVisitor {
 
   void VisitUnionType(const UnionType* type) override {
     FX_DCHECK(type->Nullable());
+    // Ordinal.
     encoder_->WriteValue<uint64_t>(0);
-    encoder_->WriteValue<uint32_t>(0);
-    encoder_->WriteValue<uint32_t>(0);
+    // Envelope.
     encoder_->WriteValue<uint64_t>(0);
   }
 
@@ -67,6 +76,14 @@ Encoder::Result Encoder::EncodeMessage(uint32_t tx_id, uint64_t ordinal,
   FX_DCHECK(sizeof(fidl_message_header_t) == encoder.current_offset_);
   object->Visit(&encoder, type);
 
+  return Result{std::move(encoder.bytes_), std::move(encoder.handles_)};
+}
+
+Encoder::Result Encoder::EncodeObject(const Value* object, const Type* type) {
+  Encoder encoder(WireVersion::kWireV2);
+  size_t object_size = type->InlineSize(encoder.version());
+  encoder.AllocateObject(object_size);
+  object->Visit(&encoder, type);
   return Result{std::move(encoder.bytes_), std::move(encoder.handles_)};
 }
 
@@ -213,16 +230,14 @@ void Encoder::VisitTableValue(const TableValue* node, const Type* for_type) {
   WriteValue<uint64_t>(node->highest_member());
   WriteValue<uint64_t>(UINTPTR_MAX);
 
-  size_t kEnvelopeSize = sizeof(uint32_t) + 2 * sizeof(uint16_t);
+  size_t kEnvelopeSize = sizeof(uint64_t);
   size_t offset = AllocateObject(node->highest_member() * kEnvelopeSize);
-
   for (Ordinal32 i = 1; i <= node->highest_member(); ++i) {
     current_offset_ = offset;
     auto it = node->members().find(node->table_definition().members()[i].get());
     if ((it == node->members().end()) || it->second->IsNull()) {
-      WriteValue<uint32_t>(0);
-      WriteValue<uint16_t>(0);
-      WriteValue<uint16_t>(0);
+      // Empty envelope.
+      WriteValue<uint64_t>(0);
     } else {
       EncodeEnvelope(it->second.get(), it->first->type());
     }

@@ -1,0 +1,36 @@
+{{/*
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+*/}}
+
+import fuchsia_controller_py
+import fidl.test_conformance as test_conformance
+import unittest
+
+def create_handle(cls):
+    """Generalized handle-maker (for sockets, events, channel, etc."""
+    res = cls.create()
+    if isinstance(res, tuple):
+        return res[0]
+    return res
+
+class ConformanceTests(unittest.TestCase):
+{{ range .EncodeSuccessCases }}
+    def test_{{ .Name }}_encode(self):
+        {{- if .HandleDefs }}
+
+        handle_defs = {{ .HandleDefs }}
+        {{- end }}
+        value = {{ .Value }}
+        bytes, hdls = value.encode()
+        self.assertEqual(bytes, {{ .Bytes }})
+        {{- if .HandleDefs }}
+        for i, hdl in enumerate(handle_defs):
+            # Element 1 is the handle (these return dispositions).
+            self.assertEqual(hdls[i][1], hdl)
+        {{- end }}
+{{ end }}
+
+if __name__ == "__main__":
+   unittest.main()
