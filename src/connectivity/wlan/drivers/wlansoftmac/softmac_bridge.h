@@ -18,13 +18,14 @@
 namespace wlan::drivers::wlansoftmac {
 
 using StartStaCompleter = fit::callback<void(zx_status_t status)>;
+using StopStaCompleter = fit::callback<void()>;
 
 class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
   static zx::result<std::unique_ptr<SoftmacBridge>> New(
       std::unique_ptr<fit::callback<void(zx_status_t status)>> completer, DeviceInterface* device,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
-  zx_status_t StopSta();
+  zx_status_t StopSta(std::unique_ptr<StopStaCompleter> completer);
   ~SoftmacBridge() override;
 
   void Query(QueryCompleter::Sync& completer) final;

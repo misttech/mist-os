@@ -29,7 +29,10 @@ mod probe_sequence;
 use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    device::{completers::StartStaCompleter, DeviceOps},
+    device::{
+        completers::{StartStaCompleter, StopStaCompleter},
+        DeviceOps,
+    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_zircon as zx,
     futures::{channel::mpsc, select, StreamExt},
@@ -154,7 +157,7 @@ pub struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
 // TODO(fxbug.dev/29063): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
-    Stop,
+    Stop(StopStaCompleter),
     // TODO(fxbug.dev/43456): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
     MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo },
@@ -260,7 +263,10 @@ async fn main_loop_impl<T: MlmeImpl>(
             driver_event = driver_event_stream.next() => match driver_event {
                 Some(event) => match event {
                     // DriverEvent::Stop indicates a safe shutdown.
-                    DriverEvent::Stop => return Ok(()),
+                    DriverEvent::Stop(stop_sta_completer) => {
+                        stop_sta_completer.complete();
+                        return Ok(())
+                    },
                     DriverEvent::MacFrameRx { bytes, rx_info } => {
                         mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info);
                     }
@@ -444,6 +450,7 @@ mod tests {
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
         let (startup_sender, mut startup_receiver) = oneshot::channel::<Result<(), zx::Status>>();
+        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
             StartStaCompleter::new(move |status: Result<(), zx::Status>| {
                 startup_sender.send(status).expect("Failed to signal startup completion.")
@@ -457,8 +464,13 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Pending);
         assert_eq!(exec.run_until_stalled(&mut startup_receiver), Poll::Ready(Ok(Ok(()))));
 
-        device_sink.unbounded_send(DriverEvent::Stop).expect("Failed to send stop event");
+        device_sink
+            .unbounded_send(DriverEvent::Stop(StopStaCompleter::new(Box::new(move || {
+                shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+            }))))
+            .expect("Failed to send stop event");
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(()));
+        assert_eq!(exec.run_until_stalled(&mut shutdown_receiver), Poll::Ready(Ok(())));
         assert!(device_sink.is_closed());
     }
 }

@@ -11,7 +11,10 @@ use {
     std::ffi::c_void,
     wlan_mlme::{
         buffer::BufferProvider,
-        device::{completers::StartStaCompleter, DeviceInterface},
+        device::{
+            completers::{StartStaCompleter, StopStaCompleter},
+            DeviceInterface,
+        },
     },
     wlan_span::CSpan,
     wlansoftmac_rust::{start_wlansoftmac, WlanSoftmacHandle},
@@ -40,8 +43,16 @@ pub extern "C" fn start_sta(
 }
 
 #[no_mangle]
-pub extern "C" fn stop_sta(softmac: &mut WlanSoftmacHandle) {
-    softmac.stop();
+pub extern "C" fn stop_sta(
+    completer: *mut c_void,
+    run_completer: extern "C" fn(completer: *mut c_void),
+    softmac: &mut WlanSoftmacHandle,
+) {
+    // Safety: Cast *mut c_void to usize so that the constructed lambda will be Send. This is safe
+    // since we don't expect to move StopStaCompleter to a thread in a different address space,
+    // i.e., the value of the pointer will still be valid in the thread.
+    let completer = completer as usize;
+    softmac.stop(StopStaCompleter::new(Box::new(move || run_completer(completer as *mut c_void))));
 }
 
 /// FFI interface: Stop and delete a WlanSoftmac via the WlanSoftmacHandle.

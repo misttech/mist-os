@@ -132,7 +132,8 @@ extern "C" wlansoftmac_handle_t *start_sta(
     rust_device_interface_t device, wlansoftmac_buffer_provider_ops_t buf_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 
-extern "C" void stop_sta(wlansoftmac_handle_t *softmac);
+extern "C" void stop_sta(void *completer, void (*run_completer)(void *completer),
+                         wlansoftmac_handle_t *softmac);
 
 /**
  * FFI interface: Stop and delete a WlanSoftmac via the WlanSoftmacHandle.

@@ -8,14 +8,18 @@ use {
     fuchsia_inspect::{self, Inspector},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_zircon as zx,
-    futures::{channel::mpsc, Future, StreamExt},
+    futures::{
+        channel::{mpsc, oneshot},
+        Future, StreamExt,
+    },
     std::pin::Pin,
     tracing::{error, info},
     wlan_mlme::{
         buffer::BufferProvider,
         device::{
-            self, completers::StartStaCompleter, Device, DeviceInterface, DeviceOps,
-            WlanSoftmacIfcProtocol,
+            self,
+            completers::{StartStaCompleter, StopStaCompleter},
+            Device, DeviceInterface, DeviceOps, WlanSoftmacIfcProtocol,
         },
     },
     wlan_sme::{self, serve::create_sme},
@@ -35,21 +39,48 @@ impl std::fmt::Debug for WlanSoftmacHandle {
 pub type DriverEvent = wlan_mlme::DriverEvent;
 
 impl WlanSoftmacHandle {
-    pub fn stop(&mut self) {
-        if let Err(e) = self.driver_event_sink.unbounded_send(DriverEvent::Stop) {
+    pub fn stop(&mut self, stop_sta_completer: StopStaCompleter) {
+        if let Err(e) = self.driver_event_sink.unbounded_send(DriverEvent::Stop(stop_sta_completer))
+        {
             error!("Failed to signal WlanSoftmac main loop thread to stop: {}", e);
-        }
-        if let Some(join_handle) = self.join_handle.take() {
-            if let Err(e) = join_handle.join() {
-                error!("WlanSoftmac main loop thread panicked: {:?}", e);
+            if let DriverEvent::Stop(stop_sta_completer) = e.into_inner() {
+                stop_sta_completer.complete();
+            } else {
+                unreachable!();
             }
         }
+        self.driver_event_sink.disconnect();
     }
 
     pub fn delete(mut self) {
-        if self.join_handle.is_some() {
+        let join_handle = if let Some(join_handle) = self.join_handle.take() {
+            join_handle
+        } else {
+            error!("WlanSoftmac main loop thread already shutdown.");
+            return;
+        };
+
+        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
+        let mut shutdown_sender = Some(shutdown_sender);
+        if !self.driver_event_sink.is_closed() {
+            let shutdown_sender = shutdown_sender.take().unwrap();
             error!("Called delete on WlanSoftmacHandle without first calling stop");
-            self.stop();
+            self.stop(StopStaCompleter::new(Box::new(move || {
+                shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+            })));
+        }
+
+        if let Err(e) = join_handle.join() {
+            error!("Couldn't join WlanSoftmac main loop thread: {:?}", e);
+        }
+
+        if let None = shutdown_sender {
+            match shutdown_receiver.try_recv() {
+                Ok(None) | Err(oneshot::Canceled) => {
+                    error!("WlanSoftmac main loop thread did not send shutdown signal.")
+                }
+                Ok(Some(())) => (),
+            }
         }
     }
 
@@ -396,7 +427,11 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut handle, _generic_sme_proxy) =
             run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
-        handle.stop();
+        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
+        handle.stop(StopStaCompleter::new(Box::new(move || {
+            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+        })));
+        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
         handle.delete();
     }
 
@@ -417,7 +452,13 @@ mod tests {
         handle
             .queue_eth_frame_tx(vec![0u8; 10])
             .expect("Should be able to queue tx before stopping wlansoftmac");
-        handle.stop();
+
+        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
+        handle.stop(StopStaCompleter::new(Box::new(move || {
+            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+        })));
+        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
+
         handle
             .queue_eth_frame_tx(vec![0u8; 10])
             .expect_err("Shouldn't be able to queue tx after stopping wlansoftmac");
@@ -438,7 +479,12 @@ mod tests {
         exec.run_singlethreaded(generic_sme_proxy.get_client_sme(client_server))
             .expect("Generic SME proxy failed")
             .expect("Client SME request failed");
-        handle.stop();
+        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
+        handle.stop(StopStaCompleter::new(Box::new(move || {
+            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+        })));
+        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
+        handle.delete();
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());

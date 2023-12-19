@@ -86,12 +86,27 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   return fit::success(std::move(softmac_bridge));
 }
 
-zx_status_t SoftmacBridge::StopSta() {
+zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) {
   if (rust_handle_ == nullptr) {
     lerror("Failed to call stop_sta()! Encountered NULL rust_handle_");
     return ZX_ERR_BAD_STATE;
   }
-  stop_sta(rust_handle_);
+  stop_sta(
+      completer.release(),
+      [](void* ctx) {
+        auto completer = static_cast<StopStaCompleter*>(ctx);
+        if (completer == nullptr) {
+          lerror("Received NULL StopStaCompleter pointer!");
+          return;
+        }
+        // Skip the check for whether completer has already been
+        // called.  This is the only location where completer is
+        // called, and its deallocated immediately after. Thus, such a
+        // check would be a use-after-free violation.
+        (*completer)();
+        delete completer;
+      },
+      rust_handle_);
   return ZX_OK;
 }
 

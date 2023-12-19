@@ -17,10 +17,7 @@ use {
 };
 
 pub mod completers {
-    use {
-        fuchsia_zircon as zx,
-        tracing::{error, warn},
-    };
+    use {fuchsia_zircon as zx, tracing::error};
 
     pub struct StartStaCompleter<F>
     where
@@ -55,9 +52,48 @@ pub mod completers {
     {
         fn drop(&mut self) {
             if let Some(completer) = self.completer.take() {
-                error!("About to drop start_sta() completer without calling it!");
-                warn!("Calling start_sta() completer from drop() to mitigate potential deadlock.");
+                error!(
+                    "About to drop start_sta() completer without calling it!\n\
+                     Calling start_sta() completer from drop() to mitigate potential deadlock."
+                );
                 completer(Err(zx::Status::BAD_STATE))
+            }
+        }
+    }
+
+    pub struct StopStaCompleter {
+        // TODO(42075638): Using dynamic dispatch since otherwise we would need to plumb generics
+        // everywhere MLME uses a DriverEventSink. Since we will remove DriverEventSink soon, this
+        // is not worthwhile.
+        completer: Option<Box<dyn FnOnce() + Send>>,
+    }
+
+    impl StopStaCompleter {
+        pub fn new(completer: Box<dyn FnOnce() + Send>) -> Self {
+            Self { completer: Some(completer) }
+        }
+
+        /// Safety: Must only be called if calling |completer| is thread-safe.
+        pub fn complete(mut self) {
+            let completer = match self.completer.take() {
+                None => {
+                    error!("Failed to call completer because it is None.");
+                    return;
+                }
+                Some(completer) => completer,
+            };
+            completer()
+        }
+    }
+
+    impl Drop for StopStaCompleter {
+        fn drop(&mut self) {
+            if let Some(completer) = self.completer.take() {
+                error!(
+                    "About to drop stop_sta() completer without calling it!\n\
+                     Calling stop_sta() completer from drop() to mitigate potential deadlock."
+                );
+                completer()
             }
         }
     }
@@ -98,6 +134,26 @@ pub mod completers {
                 });
             drop(start_sta_completer);
             assert_eq!(Ok(Some(Err(zx::Status::BAD_STATE))), receiver.try_recv());
+        }
+
+        #[test]
+        fn stop_sta_completer_sends_value() {
+            let (sender, mut receiver) = oneshot::channel();
+            let stop_sta_completer = StopStaCompleter::new(Box::new(move || {
+                sender.send(()).expect("Failed to send.");
+            }));
+            stop_sta_completer.complete();
+            assert_eq!(Ok(Some(())), receiver.try_recv());
+        }
+
+        #[test]
+        fn stop_sta_completer_sends_value_on_drop() {
+            let (sender, mut receiver) = oneshot::channel();
+            let stop_sta_completer = StopStaCompleter::new(Box::new(move || {
+                sender.send(()).expect("Failed to send.");
+            }));
+            drop(stop_sta_completer);
+            assert_eq!(Ok(Some(())), receiver.try_recv());
         }
     }
 }

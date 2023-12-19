@@ -15,6 +15,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
@@ -55,11 +56,14 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   // Create a dispatcher for Wlansoftmac device as a FIDL client.
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
-      [&](fdf_dispatcher_t*) {
+      [&](fdf_dispatcher_t* client_dispatcher) {
         async::PostTask(main_driver_dispatcher_->async_dispatcher(), [&]() {
           softmac_ifc_server_binding_.reset();
           device_unbind_reply(child_device_);
         });
+        // Explicitly call destroy since Unbind() calls releases this dispatcher before
+        // calling ShutdownAsync().
+        fdf_dispatcher_destroy(client_dispatcher);
       });
 
   if (dispatcher.is_error()) {
@@ -154,8 +158,14 @@ void SoftmacBinding::Init() {
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
-  softmac_bridge_->StopSta();
-  client_dispatcher_.ShutdownAsync();
+  auto completer =
+      std::make_unique<StopStaCompleter>([dispatcher = main_driver_dispatcher_->async_dispatcher(),
+                                          client_dispatcher = client_dispatcher_.release()] {
+        async::PostTask(dispatcher, [client_dispatcher]() {
+          fdf_dispatcher_shutdown_async(client_dispatcher);
+        });
+      });
+  softmac_bridge_->StopSta(std::move(completer));
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.
