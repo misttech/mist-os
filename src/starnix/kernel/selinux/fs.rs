@@ -66,12 +66,7 @@ impl SeLinuxFs {
         };
 
         // Read-only files & directories, exposing SELinux internal state.
-        dir.entry(
-            current_task,
-            b"checkreqprot",
-            BytesFile::new_node(SeCheckReqProt),
-            mode!(IFREG, 0o644),
-        );
+        dir.entry(current_task, b"checkreqprot", SeCheckReqProt::new_node(), mode!(IFREG, 0o644));
         dir.entry(current_task, b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
         dir.entry(
             current_task,
@@ -92,7 +87,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             b"policy",
-            BytesFile::new_node(SePolicy { security_server: security_server.clone() }),
+            SePolicy::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
         dir.entry(
@@ -122,7 +117,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             b"load",
-            BytesFile::new_node(SeLoad { security_server: security_server.clone() }),
+            SeLoad::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
 
@@ -130,7 +125,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             b"enforce",
-            BytesFile::new_node(SeEnforce { enforce: Mutex::new(false) }),
+            SeEnforce::new_node(),
             // TODO(b/297313229): Get mode from the container.
             mode!(IFREG, 0o644),
         );
@@ -166,6 +161,12 @@ struct SeLoad {
     security_server: Arc<SecurityServer>,
 }
 
+impl SeLoad {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         not_implemented!("ignoring selinux policy");
@@ -177,6 +178,12 @@ struct SePolicy {
     security_server: Arc<SecurityServer>,
 }
 
+impl SePolicy {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
 impl BytesFileOps for SePolicy {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(self.security_server.get_binary_policy().into())
@@ -185,6 +192,12 @@ impl BytesFileOps for SePolicy {
 
 struct SeEnforce {
     enforce: Mutex<bool>,
+}
+
+impl SeEnforce {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self { enforce: Mutex::new(false) })
+    }
 }
 
 impl BytesFileOps for SeEnforce {
@@ -227,6 +240,13 @@ impl BytesFileOps for SeCreate {
 }
 
 struct SeCheckReqProt;
+
+impl SeCheckReqProt {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)?;
