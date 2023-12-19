@@ -1452,6 +1452,9 @@ impl Allocator {
             } else {
                 inner.info.marked_for_deletion.insert(owner_object_id);
             }
+            // After the journal is fulled replayed, anything marked_for_deletion should stop being
+            // tracked in memory so that it will not show up in the next write of AllocatorInfo.
+            inner.owner_bytes.remove(&owner_object_id);
         }
     }
 
@@ -1549,15 +1552,11 @@ impl JournalingObject for Allocator {
         match mutation {
             Mutation::Allocator(AllocatorMutation::MarkForDeletion(owner_object_id)) => {
                 let mut inner = self.inner.lock().unwrap();
-                let mut old_allocated_bytes: Option<i64> = None;
-                if let Some(entry) = inner.owner_bytes.get_mut(&owner_object_id) {
-                    // If live, we haven't serialized this yet so we track the commitment in RAM.
-                    // If we're replaying the journal, we know this is already on storage and
-                    // MUST happen so we can update the StoreInfo (to be written at next allocator
-                    // flush time).
-                    old_allocated_bytes = Some(entry.allocated_bytes);
-                    entry.allocated_bytes = 0;
-                }
+                // If live, we haven't serialized this yet so we track the commitment in RAM.
+                // If we're replaying the journal, we know this is already on storage and
+                // MUST happen so this will be cleared out of AllocatorInfo at next allocator flush.
+                let old_allocated_bytes =
+                    inner.owner_bytes.remove(&owner_object_id).map(|v| v.allocated_bytes);
                 if let Some(old_bytes) = old_allocated_bytes {
                     inner.committed_marked_for_deletion.insert(
                         owner_object_id,
@@ -2327,7 +2326,7 @@ mod tests {
         // The flush above seems to trigger an allocation for the allocator itself.
         // We will just check that we have the right size for the owner we care about.
 
-        assert_eq!(*allocator.get_owner_allocated_bytes().get(&STORE_OBJECT_ID).unwrap() as u64, 0);
+        assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
         assert_eq!(*allocator.get_owner_allocated_bytes().get(&100).unwrap() as u64, target_bytes,);
     }
 
@@ -2486,6 +2485,41 @@ mod tests {
                 .expect("allocate failed"),
             allocated_range
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_cleanup_removed_owner() {
+        const STORE_OBJECT_ID: u64 = 99;
+        let device = {
+            let (fs, allocator) = test_fs().await;
+
+            assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
+            {
+                let mut transaction =
+                    fs.clone().new_transaction(lock_keys![], Options::default()).await.unwrap();
+                allocator
+                    .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                    .await
+                    .expect("Allocating");
+                transaction.commit().await.expect("Committing.");
+            }
+            allocator.flush().await.expect("Flushing");
+            assert!(allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
+            {
+                let mut transaction =
+                    fs.clone().new_transaction(lock_keys![], Options::default()).await.unwrap();
+                allocator.mark_for_deletion(&mut transaction, STORE_OBJECT_ID).await;
+                transaction.commit().await.expect("Committing.");
+            }
+            assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
+            fs.close().await.expect("Closing");
+            fs.take_device().await
+        };
+
+        device.reopen(false);
+        let fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+        let allocator = fs.allocator();
+        assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
     }
 
     #[fuchsia::test]
