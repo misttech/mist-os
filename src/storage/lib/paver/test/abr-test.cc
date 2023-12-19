@@ -28,6 +28,7 @@
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
+#include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
 
 namespace {
@@ -74,6 +75,19 @@ TEST(LuisAbrTests, CreateFails) {
 
   ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(devmgr.devfs_root().duplicate(),
                                                      devmgr.fshost_svc_dir(), nullptr));
+}
+
+TEST(VioletAbrTests, CreateFails) {
+  IsolatedDevmgr devmgr;
+  IsolatedDevmgr::Args args;
+  args.disable_block_watcher = false;
+  args.board_name = "astro";
+
+  ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
+  ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
+
+  ASSERT_NOT_OK(paver::VioletAbrClientFactory().Create(devmgr.devfs_root().duplicate(),
+                                                       devmgr.fshost_svc_dir(), nullptr));
 }
 
 TEST(X64AbrTests, CreateFails) {

@@ -58,6 +58,7 @@
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
 
 namespace paver {
@@ -1783,6 +1784,116 @@ TEST_F(NelsonPartitionerTests, ReadBootloaderBSucceed) {
   ASSERT_NO_FATAL_FAILURE(TestBootloaderRead(spec, 0x03, kTplImageValue, &status, read_buf.data()));
   ASSERT_OK(status);
   ASSERT_NO_FATAL_FAILURE(ValidateBootloaderRead(read_buf.data(), kBL2ImageValue, kTplImageValue));
+}
+
+class VioletPartitionerTests : public GptDevicePartitionerTests {
+ protected:
+  static constexpr size_t kVioletBlockSize = 512;
+
+  VioletPartitionerTests() : GptDevicePartitionerTests("violet", kVioletBlockSize) {}
+
+  // Create a DevicePartition for a device.
+  zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
+    fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
+    zx::result controller = ControllerFromBlock(gpt);
+    if (controller.is_error()) {
+      return controller.take_error();
+    }
+    return paver::VioletPartitioner::Initialize(devmgr_.devfs_root().duplicate(), svc_root,
+                                                std::move(controller.value()));
+  }
+};
+
+TEST_F(VioletPartitionerTests, InitializeWithoutGptFails) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(&gpt_dev));
+
+  ASSERT_NOT_OK(CreatePartitioner({}));
+}
+
+TEST_F(VioletPartitionerTests, InitializeWithoutFvmSucceeds) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(32 * kGibibyte, &gpt_dev));
+
+  {
+    // Pause the block watcher while we write partitions to the disk.
+    // This is to avoid the block watcher seeing an intermediate state of the partition table
+    // and incorrectly treating it as an MBR.
+    // The watcher is automatically resumed when this goes out of scope.
+    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
+    ASSERT_OK(pauser);
+
+    // Set up a valid GPT.
+    std::unique_ptr<gpt::GptDevice> gpt;
+    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
+
+    ASSERT_OK(CreatePartitioner({}));
+  }
+}
+
+TEST_F(VioletPartitionerTests, AddPartitionNotSupported) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kMebibyte, &gpt_dev));
+
+  zx::result status = CreatePartitioner(gpt_dev.get());
+  ASSERT_OK(status);
+
+  ASSERT_STATUS(status->AddPartition(PartitionSpec(paver::Partition::kZirconB)),
+                ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(VioletPartitionerTests, FindPartition) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  // kBlockCount should be a value large enough to accommodate all partitions and blocks reserved
+  // by GPT. The current value is copied from the case of sherlock. The actual size of fvm
+  // partition on Violet is yet to be finalized.
+  constexpr uint64_t kBlockCount = 0x748034;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(kBlockCount * block_size_, &gpt_dev));
+
+  // The initial GPT partitions are randomly chosen and does not necessarily reflect the
+  // actual GPT partition layout in product.
+  const std::vector<PartitionDescription> kVioletStartingPartitions = {
+      {GUID_ABR_META_NAME, kAbrMetaType, 0x10400, 0x10000},
+      {"boot", kDummyType, 0x30400, 0x20000},
+      {"boot_a", kZirconAType, 0x50400, 0x10000},
+      {"boot_b", kZirconBType, 0x60400, 0x10000},
+      {"system_a", kDummyType, 0x70400, 0x10000},
+      {"system_b", kDummyType, 0x80400, 0x10000},
+      {GPT_VBMETA_A_NAME, kVbMetaAType, 0x90400, 0x10000},
+      {GPT_VBMETA_B_NAME, kVbMetaBType, 0xa0400, 0x10000},
+      {"reserved_a", kDummyType, 0xc0400, 0x10000},
+      {"reserved_b", kDummyType, 0xd0400, 0x10000},
+      {"reserved_c", kVbMetaRType, 0xe0400, 0x10000},
+      {"cache", kZirconRType, 0xf0400, 0x10000},
+      {"data", kFvmType, 0x100400, 0x10000},
+
+  };
+  ASSERT_NO_FATAL_FAILURE(
+      InitializeStartingGPTPartitions(gpt_dev.get(), kVioletStartingPartitions));
+
+  zx::result status = CreatePartitioner(gpt_dev.get());
+  ASSERT_OK(status);
+  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
+
+  // Make sure we can find the ZirconA partition.
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
+}
+
+TEST_F(VioletPartitionerTests, SupportsPartition) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kMebibyte, &gpt_dev));
+
+  zx::result status = CreatePartitioner(gpt_dev.get());
+  ASSERT_OK(status);
+  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
+
+  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
+  // Unsupported partition type.
+  EXPECT_FALSE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kUnknown)));
+
+  // Unsupported content type.
+  EXPECT_FALSE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kAbrMeta, "foo_type")));
 }
 
 }  // namespace

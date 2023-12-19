@@ -11,6 +11,7 @@
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
 
 int main(int argc, char** argv) {
@@ -19,6 +20,7 @@ int main(int argc, char** argv) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
 
   // X64PartitionerFactory must be placed last if test will be run on x64 devices.
   // This is because X64PartitionerFactory determines whether itself is suitable to be used for the
@@ -33,6 +35,7 @@ int main(int argc, char** argv) {
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
 
   // Same as X64PartitionerFactory, needs to place last.
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
