@@ -89,7 +89,10 @@ source_set("previous_boot_file") {
     "previous_boot_file.h",
   ]
 
-  deps = [ "//src/lib/files" ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/files",
+  ]
 }
 
 source_set("regexp") {
