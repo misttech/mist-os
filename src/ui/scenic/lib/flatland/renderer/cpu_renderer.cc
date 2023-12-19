@@ -190,8 +190,6 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     fuchsia::sysmem::PixelFormatType render_type = render_target_constraints.pixel_format.type;
     FX_DCHECK(utils::Pixel::IsFormatSupported(image_type));
     FX_DCHECK(utils::Pixel::IsFormatSupported(render_type));
-    FX_LOGS(ERROR) << "rendering image with type: " << static_cast<uint32_t>(image_type)
-                   << " into target with type:" << static_cast<uint32_t>(render_type);
 
     // The rectangle, image, and render_target should be compatible, e.g. the image dimensions are
     // equal to the rectangle dimensions and less than or equal to the render target dimensions.
