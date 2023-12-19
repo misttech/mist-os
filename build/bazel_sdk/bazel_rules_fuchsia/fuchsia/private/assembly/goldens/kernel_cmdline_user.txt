@@ -1,0 +1,17 @@
+?blobfs.cache-eviction-policy=NEVER_EVICT
+?console.shell=false
+?kernel.compression.at_memory_pressure=true
+?kernel.compression.reclaim_anonymous=true
+?kernel.compression.reclaim_zero_forks=true
+?kernel.compression.storage-strategy=tri_page
+?kernel.compression.strategy=lz4
+?kernel.enable-debugging-syscalls=false
+?kernel.enable-serial-syscalls=false
+?kernel.oom.behavior=reboot
+?kernel.page-scanner.lru-action=compress_only
+?kernel.render-dlog-to-crashlog=true
+?kernel.serial=none
+?live_usb.is_system=true
+?netsvc.disable=true
+?virtcon.disable=true
+?virtcon.hide-on-boot

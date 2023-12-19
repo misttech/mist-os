@@ -61,6 +61,11 @@ group("assembly") {
 
   # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
   deps = eng_platform_aib_labels
+
+  # Coverage and sanitizer builders rename the shared libs, therefore ignore them.
+  if (!is_coverage && !is_asan && !is_hwasan) {
+    deps += [ "//bundles/assembly/scrutiny" ]
+  }
 }
 
 ########

@@ -12,6 +12,14 @@ python_binary("cache_packages_from_product_assembler") {
   main_source = "cache_packages_from_product_assembler.py"
 }
 
+python_binary("generate_scrutiny_configs") {
+  main_source = "generate_scrutiny_configs.py"
+  deps = [
+    "//build/python/modules/assembly",
+    "//build/python/modules/serialization",
+  ]
+}
+
 python_binary("generated_assembly_inputs") {
   main_source = "generated_assembly_inputs.py"
   deps = [ "//build/python/modules/assembly" ]

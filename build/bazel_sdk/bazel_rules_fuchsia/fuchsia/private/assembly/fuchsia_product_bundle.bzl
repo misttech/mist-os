@@ -64,6 +64,7 @@ def _scrutiny_validation(
         ffx_tool,
         pb_out_dir,
         scrutiny_config,
+        platform_scrutiny_config,
         is_recovery = False):
     deps = []
     ffx_invocation = [
@@ -81,8 +82,8 @@ def _scrutiny_validation(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        scrutiny_config.bootfs_files,
-        scrutiny_config.bootfs_packages,
+        scrutiny_config.bootfs_files + platform_scrutiny_config.bootfs_files,
+        scrutiny_config.bootfs_packages + platform_scrutiny_config.bootfs_packages,
     ))
     deps.append(_verify_kernel_cmdline(
         ctx,
@@ -90,7 +91,7 @@ def _scrutiny_validation(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        scrutiny_config.kernel_cmdline,
+        scrutiny_config.kernel_cmdline + platform_scrutiny_config.kernel_cmdline,
     ))
     deps += _verify_base_packages(
         ctx,
@@ -98,7 +99,7 @@ def _scrutiny_validation(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        scrutiny_config.base_packages,
+        [scrutiny_config.base_packages, platform_scrutiny_config.base_packages],
     )
     deps.append(_verify_pre_signing(
         ctx,
@@ -363,14 +364,17 @@ def _verify_base_packages(
         "static-pkgs",
         "--product-bundle",
         pb_out_dir.path,
-        "--golden",
-        base_packages.path,
     ]
+    for base_package_list in base_packages:
+        _ffx_invocation += [
+            "--golden",
+            base_package_list.path,
+        ]
     script_lines = [
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, base_packages]
+    inputs = [ffx_tool, pb_out_dir] + base_packages
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -585,11 +589,27 @@ def _build_fuchsia_product_bundle_impl(ctx):
 
     # Scrutiny Validation
     if ctx.attr.product_image_scrutiny_config:
+        build_type = ctx.attr.product_image[FuchsiaProductImageInfo].build_type
+        if build_type == "user":
+            platform_scrutiny_config = ctx.attr._platform_user_scrutiny_config[FuchsiaScrutinyConfigInfo]
+        elif build_type == "userdebug":
+            platform_scrutiny_config = ctx.attr._platform_userdebug_scrutiny_config[FuchsiaScrutinyConfigInfo]
+        else:
+            fail("scrutiny cannot run on 'product_image' because it is an eng build type")
+
         product_image_scrutiny_config = ctx.attr.product_image_scrutiny_config[FuchsiaScrutinyConfigInfo]
-        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, product_image_scrutiny_config)
+        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, product_image_scrutiny_config, platform_scrutiny_config)
     if ctx.attr.recovery_scrutiny_config:
+        build_type = ctx.attr.recovery[FuchsiaProductImageInfo].build_type
+        if build_type == "user":
+            platform_scrutiny_config = ctx.attr._platform_user_scrutiny_config[FuchsiaScrutinyConfigInfo]
+        elif build_type == "userdebug":
+            platform_scrutiny_config = ctx.attr._platform_userdebug_scrutiny_config[FuchsiaScrutinyConfigInfo]
+        else:
+            fail("scrutiny cannot run on 'recovery' because it is an eng build type")
+
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
-        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, True)
+        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
     return [DefaultInfo(files = depset(direct = deps)), FuchsiaProductBundleInfo(
         product_bundle = pb_out_dir,
@@ -668,6 +688,16 @@ _build_fuchsia_product_bundle = rule(
             default = "//fuchsia/tools:rebase_flash_manifest",
             executable = True,
             cfg = "exec",
+        ),
+        "_platform_user_scrutiny_config": attr.label(
+            doc = "Scrutiny config listing platform content of user products",
+            providers = [FuchsiaScrutinyConfigInfo],
+            default = "//fuchsia/private/assembly/goldens:user",
+        ),
+        "_platform_userdebug_scrutiny_config": attr.label(
+            doc = "Scrutiny config listing platform content of userdebug products",
+            providers = [FuchsiaScrutinyConfigInfo],
+            default = "//fuchsia/private/assembly/goldens:userdebug",
         ),
     },
 )

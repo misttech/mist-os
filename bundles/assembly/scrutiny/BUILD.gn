@@ -1,0 +1,37 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/generate_scrutiny_configs.gni")
+import("//bundles/assembly/platform_aibs.gni")
+
+_goldens_dir =
+    "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/assembly/goldens"
+
+generate_scrutiny_configs("user") {
+  assembly_input_bundles = user_platform_aib_files
+  deps = user_platform_aib_labels
+
+  static_packages_golden = "${_goldens_dir}/static_packages_user.txt"
+  bootfs_packages_golden = "${_goldens_dir}/bootfs_packages_user.txt"
+  bootfs_files_golden = "${_goldens_dir}/bootfs_files_user.txt"
+  kernel_cmdline_golden = "${_goldens_dir}/kernel_cmdline_user.txt"
+}
+
+generate_scrutiny_configs("userdebug") {
+  assembly_input_bundles = userdebug_platform_aib_files
+  deps = userdebug_platform_aib_labels
+
+  static_packages_golden = "${_goldens_dir}/static_packages_userdebug.txt"
+  bootfs_packages_golden = "${_goldens_dir}/bootfs_packages_userdebug.txt"
+  bootfs_files_golden = "${_goldens_dir}/bootfs_files_userdebug.txt"
+  kernel_cmdline_golden = "${_goldens_dir}/kernel_cmdline_userdebug.txt"
+}
+
+group("scrutiny") {
+  testonly = true
+  deps = [
+    ":user",
+    ":userdebug",
+  ]
+}

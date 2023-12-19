@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("//fuchsia/private/assembly:fuchsia_scrutiny_config.bzl", "fuchsia_scrutiny_config")
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_scrutiny_config(
+    name = "user",
+    base_packages = "static_packages_user.txt",
+    bootfs_files = ["bootfs_files_user.txt"],
+    bootfs_packages = ["bootfs_packages_user.txt"],
+    kernel_cmdline = ["kernel_cmdline_user.txt"],
+)
+
+fuchsia_scrutiny_config(
+    name = "userdebug",
+    base_packages = "static_packages_userdebug.txt",
+    bootfs_files = ["bootfs_files_userdebug.txt"],
+    bootfs_packages = ["bootfs_packages_userdebug.txt"],
+    kernel_cmdline = ["kernel_cmdline_userdebug.txt"],
+)
