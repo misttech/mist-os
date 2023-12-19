@@ -119,6 +119,7 @@ test("fs-management-test") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
     "//src/storage/fs_test:crypt_service",
