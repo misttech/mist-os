@@ -4,9 +4,9 @@
 
 use crate::{
     common::{
-        cmd::ManifestParams, crypto::unlock_device, fastboot_interface::FastbootInterface, finish,
-        flash_bootloader, flash_product, is_locked, lock_device, verify_hardware, Boot, Flash,
-        Unlock, MISSING_CREDENTIALS, MISSING_PRODUCT,
+        cmd::ManifestParams, crypto::unlock_device, finish, flash_bootloader, flash_product,
+        is_locked, lock_device, verify_hardware, Boot, Flash, Unlock, MISSING_CREDENTIALS,
+        MISSING_PRODUCT,
     },
     file_resolver::FileResolver,
     manifest::v1::FlashManifest as FlashManifestV1,
@@ -15,6 +15,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 

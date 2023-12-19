@@ -5,9 +5,12 @@
 use crate::Config;
 use crate::ManualTargets;
 
-use anyhow::{anyhow, Result};
-use ffx_fastboot::common::fastboot::tcp_proxy;
-use ffx_fastboot::common::fastboot_interface::Fastboot;
+use anyhow::{anyhow, Context as _, Result};
+use async_trait::async_trait;
+use ffx_fastboot_interface::fastboot_interface::Fastboot;
+use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
+use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
+use ffx_fastboot_transport_interface::tcp::{open_once, TcpNetworkInterface};
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -248,6 +251,51 @@ where
         handler.handle_event(event);
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Utility functions
+//
+
+/// Creates a FastbootProxy over TCP for a device at the given SocketAddr
+async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
+    let mut factory = OneshotTcpFactory::new(*addr);
+    let interface = factory
+        .open()
+        .await
+        .with_context(|| format!("connecting via TCP to Fastboot address: {addr}"))?;
+    Ok(FastbootProxy::<TcpNetworkInterface>::new(addr.to_string(), interface, factory))
+}
+
+#[derive(Debug, Clone)]
+pub struct OneshotTcpFactory {
+    addr: SocketAddr,
+}
+
+impl OneshotTcpFactory {
+    pub fn new(addr: SocketAddr) -> Self {
+        Self { addr }
+    }
+}
+
+#[async_trait(?Send)]
+impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
+    async fn open(&mut self) -> Result<TcpNetworkInterface> {
+        let interface = open_once(&self.addr, Duration::from_secs(1))
+            .await
+            .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
+        Ok(interface)
+    }
+
+    async fn close(&self) {
+        tracing::debug!("Closing Oneshot Fastboot TCP Factory for: {}", self.addr);
+    }
+}
+
+impl InterfaceFactory<TcpNetworkInterface> for OneshotTcpFactory {}
+
+///////////////////////////////////////////////////////////////////////////////
+// Tests
+//
 
 #[cfg(test)]
 mod test {

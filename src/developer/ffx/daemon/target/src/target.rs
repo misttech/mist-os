@@ -15,7 +15,7 @@ use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetEventInfo};
 use ffx_fastboot::common::fastboot::tcp_proxy;
-use ffx_fastboot::common::fastboot_interface::Fastboot;
+use ffx_fastboot_interface::fastboot_interface::Fastboot;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};

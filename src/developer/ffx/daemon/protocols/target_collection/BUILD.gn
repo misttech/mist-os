@@ -23,6 +23,7 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/manual_targets:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/protocols:lib",

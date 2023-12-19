@@ -6,7 +6,6 @@ use crate::{
     boot::boot,
     common::{
         cmd::{ManifestParams, OemFile},
-        fastboot_interface::FastbootInterface,
         flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait,
         Product as ProductTrait, Unlock, MISSING_PRODUCT, UNLOCK_ERR,
     },
@@ -15,6 +14,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 

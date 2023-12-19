@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::{FastbootInterface, Variable};
 use crate::common::prepare;
 use anyhow::{anyhow, Result};
+use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, Variable};
 use futures::{prelude::*, try_join};
 use std::io::Write;
 use tokio::sync::mpsc;

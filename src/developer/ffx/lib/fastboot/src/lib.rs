@@ -8,7 +8,6 @@ pub mod file_resolver;
 pub mod info;
 pub mod lock;
 pub mod manifest;
-pub mod transport;
 pub mod unlock;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -16,13 +15,13 @@ pub mod unlock;
 pub mod test {
     use crate::{
         common::fastboot::{FastbootConnectionFactory, FastbootConnectionKind},
-        common::fastboot_interface::{
-            Fastboot, FastbootInterface, RebootEvent, UploadProgress, Variable,
-        },
         file_resolver::FileResolver,
     };
     use anyhow::Result;
     use async_trait::async_trait;
+    use ffx_fastboot_interface::fastboot_interface::{
+        Fastboot, FastbootInterface, RebootEvent, UploadProgress, Variable,
+    };
     use std::{
         collections::HashMap,
         default::Default,

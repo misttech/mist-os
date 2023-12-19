@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use async_net::TcpStream;
 use async_trait::async_trait;
 use ffx_config::get;
-use ffx_fastboot::transport::tcp::{
+use ffx_fastboot_transport_interface::tcp::{
     open_once, TcpNetworkInterface, HANDSHAKE_TIMEOUT, HANDSHAKE_TIMEOUT_MILLIS, RETRY_WAIT_SECONDS,
 };
 use futures::{

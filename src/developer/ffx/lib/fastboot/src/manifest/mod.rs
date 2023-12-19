@@ -5,7 +5,6 @@
 use crate::{
     common::{
         cmd::{BootParams, Command, ManifestParams},
-        fastboot_interface::FastbootInterface,
         prepare, Boot, Flash, Unlock,
     },
     file_resolver::resolvers::{Resolver, ZipArchiveResolver},
@@ -26,6 +25,7 @@ use async_trait::async_trait;
 use camino::Utf8Path;
 use chrono::Utc;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use pbms::{load_product_bundle, ListingMode};
 use sdk_metadata::{ProductBundle, ProductBundleV2};
 use serde::{Deserialize, Serialize};

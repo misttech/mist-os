@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::{crypto::unlock_device, is_locked, MISSING_CREDENTIALS};
 use crate::file_resolver::FileResolver;
 use anyhow::Result;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use std::io::Write;
 
 const UNLOCKED: &str = "Target is now unlocked.";

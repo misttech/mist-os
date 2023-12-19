@@ -17,12 +17,13 @@ use ffx_fastboot::{
     common::fastboot::tcp_proxy,
     common::fastboot::udp_proxy,
     common::fastboot::usb_proxy,
-    common::{fastboot_interface::FastbootInterface, from_manifest, prepare},
+    common::{from_manifest, prepare},
     file_resolver::resolvers::EmptyResolver,
     info::info,
     lock::lock,
     unlock::unlock,
 };
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::FastbootInterface as FidlFastbootInterface;
 use fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy, TargetRebootState, TargetState};

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::{is_locked, lock_device, prepare, verify_variable_value};
 use anyhow::Result;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use std::io::Write;
 
 const LOCKABLE_VAR: &str = "vx-unlockable";

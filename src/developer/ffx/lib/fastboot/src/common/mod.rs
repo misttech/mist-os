@@ -4,7 +4,6 @@
 
 use crate::{
     common::cmd::{ManifestParams, OemFile},
-    common::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress},
     common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
     file_resolver::FileResolver,
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
@@ -13,6 +12,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress};
 use futures::{prelude::*, try_join};
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
@@ -29,7 +29,6 @@ pub const MISSING_CREDENTIALS: &str =
 pub mod cmd;
 pub mod crypto;
 pub mod fastboot;
-pub mod fastboot_interface;
 pub mod fidl_fastboot_compatibility;
 pub mod vars;
 

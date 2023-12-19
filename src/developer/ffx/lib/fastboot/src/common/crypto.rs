@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::{FastbootInterface, UploadProgress};
 use crate::common::{done_time, handle_upload_progress_for_staging, is_locked};
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, bail, Result};
@@ -10,6 +9,7 @@ use async_fs::OpenOptions;
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
+use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress};
 use futures::{prelude::*, try_join};
 use ring::{
     rand,

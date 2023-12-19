@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot::{InterfaceFactory, InterfaceFactoryBase};
 use anyhow::{bail, Context as _, Result};
 use async_net::TcpStream;
-use async_trait::async_trait;
 use futures::{
     prelude::*,
     task::{Context, Poll},
@@ -16,45 +14,6 @@ use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
 use timeout::timeout;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";
-
-///////////////////////////////////////////////////////////////////////////////
-// TcpFactory
-//
-
-#[derive(Debug, Clone)]
-pub struct TcpFactory {
-    addr: SocketAddr,
-}
-
-impl TcpFactory {
-    pub fn new(addr: SocketAddr) -> Self {
-        Self { addr }
-    }
-}
-
-impl Drop for TcpFactory {
-    fn drop(&mut self) {
-        futures::executor::block_on(async move {
-            self.close().await;
-        });
-    }
-}
-
-#[async_trait(?Send)]
-impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface> {
-        let interface = open_once(&self.addr, Duration::from_secs(1))
-            .await
-            .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
-        Ok(interface)
-    }
-
-    async fn close(&self) {
-        tracing::debug!("Closing Fastboot TCP Factory for: {}", self.addr);
-    }
-}
-
-impl InterfaceFactory<TcpNetworkInterface> for TcpFactory {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // TcpNetworkInterface

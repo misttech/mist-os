@@ -1,9 +1,10 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::common::fastboot::{InterfaceFactory, InterfaceFactoryBase};
+
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
 use usb_bulk::AsyncInterface;
 use usb_fastboot_discovery::open_interface_with_serial;
 

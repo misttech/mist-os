@@ -21,8 +21,8 @@ use fastboot::{
 };
 use ffx_config::get;
 use ffx_daemon_events::FastbootInterface;
-use ffx_fastboot::transport::tcp::TcpNetworkInterface;
-use ffx_fastboot::transport::udp::UdpNetworkInterface;
+use ffx_fastboot_transport_interface::tcp::TcpNetworkInterface;
+use ffx_fastboot_transport_interface::udp::UdpNetworkInterface;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_developer_ffx::{
     FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,

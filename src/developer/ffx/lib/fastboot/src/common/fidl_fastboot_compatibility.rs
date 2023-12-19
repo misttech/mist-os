@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::RebootEvent;
-use crate::common::fastboot_interface::UploadProgress;
-use crate::common::fastboot_interface::*;
 use anyhow::{anyhow, bail, Error, Result};
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use errors::ffx_bail;
+use ffx_fastboot_interface::fastboot_interface::*;
 use fidl::endpoints::create_endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl::Error as FidlError;
 use fidl_fuchsia_developer_ffx::{
-    FastbootError, FastbootProxy, RebootError, RebootListenerMarker, RebootListenerRequest,
-    UploadProgressListenerMarker, UploadProgressListenerRequest, VariableListenerMarker,
-    VariableListenerRequest,
+    FastbootError, FastbootProxy as FidlFastbootProxy, RebootError, RebootListenerMarker,
+    RebootListenerRequest, UploadProgressListenerMarker, UploadProgressListenerRequest,
+    VariableListenerMarker, VariableListenerRequest,
 };
 use futures::{prelude::*, try_join};
 use tokio::sync::mpsc::Sender;
@@ -36,6 +34,9 @@ const NO_ZEDBOOT_ADDRESS: &str = "\nUnknown Zedboot address.";
 const TARGET_COMMUNICATION: &str = "\nThere was an issue communication with the target";
 const FASTBOOT_ERROR: &str = "\nThere was an issue sending the Fastboot reboot command";
 
+#[derive(Debug)]
+struct FastbootProxy(FidlFastbootProxy);
+
 impl FastbootInterface for FastbootProxy {}
 
 #[async_trait(?Send)]
@@ -44,14 +45,17 @@ impl Fastboot for FastbootProxy {
     async fn prepare(&mut self, listener: Sender<RebootEvent>) -> Result<()> {
         let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
         let mut stream = reboot_server.into_stream()?;
-        try_join!(FastbootProxy::prepare(self, reboot_client).map_err(map_fidl_error), async move {
-            let stream_res = stream.try_next().await?;
-            if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) = stream_res {
-                tracing::debug!("About to send an on_reboot event");
+        try_join!(
+            FidlFastbootProxy::prepare(&self.0, reboot_client).map_err(map_fidl_error),
+            async move {
+                let stream_res = stream.try_next().await?;
+                if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) = stream_res {
+                    tracing::debug!("About to send an on_reboot event");
+                }
+                listener.send(RebootEvent::OnReboot).await?;
+                Ok(())
             }
-            listener.send(RebootEvent::OnReboot).await?;
-            Ok(())
-        })
+        )
         .and_then(|(prepare, _)| {
             tracing::debug!("Prepare done!");
             prepare.or_else(report_reboot_error)
@@ -60,7 +64,7 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn get_var(&mut self, name: &str) -> Result<String> {
-        FastbootProxy::get_var(self, name)
+        FidlFastbootProxy::get_var(&self.0, name)
             .await
             .map_err(map_fidl_error)?
             .map_err(map_fastboot_error)
@@ -70,7 +74,7 @@ impl Fastboot for FastbootProxy {
     async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<()> {
         let (var_client, var_server) = create_endpoints::<VariableListenerMarker>();
         let _ = try_join!(
-            FastbootProxy::get_all_vars(self, var_client).map_err(|e| {
+            FidlFastbootProxy::get_all_vars(&self.0, var_client).map_err(|e| {
                 tracing::error!("FIDL Communication error: {}", e);
                 anyhow!(
                     "There was an error communicating with the daemon. Try running\n\
@@ -91,7 +95,8 @@ impl Fastboot for FastbootProxy {
     ) -> Result<()> {
         let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
         try_join!(
-            FastbootProxy::flash(self, partition_name, &path, prog_client).map_err(map_fidl_error),
+            FidlFastbootProxy::flash(&self.0, partition_name, &path, prog_client)
+                .map_err(map_fidl_error),
             handle_upload(listener, prog_server)
         )
         .and_then(|(stage, _)| {
@@ -101,7 +106,7 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn erase(&mut self, partition_name: &str) -> Result<()> {
-        FastbootProxy::erase(self, partition_name)
+        FidlFastbootProxy::erase(&self.0, partition_name)
             .await
             .map_err(map_fidl_error)?
             .map_err(map_fastboot_error)
@@ -109,12 +114,15 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn boot(&mut self) -> Result<()> {
-        FastbootProxy::boot(self).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
+        FidlFastbootProxy::boot(&self.0).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
     }
 
     #[tracing::instrument(skip(self))]
     async fn reboot(&mut self) -> Result<()> {
-        FastbootProxy::reboot(self).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
+        FidlFastbootProxy::reboot(&self.0)
+            .await
+            .map_err(map_fidl_error)?
+            .map_err(map_fastboot_error)
     }
 
     #[tracing::instrument(skip(self, listener))]
@@ -122,7 +130,7 @@ impl Fastboot for FastbootProxy {
         let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
         let mut stream = reboot_server.into_stream()?;
         try_join!(
-            FastbootProxy::reboot_bootloader(self, reboot_client).map_err(map_fidl_error),
+            FidlFastbootProxy::reboot_bootloader(&self.0, reboot_client).map_err(map_fidl_error),
             async move {
                 if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) =
                     stream.try_next().await?
@@ -139,7 +147,7 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn continue_boot(&mut self) -> Result<()> {
-        FastbootProxy::continue_boot(self)
+        FidlFastbootProxy::continue_boot(&self.0)
             .await
             .map_err(map_fidl_error)?
             .map_err(map_fastboot_error)
@@ -147,7 +155,7 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn get_staged(&mut self, path: &str) -> Result<()> {
-        FastbootProxy::get_staged(self, path)
+        FidlFastbootProxy::get_staged(&self.0, path)
             .await
             .map_err(map_fidl_error)?
             .map_err(map_fastboot_error)
@@ -158,7 +166,7 @@ impl Fastboot for FastbootProxy {
         let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
 
         try_join!(
-            FastbootProxy::stage(self, &path, prog_client).map_err(map_fidl_error),
+            FidlFastbootProxy::stage(&self.0, &path, prog_client).map_err(map_fidl_error),
             handle_upload(listener, prog_server)
         )
         .and_then(|(stage, _)| {
@@ -168,7 +176,7 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn set_active(&mut self, slot: &str) -> Result<()> {
-        FastbootProxy::set_active(self, slot)
+        FidlFastbootProxy::set_active(&self.0, slot)
             .await
             .map_err(map_fidl_error)?
             .map_err(map_fastboot_error)
@@ -176,7 +184,10 @@ impl Fastboot for FastbootProxy {
 
     #[tracing::instrument(skip(self))]
     async fn oem(&mut self, command: &str) -> Result<()> {
-        FastbootProxy::oem(self, command).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
+        FidlFastbootProxy::oem(&self.0, command)
+            .await
+            .map_err(map_fidl_error)?
+            .map_err(map_fastboot_error)
     }
 }
 

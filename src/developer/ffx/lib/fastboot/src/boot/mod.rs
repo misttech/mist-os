@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::stage_file;
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
+use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use std::{
     convert::TryInto,
     fs::{metadata, File},

@@ -5,8 +5,7 @@
 use crate::{fastboot::InterfaceFactory, target::Target};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ffx_fastboot::transport::udp::open as udp_open;
-use ffx_fastboot::transport::udp::UdpNetworkInterface;
+use ffx_fastboot_transport_interface::udp::{open as udp_open, UdpNetworkInterface};
 use std::net::SocketAddr;
 
 pub struct UdpNetworkFactory {}
