@@ -136,6 +136,9 @@ async fn process_control_stream(peer: Arc<RwLock<RemotePeer>>) {
     match command_stream
         .map(Ok)
         .try_for_each_concurrent(16, |command| async {
+            if let Err(e) = command {
+                return Err(Error::AvctpError(e));
+            }
             let fut = peer.read().control_command_handler.handle_command(command.unwrap());
             let result: Result<(), Error> = fut.await;
             result
@@ -171,6 +174,9 @@ async fn process_browse_stream(peer: Arc<RwLock<RemotePeer>>) {
     match browse_command_stream
         .map(Ok)
         .try_for_each_concurrent(16, |command| async {
+            if let Err(e) = command {
+                return Err(Error::AvctpError(e));
+            }
             let fut = peer.read().browse_command_handler.handle_command(command.unwrap());
             let result: Result<(), Error> = fut.await;
             result
@@ -181,7 +187,10 @@ async fn process_browse_stream(peer: Arc<RwLock<RemotePeer>>) {
         Err(e) => error!("Peer command returned error {:?}", e),
     }
 
-    // Browse channel closed or errored. Do nothing because the control channel can still exist.
+    // Browse channel closed or errored. Only reset the browse connection since the control channel can still exist.
+    {
+        peer.write().reset_browse_connection(false);
+    }
 }
 
 /// Handles received notifications from the peer from the subscribed notifications streams and

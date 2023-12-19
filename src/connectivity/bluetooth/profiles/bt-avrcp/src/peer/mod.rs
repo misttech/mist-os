@@ -968,6 +968,24 @@ pub(crate) mod tests {
         }
     }
 
+    // Helper function to set incoming control connection.
+    fn set_incoming_control_connection(peer_handle: &RemotePeerHandle) -> Channel {
+        let (remote, local) = Channel::create();
+        let control_channel = AvcPeer::new(local);
+        peer_handle.set_control_connection(control_channel);
+
+        remote
+    }
+
+    // Helper function to set incoming browse connection.
+    fn set_incoming_browse_connection(peer_handle: &RemotePeerHandle) -> Channel {
+        let (remote, local) = Channel::create();
+        let browse_channel = AvctpPeer::new(local);
+        peer_handle.set_browse_connection(browse_channel);
+
+        remote
+    }
+
     // Check that the remote will attempt to connect to a peer if we have a profile.
     #[fuchsia::test]
     fn trigger_connection_test() {
@@ -1081,7 +1099,6 @@ pub(crate) mod tests {
 
         // We should have requested a connection for browse.
         let (_remote2, channel2) = Channel::create();
-
         let mut next_request_fut = profile_requests.next();
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, connection, .. }))) => {
@@ -1170,11 +1187,7 @@ pub(crate) mod tests {
 
         // Peer reconnects with a new l2cap connection. Keep the old one alive to validate that it's
         // closed.
-        let (remote2, channel2) = Channel::create();
-        let reconnect_peer = AvcPeer::new(channel2);
-        peer_handle.set_control_connection(reconnect_peer);
-
-        // Run to update watcher state. Peer should be connected.
+        let remote2 = set_incoming_control_connection(&peer_handle);
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(peer_handle.is_control_connected());
 
@@ -1236,11 +1249,7 @@ pub(crate) mod tests {
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound connection.
-        let (remote2, channel2) = Channel::create();
-        let reconnect_peer = AvcPeer::new(channel2);
-        peer_handle.set_control_connection(reconnect_peer);
-
-        // Run to update watcher state.
+        let remote2 = set_incoming_control_connection(&peer_handle);
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(!peer_handle.is_control_connected());
 
@@ -1256,7 +1265,6 @@ pub(crate) mod tests {
         let _ = exec.wake_expired_timers();
 
         let (remote3, channel3) = Channel::create();
-
         let mut next_request_fut = profile_requests.next();
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
@@ -1327,12 +1335,9 @@ pub(crate) mod tests {
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Set control channel manually to test browse channel connection retry
-        let (_remote, channel) = Channel::create();
-        let peer = AvcPeer::new(channel);
-        peer_handle.set_control_connection(peer);
+        let _remote = set_incoming_control_connection(&peer_handle);
 
-        // Run to update watcher state. Control channel should be connected,
-        // but browse is still not connected,
+        // Browse is still not connected,
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(peer_handle.is_control_connected());
         assert!(!peer_handle.is_browse_connected());
@@ -1455,12 +1460,9 @@ pub(crate) mod tests {
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound browse connection.
-        let (remote3, channel3) = Channel::create();
-        let reconnect_peer = AvctpPeer::new(channel3);
-        peer_handle.set_browse_connection(reconnect_peer);
+        let remote3 = set_incoming_browse_connection(&peer_handle);
 
-        // Run to update watcher state. Browse channel should be disconnected,
-        // but control channel should remain connected.
+        // Browse channel should be disconnected, but control channel should remain connected.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(peer_handle.is_control_connected());
         assert!(!peer_handle.is_browse_connected());
@@ -1477,7 +1479,6 @@ pub(crate) mod tests {
         let _ = exec.wake_expired_timers();
 
         let (remote4, channel4) = Channel::create();
-
         let mut next_request_fut = profile_requests.next();
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
@@ -1545,7 +1546,6 @@ pub(crate) mod tests {
 
         // We should have requested a connection for browse.
         let (remote2, channel2) = Channel::create();
-
         let mut next_request_fut = profile_requests.next();
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
@@ -1569,9 +1569,7 @@ pub(crate) mod tests {
 
         // After some time, remote peer sends incoming a new l2cap connection
         // for control channel. Keep the old one alive to validate that it's closed.
-        let (remote3, channel3) = Channel::create();
-        let reconnect_peer = AvcPeer::new(channel3);
-        peer_handle.set_control_connection(reconnect_peer);
+        let remote3 = set_incoming_control_connection(&peer_handle);
 
         // Run to update watcher state. Control channel should be connected,
         // but browse channel that was previously set should have closed.
@@ -1609,9 +1607,7 @@ pub(crate) mod tests {
         // Peer connects with a new l2cap connection for browse channel.
         // Since control channel was not already connected, verify that
         // browse channel was dropped.
-        let (_remote, channel) = Channel::create();
-        let connect_peer = AvctpPeer::new(channel);
-        peer_handle.set_browse_connection(connect_peer);
+        let _remote = set_incoming_browse_connection(&peer_handle);
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(!peer_handle.is_browse_connected());
     }
@@ -1629,9 +1625,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         // Simulate inbound control connection.
-        let (remote1, channel1) = Channel::create();
-        let control_channel = AvcPeer::new(channel1);
-        peer_handle.set_control_connection(control_channel);
+        let remote1 = set_incoming_control_connection(&peer_handle);
 
         // Advance time by the maximum amount of time it would take to establish
         // a connection.
@@ -1644,9 +1638,7 @@ pub(crate) mod tests {
         expect_channel_writable(&remote1);
 
         // Simulate inbound browse connection.
-        let (remote2, channel2) = Channel::create();
-        let browse_channel = AvctpPeer::new(channel2);
-        peer_handle.set_browse_connection(browse_channel);
+        let remote2 = set_incoming_browse_connection(&peer_handle);
 
         // Advance time by the maximum amount of time it would take to establish
         // a connection.
@@ -1765,9 +1757,8 @@ pub(crate) mod tests {
             protocol_version: AvrcpProtocolVersion(1, 6),
         });
         // Peer initiates connection to us.
-        let (_remote, channel) = Channel::create();
-        let peer = AvcPeer::new(channel);
-        peer_handle.set_control_connection(peer);
+        let remote1 = set_incoming_control_connection(&peer_handle);
+
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
@@ -1784,11 +1775,11 @@ pub(crate) mod tests {
         });
 
         // Peer initiates a browse connection.
-        let (_remote1, channel1) = Channel::create();
-        let peer1 = AvctpPeer::new(channel1);
-        peer_handle.set_browse_connection(peer1);
+        let _remote2 = set_incoming_browse_connection(&peer_handle);
+
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
         // Inspect tree should be updated with the browse connection.
         assert_data_tree!(inspect, root: {
             peer: contains {
@@ -1802,7 +1793,7 @@ pub(crate) mod tests {
         });
 
         // Peer disconnects.
-        drop(_remote);
+        drop(remote1);
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         // Inspect tree should be updated with the disconnection.
@@ -1973,20 +1964,17 @@ pub(crate) mod tests {
             protocol_version: AvrcpProtocolVersion(1, 6),
         });
         // Peer initiates control connection to us.
-        let (_remote, channel) = Channel::create();
-        let peer = AvcPeer::new(channel);
-        peer_handle.set_control_connection(peer);
+        let _remote1 = set_incoming_control_connection(&peer_handle);
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Peer initiates a browse connection.
-        let (remote1, local1) = Channel::create();
-        let local = AvctpPeer::new(local1);
-        let remote = AvctpPeer::new(remote1);
-        let mut remote_command_stream = remote.take_command_stream();
-        peer_handle.set_browse_connection(local);
+        let remote2 = set_incoming_browse_connection(&peer_handle);
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        let remote_peer = AvctpPeer::new(remote2);
+        let mut remote_command_stream = remote_peer.take_command_stream();
 
         // Should have sent a request to get all players.
         // Expect get folder items command with media player scope.
@@ -2041,5 +2029,96 @@ pub(crate) mod tests {
         assert_eq!(player.uid_counter, None);
         assert_eq!(player.num_items, 0);
         assert_eq!(player.sub_folders.len(), 0);
+    }
+
+    #[fuchsia::test]
+    fn incoming_control_command_loop_exits_gracefully() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+
+        let id = PeerId(842);
+        let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
+
+        // Simulate inbound control connection.
+        let remote_control = set_incoming_control_connection(&peer_handle);
+        exec.set_fake_time(MAX_CONNECTION_EST_TIME.after_now());
+        let _ = exec.wake_expired_timers();
+
+        // Simulate inbound browse connection.
+        let _remote_browse = set_incoming_browse_connection(&peer_handle);
+        exec.set_fake_time(MAX_CONNECTION_EST_TIME.after_now());
+        let _ = exec.wake_expired_timers();
+
+        assert!(peer_handle.is_control_connected());
+        assert!(peer_handle.is_browse_connected());
+
+        // Set the descriptors to simulate service found for peer.
+        peer_handle.set_controller_descriptor(AvrcpService::Controller {
+            features: AvrcpControllerFeatures::CATEGORY1
+                | AvrcpControllerFeatures::CATEGORY2
+                | AvrcpControllerFeatures::SUPPORTSBROWSING
+                | AvrcpControllerFeatures::SUPPORTSCOVERARTGETIMAGEPROPERTIES,
+            psm: Psm::AVCTP,
+            protocol_version: AvrcpProtocolVersion(1, 5),
+        });
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Send erroneous data over the control channel.
+        match remote_control.as_ref().write(&[0, 17, 14, 0, 72]) {
+            Ok(_) => {}
+            Err(e) => panic!("Expected data write but got {:?} instead", e),
+        }
+
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Should have gracefully disconnected all connections.
+        assert!(!peer_handle.is_control_connected());
+        assert!(!peer_handle.is_browse_connected());
+    }
+
+    #[fuchsia::test]
+    fn incoming_browse_command_loop_exits_gracefully() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+
+        let id = PeerId(842);
+        let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
+
+        // Simulate inbound control connection.
+        let _remote_control = set_incoming_control_connection(&peer_handle);
+        exec.set_fake_time(MAX_CONNECTION_EST_TIME.after_now());
+        let _ = exec.wake_expired_timers();
+
+        // Simulate inbound browse connection.
+        let (remote_browse, local_browse) = Channel::create();
+        // Set write to not work to trigger error on socket read.
+        assert!(local_browse.as_ref().half_close().is_ok());
+        let browse_channel = AvctpPeer::new(local_browse);
+        peer_handle.set_browse_connection(browse_channel);
+        exec.set_fake_time(MAX_CONNECTION_EST_TIME.after_now());
+        let _ = exec.wake_expired_timers();
+
+        assert!(peer_handle.is_control_connected());
+        assert!(peer_handle.is_browse_connected());
+
+        // Set the descriptors to simulate service found for peer.
+        peer_handle.set_controller_descriptor(AvrcpService::Controller {
+            features: AvrcpControllerFeatures::CATEGORY1
+                | AvrcpControllerFeatures::CATEGORY2
+                | AvrcpControllerFeatures::SUPPORTSBROWSING
+                | AvrcpControllerFeatures::SUPPORTSCOVERARTGETIMAGEPROPERTIES,
+            psm: Psm::AVCTP,
+            protocol_version: AvrcpProtocolVersion(1, 5),
+        });
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Send data over the browse channel with socket that'll cause error on write.
+        let _ = remote_browse.as_ref().write(&[1, 1]).expect_err("should have failed");
+
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Should have gracefully disconnected only the browse connection.
+        assert!(peer_handle.is_control_connected());
+        assert!(!peer_handle.is_browse_connected());
     }
 }
