@@ -215,6 +215,7 @@ source_set("guest_interaction_client") {
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//src/virtualization/lib/grpc",
     "//src/virtualization/tests/lib:guest_console",

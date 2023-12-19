@@ -72,6 +72,7 @@ source_set("guest_console") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_hlcpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
   public_deps = [
@@ -101,6 +102,7 @@ source_set("fake_netstack") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/connectivity/lib/network-device/cpp",
     "//src/lib/inet",
     "//third_party/googletest:gtest",

@@ -28,6 +28,7 @@ executable("hypervisor_integration_tests") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:test_settings",
     "//src/virtualization/bin/vmm:bits",
     "//third_party/googletest:gtest",
