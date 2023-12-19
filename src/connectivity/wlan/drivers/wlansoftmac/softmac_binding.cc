@@ -277,25 +277,25 @@ void WlanSoftmacHandle::Init(std::unique_ptr<StartStaCompleter> completer,
       .start = [](void* device, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         zx::channel channel;
-        zx_status_t result = AsDeviceInterface(device)->Start(ifc, &channel);
+        zx_status_t result = DeviceInterface::from(device)->Start(ifc, &channel);
         *out_sme_channel = channel.release();
         return result;
       },
       .deliver_eth_frame = [](void* device, const uint8_t* data, size_t len) -> zx_status_t {
-        return AsDeviceInterface(device)->DeliverEthernet({data, len});
+        return DeviceInterface::from(device)->DeliverEthernet({data, len});
       },
       .queue_tx = [](void* device, uint32_t options, wlansoftmac_out_buf_t buf,
                      wlan_tx_info_t tx_info) -> zx_status_t {
-        return AsDeviceInterface(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
+        return DeviceInterface::from(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
       },
       .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
-        return AsDeviceInterface(device)->SetEthernetStatus(status);
+        return DeviceInterface::from(device)->SetEthernetStatus(status);
       },
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
-        return AsDeviceInterface(device)->InstallKey(key);
+        return DeviceInterface::from(device)->InstallKey(key);
       },
       .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
-        return AsDeviceInterface(device)->JoinBss(cfg);
+        return DeviceInterface::from(device)->JoinBss(cfg);
       },
   };
 

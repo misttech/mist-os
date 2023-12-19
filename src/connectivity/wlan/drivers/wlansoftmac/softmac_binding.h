@@ -51,11 +51,6 @@ class WlanSoftmacHandle {
  private:
   DeviceInterface* device_;
   wlansoftmac_handle_t* inner_handle_;
-
-  static DeviceInterface* AsDeviceInterface(void* device) {
-    return static_cast<DeviceInterface*>(device);
-  }
-
   async::Loop wlan_softmac_bridge_server_loop_;
 };
 

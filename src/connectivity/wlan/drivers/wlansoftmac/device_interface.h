@@ -40,6 +40,7 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
 class DeviceInterface {
  public:
   virtual ~DeviceInterface() = default;
+  static DeviceInterface* from(void* device) { return static_cast<DeviceInterface*>(device); }
 
   virtual zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                             zx::channel* out_sme_channel) = 0;
