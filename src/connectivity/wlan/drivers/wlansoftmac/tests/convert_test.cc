@@ -67,21 +67,6 @@ class ConvertTest : public LogTest {};
 
 // FIDL to banjo types tests.
 
-TEST_F(ConvertTest, ToBanjoSpectrumManagementSupport) {
-  log::Instance::Init(0);
-  wlan_common::SpectrumManagementSupport in = {
-      .dfs =
-          {
-              .supported = kPopulaterBool,
-          },
-  };
-
-  spectrum_management_support_t out;
-  ConvertSpectrumManagementSupport(in, &out);
-
-  EXPECT_EQ(kPopulaterBool, out.dfs.supported);
-}
-
 TEST_F(ConvertTest, ToBanjoRxPacket) {
   log::Instance::Init(0);
   // Populate wlan_softmac::WlanRxPacket

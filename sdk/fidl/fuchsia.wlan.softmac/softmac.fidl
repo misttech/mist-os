@@ -489,6 +489,15 @@ closed protocol WlanSoftmacBridge {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;
 
+    /// Gets information about the spectrum usage (e.g., DFS) features supported
+    /// by the device. This method is safe to call even when the SoftMAC has not
+    /// yet started.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.QuerySpectrumManagementSupport")
+    strict QuerySpectrumManagementSupport() -> (struct {
+        resp fuchsia.wlan.common.SpectrumManagementSupport;
+    }) error zx.Status;
+
     /// Set the primary radio channel, e.g. in response to a channel switch event.
     /// If successful, this will trigger the channel switch immediately. This may
     /// impact the transmission of any frames that are in-flight, and might also
@@ -675,9 +684,10 @@ closed protocol WlanSoftmac {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;
 
-    /// Query the underlying device for features related to spectrum usage, e.g.
-    /// DFS. Safe to call when the softmac is not started.
-    @available(added=15)
+    /// Gets information about the spectrum usage (e.g., DFS) features supported
+    /// by the device. This method is safe to call even when the SoftMAC has not
+    /// yet started.
+    @available(added=15, removed=HEAD)
     strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;

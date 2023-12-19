@@ -325,8 +325,7 @@ impl<D: DeviceOps> Ap<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
-        let ddk_support = self.ctx.device.spectrum_management_support();
-        let support = ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
+        let support = device::try_query_spectrum_management_support(&mut self.ctx.device)?;
         responder.respond(support);
         Ok(())
     }

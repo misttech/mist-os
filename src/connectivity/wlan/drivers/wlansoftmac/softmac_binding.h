@@ -76,7 +76,6 @@ class SoftmacBinding : public DeviceInterface,
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const spectrum_management_support_t& GetSpectrumManagementSupport() const final;
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
   void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
@@ -166,7 +165,6 @@ class SoftmacBinding : public DeviceInterface,
   //                         calls have not been profiled, and this behavior is
   //                         not documented in the SDK. Moreover, caching
   //                         introduces opportunities for subtle bugs.
-  spectrum_management_support_t spectrum_management_support_ = {};
   fbl::RefPtr<DeviceState> state_;
 
   std::unique_ptr<WlanSoftmacHandle> softmac_handle_;

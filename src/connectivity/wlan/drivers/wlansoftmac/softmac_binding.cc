@@ -115,6 +115,15 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void QuerySpectrumManagementSupport(
+      QuerySpectrumManagementSupportCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySpectrumManagementSupport> dispatcher =
+        [](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->QuerySpectrumManagementSupport();
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
+
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
     Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
         [request](const auto& arena, const auto& client) {
@@ -280,9 +289,6 @@ zx_status_t WlanSoftmacHandle::Init(
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return AsDeviceInterface(device)->InstallKey(key);
       },
-      .get_spectrum_management_support = [](void* device) -> spectrum_management_support_t {
-        return AsDeviceInterface(device)->GetSpectrumManagementSupport();
-      },
       .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
         return AsDeviceInterface(device)->JoinBss(cfg);
       },
@@ -433,27 +439,6 @@ void SoftmacBinding::Init() {
     device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
     return;
   }
-
-  auto spectrum_management_arena = fdf::Arena::Create(0, 0);
-  if (spectrum_management_arena.is_error()) {
-    lerror("Failed to create arena: %s", spectrum_management_arena.status_string());
-    device_init_reply(child_device_, ZX_ERR_INTERNAL, nullptr);
-    return;
-  }
-
-  auto spectrum_management_result = client_.sync()
-                                        .buffer(*std::move(spectrum_management_arena))
-                                        ->QuerySpectrumManagementSupport();
-
-  if (!spectrum_management_result.ok()) {
-    lerror("Failed getting spectrum management result (FIDL error %s)",
-           spectrum_management_result.status_string());
-    device_init_reply(child_device_, spectrum_management_result.status(), nullptr);
-    return;
-  }
-
-  ConvertSpectrumManagementSupport(spectrum_management_result->value()->resp,
-                                   &spectrum_management_support_);
 
   /* End of data type conversion. */
 
@@ -786,7 +771,4 @@ void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, f
 
 fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
 
-const spectrum_management_support_t& SoftmacBinding::GetSpectrumManagementSupport() const {
-  return spectrum_management_support_;
-}
 }  // namespace wlan::drivers::wlansoftmac

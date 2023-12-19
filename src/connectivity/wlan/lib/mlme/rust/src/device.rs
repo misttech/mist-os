@@ -90,7 +90,9 @@ pub trait DeviceOps {
     fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status>;
     fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status>;
     fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status>;
-    fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport;
+    fn spectrum_management_support(
+        &mut self,
+    ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status>;
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
     fn send_wlan_frame(&mut self, buf: OutBuf, tx_flags: u32) -> Result<(), zx::Status>;
 
@@ -208,6 +210,17 @@ pub fn try_query_security_support(
     })
 }
 
+pub fn try_query_spectrum_management_support(
+    device: &mut impl DeviceOps,
+) -> Result<fidl_common::SpectrumManagementSupport, Error> {
+    device.spectrum_management_support().map_err(|status| {
+        Error::Status(
+            String::from("Failed to query spectrum management support for device."),
+            status,
+        )
+    })
+}
+
 impl DeviceOps for Device {
     fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
@@ -248,8 +261,13 @@ impl DeviceOps for Device {
         )
     }
 
-    fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport {
-        (self.raw_device.get_spectrum_management_support)(self.raw_device.device)
+    fn spectrum_management_support(
+        &mut self,
+    ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
+        Self::flatten_and_log_error(
+            "QuerySpectrumManagementSupport",
+            self.wlan_softmac_bridge_proxy.query_spectrum_management_support(zx::Time::INFINITE),
+        )
     }
 
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status> {
@@ -544,9 +562,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Get spectrum management features supported by this WLAN interface
-    get_spectrum_management_support:
-        extern "C" fn(device: *mut c_void) -> banjo_common::SpectrumManagementSupport,
     /// Configure the device's BSS.
     /// |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
     join_bss: extern "C" fn(device: *mut c_void, cfg: &mut banjo_common::JoinBssRequest) -> i32,
@@ -712,7 +727,7 @@ pub mod test_utils {
         pub discovery_support: fidl_common::DiscoverySupport,
         pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: fidl_common::SecuritySupport,
-        pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
+        pub spectrum_management_support: fidl_common::SpectrumManagementSupport,
         pub join_bss_request: Option<banjo_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
@@ -840,8 +855,10 @@ pub mod test_utils {
             Ok(self.state.lock().unwrap().security_support)
         }
 
-        fn spectrum_management_support(&mut self) -> banjo_common::SpectrumManagementSupport {
-            self.state.lock().unwrap().spectrum_management_support
+        fn spectrum_management_support(
+            &mut self,
+        ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
+            Ok(self.state.lock().unwrap().spectrum_management_support)
         }
 
         fn deliver_eth_frame(&mut self, data: &[u8]) -> Result<(), zx::Status> {
@@ -1084,10 +1101,8 @@ pub mod test_utils {
         }
     }
 
-    pub fn fake_spectrum_management_support() -> banjo_common::SpectrumManagementSupport {
-        banjo_common::SpectrumManagementSupport {
-            dfs: banjo_common::DfsFeature { supported: true },
-        }
+    pub fn fake_spectrum_management_support() -> fidl_common::SpectrumManagementSupport {
+        fidl_common::SpectrumManagementSupport { dfs: fidl_common::DfsFeature { supported: true } }
     }
 }
 
@@ -1252,11 +1267,11 @@ mod tests {
     fn fake_device_returns_expected_spectrum_management_support() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, _) = FakeDevice::new(&exec);
-        let spectrum_management_support = fake_device.spectrum_management_support();
+        let spectrum_management_support = fake_device.spectrum_management_support().unwrap();
         assert_eq!(
             spectrum_management_support,
-            banjo_common::SpectrumManagementSupport {
-                dfs: banjo_common::DfsFeature { supported: true },
+            fidl_common::SpectrumManagementSupport {
+                dfs: fidl_common::DfsFeature { supported: true },
             }
         );
     }

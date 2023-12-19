@@ -50,7 +50,6 @@ class DeviceInterface {
   virtual zx_status_t InstallKey(wlan_key_configuration_t* key_config) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;
-  virtual const spectrum_management_support_t& GetSpectrumManagementSupport() const = 0;
 };
 
 }  // namespace wlan::drivers

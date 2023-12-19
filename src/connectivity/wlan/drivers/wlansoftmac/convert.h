@@ -15,9 +15,6 @@
 namespace wlan {
 
 // FIDL to banjo conversions.
-void ConvertSpectrumManagementSupport(
-    const fuchsia_wlan_common::wire::SpectrumManagementSupport& in,
-    spectrum_management_support_t* out);
 zx_status_t ConvertRxPacket(const fuchsia_wlan_softmac::wire::WlanRxPacket& in,
                             wlan_rx_packet_t* out, uint8_t* rx_packet_buffer);
 zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxResult& in,

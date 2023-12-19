@@ -243,9 +243,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
             return;
         }
     };
-    let spectrum_management_support = match wlan_mlme::convert_ddk_spectrum_management_support(
-        device.spectrum_management_support(),
-    ) {
+    let spectrum_management_support = match device.spectrum_management_support() {
         Ok(s) => s,
         Err(e) => {
             startup_sender

@@ -118,14 +118,6 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     }
 }
 
-pub fn convert_ddk_spectrum_management_support(
-    support: banjo_common::SpectrumManagementSupport,
-) -> Result<fidl_common::SpectrumManagementSupport, Error> {
-    Ok(fidl_common::SpectrumManagementSupport {
-        dfs: fidl_common::DfsFeature { supported: support.dfs.supported },
-    })
-}
-
 // TODO(b/308634817): Remove this conversion once CSsid is no longer used for
 //                    SSIDs specified for active scan requests.
 pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
@@ -140,7 +132,7 @@ pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::device::fake_spectrum_management_support};
+    use super::*;
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
         banjo_wlan_softmac::WlanRxInfo {
@@ -227,13 +219,5 @@ mod tests {
         );
         assert!(mlme_band_cap.ht_cap.is_some());
         assert!(mlme_band_cap.vht_cap.is_none());
-    }
-
-    #[test]
-    fn test_convert_ddk_spectrum_management_support() {
-        let support_ddk = fake_spectrum_management_support();
-        let support_fidl = convert_ddk_spectrum_management_support(support_ddk)
-            .expect("Failed to convert spectrum management support");
-        assert_eq!(support_fidl.dfs.supported, support_ddk.dfs.supported);
     }
 }

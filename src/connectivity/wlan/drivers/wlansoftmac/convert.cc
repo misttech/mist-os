@@ -90,12 +90,6 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-void ConvertSpectrumManagementSupport(
-    const fuchsia_wlan_common::wire::SpectrumManagementSupport& in,
-    spectrum_management_support_t* out) {
-  out->dfs.supported = in.dfs.supported;
-}
-
 zx_status_t ConvertRxInfo(const fuchsia_wlan_softmac::wire::WlanRxInfo& in, wlan_rx_info_t* out) {
   zx_status_t status;
 

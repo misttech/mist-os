@@ -84,10 +84,6 @@ typedef struct {
    */
   int32_t (*set_key)(void *device, wlan_key_configuration_t *key);
   /**
-   * Get spectrum management features supported by this WLAN interface
-   */
-  spectrum_management_support_t (*get_spectrum_management_support)(void *device);
-  /**
    * Configure the device's BSS.
    * |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
    */
