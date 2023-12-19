@@ -11,7 +11,7 @@ assert(current_cpu == "arm64",
        "The arm64 board can only be defined in an arm64 toolchain.")
 
 board_configuration("arm64") {
-  provided_features = []
+  provided_features = [ "fuchsia::driver_framework_v2_support" ]
 
   input_bundles = [
     ":main_bundle",

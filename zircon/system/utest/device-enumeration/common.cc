@@ -95,16 +95,6 @@ void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count) {
   loop.Run();
 }
 
-bool IsDfv2Enabled() {
-  zx::result driver_development =
-      component::Connect<fuchsia_driver_development::DriverDevelopment>();
-  EXPECT_OK(driver_development.status_value());
-
-  const fidl::WireResult result = fidl::WireCall(driver_development.value())->IsDfv2();
-  EXPECT_OK(result.status());
-  return result.value().response;
-}
-
 }  // namespace device_enumeration
 
 // Static
@@ -152,10 +142,6 @@ void DeviceEnumerationTest::PrintAllDevices() {
       component::Connect<fuchsia_driver_development::DriverDevelopment>();
   ASSERT_OK(driver_development.status_value());
 
-  const fidl::WireResult result = fidl::WireCall(driver_development.value())->IsDfv2();
-  ASSERT_OK(result.status());
-  const bool is_dfv2 = result.value().response;
-
   {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_development::NodeInfoIterator>();
     ASSERT_OK(endpoints.status_value());
@@ -175,17 +161,10 @@ void DeviceEnumerationTest::PrintAllDevices() {
         break;
       }
       for (const fuchsia_driver_development::wire::NodeInfo& info : response.drivers) {
-        if (is_dfv2) {
-          ASSERT_TRUE(info.has_versioned_info());
-          ASSERT_TRUE(info.versioned_info().is_v2());
-          ASSERT_TRUE(info.versioned_info().v2().has_moniker());
-          std::cout << info.versioned_info().v2().moniker().get() << std::endl;
-        } else {
-          ASSERT_TRUE(info.has_versioned_info());
-          ASSERT_TRUE(info.versioned_info().is_v1());
-          ASSERT_TRUE(info.versioned_info().v1().has_topological_path());
-          std::cout << info.versioned_info().v1().topological_path().get() << std::endl;
-        }
+        ASSERT_TRUE(info.has_versioned_info());
+        ASSERT_TRUE(info.versioned_info().is_v2());
+        ASSERT_TRUE(info.versioned_info().v2().has_moniker());
+        std::cout << info.versioned_info().v2().moniker().get() << std::endl;
       }
     }
     std::cout << "END printing all devices (paths in DFv1, monikers in DFv2)." << std::endl;

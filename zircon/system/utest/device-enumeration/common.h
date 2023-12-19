@@ -23,7 +23,6 @@ void WaitForOne(cpp20::span<const char*> device_paths);
 
 void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count);
 
-bool IsDfv2Enabled();
 }  // namespace device_enumeration
 
 class DeviceEnumerationTest : public zxtest::Test {

@@ -82,14 +82,12 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
-  if (!device_enumeration::IsDfv2Enabled()) {
-    // TODO(https://fxbug.dev/124274): Fix the metadata problems in i2c.cm and re-enable this.
-    static const char* kDfv1DevicePaths[] = {
-        "sys/platform/pt/PCI0/bus/00:15.0/00:15.0/i2c-bus-9d60",
-        "sys/platform/pt/PCI0/bus/00:15.1/00:15.1/i2c-bus-9d61",
-    };
-    ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
-  }
+  // TODO(https://fxbug.dev/124274): Fix the metadata problems in i2c.cm and re-enable this.
+  // static const char* kDfv1DevicePaths[] = {
+  //     "sys/platform/pt/PCI0/bus/00:15.0/00:15.0/i2c-bus-9d60",
+  //     "sys/platform/pt/PCI0/bus/00:15.1/00:15.1/i2c-bus-9d61",
+  // };
+  // ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
 }
 
 TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
