@@ -183,8 +183,7 @@
             {
                 "paths": [
                     "src/starnix/lib/linux_uapi/stub",
-                    "zircon/LICENSE",
-                    "src/ui/lib/uitypes/BUILD.gn"
+                    "zircon/LICENSE"
                 ],
                 "notes": [
                     "Bug: fxbug.dev/126193",
