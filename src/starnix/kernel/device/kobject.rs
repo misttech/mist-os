@@ -4,7 +4,7 @@
 
 use crate::{
     device::DeviceMode,
-    fs::sysfs::SysFsDirectory,
+    fs::sysfs::SysfsDirectory,
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -12,7 +12,6 @@ use crate::{
         FsString, PathBuilder,
     },
 };
-use assert_matches::assert_matches;
 use starnix_sync::Mutex;
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
 use std::{
@@ -20,112 +19,11 @@ use std::{
     sync::{Arc, Weak},
 };
 
-/// ktype is the type of object that embeds a `kobject`.
-#[derive(Debug, PartialEq)]
-pub enum KType {
-    /// A collection of kobjects.
-    Collection,
-    /// A bus which devices can be attached to.
-    Bus,
-    /// A group of devices that have a smilar behavior.
-    Class,
-    /// A virtual/physical device that is attached to a bus.
-    ///
-    /// Contains all information of a device node.
-    Device(DeviceMetadata),
-    #[cfg(test)]
-    /// A type used for testing.
-    Test,
-}
-
-#[derive(Clone)]
-pub struct DeviceMetadata {
-    pub bus: Option<Weak<KObject>>,
-    pub class: Weak<KObject>,
-    /// Name of the device in /dev.
-    pub name: FsString,
-    pub device_type: DeviceType,
-    pub mode: DeviceMode,
-}
-
-impl DeviceMetadata {
-    pub fn new(
-        bus: Option<&KObjectHandle>,
-        class: &KObjectHandle,
-        name: &FsStr,
-        device_type: DeviceType,
-        mode: DeviceMode,
-    ) -> Self {
-        Self {
-            bus: bus.map(Arc::downgrade),
-            class: Arc::downgrade(class),
-            name: name.to_vec(),
-            device_type,
-            mode,
-        }
-    }
-}
-
-impl PartialEq for DeviceMetadata {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.device_type == other.device_type
-    }
-}
-
-impl std::fmt::Debug for DeviceMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "DeviceMetadata {{ name: {}, device_type: {}, mode: {:?} }}",
-            String::from_utf8_lossy(&self.name),
-            self.device_type,
-            self.mode
-        )
-    }
-}
-
-/// Attributes that are used to create a KType::Device kobject.
-#[derive(Clone, Debug)]
-pub struct KObjectDeviceAttribute {
-    /// Physical bus kobject that the device belongs to.
-    ///
-    ///  - `None` means it is a virtual device.
-    pub bus: Option<KObjectHandle>,
-    /// Class kobject that the device belongs to.
-    pub class: KObjectHandle,
-    /// Name in /sys.
-    pub name: FsString,
-    pub metadata: DeviceMetadata,
-}
-
-impl KObjectDeviceAttribute {
-    pub fn new(
-        bus: Option<KObjectHandle>,
-        class: KObjectHandle,
-        kobject_name: &FsStr,
-        device_name: &FsStr,
-        device_type: DeviceType,
-        mode: DeviceMode,
-    ) -> Self {
-        assert_matches!(class.ktype(), KType::Class);
-        if let Some(bus) = &bus {
-            assert_matches!(bus.ktype(), KType::Bus);
-        }
-
-        Self {
-            name: kobject_name.to_vec(),
-            metadata: DeviceMetadata::new(bus.as_ref(), &class, device_name, device_type, mode),
-            bus,
-            class,
-        }
-    }
-}
-
 /// A kobject is the fundamental unit of the sysfs /devices subsystem. Each kobject represents a
 /// sysfs object.
 ///
-/// A kobject has a name, a `ktype`, pointers to its children, and a pointer to its
-/// parent, which allows it to be organized into hierarchies.
+/// A kobject has a name, a function to create FsNodeOps, pointers to its children, and a pointer
+/// to its parent, which allows it to be organized into hierarchies.
 pub struct KObject {
     /// The name that will appear in sysfs.
     ///
@@ -142,11 +40,6 @@ pub struct KObject {
     /// references from child-to-parent. This will avoid reference cycle.
     children: Mutex<BTreeMap<FsString, KObjectHandle>>,
 
-    /// The type of object that embeds a kobject.
-    ///
-    /// It controls what happens to the kobject when being created and destroyed.
-    ktype: KType,
-
     /// Function to create the associated `FsNodeOps`.
     create_fs_node_ops: CreateFsNodeOps,
 }
@@ -160,17 +53,11 @@ impl KObject {
             name: name.to_vec(),
             parent: None,
             children: Default::default(),
-            ktype: KType::Collection,
-            create_fs_node_ops: Box::new(|kobject| Box::new(SysFsDirectory::new(kobject))),
+            create_fs_node_ops: Box::new(|kobject| Box::new(SysfsDirectory::new(kobject))),
         })
     }
 
-    fn new<F, N>(
-        name: &FsStr,
-        parent: KObjectHandle,
-        ktype: KType,
-        create_fs_node_ops: F,
-    ) -> KObjectHandle
+    fn new<F, N>(name: &FsStr, parent: KObjectHandle, create_fs_node_ops: F) -> KObjectHandle
     where
         F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
         N: FsNodeOps,
@@ -179,7 +66,6 @@ impl KObject {
             name: name.to_vec(),
             parent: Some(Arc::downgrade(&parent)),
             children: Default::default(),
-            ktype,
             create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
         })
     }
@@ -194,11 +80,6 @@ impl KObject {
     /// Returns none if this kobject is the root.
     pub fn parent(&self) -> Option<KObjectHandle> {
         self.parent.clone().and_then(|parent| Weak::upgrade(&parent))
-    }
-
-    /// The type of object that embeds a kobject.
-    pub fn ktype(&self) -> &KType {
-        &self.ktype
     }
 
     /// Returns the associated `FsNodeOps`.
@@ -246,7 +127,6 @@ impl KObject {
     pub fn get_or_create_child<F, N>(
         self: &KObjectHandle,
         name: &FsStr,
-        ktype: KType,
         create_fs_node_ops: F,
     ) -> KObjectHandle
     where
@@ -257,7 +137,7 @@ impl KObject {
         match children.get(name).cloned() {
             Some(child) => child,
             None => {
-                let child = KObject::new(name, self.clone(), ktype, create_fs_node_ops);
+                let child = KObject::new(name, self.clone(), create_fs_node_ops);
                 children.insert(name.to_vec(), child.clone());
                 child
             }
@@ -292,20 +172,115 @@ impl KObject {
 
 impl std::fmt::Debug for KObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KObject")
-            .field("name", &String::from_utf8_lossy(&self.name()))
-            .field("ktype", &self.ktype())
-            .finish()
+        f.debug_struct("KObject").field("name", &String::from_utf8_lossy(&self.name())).finish()
+    }
+}
+
+/// A trait implemented by all kobject-based types.
+pub trait KObjectBased {
+    fn kobject(&self) -> KObjectHandle;
+}
+
+/// Implements the KObjectBased traits for a KObject new type struct.
+macro_rules! impl_kobject_based {
+    ($type_name:path) => {
+        impl KObjectBased for $type_name {
+            fn kobject(&self) -> KObjectHandle {
+                self.kobject.upgrade().expect("Embedded kobject has been droppped.")
+            }
+        }
+    };
+}
+
+/// A collection of devices whose `parent` kobject is not the embedded kobject.
+///
+/// Used for grouping devices in the sysfs subsystem.
+#[derive(Clone, Debug)]
+pub struct Collection {
+    kobject: Weak<KObject>,
+}
+impl_kobject_based!(Collection);
+
+impl Collection {
+    pub fn new(kobject: KObjectHandle) -> Self {
+        Self { kobject: Arc::downgrade(&kobject) }
+    }
+}
+
+/// A Class is a higher-level view of a device.
+///
+/// It groups devices based on what they do, rather than how they are connected.
+#[derive(Clone, Debug)]
+pub struct Class {
+    kobject: Weak<KObject>,
+    /// Physical bus that the devices belong to.
+    pub bus: Bus,
+    pub collection: Collection,
+}
+impl_kobject_based!(Class);
+
+impl Class {
+    pub fn new(kobject: KObjectHandle, bus: Bus, collection: Collection) -> Self {
+        Self { kobject: Arc::downgrade(&kobject), bus, collection }
+    }
+}
+
+/// A Bus identifies how the devices are connected to the processor.
+#[derive(Clone, Debug)]
+pub struct Bus {
+    kobject: Weak<KObject>,
+    pub collection: Option<Collection>,
+}
+impl_kobject_based!(Bus);
+
+impl Bus {
+    pub fn new(kobject: KObjectHandle, collection: Option<Collection>) -> Self {
+        Self { kobject: Arc::downgrade(&kobject), collection }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Device {
+    pub kobject: Weak<KObject>,
+    /// Class kobject that the device belongs to.
+    pub class: Class,
+    pub metadata: DeviceMetadata,
+}
+impl_kobject_based!(Device);
+
+impl Device {
+    pub fn new(kobject: KObjectHandle, class: Class, metadata: DeviceMetadata) -> Self {
+        Self { kobject: Arc::downgrade(&kobject), class, metadata }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DeviceMetadata {
+    /// Name of the device in /dev.
+    pub name: FsString,
+    pub device_type: DeviceType,
+    pub mode: DeviceMode,
+}
+
+impl DeviceMetadata {
+    pub fn new(name: &FsStr, device_type: DeviceType, mode: DeviceMode) -> Self {
+        Self { name: name.to_vec(), device_type, mode }
+    }
+}
+
+impl PartialEq for DeviceMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.device_type == other.device_type && self.mode == other.mode
     }
 }
 
 pub struct UEventFsNode {
-    kobject: KObjectHandle,
+    device: Device,
 }
 
 impl UEventFsNode {
-    pub fn new(kobject: KObjectHandle) -> Self {
-        Self { kobject }
+    pub fn new(device: Device) -> Self {
+        Self { device }
     }
 }
 
@@ -318,17 +293,17 @@ impl FsNodeOps for UEventFsNode {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(UEventFile::new(self.kobject.clone())))
+        Ok(Box::new(UEventFile::new(self.device.clone())))
     }
 }
 
 struct UEventFile {
-    kobject: KObjectHandle,
+    device: Device,
 }
 
 impl UEventFile {
-    pub fn new(kobject: KObjectHandle) -> Self {
-        Self { kobject }
+    pub fn new(device: Device) -> Self {
+        Self { device }
     }
 
     fn parse_commands(data: &[u8]) -> Vec<&[u8]> {
@@ -346,18 +321,13 @@ impl FileOps for UEventFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        match self.kobject.ktype() {
-            KType::Device(device) => {
-                let content = format!(
-                    "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
-                    device.device_type.major(),
-                    device.device_type.minor(),
-                    String::from_utf8_lossy(&device.name),
-                );
-                data.write(content[offset..].as_bytes())
-            }
-            _ => error!(ENODEV),
-        }
+        let content = format!(
+            "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
+            self.device.metadata.device_type.major(),
+            self.device.metadata.device_type.minor(),
+            String::from_utf8_lossy(&self.device.kobject().name()),
+        );
+        data.write(content[offset..].as_bytes())
     }
 
     fn write(
@@ -381,7 +351,7 @@ impl FileOps for UEventFile {
             current_task
                 .kernel()
                 .device_registry
-                .dispatch_uevent(command.try_into()?, self.kobject.clone());
+                .dispatch_uevent(command.try_into()?, self.device.clone());
         }
         Ok(content.len())
     }
@@ -440,7 +410,6 @@ pub struct UEventContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::sysfs::DeviceDirectory;
 
     #[::fuchsia::test]
     fn kobject_create_child() {
@@ -448,34 +417,34 @@ mod tests {
         assert!(root.parent().is_none());
 
         assert!(!root.has_child(b"virtual"));
-        root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
+        root.get_or_create_child(b"virtual", SysfsDirectory::new);
         assert!(root.has_child(b"virtual"));
     }
 
     #[::fuchsia::test]
     fn kobject_path() {
         let root = KObject::new_root(b"devices");
-        let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
+        let bus = root.get_or_create_child(b"virtual", SysfsDirectory::new);
         let device = bus
-            .get_or_create_child(b"mem", KType::Test, SysFsDirectory::new)
-            .get_or_create_child(b"null", KType::Test, DeviceDirectory::new);
+            .get_or_create_child(b"mem", SysfsDirectory::new)
+            .get_or_create_child(b"null", SysfsDirectory::new);
         assert_eq!(device.path(), b"devices/virtual/mem/null".to_vec());
     }
 
     #[::fuchsia::test]
     fn kobject_path_to_root() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child(b"bus", KType::Test, SysFsDirectory::new);
-        let device = bus.get_or_create_child(b"device", KType::Test, SysFsDirectory::new);
+        let bus = root.get_or_create_child(b"bus", SysfsDirectory::new);
+        let device = bus.get_or_create_child(b"device", SysfsDirectory::new);
         assert_eq!(device.path_to_root(), b"../..".to_vec());
     }
 
     #[::fuchsia::test]
     fn kobject_get_children_names() {
         let root = KObject::new_root(Default::default());
-        root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
-        root.get_or_create_child(b"cpu", KType::Test, SysFsDirectory::new);
-        root.get_or_create_child(b"power", KType::Test, SysFsDirectory::new);
+        root.get_or_create_child(b"virtual", SysfsDirectory::new);
+        root.get_or_create_child(b"cpu", SysfsDirectory::new);
+        root.get_or_create_child(b"power", SysfsDirectory::new);
 
         let names = root.get_children_names();
         assert!(names.iter().any(|name| *name == b"virtual".to_vec()));
@@ -487,8 +456,8 @@ mod tests {
     #[::fuchsia::test]
     fn kobject_remove() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
-        let class = bus.get_or_create_child(b"mem", KType::Test, SysFsDirectory::new);
+        let bus = root.get_or_create_child(b"virtual", SysfsDirectory::new);
+        let class = bus.get_or_create_child(b"mem", SysfsDirectory::new);
         assert!(bus.has_child(b"mem"));
         class.remove();
         assert!(!bus.has_child(b"mem"));

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{kobject::KObjectDeviceAttribute, DeviceMode, DeviceOps},
+    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
+    fs::sysfs::DeviceDirectory,
     mm::ProtectionFlags,
     task::CurrentTask,
     vfs::{
@@ -25,20 +26,16 @@ pub fn ashmem_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let misc_class = registry.add_class(b"misc", registry.virtual_bus());
+    let misc_class = registry.get_or_create_class(b"misc", registry.virtual_bus());
     let ashmem_device =
         registry.register_dyn_chrdev(AshmemDevice {}).expect("ashmem device register failed.");
 
     registry.add_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            misc_class.clone(),
-            b"ashmem",
-            b"ashmem",
-            ashmem_device,
-            DeviceMode::Char,
-        ),
+        b"ashmem",
+        DeviceMetadata::new(b"ashmem", ashmem_device, DeviceMode::Char),
+        misc_class,
+        DeviceDirectory::new,
     );
 }
 

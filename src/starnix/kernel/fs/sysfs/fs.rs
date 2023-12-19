@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::kobject::{KObjectHandle, KType},
+    device::kobject::KObjectHandle,
     fs::sysfs::{
         cgroup::CgroupDirectoryNode, sysfs_kernel_directory, sysfs_power_directory,
-        CpuClassDirectory, SysFsDirectory,
+        CpuClassDirectory, SysfsDirectory,
     },
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
@@ -60,9 +60,10 @@ impl SysFs {
         dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
-        registry.class_subsystem_kobject().get_or_create_child(b"net", KType::Collection, |_| {
-            NetstackDevicesDirectory::new_sys_class_net()
-        });
+        kernel
+            .device_registry
+            .class_subsystem_kobject()
+            .get_or_create_child(b"net", |_| NetstackDevicesDirectory::new_sys_class_net());
 
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
@@ -71,8 +72,8 @@ impl SysFs {
         // Remove after registry.rs refactor is in place.
         registry
             .root_kobject()
-            .get_or_create_child(b"system", KType::Bus, SysFsDirectory::new)
-            .get_or_create_child(b"cpu", KType::Class, CpuClassDirectory::new);
+            .get_or_create_child(b"system", SysfsDirectory::new)
+            .get_or_create_child(b"cpu", CpuClassDirectory::new);
 
         dir.build_root();
         fs
@@ -83,7 +84,7 @@ pub fn sys_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSy
     current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options))
 }
 
-pub trait SysFsOps: FsNodeOps {
+pub trait SysfsOps: FsNodeOps {
     fn kobject(&self) -> KObjectHandle;
 }
 

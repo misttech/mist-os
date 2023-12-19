@@ -4,7 +4,7 @@
 
 use crate::{
     device::{
-        kobject::KObjectDeviceAttribute,
+        kobject::DeviceMetadata,
         terminal::{TTYState, Terminal},
         DeviceMode, DeviceOps,
     },
@@ -43,6 +43,8 @@ use starnix_uapi::{
     TIOCSRS485, TIOCSSERIAL, TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
 };
 use std::sync::{Arc, Weak};
+
+use super::sysfs::DeviceDirectory;
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
 const DEVPTS_FIRST_MAJOR: u32 = 136;
@@ -111,25 +113,21 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
 pub fn tty_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
-    let tty_class = registry.add_class(b"tty", registry.virtual_bus());
-    let tty = KObjectDeviceAttribute::new(
-        None,
+    let tty_class = registry.get_or_create_class(b"tty", registry.virtual_bus());
+    registry.add_device(
+        current_task,
+        b"tty",
+        DeviceMetadata::new(b"tty", DeviceType::TTY, DeviceMode::Char),
         tty_class.clone(),
-        b"tty",
-        b"tty",
-        DeviceType::TTY,
-        DeviceMode::Char,
+        DeviceDirectory::new,
     );
-    let ptmx = KObjectDeviceAttribute::new(
-        None,
+    registry.add_device(
+        current_task,
+        b"ptmx",
+        DeviceMetadata::new(b"ptmx", DeviceType::PTMX, DeviceMode::Char),
         tty_class,
-        b"ptmx",
-        b"ptmx",
-        DeviceType::PTMX,
-        DeviceMode::Char,
+        DeviceDirectory::new,
     );
-    registry.add_device(current_task, tty);
-    registry.add_device(current_task, ptmx);
 
     devtmpfs_mkdir(current_task, b"pts").unwrap();
 

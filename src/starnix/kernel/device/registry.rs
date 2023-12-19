@@ -4,19 +4,19 @@
 
 use crate::{
     device::kobject::{
-        KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
+        Bus, Class, Device, DeviceMetadata, KObject, KObjectBased, KObjectHandle, UEventAction,
+        UEventContext,
     },
     fs::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         sysfs::{
-            BlockDeviceDirectory, BusCollectionDirectory, ClassCollectionDirectory,
-            DeviceDirectory, SysFsDirectory, SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
+            BusCollectionDirectory, ClassCollectionDirectory, DeviceSysfsOps, SysfsDirectory,
+            SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
         },
     },
     task::CurrentTask,
-    vfs::{FileOps, FsNode, FsNodeOps, FsStr},
+    vfs::{FileOps, FsNode, FsStr},
 };
-use assert_matches::assert_matches;
 use starnix_logging::log_error;
 use starnix_uapi::{
     device_type::{DeviceType, DYN_MAJOR},
@@ -29,11 +29,13 @@ use starnix_sync::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     marker::{Send, Sync},
-    sync::{Arc, Weak},
+    sync::Arc,
 };
 
 use dyn_clone::{clone_trait_object, DynClone};
 use range_map::RangeMap;
+
+use super::kobject::Collection;
 
 const CHRDEV_MINOR_MAX: u32 = 256;
 const BLKDEV_MINOR_MAX: u32 = 2u32.pow(20);
@@ -116,7 +118,7 @@ pub type DeviceListenerKey = u64;
 
 /// A listener for uevents on devices.
 pub trait DeviceListener: Send + Sync {
-    fn on_device_event(&self, action: UEventAction, kobject: KObjectHandle, context: UEventContext);
+    fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext);
 }
 
 struct MajorDevices {
@@ -235,116 +237,99 @@ impl DeviceRegistry {
     }
 
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
-    pub fn virtual_bus(&self) -> KObjectHandle {
-        self.root_kobject.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
+    pub fn virtual_bus(&self) -> Bus {
+        Bus::new(self.root_kobject.get_or_create_child(b"virtual", SysfsDirectory::new), None)
     }
 
-    pub fn add_bus(&self, name: &FsStr) -> KObjectHandle {
-        let bus = self.root_kobject.get_or_create_child(name, KType::Bus, SysFsDirectory::new);
-        self.bus_subsystem_kobject.get_or_create_child(
-            name,
-            KType::Collection,
-            BusCollectionDirectory::new,
+    pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
+        let collection = Collection::new(
+            self.bus_subsystem_kobject.get_or_create_child(name, BusCollectionDirectory::new),
         );
-        bus
+        Bus::new(self.root_kobject.get_or_create_child(name, SysfsDirectory::new), Some(collection))
     }
 
-    pub fn add_class(&self, name: &FsStr, bus: KObjectHandle) -> KObjectHandle {
-        let class = bus.get_or_create_child(name, KType::Class, SysFsDirectory::new);
-        self.class_subsystem_kobject.get_or_create_child(
-            name,
-            KType::Collection,
-            ClassCollectionDirectory::new,
+    pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
+        let collection = Collection::new(
+            self.class_subsystem_kobject.get_or_create_child(name, ClassCollectionDirectory::new),
         );
-        class
+        Class::new(bus.kobject().get_or_create_child(name, SysfsDirectory::new), bus, collection)
     }
 
-    pub fn add_device(
+    pub fn add_device<F, N>(
         &self,
         current_task: &CurrentTask,
-        dev_attr: KObjectDeviceAttribute,
-    ) -> KObjectHandle {
-        match dev_attr.metadata.mode {
-            DeviceMode::Char => {
-                self.add_device_with_directory(current_task, dev_attr, DeviceDirectory::new)
-            }
-            DeviceMode::Block => {
-                self.add_device_with_directory(current_task, dev_attr, BlockDeviceDirectory::new)
-            }
-        }
-    }
-
-    pub fn add_device_with_directory<F, N>(
-        &self,
-        current_task: &CurrentTask,
-        dev_attr: KObjectDeviceAttribute,
-        create_fs_node_ops: F,
-    ) -> KObjectHandle
+        name: &FsStr,
+        metadata: DeviceMetadata,
+        class: Class,
+        create_device_sysfs_ops: F,
+    ) -> Device
     where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
+        F: Fn(Device) -> N + Send + Sync + 'static,
+        N: DeviceSysfsOps,
     {
-        let ktype = KType::Device(dev_attr.metadata.clone());
-        let kobj_device =
-            dev_attr.class.get_or_create_child(&dev_attr.name, ktype, create_fs_node_ops);
-        self.class_subsystem_kobject
-            .get_child(&dev_attr.class.name())
-            .expect("no associated collection exists")
-            .insert_child(kobj_device.clone());
-        if dev_attr.metadata.mode == DeviceMode::Block {
-            self.block_subsystem_kobject.insert_child(kobj_device.clone());
+        let class_cloned = class.clone();
+        let metadata_cloned = metadata.clone();
+        let device_kobject = class.kobject().get_or_create_child(name, move |kobject| {
+            create_device_sysfs_ops(Device::new(
+                kobject.upgrade().unwrap(),
+                class_cloned.clone(),
+                metadata_cloned.clone(),
+            ))
+        });
+
+        // Insert the created device kobject into its subsystems.
+        class.collection.kobject().insert_child(device_kobject.clone());
+        if metadata.mode == DeviceMode::Block {
+            self.block_subsystem_kobject.insert_child(device_kobject.clone());
         }
-        if let Some(bus) = dev_attr.bus {
-            self.bus_subsystem_kobject
-                .get_child(&bus.name())
-                .expect("no associated collection exists")
-                .insert_child(kobj_device.clone());
+        if let Some(bus_collection) = &class.bus.collection {
+            bus_collection.kobject().insert_child(device_kobject.clone());
         }
 
-        if let Err(err) = devtmpfs_create_device(current_task, dev_attr.metadata.clone()) {
-            log_error!("Cannot add device {:?} in devtmpfs ({:?})", dev_attr.metadata, err);
+        if let Err(err) = devtmpfs_create_device(current_task, metadata.clone()) {
+            log_error!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
         }
 
-        self.dispatch_uevent(UEventAction::Add, kobj_device.clone());
-        kobj_device
+        let device = device_kobject.ops().as_ref().as_any().downcast_ref::<N>().unwrap().device();
+        self.dispatch_uevent(UEventAction::Add, device.clone());
+        device
     }
 
-    pub fn add_and_register_device(
+    pub fn add_and_register_device<F, N>(
         &self,
         current_task: &CurrentTask,
-        dev_attr: KObjectDeviceAttribute,
+        name: &FsStr,
+        metadata: DeviceMetadata,
+        class: Class,
+        create_device_sysfs_ops: F,
         dev_ops: impl DeviceOps,
-    ) -> KObjectHandle {
+    ) -> Device
+    where
+        F: Fn(Device) -> N + Send + Sync + 'static,
+        N: DeviceSysfsOps,
+    {
         if let Err(err) = self.register_device(
-            dev_attr.metadata.device_type.major(),
-            dev_attr.metadata.device_type.minor(),
+            metadata.device_type.major(),
+            metadata.device_type.minor(),
             1,
             dev_ops,
-            dev_attr.metadata.mode,
+            metadata.mode,
         ) {
-            log_error!("Cannot register device {:?} ({:?})", dev_attr.metadata, err);
+            log_error!("Cannot register device {:?} ({:?})", metadata, err);
         }
-        self.add_device(current_task, dev_attr)
+        self.add_device(current_task, name, metadata, class, create_device_sysfs_ops)
     }
 
-    pub fn remove_device(&self, current_task: &CurrentTask, device: KObjectHandle) {
-        assert_matches!(device.ktype(), KType::Device(_));
-        if let KType::Device(metadata) = device.ktype() {
-            self.class_subsystem_kobject
-                .get_child(&metadata.class.upgrade().expect("class kobject should be valid").name())
-                .expect("associated collection should exist")
-                .remove_child(&device.name());
-            if let Some(bus) = &metadata.bus {
-                self.bus_subsystem_kobject
-                    .get_child(&bus.upgrade().expect("bus kobject should be valid").name())
-                    .expect("associated collection should exist")
-                    .remove_child(&device.name());
-            }
-            device.remove();
-            self.dispatch_uevent(UEventAction::Remove, device.clone());
-
-            devtmpfs_remove_child(current_task, &metadata.name);
+    pub fn remove_device(&self, current_task: &CurrentTask, device: Device) {
+        let name = device.kobject().name();
+        device.class.collection.kobject().remove_child(&name);
+        if let Some(bus_collection) = &device.class.bus.collection {
+            bus_collection.kobject().remove_child(&name);
         }
+        device.kobject().remove();
+        self.dispatch_uevent(UEventAction::Remove, device.clone());
+
+        devtmpfs_remove_child(current_task, &device.metadata.name);
     }
 
     fn major_devices(&self, mode: DeviceMode) -> MappedMutexGuard<'_, MajorDevices> {
@@ -416,13 +401,13 @@ impl DeviceRegistry {
     }
 
     /// Dispatch an uevent for the given `device`.
-    pub fn dispatch_uevent(&self, action: UEventAction, kobject: KObjectHandle) {
+    pub fn dispatch_uevent(&self, action: UEventAction, device: Device) {
         let mut state = self.state.lock();
         let event_id = state.next_event_id;
         state.next_event_id += 1;
         let context = UEventContext { seqnum: event_id };
         for listener in state.listeners.values() {
-            listener.on_device_event(action, kobject.clone(), context);
+            listener.on_device_event(action, device.clone(), context);
         }
     }
 
@@ -511,7 +496,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, testing::*, vfs::*};
+    use crate::{device::mem::DevNull, fs::sysfs::DeviceDirectory, testing::*, vfs::*};
     use starnix_uapi::device_type::{INPUT_MAJOR, MEM_MAJOR};
 
     #[::fuchsia::test]
@@ -601,17 +586,13 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let input_class = registry.add_class(b"input", registry.virtual_bus());
+        let input_class = registry.get_or_create_class(b"input", registry.virtual_bus());
         registry.add_device(
             &current_task,
-            KObjectDeviceAttribute::new(
-                None,
-                input_class,
-                b"mice",
-                b"mice",
-                DeviceType::new(INPUT_MAJOR, 0),
-                DeviceMode::Char,
-            ),
+            b"mice",
+            DeviceMetadata::new(b"mice", DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            input_class,
+            DeviceDirectory::new,
         );
 
         assert!(registry.class_subsystem_kobject().has_child(b"input"));
@@ -627,18 +608,14 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let bus = registry.add_bus(b"bus");
-        let class = registry.add_class(b"class", bus.clone());
+        let bus = registry.get_or_create_bus(b"bus");
+        let class = registry.get_or_create_class(b"class", bus);
         registry.add_device(
             &current_task,
-            KObjectDeviceAttribute::new(
-                Some(bus),
-                class,
-                b"device",
-                b"device",
-                DeviceType::new(0, 0),
-                DeviceMode::Char,
-            ),
+            b"device",
+            DeviceMetadata::new(b"device", DeviceType::new(0, 0), DeviceMode::Char),
+            class,
+            DeviceDirectory::new,
         );
         assert!(registry.bus_subsystem_kobject().has_child(b"bus"));
         assert!(registry
@@ -653,22 +630,18 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let pci_bus = registry.add_bus(b"pci");
-        let input_class = registry.add_class(b"input", pci_bus.clone());
+        let pci_bus = registry.get_or_create_bus(b"pci");
+        let input_class = registry.get_or_create_class(b"input", pci_bus);
         let mice_dev = registry.add_device(
             &current_task,
-            KObjectDeviceAttribute::new(
-                Some(pci_bus),
-                input_class.clone(),
-                b"mice",
-                b"mice",
-                DeviceType::new(INPUT_MAJOR, 0),
-                DeviceMode::Char,
-            ),
+            b"mice",
+            DeviceMetadata::new(b"mice", DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            input_class.clone(),
+            DeviceDirectory::new,
         );
 
         registry.remove_device(&current_task, mice_dev);
-        assert!(!input_class.has_child(b"mice"));
+        assert!(!input_class.kobject().has_child(b"mice"));
         assert!(!registry
             .bus_subsystem_kobject()
             .get_child(b"pci")

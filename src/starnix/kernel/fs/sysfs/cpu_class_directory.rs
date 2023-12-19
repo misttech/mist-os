@@ -4,7 +4,7 @@
 
 use crate::{
     device::kobject::{KObject, KObjectHandle},
-    fs::{sysfs::SysFsOps, tmpfs::TmpfsDirectory},
+    fs::{sysfs::SysfsOps, tmpfs::TmpfsDirectory},
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
@@ -25,7 +25,7 @@ impl CpuClassDirectory {
     }
 }
 
-impl SysFsOps for CpuClassDirectory {
+impl SysfsOps for CpuClassDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }

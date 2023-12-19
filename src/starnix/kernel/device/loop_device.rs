@@ -1,10 +1,10 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use super::DeviceMode;
 
 use crate::{
-    device::kobject::KObjectDeviceAttribute,
+    device::{kobject::DeviceMetadata, DeviceMode},
+    fs::sysfs::BlockDeviceDirectory,
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
@@ -133,17 +133,17 @@ impl LoopDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let loop_device_name = format!("loop{minor}");
-        let virtual_block_class = registry.add_class(b"block", registry.virtual_bus());
+        let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
         registry.add_device(
             current_task,
-            KObjectDeviceAttribute::new(
-                None,
-                virtual_block_class,
-                loop_device_name.as_bytes(),
+            loop_device_name.as_bytes(),
+            DeviceMetadata::new(
                 loop_device_name.as_bytes(),
                 DeviceType::new(LOOP_MAJOR, minor),
                 DeviceMode::Block,
             ),
+            virtual_block_class,
+            BlockDeviceDirectory::new,
         );
         Arc::new(Self { number: minor, state: Default::default() })
     }

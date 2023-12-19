@@ -4,7 +4,8 @@
 
 use super::file::GrallocFile;
 use crate::{
-    device::{kobject::KObjectDeviceAttribute, DeviceMode, DeviceOps},
+    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
+    fs::sysfs::DeviceDirectory,
     task::CurrentTask,
     vfs::{FileOps, FsNode},
 };
@@ -44,7 +45,7 @@ pub fn gralloc_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class = registry.add_class(b"starnix", registry.virtual_bus());
+    let starnix_class = registry.get_or_create_class(b"starnix", registry.virtual_bus());
 
     let gralloc_type: DeviceType = registry
         .register_dyn_chrdev(GrallocDevice::new(mode_setter))
@@ -52,13 +53,9 @@ pub fn gralloc_device_init(current_task: &CurrentTask) {
 
     registry.add_device(
         current_task,
-        KObjectDeviceAttribute::new(
-            None,
-            starnix_class,
-            b"virtgralloc0",
-            b"virtgralloc0",
-            gralloc_type,
-            DeviceMode::Char,
-        ),
+        b"virtgralloc0",
+        DeviceMetadata::new(b"virtgralloc0", gralloc_type, DeviceMode::Char),
+        starnix_class,
+        DeviceDirectory::new,
     );
 }

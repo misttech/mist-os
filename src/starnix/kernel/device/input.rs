@@ -6,8 +6,9 @@ use crate::{
     device::{
         framebuffer::Framebuffer,
         input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
-        kobject::KObjectDeviceAttribute, registry::DeviceOps, DeviceMode,
+        kobject::DeviceMetadata, registry::DeviceOps, DeviceMode,
     },
+    fs::sysfs::DeviceDirectory,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -867,18 +868,21 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let input_class = registry.add_class(b"input", registry.virtual_bus());
+    let input_class = registry.get_or_create_class(b"input", registry.virtual_bus());
 
     let device_id = get_next_device_id();
-    let attr = KObjectDeviceAttribute::new(
-        None,
-        input_class,
+    registry.add_and_register_device(
+        system_task,
         format!("event{}", device_id).as_bytes(),
-        format!("input/event{}", device_id).as_bytes(),
-        DeviceType::new(INPUT_MAJOR, device_id),
-        DeviceMode::Char,
+        DeviceMetadata::new(
+            format!("input/event{}", device_id).as_bytes(),
+            DeviceType::new(INPUT_MAJOR, device_id),
+            DeviceMode::Char,
+        ),
+        input_class,
+        DeviceDirectory::new,
+        dev_ops,
     );
-    registry.add_and_register_device(system_task, attr, dev_ops);
 }
 
 /// add and register 1 touch device and 1 keyboard device to kernel.

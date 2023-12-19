@@ -23,7 +23,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     device::{
-        kobject::{KObjectHandle, KType, UEventAction, UEventContext},
+        kobject::{Device, KObjectBased, UEventAction, UEventContext},
         DeviceListener, DeviceListenerKey,
     },
     mm::MemoryAccessorExt,
@@ -692,19 +692,13 @@ impl SocketOps for UEventNetlinkSocket {
 }
 
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
-    fn on_device_event(
-        &self,
-        action: UEventAction,
-        kobject: KObjectHandle,
-        context: UEventContext,
-    ) {
-        let message = match kobject.ktype() {
-            KType::Device(device) => {
-                let subsystem = kobject.parent().unwrap().name();
-                // TODO(fxb/127713): Pass the synthetic UUID when available.
-                // Otherwise, default as "0".
-                let message = format!(
-                    "{action}@/{path}\0\
+    fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext) {
+        let kobject = device.kobject();
+        let subsystem = kobject.parent().unwrap().name();
+        // TODO(fxb/127713): Pass the synthetic UUID when available.
+        // Otherwise, default as "0".
+        let message = format!(
+            "{action}@/{path}\0\
                             ACTION={action}\0\
                             DEVPATH=/{path}\0\
                             DEVNAME={name}\0\
@@ -713,20 +707,13 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MAJOR={major}\0\
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
-                    path = String::from_utf8_lossy(&kobject.path()),
-                    name = String::from_utf8_lossy(&device.name),
-                    subsystem = String::from_utf8_lossy(&subsystem),
-                    major = device.device_type.major(),
-                    minor = device.device_type.minor(),
-                    seqnum = context.seqnum,
-                );
-                message
-            }
-            _ => {
-                log_error!("This kobject ({:?}) is not a device type.", kobject);
-                return;
-            }
-        };
+            path = String::from_utf8_lossy(&kobject.path()),
+            name = String::from_utf8_lossy(&device.metadata.name),
+            subsystem = String::from_utf8_lossy(&subsystem),
+            major = device.metadata.device_type.major(),
+            minor = device.metadata.device_type.minor(),
+            seqnum = context.seqnum,
+        );
         let ancillary_data = AncillaryData::Unix(UnixControlData::Credentials(Default::default()));
         let mut ancillary_data = vec![ancillary_data];
         // Ignore write errors

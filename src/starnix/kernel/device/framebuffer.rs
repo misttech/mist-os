@@ -7,7 +7,8 @@ use super::framebuffer_server::{
     start_flatland_presentation_loop, FramebufferServer,
 };
 use crate::{
-    device::{features::AspectRatio, kobject::KObjectDeviceAttribute, DeviceMode, DeviceOps},
+    device::{features::AspectRatio, kobject::DeviceMetadata, DeviceMode, DeviceOps},
+    fs::sysfs::DeviceDirectory,
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::{CurrentTask, Kernel},
     vfs::{
@@ -293,14 +294,13 @@ pub fn fb_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let graphics_class = registry.add_class(b"graphics", registry.virtual_bus());
-    let fb_attr = KObjectDeviceAttribute::new(
-        None,
+    let graphics_class = registry.get_or_create_class(b"graphics", registry.virtual_bus());
+    registry.add_and_register_device(
+        system_task,
+        b"fb0",
+        DeviceMetadata::new(b"fb0", DeviceType::FB0, DeviceMode::Char),
         graphics_class,
-        b"fb0",
-        b"fb0",
-        DeviceType::FB0,
-        DeviceMode::Char,
+        DeviceDirectory::new,
+        kernel.framebuffer.clone(),
     );
-    registry.add_and_register_device(system_task, fb_attr, kernel.framebuffer.clone());
 }

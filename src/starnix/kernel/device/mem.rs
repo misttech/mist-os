@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{kobject::KObjectDeviceAttribute, simple_device_ops, DeviceMode},
+    device::{kobject::DeviceMetadata, simple_device_ops, DeviceMode},
+    fs::sysfs::DeviceDirectory,
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
@@ -266,77 +267,53 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let mem_class = registry.add_class(b"mem", registry.virtual_bus());
+    let mem_class = registry.get_or_create_class(b"mem", registry.virtual_bus());
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class.clone(),
-            b"null",
-            b"null",
-            DeviceType::NULL,
-            DeviceMode::Char,
-        ),
+        b"null",
+        DeviceMetadata::new(b"null", DeviceType::NULL, DeviceMode::Char),
+        mem_class.clone(),
+        DeviceDirectory::new,
         simple_device_ops::<DevNull>,
     );
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class.clone(),
-            b"zero",
-            b"zero",
-            DeviceType::ZERO,
-            DeviceMode::Char,
-        ),
+        b"zero",
+        DeviceMetadata::new(b"zero", DeviceType::ZERO, DeviceMode::Char),
+        mem_class.clone(),
+        DeviceDirectory::new,
         simple_device_ops::<DevZero>,
     );
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class.clone(),
-            b"full",
-            b"full",
-            DeviceType::FULL,
-            DeviceMode::Char,
-        ),
+        b"full",
+        DeviceMetadata::new(b"full", DeviceType::FULL, DeviceMode::Char),
+        mem_class.clone(),
+        DeviceDirectory::new,
         simple_device_ops::<DevFull>,
     );
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class.clone(),
-            b"random",
-            b"random",
-            DeviceType::RANDOM,
-            DeviceMode::Char,
-        ),
+        b"random",
+        DeviceMetadata::new(b"random", DeviceType::RANDOM, DeviceMode::Char),
+        mem_class.clone(),
+        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class.clone(),
-            b"urandom",
-            b"urandom",
-            DeviceType::URANDOM,
-            DeviceMode::Char,
-        ),
+        b"urandom",
+        DeviceMetadata::new(b"urandom", DeviceType::URANDOM, DeviceMode::Char),
+        mem_class.clone(),
+        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            mem_class,
-            b"kmsg",
-            b"kmsg",
-            DeviceType::KMSG,
-            DeviceMode::Char,
-        ),
+        b"kmsg",
+        DeviceMetadata::new(b"kmsg", DeviceType::KMSG, DeviceMode::Char),
+        mem_class,
+        DeviceDirectory::new,
         open_kmsg,
     );
 }

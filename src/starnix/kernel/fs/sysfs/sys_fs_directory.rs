@@ -4,7 +4,7 @@
 
 use crate::{
     device::kobject::{KObject, KObjectHandle},
-    fs::sysfs::SysFsOps,
+    fs::sysfs::SysfsOps,
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -14,23 +14,23 @@ use crate::{
 use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
-pub struct SysFsDirectory {
+pub struct SysfsDirectory {
     kobject: Weak<KObject>,
 }
 
-impl SysFsDirectory {
+impl SysfsDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
 }
 
-impl SysFsOps for SysFsDirectory {
+impl SysfsOps for SysfsDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
-impl FsNodeOps for SysFsDirectory {
+impl FsNodeOps for SysfsDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(

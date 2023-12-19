@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use crate::{
     device::kobject::{KObject, KObjectHandle},
-    fs::sysfs::{sysfs_create_link, SysFsOps},
+    fs::sysfs::{sysfs_create_link, SysfsOps},
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -23,7 +23,7 @@ impl BusCollectionDirectory {
     }
 }
 
-impl SysFsOps for BusCollectionDirectory {
+impl SysfsOps for BusCollectionDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
@@ -75,7 +75,7 @@ impl BusDevicesDirectory {
     }
 }
 
-impl SysFsOps for BusDevicesDirectory {
+impl SysfsOps for BusDevicesDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
@@ -124,8 +124,8 @@ impl FsNodeOps for BusDevicesDirectory {
 #[cfg(test)]
 mod tests {
     use crate::{
-        device::kobject::{KObject, KType},
-        fs::sysfs::{BusCollectionDirectory, SysFsDirectory},
+        device::kobject::KObject,
+        fs::sysfs::{BusCollectionDirectory, SysfsDirectory},
         task::CurrentTask,
         testing::{create_fs, create_kernel_and_task},
         vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode},
@@ -157,7 +157,7 @@ mod tests {
     async fn bus_devices_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child(b"0", KType::Test, SysFsDirectory::new);
+        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 

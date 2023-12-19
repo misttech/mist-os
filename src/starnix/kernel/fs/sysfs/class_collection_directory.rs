@@ -4,7 +4,7 @@
 
 use crate::{
     device::kobject::{KObject, KObjectHandle},
-    fs::sysfs::{sysfs_create_link, SysFsOps},
+    fs::sysfs::{sysfs_create_link, SysfsOps},
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -24,7 +24,7 @@ impl ClassCollectionDirectory {
     }
 }
 
-impl SysFsOps for ClassCollectionDirectory {
+impl SysfsOps for ClassCollectionDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
@@ -73,8 +73,8 @@ impl FsNodeOps for ClassCollectionDirectory {
 #[cfg(test)]
 mod tests {
     use crate::{
-        device::kobject::{KObject, KType},
-        fs::sysfs::{ClassCollectionDirectory, SysFsDirectory},
+        device::kobject::KObject,
+        fs::sysfs::{ClassCollectionDirectory, SysfsDirectory},
         task::CurrentTask,
         testing::{create_fs, create_kernel_and_task},
         vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode},
@@ -95,7 +95,8 @@ mod tests {
     async fn class_collection_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child(b"0", KType::Test, SysFsDirectory::new);
+        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
+        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
         let test_fs =
             create_fs(&kernel, ClassCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 

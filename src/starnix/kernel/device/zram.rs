@@ -4,10 +4,10 @@
 
 use crate::{
     device::{
-        kobject::{KObject, KObjectDeviceAttribute},
+        kobject::{Device, DeviceMetadata, KObjectHandle},
         simple_device_ops, DeviceMode,
     },
-    fs::sysfs::BlockDeviceDirectory,
+    fs::sysfs::{BlockDeviceDirectory, DeviceSysfsOps, SysfsOps},
     task::{CurrentTask, KernelStats},
     vfs::{
         fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
@@ -25,7 +25,7 @@ use starnix_uapi::{
     file_mode::mode,
     open_flags::OpenFlags,
 };
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct DevZram;
@@ -40,8 +40,20 @@ pub struct ZramDeviceDirectory {
 }
 
 impl ZramDeviceDirectory {
-    pub fn new(kobject: Weak<KObject>) -> Self {
-        Self { base_dir: BlockDeviceDirectory::new(kobject) }
+    pub fn new(device: Device) -> Self {
+        Self { base_dir: BlockDeviceDirectory::new(device) }
+    }
+}
+
+impl SysfsOps for ZramDeviceDirectory {
+    fn kobject(&self) -> KObjectHandle {
+        self.base_dir.kobject()
+    }
+}
+
+impl DeviceSysfsOps for ZramDeviceDirectory {
+    fn device(&self) -> Device {
+        self.base_dir.device()
     }
 }
 
@@ -124,21 +136,16 @@ pub fn zram_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let virtual_block_class = registry.add_class(b"block", registry.virtual_bus());
+    let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
     registry
         .register_device(ZRAM_MAJOR, 0, 1, simple_device_ops::<DevZram>, DeviceMode::Block)
         .expect("Failed to register zram device.");
 
-    registry.add_device_with_directory(
+    registry.add_device(
         system_task,
-        KObjectDeviceAttribute::new(
-            None,
-            virtual_block_class,
-            b"zram0",
-            b"zram0",
-            DeviceType::new(ZRAM_MAJOR, 0),
-            DeviceMode::Block,
-        ),
+        b"zram0",
+        DeviceMetadata::new(b"zram0", DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
+        virtual_block_class,
         ZramDeviceDirectory::new,
     );
 }
