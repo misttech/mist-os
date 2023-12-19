@@ -44,6 +44,7 @@ executable("bin") {
 
   deps = [
     ":lib",
+    "//sdk/lib/sys/cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

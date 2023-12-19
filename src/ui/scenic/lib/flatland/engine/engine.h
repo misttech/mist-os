@@ -6,7 +6,7 @@
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_H_
 
 #include <fuchsia/ui/display/color/cpp/fidl.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/eventpair.h>
 
 // TODO(fxbug.dev/76640): delete when we delete hack_seen_display_id_values_.

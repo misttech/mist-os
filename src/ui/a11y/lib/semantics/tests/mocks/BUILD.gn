@@ -33,7 +33,7 @@ source_set("mocks") {
     "//sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/lib/fxl",
     "//src/ui/a11y/lib/util",
   ]

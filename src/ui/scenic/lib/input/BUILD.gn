@@ -27,7 +27,7 @@ source_set("system") {
     ":mouse",
     ":touch",
     ":utils",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
   ]
 
   public_deps = [ "//src/ui/scenic/lib/view_tree:view_tree_snapshot" ]
@@ -158,8 +158,8 @@ source_set("touch") {
     ":gesture_contender_interface",
     ":legacy",
     ":utils",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/trace",
   ]

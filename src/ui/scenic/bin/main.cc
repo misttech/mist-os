@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
@@ -12,7 +13,6 @@
 #include <memory>
 
 #include "lib/inspect/cpp/inspect.h"
-#include "lib/sys/inspect/cpp/component.h"
 #include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
@@ -31,7 +31,7 @@ int main(int argc, const char** argv) {
   std::unique_ptr<sys::ComponentContext> app_context = sys::ComponentContext::Create();
 
   // Set up an inspect::Node to inject into the App.
-  sys::ComponentInspector inspector(app_context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
 
   auto display_coordinator_promise = display::GetCoordinator();
 
