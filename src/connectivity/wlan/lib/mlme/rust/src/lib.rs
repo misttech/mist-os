@@ -29,13 +29,10 @@ mod probe_sequence;
 use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    device::DeviceOps,
+    device::{completers::StartStaCompleter, DeviceOps},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        select, StreamExt,
-    },
+    futures::{channel::mpsc, select, StreamExt},
     parking_lot::Mutex,
     std::{cmp, sync::Arc, time::Duration},
     tracing::{error, info},
@@ -183,12 +180,12 @@ const MINSTREL_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_
 const MINSTREL_UPDATE_INTERVAL_HW_SIM: std::time::Duration = std::time::Duration::from_millis(83);
 
 pub async fn mlme_main_loop<T: MlmeImpl>(
+    start_sta_completer: StartStaCompleter<impl FnOnce(Result<(), zx::Status>) + Send>,
     config: T::Config,
     mut device: T::Device,
     buf_provider: buffer::BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
-    startup_sender: oneshot::Sender<Result<(), Error>>,
 ) {
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
     let minstrel = device.mac_sublayer_support().ok().filter(should_enable_minstrel).map(
@@ -212,9 +209,8 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     // path if this occurs.
     let mlme_impl = T::new(config, device, buf_provider, timer).expect("Failed to create MLME.");
 
-    // Startup is complete. Signal the main thread to proceed.
-    // Failure to unwrap indicates a critical failure in the driver init thread.
-    startup_sender.send(Ok(())).unwrap();
+    // Signal the main driver dispatcher that startup is complete.
+    start_sta_completer.complete(Ok(()));
 
     let result = main_loop_impl(
         mlme_impl,
@@ -443,21 +439,23 @@ mod tests {
     #[test]
     fn start_and_stop_main_loop() {
         let mut exec = TestExecutor::new();
-        let (device, _device_state) = FakeDevice::new(&exec);
+        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let buf_provider = FakeBufferProvider::new();
         let (device_sink, device_stream) = mpsc::unbounded();
-        let (startup_sender, mut startup_receiver) = oneshot::channel();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
+        let (startup_sender, mut startup_receiver) = oneshot::channel::<Result<(), zx::Status>>();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
+            StartStaCompleter::new(move |status: Result<(), zx::Status>| {
+                startup_sender.send(status).expect("Failed to signal startup completion.")
+            }),
             (),
-            device,
+            fake_device,
             buf_provider,
             mlme_request_stream,
             device_stream,
-            startup_sender,
         ));
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Pending);
-        assert_variant!(startup_receiver.try_recv(), Ok(Some(Ok(()))));
+        assert_eq!(exec.run_until_stalled(&mut startup_receiver), Poll::Ready(Ok(Ok(()))));
 
         device_sink.unbounded_send(DriverEvent::Stop).expect("Failed to send stop event");
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(()));

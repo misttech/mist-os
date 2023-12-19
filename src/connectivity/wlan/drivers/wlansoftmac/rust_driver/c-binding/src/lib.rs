@@ -9,8 +9,10 @@
 use {
     fuchsia_zircon as zx,
     std::ffi::c_void,
-    tracing::error,
-    wlan_mlme::{buffer::BufferProvider, device::DeviceInterface},
+    wlan_mlme::{
+        buffer::BufferProvider,
+        device::{completers::StartStaCompleter, DeviceInterface},
+    },
     wlan_span::CSpan,
     wlansoftmac_rust::{start_wlansoftmac, WlanSoftmacHandle},
 };
@@ -23,17 +25,18 @@ pub extern "C" fn start_sta(
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> *mut WlanSoftmacHandle {
-    match start_wlansoftmac(device, buf_provider, wlan_softmac_bridge_client_handle) {
-        Ok(handle) => {
-            run_completer(completer, zx::Status::OK.into_raw());
-            Box::into_raw(Box::new(handle))
-        }
-        Err(e) => {
-            error!("Failed to start WLAN Softmac STA: {}", e);
-            run_completer(completer, zx::Status::INTERNAL.into_raw());
-            std::ptr::null_mut()
-        }
-    }
+    // Safety: Cast *mut c_void to usize so that the constructed lambda will be Send. This is safe
+    // since we don't expect to move StartStaCompleter to a thread in a different address space,
+    // i.e., the value of the pointer will still be valid in the thread.
+    let completer = completer as usize;
+    Box::into_raw(Box::new(start_wlansoftmac(
+        StartStaCompleter::new(move |status: Result<(), zx::Status>| {
+            run_completer(completer as *mut c_void, zx::Status::from(status).into_raw());
+        }),
+        device,
+        buf_provider,
+        wlan_softmac_bridge_client_handle,
+    )))
 }
 
 #[no_mangle]

@@ -16,7 +16,92 @@ use {
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
 };
 
-#[cfg(test)]
+pub mod completers {
+    use {
+        fuchsia_zircon as zx,
+        tracing::{error, warn},
+    };
+
+    pub struct StartStaCompleter<F>
+    where
+        F: FnOnce(Result<(), zx::Status>) + Send,
+    {
+        completer: Option<F>,
+    }
+
+    impl<F> StartStaCompleter<F>
+    where
+        F: FnOnce(Result<(), zx::Status>) + Send,
+    {
+        pub fn new(completer: F) -> Self {
+            Self { completer: Some(completer) }
+        }
+
+        pub fn complete(mut self, result: Result<(), zx::Status>) {
+            let completer = match self.completer.take() {
+                None => {
+                    error!("Failed to call completer because it is None.");
+                    return;
+                }
+                Some(completer) => completer,
+            };
+            completer(result)
+        }
+    }
+
+    impl<F> Drop for StartStaCompleter<F>
+    where
+        F: FnOnce(Result<(), zx::Status>) + Send,
+    {
+        fn drop(&mut self) {
+            if let Some(completer) = self.completer.take() {
+                error!("About to drop start_sta() completer without calling it!");
+                warn!("Calling start_sta() completer from drop() to mitigate potential deadlock.");
+                completer(Err(zx::Status::BAD_STATE))
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use futures::channel::oneshot;
+
+        #[test]
+        fn start_sta_completer_sends_ok() {
+            let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
+            let start_sta_completer =
+                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
+                    sender.send(result).expect("Failed to send result.");
+                });
+            start_sta_completer.complete(Ok(()));
+            assert_eq!(Ok(Some(Ok(()))), receiver.try_recv());
+        }
+
+        #[test]
+        fn start_sta_completer_sends_err() {
+            let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
+            let start_sta_completer =
+                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
+                    sender.send(result).expect("Failed to send result.");
+                });
+            start_sta_completer.complete(Err(zx::Status::INTERNAL));
+            assert_eq!(Ok(Some(Err(zx::Status::INTERNAL))), receiver.try_recv());
+        }
+
+        #[test]
+        fn start_sta_completer_sends_err_on_drop() {
+            let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
+            let start_sta_completer =
+                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
+                    sender.send(result).expect("Failed to send result.");
+                });
+            drop(start_sta_completer);
+            assert_eq!(Ok(Some(Err(zx::Status::BAD_STATE))), receiver.try_recv());
+        }
+    }
+}
+
 pub use test_utils::*;
 
 #[derive(Debug, PartialEq)]
