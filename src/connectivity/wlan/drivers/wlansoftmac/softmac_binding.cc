@@ -263,17 +263,13 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 };
 
-void WlanSoftmacHandle::Init(std::unique_ptr<StartStaCompleter> completer,
-                             fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client) {
-  if (inner_handle_ != nullptr) {
-    auto status = ZX_ERR_BAD_STATE;
-    lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
-    (*completer)(status);
-    return;
-  }
+zx::result<std::unique_ptr<WlanSoftmacHandle>> WlanSoftmacHandle::New(
+    std::unique_ptr<StartStaCompleter> completer, DeviceInterface* device,
+    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& client) {
+  auto softmac_handle = std::unique_ptr<WlanSoftmacHandle>(new WlanSoftmacHandle(device));
 
   rust_device_interface_t wlansoftmac_rust_ops = {
-      .device = static_cast<void*>(this->device_),
+      .device = static_cast<void*>(softmac_handle->device_),
       .start = [](void* device, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         zx::channel channel;
@@ -300,11 +296,16 @@ void WlanSoftmacHandle::Init(std::unique_ptr<StartStaCompleter> completer,
   };
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
-  WlanSoftmacBridgeImpl::BindSelfManagedServer(wlan_softmac_bridge_server_loop_.dispatcher(),
-                                               std::move(client), std::move(endpoints->server));
-  wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
+  if (endpoints.is_error()) {
+    lerror("Failed to create WlanSoftmacBridge endpoints: %s", endpoints.status_string());
+    return endpoints.take_error();
+  }
+  WlanSoftmacBridgeImpl::BindSelfManagedServer(
+      softmac_handle->wlan_softmac_bridge_server_loop_.dispatcher(), std::move(client),
+      std::move(endpoints->server));
+  softmac_handle->wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
 
-  inner_handle_ = start_sta(
+  softmac_handle->inner_handle_ = start_sta(
       completer.release(),
       [](void* ctx, zx_status_t status) {
         auto completer = static_cast<StartStaCompleter*>(ctx);
@@ -320,6 +321,7 @@ void WlanSoftmacHandle::Init(std::unique_ptr<StartStaCompleter> completer,
         delete completer;
       },
       wlansoftmac_rust_ops, rust_buffer_provider, endpoints->client.TakeHandle().release());
+  return fit::success(std::move(softmac_handle));
 }
 
 zx_status_t WlanSoftmacHandle::StopMainLoop() {
@@ -434,7 +436,6 @@ void SoftmacBinding::Init() {
   linfo("Connected to WlanSoftmac service.");
 
   linfo("Initializing Rust WlanSoftmac...");
-  softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
   auto completer = std::make_unique<StartStaCompleter>(
       [dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher(),
        child_device = child_device_](zx_status_t status) {
@@ -453,7 +454,13 @@ void SoftmacBinding::Init() {
           device_init_reply(child_device, status, nullptr);
         });
       });
-  softmac_handle_->Init(std::move(completer), client_.Clone());
+  auto softmac_handle = WlanSoftmacHandle::New(std::move(completer), this, client_.Clone());
+  if (softmac_handle.is_error()) {
+    lerror("Failed to create WlanSoftmacHandle: %s", softmac_handle.status_string());
+    device_init_reply(child_device_, softmac_handle.error_value(), nullptr);
+    return;
+  }
+  softmac_handle_ = std::move(*softmac_handle);
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.

@@ -40,15 +40,16 @@ using StartStaCompleter = fit::callback<void(zx_status_t status)>;
 
 class WlanSoftmacHandle {
  public:
-  explicit WlanSoftmacHandle(DeviceInterface* device);
+  static zx::result<std::unique_ptr<WlanSoftmacHandle>> New(
+      std::unique_ptr<StartStaCompleter> completer, DeviceInterface* device,
+      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& client);
   ~WlanSoftmacHandle();
 
-  void Init(std::unique_ptr<StartStaCompleter> completer,
-            fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client);
   zx_status_t StopMainLoop();
   void QueueEthFrameTx(eth::BorrowedOperation<> op);
 
  private:
+  explicit WlanSoftmacHandle(DeviceInterface* device);
   DeviceInterface* device_;
   wlansoftmac_handle_t* inner_handle_;
   async::Loop wlan_softmac_bridge_server_loop_;
