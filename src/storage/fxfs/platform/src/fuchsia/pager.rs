@@ -418,7 +418,11 @@ pub trait PagerBacked: Sync + Send + 'static {
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
-    fxfs_trace::duration!("start-page-in");
+    fxfs_trace::duration!(
+        "start-page-in",
+        "offset" => range.start,
+        "len" => range.end - range.start
+    );
 
     let pager = this.pager();
 
@@ -463,7 +467,7 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     }
 }
 
-#[fxfs_trace::trace]
+#[fxfs_trace::trace("offset" => read_range.start, "len" => read_range.end - read_range.start)]
 async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: Range<u64>, _ref_guard: RefGuard) {
     let (buffer, buffer_len) = match this.aligned_read(read_range.clone()).await {
         Ok(v) => v,

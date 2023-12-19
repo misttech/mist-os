@@ -5,14 +5,14 @@
 use {
     proc_macro::TokenStream,
     proc_macro2::TokenStream as TokenStream2,
-    quote::quote,
+    quote::{quote, ToTokens, TokenStreamExt},
     std::vec::Vec,
     syn::{
         parse::{Parse, ParseStream},
         parse_macro_input, parse_quote,
         spanned::Spanned,
         visit_mut::VisitMut,
-        Attribute, Block, Ident, ImplItem, ItemFn, ItemImpl, LitStr, ReturnType, Token, Type,
+        Attribute, Block, Expr, Ident, ImplItem, ItemFn, ItemImpl, LitStr, ReturnType, Token, Type,
     },
 };
 
@@ -77,56 +77,86 @@ impl Parse for TraceImplArgs {
     }
 }
 
-struct TraceMethodArgs {
-    name: Option<String>,
+#[derive(Default)]
+struct TraceArgs(Vec<(LitStr, Expr)>);
+
+impl ToTokens for TraceArgs {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        if self.0.len() > 0 {
+            let arg_names = self.0.iter().map(|a| &a.0);
+            let arg_values = self.0.iter().map(|a| &a.1);
+            tokens.append_all(quote!(, #(#arg_names => #arg_values),*));
+        }
+    }
 }
 
-impl Parse for TraceMethodArgs {
+#[derive(Default)]
+struct AttributeArgs {
+    name: Option<String>,
+    trace_args: TraceArgs,
+}
+
+impl Parse for AttributeArgs {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let mut args = Self { name: None };
-        if input.is_empty() {
-            return Ok(args);
+        let mut args = Self::default();
+        loop {
+            if input.is_empty() {
+                break;
+            } else if input.peek(Ident) {
+                let ident: Ident = input.parse()?;
+                if ident.to_string() != "name" {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        format!("unknown argument: {}", ident),
+                    ));
+                }
+                if args.name.is_some() {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        format!("name specified multiple times"),
+                    ));
+                }
+                input.parse::<Token![=]>()?;
+                let trace_name: LitStr = input.parse()?;
+                args.name = Some(trace_name.value());
+            } else if input.peek(LitStr) {
+                let arg_name: LitStr = input.parse()?;
+                input.parse::<Token![=>]>()?;
+                let expr: Expr = input.parse()?;
+                args.trace_args.0.push((arg_name, expr))
+            }
+
+            if input.is_empty() {
+                break;
+            } else {
+                input.parse::<Token![,]>()?;
+            }
         }
-        let content;
-        syn::parenthesized!(content in input);
-        let ident: Ident = content.parse()?;
-        if ident.to_string() != "name" {
-            return Err(syn::Error::new(ident.span(), format!("unknown argument: {}", ident)));
-        }
-        content.parse::<Token![=]>()?;
-        let name: LitStr = content.parse()?;
-        args.name = Some(name.value());
-        if !content.is_empty() {
-            return Err(syn::Error::new(content.span(), format!("Unexpected input")));
-        }
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), format!("Unexpected input")));
-        }
+
         Ok(args)
     }
 }
 
-struct TraceFnArgs {
-    name: Option<String>,
+#[derive(Default)]
+struct TraceMethodArgs(AttributeArgs);
+
+impl Parse for TraceMethodArgs {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        if input.is_empty() {
+            return Ok(Self::default());
+        }
+        let content;
+        syn::parenthesized!(content in input);
+        Ok(Self(content.parse()?))
+    }
 }
+
+#[derive(Default)]
+struct TraceFnArgs(AttributeArgs);
 
 impl Parse for TraceFnArgs {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let mut args = Self { name: None };
-        if input.is_empty() {
-            return Ok(args);
-        }
-        let ident: Ident = input.parse()?;
-        if ident.to_string() != "name" {
-            return Err(syn::Error::new(ident.span(), format!("unknown argument: {}", ident)));
-        }
-        input.parse::<Token![=]>()?;
-        let name: LitStr = input.parse()?;
-        args.name = Some(name.value());
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), format!("Too many arguments")));
-        }
-        Ok(args)
+        Ok(Self(input.parse()?))
     }
 }
 
@@ -156,7 +186,12 @@ impl VisitMut for RemoveImplTrait {
     }
 }
 
-fn add_tracing_to_async_block(return_type: &ReturnType, block: &mut Block, name: &str) {
+fn add_tracing_to_async_block(
+    return_type: &ReturnType,
+    block: &mut Block,
+    name: &str,
+    args: TraceArgs,
+) {
     let return_type = if let ReturnType::Type(_, return_type) = return_type {
         let mut return_type = *return_type.clone();
         // `impl Trait` can't appear in the type of a variable binding. Replace all `impl Trait`s
@@ -181,19 +216,23 @@ fn add_tracing_to_async_block(return_type: &ReturnType, block: &mut Block, name:
         }
     };
 
+    // The trace args are created before the future because the future may move variables that are
+    // referenced in the trace args. The trace args should make copies of the data so they won't
+    // move any variables used in the future.
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
+        let __trace_args = ::fxfs_trace::trace_future_args!(#name #args);
         ::fxfs_trace::TraceFutureExt::trace(async move {
             #type_inference_fix
             #(#stmts)*
-        }, ::fxfs_trace::trace_future_args!(#name)).await
+        }, __trace_args).await
     );
 }
 
-fn add_tracing_to_sync_block(block: &mut Block, name: &str) {
+fn add_tracing_to_sync_block(block: &mut Block, name: &str, args: TraceArgs) {
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
-        ::fxfs_trace::duration!(#name);
+        ::fxfs_trace::duration!(#name #args);
         #(#stmts)*
     );
 }
@@ -223,7 +262,7 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
         if let ImplItem::Method(method) = item {
             let trace_fn_args = remove_trace_attribute(&mut method.attrs)?.or_else(|| {
                 if args.trace_all_methods {
-                    Some(TraceMethodArgs { name: None })
+                    Some(TraceMethodArgs::default())
                 } else {
                     None
                 }
@@ -231,15 +270,24 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
             let Some(trace_fn_args) = trace_fn_args else {
                 continue;
             };
-            let trace_name = if let Some(name) = trace_fn_args.name {
+            let trace_name = if let Some(name) = trace_fn_args.0.name {
                 name
             } else {
                 format!("{}::{}", prefix, method.sig.ident)
             };
             if method.sig.asyncness.is_some() {
-                add_tracing_to_async_block(&method.sig.output, &mut method.block, &trace_name);
+                add_tracing_to_async_block(
+                    &method.sig.output,
+                    &mut method.block,
+                    &trace_name,
+                    trace_fn_args.0.trace_args,
+                );
             } else {
-                add_tracing_to_sync_block(&mut method.block, &trace_name);
+                add_tracing_to_sync_block(
+                    &mut method.block,
+                    &trace_name,
+                    trace_fn_args.0.trace_args,
+                );
             }
         }
     }
@@ -247,11 +295,17 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
 }
 
 fn add_tracing_to_fn(mut item_fn: ItemFn, args: TraceFnArgs) -> syn::Result<TokenStream2> {
-    let trace_name = if let Some(name) = args.name { name } else { item_fn.sig.ident.to_string() };
+    let trace_name =
+        if let Some(name) = args.0.name { name } else { item_fn.sig.ident.to_string() };
     if item_fn.sig.asyncness.is_some() {
-        add_tracing_to_async_block(&item_fn.sig.output, &mut item_fn.block, &trace_name);
+        add_tracing_to_async_block(
+            &item_fn.sig.output,
+            &mut item_fn.block,
+            &trace_name,
+            args.0.trace_args,
+        );
     } else {
-        add_tracing_to_sync_block(&mut item_fn.block, &trace_name);
+        add_tracing_to_sync_block(&mut item_fn.block, &trace_name, args.0.trace_args);
     }
     Ok(quote!(#item_fn))
 }
@@ -324,9 +378,10 @@ fn add_tracing_to_fn(mut item_fn: ItemFn, args: TraceFnArgs) -> syn::Result<Toke
 /// }
 /// // Expands to:
 /// async fn example_function() {
-///     fxfs_trace::FxfsTraceFutureExt::trace(async move {
+///     let trace_future_args = fxfs_trace::trace_future_args!("example_function");
+///     async move {
 ///         ...
-///     }, fxfs_trace::cstr!("example_function")).await
+///     }.trace(trace_future_args).await
 /// }
 /// ```
 #[proc_macro_attribute]

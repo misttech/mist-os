@@ -178,7 +178,7 @@ impl XtsCipherSet {
     ///
     /// `buffer` *must* be 16 byte aligned.
     pub fn decrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        fxfs_trace::duration!("decrypt");
+        fxfs_trace::duration!("decrypt", "len" => buffer.len());
         assert_eq!(offset % SECTOR_SIZE, 0);
         let cipher = &self
             .0
@@ -205,7 +205,7 @@ impl XtsCipherSet {
     ///
     /// `buffer` *must* be 16 byte aligned.
     pub fn encrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        fxfs_trace::duration!("encrypt");
+        fxfs_trace::duration!("encrypt", "len" => buffer.len());
         assert_eq!(offset % SECTOR_SIZE, 0);
         let cipher = &self
             .0
@@ -239,12 +239,12 @@ impl StreamCipher {
     }
 
     pub fn encrypt(&mut self, buffer: &mut [u8]) {
-        fxfs_trace::duration!("StreamCipher::encrypt");
+        fxfs_trace::duration!("StreamCipher::encrypt", "len" => buffer.len());
         self.0.apply_keystream(buffer);
     }
 
     pub fn decrypt(&mut self, buffer: &mut [u8]) {
-        fxfs_trace::duration!("StreamCipher::decrypt");
+        fxfs_trace::duration!("StreamCipher::decrypt", "len" => buffer.len());
         self.0.apply_keystream(buffer);
     }
 

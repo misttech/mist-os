@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fxfs_trace::{trace_future_args, TraceFutureExt};
+use {
+    fxfs_trace::{trace_future_args, TraceFutureExt},
+    std::ops::Range,
+};
 
 #[fuchsia::test]
 fn test_fn_attr_sync() {
@@ -68,6 +71,33 @@ fn test_fn_attr_with_name() {
         5
     }
     assert_eq!(test_fn(), 5);
+}
+
+#[fuchsia::test]
+async fn test_fn_attr_async_with_args() {
+    #[fxfs_trace::trace("start" => range.start, "end" => range.end)]
+    async fn test_fn(range: Range<u64>) -> u64 {
+        range.start
+    }
+    assert_eq!(test_fn(5..10).await, 5);
+}
+
+#[fuchsia::test]
+fn test_fn_attr_sync_with_args() {
+    #[fxfs_trace::trace("start" => range.start, "end" => range.end)]
+    fn test_fn(range: Range<u64>) -> u64 {
+        range.start
+    }
+    assert_eq!(test_fn(5..10), 5);
+}
+
+#[fuchsia::test]
+fn test_fn_attr_with_name_and_args() {
+    #[fxfs_trace::trace(name = "trace-name", "start" => range.start, "end" => range.end)]
+    fn test_fn(range: Range<u64>) -> u64 {
+        range.start
+    }
+    assert_eq!(test_fn(5..10), 5);
 }
 
 #[fuchsia::test]
@@ -226,6 +256,19 @@ async fn test_trace_future() {
     let tace_only_var = 7;
     let value = async move { 5 }
         .trace(trace_future_args!("test-future", "arg1" => 6, "ar2" => tace_only_var))
+        .await;
+    assert_eq!(value, 5);
+}
+
+#[fuchsia::test]
+async fn test_trace_future_with_args() {
+    let range = 0u64..10;
+    let value = async move { 5 }
+        .trace(fxfs_trace::trace_future_args!(
+            "test-future",
+            "offset" => range.start,
+            "len" => range.end - range.start
+        ))
         .await;
     assert_eq!(value, 5);
 }

@@ -43,9 +43,8 @@ pub enum Reason {
 
 #[fxfs_trace::trace]
 impl ObjectStore {
-    #[trace]
+    #[trace("store_object_id" => self.store_object_id)]
     pub async fn flush_with_reason(&self, reason: Reason) -> Result<Version, Error> {
-        fxfs_trace::instant!("ObjectStore::flush", "store_object_id" => self.store_object_id);
         if self.parent_store.is_none() {
             // Early exit, but still return the earliest version used by a struct in the tree
             return Ok(self.tree.get_earliest_version());
