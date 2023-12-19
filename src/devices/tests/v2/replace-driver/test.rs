@@ -46,12 +46,12 @@ fn send_get_device_info_request(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[String],
     exact_match: bool,
-) -> Result<fdd::DeviceInfoIteratorProxy> {
+) -> Result<fdd::NodeInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
 
     service
-        .get_device_info(device_filter, iterator_server, exact_match)
+        .get_node_info(device_filter, iterator_server, exact_match)
         .context("FIDL call to get device info failed")?;
 
     Ok(iterator)
@@ -61,7 +61,7 @@ async fn get_device_info(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[String],
     exact_match: bool,
-) -> Result<Vec<fdd::DeviceInfo>> {
+) -> Result<Vec<fdd::NodeInfo>> {
     let iterator = send_get_device_info_request(service, device_filter, exact_match)?;
 
     let mut device_infos = Vec::new();
@@ -300,7 +300,15 @@ async fn test_replace_target() -> Result<()> {
     loop {
         let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
         if !device_infos.iter().any(|info| {
-            let name = info.moniker.clone().unwrap().split(".").last().unwrap().to_string();
+            let moniker = info
+                .versioned_info
+                .as_ref()
+                .and_then(|info| match &info {
+                    fdd::VersionedNodeInfo::V2(v2_info) => Some(v2_info.moniker.clone()),
+                    _ => None,
+                })
+                .unwrap();
+            let name = moniker.unwrap().split(".").last().unwrap().to_string();
             return name == "H".to_string();
         }) {
             break;

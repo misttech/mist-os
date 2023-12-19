@@ -72,8 +72,8 @@ pub async fn list(
             let driver = device.bound_driver_url.clone();
             let device: Device = device.into();
             let device_name = match device {
-                Device::V1(ref info) => &info.0.topological_path,
-                Device::V2(ref info) => &info.0.moniker,
+                Device::V1(ref info) => &info.get_v1_info()?.topological_path,
+                Device::V2(ref info) => &info.get_v2_info()?.moniker,
             };
             if let (Some(driver), Some(device_name)) = (driver, device_name) {
                 driver_to_devices
@@ -222,15 +222,15 @@ mod tests {
     }
 
     async fn run_device_info_iterator_server(
-        mut device_infos: Vec<fdd::DeviceInfo>,
-        iterator: ServerEnd<fdd::DeviceInfoIteratorMarker>,
+        mut device_infos: Vec<fdd::NodeInfo>,
+        iterator: ServerEnd<fdd::NodeInfoIteratorMarker>,
     ) -> Result<()> {
         let mut iterator =
             iterator.into_stream().context("Failed to convert iterator into a stream")?;
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {
-                fdd::DeviceInfoIteratorRequest::GetNext { responder } => {
+                fdd::NodeInfoIteratorRequest::GetNext { responder } => {
                     responder
                         .send(&device_infos)
                         .context("Failed to send device infos to responder")?;
@@ -274,17 +274,20 @@ mod tests {
                 )
                 .await
                 .context("Failed to run driver info iterator server")?,
-                fdd::DriverDevelopmentRequest::GetDeviceInfo {
-                    device_filter: _,
+                fdd::DriverDevelopmentRequest::GetNodeInfo {
+                    node_filter: _,
                     iterator,
                     control_handle: _,
                     exact_match: _,
                 } => run_device_info_iterator_server(
-                    vec![fdd::DeviceInfo {
-                        moniker: Some("dev.sys.foo".to_owned()),
+                    vec![fdd::NodeInfo {
                         bound_driver_url: Some(
                             "fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm".to_owned(),
                         ),
+                        versioned_info: Some(fdd::VersionedNodeInfo::V2(fdd::V2NodeInfo {
+                            moniker: Some("dev.sys.foo".to_owned()),
+                            ..Default::default()
+                        })),
                         ..Default::default()
                     }],
                     iterator,

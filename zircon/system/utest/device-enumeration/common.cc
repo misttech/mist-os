@@ -157,12 +157,12 @@ void DeviceEnumerationTest::PrintAllDevices() {
   const bool is_dfv2 = result.value().response;
 
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DeviceInfoIterator>();
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_development::NodeInfoIterator>();
     ASSERT_OK(endpoints.status_value());
     auto& [client, server] = endpoints.value();
 
     const fidl::Status result = fidl::WireCall(driver_development.value())
-                                    ->GetDeviceInfo({}, std::move(server), /* exact_match= */ true);
+                                    ->GetNodeInfo({}, std::move(server), /* exact_match= */ true);
     ASSERT_OK(result.status());
 
     // NB: this uses iostream (rather than printf) because FIDL strings aren't null-terminated.
@@ -174,13 +174,17 @@ void DeviceEnumerationTest::PrintAllDevices() {
       if (response.drivers.empty()) {
         break;
       }
-      for (const fuchsia_driver_development::wire::DeviceInfo& info : response.drivers) {
+      for (const fuchsia_driver_development::wire::NodeInfo& info : response.drivers) {
         if (is_dfv2) {
-          ASSERT_TRUE(info.has_moniker());
-          std::cout << info.moniker().get() << std::endl;
+          ASSERT_TRUE(info.has_versioned_info());
+          ASSERT_TRUE(info.versioned_info().is_v2());
+          ASSERT_TRUE(info.versioned_info().v2().has_moniker());
+          std::cout << info.versioned_info().v2().moniker().get() << std::endl;
         } else {
-          ASSERT_TRUE(info.has_topological_path());
-          std::cout << info.topological_path().get() << std::endl;
+          ASSERT_TRUE(info.has_versioned_info());
+          ASSERT_TRUE(info.versioned_info().is_v1());
+          ASSERT_TRUE(info.versioned_info().v1().has_topological_path());
+          std::cout << info.versioned_info().v1().topological_path().get() << std::endl;
         }
       }
     }

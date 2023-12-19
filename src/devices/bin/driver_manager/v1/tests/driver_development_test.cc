@@ -26,7 +26,7 @@ TEST_F(DriverDevelopmentTest, DeviceInfo) {
   auto result = GetDeviceInfo(*arena, {dev});
   ASSERT_EQ(ZX_OK, result.status_value());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DeviceInfoIterator>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::NodeInfoIterator>();
   auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
                                                                            std::move(*result));
 
@@ -38,15 +38,16 @@ TEST_F(DriverDevelopmentTest, DeviceInfo) {
   bool was_called = false;
   client->GetNext().Then(
       [&was_called](
-          fidl::WireUnownedResult<::fuchsia_driver_development::DeviceInfoIterator::GetNext>&
+          fidl::WireUnownedResult<::fuchsia_driver_development::NodeInfoIterator::GetNext>&
               result) {
         was_called = true;
         auto count = result->drivers.count();
         ASSERT_EQ(count, 1);
 
-        ASSERT_EQ(std::string(result->drivers[0].topological_path().get()),
+        ASSERT_EQ(std::string(result->drivers[0].versioned_info().v1().topological_path().get()),
                   std::string("/dev/sys/platform-bus/parent-device"));
-        ASSERT_EQ(result->drivers[0].flags(), fuchsia_driver_legacy::DeviceFlags::kBound);
+        ASSERT_EQ(result->drivers[0].versioned_info().v1().flags(),
+                  fuchsia_driver_legacy::DeviceFlags::kBound);
       });
 
   loop.RunUntilIdle();
@@ -66,7 +67,7 @@ TEST_F(DriverDevelopmentTest, UnknownFlagsWork) {
   auto result = GetDeviceInfo(*arena, {dev});
   ASSERT_EQ(ZX_OK, result.status_value());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DeviceInfoIterator>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::NodeInfoIterator>();
   auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
                                                                            std::move(*result));
 
@@ -78,12 +79,12 @@ TEST_F(DriverDevelopmentTest, UnknownFlagsWork) {
   bool was_called = false;
   client->GetNext().Then(
       [&was_called](
-          fidl::WireUnownedResult<::fuchsia_driver_development::DeviceInfoIterator::GetNext>&
+          fidl::WireUnownedResult<::fuchsia_driver_development::NodeInfoIterator::GetNext>&
               result) {
         was_called = true;
         auto count = result->drivers.count();
         ASSERT_EQ(count, 1);
-        ASSERT_EQ(static_cast<uint32_t>(result->drivers[0].flags()), 0);
+        ASSERT_EQ(static_cast<uint32_t>(result->drivers[0].versioned_info().v1().flags()), 0);
       });
 
   loop.RunUntilIdle();

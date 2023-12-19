@@ -20,15 +20,15 @@ trait DevicePrinter {
 
 impl DevicePrinter for DFv1Device {
     fn print(&self) -> Result<()> {
-        if let Some(ref topo_path) = self.0.topological_path {
+        if let Some(ref topo_path) = self.get_v1_info()?.topological_path {
             println!("{}", topo_path);
         }
         Ok(())
     }
 
     fn print_verbose(&self) -> Result<()> {
-        let topo_path = self
-            .0
+        let v1_info = self.get_v1_info()?;
+        let topo_path = v1_info
             .topological_path
             .as_deref()
             .map(|s| s.strip_prefix("/dev/").unwrap().to_string())
@@ -36,21 +36,21 @@ impl DevicePrinter for DFv1Device {
         let (_, name) = topo_path.rsplit_once('/').unwrap_or(("", &topo_path));
         println!("{0: <9}: {1}", "Name", name);
         println!("{0: <9}: {1}", "Topo Path", topo_path);
-        println!("{0: <9}: {1}", "Driver", self.0.bound_driver_libname.as_deref().unwrap_or(""));
+        println!("{0: <9}: {1}", "Driver", v1_info.bound_driver_libname.as_deref().unwrap_or(""));
         println!(
             "{0: <9}: {1:?}",
             "Flags",
-            self.0.flags.as_ref().unwrap_or(&fdl::DeviceFlags::empty())
+            v1_info.flags.as_ref().unwrap_or(&fdl::DeviceFlags::empty())
         );
-        if let Some(protocol_id) = self.0.protocol_id {
+        if let Some(protocol_id) = v1_info.protocol_id {
             println!(
                 "{0: <9}: {1} ({2})",
                 "Proto",
-                self.0.protocol_name.as_deref().unwrap_or("none"),
+                v1_info.protocol_name.as_deref().unwrap_or("none"),
                 protocol_id
             );
         }
-        if let Some(ref property_list) = self.0.property_list {
+        if let Some(ref property_list) = v1_info.property_list {
             let count = property_list.props.len();
             println!("{} Properties", count);
             let mut idx = 1;
@@ -98,17 +98,21 @@ impl DevicePrinter for DFv1Device {
 
 impl DevicePrinter for DFv2Node {
     fn print(&self) -> Result<()> {
-        println!("{}", self.0.moniker.as_ref().expect("DFv2 node does not have a moniker"));
+        println!(
+            "{}",
+            self.get_v2_info()?.moniker.as_ref().expect("DFv2 node does not have a moniker")
+        );
         Ok(())
     }
 
     fn print_verbose(&self) -> Result<()> {
-        let moniker = self.0.moniker.as_deref().expect("DFv2 node does not have a moniker");
+        let v2_info = self.get_v2_info()?;
+        let moniker = v2_info.moniker.as_deref().expect("DFv2 node does not have a moniker");
         let (_, name) = moniker.rsplit_once('.').unwrap_or(("", &moniker));
         println!("{0: <9}: {1}", "Name", name);
         println!("{0: <9}: {1}", "Moniker", moniker);
-        println!("{0: <9}: {1}", "Driver", &self.0.bound_driver_url.as_deref().unwrap_or("None"));
-        if let Some(ref node_property_list) = self.0.node_property_list {
+        println!("{0: <9}: {1}", "Driver", self.0.bound_driver_url.as_deref().unwrap_or("None"));
+        if let Some(ref node_property_list) = v2_info.node_property_list {
             println!("{} Properties", node_property_list.len());
             for i in 0..node_property_list.len() {
                 let node_property = &node_property_list[i];
@@ -124,7 +128,7 @@ impl DevicePrinter for DFv2Node {
             println!("0 Properties");
         }
 
-        if let Some(ref offer_list) = self.0.offer_list {
+        if let Some(ref offer_list) = v2_info.offer_list {
             println!("{} Offers", offer_list.len());
             for i in 0..offer_list.len() {
                 if let fdecl::Offer::Service(service) = &offer_list[i] {

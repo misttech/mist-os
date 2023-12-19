@@ -71,14 +71,14 @@ class BindLibToFidlCodeGenTest : public testing::Test {
 };
 
 TEST_F(BindLibToFidlCodeGenTest, DeviceProperties) {
-  fuchsia::driver::development::DeviceInfoIteratorSyncPtr iterator;
-  ASSERT_EQ(ZX_OK, driver_dev_->GetDeviceInfo({kChildDevicePath}, iterator.NewRequest(),
-                                              /* exact_match= */ true));
+  fuchsia::driver::development::NodeInfoIteratorSyncPtr iterator;
+  ASSERT_EQ(ZX_OK, driver_dev_->GetNodeInfo({kChildDevicePath}, iterator.NewRequest(),
+                                            /* exact_match= */ true));
 
-  std::vector<fuchsia::driver::development::DeviceInfo> devices;
+  std::vector<fuchsia::driver::development::NodeInfo> devices;
   ASSERT_EQ(iterator->GetNext(&devices), ZX_OK);
 
-  auto& str_props = devices[0].property_list().str_props;
+  auto& str_props = devices[0].versioned_info().v1().property_list().str_props;
   ASSERT_EQ(static_cast<size_t>(9), str_props.size());
 
   ASSERT_EQ(bind_fuchsia::PROTOCOL, str_props[0].key);

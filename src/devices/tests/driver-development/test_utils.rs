@@ -13,7 +13,7 @@ use {
 /// Represents either a DFv1 device or DFv2 node.
 #[derive(Debug, PartialEq)]
 pub struct DeviceNode {
-    pub info: Rc<fdd::DeviceInfo>,
+    pub info: Rc<fdd::NodeInfo>,
     pub child_nodes: Vec<DeviceNode>,
     /// The number of child devices a device has. This can be different than
     /// `child_nodes.len()` if, for example, the call to GetDeviceInfo passes a
@@ -22,11 +22,7 @@ pub struct DeviceNode {
 }
 
 impl DeviceNode {
-    pub fn new(
-        info: Rc<fdd::DeviceInfo>,
-        child_nodes: Vec<DeviceNode>,
-        num_children: usize,
-    ) -> Self {
+    pub fn new(info: Rc<fdd::NodeInfo>, child_nodes: Vec<DeviceNode>, num_children: usize) -> Self {
         Self { info, child_nodes, num_children }
     }
 }
@@ -34,13 +30,13 @@ impl DeviceNode {
 // Used internally for quick lookup of DFv1 devices or DFv2 nodes within a
 // hashmap.
 struct DeviceVertex {
-    info: Rc<fdd::DeviceInfo>,
+    info: Rc<fdd::NodeInfo>,
     parent_ids: HashSet<u64>,
     child_ids: HashSet<u64>,
 }
 
 impl DeviceVertex {
-    fn new(info: Rc<fdd::DeviceInfo>, parent_ids: HashSet<u64>, child_ids: HashSet<u64>) -> Self {
+    fn new(info: Rc<fdd::NodeInfo>, parent_ids: HashSet<u64>, child_ids: HashSet<u64>) -> Self {
         Self { info, parent_ids, child_ids }
     }
 }
@@ -123,8 +119,8 @@ fn is_cyclic(vertices: &HashMap<u64, DeviceVertex>) -> bool {
     false
 }
 
-impl From<Rc<fdd::DeviceInfo>> for DeviceVertex {
-    fn from(device_info: Rc<fdd::DeviceInfo>) -> Self {
+impl From<Rc<fdd::NodeInfo>> for DeviceVertex {
+    fn from(device_info: Rc<fdd::NodeInfo>) -> Self {
         let mut parent_ids = HashSet::<u64>::new();
         if let Some(ids) = device_info.parent_ids.as_ref() {
             parent_ids = ids.iter().map(|id| *id).collect();
@@ -159,8 +155,8 @@ impl From<Rc<fdd::DeviceInfo>> for DeviceVertex {
 /// Panics if one of the resulting graphs is cyclic or if `device_infos`
 /// contains conflicting information about the devices'/nodes' topology or if a
 /// device's/node's ID or topological path is missing.
-pub fn create_device_topology(device_infos: Vec<fdd::DeviceInfo>) -> Vec<DeviceNode> {
-    let device_infos: Vec<Rc<fdd::DeviceInfo>> =
+pub fn create_device_topology(device_infos: Vec<fdd::NodeInfo>) -> Vec<DeviceNode> {
+    let device_infos: Vec<Rc<fdd::NodeInfo>> =
         device_infos.into_iter().map(|device_info| Rc::new(device_info)).collect();
     // Key: ID of the vertex
     let device_vertices: HashMap<u64, DeviceVertex> = device_infos

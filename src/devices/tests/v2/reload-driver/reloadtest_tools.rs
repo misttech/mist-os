@@ -36,13 +36,16 @@ pub async fn wait_for_nodes(
 //   if they are not new.
 pub async fn validate_host_koids(
     test_stage_name: &str,
-    device_infos: Vec<fdd::DeviceInfo>,
+    device_infos: Vec<fdd::NodeInfo>,
     changed_or_new: &mut HashMap<String, Option<Option<u64>>>,
     previous: Vec<&HashMap<String, Option<Option<u64>>>>,
     should_not_exist: Option<&HashSet<String>>,
 ) -> Result<()> {
     for dev in &device_infos {
-        let key = dev.moniker.clone().unwrap().split(".").last().unwrap().to_string();
+        let fdd::VersionedNodeInfo::V2(info) = dev.versioned_info.as_ref().unwrap() else {
+            panic!("No v2 info");
+        };
+        let key = info.moniker.clone().unwrap().split(".").last().unwrap().to_string();
 
         // Items in changed_or_new are expected to be different so just save that info and move on.
         if changed_or_new.contains_key(&key) {

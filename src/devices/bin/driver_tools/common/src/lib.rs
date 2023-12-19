@@ -8,12 +8,16 @@ use {
 };
 
 #[derive(Debug)]
-pub struct DFv1Device(pub fdd::DeviceInfo);
+pub struct DFv1Device(pub fdd::NodeInfo);
 
 impl DFv1Device {
     /// Gets the full topological path name of the device.
     pub fn get_topo_path(&self) -> Result<&str> {
-        Ok(self.0.topological_path.as_ref().ok_or(format_err!("Missing topological path"))?)
+        let topological_path = self.0.versioned_info.as_ref().and_then(|info| match info {
+            fdd::VersionedNodeInfo::V1(v1) => v1.topological_path.as_ref(),
+            _ => None,
+        });
+        Ok(topological_path.ok_or(format_err!("Missing topological path"))?)
     }
 
     /// Gets the last ordinal of the device's topological path.
@@ -24,15 +28,28 @@ impl DFv1Device {
         let (_, name) = topological_path.rsplit_once('/').unwrap_or(("", &topological_path));
         Ok(name)
     }
+
+    pub fn get_v1_info(&self) -> Result<&fdd::V1DeviceInfo> {
+        let info = self.0.versioned_info.as_ref().and_then(|info| match info {
+            fdd::VersionedNodeInfo::V1(v1) => Some(v1),
+            _ => None,
+        });
+
+        Ok(info.ok_or(format_err!("Missing v1 info"))?)
+    }
 }
 
 #[derive(Debug)]
-pub struct DFv2Node(pub fdd::DeviceInfo);
+pub struct DFv2Node(pub fdd::NodeInfo);
 
 impl DFv2Node {
     /// Gets the full moniker name of the device.
     pub fn get_moniker(&self) -> Result<&str> {
-        Ok(self.0.moniker.as_ref().ok_or(format_err!("Missing moniker"))?)
+        let moniker = self.0.versioned_info.as_ref().and_then(|info| match info {
+            fdd::VersionedNodeInfo::V2(v2) => v2.moniker.as_ref(),
+            _ => None,
+        });
+        Ok(moniker.ok_or(format_err!("Missing moniker"))?)
     }
 
     /// Gets the last ordinal of the device's moniker.
@@ -43,6 +60,15 @@ impl DFv2Node {
         let (_, name) = moniker.rsplit_once('.').unwrap_or(("", &moniker));
         Ok(name)
     }
+
+    pub fn get_v2_info(&self) -> Result<&fdd::V2NodeInfo> {
+        let info = self.0.versioned_info.as_ref().and_then(|info| match info {
+            fdd::VersionedNodeInfo::V2(v2) => Some(v2),
+            _ => None,
+        });
+
+        Ok(info.ok_or(format_err!("Missing v2 info"))?)
+    }
 }
 
 #[derive(Debug)]
@@ -52,7 +78,7 @@ pub enum Device {
 }
 
 impl Device {
-    pub fn get_device_info(&self) -> &fdd::DeviceInfo {
+    pub fn get_device_info(&self) -> &fdd::NodeInfo {
         match self {
             Device::V1(device) => &device.0,
             Device::V2(node) => &node.0,
@@ -82,16 +108,15 @@ impl Device {
     }
 }
 
-impl std::convert::From<fdd::DeviceInfo> for Device {
-    fn from(device_info: fdd::DeviceInfo) -> Device {
-        fn is_dfv2_node(device_info: &fdd::DeviceInfo) -> bool {
-            device_info.bound_driver_libname.is_none()
-        }
-
-        if is_dfv2_node(&device_info) {
-            Device::V2(DFv2Node(device_info))
-        } else {
-            Device::V1(DFv1Device(device_info))
+impl std::convert::From<fdd::NodeInfo> for Device {
+    fn from(device_info: fdd::NodeInfo) -> Device {
+        match &device_info.versioned_info {
+            Some(info) => match &info {
+                fdd::VersionedNodeInfo::V1(_) => Device::V1(DFv1Device(device_info)),
+                fdd::VersionedNodeInfo::V2(_) => Device::V2(DFv2Node(device_info)),
+                _ => Device::V1(DFv1Device(device_info)),
+            },
+            None => Device::V1(DFv1Device(device_info)),
         }
     }
 }
@@ -101,12 +126,12 @@ pub async fn get_device_info(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[String],
     exact_match: bool,
-) -> Result<Vec<fdd::DeviceInfo>> {
+) -> Result<Vec<fdd::NodeInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
 
     service
-        .get_device_info(device_filter, iterator_server, exact_match)
+        .get_node_info(device_filter, iterator_server, exact_match)
         .context("FIDL call to get device info failed")?;
 
     let mut info_result = Vec::new();

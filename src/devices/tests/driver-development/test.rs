@@ -60,12 +60,12 @@ fn send_get_device_info_request(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[&str],
     exact_match: bool,
-) -> Result<fdd::DeviceInfoIteratorProxy> {
+) -> Result<fdd::NodeInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
 
     service
-        .get_device_info(
+        .get_node_info(
             &device_filter.iter().copied().map(String::from).collect::<Vec<_>>(),
             iterator_server,
             exact_match,
@@ -79,7 +79,7 @@ async fn get_device_info(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[&str],
     exact_match: bool,
-) -> Result<Vec<fdd::DeviceInfo>> {
+) -> Result<Vec<fdd::NodeInfo>> {
     let iterator = send_get_device_info_request(service, device_filter, exact_match)?;
 
     let mut device_infos = Vec::new();
@@ -314,15 +314,18 @@ async fn test_get_device_info_no_filter_dfv1() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root_sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(root_sys_test_info)) = &root_sys_test.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        root_sys_test.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        root_sys_test_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test"
     );
-    assert!(root_sys_test.info.moniker.is_none());
-    assert!(root_sys_test.info.node_property_list.is_none());
+
     assert_eq!(
-        root_sys_test
-            .info
+        root_sys_test_info
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
@@ -332,15 +335,17 @@ async fn test_get_device_info_no_filter_dfv1() -> Result<()> {
     assert_eq!(root_sys_test.child_nodes.len(), 1);
 
     let sample_driver = &root_sys_test.child_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        sample_driver.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test/sample_driver"
     );
-    assert!(sample_driver.info.moniker.is_none());
-    assert!(sample_driver.info.node_property_list.is_none());
     assert_eq!(
-        sample_driver
-            .info
+        sample_driver_info
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
@@ -363,15 +368,15 @@ async fn test_get_device_info_with_filter_dfv1() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sys_test_info)) = &sys_test.info.versioned_info else {
+        panic!("wrong info type");
+    };
     assert_eq!(
-        sys_test.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        sys_test_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test"
     );
-    assert!(sys_test.info.moniker.is_none());
-    assert!(sys_test.info.node_property_list.is_none());
     assert_eq!(
-        sys_test
-            .info
+        sys_test_info
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
@@ -394,15 +399,17 @@ async fn test_get_device_info_with_duplicate_filter_dfv1() -> Result<()> {
     assert_eq!(device_nodes.len(), 2);
 
     let sample_driver = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        sample_driver.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test/sample_driver"
     );
-    assert!(sample_driver.info.moniker.is_none());
-    assert!(sample_driver.info.node_property_list.is_none());
     assert_eq!(
-        sample_driver
-            .info
+        sample_driver_info
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
@@ -411,15 +418,17 @@ async fn test_get_device_info_with_duplicate_filter_dfv1() -> Result<()> {
     assert!(sample_driver.child_nodes.is_empty());
 
     let sample_driver = &device_nodes[1];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        sample_driver.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test/sample_driver"
     );
-    assert!(sample_driver.info.moniker.is_none());
-    assert!(sample_driver.info.node_property_list.is_none());
     assert_eq!(
-        sample_driver
-            .info
+        sample_driver_info
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
@@ -443,8 +452,12 @@ async fn test_get_device_info_with_partial_filter_dfv1() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let matched_node = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(matched_node_info)) = &matched_node.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
     assert_eq!(
-        matched_node.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        matched_node_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test/sample_driver"
     );
 
@@ -475,8 +488,12 @@ async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let matched_node = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(matched_node_info)) = &matched_node.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
     assert_eq!(
-        matched_node.info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        matched_node_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
         "/dev/sys/test/sample_driver"
     );
 
@@ -493,40 +510,48 @@ async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root = &device_nodes[0];
-    assert_eq!(root.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev");
-    assert!(root.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
+    let Some(fdd::VersionedNodeInfo::V2(root_info)) = &root.info.versioned_info else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(root_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev");
     assert_eq!(
         root.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
         PARENT_DRIVER_URL
     );
-    assert!(root.info.property_list.is_none());
-    assert!(root.info.node_property_list.is_none());
+    assert!(root_info.node_property_list.is_none());
     assert_eq!(root.num_children, 1);
     assert_eq!(root.child_nodes.len(), 1);
 
     let sys = &root.child_nodes[0];
-    assert_eq!(sys.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys");
-    assert!(sys.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
+    let Some(fdd::VersionedNodeInfo::V2(sys_info)) = &sys.info.versioned_info else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(sys_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys");
     assert_eq!(
         sys.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
         "unbound"
     );
     assert_eq!(
-        sys.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        sys_info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_no_protocol_dfv2_property_list().as_ref().map(|x| x.as_slice())
     );
     assert_eq!(sys.num_children, 1);
     assert_eq!(sys.child_nodes.len(), 1);
 
     let test = &sys.child_nodes[0];
-    assert_eq!(test.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys.test");
-    assert!(test.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
+    let Some(fdd::VersionedNodeInfo::V2(test_info)) = &test.info.versioned_info else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(test_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys.test");
     assert_eq!(
         test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        test_info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
     );
     Ok(())
@@ -544,20 +569,21 @@ async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root_sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V2(root_sys_test_info)) = &root_sys_test.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        root_sys_test.info.moniker.as_ref().expect("DFv2 node missing moniker"),
+        root_sys_test_info.moniker.as_ref().expect("DFv2 node missing moniker"),
         "dev.sys.test"
-    );
-    assert!(
-        root_sys_test.info.bound_driver_libname.is_none(),
-        "DFv2 node specified bound driver libname"
     );
     assert_eq!(
         root_sys_test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        root_sys_test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        root_sys_test_info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
     );
     assert!(root_sys_test.child_nodes.is_empty());
@@ -576,20 +602,21 @@ async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root_sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V2(root_sys_test_info)) = &root_sys_test.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
     assert_eq!(
-        root_sys_test.info.moniker.as_ref().expect("DFv2 node missing moniker"),
+        root_sys_test_info.moniker.as_ref().expect("DFv2 node missing moniker"),
         "dev.sys.test"
-    );
-    assert!(
-        root_sys_test.info.bound_driver_libname.is_none(),
-        "DFv2 node specified bound driver libname"
     );
     assert_eq!(
         root_sys_test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        root_sys_test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        root_sys_test_info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
     );
     assert!(root_sys_test.child_nodes.is_empty());

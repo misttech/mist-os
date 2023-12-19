@@ -23,9 +23,9 @@ namespace driver_manager {
 
 namespace {
 
-zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
-                                                   const dfv2::Node* node) {
-  auto device_info = fdd::wire::DeviceInfo::Builder(allocator);
+zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
+                                                 const dfv2::Node* node) {
+  auto device_info = fdd::wire::NodeInfo::Builder(allocator);
 
   device_info.id(reinterpret_cast<uint64_t>(node));
 
@@ -54,7 +54,9 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     device_info.parent_ids(parent_ids);
   }
 
-  device_info.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
+  auto v2_info_builder = fuchsia_driver_development::wire::V2NodeInfo::Builder(allocator);
+
+  v2_info_builder.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
 
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
@@ -67,7 +69,7 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
           .value = fidl::ToWire(allocator, fidl::ToNatural(properties[i].value)),
       };
     }
-    device_info.node_property_list(node_properties);
+    v2_info_builder.node_property_list(node_properties);
   }
 
   // TODO(fxbug.dev/90735): Get topological path
@@ -97,7 +99,11 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
       node_offers[i] = fidl::ToWire(allocator, fidl::ToNatural(offers[i]));
     }
   }
-  device_info.offer_list(offers);
+  v2_info_builder.offer_list(offers);
+
+  auto versioned_info = fuchsia_driver_development::wire::VersionedNodeInfo::WithV2(
+      allocator, v2_info_builder.Build());
+  device_info.versioned_info(versioned_info);
 
   return zx::ok(device_info.Build());
 }
@@ -114,10 +120,10 @@ void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
   ZX_ASSERT(result.is_ok());
 }
 
-void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
-                                             GetDeviceInfoCompleter::Sync& completer) {
+void DriverDevelopmentService::GetNodeInfo(GetNodeInfoRequestView request,
+                                           GetNodeInfoCompleter::Sync& completer) {
   auto arena = std::make_unique<fidl::Arena<512>>();
-  std::vector<fdd::wire::DeviceInfo> device_infos;
+  std::vector<fdd::wire::NodeInfo> device_infos;
 
   std::unordered_set<const dfv2::Node*> unique_nodes;
   std::queue<const dfv2::Node*> remaining_nodes;
@@ -136,16 +142,16 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
     }
 
     std::string moniker = node->MakeComponentMoniker();
-    if (!request->device_filter.empty()) {
+    if (!request->node_filter.empty()) {
       bool found = false;
-      for (const auto& device_path : request->device_filter) {
+      for (const auto& node_filter : request->node_filter) {
         if (request->exact_match) {
-          if (moniker == device_path.get()) {
+          if (moniker == node_filter.get()) {
             found = true;
             break;
           }
         } else {
-          if (moniker.find(device_path.get()) != std::string::npos) {
+          if (moniker.find(node_filter.get()) != std::string::npos) {
             found = true;
             break;
           }
@@ -166,7 +172,7 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
                                                                            std::move(device_infos));
   fidl::BindServer(
       this->dispatcher_, std::move(request->iterator), std::move(iterator),
-      [](auto* self, fidl::UnbindInfo info, fidl::ServerEnd<fdd::DeviceInfoIterator> server_end) {
+      [](auto* self, fidl::UnbindInfo info, fidl::ServerEnd<fdd::NodeInfoIterator> server_end) {
         if (info.is_user_initiated()) {
           return;
         }
@@ -281,7 +287,7 @@ void DriverDevelopmentService::ReEnableMatchWithDriverUrl(
 
 void DriverDevelopmentService::RestartDriverHosts(RestartDriverHostsRequestView request,
                                                   RestartDriverHostsCompleter::Sync& completer) {
-  auto result = driver_runner_.RestartNodesColocatedWithDriverUrl(request->driver_path.get(),
+  auto result = driver_runner_.RestartNodesColocatedWithDriverUrl(request->driver_url.get(),
                                                                   request->rematch_flags);
   if (result.is_ok()) {
     completer.ReplySuccess(result.value());

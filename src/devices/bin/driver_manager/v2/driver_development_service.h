@@ -33,8 +33,7 @@ class DriverDevelopmentService
                                  DisableMatchWithDriverUrlCompleter::Sync& completer) override;
   void ReEnableMatchWithDriverUrl(ReEnableMatchWithDriverUrlRequestView request,
                                   ReEnableMatchWithDriverUrlCompleter::Sync& completer) override;
-  void GetDeviceInfo(GetDeviceInfoRequestView request,
-                     GetDeviceInfoCompleter::Sync& completer) override;
+  void GetNodeInfo(GetNodeInfoRequestView request, GetNodeInfoCompleter::Sync& completer) override;
   void GetCompositeInfo(GetCompositeInfoRequestView request,
                         GetCompositeInfoCompleter::Sync& completer) override;
   void BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) override;

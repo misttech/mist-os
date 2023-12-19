@@ -46,12 +46,12 @@ fn send_get_device_info_request(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[String],
     exact_match: bool,
-) -> Result<fdd::DeviceInfoIteratorProxy> {
+) -> Result<fdd::NodeInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
 
     service
-        .get_device_info(device_filter, iterator_server, exact_match)
+        .get_node_info(device_filter, iterator_server, exact_match)
         .context("FIDL call to get device info failed")?;
 
     Ok(iterator)
@@ -61,7 +61,7 @@ async fn get_device_info(
     service: &fdd::DriverDevelopmentProxy,
     device_filter: &[String],
     exact_match: bool,
-) -> Result<Vec<fdd::DeviceInfo>> {
+) -> Result<Vec<fdd::NodeInfo>> {
     let iterator = send_get_device_info_request(service, device_filter, exact_match)?;
 
     let mut device_infos = Vec::new();

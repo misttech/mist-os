@@ -27,9 +27,9 @@ const char* get_protocol_name(uint32_t protocol_id) {
 
 }  // namespace
 
-zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
+zx::result<std::vector<fdd::wire::NodeInfo>> GetDeviceInfo(
     fidl::AnyArena& allocator, const std::vector<fbl::RefPtr<const Device>>& devices) {
-  std::vector<fdd::wire::DeviceInfo> device_info_vec;
+  std::vector<fdd::wire::NodeInfo> device_info_vec;
   for (const auto& device : devices) {
     if (device->props().size() > fuchsia_driver_legacy::wire::kPropertiesMax) {
       return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
@@ -38,7 +38,7 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
       return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
     }
 
-    auto device_info = fdd::wire::DeviceInfo::Builder(allocator);
+    auto device_info = fdd::wire::NodeInfo::Builder(allocator);
 
     // id leaks internal pointers, but since this is a development only API, it shouldn't be
     // a big deal.
@@ -66,14 +66,16 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
       device_info.driver_host_koid(device->host()->koid());
     }
 
-    device_info.topological_path(device->MakeTopologicalPath());
+    auto v1_info_builder = fuchsia_driver_development::wire::V1DeviceInfo::Builder(allocator);
+
+    v1_info_builder.topological_path(device->MakeTopologicalPath());
 
     auto bound_driver_component_url = device->bound_driver_component_url();
     if (bound_driver_component_url.has_value()) {
       device_info.bound_driver_url(fidl::StringView(allocator, bound_driver_component_url.value()));
     }
 
-    device_info.bound_driver_libname(fidl::StringView(allocator, device->parent_driver_url()));
+    v1_info_builder.bound_driver_libname(fidl::StringView(allocator, device->parent_driver_url()));
 
     fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty> props(allocator,
                                                                         device->props().size());
@@ -126,18 +128,22 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
       str_props[i] = fidl_str_prop;
     }
 
-    device_info.property_list(fuchsia_driver_legacy::wire::DevicePropertyList{
+    v1_info_builder.property_list(fuchsia_driver_legacy::wire::DevicePropertyList{
         .props = props,
         .str_props = str_props,
     });
 
-    device_info.flags(fdl::DeviceFlags::TruncatingUnknown(device->flags));
+    v1_info_builder.flags(fdl::DeviceFlags::TruncatingUnknown(device->flags));
 
     if (device->protocol_id() != 0 && device->protocol_id() != ZX_PROTOCOL_MISC) {
-      device_info.protocol_id(device->protocol_id());
+      v1_info_builder.protocol_id(device->protocol_id());
       const char* protocol_name = get_protocol_name(device->protocol_id());
-      device_info.protocol_name(allocator, std::string_view(protocol_name));
+      v1_info_builder.protocol_name(allocator, std::string_view(protocol_name));
     }
+
+    auto versioned_info = fuchsia_driver_development::wire::VersionedNodeInfo::WithV1(
+        allocator, v1_info_builder.Build());
+    device_info.versioned_info(versioned_info);
 
     device_info_vec.push_back(device_info.Build());
   }

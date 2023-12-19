@@ -804,25 +804,25 @@ void Coordinator::ReEnableMatchWithDriverUrl(ReEnableMatchWithDriverUrlRequestVi
   completer.Reply(un_disable_result.value());
 }
 
-void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
-                                GetDeviceInfoCompleter::Sync& completer) {
+void Coordinator::GetNodeInfo(GetNodeInfoRequestView request,
+                              GetNodeInfoCompleter::Sync& completer) {
   std::vector<fbl::RefPtr<const Device>> device_list;
   for (auto& device : device_manager_->devices()) {
     if (device.is_fragment_proxy_device()) {
       continue;
     }
 
-    if (request->device_filter.empty()) {
+    if (request->node_filter.empty()) {
       device_list.emplace_back(&device);
     } else {
-      for (const fidl::StringView& device_filter : request->device_filter) {
+      for (const fidl::StringView& node_filter : request->node_filter) {
         std::string path = device.MakeTopologicalPath();
         bool matches = false;
         // TODO(fxbug.dev/115717): Matches should also check the /dev/class/ path.
         if (request->exact_match) {
-          matches = path == device_filter.get();
+          matches = path == node_filter.get();
         } else {
-          matches = path.find(device_filter.get()) != std::string_view::npos;
+          matches = path.find(node_filter.get()) != std::string_view::npos;
         }
         if (matches) {
           device_list.emplace_back(&device);
@@ -972,13 +972,13 @@ void Coordinator::AddSpecToDriverIndex(fuchsia_driver_framework::wire::Composite
 
 void Coordinator::RestartDriverHosts(RestartDriverHostsRequestView request,
                                      RestartDriverHostsCompleter::Sync& completer) {
-  std::string_view driver_path(request->driver_path.data(), request->driver_path.size());
+  std::string_view driver_url(request->driver_url.data(), request->driver_url.size());
 
   // Find devices containing the driver.
   uint32_t count = 0;
   for (auto& dev : device_manager_->devices()) {
     // Call remove on the device's driver host if it contains the driver.
-    if (dev.parent_driver_url().compare(driver_path) == 0) {
+    if (dev.parent_driver_url().compare(driver_url) == 0) {
       LOGF(INFO, "Device %s found in restart driver hosts.", dev.name().data());
       LOGF(INFO, "Shutting down host: %ld.", dev.host()->koid());
 

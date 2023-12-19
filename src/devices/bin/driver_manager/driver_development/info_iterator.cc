@@ -16,7 +16,7 @@ constexpr size_t kMaxEntries = 15;
 
 void DeviceInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
   if (offset_ >= list_.size()) {
-    completer.Reply(fidl::VectorView<fdd::wire::DeviceInfo>{});
+    completer.Reply(fidl::VectorView<fdd::wire::NodeInfo>{});
     return;
   }
 
@@ -24,7 +24,7 @@ void DeviceInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
   offset_ += result.size();
 
   completer.Reply(
-      fidl::VectorView<fdd::wire::DeviceInfo>::FromExternal(result.data(), result.size()));
+      fidl::VectorView<fdd::wire::NodeInfo>::FromExternal(result.data(), result.size()));
 }
 
 void CompositeInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
