@@ -88,6 +88,7 @@ test("driver_integration_test") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
   ]
