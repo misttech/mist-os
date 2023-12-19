@@ -124,7 +124,7 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
             cli_args[:extra_index],
             cli_args[extra_index + 1 :],
         )
-    elif cli_args is None:
+    elif cli_args is None and "--" in sys.argv:
         extra_index = sys.argv.index("--")
         (sys.argv, extra_args) = (
             sys.argv[:extra_index],
