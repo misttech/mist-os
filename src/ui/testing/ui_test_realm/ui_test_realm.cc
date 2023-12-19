@@ -240,11 +240,18 @@ void UITestRealm::ConfigureClientSubrealm() {
   //
   // NOTE: The client must offer the "config-data" capability to #realm_builder in
   // its test .cml file.
-  realm_builder_.AddRoute(
-      {.capabilities = {Directory{
-           .name = "config-data", .rights = fuchsia::io::R_STAR_DIR, .path = "/config/data"}},
-       .source = ParentRef(),
-       .targets = {ChildRef{kClientSubrealmName}}});
+  realm_builder_.AddRoute({.capabilities =
+                               {
+                                   Directory{.name = "config-data",
+                                             .rights = fuchsia::io::R_STAR_DIR,
+                                             .path = "/config/data"},
+
+                                   Directory{.name = "tzdata-icu",
+                                             .rights = fuchsia::io::R_STAR_DIR,
+                                             .path = "/config/tzdata/icu"},
+                               },
+                           .source = ParentRef(),
+                           .targets = {ChildRef{kClientSubrealmName}}});
 }
 
 void UITestRealm::ConfigureAccessibility() {

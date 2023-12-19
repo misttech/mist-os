@@ -117,6 +117,11 @@
             availability: "required",
         },
         {
+            directory: "tzdata-icu",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             // Used by ContextProvider.
             protocol: [
                 "fuchsia.feedback.ComponentDataRegister",

@@ -212,7 +212,12 @@
             source_availability: "unknown",
         },
         {
-            directory: "tzdata-icu-44-le",
+            directory: [
+                // `tzdata-icu` offers /config/tzdata/icu.
+                // `tzdata-icu-44-le` offers /config/tzdata/icu/44/le only.
+                "tzdata-icu",
+                "tzdata-icu-44-le",
+            ],
             from: "#tzdata-provider",
             to: "#session-manager",
             source_availability: "unknown",
