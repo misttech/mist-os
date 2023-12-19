@@ -77,6 +77,7 @@ source_set("run_test") {
 
   public_deps = [
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
 
@@ -159,6 +160,7 @@ executable("trace_integration_tests") {
     ":gtest_main",
     ":integration_test_utils",
     ":run_test",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:test_settings",
     "//src/performance/lib/test_utils",
     "//third_party/googletest:gtest",
@@ -284,6 +286,7 @@ executable("detach_tests") {
     ":gtest_main",
     ":integration_test_utils",
     ":run_test",
+    "//sdk/lib/syslog/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]
@@ -296,6 +299,7 @@ executable("shared_provider_app") {
 
   deps = [
     ":integration_test_utils",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -314,6 +318,7 @@ executable("shared_provider_integration_tests") {
     ":gtest_main",
     ":integration_test_utils",
     ":run_test",
+    "//sdk/lib/syslog/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace-reader",
     "//zircon/system/ulib/zx",

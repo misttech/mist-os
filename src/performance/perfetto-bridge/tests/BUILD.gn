@@ -91,6 +91,7 @@ executable("perfetto_unittests_bin") {
   sources = [ "consumer_adapter_tests.cc" ]
 
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/performance/lib/test_utils",
