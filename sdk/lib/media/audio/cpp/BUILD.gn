@@ -10,7 +10,10 @@ source_set("cpp") {
     "types.h",
   ]
 
-  deps = [ "//src/lib/fxl" ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl",
+  ]
 
   public_deps = [ "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp" ]
 
