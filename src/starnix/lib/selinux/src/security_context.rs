@@ -114,6 +114,20 @@ impl TryFrom<&str> for SecurityContext {
     }
 }
 
+impl TryFrom<Vec<u8>> for SecurityContext {
+    type Error = SecurityContextParseError;
+
+    // Parses a security context from a `Vec<u8>`.
+    //
+    // The supplied vector of octets is required to contain a valid UTF-8
+    // encoded string, from which a valid Security Context string can be
+    // parsed.
+    fn try_from(security_context: Vec<u8>) -> Result<Self, Self::Error> {
+        let as_string = String::from_utf8(security_context).map_err(|_| Self::Error::Invalid)?;
+        Self::try_from(as_string.as_str())
+    }
+}
+
 impl fmt::Display for SecurityContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let range_fmt =

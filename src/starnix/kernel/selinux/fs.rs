@@ -14,9 +14,9 @@ use crate::{
     },
 };
 use derivative::Derivative;
-use selinux::security_server::SecurityServer;
+use selinux::{security_context::SecurityContext, security_server::SecurityServer};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
-use starnix_logging::{log_debug, not_implemented};
+use starnix_logging::not_implemented;
 use starnix_sync::Mutex;
 use starnix_uapi::{
     device_type::DeviceType,
@@ -112,8 +112,13 @@ impl SeLinuxFs {
 
         // Write-only files used to configure and query SELinux.
         dir.entry(current_task, b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
-        dir.entry(current_task, b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
-        dir.entry(current_task, b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
+        dir.entry(
+            current_task,
+            b"context",
+            SeContext::new_node(security_server.clone()),
+            mode!(IFREG, 0o666),
+        );
+        dir.entry(current_task, b"create", SeCreate::new_node(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
             b"load",
@@ -255,11 +260,27 @@ impl BytesFileOps for SeCheckReqProt {
     }
 }
 
-struct SeContext;
+struct SeContext {
+    security_server: Arc<SecurityServer>,
+}
+
+impl SeContext {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
 impl BytesFileOps for SeContext {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!("selinux validate context");
-        log_debug!("selinux context: {}", String::from_utf8_lossy(&data));
+        // Validate that `data` holds a valid UTF-8 encoded Security Context
+        // string.
+        let security_context = SecurityContext::try_from(data).map_err(|_| errno!(EINVAL))?;
+
+        // Validate that the `SecurityContext` refers to principals, types, etc
+        // that actually exist in the current policy, by attempting to create
+        // a SID from it.
+        let _sid = self.security_server.security_context_to_sid(&security_context);
+
         Ok(())
     }
 }
