@@ -41,6 +41,7 @@ test("net_interfaces_test") {
   deps = [
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/syslog/cpp",
     "//src/connectivity/network/lib/net_interfaces/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
