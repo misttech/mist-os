@@ -218,9 +218,11 @@ pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
     connect_to_named_protocol_at_dir_root::<P>(directory, &protocol_path)
 }
 
-struct DirectoryProtocolImpl(fio::DirectoryProxy);
+/// This wraps an instance directory for a service capability and provides the MemberOpener trait
+/// for it. This can be boxed and used with a |ServiceProxy::from_member_opener|.
+pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy);
 
-impl MemberOpener for DirectoryProtocolImpl {
+impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory) = self;
         // NB: This can't use fdio::service_connect_at because the return type is fidl::Error.
@@ -262,7 +264,7 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_in_namespace(&service_path, fio::OpenFlags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
 /// Connect to the "default" instance of a FIDL service hosted on the directory protocol
@@ -288,7 +290,7 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
         &service_path,
         fio::OpenFlags::empty(),
     )?;
-    Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
 /// Connect to the "default" instance of a FIDL service hosted in `directory`.
@@ -317,7 +319,7 @@ pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
         fio::OpenFlags::DIRECTORY,
         server_end.into_channel(),
     )?;
-    Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
 /// Opens a FIDL service as a directory, which holds instances of the service.

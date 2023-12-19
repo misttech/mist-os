@@ -5,14 +5,14 @@
 use {
     anyhow::{Context, Error, Result},
     fidl::endpoints,
-    fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream},
     fuchsia_async as fasync,
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon::{self as zx},
     futures::{Future, StreamExt, TryStreamExt},
     std::sync::Mutex,
-    tracing::{error, info},
+    tracing::{error, info, warn},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
@@ -25,6 +25,23 @@ pub trait RealmProxy {
     fn connect_to_named_protocol(
         &mut self,
         protocol: &str,
+        server_end: zx::Channel,
+    ) -> Result<(), OperationError>;
+
+    // Opens the service directory in this proxy's realm.
+    //
+    // If the connection fails, the resulting [OperationError] is determined
+    // by the [RealmProxy] implementation.
+    fn open_service(&self, service: &str, server_end: zx::Channel) -> Result<(), OperationError>;
+
+    // Connects to the service instance in this proxy's realm.
+    //
+    // If the connection fails, the resulting [OperationError] is determined
+    // by the [RealmProxy] implementation.
+    fn connect_to_service_instance(
+        &self,
+        service: &str,
+        instance: &str,
         server_end: zx::Channel,
     ) -> Result<(), OperationError>;
 }
@@ -42,11 +59,48 @@ impl RealmProxy for RealmInstanceProxy {
             self.0.root.connect_request_to_named_protocol_at_exposed_dir(protocol, server_end);
 
         if let Some(err) = res.err() {
-            error!("{:?}", err);
+            error!("{err:?}");
             return Err(OperationError::Failed);
         }
 
         Ok(())
+    }
+
+    fn open_service(&self, service: &str, server_end: zx::Channel) -> Result<(), OperationError> {
+        self.0
+            .root
+            .get_exposed_dir()
+            .open(
+                fio::OpenFlags::DIRECTORY,
+                fio::ModeType::empty(),
+                service,
+                fidl::endpoints::ServerEnd::new(server_end),
+            )
+            .map_err(|e| {
+                warn!("Failed to open service directory for {service}. {e:?}");
+                OperationError::Failed
+            })
+    }
+
+    fn connect_to_service_instance(
+        &self,
+        service: &str,
+        instance: &str,
+        server_end: zx::Channel,
+    ) -> Result<(), OperationError> {
+        self.0
+            .root
+            .get_exposed_dir()
+            .open(
+                fio::OpenFlags::DIRECTORY,
+                fio::ModeType::empty(),
+                format!("{service}/{instance}").as_str(),
+                fidl::endpoints::ServerEnd::new(server_end),
+            )
+            .map_err(|e| {
+                warn!("Failed to open service instance directory for {service}/{instance}. {e:?}");
+                OperationError::Failed
+            })
     }
 }
 
@@ -89,6 +143,23 @@ pub async fn serve_with_proxy<P: RealmProxy>(
                     ..
                 } => {
                     let res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
+                    responder.send(res)?;
+                }
+                RealmProxy_Request::OpenService { service, server_end, responder } => {
+                    let res = proxy.open_service(service.as_str(), server_end);
+                    responder.send(res)?;
+                }
+                RealmProxy_Request::ConnectToServiceInstance {
+                    service,
+                    instance,
+                    server_end,
+                    responder,
+                } => {
+                    let res = proxy.connect_to_service_instance(
+                        service.as_str(),
+                        instance.as_str(),
+                        server_end,
+                    );
                     responder.send(res)?;
                 }
             },

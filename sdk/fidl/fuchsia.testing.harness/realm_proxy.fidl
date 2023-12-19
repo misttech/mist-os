@@ -35,4 +35,17 @@ closed protocol RealmProxy {
         protocol string:MAX_PROTOCOL_LEN;
         server_end zx.Handle:CHANNEL;
     }) -> () error OperationError;
+
+    /// Connects [server_end] to the [service] directory from this proxy's namespace.
+    strict OpenService(resource struct {
+        service string:MAX_PROTOCOL_LEN;
+        server_end zx.Handle:CHANNEL;
+    }) -> () error OperationError;
+
+    /// Connects [server_end] to the [service]/[instance] from this proxy's namespace.
+    strict ConnectToServiceInstance(resource struct {
+        service string:MAX_PROTOCOL_LEN;
+        instance string:MAX_PROTOCOL_LEN;
+        server_end zx.Handle:CHANNEL;
+    }) -> () error OperationError;
 };

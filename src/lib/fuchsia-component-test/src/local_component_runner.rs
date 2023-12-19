@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{
-        create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker, MemberOpener,
+        create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker,
         ProtocolMarker, RequestStream, ServerEnd, ServiceMarker, ServiceProxy,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
@@ -19,22 +19,6 @@ use {
     tracing::*,
     vfs::execution_scope::ExecutionScope,
 };
-
-struct DirectoryProtocolImpl(fio::DirectoryProxy);
-
-impl MemberOpener for DirectoryProtocolImpl {
-    fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
-        let Self(directory) = self;
-        // NB: This can't use fdio::service_connect_at because the return type is fidl::Error.
-        let () = directory.open(
-            fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
-            member,
-            ServerEnd::new(server_end),
-        )?;
-        Ok(())
-    }
-}
 
 /// The handles from the framework over which the local component should interact with other
 /// components.
@@ -175,7 +159,9 @@ impl LocalComponentHandles {
             instance_name,
             fuchsia_fs::OpenFlags::empty(),
         )?;
-        Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
+        Ok(S::Proxy::from_member_opener(Box::new(
+            fuchsia_component::client::ServiceInstanceDirectory(directory_proxy),
+        )))
     }
 
     /// Clones a directory from the local component's namespace.

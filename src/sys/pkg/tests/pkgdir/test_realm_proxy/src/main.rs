@@ -182,4 +182,17 @@ impl realm_proxy::service::RealmProxy for PkgdirTestRealmProxy {
             OperationError::Failed
         })
     }
+
+    fn open_service(&self, _service: &str, _server_end: zx::Channel) -> Result<(), OperationError> {
+        Err(OperationError::Unsupported)
+    }
+
+    fn connect_to_service_instance(
+        &self,
+        _service: &str,
+        _instance: &str,
+        _server_end: zx::Channel,
+    ) -> Result<(), OperationError> {
+        Err(OperationError::Unsupported)
+    }
 }

@@ -5,8 +5,11 @@
 use {
     anyhow::{bail, format_err, Error, Result},
     fdio::Namespace,
-    fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy},
+    fidl::endpoints::{
+        create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy, ServiceMarker, ServiceProxy,
+    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy},
     fuchsia_component::client::connect_to_protocol,
     std::fmt::Debug,
@@ -139,5 +142,45 @@ impl RealmProxyClient {
         }
 
         Ok(client.into_proxy()?)
+    }
+
+    // Opens the given service capability, via the proxy.
+    //
+    // See https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/service
+    // for more information about service capabilities.
+    //
+    // Returns an error if the connection fails.
+    pub async fn open_service<T: ServiceMarker>(&self) -> Result<fio::DirectoryProxy, Error> {
+        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
+        let res = self.inner.open_service(T::SERVICE_NAME, server.into_channel()).await?;
+        if let Some(op_err) = res.err() {
+            bail!("{:?}", op_err);
+        }
+
+        Ok(client.into_proxy()?)
+    }
+
+    // Connects to the given service instance, via the proxy.
+    //
+    // See https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/service
+    // for more information about service capabilities.
+    //
+    // Returns an error if the connection fails.
+    pub async fn connect_to_service_instance<T: ServiceMarker>(
+        &self,
+        instance: &str,
+    ) -> Result<T::Proxy, Error> {
+        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
+        let res = self
+            .inner
+            .connect_to_service_instance(T::SERVICE_NAME, instance, server.into_channel())
+            .await?;
+        if let Some(op_err) = res.err() {
+            bail!("{:?}", op_err);
+        }
+
+        Ok(T::Proxy::from_member_opener(Box::new(
+            fuchsia_component::client::ServiceInstanceDirectory(client.into_proxy()?),
+        )))
     }
 }
