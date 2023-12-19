@@ -25,6 +25,7 @@ sdk_source_set("vmo") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fxl:memory",
     "//zircon/system/ulib/fbl",
