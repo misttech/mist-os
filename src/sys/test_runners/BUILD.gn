@@ -20,7 +20,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_rust",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.test:fuchsia.test_rust",
     "//sdk/fidl/fuchsia.test:rust_measure_tape_for_case",

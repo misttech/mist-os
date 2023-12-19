@@ -36,7 +36,7 @@ pub enum StartComponentError {
     #[error("failed to duplicate UTC clock: {_0}")]
     UtcClockDuplicateFailed(#[source] zx::Status),
     #[error("failed to process the component's config data: {_0}")]
-    ConfigDataError(#[from] ConfigDataError),
+    ConfigDataError(#[from] runner::ConfigDataError),
     #[error("could not create component namespace, {_0}")]
     NamespaceError(#[from] namespace::NamespaceError),
     #[error("error configuring process launcher: {_0}")]
@@ -55,17 +55,6 @@ impl StartComponentError {
             _ => zx::Status::INTERNAL,
         }
     }
-}
-
-/// Errors from parsing a component's configuration data.
-#[derive(Debug, Clone, Error)]
-pub enum ConfigDataError {
-    #[error("failed to create a vmo: {_0}")]
-    VmoCreate(#[source] zx::Status),
-    #[error("failed to write to vmo: {_0}")]
-    VmoWrite(#[source] zx::Status),
-    #[error("encountered an unrecognized variant of fuchsia.mem.Data")]
-    UnrecognizedDataVariant,
 }
 
 /// Errors from creating and initializing a component's job.

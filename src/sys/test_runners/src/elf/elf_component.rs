@@ -12,7 +12,6 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_ldsvc::LoaderMarker,
-    fidl_fuchsia_mem as fmem,
     fidl_fuchsia_test_runner::{
         LibraryLoaderCacheBuilderMarker, LibraryLoaderCacheMarker, LibraryLoaderCacheProxy,
     },
@@ -259,7 +258,9 @@ impl Component {
 
         let config_vmo = match start_info.encoded_config {
             None => None,
-            Some(config) => Some(encoded_config_into_vmo(config)?),
+            Some(config) => Some(runner::get_config_vmo(config).map_err(|e| {
+                ComponentError::ConfigVmo(anyhow!("Failed to get config vmo: {}", e))
+            })?),
         };
 
         Ok((
@@ -342,24 +343,6 @@ impl Component {
             options: args.options,
             config_vmo: None,
         })
-    }
-}
-
-fn encoded_config_into_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ComponentError> {
-    match encoded_config {
-        fmem::Data::Buffer(fmem::Buffer {
-            vmo,
-            size: _, // we get this vmo from component manager which sets the content size
-        }) => Ok(vmo),
-        fmem::Data::Bytes(bytes) => {
-            let size = bytes.len() as u64;
-            let vmo = zx::Vmo::create(size)
-                .map_err(|e| ComponentError::ConfigVmo(anyhow!("Failed to create vmo: {}", e)))?;
-            vmo.write(&bytes, 0)
-                .map_err(|e| ComponentError::ConfigVmo(anyhow!("Failed to write to vmo: {}", e)))?;
-            Ok(vmo)
-        }
-        _ => Err(ComponentError::ConfigVmo(anyhow!("Bad fmem::Buffer variant"))),
     }
 }
 

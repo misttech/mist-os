@@ -18,7 +18,7 @@ use {
     self::{
         component::{ElfComponent, ElfComponentInfo},
         config::ElfProgramConfig,
-        error::{ConfigDataError, JobError, StartComponentError, StartInfoError},
+        error::{JobError, StartComponentError, StartInfoError},
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
     },
@@ -33,7 +33,7 @@ use {
     fidl_fuchsia_diagnostics_types::{
         ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
     },
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_memory_report as freport, fidl_fuchsia_process as fproc,
+    fidl_fuchsia_memory_report as freport, fidl_fuchsia_process as fproc,
     fidl_fuchsia_process_lifecycle::LifecycleMarker,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
@@ -191,22 +191,6 @@ impl ElfRunner {
         })
     }
 
-    fn encoded_config_into_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ConfigDataError> {
-        match encoded_config {
-            fmem::Data::Buffer(fmem::Buffer {
-                vmo,
-                size: _, // we get this vmo from component manager which sets the content size
-            }) => Ok(vmo),
-            fmem::Data::Bytes(bytes) => {
-                let size = bytes.len() as u64;
-                let vmo = zx::Vmo::create(size).map_err(ConfigDataError::VmoCreate)?;
-                vmo.write(&bytes, 0).map_err(ConfigDataError::VmoWrite)?;
-                Ok(vmo)
-            }
-            _ => Err(ConfigDataError::UnrecognizedDataVariant.into()),
-        }
-    }
-
     fn create_handle_infos(
         outgoing_dir: Option<zx::Channel>,
         lifecycle_server: Option<zx::Channel>,
@@ -313,7 +297,7 @@ impl ElfRunner {
             .map_err(StartComponentError::NamespaceError)?;
 
         let config_vmo =
-            start_info.encoded_config.take().map(ElfRunner::encoded_config_into_vmo).transpose()?;
+            start_info.encoded_config.take().map(runner::get_config_vmo).transpose()?;
 
         let next_vdso = program_config.use_next_vdso.then(get_next_vdso_vmo).transpose()?;
 

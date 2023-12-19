@@ -219,6 +219,33 @@ pub fn get_environ(dict: &fdata::Dictionary) -> Result<Option<Vec<String>>, Star
     }
 }
 
+/// Errors from parsing a component's configuration data.
+#[derive(Debug, Clone, Error)]
+pub enum ConfigDataError {
+    #[error("failed to create a vmo: {_0}")]
+    VmoCreate(#[source] zx::Status),
+    #[error("failed to write to vmo: {_0}")]
+    VmoWrite(#[source] zx::Status),
+    #[error("encountered an unrecognized variant of fuchsia.mem.Data")]
+    UnrecognizedDataVariant,
+}
+
+pub fn get_config_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ConfigDataError> {
+    match encoded_config {
+        fmem::Data::Buffer(fmem::Buffer {
+            vmo,
+            size: _, // we get this vmo from component manager which sets the content size
+        }) => Ok(vmo),
+        fmem::Data::Bytes(bytes) => {
+            let size = bytes.len() as u64;
+            let vmo = zx::Vmo::create(size).map_err(ConfigDataError::VmoCreate)?;
+            vmo.write(&bytes, 0).map_err(ConfigDataError::VmoWrite)?;
+            Ok(vmo)
+        }
+        _ => Err(ConfigDataError::UnrecognizedDataVariant.into()),
+    }
+}
+
 /// Errors from parsing ComponentStartInfo.
 #[derive(Debug, Clone, Error)]
 pub enum StartInfoError {
