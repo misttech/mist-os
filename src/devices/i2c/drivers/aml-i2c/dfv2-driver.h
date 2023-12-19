@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_AML_I2C_DFV2_DRIVER_H_
 #define SRC_DEVICES_I2C_DRIVERS_AML_I2C_DFV2_DRIVER_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/compat/cpp/compat.h>
@@ -22,11 +21,6 @@ class Dfv2Driver : public fdf::DriverBase {
   zx::result<> Start() override;
 
   void SetTimeout(zx::duration timeout) { aml_i2c_->SetTimeout(timeout); }
-
-  zx_status_t GetProtocol(uint32_t proto_id, void* out) const {
-    return device_server_.GetProtocol(proto_id,
-                                      static_cast<compat::DeviceServer::GenericProtocol*>(out));
-  }
 
  private:
   compat::DeviceServer::BanjoConfig CreateBanjoConfig();

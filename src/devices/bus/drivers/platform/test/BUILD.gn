@@ -42,7 +42,6 @@ fuchsia_driver("test-board-driver") {
     "test-clock.cc",
     "test-composite-node-spec.cc",
     "test-gpio.cc",
-    "test-i2c.cc",
     "test-power.cc",
     "test-spi.cc",
     "test.cc",
@@ -174,38 +173,6 @@ fuchsia_driver_component("test-clock") {
   deps = [ ":test-clock-driver" ]
   info = "test-driver-info.json"
   manifest = "meta/test-clock.cml"
-}
-
-driver_bind_rules("test-i2c-bind") {
-  rules = "test/test-i2c.bind"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.test.platform",
-  ]
-}
-
-fuchsia_driver("test-i2c-driver") {
-  output_name = "test-i2c"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/i2c.cc" ]
-  deps = [
-    ":test-i2c-bind",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("test-i2c") {
-  component_name = "test-i2c"
-  deps = [ ":test-i2c-driver" ]
-  info = "test-driver-info.json"
-  manifest = "meta/test-i2c.cml"
 }
 
 driver_bind_rules("test-spi-bind") {
@@ -346,13 +313,11 @@ fuchsia_unittest_package("platform-bus-test") {
     ":test-composite",
     ":test-composite-node-spec",
     ":test-gpio",
-    ":test-i2c",
     ":test-power",
     ":test-spi",
     "//src/devices/bus/drivers/platform",
     "//src/devices/clock/drivers/clock",
     "//src/devices/gpio/drivers/gpio",
-    "//src/devices/i2c/drivers/i2c",
     "//src/devices/internal/drivers/fragment",
     "//src/devices/power/drivers/power",
     "//src/devices/spi/drivers/spi",

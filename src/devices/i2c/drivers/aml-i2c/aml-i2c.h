@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 #define SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/event.h>
@@ -17,7 +17,7 @@
 
 namespace aml_i2c {
 
-class AmlI2c : public ddk::I2cImplProtocol<AmlI2c> {
+class AmlI2c : public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {
  public:
   // Create an `AmlI2c` object and return a pointer to it. The return type is a
   // pointer to `AmlI2c` and not just `AmlI2c` because `AmlI2c` is not copyable.
@@ -36,15 +36,21 @@ class AmlI2c : public ddk::I2cImplProtocol<AmlI2c> {
     }
   }
 
-  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* rws, size_t count);
+  // I2cImpl protocol implementation
+  void GetMaxTransferSize(fdf::Arena& arena, GetMaxTransferSizeCompleter::Sync& completer) override;
+  void SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
+                  SetBitrateCompleter::Sync& completer) override;
+  void Transact(TransactRequestView request, fdf::Arena& arena,
+                TransactCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   thrd_t irqthrd() const { return irqthrd_; }
 
-  void* get_ops() { return &i2c_impl_protocol_ops_; }
-
   void SetTimeout(zx::duration timeout) { timeout_ = timeout; }
+
+  fuchsia_hardware_i2cimpl::Service::InstanceHandler GetI2cImplInstanceHandler(
+      fdf_dispatcher_t* dispatcher);
 
  private:
   static zx_status_t SetClockDelay(const aml_i2c_delay_values& delay,
@@ -54,8 +60,8 @@ class AmlI2c : public ddk::I2cImplProtocol<AmlI2c> {
   void StartXfer() const;
   zx_status_t WaitTransferComplete() const;
 
-  zx_status_t Read(uint8_t* buff, uint32_t len, bool stop) const;
-  zx_status_t Write(const uint8_t* buff, uint32_t len, bool stop) const;
+  zx_status_t Read(cpp20::span<uint8_t> dst, bool stop) const;
+  zx_status_t Write(cpp20::span<uint8_t> src, bool stop) const;
 
   void StartIrqThread();
   int IrqThread() const;
@@ -65,6 +71,7 @@ class AmlI2c : public ddk::I2cImplProtocol<AmlI2c> {
   const fdf::MmioBuffer regs_iobuff_;
   zx::duration timeout_ = zx::sec(1);
   thrd_t irqthrd_{};
+  fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> i2cimpl_bindings_;
 };
 
 }  // namespace aml_i2c
