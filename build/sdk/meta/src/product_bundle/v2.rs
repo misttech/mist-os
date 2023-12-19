@@ -392,7 +392,8 @@ mod tests {
     #[test]
     fn test_canonicalize_with_paths() {
         let tmp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
+        // Canonicalize tempdir because on macOS /tmp is a symlink to /private/tmp
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
 
         let create_temp_file = |name: &str| {
             let path = tempdir.join(name);
@@ -441,7 +442,7 @@ mod tests {
             update_package_hash: None,
             virtual_devices_path: Some("device".into()),
         };
-        let result = pb.canonicalize_paths(tempdir);
+        let result = pb.canonicalize_paths(&tempdir);
         assert!(result.is_ok());
 
         // Validate system_a. Note the fvm file does not exist in tempdir.

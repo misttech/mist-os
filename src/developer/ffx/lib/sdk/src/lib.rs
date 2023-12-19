@@ -613,7 +613,18 @@ mod test {
         let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
-        assert_eq!(manifest_path.join("host_x64/ffx-assembly"), ffx_assembly.executable);
+        // get_ffx_tool selects with the current architecture, so the executable path will be
+        // architecture-dependent.
+        let arch = CpuArchitecture::current();
+        let host_dir = match arch {
+            CpuArchitecture::X64 => "host_x64",
+            CpuArchitecture::Arm64 => "host_arm64",
+            CpuArchitecture::Riscv64 => "host_riscv64",
+            _ => panic!("Unsupported architecture {}", arch),
+        };
+        assert_eq!(manifest_path.join(host_dir).join("ffx-assembly"), ffx_assembly.executable);
+        // On the other hand, the metadata comes from a fixed set of input test data, which says
+        // the source of tools/ffx_tools/ffx-assembly.json is host_x64/ffx-assembly.json
         assert_eq!(manifest_path.join("host_x64/ffx-assembly.json"), ffx_assembly.metadata);
     }
 
@@ -677,7 +688,19 @@ mod test {
         };
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
-        assert_eq!(sdk_root.join("tools/x64/ffx_tools/ffx-assembly"), ffx_assembly.executable);
+        // get_ffx_tool selects with the current architecture, so the executable path will be
+        // architecture-dependent.
+        let current_arch = CpuArchitecture::current();
+        let arch = match current_arch {
+            CpuArchitecture::Arm64 => "arm64",
+            CpuArchitecture::X64 => "x64",
+            CpuArchitecture::Riscv64 => "riscv64",
+            _ => panic!("Unsupported host tool architecture {}", current_arch),
+        };
+        assert_eq!(
+            sdk_root.join("tools").join(arch).join("ffx_tools/ffx-assembly"),
+            ffx_assembly.executable
+        );
         assert_eq!(sdk_root.join("tools/ffx_tools/ffx-assembly.json"), ffx_assembly.metadata);
     }
 

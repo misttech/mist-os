@@ -35,7 +35,7 @@ use crate::repository::{FileSystemRepository, RepoProvider};
 #[cfg(not(target_os = "fuchsia"))]
 use anyhow::anyhow;
 
-const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_lib_pkg/empty-repo";
+const EMPTY_REPO_PATH: &str = concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
 
 #[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]

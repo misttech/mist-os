@@ -1371,7 +1371,8 @@ mod tests {
     const HOST_ADDR: &str = "1.2.3.4";
     const DEVICE_ADDR: &str = "127.0.0.1:5";
     const DEVICE_PORT: u16 = 5;
-    const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_daemon_protocol_repo/empty-repo";
+    const EMPTY_REPO_PATH: &str =
+        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_daemon_protocol_repo/empty-repo");
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,

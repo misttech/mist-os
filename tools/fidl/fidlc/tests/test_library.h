@@ -219,7 +219,13 @@ class TestLibrary final : public SharedInterface {
   }
 
   static std::string TestFilePath(const std::string& name) {
-    return "host_x64/fidlc-tests/" + name;
+#ifndef TEST_DATA_ROOT
+#error "TEST_DATA_ROOT must be defined"
+#else
+    // TEST_DATA_ROOT is expected to be the toolchain's output root path,
+    // relative to the build root, e.g. "host_x64"
+    return TEST_DATA_ROOT "/fidlc-tests/" + name;
+#endif
   }
 
   // Read the source from an associated external file.

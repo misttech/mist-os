@@ -11,11 +11,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 )
+
+var hostDir = map[string]string{"arm64": "host_arm64", "amd64": "host_x64"}[runtime.GOARCH]
 
 // createTestPackage fills the given directory with a new repository.
 func createTestPackage(t *testing.T, dir string) (*Repository, build.MerkleRoot) {
@@ -63,7 +66,7 @@ func createTestPackage(t *testing.T, dir string) (*Repository, build.MerkleRoot)
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
-	keysDir := "host_x64/test_data/ffx_lib_pkg/empty-repo/keys"
+	keysDir := filepath.Join(hostDir, "test_data/ffx_lib_pkg/empty-repo/keys")
 	err = ffx.RepositoryCreate(ctx, dir, keysDir)
 	if err != nil {
 		t.Fatalf("failed to create repository: %s", err)

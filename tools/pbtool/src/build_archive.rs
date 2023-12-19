@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn test_generate_build_archive() {
         let tmp = tempdir().unwrap();
-        let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
 
         let json = r#"
             {

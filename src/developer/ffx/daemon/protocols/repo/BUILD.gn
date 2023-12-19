@@ -31,6 +31,7 @@ if (is_host) {
     outputs = [ "$root_out_dir/test_data/ffx_daemon_protocol_repo/empty-repo/repository/{{source_file_part}}" ]
   }
 
+  relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
   rustc_library("ffx_daemon_protocol_repo") {
     version = "0.1.0"
     edition = "2021"
@@ -78,6 +79,7 @@ if (is_host) {
     ]
 
     sources = [ "src/lib.rs" ]
+    rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
   }
 }
 

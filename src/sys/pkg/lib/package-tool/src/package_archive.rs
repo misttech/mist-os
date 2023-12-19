@@ -222,7 +222,7 @@ mod tests {
         tempfile::TempDir,
     };
 
-    const PM_BIN: &str = "host_x64/test_data/package-tool/pm";
+    const PM_BIN: &str = concat!(env!("ROOT_OUT_DIR"), "/test_data/package-tool/pm");
 
     const BIN_CONTENTS: &[u8] = b"bin";
     const LIB_CONTENTS: &[u8] = b"lib";

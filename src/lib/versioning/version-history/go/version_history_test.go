@@ -8,12 +8,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
+var hostDir = map[string]string{"arm64": "host_arm64", "amd64": "host_x64"}[runtime.GOARCH]
+
 func TestCompiledVersionMatchesBuildVersion(t *testing.T) {
-	expectedBytes, err := os.ReadFile("host_x64/test_data/version-history/go/version_history.json")
+	expectedBytes, err := os.ReadFile(filepath.Join(hostDir, "test_data/version-history/go/version_history.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

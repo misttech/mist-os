@@ -606,7 +606,7 @@ mod test {
     #[fuchsia::test]
     async fn test_pb_create_a_and_r_and_repository() {
         let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
         let pb_dir = tempdir.join("pb");
 
         let partitions_path = tempdir.join("partitions.json");
@@ -671,7 +671,7 @@ mod test {
     #[fuchsia::test]
     async fn test_pb_create_with_update() {
         let tmp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
 
         let pb_dir = tempdir.join("pb");
 
@@ -740,7 +740,7 @@ mod test {
     #[fuchsia::test]
     async fn test_pb_create_with_virtual_devices() -> Result<()> {
         let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
         let pb_dir = tempdir.join("pb");
 
         let partitions_path = tempdir.join("partitions.json");
@@ -824,7 +824,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_delivery_blob_type() {
         let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
         let pb_dir = tempdir.join("pb");
 
         let partitions_path = tempdir.join("partitions.json");

@@ -248,7 +248,8 @@ mod tests {
     use std::str::FromStr;
     use tempfile::TempDir;
 
-    const EXT4_IMAGE_PATH: &str = "host_x64/test_data/gen-android-starnix-container/test.img";
+    const EXT4_IMAGE_PATH: &str =
+        concat!(env!("ROOT_OUT_DIR"), "/test_data/gen-android-starnix-container/test.img");
 
     fn fake_base(outdir: &Utf8Path) -> Utf8PathBuf {
         // Build a fake "base".

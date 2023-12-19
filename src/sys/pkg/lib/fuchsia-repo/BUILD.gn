@@ -4,6 +4,7 @@
 
 import("//build/rust/rustc_library.gni")
 
+relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
 rustc_library("fuchsia-repo") {
   version = "0.1.0"
   edition = "2021"
@@ -97,6 +98,7 @@ rustc_library("fuchsia-repo") {
     "src/util.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
 }
 
 group("tests") {

@@ -205,7 +205,8 @@ mod test {
     const DEVICE_PORT: u16 = 5;
     const HOST_ADDR: &str = "1.2.3.4";
     const TARGET_NODENAME: &str = "some-target";
-    const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_plugin_serve_repo/empty-repo";
+    const EMPTY_REPO_PATH: &str =
+        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_plugin_serve_repo/empty-repo");
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,

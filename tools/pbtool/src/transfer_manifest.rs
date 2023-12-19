@@ -205,7 +205,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_generate() {
         let tmp = tempdir().unwrap();
-        let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
 
         let pb_path = tempdir.join("product_bundle");
         std::fs::create_dir_all(&pb_path).unwrap();

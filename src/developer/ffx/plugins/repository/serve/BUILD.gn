@@ -20,6 +20,7 @@ if (is_host) {
   }
 }
 
+relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
 ffx_plugin("ffx_repository_serve") {
   version = "0.1.0"
   edition = "2021"
@@ -63,4 +64,5 @@ ffx_plugin("ffx_repository_serve") {
   }
 
   sources = [ "src/lib.rs" ]
+  rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
 }
