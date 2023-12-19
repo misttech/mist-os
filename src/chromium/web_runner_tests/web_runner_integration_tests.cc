@@ -57,6 +57,10 @@ class ChromiumAppTest : public gtest::RealLoopFixture,
                                Protocol{"fuchsia.feedback.ComponentDataRegister"},
                                Protocol{"fuchsia.feedback.CrashReportingProductRegister"},
                                Directory{
+                                   .name = "tzdata-icu",
+                                   .rights = fuchsia::io::R_STAR_DIR,
+                               },
+                               Directory{
                                    .name = "root-ssl-certificates",
                                    .rights = fuchsia::io::R_STAR_DIR,
                                }},
