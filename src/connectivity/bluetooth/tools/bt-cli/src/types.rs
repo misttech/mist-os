@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth::DeviceClass as FidlDeviceClass,
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth::DeviceClass as FidlDeviceClass;
 
 pub trait TryInto<T> {
     fn try_into(self) -> Result<T, Error>;

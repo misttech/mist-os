@@ -19,7 +19,7 @@ may be needed.
 
 ## PTS Testing
 
-1) Launch `$ bt-cli` and make sure the adapter is discoverable using `discoverable`.
+1) Launch `$ bt-cli` and make sure the controller is discoverable using `discoverable`.
 2) In a different shell, run: `$ bt-avdtp-tool`.
 3) On the PTS machine, run a test. Make sure the device address entered in PTS matches
 the device address shown in the `bt-cli` tool.

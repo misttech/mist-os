@@ -43,7 +43,7 @@ $ bt-hci-tool read-bdaddr
 ## bt-snoop-cli
 
 `bt-snoop-cli` is a command line client of the `bt-snoop` service. `bt-snoop` monitors snoop
-channels for all bluetooth adapters on the system.
+channels for all bluetooth controllers on the system.
 `bt-snoop-cli` subscribes to snoop logs for HCI devices and writes traffic to a file (stdout by
 default) supporting the pcap format. The captured packets can be visualized using any protocol
 analyzer that supports pcap (e.g. Wireshark).
@@ -90,8 +90,8 @@ bt-cli, as it will be launched by sysmgr if necessary.
 
 ```
 $ bt-cli
-bt> adapter
-Adapter:
+bt> controller
+HostInfo:
         identifier:     35700c9b-6748-4676-bd2c-1d863fd89210
         addresses:      [address (public) 28:C6:3F:2F:D4:14]
                         [address (random) 28:C6:3F:2F:D4:15]

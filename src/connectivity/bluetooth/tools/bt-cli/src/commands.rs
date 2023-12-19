@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    parking_lot::Mutex,
-    rustyline::{
-        completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
-    },
-    std::{
-        borrow::Cow::{self, Borrowed, Owned},
-        fmt,
-        str::FromStr,
-        sync::Arc,
-    },
+use parking_lot::Mutex;
+use rustyline::{
+    completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
 };
+use std::borrow::Cow::{self, Borrowed, Owned};
+use std::fmt;
+use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::State;
 
@@ -93,14 +89,14 @@ gen_commands! {
         Pair = ("pair", ["id|addr", "security_level", "bondable_mode", "transport (optional)"], "pair to a peer"),
         AllowPairing = ("allow-pairing", ["input cap. (none|confirmation|keyboard)", "output cap. (none|display)"], "Enable pairing mode to allow incoming pairing requests. Capabilities default to none if no arguments are passed in."),
         Forget = ("forget", ["id|addr"], "delete and disconnect a remote peer"),
-        ActiveAdapter = ("adapter", [], "Show the Active Adapter"),
-        SetActiveAdapter = ("set-adapter", ["id"], "Set the Active Adapter"),
-        SetAdapterName = ("set-local-name", ["name"], "Set the name of the Active Adapter"),
-        SetAdapterDeviceClass = ("set-device-class", ["Major Class", "Minor Class", "Service Classes..."], "Set the device class of the Active Adapter"),
-        GetAdapters = ("list-adapters", [], "Show all known bluetooth adapters"),
-        GetPeers = ("list-peers", ["filter"], "Show all known peers in a summarized view (optionally filtered)"),
+        Controller = ("controller", [], "Show the active controller"),
+        SetController = ("set-controller", ["id"], "Set the active controller"),
+        SetLocalName = ("set-local-name", ["name"], "Set the name of the active controller"),
+        SetDeviceClass = ("set-device-class", ["Major Class", "Minor Class", "Service Classes..."], "Set the device class of the active controller"),
+        ListControllers = ("list-controllers", [], "List all known bluetooth controllers"),
+        ListPeers = ("list-peers", ["filter"], "Show all known peers in a summarized view (optionally filtered)"),
         ShowPeers = ("show-peers", ["filter"], "Show details for all known peers (optionally filtered)"),
-        GetPeer = ("peer", ["id|addr"], "Show details for a known peer"),
+        Peer = ("peer", ["id|addr"], "Show details for a known peer"),
         StartDiscovery = ("start-discovery", [], "Start Discovery"),
         StopDiscovery = ("stop-discovery", [], "Stop Discovery"),
         Discoverable = ("discoverable", [], "Set this device to be discoverable"),
@@ -213,7 +209,7 @@ mod tests {
     #[test]
     fn test_gen_commands_macro() {
         assert!(Cmd::variants().contains(&"connect".to_string()));
-        assert_eq!(Cmd::GetPeer.arguments(), "<id|addr> ");
+        assert_eq!(Cmd::Peer.arguments(), "<id|addr> ");
         assert!(Cmd::help_msg().starts_with("Commands:\n"));
     }
 

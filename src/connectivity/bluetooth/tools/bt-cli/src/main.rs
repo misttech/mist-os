@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_bluetooth::{HostId as FidlHostId, PeerId as FidlPeerId},
-    fidl_fuchsia_bluetooth_sys::{
-        AccessMarker, AccessProxy, BondableMode, HostWatcherMarker, HostWatcherProxy,
-        PairingDelegateMarker, PairingMarker, PairingOptions, PairingProxy, PairingSecurityLevel,
-        ProcedureTokenProxy, TechnologyType,
-    },
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::io_capabilities::{InputCapability, OutputCapability},
-    fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Peer, PeerId},
-    fuchsia_component::client::connect_to_protocol,
-    futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt},
-    pairing_delegate,
-    parking_lot::Mutex,
-    pin_utils::pin_mut,
-    prettytable::{cell, format, row, Row, Table},
-    regex::Regex,
-    rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
-    std::{
-        cmp::Ordering, collections::HashMap, convert::TryFrom, iter::FromIterator, str::FromStr,
-        sync::Arc, thread,
-    },
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_bluetooth::{HostId as FidlHostId, PeerId as FidlPeerId};
+use fidl_fuchsia_bluetooth_sys::{
+    AccessMarker, AccessProxy, BondableMode, HostWatcherMarker, HostWatcherProxy,
+    PairingDelegateMarker, PairingMarker, PairingOptions, PairingProxy, PairingSecurityLevel,
+    ProcedureTokenProxy, TechnologyType,
+};
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::io_capabilities::{InputCapability, OutputCapability};
+use fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Peer, PeerId};
+use fuchsia_component::client::connect_to_protocol;
+use futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
+use pairing_delegate;
+use parking_lot::Mutex;
+use pin_utils::pin_mut;
+use prettytable::{cell, format, row, Row, Table};
+use regex::Regex;
+use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
+use std::sync::Arc;
+use std::thread;
+use std::{
+    cmp::Ordering, collections::HashMap, convert::TryFrom, iter::FromIterator, str::FromStr,
 };
 
 use crate::{
@@ -37,7 +36,7 @@ mod types;
 
 static PROMPT: &str = "\x1b[34mbt>\x1b[0m ";
 /// Escape code to clear the pty line on which the cursor is located.
-/// Used when evented output is intermingled with the REPL prompt.
+/// Used when event output is intermingled with the REPL prompt.
 static CLEAR_LINE: &str = "\x1b[2K";
 
 async fn get_active_host(state: &Mutex<State>) -> Result<String, Error> {
@@ -45,14 +44,14 @@ async fn get_active_host(state: &Mutex<State>) -> Result<String, Error> {
     let active_iter = state.hosts.iter().find(|&h| h.active);
     match active_iter {
         Some(host) => Ok(host.to_string()),
-        None => Ok(String::from("No Active Adapter")),
+        None => Ok(String::from("No host instances")),
     }
 }
 
 async fn get_hosts(state: &Mutex<State>) -> Result<String, Error> {
     let hosts = &state.lock().hosts;
     if hosts.is_empty() {
-        return Ok(String::from("No adapters detected"));
+        return Ok(String::from("No host instances detected"));
     }
     // Create table of results
     let mut table = Table::new();
@@ -85,14 +84,14 @@ async fn set_active_host<'a>(
     host_svc: &'a HostWatcherProxy,
 ) -> Result<String, Error> {
     if args.len() != 1 {
-        return Err(format_err!("usage: {}", Cmd::SetActiveAdapter.cmd_help()));
+        return Err(format_err!("usage: {}", Cmd::SetController.cmd_help()));
     }
-    println!("Setting active adapter");
+    println!("Setting active controller");
     let host_id = HostId::from_str(args[0])?;
     let fidl_host_id: FidlHostId = host_id.into();
     match host_svc.set_active(&fidl_host_id).await {
         Ok(_) => Ok(String::new()),
-        Err(err) => Ok(format!("Error setting active host: {}", err)),
+        Err(err) => Ok(format!("Error setting active controller: {}", err)),
     }
 }
 
@@ -101,17 +100,17 @@ async fn set_local_name<'a>(
     access_svc: &'a AccessProxy,
 ) -> Result<String, Error> {
     if args.len() != 1 {
-        return Ok(format!("usage: {}", Cmd::SetAdapterName.cmd_help()));
+        return Ok(format!("usage: {}", Cmd::SetLocalName.cmd_help()));
     }
-    println!("Setting local name of the active host");
+    println!("Setting local name of the active controller");
     match access_svc.set_local_name(args[0]) {
         Ok(_) => Ok(String::new()),
         Err(err) => Ok(format!("Error setting local name: {:?}", err)),
     }
 }
 
-/// Set the class of device for the currently active adapter. Arguments are optional, and defaults
-/// will be used if arguments aren't provided.
+/// Set the class of device for the currently active controller. Arguments are optional, and
+/// defaults will be used if arguments aren't provided.
 ///
 /// Returns an error if the input is not recognized as a valid device class .
 async fn set_device_class<'a>(
@@ -119,7 +118,7 @@ async fn set_device_class<'a>(
     access_svc: &'a AccessProxy,
 ) -> Result<String, Error> {
     let mut args = args.iter();
-    println!("Setting device class of the active adapter");
+    println!("Setting device class of the active controller");
     let device_class = DeviceClass {
         major: args
             .next()
@@ -156,7 +155,7 @@ fn get_peers<'a>(args: &'a [&'a str], state: &Mutex<State>, full_details: bool) 
     let find = match args.len() {
         0 => "",
         1 => args[0],
-        _ => return format!("usage: {}", Cmd::GetPeers.cmd_help()),
+        _ => return format!("usage: {}", Cmd::ListPeers.cmd_help()),
     };
     let state = state.lock();
     if state.peers.is_empty() {
@@ -193,7 +192,7 @@ fn get_peers<'a>(args: &'a [&'a str], state: &Mutex<State>, full_details: bool) 
 /// Get the string representation of a peer from either an identifier or address
 fn get_peer<'a>(args: &'a [&'a str], state: &Mutex<State>) -> String {
     if args.len() != 1 {
-        return format!("usage: {}", Cmd::GetPeer.cmd_help());
+        return format!("usage: {}", Cmd::Peer.cmd_help());
     }
 
     to_identifier(state, args[0])
@@ -599,14 +598,14 @@ async fn handle_cmd(
         Cmd::StopDiscovery => set_discovery(false, &state, &access_svc).await,
         Cmd::Discoverable => set_discoverable(true, &access_svc, &state).await,
         Cmd::NotDiscoverable => set_discoverable(false, &access_svc, &state).await,
-        Cmd::GetPeers => Ok(get_peers(args, &state, false)),
+        Cmd::ListPeers => Ok(get_peers(args, &state, false)),
         Cmd::ShowPeers => Ok(get_peers(args, &state, true)),
-        Cmd::GetPeer => Ok(get_peer(args, &state)),
-        Cmd::GetAdapters => get_hosts(&state).await,
-        Cmd::SetActiveAdapter => set_active_host(args, &host_svc).await,
-        Cmd::SetAdapterName => set_local_name(args, &access_svc).await,
-        Cmd::SetAdapterDeviceClass => set_device_class(args, &access_svc).await,
-        Cmd::ActiveAdapter => get_active_host(&state).await,
+        Cmd::Peer => Ok(get_peer(args, &state)),
+        Cmd::ListControllers => get_hosts(&state).await,
+        Cmd::SetController => set_active_host(args, &host_svc).await,
+        Cmd::SetLocalName => set_local_name(args, &access_svc).await,
+        Cmd::SetDeviceClass => set_device_class(args, &access_svc).await,
+        Cmd::Controller => get_active_host(&state).await,
         Cmd::Help => Ok(Cmd::help_msg().to_string()),
         Cmd::Exit | Cmd::Quit => return Ok(ReplControl::Break),
     }?;
@@ -709,8 +708,11 @@ async fn watch_hosts(host_svc: HostWatcherProxy, state: Arc<Mutex<State>>) -> Re
             let host = HostInfo::try_from(fidl_host)?;
             if !first_result {
                 println!(
-                    "Adapter updated: [addresses: {}, active: {}, discoverable: {}, discovering: {}]",
-                    addresses_to_custom_string(&host.addresses, " "), host.active, host.discoverable, host.discovering
+                    "Controller updated: [addresses: {}, active: {}, discoverable: {}, discovering: {}]",
+                    addresses_to_custom_string(&host.addresses, " "),
+                    host.active,
+                    host.discoverable,
+                    host.discovering
                 );
             }
             hosts.push(host);
@@ -874,7 +876,7 @@ mod tests {
         // No hosts
         let mut output = get_hosts(&Mutex::new(State::new())).await.unwrap();
         assert!(!fields.is_match(&output));
-        assert!(output.contains("No adapters"));
+        assert!(output.contains("No host instances"));
 
         let mut state = State::new();
         state.hosts.push(custom_host(

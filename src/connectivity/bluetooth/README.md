@@ -82,7 +82,7 @@ Examples using Fuchsia's Bluetooth Low Energy APIs can be found
 Dual-mode (LE + Classic) GAP operations that are typically exposed to privileged
 clients are performed using the
 [fuchsia.bluetooth.sys](/sdk/fidl/fuchsia.bluetooth.sys) protocol. This API is
-intended for managing local adapters, device discovery & discoverability,
+intended for managing local controllers, device discovery & discoverability,
 pairing/bonding, and global settings.
 
 [`bt-cli`](tools/bt-cli) is a command-line front-end for privileged access
@@ -90,15 +90,10 @@ operations:
 
 ```
 $ bt-cli
-bt> list-adapters
-Adapter:
-    Identifier:     e5878e9f642d8908
-    Address:        34:13:E8:86:8C:19
-    Technology:     DualMode
-    Local Name:     siren-relic-wad-pout
-    Discoverable:   false
-    Discovering:    false
-    Local UUIDs:    None
+bt> list-controllers
+HostId            Addresses             Active  Technology  Name                    Discoverable  Discovering
+e5878e9f642d8908  [34:13:E8:86:8C:19]   true    DualMode    fuchsia-12ab-34cd-56ef  true          false
+de22345ab1234cc0  [34:13:E8:86:8D:20]   false   DualMode    fuchsia-77aa-88bb-99cc  false         false
 ```
 
 ### Tools
