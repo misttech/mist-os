@@ -8,6 +8,7 @@
 # The above allows this fragment to be merged from `bazel_rules_fuchsia` into
 # `@fuchsia_sdk//:BUILD.bazel`.
 
+# buildifier: disable=bzl-visibility
 load("//fuchsia/private:debug_info.bzl", "print_debug_info")
 
 # A target that will dump debug information about the Fuchsia

@@ -34,6 +34,8 @@ _fuchsia_package = rule(
     },
 )
 
+# **kwargs is not documented.
+# buildifier: disable=function-docstring-args
 def fuchsia_package_directory(*, name, root, package_manifest, **kwargs):
     """Creates a Fuchsia package from a directory.
 

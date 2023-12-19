@@ -221,6 +221,7 @@ _pack_prebuilt_package = rule(
     },
 )
 
+# buildifier: disable=function-docstring
 def fuchsia_prebuilt_package(*, name, archive = None, manifest = None, files = [], components = [], drivers = [], **kwargs):
     if (archive and files) or bool(archive) == bool(manifest):
         fail("Must specify exactly either `archive` or `manifest + files`.")

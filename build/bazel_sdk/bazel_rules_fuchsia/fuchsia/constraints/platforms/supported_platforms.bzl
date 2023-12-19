@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Fuchsia platform shortcuts."""
+
 # TODO document
 fuchsia_platforms = struct(
     arm64 = "@fuchsia_sdk//fuchsia/constraints/platforms:fuchsia_arm64",

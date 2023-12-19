@@ -46,6 +46,7 @@ def _instantiate_from_local_dir(ctx, local_clang):
         version_file = ctx.os.environ.get(_LOCAL_FUCHSIA_CLANG_VERSION_FILE)
         if version_file:
             if version_file.startswith(("/", "..")):
+                # buildifier: disable=print
                 print("### Ignoring %s value, path should be relative to workspace root: %s" % (_LOCAL_FUCHSIA_CLANG_VERSION_FILE, version_file))
             else:
                 ctx.path(Label("@//:" + version_file))

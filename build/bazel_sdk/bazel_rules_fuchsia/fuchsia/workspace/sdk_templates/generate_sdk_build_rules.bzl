@@ -60,7 +60,7 @@ def _get_starlark_dict(entries):
         if type(v) == "list":
             v_str = "[" + _get_starlark_list(v).replace("\n", "") + "]"
         elif type(v) == "struct":
-            values_str += "    " + str(v) + ",\n"
+            v_str += "    " + str(v) + ",\n"
         else:
             v_str = "\"" + str(v) + "\""
         entries_str += "    \"" + k + "\": " + v_str + ",\n"

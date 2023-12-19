@@ -117,6 +117,7 @@ fuchsia_archivist_pipeline_test_manifest = rule(
     },
 )
 
+# buildifier: disable=function-docstring
 def fuchsia_archivist_pipeline_test(name, pipeline_name, inspect = [], expect_disabled = False):
     cml_name = name + "_cml"
     fuchsia_archivist_pipeline_test_manifest(

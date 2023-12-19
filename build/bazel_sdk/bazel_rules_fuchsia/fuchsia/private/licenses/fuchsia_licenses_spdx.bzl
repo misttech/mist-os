@@ -71,6 +71,7 @@ The SPDX json conforms with:
 https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json
 """,
     implementation = _fuchsia_licenses_spdx_impl,
+    # buildifier: disable=attr-licenses
     attrs = {
         "target": attr.label(
             doc = "The target to aggregate the licenses from. DEPRECATED: Use `licenses` instead",

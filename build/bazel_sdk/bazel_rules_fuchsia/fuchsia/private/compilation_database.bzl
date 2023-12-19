@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Clang compilation database support."""
+
 load(
     "@bazel_tools//tools/build_defs/cc:action_names.bzl",
     "CPP_COMPILE_ACTION_NAME",

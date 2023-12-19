@@ -202,6 +202,7 @@ def _write_licenses_collection_json(ctx, gathered_licenses_info, output_file):
                 })
             unlicensed_targets.append(unlicensed_target)
 
+    # buildifier: disable=attr-licenses
     json_content = {
         "root_target": root_target_str,
         "licenses": licenses,
