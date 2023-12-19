@@ -27,6 +27,7 @@ test("ld-unittests") {
     "..:headers",
     "../testing",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/symbolizer-markup",
     "//third_party/googletest:gmock",
   ]
 

@@ -164,6 +164,42 @@ constexpr auto AbiLoadedSymbolModules(const abi::Abi<Elf>& abi) {
   return ld::internal::filter_view{AbiLoadedModules(abi), &Module::symbols_visible};
 }
 
+// This uses the symbolizer_markup::Writer API to emit the contextual elements
+// describing this Module.  It requires the page size used to load the module.
+template <class Module, class Writer>
+constexpr Writer& ModuleSymbolizerContext(
+    Writer& writer, const Module& module,
+    typename decltype(module.vaddr_start)::value_type page_size, std::string_view prefix = {}) {
+  using size_type = decltype(page_size);
+  using Phdr = std::decay_t<decltype(module.phdrs.front())>;
+
+  std::string_view name = module.link_map.name.get();
+  if (name.empty()) {
+    name = "<application>";
+  }
+  writer  //
+      .Prefix(prefix)
+      .ElfModule(module.symbolizer_modid, name, module.build_id.get())
+      .Newline();
+
+  const size_type load_bias = module.link_map.addr;
+  const uint32_t modid = module.symbolizer_modid;
+  for (const Phdr& phdr : module.phdrs) {
+    const size_type vaddr = phdr.vaddr & -page_size;
+    const size_type memsz = (vaddr + phdr.memsz + page_size - 1) & -page_size;
+    writer  //
+        .Prefix(prefix)
+        .LoadImageMmap(vaddr + load_bias, memsz, modid,
+                       {.read = (phdr.flags & Phdr::kRead) != 0,
+                        .write = (phdr.flags & Phdr::kWrite) != 0,
+                        .execute = (phdr.flags & Phdr::kExecute) != 0},
+                       vaddr)
+        .Newline();
+  }
+
+  return writer;
+}
+
 }  // namespace ld
 
 #endif  // LIB_LD_MODULE_H_
