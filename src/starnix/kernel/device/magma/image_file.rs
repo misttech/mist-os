@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
-    mm::ProtectionFlags,
     task::CurrentTask,
     vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, Anon, FileHandle, FileObject, FileOps, FsNodeInfo, VmoFileOperation,
+        fileops_impl_seekable, fileops_impl_vmo, Anon, FileHandle, FileObject, FileOps, FsNodeInfo,
     },
 };
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
-use starnix_uapi::{errors::Errno, file_mode::FileMode, open_flags::OpenFlags};
+use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
 use std::sync::Arc;
 
 pub struct ImageInfo {
@@ -69,35 +67,5 @@ impl ImageFile {
 }
 
 impl FileOps for ImageFile {
-    fileops_impl_seekable!();
-
-    fn read(
-        &self,
-        file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::read(&self.vmo, file, offset, data)
-    }
-
-    fn write(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
-    }
-
-    fn get_vmo(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
-    }
+    fileops_impl_vmo!(self, &self.vmo);
 }

@@ -2,24 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon as zx;
+use once_cell::sync::OnceCell;
+use std::sync::Arc;
+
 use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
+    device::{kobject::DeviceMetadata, DeviceMode},
     fs::sysfs::DeviceDirectory,
-    mm::ProtectionFlags,
+    mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
     vfs::{
-        default_ioctl, fileops_impl_seekable, FileObject, FileOps, FsNode, InputBuffer,
-        OutputBuffer, VmoFileOperation,
+        default_ioctl, fileops_impl_seekable, fileops_impl_vmo, FileObject, FileOps,
+        FileSystemCreator, FsNode, FsString,
     },
 };
-use fuchsia_zircon as zx;
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE, ASHMEM_PIN,
     ASHMEM_PURGE_ALL_CACHES, ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
 };
-use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{device_type, errno, error, errors::Errno, open_flags::OpenFlags};
-use std::sync::Arc;
+use starnix_logging::not_implemented;
+use starnix_sync::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::{
+    device_type, errno, error, errors::Errno, open_flags::OpenFlags, ASHMEM_GET_FILE_ID,
+    ASHMEM_NAME_LEN,
+};
 
 /// Initializes the ashmem device.
 pub fn ashmem_device_init(system_task: &CurrentTask) {
@@ -28,7 +35,7 @@ pub fn ashmem_device_init(system_task: &CurrentTask) {
 
     let misc_class = registry.get_or_create_class(b"misc", registry.virtual_bus());
     let ashmem_device =
-        registry.register_dyn_chrdev(AshmemDevice {}).expect("ashmem device register failed.");
+        registry.register_dyn_chrdev(Ashmem::open).expect("ashmem device register failed.");
 
     registry.add_device(
         system_task,
@@ -39,68 +46,42 @@ pub fn ashmem_device_init(system_task: &CurrentTask) {
     );
 }
 
-#[derive(Clone)]
-struct AshmemDevice {}
+pub struct Ashmem {
+    vmo: OnceCell<Arc<zx::Vmo>>,
+    state: Mutex<AshmemState>,
+}
 
-impl DeviceOps for AshmemDevice {
-    fn open(
-        &self,
+#[derive(Default)]
+struct AshmemState {
+    size: usize,
+    name: FsString,
+}
+
+impl Ashmem {
+    pub fn open(
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(AshmemFileObject::new()?))
+        Ok(Box::new(Ashmem { vmo: OnceCell::new(), state: Mutex::default() }))
+    }
+
+    fn vmo(&self) -> Result<&Arc<zx::Vmo>, Errno> {
+        let state = self.state.lock();
+        self.vmo.get_or_try_init(|| {
+            if state.size == 0 {
+                return error!(EINVAL);
+            }
+            let vmo = zx::Vmo::create(state.size as u64).map_err(|_| errno!(ENOMEM))?;
+            Ok(Arc::new(vmo))
+        })
     }
 }
 
-struct AshmemFileObject {
-    vmo: Arc<zx::Vmo>,
-}
+impl FileOps for Ashmem {
+    fileops_impl_vmo!(self, self.vmo()?);
 
-impl AshmemFileObject {
-    pub fn new() -> Result<Self, Errno> {
-        let vmo =
-            zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).map_err(|_| errno!(ENOMEM))?;
-        let vmo = Arc::new(vmo);
-        Ok(AshmemFileObject { vmo })
-    }
-}
-
-impl FileOps for AshmemFileObject {
-    fileops_impl_seekable!();
-
-    fn read(
-        &self,
-        file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::read(&self.vmo, file, offset, data)
-    }
-
-    fn write(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
-    }
-
-    fn get_vmo(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
-    }
-
-    /// Implements ioctl.
     fn ioctl(
         &self,
         file: &FileObject,
@@ -109,17 +90,59 @@ impl FileOps for AshmemFileObject {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            ASHMEM_GET_NAME
-            | ASHMEM_GET_PIN_STATUS
-            | ASHMEM_GET_PROT_MASK
-            | ASHMEM_GET_SIZE
-            | ASHMEM_PIN
-            | ASHMEM_PURGE_ALL_CACHES
-            | ASHMEM_SET_NAME
-            | ASHMEM_SET_PROT_MASK
-            | ASHMEM_SET_SIZE
-            | ASHMEM_UNPIN => {
-                error!(EINVAL)
+            ASHMEM_SET_SIZE => {
+                let mut state = self.state.lock();
+                if self.vmo.get().is_some() {
+                    return error!(EINVAL);
+                }
+                state.size = arg.into();
+                Ok(SUCCESS)
+            }
+            ASHMEM_GET_SIZE => Ok(self.state.lock().size.into()),
+
+            ASHMEM_SET_NAME => {
+                let name =
+                    current_task.read_c_string_to_vec(arg.into(), ASHMEM_NAME_LEN as usize)?;
+                self.state.lock().name = name;
+                Ok(SUCCESS)
+            }
+            ASHMEM_GET_NAME => {
+                let state = self.state.lock();
+                let mut name = &state.name[..];
+                if name.len() == 0 {
+                    name = b"";
+                }
+                current_task.write_memory(arg.into(), name)?;
+                Ok(SUCCESS)
+            }
+
+            ASHMEM_SET_PROT_MASK => {
+                not_implemented!("ASHMEM_SET_PROT_MASK");
+                error!(ENOSYS)
+            }
+            ASHMEM_GET_PROT_MASK => {
+                not_implemented!("ASHMEM_GET_PROT_MASK");
+                error!(ENOSYS)
+            }
+            ASHMEM_PIN => {
+                not_implemented!("ASHMEM_PIN");
+                error!(ENOSYS)
+            }
+            ASHMEM_UNPIN => {
+                not_implemented!("ASHMEM_UNPIN");
+                error!(ENOSYS)
+            }
+            ASHMEM_GET_PIN_STATUS => {
+                not_implemented!("ASHMEM_GET_PIN_STATUS");
+                error!(ENOSYS)
+            }
+            ASHMEM_PURGE_ALL_CACHES => {
+                not_implemented!("ASHMEM_PURGE_ALL_CACHES");
+                error!(ENOSYS)
+            }
+            ASHMEM_GET_FILE_ID => {
+                not_implemented!("ASHMEM_GET_FILE_ID");
+                error!(ENOSYS)
             }
             _ => default_ioctl(file, current_task, request, arg),
         }

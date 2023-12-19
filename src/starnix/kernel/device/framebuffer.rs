@@ -9,12 +9,9 @@ use super::framebuffer_server::{
 use crate::{
     device::{features::AspectRatio, kobject::DeviceMetadata, DeviceMode, DeviceOps},
     fs::sysfs::DeviceDirectory,
-    mm::{MemoryAccessorExt, ProtectionFlags},
+    mm::MemoryAccessorExt,
     task::{CurrentTask, Kernel},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, FileObject, FileOps, FsNode, VmoFileOperation,
-    },
+    vfs::{fileops_impl_seekable, fileops_impl_vmo, FileObject, FileOps, FsNode},
 };
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_math as fmath;
@@ -210,7 +207,7 @@ impl DeviceOps for Arc<Framebuffer> {
 }
 
 impl FileOps for Arc<Framebuffer> {
-    fileops_impl_seekable!();
+    fileops_impl_vmo!(self, &self.vmo);
 
     fn ioctl(
         &self,
@@ -257,36 +254,6 @@ impl FileOps for Arc<Framebuffer> {
                 error!(EINVAL)
             }
         }
-    }
-
-    fn read(
-        &self,
-        file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::read(&self.vmo, file, offset, data)
-    }
-
-    fn write(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
-    }
-
-    fn get_vmo(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
     }
 }
 

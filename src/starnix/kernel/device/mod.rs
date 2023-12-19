@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod ashmem;
 mod binder;
 mod common;
 mod features;
@@ -16,7 +17,6 @@ pub use common::*;
 pub use features::*;
 pub use registry::*;
 
-pub mod ashmem;
 pub mod framebuffer;
 pub mod gralloc;
 pub mod input;

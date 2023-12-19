@@ -178,9 +178,18 @@ impl FsNodeOps for VmoFileNode {
     }
 }
 
-pub struct VmoFileOperation {}
+pub struct VmoFileObject {
+    pub vmo: Arc<zx::Vmo>,
+}
 
-impl VmoFileOperation {
+impl VmoFileObject {
+    /// Create a file object based on a VMO.
+    pub fn new(vmo: Arc<zx::Vmo>) -> Self {
+        VmoFileObject { vmo }
+    }
+}
+
+impl VmoFileObject {
     pub fn read(
         vmo: &zx::Vmo,
         file: &FileObject,
@@ -301,49 +310,45 @@ impl VmoFileOperation {
     }
 }
 
-pub struct VmoFileObject {
-    pub vmo: Arc<zx::Vmo>,
-}
+macro_rules! fileops_impl_vmo {
+    ($self:ident, $vmo:expr) => {
+        fileops_impl_seekable!();
 
-impl VmoFileObject {
-    /// Create a file object based on a VMO.
-    pub fn new(vmo: Arc<zx::Vmo>) -> Self {
-        VmoFileObject { vmo }
+        fn read(
+            &$self,
+            file: &crate::vfs::FileObject,
+            _current_task: &crate::task::CurrentTask,
+            offset: usize,
+            data: &mut dyn crate::vfs::buffers::OutputBuffer,
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
+            crate::vfs::VmoFileObject::read($vmo, file, offset, data)
+        }
+
+        fn write(
+            &$self,
+            file: &crate::vfs::FileObject,
+            current_task: &crate::task::CurrentTask,
+            offset: usize,
+            data: &mut dyn crate::vfs::buffers::InputBuffer,
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
+            crate::vfs::VmoFileObject::write($vmo, file, current_task, offset, data)
+        }
+
+        fn get_vmo(
+            &$self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            _length: Option<usize>,
+            prot: crate::mm::ProtectionFlags,
+        ) -> Result<Arc<fuchsia_zircon::Vmo>, starnix_uapi::errors::Errno> {
+            crate::vfs::VmoFileObject::get_vmo($vmo, file, current_task, prot)
+        }
     }
 }
+pub(crate) use fileops_impl_vmo;
 
 impl FileOps for VmoFileObject {
-    fileops_impl_seekable!();
-
-    fn read(
-        &self,
-        file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::read(&self.vmo, file, offset, data)
-    }
-
-    fn write(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        VmoFileOperation::write(&self.vmo, file, current_task, offset, data)
-    }
-
-    fn get_vmo(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        VmoFileOperation::get_vmo(&self.vmo, file, current_task, prot)
-    }
+    fileops_impl_vmo!(self, &self.vmo);
 }
 
 pub fn new_memfd(
