@@ -52,6 +52,7 @@ class Asix88179Ethernet : public DeviceType,
   void EthernetImplGetBti(zx::bti* bti) { bti->reset(); }
 
   static zx_status_t Bind(void* ctx, zx_device_t* device);
+  static void Release(void* ctx);
 
  private:
   zx_status_t Initialize();

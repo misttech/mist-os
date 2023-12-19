@@ -993,12 +993,15 @@ zx_status_t Asix88179Ethernet::Bind(void* ctx, zx_device_t* dev) {
   return ZX_OK;
 }
 
+void Asix88179Ethernet::Release(void* ctx) { delete reinterpret_cast<Asix88179Ethernet*>(ctx); }
+
 }  // namespace eth
 
 static constexpr zx_driver_ops_t ax88179_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
   ops.bind = &eth::Asix88179Ethernet::Bind;
+  ops.release = &eth::Asix88179Ethernet::Release;
 
   return ops;
 }();
