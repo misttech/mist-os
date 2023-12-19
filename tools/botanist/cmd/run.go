@@ -55,6 +55,9 @@ type RunCommand struct {
 	// ProductBundleName is a name of product bundle getting used.
 	productBundleName string
 
+	// IsBootTest tells whether the product bundle provided is for a boot test.
+	isBootTest bool
+
 	// Netboot tells botanist to netboot (and not to pave).
 	netboot bool
 
@@ -145,6 +148,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.imageManifest, "images", "", "path to an image manifest")
 	f.StringVar(&r.productBundles, "product-bundles", "", "path to product_bundles.json file")
 	f.StringVar(&r.productBundleName, "product-bundle-name", "", "name of product bundle to use")
+	f.BoolVar(&r.isBootTest, "boot-test", false, "whether the provided product bundle is for a boot test.")
 	f.BoolVar(&r.netboot, "netboot", false, "if set, botanist will not pave; but will netboot instead")
 	f.Var(&r.zirconArgs, "zircon-args", "kernel command-line arguments")
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
@@ -360,6 +364,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 			ZirconArgs:        r.zirconArgs,
 			ProductBundles:    r.productBundles,
 			ProductBundleName: r.productBundleName,
+			IsBootTest:        r.isBootTest,
 		}
 
 		if err := targets.StartTargets(ctx, startOpts, fuchsiaTargets); err != nil {

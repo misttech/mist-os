@@ -618,6 +618,9 @@ type StartOptions struct {
 
 	// ProductBundleName is a name of product bundle getting used.
 	ProductBundleName string
+
+	// IsBootTest tells whether the provided product bundle is for a boot test.
+	IsBootTest bool
 }
 
 // StartTargets starts all the targets given the opts.
