@@ -17,10 +17,7 @@
 #
 # This file contains the module extensions used by the Fuchsia platform build.
 
-# clang_toolchains_extensions:
-#
-# Generate repositories related to Clang toolchains.
-#
+"""Clang toolchain repository extensions."""
 
 load(
     "//:build/bazel/toolchains/clang/repository_rules.bzl",

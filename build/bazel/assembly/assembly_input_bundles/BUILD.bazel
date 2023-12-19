@@ -2,10 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
 load("@fuchsia_sdk//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
-load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
-load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 load(
     "//:bundles/assembly/platform_aib_names.bzl",
     "BRINGUP_PLATFORM_AIB_NAMES",
@@ -16,6 +13,8 @@ load(
     "USER_PLATFORM_AIB_NAMES",
     "USER_PLATFORM_AIB_NAMES_RISCV64",
 )
+load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
+load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 
 package(default_visibility = ["//visibility:public"])
 

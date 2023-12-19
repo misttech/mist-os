@@ -4,12 +4,11 @@
 
 """BUILD.bazel file for @prebuilt_clang repository."""
 
-load("@fuchsia_build_config//:defs.bzl", "build_config")
-load(":generated_constants.bzl", "constants")
 load(
     "@//:build/bazel/toolchains/clang/toolchains.bzl",
     "define_host_prebuilt_clang_cc_toolchains",
 )
+load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
     "@fuchsia_sdk_common//:toolchains/clang/clang_utils_test.bzl",
     "include_clang_utils_test_suite",
@@ -18,6 +17,7 @@ load(
     "@fuchsia_sdk_common//:toolchains/clang/repository_utils.bzl",
     "setup_clang_repository",
 )
+load(":generated_constants.bzl", "constants")
 
 package(default_visibility = ["//visibility:public"])
 

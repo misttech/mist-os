@@ -87,6 +87,7 @@ fuchsia_build_config_repository(
     name = "fuchsia_build_config",
 )
 
+# buildifier: disable=load-on-top
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 
 fuchsia_host_tag = build_config.host_tag
@@ -110,15 +111,15 @@ fuchsia_icu_config_repository(
 )
 
 # buildifier: disable=load-on-top
-load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
-
-# buildifier: disable=load-on-top
 load(
     "@bazel_skylib//:workspace.bzl",
     "bazel_skylib_workspace",
 )
 
 bazel_skylib_workspace()
+
+# buildifier: disable=load-on-top
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
 
 rules_rust_dependencies()
 
