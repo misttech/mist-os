@@ -156,6 +156,7 @@ source_set("fidl_server") {
 
   public_deps = [
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
 }

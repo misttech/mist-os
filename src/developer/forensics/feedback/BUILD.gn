@@ -147,6 +147,7 @@ source_set("namespace_init") {
   ]
 
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/feedback_data/system_log_recorder:reader",
     "//src/developer/forensics/feedback_data/system_log_recorder/encoding:production",
     "//src/developer/forensics/feedback_data/system_log_recorder/encoding:version",
