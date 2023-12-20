@@ -16,10 +16,10 @@ use {
     fuchsia_zircon::{
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
-    futures::{lock::Mutex, StreamExt},
+    futures::{lock::Mutex, stream::Peekable, Stream, StreamExt},
     measure_tape_for_events::Measurable,
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
-    std::sync::Arc,
+    std::{pin::Pin, sync::Arc, task::Poll},
     tracing::{error, warn},
 };
 
@@ -174,110 +174,120 @@ pub fn validate_and_filter_event(
     }
 }
 
-async fn handle_get_next_request(
-    event_stream: &mut EventStream,
-    pending_event: &mut Option<fcomponent::Event>,
-) -> Option<Vec<fcomponent::Event>> {
-    // Handle buffered state
-    // TODO(https://fxbug.dev/98653): Replace this
-    // with a function to measure a Vec<fsys::Event>
-    let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
-    let mut handles_used: usize = 0;
-    let mut events = vec![];
+/// [`EventFiller`] helps build a vector of events up to the Zircon
+/// channel message size limit.
+///
+/// TODO(https://fxbug.dev/98653): This can be simplified given better
+/// FIDL large messages support.
+struct EventFiller {
+    bytes_used: usize,
+    handles_used: usize,
+    events: Vec<fcomponent::Event>,
+}
 
-    /// Measures the size of an event, increments bytes used,
-    /// and returns the event Vec if full.
-    /// If there isn't enough space for even one event, logs an error
-    /// and returns an empty Vec.
-    macro_rules! handle_event {
-        ($e: expr, $event_type: expr) => {
-            let measure_tape = $e.measure();
-            bytes_used += measure_tape.num_bytes;
-            handles_used += measure_tape.num_handles;
-            if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize
-            || handles_used > ZX_CHANNEL_MAX_MSG_HANDLES as usize {
-                if pending_event.is_some() {
-                    unreachable!("Overflowed twice");
-                }
-                *pending_event = Some($e);
-                if events.len() == 0 {
-                    error!(
-                        event_type = $event_type.as_str(),
-                        "Event exceeded the maximum channel size, dropping event"
-                    );
-                }
-                return Some(events);
-            } else {
-                events.push($e);
-            }
+impl EventFiller {
+    fn new() -> Self {
+        EventFiller {
+            bytes_used: FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES,
+            handles_used: 0,
+            events: vec![],
         }
     }
 
-    macro_rules! handle_and_filter_event {
-        ($event: expr, $route: expr) => {
-            if let Some(mut route) = $route {
-                route.reverse();
-                if !validate_and_filter_event(&mut $event.event.target_moniker, &route) {
-                    continue;
-                }
-            }
-            let event_type = $event.event.event_type().to_string();
-            let event_fidl_object = match create_event_fidl_object($event).await {
-                Ok(event_fidl_object) => event_fidl_object,
-                Err(error) => {
-                    warn!(?error, "Failed to create event object");
-                    continue;
-                }
-            };
-            handle_event!(event_fidl_object, event_type);
-        };
+    fn is_empty(&self) -> bool {
+        self.events.is_empty()
     }
 
-    // Read overflowed events from the buffer first
-    if let Some(event) = pending_event.take() {
-        let e_type = event
+    /// Measures the size of an event, increments bytes used, and returns the
+    /// event Vec as an error if full.
+    ///
+    /// If there isn't enough space for even one event, logs an error and
+    /// returns an empty Vec.
+    fn add_event(
+        mut self,
+        event: fcomponent::Event,
+        pending_event: &mut Option<fcomponent::Event>,
+    ) -> Result<Self, Vec<fcomponent::Event>> {
+        let event_type = event
             .header
             .as_ref()
             .map(|header| format!("{:?}", header.event_type))
             .unwrap_or("unknown".to_string());
-        handle_event!(event, e_type);
-    }
-
-    if events.is_empty() {
-        // Block
-        // If not for the macro this would be an if let
-        // because the loop will only iterate once (therefore we block only 1 time)
-        while let Some((mut event, route)) = event_stream.next().await {
-            handle_and_filter_event!(event, route);
-            break;
-        }
-    }
-    loop {
-        if let Some(Some((mut event, route))) = event_stream.next_or_none().await {
-            handle_and_filter_event!(event, route);
+        let measure_tape = event.measure();
+        self.bytes_used += measure_tape.num_bytes;
+        self.handles_used += measure_tape.num_handles;
+        if self.bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize
+            || self.handles_used > ZX_CHANNEL_MAX_MSG_HANDLES as usize
+        {
+            if pending_event.is_some() {
+                unreachable!("Overflowed twice");
+            }
+            *pending_event = Some(event);
+            if self.events.len() == 0 {
+                error!(
+                    event_type = event_type.as_str(),
+                    "Event exceeded the maximum channel size, dropping event"
+                );
+            }
+            return Err(self.events);
         } else {
-            break;
+            self.events.push(event);
+            return Ok(self);
         }
-    }
-    if events.is_empty() {
-        None
-    } else {
-        Some(events)
     }
 }
 
-/// Tries to handle the next request.
-/// An error value indicates the caller should close the channel
-async fn try_handle_get_next_request(
-    event_stream: &mut EventStream,
-    responder: fcomponent::EventStreamGetNextResponder,
-    buffer: &mut Option<fcomponent::Event>,
-) -> bool {
-    let events = handle_get_next_request(event_stream, buffer).await;
-    if let Some(events) = events {
-        responder.send(events).is_ok()
-    } else {
+impl From<EventFiller> for Vec<fcomponent::Event> {
+    fn from(value: EventFiller) -> Self {
+        value.events
+    }
+}
+
+/// This function returns events via both `Ok` and `Err` such that we
+/// may use the question mark operator to return early.
+async fn do_handle_get_next_request(
+    mut event_stream: Pin<&mut Peekable<impl Stream<Item = fcomponent::Event>>>,
+    pending_event: &mut Option<fcomponent::Event>,
+) -> Result<Vec<fcomponent::Event>, Vec<fcomponent::Event>> {
+    let mut events = EventFiller::new();
+
+    // Read overflowed events from the buffer first.
+    if let Some(event) = pending_event.take() {
+        events = events.add_event(event, pending_event)?;
+    }
+
+    if events.is_empty() {
+        // Block one time, to ensure we get at least one event to return to the client.
+        if let Some(event) = event_stream.next().await {
+            events = events.add_event(event, pending_event)?;
+        }
+    }
+    loop {
+        // Try to add any immediately available event, stopping if there aren't any.
+        let Poll::Ready(_) = futures::poll!(event_stream.as_mut().peek()) else {
+            break;
+        };
+        let Some(event) = event_stream.next().await else {
+            break;
+        };
+        events = events.add_event(event, pending_event)?;
+    }
+    if events.is_empty() {
         unreachable!("Internal: The event_stream internal channel should never be closed.");
+    }
+    Ok(events.into())
+}
+
+/// Obtains the next batch of events, waiting for at least one. Returns when there are no
+/// more events available at the moment, or when the events are going to exceed the
+/// maximum size that can be sent in a channel message.
+async fn handle_get_next_request(
+    event_stream: Pin<&mut Peekable<impl Stream<Item = fcomponent::Event>>>,
+    pending_event: &mut Option<fcomponent::Event>,
+) -> Vec<fcomponent::Event> {
+    match do_handle_get_next_request(event_stream, pending_event).await {
+        Ok(v) => v,
+        Err(v) => v,
     }
 }
 
@@ -285,14 +295,38 @@ async fn try_handle_get_next_request(
 /// This is needed because we get the request stream directly as a stream from FDIO
 /// but as a ServerEnd from the hooks system.
 pub async fn serve_event_stream_as_stream(
-    mut event_stream: EventStream,
+    event_stream: EventStream,
     mut stream: fcomponent::EventStreamRequestStream,
 ) {
+    async fn filter_event(input: (Event, Option<Vec<ComponentEventRoute>>)) -> Option<Event> {
+        let (mut event, route) = input;
+        if let Some(mut route) = route {
+            route.reverse();
+            if !validate_and_filter_event(&mut event.event.target_moniker, &route) {
+                return None;
+            }
+        }
+        Some(event)
+    }
+    async fn try_into_fidl_object(event: Event) -> Option<fcomponent::Event> {
+        match create_event_fidl_object(event).await {
+            Ok(event_fidl_object) => Some(event_fidl_object),
+            Err(error) => {
+                warn!(?error, "Failed to create event object");
+                None
+            }
+        }
+    }
+    let event_stream = event_stream.filter_map(filter_event).filter_map(try_into_fidl_object);
+    let mut event_stream = event_stream.peekable();
+    let mut event_stream = std::pin::pin!(event_stream);
+
     let mut buffer = None;
     while let Some(Ok(request)) = stream.next().await {
         match request {
             fcomponent::EventStreamRequest::GetNext { responder } => {
-                if !try_handle_get_next_request(&mut event_stream, responder, &mut buffer).await {
+                let events = handle_get_next_request(event_stream.as_mut(), &mut buffer).await;
+                if !responder.send(events).is_ok() {
                     // Close the channel if an error occurs while handling the request.
                     return;
                 }

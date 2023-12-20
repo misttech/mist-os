@@ -8,7 +8,7 @@ use {
         event::Event,
         registry::ComponentEventRoute,
     },
-    futures::{channel::mpsc, poll, stream::Peekable, task::Context, Stream, StreamExt},
+    futures::{channel::mpsc, stream::Peekable, task::Context, Stream, StreamExt},
     moniker::ExtendedMoniker,
     std::{
         pin::Pin,
@@ -62,15 +62,6 @@ impl EventStream {
             Arc::new(EventDispatcher::new_with_route(subscriber, scopes, self.tx.clone(), route));
         self.dispatchers.push(dispatcher.clone());
         Arc::downgrade(&dispatcher)
-    }
-
-    pub async fn next_or_none(
-        &mut self,
-    ) -> Option<Option<(Event, Option<Vec<ComponentEventRoute>>)>> {
-        match poll!(Pin::new(&mut self.rx).peek()) {
-            Poll::Ready(_) => Some(self.rx.next().await),
-            Poll::Pending => None,
-        }
     }
 
     pub fn sender(&self) -> mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)> {
