@@ -44,7 +44,7 @@ import("sdk_molecule.gni")
 #     will rely on IDK archives instead. Defaults to false.
 #
 #   deps
-#     A list of sdk_atom(), sdk_molecule() targets that will be walked to
+#     A list of sdk_atom() and sdk_molecule() targets that will be walked to
 #     collect all SDK atom dependencies for this collection.
 #
 #   testonly

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/sdk/config.gni")
+
 # Defines a group of SDK elements.
 #
 # Parameters
@@ -20,21 +22,39 @@
 #
 #   non_sdk_deps (optional)
 #     List of GN labels which this target needs built.
+#
+#   host_tools_deps (optional)
+#     A list of sdk_atom() and sdk_molecule() targets that will be walked to
+#     collect all SDK host tool atom dependencies for this collection.
+#     Unlike `deps`, this is only walked when host tools are included in the
+#     current build configuration.
 
 template("sdk_molecule") {
   gn_deps = []
-  if (defined(invoker.non_sdk_deps)) {
-    gn_deps = invoker.non_sdk_deps
-  }
 
-  dep_manifests = []
   if (defined(invoker.deps)) {
     gn_deps += invoker.deps
-    foreach(dep, invoker.deps) {
-      gen_dir = get_label_info(dep, "target_gen_dir")
-      name = get_label_info(dep, "name")
-      dep_manifests += [ "$gen_dir/$name.sdk" ]
+  }
+
+  # Only build host tools in the main build to save considerable build time.
+  if (defined(invoker.host_tools_deps)) {
+    if (sdk_inside_sub_build) {
+      not_needed(invoker.host_tools_deps)
+    } else {
+      gn_deps += invoker.host_tools_deps
     }
+  }
+
+  # Add manifests for all of the SDK deps before adding the non-SDK deps.
+  dep_manifests = []
+  foreach(dep, gn_deps) {
+    gen_dir = get_label_info(dep, "target_gen_dir")
+    name = get_label_info(dep, "name")
+    dep_manifests += [ "$gen_dir/$name.sdk" ]
+  }
+
+  if (defined(invoker.non_sdk_deps)) {
+    gn_deps += invoker.non_sdk_deps
   }
 
   output_name = target_name

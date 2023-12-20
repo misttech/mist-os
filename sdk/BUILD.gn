@@ -18,6 +18,9 @@ import("config.gni")
 
 visibility = [ ":*" ]
 
+assert(sdk_inside_supported_api_sub_build ==
+       (sdk_inside_sub_build && override_target_api_level != -1))
+
 # Another list of validation targets, these will only be built in the
 # top-level build, and should depend on //sdk:final_fuchsia_idk.exported
 # directly to validate its content.
@@ -125,7 +128,7 @@ sdk_collection("core") {
 
   deps = [
     # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
-    # ":fuchsia_idk_atoms" sdk_molecule.
+    # ":fuchsia_idk_atoms" or ":fuchsia_idk_atoms_host_tools" sdk_molecule.
     ":fuchsia_idk_atoms",
   ]
 }
@@ -155,9 +158,7 @@ sdk_molecule("fuchsia_idk_atoms") {
     ]
   }
 
-  if (!sdk_no_host_tools) {
-    deps += [ ":fuchsia_idk_atoms_host_tools_sdk" ]
-  }
+  host_tools_deps = [ ":fuchsia_idk_atoms_host_tools" ]
 }
 
 # Prebulilt libraries and packages must be built and included for all API
@@ -217,15 +218,13 @@ if (!sdk_inside_supported_api_sub_build) {
   }
 }
 
-if (!sdk_no_host_tools) {
-  # IDK atoms that are host tools. These may rely on an API level because they
-  # are not shipped to devices.
-  sdk_molecule("fuchsia_idk_atoms_host_tools_sdk") {
-    deps = [
-      ":host_tools",
-      "//tools/docsgen:ref_docs_sdk",
-    ]
-  }
+# IDK atoms that are host tools. These may rely on an API level because they
+# are not shipped to devices.
+sdk_molecule("fuchsia_idk_atoms_host_tools") {
+  deps = [
+    ":host_tools",
+    "//tools/docsgen:ref_docs_sdk",
+  ]
 }
 
 group("tests_no_e2e") {
@@ -830,9 +829,8 @@ sdk_molecule("driver_atoms") {
     "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
   ]
-  if (!sdk_no_host_tools) {
-    deps += [ ":driver_host_tools" ]
-  }
+
+  host_tools_deps = [ ":driver_host_tools" ]
 }
 
 # These markers are used to define dependencies on FIDL bindings
