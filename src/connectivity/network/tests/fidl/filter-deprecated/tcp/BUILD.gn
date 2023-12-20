@@ -4,12 +4,12 @@
 
 import("//build/rust/rustc_test.gni")
 
-rustc_test("udp") {
+rustc_test("tcp") {
   edition = "2021"
-  output_name = "udp_filter_fidl_test"
+  output_name = "tcp_filter_deprecated_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
-    "//src/connectivity/network/tests/fidl/filter/common",
+    "//src/connectivity/network/tests/fidl/filter-deprecated/common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fuchsia-async",

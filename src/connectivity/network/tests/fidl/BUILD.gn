@@ -32,18 +32,18 @@ foreach(test, tests) {
   }
 }
 
-filter_tests = [
+filter_deprecated_tests = [
   "nat",
   "tcp",
   "udp",
 ]
 
-foreach(test, filter_tests) {
-  name = "netstack-${test}-filter-fidl-test"
+foreach(test, filter_deprecated_tests) {
+  name = "netstack-${test}-filter-deprecated-fidl-test"
   fuchsia_test_component_with_expectations(name) {
-    manifest = "meta/netstack-${test}-filter-fidl-test.cml"
+    manifest = "meta/netstack-${test}-filter-deprecated-fidl-test.cml"
     expectations = "expectations/${test}.json5"
-    deps = [ "filter/${test}" ]
+    deps = [ "filter-deprecated/${test}" ]
   }
 }
 
@@ -66,8 +66,8 @@ fuchsia_test_package("netstack-fidl-tests") {
   foreach(test, tests) {
     test_components += [ ":netstack-${test}-fidl-test" ]
   }
-  foreach(test, filter_tests) {
-    test_components += [ ":netstack-${test}-filter-fidl-test" ]
+  foreach(test, filter_deprecated_tests) {
+    test_components += [ ":netstack-${test}-filter-deprecated-fidl-test" ]
   }
 
   deps = _common_test_package_deps +

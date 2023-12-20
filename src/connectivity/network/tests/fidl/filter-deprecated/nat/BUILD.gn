@@ -6,7 +6,7 @@ import("//build/rust/rustc_test.gni")
 
 rustc_test("nat") {
   edition = "2021"
-  output_name = "nat_filter_fidl_test"
+  output_name = "nat_filter_deprecated_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
@@ -17,7 +17,7 @@ rustc_test("nat") {
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/lib/netfilter",
     "//src/connectivity/network/testing/netemul/rust:lib",
-    "//src/connectivity/network/tests/fidl/filter/common",
+    "//src/connectivity/network/tests/fidl/filter-deprecated/common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fuchsia-async",
