@@ -4,7 +4,6 @@
 
 #include "storage/buffer/ring_buffer.h"
 
-#include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
 #include <algorithm>
@@ -82,10 +81,6 @@ void internal::RingBufferState::Free(const RingBufferReservation& reservation) {
 }
 
 bool internal::RingBufferState::IsSpaceAvailableLocked(size_t blocks) const {
-  if (blocks > capacity()) {
-    FX_LOGS(WARNING) << "storage: Requested reservation too large (" << blocks << " > "
-                     << capacity() << " blocks)";
-  }
   return reserved_length_ + blocks <= capacity();
 }
 
@@ -188,8 +183,6 @@ zx::result<size_t> RingBufferReservation::CopyRequests(
       zx_status_t status =
           vmo->read(ptr, vmo_offset * buffer_->BlockSize(), buf_len * buffer_->BlockSize());
       if (status != ZX_OK) {
-        FX_LOGS(ERROR) << "fs: Failed to read from source buffer (" << buf_len << " @ "
-                       << vmo_offset << "): " << zx_status_get_string(status);
         return zx::error(status);
       }
     }
@@ -221,8 +214,6 @@ zx::result<size_t> RingBufferReservation::CopyRequests(
         if (zx_status_t status =
                 vmo->read(ptr, vmo_offset * buffer_->BlockSize(), buf_len * buffer_->BlockSize());
             status != ZX_OK) {
-          FX_LOGS(ERROR) << "fs: Failed to read from source buffer (" << buf_len << " @ "
-                         << vmo_offset << "): " << zx_status_get_string(status);
           return zx::error(status);
         }
       }

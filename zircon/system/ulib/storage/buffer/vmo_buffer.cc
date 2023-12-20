@@ -4,7 +4,6 @@
 
 #include "storage/buffer/vmo_buffer.h"
 
-#include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
@@ -60,15 +59,11 @@ zx_status_t VmoBuffer::Initialize(storage::VmoidRegistry* vmoid_registry, size_t
     return ZX_ERR_INVALID_ARGS;
   zx_status_t status = mapper.CreateAndMap(size.ValueOrDie(), label);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "VmoBuffer: Failed to create vmo " << label << ": "
-                   << zx_status_get_string(status);
     return status;
   }
 
   status = vmoid_registry->BlockAttachVmo(mapper.vmo(), &vmoid_);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "VmoBuffer: Failed to attach vmo " << label << ": "
-                   << zx_status_get_string(status);
     return status;
   }
 
