@@ -159,8 +159,8 @@ class Device final : public DdkDeviceType,
 
   // Get heap properties of a specific memory heap allocator.
   //
-  // Clients should guarantee that the heap is valid and already registered to sysmem driver.
-  [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties& GetHeapProperties(
+  // If the heap is not valid or not registered to sysmem driver, nullptr is returned.
+  [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties* GetHeapProperties(
       fuchsia_sysmem2::HeapType heap) const;
 
   [[nodiscard]] const sysmem_protocol_t* proto() const { return &in_proc_sysmem_protocol_; }

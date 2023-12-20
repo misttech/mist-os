@@ -1594,6 +1594,9 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
   ZX_DEBUG_ASSERT(generate_result.is_ok());
   auto buffer_collection_info = generate_result.take_value();
 
+  // Above here, a BufferCollectionTokenGroup will move on to its next child. Below here, the group
+  // will not move on to its next child and the overall allocation will fail.
+
   // Save BufferCollectionInfo prior to populating with VMOs, for later comparison with analogous
   // BufferCollectionInfo generated after AttachToken().
   //
@@ -3316,13 +3319,16 @@ static fpromise::result<fuchsia_sysmem2::HeapType, zx_status_t> GetHeap(
 
   for (size_t i = 0; i < constraints.heap_permitted()->size(); ++i) {
     auto heap = constraints.heap_permitted()->at(i);
-    const auto& heap_properties = device->GetHeapProperties(heap);
-    if (heap_properties.coherency_domain_support().has_value() &&
-        ((*heap_properties.coherency_domain_support()->cpu_supported() &&
+    const auto* heap_properties = device->GetHeapProperties(heap);
+    if (!heap_properties) {
+      continue;
+    }
+    if (heap_properties->coherency_domain_support().has_value() &&
+        ((*heap_properties->coherency_domain_support()->cpu_supported() &&
           *constraints.cpu_domain_supported()) ||
-         (*heap_properties.coherency_domain_support()->ram_supported() &&
+         (*heap_properties->coherency_domain_support()->ram_supported() &&
           *constraints.ram_domain_supported()) ||
-         (*heap_properties.coherency_domain_support()->inaccessible_supported() &&
+         (*heap_properties->coherency_domain_support()->inaccessible_supported() &&
           *constraints.inaccessible_domain_supported()))) {
       return fpromise::ok(heap);
     }

@@ -482,6 +482,33 @@ void set_min_camping_constraints_v2(fidl::SyncClient<v2::BufferCollection>& coll
   EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 }
 
+void set_heap_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
+                             std::vector<fuchsia_sysmem2::HeapType> heap_types,
+                             bool support_cpu_and_ram, bool support_inaccessible) {
+  v2::BufferCollectionConstraints constraints;
+  constraints.usage().emplace();
+  constraints.usage()->display() = v2::kDisplayUsageLayer;
+  constraints.min_buffer_count() = 1;
+  constraints.buffer_memory_constraints().emplace();
+  auto& buffer_memory = constraints.buffer_memory_constraints().value();
+  buffer_memory.min_size_bytes() = zx_system_get_page_size();
+  // Allow a max that's just large enough to accommodate the size implied
+  // by the min frame size and PixelFormat.
+  buffer_memory.max_size_bytes() = zx_system_get_page_size();
+  buffer_memory.physically_contiguous_required() = false;
+  buffer_memory.secure_required() = false;
+  buffer_memory.ram_domain_supported() = support_cpu_and_ram;
+  buffer_memory.cpu_domain_supported() = support_cpu_and_ram;
+  buffer_memory.inaccessible_domain_supported() = support_inaccessible;
+  if (!heap_types.empty()) {
+    buffer_memory.heap_permitted() = std::move(heap_types);
+  }
+  ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+  v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+}
+
 bool Equal(const v2::BufferCollectionInfo& lhs, const v2::BufferCollectionInfo& rhs) {
   // Clone both.
   auto clone = [](const v2::BufferCollectionInfo& v) -> v2::BufferCollectionInfo {
@@ -6978,6 +7005,30 @@ TEST(Sysmem, BufferCollectionTokenGroupCloseBeforeAllChildrenPresentFails) {
       break;
     }
   }
+}
+
+TEST(Sysmem, HeapConflictMovesToNextGroupChild) {
+  auto parent = create_initial_token_v2();
+  auto group = create_group_under_token_v2(parent);
+  auto child1 = create_token_under_group_v2(group);
+  auto child2 = create_token_under_group_v2(group);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent));
+  auto child1_collection = convert_token_to_collection_v2(std::move(child1));
+  auto child2_collection = convert_token_to_collection_v2(std::move(child2));
+
+  // Intentionally setting supported domains incompatible with kGoldfishDeviceLocal, which only
+  // supports inaccessible domain. We expect allocation to succeed when the group tries child2
+  // (after having tried child1 unsuccessfully first).
+  set_heap_constraints_v2(parent_collection, {}, true, false);
+  ASSERT_TRUE(group->AllChildrenPresent().is_ok());
+  set_heap_constraints_v2(child1_collection, {v2::HeapType::kGoldfishDeviceLocal}, true, true);
+  set_heap_constraints_v2(child2_collection, {}, true, false);
+
+  auto wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  auto& info = wait_result->buffer_collection_info().value();
+  ASSERT_EQ(info.settings()->buffer_settings()->heap().value(), v2::HeapType::kSystemRam);
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

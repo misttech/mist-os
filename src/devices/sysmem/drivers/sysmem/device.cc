@@ -1157,11 +1157,13 @@ MemoryAllocator* Device::GetAllocator(const fuchsia_sysmem2::BufferMemorySetting
   return iter->second.get();
 }
 
-const fuchsia_hardware_sysmem::HeapProperties& Device::GetHeapProperties(
+const fuchsia_hardware_sysmem::HeapProperties* Device::GetHeapProperties(
     fuchsia_sysmem2::HeapType heap) const {
   std::lock_guard checker(*loop_checker_);
-  ZX_DEBUG_ASSERT(allocators_.find(heap) != allocators_.end());
-  return allocators_.at(heap)->heap_properties();
+  if (allocators_.find(heap) == allocators_.end()) {
+    return nullptr;
+  }
+  return &allocators_.at(heap)->heap_properties();
 }
 
 void Device::AddVmoKoid(zx_koid_t koid, bool is_weak, LogicalBuffer& logical_buffer) {
