@@ -97,9 +97,9 @@ void HidButtonsDevice::Notify(uint32_t button_index) {
   auto result = GetInputReport();
   if (result.is_error()) {
     zxlogf(ERROR, "HidbusGetReport failed %d", result.error_value());
-  } else if (last_report_ != result.value()) {
-    readers_.SendReportToAllReaders(result.value());
+  } else if (!last_report_.has_value() || *last_report_ != result.value()) {
     last_report_ = result.value();
+    readers_.SendReportToAllReaders(*last_report_);
 
     if (debounce_states_[button_index].timestamp != zx::time::infinite_past()) {
       const zx::duration latency =
@@ -115,9 +115,9 @@ void HidButtonsDevice::Notify(uint32_t button_index) {
       }
     }
 
-    if (!last_report_.empty()) {
+    if (!last_report_->empty()) {
       total_report_count_.Add(1);
-      last_event_timestamp_.Set(last_report_.event_time.get());
+      last_event_timestamp_.Set(last_report_->event_time.get());
     }
   }
   if (buttons_[button_index].id == BUTTONS_ID_FDR) {
@@ -206,7 +206,13 @@ int HidButtonsDevice::Thread() {
 
 void HidButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                              GetInputReportsReaderCompleter::Sync& completer) {
-  auto status = readers_.CreateReader(dispatcher_, std::move(request->reader));
+  auto initial_report = GetInputReport();
+  if (initial_report.is_error()) {
+    zxlogf(ERROR, "Failed to get initial report %d", initial_report.error_value());
+  }
+  auto status = readers_.CreateReader(
+      dispatcher_, std::move(request->reader),
+      initial_report.is_ok() ? std::make_optional(initial_report.value()) : std::nullopt);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create a reader %d", status);
   }
@@ -571,13 +577,6 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
         return ZX_ERR_NOT_SUPPORTED;
       }
     }
-  }
-
-  auto result = GetInputReport();
-  if (result.is_error()) {
-    zxlogf(ERROR, "GetInputReport failed %d", status);
-  } else {
-    last_report_ = result.value();
   }
 
   auto f = [](void* arg) -> int { return reinterpret_cast<HidButtonsDevice*>(arg)->Thread(); };

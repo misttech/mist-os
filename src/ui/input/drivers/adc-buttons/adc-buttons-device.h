@@ -60,16 +60,6 @@ class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevi
  private:
   friend class AdcButtonsDeviceTest;
 
-  void PollingTask(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
-
-  async_dispatcher_t* const dispatcher_;
-
-  async::TaskMethod<AdcButtonsDevice, &AdcButtonsDevice::PollingTask> polling_task_{this};
-  uint32_t polling_rate_usec_;
-
-  std::vector<AdcButtonClient> clients_;
-  std::set<fuchsia_input_report::ConsumerControlButton> buttons_;  // For descriptor
-
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
   struct AdcButtonInputReport {
     zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
@@ -79,7 +69,19 @@ class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevi
         fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
         fidl::AnyArena& allocator);
   };
-  AdcButtonInputReport rpt_;
+
+  void PollingTask(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
+  zx::result<AdcButtonInputReport> GetInputReport();
+
+  async_dispatcher_t* const dispatcher_;
+
+  async::TaskMethod<AdcButtonsDevice, &AdcButtonsDevice::PollingTask> polling_task_{this};
+  uint32_t polling_rate_usec_;
+
+  std::vector<AdcButtonClient> clients_;
+  std::set<fuchsia_input_report::ConsumerControlButton> buttons_;  // For descriptor
+
+  std::optional<AdcButtonInputReport> rpt_ = std::nullopt;
   input_report_reader::InputReportReaderManager<AdcButtonInputReport> readers_;
 };
 

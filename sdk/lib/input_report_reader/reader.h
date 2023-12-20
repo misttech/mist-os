@@ -69,9 +69,11 @@ class InputReportReaderManager final {
   InputReportReaderManager& operator=(const InputReportReaderManager&) = delete;
   InputReportReaderManager& operator=(InputReportReaderManager&&) = delete;
 
-  // Create a new InputReportReader that is managed by this InputReportReaderManager.
+  // Create a new InputReportReader that is managed by this InputReportReaderManager. If
+  // initial_report exists, InputReportReaderManager will send initial_report to the new reader.
   zx_status_t CreateReader(async_dispatcher_t* dispatcher,
-                           fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
+                           fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server,
+                           std::optional<Report> initial_report = std::nullopt) {
     ZX_ASSERT(dispatcher);
     std::scoped_lock lock(lock_);
     auto reader =
@@ -80,6 +82,9 @@ class InputReportReaderManager final {
       return ZX_ERR_INTERNAL;
     }
     next_reader_id_++;
+    if (initial_report.has_value()) {
+      reader->ReceiveReport(std::move(*initial_report));
+    }
     readers_list_.push_back(std::move(reader));
     return ZX_OK;
   }

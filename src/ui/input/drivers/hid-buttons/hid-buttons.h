@@ -141,7 +141,7 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   };
   fbl::Array<debounce_state> debounce_states_;
   // last_report_ saved to de-duplicate reports
-  ButtonsInputReport last_report_;
+  std::optional<ButtonsInputReport> last_report_ = std::nullopt;
 
   zx::duration poll_period_{zx::duration::infinite()};
   zx::timer poll_timer_;

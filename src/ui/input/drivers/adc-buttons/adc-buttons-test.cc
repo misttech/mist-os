@@ -116,6 +116,22 @@ class AdcButtonsDeviceTest : public zxtest::Test {
         fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(connect_result.value())));
   }
 
+  void DrainInitialReport(fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>& reader) {
+    auto result = reader->ReadInputReports();
+    ASSERT_OK(result.status());
+    ASSERT_FALSE(result.value().is_error());
+    auto& reports = result.value().value()->reports;
+
+    ASSERT_EQ(1, reports.count());
+    auto report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
+
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
+  }
+
  private:
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
@@ -170,6 +186,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
   auto reader =
       fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints->client));
   EXPECT_TRUE(reader.is_valid());
+  DrainInitialReport(reader);
 
   incoming_.SyncCall(
       [](IncomingNamespace* incoming) { incoming->fake_adc_server_.set_sample(20); });

@@ -38,6 +38,7 @@ class MouseDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
     }
     return ZX_OK;
   }
+  void SetInitialReport(MouseReport report) { initial_report_ = report; }
 
   // The FIDL methods for InputDevice.
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -55,6 +56,7 @@ class MouseDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
   sync_completion_t next_reader_wait_;
   input_report_reader::InputReportReaderManager<MouseReport, 10> input_report_readers_;
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
+  std::optional<MouseReport> initial_report_ = std::nullopt;
 };
 
 zx_status_t MouseDevice::Start() {
@@ -73,8 +75,8 @@ void MouseDevice::GetInputReportsReader(GetInputReportsReaderRequestView request
                                         GetInputReportsReaderCompleter::Sync& completer) {
   sync_completion_t wait;
   async::PostTask(loop_.dispatcher(), [&]() {
-    zx_status_t status =
-        input_report_readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
+    zx_status_t status = input_report_readers_.CreateReader(
+        loop_.dispatcher(), std::move(request->reader), initial_report_);
     if (status == ZX_OK) {
       // Signal to a test framework (if it exists) that we are connected to a reader.
       sync_completion_signal(&next_reader_wait_);
@@ -398,4 +400,43 @@ TEST_F(InputReportReaderTests, MaxUnreadReports) {
   ASSERT_TRUE(reports[9].has_mouse());
   ASSERT_TRUE(reports[9].mouse().has_movement_x());
   EXPECT_EQ(reports[9].mouse().movement_x(), 15);
+}
+
+TEST_F(InputReportReaderTests, InitialReportTest) {
+  mouse_.SetInitialReport({
+      .movement_x = 0x50,
+      .movement_y = 0x100,
+  });
+
+  // Get an InputReportsReader.
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
+  {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
+    ASSERT_TRUE(endpoints.is_ok());
+    auto [client, server] = std::move(endpoints.value());
+    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    (void)input_device_->GetInputReportsReader(std::move(server));
+    reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
+    mouse_.WaitForNextReader(zx::duration::infinite());
+  }
+
+  // Get the report.
+  auto result = reader->ReadInputReports();
+  ASSERT_OK(result.status());
+  ASSERT_FALSE(result->is_error());
+  auto& reports = result->value()->reports;
+
+  ASSERT_EQ(1, reports.count());
+
+  ASSERT_TRUE(reports[0].has_event_time());
+  ASSERT_TRUE(reports[0].has_mouse());
+  auto& mouse_report = reports[0].mouse();
+
+  ASSERT_TRUE(mouse_report.has_movement_x());
+  ASSERT_EQ(0x50, mouse_report.movement_x());
+
+  ASSERT_TRUE(mouse_report.has_movement_y());
+  ASSERT_EQ(0x100, mouse_report.movement_y());
+
+  ASSERT_FALSE(mouse_report.has_pressed_buttons());
 }

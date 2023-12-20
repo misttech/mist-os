@@ -30,16 +30,30 @@ void AdcButtonsDevice::PollingTask(async_dispatcher_t* dispatcher, async::TaskBa
 
   polling_task_.PostDelayed(dispatcher_, zx::usec(polling_rate_usec_));
 
+  auto report = GetInputReport();
+  if (report.is_error()) {
+    FDF_LOG(ERROR, "Failed to get report %d", report.error_value());
+    return;
+  }
+  if (rpt_.has_value() && rpt_->buttons == report->buttons) {
+    return;
+  }
+
+  rpt_ = std::move(*report);
+  readers_.SendReportToAllReaders(*rpt_);
+}
+
+zx::result<AdcButtonsDevice::AdcButtonInputReport> AdcButtonsDevice::GetInputReport() {
   std::set<fuchsia_input_report::ConsumerControlButton> buttons;
   for (const auto& client : clients_) {
     auto result = client.adc_->GetSample();
     if (!result.ok()) {
       FDF_LOG(ERROR, "%s: GetSample failed %s", __func__, result.FormatDescription().c_str());
-      return;
+      return zx::error(ZX_ERR_INTERNAL);
     }
     if (result->is_error()) {
       FDF_LOG(ERROR, "%s: GetSample failed %d", __func__, result->error_value());
-      return;
+      return zx::error(result->error_value());
     }
 
     for (const auto& cfg : client.buttons_) {
@@ -54,18 +68,22 @@ void AdcButtonsDevice::PollingTask(async_dispatcher_t* dispatcher, async::TaskBa
       buttons.size() <= fuchsia_input_report::kConsumerControlMaxNumButtons,
       "More buttons than expected (max = %d). Please increase kConsumerControlMaxNumButtons ",
       fuchsia_input_report::kConsumerControlMaxNumButtons);
-  if (rpt_.buttons == buttons) {
-    return;
-  }
 
-  rpt_.buttons = std::move(buttons);
-  rpt_.event_time = zx::clock::get_monotonic();
-  readers_.SendReportToAllReaders(rpt_);
+  return zx::ok(AdcButtonInputReport{
+      .event_time = zx::clock::get_monotonic(),
+      .buttons = std::move(buttons),
+  });
 }
 
 void AdcButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                              GetInputReportsReaderCompleter::Sync& completer) {
-  auto status = readers_.CreateReader(dispatcher_, std::move(request->reader));
+  auto initial_report = GetInputReport();
+  if (initial_report.is_error()) {
+    FDF_LOG(ERROR, "Failed to get initial report %d", initial_report.error_value());
+  }
+  auto status = readers_.CreateReader(
+      dispatcher_, std::move(request->reader),
+      initial_report.is_ok() ? std::make_optional(initial_report.value()) : std::nullopt);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "%s: CreateReader failed %d", __func__, status);
   }

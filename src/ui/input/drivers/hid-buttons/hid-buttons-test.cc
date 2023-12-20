@@ -193,6 +193,8 @@ class HidButtonsTest : public zxtest::Test {
 
     EXPECT_OK(input_report_loop_.RunUntilIdle());
 
+    DrainInitialReport(reader);
+
     return reader;
   }
 
@@ -230,6 +232,27 @@ class HidButtonsTest : public zxtest::Test {
     } else if (gpio_config.type == BUTTONS_GPIO_TYPE_POLL) {
       gpio.SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(0));
     }
+  }
+
+  void DrainInitialReport(fidl::WireClient<fuchsia_input_report::InputReportsReader>& reader) {
+    reader->ReadInputReports().Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok());
+      auto& reports = result->value()->reports;
+
+      ASSERT_EQ(reports.count(), 1);
+      auto& report = reports[0];
+
+      ASSERT_TRUE(report.has_event_time());
+      ASSERT_TRUE(report.has_consumer_control());
+      auto& consumer_control = report.consumer_control();
+
+      ASSERT_TRUE(consumer_control.has_pressed_buttons());
+
+      input_report_loop_.Quit();
+    });
+    EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+    EXPECT_OK(input_report_loop_.ResetQuit());
   }
 
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
