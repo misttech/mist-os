@@ -22,6 +22,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/hci",
     "//src/connectivity/bluetooth/core/bt-host/hci-spec",
