@@ -60,10 +60,10 @@ impl WlanSoftmacHandle {
             return;
         };
 
-        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
-        let mut shutdown_sender = Some(shutdown_sender);
+        // If stop() was not called first, then delete() must send the shutdown signal
+        // itself before calling JoinHandle::join(). Otherwise, join() will deadlock.
+        let (shutdown_sender, _shutdown_receiver) = oneshot::channel::<()>();
         if !self.driver_event_sink.is_closed() {
-            let shutdown_sender = shutdown_sender.take().unwrap();
             error!("Called delete on WlanSoftmacHandle without first calling stop");
             self.stop(StopStaCompleter::new(Box::new(move || {
                 shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
@@ -72,15 +72,6 @@ impl WlanSoftmacHandle {
 
         if let Err(e) = join_handle.join() {
             error!("Couldn't join WlanSoftmac main loop thread: {:?}", e);
-        }
-
-        if let None = shutdown_sender {
-            match shutdown_receiver.try_recv() {
-                Ok(None) | Err(oneshot::Canceled) => {
-                    error!("WlanSoftmac main loop thread did not send shutdown signal.")
-                }
-                Ok(Some(())) => (),
-            }
         }
     }
 

@@ -158,10 +158,11 @@ void SoftmacBinding::Init() {
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
-  auto completer =
-      std::make_unique<StopStaCompleter>([dispatcher = main_driver_dispatcher_->async_dispatcher(),
-                                          client_dispatcher = client_dispatcher_.release()] {
-        async::PostTask(dispatcher, [client_dispatcher]() {
+  auto completer = std::make_unique<StopStaCompleter>(
+      [&, dispatcher = main_driver_dispatcher_->async_dispatcher(),
+       client_dispatcher = client_dispatcher_.release()] {
+        async::PostTask(dispatcher, [&, client_dispatcher]() {
+          softmac_bridge_.reset();
           fdf_dispatcher_shutdown_async(client_dispatcher);
         });
       });
