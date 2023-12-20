@@ -44,5 +44,12 @@ fuchsia_unittest_package("package") {
     # Include the test parent (if your driver binds to it).
     "//src/devices/misc/drivers/test-parent",
   ]
+
+  # There's expected error logs that happen due to races in driver enumeration.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 # [END example]

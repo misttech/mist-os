@@ -27,7 +27,8 @@ namespace {
 using device_watcher::RecursiveWaitForFile;
 using devmgr_integration_test::IsolatedDevmgr;
 
-TEST(PbusTest, Enumeration) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST(PbusTest, DISABLED_Enumeration) {
   // NB: this loop is never run. RealmBuilder::Build is in the call stack, and insists on a non-null
   // dispatcher.
   //

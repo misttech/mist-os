@@ -19,8 +19,8 @@
 #include <zircon/errors.h>
 
 #include "driver.h"
-#include "src/devices/bin/driver_host/composite_node_spec_util.h"
 #include "src/devices/misc/drivers/compat/composite.h"
+#include "src/devices/misc/drivers/compat/composite_node_spec_util.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

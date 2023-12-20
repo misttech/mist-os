@@ -100,8 +100,5 @@ int main(int argc, char** argv) {
   SetLoggingProcessName();
 
   auto boot_args = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(*args_result)};
-  if (config.use_driver_framework_v2()) {
-    return RunDfv2(std::move(config), std::move(boot_args));
-  }
-  return RunDfv1(std::move(config), std::move(boot_args));
+  return RunDfv2(std::move(config), std::move(boot_args));
 }

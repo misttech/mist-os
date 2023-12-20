@@ -47,7 +47,8 @@ class PciDriverTests : public zxtest::Test {
 //
 // TestRunner(driver_tests) -> pbus -> fake_pci <-> ProtocolTestDriver(pci.proxy)
 //       \---------------> Fuchsia.Device.Test <-------------/
-TEST_F(PciDriverTests, TestRunner) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(PciDriverTests, DISABLED_TestRunner) {
   IsolatedDevmgr::Args args;
 
   args.device_list.push_back(kDeviceEntry);

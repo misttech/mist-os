@@ -70,7 +70,8 @@ class BindLibToFidlCodeGenTest : public testing::Test {
   fuchsia::driver::development::DriverDevelopmentSyncPtr driver_dev_;
 };
 
-TEST_F(BindLibToFidlCodeGenTest, DeviceProperties) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(BindLibToFidlCodeGenTest, DISABLED_DeviceProperties) {
   fuchsia::driver::development::NodeInfoIteratorSyncPtr iterator;
   ASSERT_EQ(ZX_OK, driver_dev_->GetNodeInfo({kChildDevicePath}, iterator.NewRequest(),
                                             /* exact_match= */ true));

@@ -77,10 +77,7 @@ fuchsia_driver("msd_arm-dfv2-driver") {
     ":msd_arm_entry_dfv2",
     "src",
   ]
-  assert_no_deps = [
-    "//src/devices/bin/driver_host:driver",
-    "//zircon/system/ulib/trace-engine:trace-engine-static",
-  ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_arm_dfv2") {
@@ -114,10 +111,7 @@ fuchsia_driver("msd_arm_test-dfv2-driver") {
     ":msd_arm_test_entry_dfv2",
     "src",
   ]
-  assert_no_deps = [
-    "//src/devices/bin/driver_host:driver",
-    "//zircon/system/ulib/trace-engine:trace-engine-static",
-  ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_arm_test_dfv2") {

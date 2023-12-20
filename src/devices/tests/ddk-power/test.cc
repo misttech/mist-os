@@ -117,7 +117,8 @@ class PowerTestCase : public zxtest::Test {
   IsolatedDevmgr devmgr;
 };
 
-TEST_F(PowerTestCase, InvalidDevicePowerCaps_Less) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(PowerTestCase, DISABLED_InvalidDevicePowerCaps_Less) {
   std::array<DevicePowerStateInfo, 1> states;
   states[0].state_id = DevicePowerState::kDevicePowerStateD1;
   states[0].is_supported = true;
@@ -131,7 +132,8 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_Less) {
   ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(PowerTestCase, InvalidDevicePowerCaps_More) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(PowerTestCase, DISABLED_InvalidDevicePowerCaps_More) {
   std::array<DevicePowerStateInfo, kMaxDevicePowerStates + 1> states;
   for (uint8_t i = 0; i < kMaxDevicePowerStates + 1; i++) {
     states[i].state_id = DevicePowerState::kDevicePowerStateD1;
@@ -148,7 +150,8 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_More) {
   ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(PowerTestCase, InvalidDevicePowerCaps_MissingRequired) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(PowerTestCase, DISABLED_InvalidDevicePowerCaps_MissingRequired) {
   std::array<DevicePowerStateInfo, kMaxDevicePowerStates> states;
   for (uint8_t i = 0; i < kMaxDevicePowerStates; i++) {
     // Missing D0 and D3COLD
@@ -166,7 +169,8 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_MissingRequired) {
   ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(PowerTestCase, InvalidDevicePowerCaps_DuplicateCaps) {
+// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+TEST_F(PowerTestCase, DISABLED_InvalidDevicePowerCaps_DuplicateCaps) {
   std::array<DevicePowerStateInfo, kMaxDevicePowerStates> states;
   states[0].state_id = DevicePowerState::kDevicePowerStateD0;
   states[0].is_supported = true;

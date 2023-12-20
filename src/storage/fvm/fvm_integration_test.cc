@@ -233,6 +233,9 @@ class FvmTest : public zxtest::Test {
 };
 
 void FvmTest::CreateRamdisk(uint64_t block_size, uint64_t block_count) {
+  if (ramdisk_ != nullptr) {
+    ramdisk_destroy(ramdisk_);
+  }
   ASSERT_OK(ramdisk_create_at(devfs_root_fd().get(), block_size, block_count, &ramdisk_));
 }
 
@@ -2778,6 +2781,8 @@ TEST_F(FvmTest, TestAbortDriverLoadSmallDevice) {
   ASSERT_FALSE(resp->is_ok());
   ASSERT_EQ(resp->error_value(), ZX_ERR_INTERNAL);
 
+  CreateRamdisk(kBlockSize, kBlockCount);
+  fs_management::FvmInitWithSize(ramdisk_block_interface(), kFvmPartitionSize, kSliceSize);
   // Grow the ramdisk to the appropiate size and bind should succeed.
   ASSERT_OK(ramdisk_grow(ramdisk(), kFvmPartitionSize));
   // Use Controller::Call::Rebind because the driver might still be

@@ -171,8 +171,7 @@ only with a bringup build. For these situations, prefer using `iquery` which is 
 (in bringup, if you are working in other product see [below](#include-iquery-bootfs).
 
   Note: Don’t forget to write tests for the inspect code. You can look at the inspect
-  [codelab][inspect_codelab] or [the driver host inspect test][driver_host_inspect_test] for some
-  examples.
+  [codelab][inspect_codelab] for an example.
 
 
 ## Include `iquery` in bootfs {#include-iquery-bootfs}
@@ -193,5 +192,4 @@ fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
 [example_test_driver]: /src/devices/tests/driver-inspect-test/test-driver.cc
 [property_types]: /docs/development/diagnostics/inspect/README.md#property
 [inspect_codelab]: /docs/development/diagnostics/inspect/codelab/README.md
-[driver_host_inspect_test]: /src/devices/bin/driver_host/tests/inspect_test.cc
 [selectors]: /docs/reference/diagnostics/selectors.md

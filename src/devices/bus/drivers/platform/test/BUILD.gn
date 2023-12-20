@@ -352,8 +352,6 @@ fuchsia_unittest_package("platform-bus-test") {
     "//src/devices/bus/drivers/platform",
     "//src/devices/clock/drivers/clock",
     "//src/devices/gpio/drivers/gpio",
-    "//src/devices/i2c/drivers/i2c",
-    "//src/devices/internal/drivers/fragment",
     "//src/devices/power/drivers/power",
     "//src/devices/spi/drivers/spi",
   ]
@@ -461,7 +459,6 @@ fuchsia_unittest_package("platform-bus-bti-test") {
     ":test-bti",
     ":test-bti-board",
     "//src/devices/bus/drivers/platform",
-    "//src/devices/internal/drivers/fragment",
   ]
   test_type = "system"
 }
