@@ -619,18 +619,16 @@ TEST(ModuleSymbols, IndexFission) {
 )";
   EXPECT_EQ(kExpected, out.str());
 
-  // TODO(brettw) enable when debug fission support is complete. Currently we don't support looking
-  // up the code ranges (requires using the SkeletonUnit.addr_base when decoding the symbols
-  // referencing addresses).
-#if 0
   // Resolve one of the functions in a .dwo to make sure we can look it up.
   SymbolContext symbol_context(0x10000000);
   std::vector<Location> result = setup.symbols()->ResolveInputLocation(
       symbol_context, InputLocation(Identifier(IdentifierComponent("CallOther"))));
   ASSERT_EQ(1u, result.size());
 
-  // TODO(brettw) check the address is correct.
-#endif
+  // The 114f is the address stored in the main binary for the CallOther function (referenced via
+  // the address table). This may change if the sample binary is recompiled.
+  constexpr uint64_t kCallOtherRelativeAddr = 0x114f;
+  EXPECT_EQ(symbol_context.RelativeToAbsolute(kCallOtherRelativeAddr), result[0].address());
 }
 
 }  // namespace zxdb

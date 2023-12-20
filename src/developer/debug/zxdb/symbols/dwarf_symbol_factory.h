@@ -5,6 +5,10 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_SYMBOL_FACTORY_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_SYMBOL_FACTORY_H_
 
+#include <llvm/DebugInfo/DWARF/DWARFAddressRange.h>
+#include <llvm/Support/Error.h>  // For llvm::Expected.
+
+#include "src/developer/debug/zxdb/common/address_range.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/symbol_factory.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
@@ -12,11 +16,14 @@
 namespace llvm {
 class DWARFContext;
 class DWARFDie;
+class DWARFFormValue;
 }  // namespace llvm
 
 namespace zxdb {
 
+class AddressRanges;
 class BaseType;
+class CompileUnit;
 class DwarfBinaryImpl;
 class LazySymbol;
 class ModuleSymbols;
@@ -40,6 +47,10 @@ class DwarfSymbolFactory : public SymbolFactory {
     virtual DwarfBinaryImpl* GetDwarfBinaryImpl() = 0;
     virtual std::string GetBuildDirForSymbolFactory() = 0;
     virtual fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() = 0;
+
+    // When the current binary is a DWO, this returns the skeleton unit in the main binary
+    // corresponding to this DWO. When this is not a DWO, returns null.
+    virtual CompileUnit* GetSkeletonCompileUnit() = 0;
   };
 
   // SymbolFactory implementation.
@@ -95,6 +106,23 @@ class DwarfSymbolFactory : public SymbolFactory {
                                      bool is_specification = false) const;
   fxl::RefPtr<Symbol> DecodeVariant(const llvm::DWARFDie& die) const;
   fxl::RefPtr<Symbol> DecodeVariantPart(const llvm::DWARFDie& die) const;
+
+  // Generates ranges for a CodeBlock. The attributes may be not present, this function will compute
+  // what it can given the information (which may be an empty vector).
+  AddressRanges GetCodeRanges(const llvm::DWARFDie& die) const;
+
+  // Returns the single code range if it's encoded with DW_AT_low_pc and DW_AT_high_pc.
+  std::optional<AddressRange> GetLowHighEncodedCodeRange(const llvm::DWARFDie& die) const;
+
+  // Decodes the index for a DW_FORM_rnglistx encoding.
+  llvm::Expected<llvm::DWARFAddressRangesVector> GetCodeRangesFromRangelistXIndex(
+      const llvm::DWARFDie& die, uint64_t index) const;
+
+  // Looks up an address from the address table, taking account the unit for the DIE. This handles
+  // lookup it up in the main binary in the case of DWOs.
+  std::optional<uint64_t> GetAddrFromFormValue(const llvm::DWARFDie& die,
+                                               const llvm::DWARFFormValue& form) const;
+  std::optional<uint64_t> GetAddrFromIndex(const llvm::DWARFDie& die, uint64_t index) const;
 
   // This can be null if the module is unloaded but there are still some dangling type references to
   // it.

@@ -152,10 +152,10 @@ bool HasOnlySupportedSpecialIdentifierTypes(const Identifier& ident) {
 // This class glues everything together for the DWO via the DwarfSymbolFactory::Delegate interface.
 class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
  public:
-  DwoInfo(std::unique_ptr<DwarfBinaryImpl> binary, std::string build_dir,
+  DwoInfo(std::unique_ptr<DwarfBinaryImpl> binary, SkeletonUnit skeleton,
           fxl::WeakPtr<ModuleSymbols> module_symbols)
       : binary_(std::move(binary)),
-        build_dir_(std::move(build_dir)),
+        skeleton_(std::move(skeleton)),
         module_symbols_(std::move(module_symbols)),
         weak_factory_(this) {
     symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(weak_factory_.GetWeakPtr(),
@@ -166,14 +166,32 @@ class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
 
   // DwarfSymbolFactory::Delegate implementation.
   DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
-  std::string GetBuildDirForSymbolFactory() override { return build_dir_; }
+  std::string GetBuildDirForSymbolFactory() override { return skeleton_.comp_dir; }
   fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return module_symbols_; }
+  CompileUnit* GetSkeletonCompileUnit() override {
+    if (!skeleton_unit_) {
+      // The skeleton DIE offset refers into the MAIN BINARY so we must use the main binary's symbol
+      // factory to create it, not our symbol_factory_ (for the .dwo file).
+      //
+      // This must not be a temporary because it will own the pointers for the duration of this fn.
+      LazySymbol lazy_skeleton =
+          module_symbols_->GetSymbolFactory()->MakeLazy(skeleton_.skeleton_die_offset);
+      if (const CompileUnit* unit = lazy_skeleton.Get()->As<CompileUnit>()) {
+        skeleton_unit_ = RefPtrTo<CompileUnit>(unit);
+      }
+    }
+    // Returns a pointer to our cached value. This assumes the cache is not cleared.
+    return skeleton_unit_.get();
+  }
 
  private:
   std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null.
-  std::string build_dir_;
+  SkeletonUnit skeleton_;  // Refers to the skeleton in the main binary corresponding to this DWO.
   fxl::WeakPtr<ModuleSymbols> module_symbols_;
   fxl::RefPtr<SymbolFactory> symbol_factory_;
+
+  // Lazily constructed & cached unit corresponding to the skeleton.
+  fxl::RefPtr<CompileUnit> skeleton_unit_;
 
   fxl::WeakPtrFactory<DwarfSymbolFactory::Delegate> weak_factory_;
 };
@@ -889,8 +907,7 @@ void ModuleSymbolsImpl::CreateIndex() {
     dwo_index.CreateIndex(*dwo_binary, static_cast<int32_t>(dwos_.size()));
     index_.root().MergeFrom(dwo_index.root());
 
-    dwos_.push_back(
-        std::make_unique<DwoInfo>(std::move(dwo_binary), skeleton.comp_dir, GetWeakPtr()));
+    dwos_.push_back(std::make_unique<DwoInfo>(std::move(dwo_binary), skeleton, GetWeakPtr()));
   }
 }
 

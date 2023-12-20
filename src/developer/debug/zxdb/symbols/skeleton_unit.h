@@ -13,6 +13,10 @@ namespace zxdb {
 // file. The main binary references the .dwo files with a "skeleton unit" in the main binary that
 // stores the information on how to locate the .dwo file and how to relocate its addresses.
 struct SkeletonUnit {
+  // Offset in the main binary of the DIE defining the skeleton unit. This is used later to
+  // reconstruct the symbol if we need it (normally it's not needed).
+  uint64_t skeleton_die_offset = 0;
+
   std::string dwo_name;
   std::string comp_dir;
 

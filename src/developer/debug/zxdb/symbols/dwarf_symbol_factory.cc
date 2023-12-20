@@ -45,29 +45,13 @@ namespace zxdb {
 
 namespace {
 
-// Generates ranges for a CodeBlock. The attributes may be not present, this function will compute
-// what it can given the information (which may be an empty vector).
-AddressRanges GetCodeRanges(const llvm::DWARFDie& die) {
-  AddressRanges::RangeVector code_ranges;
-
-  // It would be trivially more efficient to get the DW_AT_ranges, etc.  attributes out when we're
-  // iterating through the DIE. But the address ranges have many different forms and also vary
-  // between DWARF versions 4 and 5. It's easier to let LLVM deal with this complexity.
-  auto expected_ranges = die.getAddressRanges();
-  if (!expected_ranges || expected_ranges->empty())
-    return AddressRanges();
-
-  code_ranges.reserve(expected_ranges->size());
-  for (const llvm::DWARFAddressRange& range : *expected_ranges) {
-    // A zero DW_AT_low_pc means the code is removed during the linking, either due to garbage
-    // collection (of unused functions) or identical code folding. Functions inlined and not used
-    // outside their compilation units will also get removed.
-    if (range.valid() && range.LowPC)
-      code_ranges.emplace_back(range.LowPC, range.HighPC);
-  }
-
-  // Can't trust DWARF to have stored them in any particular order.
-  return AddressRanges(AddressRanges::kNonCanonical, std::move(code_ranges));
+// Appends the given (low, high) range to the vector if everything is valid and nonempty.
+void AppendAddressRange(uint64_t low, uint64_t high, AddressRanges::RangeVector* ranges) {
+  // A zero DW_AT_low_pc means the code is removed during the linking, either due to garbage
+  // collection (of unused functions) or identical code folding. Functions inlined and not used
+  // outside their compilation units will also get removed.
+  if (low > 0 && low < high)
+    ranges->emplace_back(low, high);
 }
 
 // Extracts a FileLine if possible from the given input. If the optional values aren't present, or
@@ -108,6 +92,14 @@ void DisplayDebugTypesSectionWarning() {
       << "Separated .debug_types section is not supported yet. Please consider to remove "
          "`-fdebug-types-section` from the compiler flags or add `-fno-debug-types-section` if "
          "it's enabled by default. (fxbug.dev/97388)";
+}
+
+// Returns true if the form uses any of the addr "x" encodings (relocatable references to the
+// address table).
+bool IsAddrXForm(llvm::dwarf::Form form) {
+  return form == llvm::dwarf::DW_FORM_addrx || form == llvm::dwarf::DW_FORM_addrx1 ||
+         form == llvm::dwarf::DW_FORM_addrx2 || form == llvm::dwarf::DW_FORM_addrx3 ||
+         form == llvm::dwarf::DW_FORM_addrx4 || form == llvm::dwarf::DW_FORM_GNU_addr_index;
 }
 
 }  // namespace
@@ -1157,6 +1149,176 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeVariantPart(const llvm::DWARFDie& 
   }
 
   return fxl::MakeRefCounted<VariantPart>(MakeLazy(discriminant), std::move(variants));
+}
+
+AddressRanges DwarfSymbolFactory::GetCodeRanges(const llvm::DWARFDie& die) const {
+  // It would be trivially more efficient to get the DW_AT_ranges, etc. attributes out when we're
+  // iterating through the DIE. But the address ranges have several different forms and also vary
+  // between DWARF versions 4 and 5 and this code isn't called too often.
+  AddressRanges::RangeVector code_ranges;
+
+  // First check for a single range on the DIE.
+  if (std::optional<AddressRange> range = GetLowHighEncodedCodeRange(die)) {
+    AppendAddressRange(range->begin(), range->end(), &code_ranges);
+    // With only one range we know it's canonical.
+    return AddressRanges(AddressRanges::kCanonical, std::move(code_ranges));
+  }
+
+  std::optional<llvm::DWARFFormValue> form_value = die.find(llvm::dwarf::DW_AT_ranges);
+  if (!form_value) {
+    // This DIE has no address ranges.
+    return AddressRanges();
+  }
+
+  // Got a range list, decode.
+  llvm::DWARFAddressRangesVector ranges;
+  switch (form_value->getForm()) {
+    case llvm::dwarf::DW_FORM_rnglistx: {
+      llvm::Expected<llvm::DWARFAddressRangesVector> opt_ranges =
+          GetCodeRangesFromRangelistXIndex(die, *form_value->getAsSectionOffset());
+      if (!opt_ranges)
+        return AddressRanges();
+      ranges = std::move(opt_ranges.get());
+      break;
+    }
+
+    case llvm::dwarf::DW_FORM_sec_offset: {
+      // These encodings do not support Debug Fission (requiring lookup in the main symbol file if
+      // the current one is a DWO) so we can have LLVM look it up in the current unit directly.
+      llvm::Expected<llvm::DWARFAddressRangesVector> opt_ranges =
+          die.getDwarfUnit()->findRnglistFromOffset(*form_value->getAsSectionOffset());
+      if (!opt_ranges)
+        return AddressRanges();
+      ranges = std::move(opt_ranges.get());
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  if (ranges.empty())
+    return AddressRanges();
+
+  code_ranges.reserve(ranges.size());
+  for (const llvm::DWARFAddressRange& range : ranges) {
+    AppendAddressRange(range.LowPC, range.HighPC, &code_ranges);
+  }
+
+  // Can't trust DWARF to have stored them in any particular order so specify "non canonical".
+  return AddressRanges(AddressRanges::kNonCanonical, std::move(code_ranges));
+}
+
+// Similar to llvm::DWARFDie::getLowAndHighPC but works in our implementat ion debug fission.
+std::optional<AddressRange> DwarfSymbolFactory::GetLowHighEncodedCodeRange(
+    const llvm::DWARFDie& die) const {
+  std::optional<llvm::DWARFFormValue> low_form = die.find(llvm::dwarf::DW_AT_low_pc);
+  std::optional<llvm::DWARFFormValue> high_form = die.find(llvm::dwarf::DW_AT_high_pc);
+  // Note that the "high pc" has an offset form so don't check that it has an FC_Address form yet.
+  if (!low_form || !high_form || !low_form->isFormClass(llvm::DWARFFormValue::FC_Address)) {
+    return std::nullopt;
+  }
+
+  // Low range.
+  uint64_t low_addr = 0;
+  if (std::optional<uint64_t> opt_low_addr = GetAddrFromFormValue(die, *low_form)) {
+    low_addr = *opt_low_addr;
+  } else {
+    // The low address must be a valid address type.
+    return std::nullopt;
+  }
+
+  // High range, this can be encoded as an address or an offset according to the form class.
+  uint64_t high_addr = 0;
+  if (std::optional<uint64_t> opt_high_addr = GetAddrFromFormValue(die, *high_form)) {
+    // Encoded as an address.
+    high_addr = *opt_high_addr;
+  } else if (std::optional<uint64_t> opt_offset = high_form->getAsUnsignedConstant()) {
+    // Encoded as an offset from the base of the range.
+    high_addr = low_addr + *opt_offset;
+  } else {
+    return std::nullopt;
+  }
+
+  return AddressRange(low_addr, high_addr);
+}
+
+// The DW_FORM_rnglistx in DWARF 5 is:
+//
+//   "An index into the .debug_rnglists section (DW_FORM_rnglistx). The unsigned ULEB operand
+//   identifies an offset location relative to the base of that section (the location of the first
+//   offset in the section, not the first byte of the section). The contents of that location is
+//   then added to the base to determine the location of the target range list of entries."
+//
+// In the case of a DWO, the address table for the DWO's range lists is stored in the main binary.
+// The skeleton unit in the main binary corresponding to this DWO has a DW_AT_addr_base attribute
+// that locates its address table where we look up the index in the main binary.
+//
+// For non-DWO, we do the same thing except the DW_AT_addr_base and the table data come from the
+// current binary.
+//
+// This function returns LLVM types so it can have the same return value as the LLVM lookups for the
+// other address ranges forms.
+llvm::Expected<llvm::DWARFAddressRangesVector> DwarfSymbolFactory::GetCodeRangesFromRangelistXIndex(
+    const llvm::DWARFDie& die, uint64_t index) const {
+  if (CompileUnit* skeleton_unit = delegate_->GetSkeletonCompileUnit()) {
+    // This is a DWO object so we use the main binary's DWARF unit corresponding to this file to
+    // look up the data.
+    return skeleton_unit->dwarf_unit()->GetLLVMUnit()->findRnglistFromIndex(index);
+  }
+
+  // This is not a DWO object and we use the current DIE's unit for all information.
+  return die.getDwarfUnit()->findRnglistFromIndex(index);
+}
+
+std::optional<uint64_t> DwarfSymbolFactory::GetAddrFromFormValue(
+    const llvm::DWARFDie& die, const llvm::DWARFFormValue& form_value) const {
+  llvm::DWARFUnit* unit = die.getDwarfUnit();
+  llvm::dwarf::Form form = form_value.getForm();
+  if (!llvm::dwarf::doesFormBelongToClass(form, llvm::DWARFFormValue::FC_Address,
+                                          unit->getVersion())) {
+    // Not an address type.
+    return std::nullopt;
+  }
+
+  uint64_t addr = 0;
+  if (IsAddrXForm(form_value.getForm())) {
+    // Lookup in the address table.
+    uint64_t index = form_value.getRawUValue();
+    if (std::optional<uint64_t> opt_addr = GetAddrFromIndex(die, index)) {
+      addr = *opt_addr;
+    } else {
+      return std::nullopt;
+    }
+  } else {
+    // Simple lookup of an address value.
+    addr = form_value.getRawUValue();
+  }
+
+  if (addr == std::numeric_limits<uint64_t>::max()) {
+    // Indicates that this range was optimized out.
+    return std::nullopt;
+  }
+
+  return addr;
+}
+
+std::optional<uint64_t> DwarfSymbolFactory::GetAddrFromIndex(const llvm::DWARFDie& die,
+                                                             uint64_t index) const {
+  std::optional<llvm::object::SectionedAddress> addr;
+  if (CompileUnit* skeleton_unit = delegate_->GetSkeletonCompileUnit()) {
+    // This is a DWO object so we use the main binary's DWARF unit corresponding to this file to
+    // look up the data.
+    addr = skeleton_unit->dwarf_unit()->GetLLVMUnit()->getAddrOffsetSectionItem(index);
+  } else {
+    // Look up in the unit for this DIE.
+    addr = die.getDwarfUnit()->getAddrOffsetSectionItem(index);
+  }
+
+  if (!addr) {
+    return std::nullopt;
+  }
+  return addr->Address;
 }
 
 }  // namespace zxdb

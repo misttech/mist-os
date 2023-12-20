@@ -744,6 +744,7 @@ void Index::IndexSkeletonCompileUnit(const DwarfUnit& unit, const llvm::DWARFDie
     return;  // Need a name for the .dwo file to work, plus an address.
 
   SkeletonUnit& skeleton = dwo_refs_.emplace_back();
+  skeleton.skeleton_die_offset = unit_die.getDebugInfoEntry()->getOffset();
   skeleton.dwo_name = dwo_name ? *dwo_name : *gnu_dwo_name;
 
   skeleton.comp_dir = comp_dir ? *comp_dir : "";

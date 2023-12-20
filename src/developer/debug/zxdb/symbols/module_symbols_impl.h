@@ -76,6 +76,10 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
   std::string GetBuildDirForSymbolFactory() override { return build_dir_; }
   fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return GetWeakPtr(); }
+  CompileUnit* GetSkeletonCompileUnit() override {
+    // The main binary is not a DWO so there is no corresponding skeleton unit for it.
+    return nullptr;
+  }
 
  private:
   FRIEND_MAKE_REF_COUNTED(ModuleSymbolsImpl);
