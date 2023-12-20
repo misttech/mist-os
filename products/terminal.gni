@@ -36,10 +36,6 @@ legacy_cache_package_labels += [ "//src/chromium:chromium_test_base_deps" ]
 # QEMU images generated for the SDK, but in cache, so they can be updated.
 legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
 
-# These were previously included in "//sdk/bundles:tools".
-# TODO(fxbug.dev/119075): Remove these.
-legacy_cache_package_labels += [ "//src/chromium:web_engine" ]
-
 core_realm_shards += [ "//src/media/codec:codec_factory_shard" ]
 
 # Run tiles-flatland and flatland-view-provider automatically.
