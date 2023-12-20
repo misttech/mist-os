@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -25,9 +26,6 @@ using bt::testing::FakeController;
 
 namespace bt_hci_virtual {
 namespace {
-
-// Arbitrary value to signal between userland eventpairs.
-constexpr uint32_t PEER_SIGNAL = ZX_USER_SIGNAL_0;
 
 FakeController::Settings SettingsFromFidl(const ftest::EmulatorSettings& input) {
   FakeController::Settings settings;
@@ -98,6 +96,7 @@ constexpr zx_protocol_device_t bt_hci_device_ops = {
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
     },
+    .release = [](void* ctx) { DEV(ctx)->ClearHciDev(); },
     .message =
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "HciMessage\n");
@@ -183,34 +182,19 @@ zx_status_t EmulatorDevice::Bind(std::string_view name) {
 
 void EmulatorDevice::Unbind() {
   logf(TRACE, "unbind\n");
-  zx::eventpair this_thread_waiter, loop_signaller;
-  zx_status_t status = zx::eventpair::create(0, &this_thread_waiter, &loop_signaller);
-  // If eventpair creation fails, the rest of Unbind will not work properly, so we assert to fail
-  // fast and obviously. This is OK since the emulator is only run in tests anyway.
-  ZX_ASSERT_MSG(status == ZX_OK, "could not create eventpair: %s\n", zx_status_get_string(status));
+  libsync::Completion completion;
 
   // It is OK to capture a self-reference since this function blocks on the task completion.
-  async::PostTask(loop_.dispatcher(), [this, loop_signaller = std::move(loop_signaller)] {
+  async::PostTask(loop_.dispatcher(), [this, &completion] {
     // Stop servicing HciEmulator FIDL messages from higher layers.
     binding_.Unbind();
-    // Unpublish the bt-hci device.
-    UnpublishHci();
-    zx_status_t status = loop_signaller.signal_peer(/*clear_mask=*/0, /*set_mask=*/PEER_SIGNAL);
-    if (status != ZX_OK) {
-      logf(ERROR, "could not signal event peer: %s\n", zx_status_get_string(status));
-    }
+    completion.Signal();
   });
 
   // Block here to ensure that UnpublishHci runs before Unbind completion.  We use EventPair instead
   // of loop_.JoinThreads to block because fake_device_ has tasks on the loop_ that won't complete
   // until fake_device_ is stopped during Release.
-  zx_signals_t _ignored;
-  status = this_thread_waiter.wait_one(PEER_SIGNAL, zx::time::infinite(), &_ignored);
-  if (status != ZX_OK) {
-    logf(ERROR, "failed to wait for eventpair signal: %s\n", zx_status_get_string(status));
-  } else {
-    logf(TRACE, "emulator's bt-hci device unpublished\n");
-  }
+  completion.Wait();
 
   device_unbind_reply(emulator_dev_);
   emulator_dev_ = nullptr;

@@ -408,7 +408,7 @@ void DriverHostContext::DeviceInitReply(const fbl::RefPtr<zx_device_t>& dev, zx_
 
 zx_status_t DriverHostContext::DeviceRemove(const fbl::RefPtr<zx_device_t>& dev, bool unbind_self) {
   if (dev->flags() & REMOVAL_BAD_FLAGS) {
-    LOGD(ERROR, *dev, "Cannot remove device %p: %s", dev.get(),
+    LOGD(WARNING, *dev, "Cannot remove device %p: %s", dev.get(),
          internal::removal_problem(dev->flags()));
     return ZX_ERR_INVALID_ARGS;
   }

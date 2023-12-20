@@ -53,6 +53,8 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
                         OpenSnoopChannelCompleter::Sync& completer) override;
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
+  void ClearHciDev() { hci_dev_ = nullptr; }
+
  private:
   void StartEmulatorInterface(zx::channel chan);
 
