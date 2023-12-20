@@ -178,8 +178,8 @@ Create the following file and directory structure in the new project directory:
 
 ### Update the test component manifest
 
-The generated manifest for the test component applies the baseline
-dependencies, such as the Rust test runner. Update the `echo_integration.cml`
+The manifest for the test component applies the baseline
+dependencies, such as `test_runners`. Update the `echo_integration.cml`
 file to declare the `echo-server` component as a child and route the `Echo`
 protocol capability to the test component.
 
