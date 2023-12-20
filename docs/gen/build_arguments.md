@@ -996,8 +996,8 @@ From //build/images/args.gni:95
 ### chromium_build_dir
 
 This variable specifies a fully qualified Chromium build output directory,
-such as `/home/$USER/chrome/src/out/fuchsia`, from which `chrome`,
-`cast_runner`, and `web_engine` will be obtained.
+such as `/home/$USER/chrome/src/out/fuchsia`, from which `web_engine` will
+be obtained.
 All of those targets must exist in the output directory.
 If unset, the prebuilt packages from CIPD will be used.
 
@@ -8378,13 +8378,10 @@ From //build/toolchain/ccache.gni:9
 
 Whether to use the most recent (canary) version of prebuilt Chromium
 components. Otherwise, the qualified "release" version is used.
-For scenarios where CastRunner is used,
-[`use_cast_runner_canary`](#use_cast_runner_canary) must be set to the same
-value.
 
 **Current value (from the default):** `false`
 
-From //src/chromium/BUILD.gn:33
+From //src/chromium/BUILD.gn:30
 
 ### use_dbus
 
