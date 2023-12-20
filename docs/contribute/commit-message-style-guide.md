@@ -168,8 +168,8 @@ Multiply: setui_client_interface_test
 Change-Id: I67e061edee1e81a6875bf26b752ba5687c4ced71
 ```
 
-Note: To add multiple to more than one test, you can either separate multiple
-entries with commas on a single line, or add multiple `Multiply:` lines as shown
+Note: To specify that more than one test should be retried to deflake, you can add multiple
+comma separated test names on a single line, or add multiple `Multiply:` lines as shown
 in the above example.
 
 If the testing instructions are complex, create an issue and provide a link to
