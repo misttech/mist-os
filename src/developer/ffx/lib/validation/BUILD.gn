@@ -12,10 +12,12 @@ rustc_library("lib") {
   sources = [
     "src/lib.rs",
     "src/schema.rs",
+    "src/schema/macros.rs",
     "src/validate.rs",
   ]
 
   deps = [
+    "proc_macro",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
