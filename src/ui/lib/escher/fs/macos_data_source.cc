@@ -8,6 +8,7 @@
 #include <mach-o/dyld.h>
 #endif
 
+#include <lib/syslog/cpp/macros.h>
 #include <limits.h>
 
 #include "src/lib/files/directory.h"

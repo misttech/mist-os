@@ -4,6 +4,7 @@
 
 #include "src/ui/lib/escher/fs/fuchsia_data_source.h"
 
+#include <lib/syslog/cpp/macros.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/pseudo_file.h>
 #include <zircon/errors.h>

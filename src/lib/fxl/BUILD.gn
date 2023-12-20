@@ -44,7 +44,7 @@ sdk_source_set("memory") {
 
   public_deps = [
     ":common",
-    "//sdk/lib/syslog/cpp",
+    "//zircon/system/public",
   ]
 }
 
@@ -144,7 +144,6 @@ sdk_source_set("fxl") {
     ":memory",
     ":strings",
     "//sdk/lib/fit",
-    "//sdk/lib/syslog/cpp",
     "//src/lib/files",
   ]
 }

@@ -4,7 +4,7 @@
 
 #include "src/lib/fxl/memory/weak_ptr_internal.h"
 
-#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 
 namespace fxl {
 namespace internal {
@@ -13,12 +13,12 @@ WeakPtrFlag::WeakPtrFlag() : is_valid_(true) {}
 
 WeakPtrFlag::~WeakPtrFlag() {
   // Should be invalidated before destruction.
-  FX_DCHECK(!is_valid_);
+  ZX_DEBUG_ASSERT(!is_valid_);
 }
 
 void WeakPtrFlag::Invalidate() {
   // Invalidation should happen exactly once.
-  FX_DCHECK(is_valid_);
+  ZX_DEBUG_ASSERT(is_valid_);
   is_valid_ = false;
 }
 

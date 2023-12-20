@@ -5,6 +5,8 @@
 #ifndef SRC_UI_LIB_ESCHER_VK_SHADER_MODULE_H_
 #define SRC_UI_LIB_ESCHER_VK_SHADER_MODULE_H_
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/lib/fxl/memory/ref_counted.h"
 #include "src/ui/lib/escher/third_party/granite/vk/shader_module_resource_layout.h"
 #include "src/ui/lib/escher/vk/shader_stage.h"

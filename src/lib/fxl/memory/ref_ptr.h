@@ -7,7 +7,7 @@
 #ifndef SRC_LIB_FXL_MEMORY_REF_PTR_H_
 #define SRC_LIB_FXL_MEMORY_REF_PTR_H_
 
-#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 
 #include <cstddef>
 #include <functional>
@@ -109,12 +109,12 @@ class RefPtr final {
   T* get() const { return ptr_; }
 
   T& operator*() const {
-    FX_DCHECK(ptr_);
+    ZX_DEBUG_ASSERT(ptr_);
     return *ptr_;
   }
 
   T* operator->() const {
-    FX_DCHECK(ptr_);
+    ZX_DEBUG_ASSERT(ptr_);
     return ptr_;
   }
 
@@ -207,7 +207,7 @@ class RefPtr final {
   friend RefPtr<T> AdoptRef<T>(T*);
 
   enum AdoptTag { ADOPT };
-  RefPtr(T* ptr, AdoptTag) : ptr_(ptr) { FX_DCHECK(ptr_); }
+  RefPtr(T* ptr, AdoptTag) : ptr_(ptr) { ZX_DEBUG_ASSERT(ptr_); }
 
   T* ptr_;
 };

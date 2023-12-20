@@ -5,6 +5,8 @@
 #ifndef SRC_UI_LIB_ESCHER_TEST_COMMON_VK_VK_DEBUG_REPORT_CALLBACK_REGISTRY_H_
 #define SRC_UI_LIB_ESCHER_TEST_COMMON_VK_VK_DEBUG_REPORT_CALLBACK_REGISTRY_H_
 
+#include <lib/syslog/cpp/macros.h>
+
 #include <utility>
 #include <vector>
 

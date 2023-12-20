@@ -4,6 +4,7 @@
 
 #include "src/ui/lib/escher/fs/linux_data_source.h"
 
+#include <lib/syslog/cpp/macros.h>
 #include <limits.h>
 #include <unistd.h>
 

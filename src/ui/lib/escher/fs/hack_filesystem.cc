@@ -4,6 +4,8 @@
 
 #include "src/ui/lib/escher/fs/hack_filesystem.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
