@@ -7529,16 +7529,27 @@ Identifier for the Core SDK.
 
 From //sdk/config.gni:7
 
-### sdk_inside_supported_api_sub_build
+### sdk_inside_sub_build
 
-True when building an IDK cpu-specific and supported API sub-build. See
-//build/sdk/build_final_idk.py.
-This is expect to avoid building same build target and only do variant
-related artifacts.
+Whether currently building a sub-build (vs. the main build).
+Can be true for any API level, including the default level.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:17
+From //build/sdk/config.gni:12
+
+### sdk_inside_supported_api_sub_build
+
+Whether currently building a sub-build for a specific supported API level
+rather than a build or sub-build at the default API level.
+Note that this can be false in sub-builds - specifically, when building the
+default API level for target CPUs other than the host.
+`sdk_inside_sub_build` must be true and `override_target_api_level` must be
+set to a valid level.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:20
 
 ### sdk_max_simultaneous_sub_builds
 
@@ -7560,15 +7571,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:34
-
-### sdk_no_host_tools
-
-Whether to omit host tools from the generated IDKs.
-
-**Current value (from the default):** `false`
-
-From //build/sdk/config.gni:11
+From //build/sdk/config.gni:37
 
 ### sdk_sub_build_max_load_average
 
@@ -7578,7 +7581,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:46
+From //build/sdk/config.gni:49
 
 ### sdk_sub_build_parallelism
 
@@ -7590,7 +7593,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:41
+From //build/sdk/config.gni:44
 
 ### sdk_with_all_supported_api_levels
 
