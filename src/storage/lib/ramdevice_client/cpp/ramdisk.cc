@@ -404,6 +404,9 @@ zx_status_t ramdisk_grow(const ramdisk_client* client, uint64_t required_size) {
   if (!result.ok()) {
     return result.status();
   }
+  if (!result->is_ok()) {
+    return result->error_value();
+  }
   return ZX_OK;
 }
 
