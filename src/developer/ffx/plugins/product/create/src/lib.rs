@@ -91,9 +91,9 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
     let partitions = load_partitions_config(&cmd.partitions, &cmd.out_dir.join("partitions"))?;
     let (system_a, packages_a) =
         load_assembly_manifest(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
-    let (system_b, packages_b) =
+    let (system_b, _packages_b) =
         load_assembly_manifest(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
-    let (system_r, _packages_r) =
+    let (system_r, packages_r) =
         load_assembly_manifest(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
 
     // Generate the update packages if necessary.
@@ -130,26 +130,26 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
 
     let repositories = if let Some(tuf_keys) = &cmd.tuf_keys {
         let repo_path = &cmd.out_dir;
-        let metadata_path = repo_path.join("repository");
+        let main_metadata_path = repo_path.join("repository");
+        let recovery_metadata_path = repo_path.join("recovery_repository");
         let blobs_path = repo_path.join("blobs");
         let keys_path = repo_path.join("keys");
         let delivery_blob_type = cmd.delivery_blob_type.or(default_delivery_blob_type(&partitions));
-        let repo =
-            FileSystemRepository::builder(metadata_path.to_path_buf(), blobs_path.to_path_buf())
-                .delivery_blob_type(
-                    delivery_blob_type
-                        .map(TryInto::try_into)
-                        .transpose()
-                        .context("creating repo")?,
-                )
-                .build();
+
         let repo_keys =
             RepoKeys::from_dir(tuf_keys.as_std_path()).context("Gathering repo keys")?;
 
+        // Main slot.
+        let repo = FileSystemRepository::builder(
+            main_metadata_path.to_path_buf(),
+            blobs_path.to_path_buf(),
+        )
+        .delivery_blob_type(
+            delivery_blob_type.map(TryInto::try_into).transpose().context("creating repo")?,
+        )
+        .build();
         RepoBuilder::create(&repo, &repo_keys)
             .add_package_manifests(packages_a.into_iter())
-            .await?
-            .add_package_manifests(packages_b.into_iter())
             .await?
             .add_package_manifests(update_packages.into_iter().map(|manifest| (None, manifest)))
             .await?
@@ -157,10 +157,33 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
             .await
             .context("Building the repo")?;
 
+        // Recovery slot.
+        // We currently need this for scrutiny to find the recovery blobs.
+        let recovery_repo = FileSystemRepository::builder(
+            recovery_metadata_path.to_path_buf(),
+            blobs_path.to_path_buf(),
+        )
+        .delivery_blob_type(
+            delivery_blob_type
+                .map(TryInto::try_into)
+                .transpose()
+                .context("creating recovery repo")?,
+        )
+        .build();
+        RepoBuilder::create(&recovery_repo, &repo_keys)
+            .add_package_manifests(packages_r.into_iter())
+            .await?
+            .commit()
+            .await
+            .context("Building the recovery repo")?;
+
         std::fs::create_dir_all(&keys_path).context("Creating keys directory")?;
+
+        // We intentionally do not add the recovery repository, because no tools currently need
+        // it. Scrutiny needs the recovery blobs to be accessible, but that's it.
         vec![Repository {
             name: "fuchsia.com".into(),
-            metadata_path: metadata_path,
+            metadata_path: main_metadata_path,
             blobs_path: blobs_path,
             delivery_blob_type: delivery_blob_type,
             root_private_key_path: copy_file(tuf_keys.join("root.json"), &keys_path).ok(),

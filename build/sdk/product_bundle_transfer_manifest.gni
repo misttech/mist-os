@@ -55,6 +55,7 @@ template("product_bundle_transfer_manifest") {
     hermetic_action_ignored_prefixes = [
       "${_product_bundle_dir}/blobs",
       "${_product_bundle_dir}/repository",
+      "${_product_bundle_dir}/recovery_repository",
       "${_product_bundle_dir}/virtual_devices",
     ]
 
