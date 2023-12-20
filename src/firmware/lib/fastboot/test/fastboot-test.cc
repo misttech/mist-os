@@ -1048,24 +1048,24 @@ class FastbootRebootTest : public zxtest::Test {
       return reboot_triggered_;
     }
 
+    bool reboot2recovery_triggered() const {
+      fbl::AutoLock al(&lock_);
+      return reboot2recovery_triggered_;
+    }
+
+    void set_reboot2recovery_triggered(bool v) {
+      fbl::AutoLock al(&lock_);
+      reboot2recovery_triggered_ = v;
+    }
+
     void set_reboot_triggered(bool v) {
       fbl::AutoLock al(&lock_);
       reboot_triggered_ = v;
     }
 
-    bool one_shot_recovery() const {
-      fbl::AutoLock al(&lock_);
-      return one_shot_recovery_;
-    }
-
-    void set_one_shot_recovery(bool v) {
-      fbl::AutoLock al(&lock_);
-      one_shot_recovery_ = v;
-    }
-
    private:
+    bool reboot2recovery_triggered_ __TA_GUARDED(lock_) = false;
     bool reboot_triggered_ __TA_GUARDED(lock_) = false;
-    bool one_shot_recovery_ __TA_GUARDED(lock_) = false;
     mutable fbl::Mutex lock_;
   };
 
@@ -1086,6 +1086,11 @@ class FastbootRebootTest : public zxtest::Test {
     }
 
    private:
+    void RebootToRecovery(RebootToRecoveryCompleter::Sync& completer) override {
+      state_->set_reboot2recovery_triggered(true);
+      completer.ReplySuccess();
+    }
+
     void Reboot(RebootRequestView request, RebootCompleter::Sync& completer) override {
       state_->set_reboot_triggered(true);
       completer.ReplySuccess();
@@ -1095,11 +1100,6 @@ class FastbootRebootTest : public zxtest::Test {
                          FindBootManagerCompleter::Sync& completer) override {
       boot_manager_bindings_.AddBinding(dispatcher_, std::move(request->boot_manager), this,
                                         fidl::kIgnoreBindingClosure);
-    }
-
-    void SetOneShotRecovery(SetOneShotRecoveryCompleter::Sync& completer) override {
-      state_->set_one_shot_recovery(true);
-      completer.ReplySuccess();
     }
 
     void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -1194,8 +1194,7 @@ TEST_F(FastbootRebootTest, RebootBootloader) {
   // Two info messages plus one OKAY message
   ASSERT_EQ(transport.GetOutPackets().size(), 3ULL);
   ASSERT_EQ(transport.GetOutPackets().back(), "OKAY");
-  ASSERT_TRUE(state().reboot_triggered());
-  ASSERT_TRUE(state().one_shot_recovery());
+  ASSERT_TRUE(state().reboot2recovery_triggered());
 }
 
 TEST_F(FastbootFlashTest, UnknownOemCommand) {

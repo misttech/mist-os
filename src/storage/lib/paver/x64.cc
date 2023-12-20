@@ -13,6 +13,7 @@
 
 #include <src/lib/fidl/cpp/include/lib/fidl/cpp/channel.h>
 
+#include "fidl/fuchsia.device.manager/cpp/common_types.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/pave-logging.h"
@@ -24,6 +25,7 @@ namespace paver {
 
 namespace {
 
+using fuchsia_device_manager::SystemPowerState;
 using uuid::Uuid;
 
 constexpr size_t kKibibyte = 1024;
@@ -268,29 +270,44 @@ zx::result<> EfiDevicePartitioner::ValidatePayload(const PartitionSpec& spec,
   return zx::ok();
 }
 
-// Setting one-shot flag in A/B/R metadata for Reboot to Bootloader if required.
-// A/B/R metadata is used because original EFI variables setting doesn't reliably works during
-// shutdown process.
+// Helper function to access `abr_client`.
+// Used to set one-shot flags to reboot to recovery/bootloader.
+zx::result<> EfiDevicePartitioner::CallAbr(
+    std::function<zx::result<>(abr::Client&)> call_abr) const {
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  if (partition.is_error()) {
+    ERROR("Failed to find A/B/R metadata partition: %s\n", partition.status_string());
+    return partition.take_error();
+  }
+
+  auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
+  if (abr_partition_client.is_error()) {
+    ERROR("Failed to create A/B/R metadata partition client: %s\n",
+          abr_partition_client.status_string());
+    return abr_partition_client.take_error();
+  }
+  auto& abr_client = abr_partition_client.value();
+
+  return call_abr(*abr_client);
+}
+
 zx::result<> EfiDevicePartitioner::OnStop() const {
-  if (GetShutdownSystemState(gpt_->svc_root()) ==
-      fuchsia_device_manager::SystemPowerState::kRebootBootloader) {
-    auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
-    if (partition.is_error()) {
-      ERROR("Failed to find A/B/R metadata partition: %s\n", partition.status_string());
-      return partition.take_error();
-    }
-
-    auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
-    if (abr_partition_client.is_error()) {
-      ERROR("Failed to create A/B/R metadata partition client: %s\n",
-            abr_partition_client.status_string());
-      return abr_partition_client.take_error();
-    }
-    auto& abr_client = abr_partition_client.value();
-
-    auto result = abr_client->SetOneShotBootloader();
-    LOG("Setting one shot reboot to bootloader flag: %s", result.status_string());
-    return result;
+  const auto state = GetShutdownSystemState(gpt_->svc_root());
+  switch (state) {
+    case SystemPowerState::kRebootBootloader:
+      LOG("Setting one shot reboot to bootloader flag.\n");
+      return CallAbr([](abr::Client& abr_client) { return abr_client.SetOneShotBootloader(); });
+    case SystemPowerState::kRebootRecovery:
+      LOG("Setting one shot reboot to recovery flag\n");
+      return CallAbr([](abr::Client& abr_client) { return abr_client.SetOneShotRecovery(); });
+    case SystemPowerState::kFullyOn:
+    case SystemPowerState::kReboot:
+    case SystemPowerState::kPoweroff:
+    case SystemPowerState::kMexec:
+    case SystemPowerState::kSuspendRam:
+    case SystemPowerState::kRebootKernelInitiated:
+      // nothing to do for these cases
+      break;
   }
 
   return zx::ok();

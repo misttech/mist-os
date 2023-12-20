@@ -46,6 +46,8 @@ class EfiDevicePartitioner : public DevicePartitioner {
                        std::shared_ptr<Context> context)
       : gpt_(std::move(gpt)), arch_(arch), context_(context) {}
 
+  zx::result<> CallAbr(std::function<zx::result<>(abr::Client&)> call_abr) const;
+
   std::unique_ptr<GptDevicePartitioner> gpt_;
   Arch arch_;
   std::shared_ptr<Context> context_;
