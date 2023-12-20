@@ -56,7 +56,7 @@ DeviceCtx::DeviceCtx(DriverCtx* driver, zx_device_t* parent)
   device_fidl_ = std::make_unique<DeviceFidl>(this);
 }
 
-DeviceCtx::~DeviceCtx() { TeardownDeviceFidl(); }
+DeviceCtx::~DeviceCtx() = default;
 
 void DeviceCtx::TeardownDeviceFidl() {
   if (!device_fidl_) {
@@ -107,6 +107,11 @@ void DeviceCtx::DdkSuspend(ddk::SuspendTxn txn) {
   video_.reset();
   driver_->Suspend();
   txn.Reply(ZX_OK, txn.requested_state());
+}
+
+void DeviceCtx::DdkUnbind(ddk::UnbindTxn txn) {
+  TeardownDeviceFidl();
+  txn.Reply();
 }
 
 void DeviceCtx::SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const {

@@ -205,7 +205,9 @@ class BindingTest : public testing::Test {
 };
 
 TEST_F(BindingTest, Destruction) {
-  Init();
+  auto device = Init();
+  device->DdkAsyncRemove();
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
   root_.reset();
 }
 

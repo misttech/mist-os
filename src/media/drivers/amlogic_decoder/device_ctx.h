@@ -25,7 +25,7 @@ class DeviceCtx;
 
 using DdkDeviceType =
     ddk::Device<DeviceCtx, ddk::Messageable<fuchsia_hardware_mediacodec::Device>::Mixin,
-                ddk::Suspendable>;
+                ddk::Suspendable, ddk::Unbindable>;
 
 // A pointer to an instance of this class is the per-device "ctx".  The purpose
 // of this class is to provide a place for device-lifetime stuff to be rooted,
@@ -57,6 +57,7 @@ class DeviceCtx : public DdkDeviceType,
 
   void DdkRelease() { delete this; }
   void DdkSuspend(ddk::SuspendTxn txn);
+  void DdkUnbind(ddk::UnbindTxn txn);
 
   // AmlogicVideo::Owner implementation
   void SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const override;
