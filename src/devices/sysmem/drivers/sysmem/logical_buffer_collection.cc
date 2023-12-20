@@ -1588,7 +1588,8 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     if (generate_result.error() != ZX_ERR_NOT_SUPPORTED) {
       LogError(FROM_HERE, "GenerateUnpopulatedBufferCollectionInfo() failed");
     }
-    return generate_result;
+    // This error code allows a BufferCollectionTokenGroup (if any) to try its next child.
+    return fpromise::error(ZX_ERR_NOT_SUPPORTED);
   }
   ZX_DEBUG_ASSERT(generate_result.is_ok());
   auto buffer_collection_info = generate_result.take_value();
@@ -1788,7 +1789,8 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
                "AttachToken() sequence failed - status: %d",
                generate_result.error());
     }
-    return generate_result.error();
+    // This error code allows a BufferCollectionTokenGroup (if any) to try its next child.
+    return ZX_ERR_NOT_SUPPORTED;
   }
   ZX_DEBUG_ASSERT(generate_result.is_ok());
   fuchsia_sysmem2::BufferCollectionInfo unpopulated_buffer_collection_info =
