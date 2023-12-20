@@ -8,7 +8,8 @@ import("//sdk/ctf/build/ctf.gni")
 group("tests") {
   testonly = true
   deps = [
-    ":fuchsia-driver-test_tests-package",
+    # TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
+    # ":fuchsia-driver-test_tests-package",
     # TODO(https://fxbug.dev/116940): Uncomment to include this test in CTF when it no longer
     # depends on the experimental //sdk/lib/device_watcher API.
     # ":fuchsia-driver-test_tests_archive",
