@@ -54,7 +54,6 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
       std::make_tuple("lo", "127.0.0.1", 8, 0, IFF_LOOPBACK | IFF_UP | IFF_RUNNING),
       std::make_tuple("lo", "::1", 128, 0, IFF_LOOPBACK | IFF_UP | IFF_RUNNING),
   };
-  const size_t lo_addrs_count = want_ifaddrs.size();
 
   if (kIsFuchsia) {
     want_ifaddrs.push_back(std::make_tuple("ep1", "192.168.0.1", 20, 0, IFF_UP | IFF_RUNNING));
@@ -63,10 +62,7 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
     want_ifaddrs.push_back(std::make_tuple("ep4", "1234::5:6:7:8", 120, 0, IFF_UP | IFF_RUNNING));
   }
 
-  std::vector<InterfaceAddress> unknown_link_local_addrs, other_addrs;
-  constexpr size_t link_local_addrs_per_external_interface = 1;
-  const size_t want_unknown_link_local_addrs =
-      link_local_addrs_per_external_interface * (want_ifaddrs.size() - lo_addrs_count);
+  std::vector<InterfaceAddress> seek_addrs;
 
   struct ifaddrs* ifaddr;
   ASSERT_EQ(getifaddrs(&ifaddr), 0) << strerror(errno);
@@ -88,8 +84,8 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
         const uint8_t prefix_len =
             count_prefix(reinterpret_cast<const uint8_t*>(&netmask->sin_addr.s_addr), 4);
 
-        other_addrs.push_back(std::make_tuple(if_name, std::string(sin_addr), prefix_len, 0,
-                                              it->ifa_flags & ~unsupported_flags));
+        seek_addrs.push_back(std::make_tuple(if_name, std::string(sin_addr), prefix_len, 0,
+                                             it->ifa_flags & ~unsupported_flags));
         break;
       }
       case AF_INET6: {
@@ -112,10 +108,14 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
             std::make_tuple(if_name, sin6_addr_str, prefix_len, addr_in6->sin6_scope_id,
                             it->ifa_flags & ~unsupported_flags);
 
-        if (IN6_IS_ADDR_LINKLOCAL(addr_in6->sin6_addr.s6_addr) && !is_known_addr) {
-          unknown_link_local_addrs.push_back(std::move(if_addr));
+        if (is_known_addr) {
+          seek_addrs.push_back(std::move(if_addr));
         } else {
-          other_addrs.push_back(std::move(if_addr));
+          // Any addresses not in the list must be an autoconfigured link local
+          // IPv6 address. We can't assert on them because we don't know their
+          // value and there is no synchronization point to wait for them to be
+          // in the assigned state.
+          EXPECT_TRUE(IN6_IS_ADDR_LINKLOCAL(addr_in6->sin6_addr.s6_addr));
         }
 
         break;
@@ -129,8 +129,7 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
   }
   freeifaddrs(ifaddr);
 
-  EXPECT_THAT(other_addrs, testing::UnorderedElementsAreArray(want_ifaddrs));
-  EXPECT_THAT(unknown_link_local_addrs, testing::SizeIs(want_unknown_link_local_addrs));
+  EXPECT_THAT(seek_addrs, testing::UnorderedElementsAreArray(want_ifaddrs));
 }
 
 }  // namespace
