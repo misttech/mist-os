@@ -31,5 +31,10 @@ fuchsia_test_package("bt-bootstrap-integration-tests") {
   test_specs = {
     # control the parallelism
     parallel = 1
+
+    # b/317259066 causes driver_manager ERRORs. Ignore until fixed.
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }

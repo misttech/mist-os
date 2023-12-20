@@ -36,5 +36,11 @@ fuchsia_test_component("bt-le-integration-tests-component") {
 }
 
 fuchsia_test_package("bt-le-integration-tests") {
+  # b/317259066 causes driver_manager ERRORs. Ignore until fixed.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   test_components = [ ":bt-le-integration-tests-component" ]
 }
