@@ -11,7 +11,6 @@ executable("f2fs") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/storage/f2fs",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

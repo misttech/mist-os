@@ -33,6 +33,7 @@ static_library("blobfs_integration_fixtures") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//sdk/lib/fdio",
+    "//sdk/lib/sys/cpp",
     "//src/storage/lib/fs_management",
     "//zircon/system/ulib/fdio-caller",
   ]
@@ -55,7 +56,6 @@ test("external_decompressor_integration") {
     ":blobfs_integration_fixtures",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/blobfs",
     "//src/storage/blobfs:fuchsia.blobfs.internal_hlcpp",
@@ -103,7 +103,6 @@ test("blobfs_integration") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/blobfs",
     "//src/storage/fs_test",
