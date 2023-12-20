@@ -38,7 +38,7 @@ structure:
 ## Connect to the parent device
 
 To access the `fuchsia.hardware.pci/Device` interface from the parent device
-node, add the `fuchsia.driver.compat.Service` capability to the driver's
+node, add the `fuchsia.hardware.pci.Service` capability to the driver's
 component manifest:
 
 `qemu_edu/drivers/meta/qemu_edu.cml`:
@@ -60,8 +60,6 @@ offered by the parent device during driver initialization:
 
 ```cpp
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="imports" adjust_indentation="auto" %}
-
-{{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="compat_imports" adjust_indentation="auto" %}{{ '</strong>' }}
 
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="namespace_start" adjust_indentation="auto" %}
 // ...
