@@ -64,15 +64,15 @@ for arg in "$@"
 do
   case "$arg" in
     --config=sponge) # Sponge build event service
-      test -z "$BAZEL_sponge_socket_path" ||
+      [[ "${{BAZEL_sponge_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_sponge_socket_path" )
       ;;
     --config=resultstore) # Resultstore build event service
-      test -z "$BAZEL_resultstore_socket_path" ||
+      [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
       ;;
     --config=remote) # Remote build execution service
-      test -z "$BAZEL_rbe_socket_path" ||
+      [[ "${{BAZEL_rbe_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--remote_proxy=unix://$BAZEL_rbe_socket_path" )
       ;;
   esac
