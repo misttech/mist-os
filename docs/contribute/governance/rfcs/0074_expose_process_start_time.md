@@ -15,10 +15,10 @@ the monotonic time at which `zx_process_start()` was called, when valid.
 
 ## Motivation
 
-First filed at crbug.com/726484 and then fxbug.dev/30751, Chromium requested
+First filed at [crbug.com/726484] and then [fxbug.dev/30751], Chromium requested
 the feature in order to give a base time for trace events, extending a
 platform-agnostic interface already supporting Linux, macOS, and Windows.
-Further, fxbug.dev/43108 was filed to leverage this same feature in order to
+Further, [fxbug.dev/43108] was filed to leverage this same feature in order to
 include uptime in crash reports.
 
 ## Design
@@ -29,8 +29,9 @@ and then pass it along in `ProcessDispatcher::GetInfo()`; the former method is
 the main "starting" routine of `zx_process_start()`, while the latter is that
 of `zx_get_object_info()` for a process handle with `ZX_INFO_PROCESS`.
 
-As for the struct populated by `zx_object_get_info()`, currently we have
-```
+As for the struct populated by `zx_object_get_info()`, currently we have:
+
+```cpp
 typedef struct zx_info_process {
     // The process's return code; only valid if |exited| is true.
     // If the process was killed, it will be one of the ZX_TASK_RETCODE values.
@@ -45,14 +46,16 @@ typedef struct zx_info_process {
     uint8_t padding1[5];
 } zx_info_process_t;
 ```
-We would evolve it to be
-```
+
+We would evolve it to be:
+
+```cpp
 typedef struct zx_info_process {
     // The process's return code; only valid if the
     // |ZX_PROCESS_INFO_FLAG_EXITED| flag is set. If the process was killed, it
     // will be one of the |ZX_TASK_RETCODE| values.
     int64_t return_code;
-    // The monotonic time at which `zx_process_start()` was called, only valid
+    // The monotonic time at which zx_process_start() was called, only valid
     // if the |ZX_INFO_PROCESS_FLAG_STARTED| flag is set.
     zx_time_t start_time;
     // Bitwise OR of ZX_INFO_PROCESS_FLAG_* values.
@@ -60,9 +63,11 @@ typedef struct zx_info_process {
     uint8_t padding1[4];
 } zx_info_process_t;
 ```
-for which the following flag values would be introduced:
-```
-// Whether the process has started. `zx_process_info_t::start_time` is only
+
+For which the following flag values would be introduced:
+
+```cpp
+// Whether the process has started. zx_process_info_t::start_time is only
 // valid if this flag is set.
 #define ZX_INFO_PROCESS_FLAG_STARTED (1u << 0)
 
@@ -72,6 +77,7 @@ for which the following flag values would be introduced:
 // Whether a debugger is attached to the process.
 #define ZX_INFO_PROCESS_FLAG_DEBUGGER_ATTACHED (1u << 2)
 ```
+
 The boolean-to-flag refactor is not strictly necessary, but it would bring
 `zx_info_process_t` in line with current syscall struct policy, save a byte
 on padding, and would not increase the amount of work needed to carry out this
@@ -144,4 +150,8 @@ would allow us to sidestep the need for task hierarchy walking.
 Linux:  [`/proc/[pid]/stat`](https://man7.org/linux/man-pages/man5/procfs.5.html) exposes `starttime`.
 FreeBSD: [`/proc/[pid]/status`](https://www.freebsd.org/cgi/man.cgi?query=procfs) exposes start time in a space-separated list of statistics.
 macOS: The `proc_pidinfo()` syscalls seems to expose this.
-...
+
+<!-- xrefs -->
+[crbug.com/726484]: https://bugs.chromium.org/p/chromium/issues/detail?id=726484
+[fxbug.dev/30751]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=30751
+[fxbug.dev/43108]: https://b.corp.google.com/issues/42119376
