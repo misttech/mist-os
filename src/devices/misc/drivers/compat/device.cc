@@ -711,9 +711,23 @@ void Device::UnbindAndRelease() {
   // while being run in a promise on our own executor.
   parent_.value()->executor_.schedule_task(
       UnbindOp().then([device = shared_from_this()](fpromise::result<void>& init) {
-        // Our device should be destructed at the end of this callback when the reference to the
-        // shared pointer is removed.
-        device->parent_.value()->children_.remove(device);
+        if (device->parent_.value()->parent_ == std::nullopt &&
+            device->parent_.value()->children_.size() == 1) {
+          // We are the last remaing child. We should break the reference cycle and let destruction
+          // happen when the driver destructs in order to make sure the release hook is only invoked
+          // after the the dispatcher is shutdown.
+          device->release_with_null_parent_ = true;
+          device->parent_.reset();
+
+          auto completers = std::move(device->remove_completers_);
+          for (auto& completer : completers) {
+            completer.complete_ok();
+          }
+        } else {
+          // Our device should be destructed at the end of this callback when the reference to the
+          // shared pointer is removed.
+          device->parent_.value()->children_.remove(device);
+        }
       }));
 }
 

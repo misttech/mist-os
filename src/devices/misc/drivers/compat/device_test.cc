@@ -148,12 +148,14 @@ TEST_F(DeviceTest, RemoveChildren) {
 
   // Call Remove children and check that the callback finished and the children
   // were removed.
+  parent.parent().emplace(nullptr);
   bool callback_finished = false;
   parent.executor().schedule_task(parent.RemoveChildren().and_then(
       [&callback_finished]() mutable { callback_finished = true; }));
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(callback_finished);
   ASSERT_FALSE(parent.HasChildren());
+  parent.parent().reset();
 }
 
 TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
@@ -330,10 +332,12 @@ TEST_F(DeviceTest, AddChildDeviceWithInitFailure) {
 
   // Parent init finishes.
   parent.InitReply(ZX_OK);
+  parent.parent().emplace(nullptr);
   EXPECT_TRUE(RunLoopUntilIdle());
 
   // Should not have a child since the init failed on the child.
   ASSERT_FALSE(parent.HasChildren());
+  parent.parent().reset();
 }
 
 TEST_F(DeviceTest, ParentInitFails) {
@@ -381,9 +385,11 @@ TEST_F(DeviceTest, ParentInitFails) {
   EXPECT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(child_one->HasChildren());
 
+  parent.parent().emplace(nullptr);
   device_init_reply(child_two, ZX_OK, nullptr);
   EXPECT_TRUE(RunLoopUntilIdle());
   ASSERT_FALSE(parent.HasChildren());
+  parent.parent().reset();
 }
 
 TEST_F(DeviceTest, AddAndRemoveChildDevice) {
@@ -407,11 +413,13 @@ TEST_F(DeviceTest, AddAndRemoveChildDevice) {
   EXPECT_TRUE(parent.HasChildren());
 
   // Remove the child device.
+  parent.parent().emplace(nullptr);
   child->Remove();
   ASSERT_TRUE(RunLoopUntilIdle());
 
   // Check that the related child device is removed from the parent device.
   EXPECT_FALSE(parent.HasChildren());
+  parent.parent().reset();
 }
 
 TEST_F(DeviceTest, AddChildToBindableDevice) {

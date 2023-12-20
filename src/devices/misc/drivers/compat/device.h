@@ -123,6 +123,9 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
 
   const std::vector<std::string>& fragments() { return fragments_; }
 
+  // Public for testing.
+  std::optional<Device*>& parent() { return parent_; }
+
  private:
   Device(Device&&) = delete;
   Device& operator=(Device&&) = delete;
@@ -166,7 +169,8 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
     // shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client should have been torn
     // down by the driver runtime canceling all outstanding waits by the time stop has been called,
     // allowing shutdown to proceed.
-    return parent_ && system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
+    return (release_with_null_parent_ || parent_) &&
+           system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
   }
 
   bool HasChildNamed(std::string_view name) const;
@@ -230,13 +234,15 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // This is used by a Device to free itself, by calling parent_.RemoveChild(this).
   //
   // parent_ will be std::nullopt when the Device is the fake device created
-  // by the Driver class in the DFv1 shim. When parent_ is std::nullopt, the
-  // Device will be freed when the Driver is freed.
+  // by the Driver class in the DFv1 shim. It is also std::nullopt when it is the last child of
+  // the root device. When parent_ is std::nullopt, the Device will be freed when the Driver is
+  // freed.
 
   fidl::WireSharedClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSharedClient<fuchsia_driver_framework::NodeController> controller_;
 
-  const std::optional<Device*> parent_;
+  std::optional<Device*> parent_;
+  bool release_with_null_parent_ = false;
 
   // The Device's children. The Device has full ownership of the children,
   // but these are shared pointers so that the NodeController can get a weak
