@@ -137,6 +137,8 @@ async fn early_boot_profile<W: 'static + Write + Send + Sync>(
             return Err(e.into());
         }
     };
+    // save summary
+    reporter.entity_finished(&run_test_suite_lib::output::EntityId::TestRun)?;
 
     Ok(())
 }
