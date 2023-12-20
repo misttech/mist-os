@@ -1,0 +1,59 @@
+{
+    children: [
+        {
+            name: "flash_ts_feedback_id",
+            url: "{{COMPONENT_URL}}",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.feedback.DeviceIdProvider",
+            from: "#flash_ts_feedback_id",
+            to: "#feedback",
+        },
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: "#flash_ts_feedback_id",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#flash_ts_feedback_id",
+            subdir: "{{PACKAGE_NAME}}",
+        },
+        {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            from: "#cobalt",
+            to: [ "#flash_ts_feedback_id" ],
+        },
+        {
+            protocol: [
+                "google.deviceproperty.Reader",
+                "google.deviceproperty.Writer",
+                "google.flashts.Reader",
+            ],
+            from: "#flash_ts_feedback_id",
+            to: "#session-manager",
+        },
+        {
+            storage: "data",
+            from: "self",
+            to: [ "#flash_ts_feedback_id" ],
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-block",
+            to: [ "#flash_ts_feedback_id" ],
+            subdir: "block",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-skip-block",
+            to: [ "#flash_ts_feedback_id" ],
+            subdir: "skip-block",
+        },
+    ],
+}

@@ -46,6 +46,15 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             }
         }
 
+        if let Some(url) = &config.feedback.flash_ts_feedback_id_component_url {
+            util::add_platform_declared_product_provided_component(
+                &url,
+                "flash_ts_feedback_id.core_shard.cml.template",
+                context,
+                builder,
+            )?;
+        }
+
         Ok(())
     }
 }

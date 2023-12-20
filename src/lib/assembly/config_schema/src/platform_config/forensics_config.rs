@@ -25,6 +25,8 @@ pub struct FeedbackConfig {
     pub large_disk: bool,
     #[serde(default)]
     pub remote_device_id_provider: bool,
+    #[serde(default)]
+    pub flash_ts_feedback_id_component_url: Option<String>,
 }
 
 /// Configuration options for the cobalt configuration area.
