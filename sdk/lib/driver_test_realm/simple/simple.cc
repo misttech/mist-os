@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <fidl/fuchsia.driver.test/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include <fbl/unique_fd.h>
 
 int main() {
   fuchsia_logging::SetTags({"simple_driver_test_realm"});
@@ -28,5 +32,19 @@ int main() {
     return 1;
   }
 
+  // Wait until /dev/sys/test has been populated so we know the test realm has been set up.
+  // Otherwise, tearing down the realm at the end of a test can race with asynchronous operations
+  // that occur during setup (see b/316579125).
+  fbl::unique_fd dev(open("/dev", O_RDONLY));
+  if (!dev) {
+    FX_SLOG(ERROR, "Failed to open /dev");
+    return 1;
+  }
+  if (zx_status_t status =
+          device_watcher::RecursiveWaitForFile(dev.get(), "sys/test").status_value();
+      status != ZX_OK) {
+    FX_SLOG(ERROR, "Failed to open /dev/sys/test");
+    return 1;
+  }
   return 0;
 }

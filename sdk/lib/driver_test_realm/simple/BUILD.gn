@@ -32,7 +32,9 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/fbl",
   ]
 
   # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,

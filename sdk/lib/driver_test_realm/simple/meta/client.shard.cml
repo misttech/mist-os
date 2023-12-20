@@ -16,6 +16,11 @@
             to: [ "#simple_driver_test_realm" ],
         },
         {
+            directory: "dev-topological",
+            from: "#driver_test_realm",
+            to: [ "#simple_driver_test_realm" ],
+        },
+        {
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
             to: [ "#simple_driver_test_realm" ],
