@@ -16,4 +16,5 @@ subdir('src/graphics/lib/magma')
 
 if get_option('with_tests')
     subdir('src/graphics/tests/vkreadback')
+    subdir('src/graphics/magma/tests')
 endif

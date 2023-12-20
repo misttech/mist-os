@@ -41,7 +41,7 @@ test = 'virtmagma_conformance_tests'
 files_test = files(
   'integration/test_magma.cc',
   'integration/test_magma_c.c',
-  '../../../magma/lib/magma_client/test_util/magma_map_cpu.cc',
+  '../lib/magma_client/test_util/magma_map_cpu.cc',
 )
 
 test_magma = executable(
