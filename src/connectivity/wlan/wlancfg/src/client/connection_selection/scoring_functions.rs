@@ -16,7 +16,10 @@ const RSSI_CUTOFF_5G_PREFERENCE: i16 = -64;
 /// The score boost for 5G networks that we are giving preference to.
 const RSSI_5G_PREFERENCE_BOOST: i16 = 20;
 /// The amount to decrease the score by for each failed connection attempt.
-const SCORE_PENALTY_FOR_RECENT_FAILURE: i16 = 5;
+const SCORE_PENALTY_FOR_RECENT_CONNECT_FAILURE: i16 = 5;
+/// Excessive recent connect failures warrant a higher penalty.
+const THRESHOLD_EXCESSIVE_RECENT_CONNECT_FAILURES: usize = 5;
+const SCORE_PENALTY_FOR_EXCESSIVE_RECENT_CONNECT_FAILURES: i16 = 10;
 /// This penalty is much higher than for a general failure because we are not likely to succeed
 /// on a retry.
 const SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED: i16 = 30;
@@ -40,13 +43,20 @@ pub fn score_bss_scanned_candidate(bss_candidate: types::ScannedCandidate) -> i1
         .recent_failures
         .iter()
         .filter(|failure| failure.bssid == bss_candidate.bss.bssid);
+    let mut connect_failure_count: usize = 0;
     for failure in matching_failures {
         // Count failures for rejected credentials higher since we probably won't succeed
         // another try with the same credentials.
         if failure.reason == CredentialRejected {
             score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED);
         } else {
-            score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_FAILURE);
+            connect_failure_count += 1;
+            if connect_failure_count <= THRESHOLD_EXCESSIVE_RECENT_CONNECT_FAILURES {
+                score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_CONNECT_FAILURE);
+            } else {
+                // Additional penalty for excessive recent failures.
+                score = score.saturating_sub(SCORE_PENALTY_FOR_EXCESSIVE_RECENT_CONNECT_FAILURES);
+            }
         }
     }
     // Penalize APs with recent short connections before disconnecting.
