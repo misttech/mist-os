@@ -3353,18 +3353,18 @@ impl MemoryManager {
         Ok(result)
     }
 
-    pub fn atomic_load_u32_acquire(&self, addr: UserAddress) -> Result<u32, Errno> {
+    pub fn atomic_load_u32_relaxed(&self, addr: UserAddress) -> Result<u32, Errno> {
         if let Some(usercopy) = usercopy() {
-            usercopy.atomic_load_u32_acquire(addr.ptr()).map_err(|_| errno!(EFAULT))
+            usercopy.atomic_load_u32_relaxed(addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
             let buf = self.read_memory_to_array(addr)?;
             Ok(u32::from_ne_bytes(buf))
         }
     }
 
-    pub fn atomic_store_u32_release(&self, addr: UserAddress, value: u32) -> Result<(), Errno> {
+    pub fn atomic_store_u32_relaxed(&self, addr: UserAddress, value: u32) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy() {
-            usercopy.atomic_store_u32_release(addr.ptr(), value).map_err(|_| errno!(EFAULT))
+            usercopy.atomic_store_u32_relaxed(addr.ptr(), value).map_err(|_| errno!(EFAULT))
         } else {
             let value_ref = UserRef::<u32>::new(addr);
             self.write_object(value_ref, &value)?;

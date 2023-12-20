@@ -428,7 +428,7 @@ impl FutexKey for PrivateFutexKey {
 
     fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno> {
         let key = Self::get_key(task, addr)?;
-        Ok((task.mm().atomic_load_u32_acquire(addr)?, key))
+        Ok((task.mm().atomic_load_u32_relaxed(addr)?, key))
     }
 }
 
