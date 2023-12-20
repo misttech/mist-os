@@ -9,6 +9,18 @@ using fuchsia.hardware.network;
 using fuchsia.net.interfaces;
 using zx;
 
+/// NudConfiguration for an interface.
+///
+/// This is scoped to IPv4 or IPv6 configuration by the [`Configuration`] type.
+type NudConfiguration = table {
+    /// The number of multicast solicitations before considering a neighbor
+    /// unreachable.
+    ///
+    /// Must be nonzero. `ILLEGAL_ZERO_VALUE` is returned on
+    /// [`Control.SetConfiguration`] otherwise.
+    1: max_multicast_solicitations uint16;
+};
+
 /// The configuration for an interface.
 type Configuration = table {
     /// The IPv4 configuration for an interface.
@@ -38,6 +50,12 @@ type Configuration = table {
                 V3 = 3;
             };
         };
+
+        /// Controls ARP configuration.
+        4: arp @generated_name("ArpConfiguration") table {
+            /// Neighbor Unreachabilty Detection over ARP configuration.
+            1: nud NudConfiguration;
+        };
     };
 
     /// The IPv6 configuration for an interface.
@@ -64,6 +82,12 @@ type Configuration = table {
                 /// MLDv2.
                 V2 = 2;
             };
+        };
+
+        /// Controls NDP configuration.
+        4: ndp @generated_name("NdpConfiguration") table {
+            /// Neighbor Unreachabilty Detection over NDP configuration.
+            1: nud NudConfiguration;
         };
     };
 };
@@ -164,6 +188,17 @@ closed protocol Control {
         /// Indicates that the provided value for `config.ipv6.mld.version` is
         /// unsupported.
         IPV6_MLD_VERSION_UNSUPPORTED = 6;
+        /// Indicates that a zero value was provided for a field that must be
+        /// nonzero.
+        ILLEGAL_ZERO_VALUE = 7;
+        /// Indicates that ARP configurations are not supported for this device.
+        ///
+        /// Devices without a link (notably loopback) do not support ARP.
+        ARP_NOT_SUPPORTED = 8;
+        /// Indicates that NDP configurations are not supported for this device.
+        ///
+        /// Devices without a link (notably loopback) do not support NDP.
+        NDP_NOT_SUPPORTED = 9;
     };
 
     /// Gets a snapshot of the interface's configuration.

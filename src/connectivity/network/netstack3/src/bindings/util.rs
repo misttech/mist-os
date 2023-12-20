@@ -15,6 +15,7 @@ use std::{
 use explicit::UnreachableExt as _;
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
@@ -30,8 +31,12 @@ use net_types::{
     AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
+    device::{
+        ArpConfiguration, ArpConfigurationUpdate, DeviceId, NdpConfiguration,
+        NdpConfigurationUpdate, WeakDeviceId,
+    },
     error::{ExistsError, NetstackError, NotFoundError},
+    neighbor::{NudUserConfig, NudUserConfigUpdate},
     routes::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
         RawMetric,
@@ -1242,6 +1247,113 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
                 metric: metric.value().into(),
             },
         })
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct IllegalZeroValueError;
+
+impl TryFromFidl<u16> for NonZeroU16 {
+    type Error = IllegalZeroValueError;
+
+    fn try_from_fidl(fidl: u16) -> Result<Self, Self::Error> {
+        NonZeroU16::new(fidl).ok_or(IllegalZeroValueError)
+    }
+}
+
+impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
+    type Error = IllegalZeroValueError;
+
+    fn try_from_fidl(fidl: fnet_interfaces_admin::NudConfiguration) -> Result<Self, Self::Error> {
+        let fnet_interfaces_admin::NudConfiguration {
+            max_multicast_solicitations,
+            __source_breaking,
+        } = fidl;
+        Ok(NudUserConfigUpdate {
+            max_multicast_solicitations: max_multicast_solicitations
+                .map(TryIntoCore::try_into_core)
+                .transpose()?,
+            ..Default::default()
+        })
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
+    fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
+        let NudUserConfigUpdate { max_unicast_solicitations: _, max_multicast_solicitations } =
+            self;
+        fnet_interfaces_admin::NudConfiguration {
+            max_multicast_solicitations: max_multicast_solicitations.map(|c| c.get()),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+/// A helper function to transform a NudUserConfig to a NudUserConfigUpdate with
+/// all the fields set so we can maximize reusing FIDL conversion functions.
+fn nud_user_config_to_update(c: NudUserConfig) -> NudUserConfigUpdate {
+    let NudUserConfig { max_multicast_solicitations, max_unicast_solicitations } = c;
+    NudUserConfigUpdate {
+        max_unicast_solicitations: Some(max_unicast_solicitations),
+        max_multicast_solicitations: Some(max_multicast_solicitations),
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfig {
+    fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
+        nud_user_config_to_update(self).into_fidl()
+    }
+}
+
+impl TryFromFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfigurationUpdate {
+    type Error = IllegalZeroValueError;
+
+    fn try_from_fidl(fidl: fnet_interfaces_admin::ArpConfiguration) -> Result<Self, Self::Error> {
+        let fnet_interfaces_admin::ArpConfiguration { nud, __source_breaking } = fidl;
+        Ok(ArpConfigurationUpdate { nud: nud.map(TryFromFidl::try_from_fidl).transpose()? })
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfigurationUpdate {
+    fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
+        let ArpConfigurationUpdate { nud } = self;
+        fnet_interfaces_admin::ArpConfiguration {
+            nud: nud.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
+    fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
+        let ArpConfiguration { nud } = self;
+        ArpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
+    }
+}
+
+impl TryFromFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfigurationUpdate {
+    type Error = IllegalZeroValueError;
+
+    fn try_from_fidl(fidl: fnet_interfaces_admin::NdpConfiguration) -> Result<Self, Self::Error> {
+        let fnet_interfaces_admin::NdpConfiguration { nud, __source_breaking } = fidl;
+        Ok(NdpConfigurationUpdate { nud: nud.map(TryFromFidl::try_from_fidl).transpose()? })
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfigurationUpdate {
+    fn into_fidl(self) -> fnet_interfaces_admin::NdpConfiguration {
+        let NdpConfigurationUpdate { nud } = self;
+        fnet_interfaces_admin::NdpConfiguration {
+            nud: nud.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfiguration {
+    fn into_fidl(self) -> fnet_interfaces_admin::NdpConfiguration {
+        let NdpConfiguration { nud } = self;
+        NdpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
     }
 }
 

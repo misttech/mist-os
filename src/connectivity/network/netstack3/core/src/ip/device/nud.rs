@@ -1597,17 +1597,18 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, Self::
 }
 
 /// NUD configurations.
-pub(crate) struct NudUserConfig {
+#[derive(Clone, Debug)]
+pub struct NudUserConfig {
     /// The maximum number of unicast solicitations as defined in [RFC 4861
     /// section 10].
     ///
     /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-    pub(crate) max_unicast_solicitations: NonZeroU16,
+    pub max_unicast_solicitations: NonZeroU16,
     /// The maximum number of multicast solicitations as defined in [RFC 4861
     /// section 10].
     ///
     /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-    pub(crate) max_multicast_solicitations: NonZeroU16,
+    pub max_multicast_solicitations: NonZeroU16,
 }
 
 impl Default for NudUserConfig {
@@ -1616,6 +1617,34 @@ impl Default for NudUserConfig {
             max_unicast_solicitations: DEFAULT_MAX_UNICAST_SOLICIT,
             max_multicast_solicitations: DEFAULT_MAX_MULTICAST_SOLICIT,
         }
+    }
+}
+
+/// An update structure for [`NudUserConfig`].
+///
+/// Only fields with variant `Some` are updated.
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct NudUserConfigUpdate {
+    /// The maximum number of unicast solicitations as defined in [RFC 4861
+    /// section 10].
+    pub max_unicast_solicitations: Option<NonZeroU16>,
+    /// The maximum number of multicast solicitations as defined in [RFC 4861
+    /// section 10].
+    pub max_multicast_solicitations: Option<NonZeroU16>,
+}
+
+impl NudUserConfigUpdate {
+    pub(crate) fn apply_and_take_previous(mut self, config: &mut NudUserConfig) -> Self {
+        fn swap_if_set<T>(opt: &mut Option<T>, target: &mut T) {
+            if let Some(opt) = opt.as_mut() {
+                core::mem::swap(opt, target)
+            }
+        }
+        let Self { max_unicast_solicitations, max_multicast_solicitations } = &mut self;
+        swap_if_set(max_unicast_solicitations, &mut config.max_unicast_solicitations);
+        swap_if_set(max_multicast_solicitations, &mut config.max_multicast_solicitations);
+
+        self
     }
 }
 

@@ -573,6 +573,43 @@ func (ci *adminControlImpl) getNetworkEndpoint(netProto tcpip.NetworkProtocolNum
 	return ep
 }
 
+func toAdminNudConfiguration(stackNud stack.NUDConfigurations) admin.NudConfiguration {
+	var adminNud admin.NudConfiguration
+	adminNud.SetMaxMulticastSolicitations(uint16(stackNud.MaxMulticastProbes))
+	return adminNud
+}
+
+func (ci *adminControlImpl) getNUDConfig(netProto tcpip.NetworkProtocolNumber) stack.NUDConfigurations {
+	config, err := ci.ns.stack.NUDConfigurations(tcpip.NICID(ci.nicid), netProto)
+	if err != nil {
+		panic(fmt.Sprintf("ci.ns.stack.NUDConfigurations(tcpip.NICID(%d), %d): %s", ci.nicid, netProto, err))
+	}
+	return config
+}
+
+func (ci *adminControlImpl) applyNUDConfig(netProto tcpip.NetworkProtocolNumber, nudConfig *admin.NudConfiguration) admin.NudConfiguration {
+	var previousNudConfig admin.NudConfiguration
+
+	// NB: We're reading and updating in place here without acquiring
+	// locks, this is fine because we don't serve
+	// fuchsia.net.interfaces.admin.Control concurrently.
+	stackNudConfig := ci.getNUDConfig(netProto)
+	needsNudUpdate := false
+	if nudConfig.HasMaxMulticastSolicitations() {
+		prev := stackNudConfig.MaxMulticastProbes
+		stackNudConfig.MaxMulticastProbes = uint32(nudConfig.MaxMulticastSolicitations)
+		previousNudConfig.SetMaxMulticastSolicitations(uint16(prev))
+		needsNudUpdate = true
+	}
+
+	if needsNudUpdate {
+		if err := ci.ns.stack.SetNUDConfigurations(tcpip.NICID(ci.nicid), netProto, stackNudConfig); err != nil {
+			panic(fmt.Sprintf("ci.ns.stack.SetNUDConfigurations(tcpip.NICID(%d), %d, %v): %s", ci.nicid, netProto, stackNudConfig, err))
+		}
+	}
+	return previousNudConfig
+}
+
 func (ci *adminControlImpl) getIGMPEndpoint() ipv4.IGMPEndpoint {
 	// We want this to panic if EP does not implement ipv4.IGMPEndpoint.
 	return ci.getNetworkEndpoint(ipv4.ProtocolNumber).(ipv4.IGMPEndpoint)
@@ -618,6 +655,10 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			if config.Ipv4.HasMulticastForwarding() && config.Ipv4.MulticastForwarding {
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4MulticastForwardingUnsupported), nil
 			}
+
+			if config.Ipv4.HasArp() {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorArpNotSupported), nil
+			}
 		}
 
 		// Make sure the IGMP version (if specified) is supported.
@@ -626,6 +667,14 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			case admin.IgmpVersionV1, admin.IgmpVersionV2, admin.IgmpVersionV3:
 			default:
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4IgmpVersionUnsupported), nil
+			}
+		}
+
+		if config.Ipv4.HasArp() {
+			if config.Ipv4.Arp.HasNud() {
+				if config.Ipv4.Arp.Nud.HasMaxMulticastSolicitations() && config.Ipv4.Arp.Nud.MaxMulticastSolicitations == 0 {
+					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+				}
 			}
 		}
 	}
@@ -640,6 +689,10 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			if config.Ipv6.HasMulticastForwarding() && config.Ipv6.MulticastForwarding {
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MulticastForwardingUnsupported), nil
 			}
+
+			if config.Ipv6.HasNdp() {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorNdpNotSupported), nil
+			}
 		}
 
 		// Make sure the MLD version (if specified) is supported.
@@ -648,6 +701,14 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			case admin.MldVersionV1, admin.MldVersionV2:
 			default:
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MldVersionUnsupported), nil
+			}
+		}
+
+		if config.Ipv6.HasNdp() {
+			if config.Ipv6.Ndp.HasNud() {
+				if config.Ipv6.Ndp.Nud.HasMaxMulticastSolicitations() && config.Ipv6.Ndp.Nud.MaxMulticastSolicitations == 0 {
+					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+				}
 			}
 		}
 	}
@@ -694,6 +755,15 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			previousIpv4Config.SetIgmp(previousIgmpConfig)
 		}
 
+		if ipv4Config.HasArp() {
+			var previousArpConfig admin.ArpConfiguration
+			if ipv4Config.Arp.HasNud() {
+				previousArpConfig.SetNud(ci.applyNUDConfig(ipv4.ProtocolNumber, &ipv4Config.Arp.Nud))
+			}
+
+			previousIpv4Config.SetArp(previousArpConfig)
+		}
+
 		previousConfig.SetIpv4(previousIpv4Config)
 	}
 
@@ -729,6 +799,15 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			}
 
 			previousIpv6Config.SetMld(previousMldConfig)
+		}
+
+		if ipv6Config.HasNdp() {
+			var previousNdpConfig admin.NdpConfiguration
+			if ipv6Config.Ndp.HasNud() {
+				previousNdpConfig.SetNud(ci.applyNUDConfig(ipv6.ProtocolNumber, &ipv6Config.Ndp.Nud))
+			}
+
+			previousIpv6Config.SetNdp(previousNdpConfig)
 		}
 
 		previousConfig.SetIpv6(previousIpv6Config)
@@ -775,6 +854,11 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		var igmpConfig admin.IgmpConfiguration
 		igmpConfig.SetVersion(toAdminIgmpVersion(ci.getIGMPEndpoint().GetIGMPVersion()))
 		ipv4Config.SetIgmp(igmpConfig)
+		if !ci.isLoopback() {
+			var arpConfig admin.ArpConfiguration
+			arpConfig.SetNud(toAdminNudConfiguration(ci.getNUDConfig(ipv4.ProtocolNumber)))
+			ipv4Config.SetArp(arpConfig)
+		}
 
 		config.SetIpv4(ipv4Config)
 	}
@@ -787,6 +871,11 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		var mldConfig admin.MldConfiguration
 		mldConfig.SetVersion(toAdminMldVersion(ci.getMLDEndpoint().GetMLDVersion()))
 		ipv6Config.SetMld(mldConfig)
+		if !ci.isLoopback() {
+			var ndpConfig admin.NdpConfiguration
+			ndpConfig.SetNud(toAdminNudConfiguration(ci.getNUDConfig(ipv6.ProtocolNumber)))
+			ipv6Config.SetNdp(ndpConfig)
+		}
 
 		config.SetIpv6(ipv6Config)
 	}

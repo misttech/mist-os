@@ -21,6 +21,7 @@ lib_sources = [
   "src/data_structures/token_bucket.rs",
   "src/device/arp.rs",
   "src/device/base.rs",
+  "src/device/config.rs",
   "src/device/ethernet.rs",
   "src/device/id.rs",
   "src/device/integration.rs",

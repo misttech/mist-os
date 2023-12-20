@@ -48,6 +48,7 @@ pub mod transport;
 pub mod device {
     pub(crate) mod arp;
     pub(crate) mod base;
+    pub(crate) mod config;
     pub(crate) mod ethernet;
     pub(crate) mod id;
     pub(crate) mod integration;
@@ -74,12 +75,17 @@ pub mod device {
         remove_ethernet_device, remove_loopback_device, remove_neighbor_table_entry,
         set_ip_addr_properties, set_tx_queue_configuration, transmit_queued_tx_frames,
     };
+    pub use config::{get_device_configuration, new_device_configuration_update};
     pub use ethernet::resolve_ethernet_link_addr;
 
     // Re-exported types.
     pub use base::{
         DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, DevicesVisitor,
         InspectDeviceState, NeighborVisitor, RemoveDeviceResult, RemoveDeviceResultWithContext,
+    };
+    pub use config::{
+        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
+        DeviceConfigurationUpdateError, NdpConfiguration, NdpConfigurationUpdate,
     };
     pub use ethernet::{EthernetLinkDevice, MaxEthernetFrameSize};
     pub use id::{DeviceId, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
@@ -180,7 +186,8 @@ pub mod neighbor {
     // Re-exported types.
     pub use crate::ip::device::nud::{
         Event, EventDynamicState, EventKind, EventState, LinkResolutionContext,
-        LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect, MAX_ENTRIES,
+        LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect, NudUserConfig,
+        NudUserConfigUpdate, MAX_ENTRIES,
     };
 }
 

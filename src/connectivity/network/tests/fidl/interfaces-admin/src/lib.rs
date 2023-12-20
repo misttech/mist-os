@@ -23,7 +23,7 @@ use fuchsia_async::{
 use fuchsia_zircon as zx;
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip_v6, std_socket_addr};
+use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
 use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::{
@@ -3135,4 +3135,185 @@ async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
             )
         );
     }
+}
+
+fn to_ip_nud_configuration<I: net_types::ip::Ip>(
+    config: finterfaces_admin::Configuration,
+) -> Option<finterfaces_admin::NudConfiguration> {
+    match I::VERSION {
+        net_types::ip::IpVersion::V4 => config.ipv4.and_then(|x| x.arp).and_then(|x| x.nud),
+        net_types::ip::IpVersion::V6 => config.ipv6.and_then(|x| x.ndp).and_then(|x| x.nud),
+    }
+}
+
+#[netstack_test]
+async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("create netstack realm");
+
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "client").await.expect("join network");
+
+    let fake_ep = network.create_fake_endpoint().expect("create fake ep");
+
+    let (client_addr, server_addr) = match I::VERSION {
+        net_types::ip::IpVersion::V4 => (fidl_subnet!("192.0.2.1/24"), std_ip!("192.0.2.2")),
+        net_types::ip::IpVersion::V6 => (fidl_subnet!("2001:db8::1/32"), std_ip!("2001:db8::2")),
+    };
+    let solicit_stream =
+        netstack_testing_common::nud::create_metadata_stream(&fake_ep).filter_map(|meta| {
+            futures::future::ready(match meta.expect("frame error") {
+                netstack_testing_common::nud::FrameMetadata::NeighborSolicitation(dst) => {
+                    let fnet_ext::IpAddress(dst) = dst.into();
+                    (dst == server_addr).then_some(())
+                }
+                _ => None,
+            })
+        });
+
+    iface.add_address_and_subnet_route(client_addr).await.expect("add address");
+
+    let make_nud_config = |v: u16| {
+        let nud = Some(finterfaces_admin::NudConfiguration {
+            max_multicast_solicitations: Some(v),
+            ..Default::default()
+        });
+        match I::VERSION {
+            net_types::ip::IpVersion::V4 => finterfaces_admin::Configuration {
+                ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                    arp: Some(finterfaces_admin::ArpConfiguration { nud, ..Default::default() }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            net_types::ip::IpVersion::V6 => finterfaces_admin::Configuration {
+                ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                    ndp: Some(finterfaces_admin::NdpConfiguration { nud, ..Default::default() }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        }
+    };
+
+    // Setting a zero value should fail.
+    assert_matches!(
+        iface.control().set_configuration(make_nud_config(0)).await,
+        Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalZeroValue)),
+        "can't set to zero"
+    );
+
+    // Set a higher value than the default and attempt a neighbor resolution
+    // that will not complete, counting the number of solicitations we see on
+    // the wire.
+    const WANT_SOLICITS: u16 = 4;
+    let config = iface
+        .control()
+        .set_configuration(make_nud_config(WANT_SOLICITS))
+        .await
+        .expect("setting configuration")
+        .expect("setting more solicitations");
+    let finterfaces_admin::NudConfiguration { max_multicast_solicitations, .. } =
+        to_ip_nud_configuration::<I>(config).expect("missing nud config");
+    // Previous value is the default as defined in RFC 4861.
+    const DEFAULT_MAX_MULTICAST_SOLICITATIONS: u16 = 3;
+    assert_eq!(max_multicast_solicitations, Some(DEFAULT_MAX_MULTICAST_SOLICITATIONS));
+    let finterfaces_admin::NudConfiguration { max_multicast_solicitations, .. } = {
+        let config = iface
+            .control()
+            .get_configuration()
+            .await
+            .expect("get configuration failed")
+            .expect("get configuration error");
+        to_ip_nud_configuration::<I>(config).expect("nud present")
+    };
+    assert_eq!(max_multicast_solicitations, Some(WANT_SOLICITS));
+
+    // Try to ping the server and wait until we observe the number of
+    // solicitations.
+    let ping_fut = match server_addr {
+        std::net::IpAddr::V4(v4) => {
+            realm.ping_once::<::ping::Ipv4>(std::net::SocketAddrV4::new(v4, 1), 1).left_future()
+        }
+        std::net::IpAddr::V6(v6) => realm
+            .ping_once::<::ping::Ipv6>(std::net::SocketAddrV6::new(v6, 1, 0, 0), 1)
+            .right_future(),
+    }
+    .fuse();
+    futures::pin_mut!(ping_fut);
+    let mut stream_fut = solicit_stream.take(WANT_SOLICITS.into()).collect::<()>().fuse();
+    futures::select! {
+        () = stream_fut => {},
+        r = ping_fut => panic!("ping should not complete {r:?}"),
+    }
+}
+
+#[netstack_test]
+async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+
+    // Check that the behavior is as expected for loopback, which doesn't
+    // support these configurations.
+    let loopback_id = realm
+        .loopback_properties()
+        .await
+        .expect("error getting loopback properties")
+        .expect("loopback must exist")
+        .id;
+    let loopback_control = realm
+        .interface_control(loopback_id.get())
+        .expect("failed to get loopback interface control client proxy");
+
+    let set_config = Some(finterfaces_admin::NudConfiguration {
+        max_multicast_solicitations: Some(2),
+        ..Default::default()
+    });
+    let (set_config, expect_err) = match I::VERSION {
+        net_types::ip::IpVersion::V4 => (
+            finterfaces_admin::Configuration {
+                ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                    arp: Some(finterfaces_admin::ArpConfiguration {
+                        nud: set_config,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            finterfaces_admin::ControlSetConfigurationError::ArpNotSupported,
+        ),
+        net_types::ip::IpVersion::V6 => (
+            finterfaces_admin::Configuration {
+                ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                    ndp: Some(finterfaces_admin::NdpConfiguration {
+                        nud: set_config,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            finterfaces_admin::ControlSetConfigurationError::NdpNotSupported,
+        ),
+    };
+
+    // Can't set.
+    let err = loopback_control
+        .set_configuration(set_config)
+        .await
+        .expect("set_configuration")
+        .expect_err("set configuration should fail");
+    assert_eq!(err, expect_err);
+
+    // Not present on get.
+    let nud_config = loopback_control
+        .get_configuration()
+        .await
+        .expect("get configuration failed")
+        .expect("get configuration error");
+    let nud_config = to_ip_nud_configuration::<I>(nud_config);
+    assert_matches!(nud_config, None);
 }

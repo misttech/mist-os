@@ -935,34 +935,22 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
                     .interface_control(if_id)
                     .expect("connect to fuchsia.net.interfaces.admin/Control for new interface");
 
-                // The configuration installs forwarding on v4 on Virtual interfaces
-                // and v6 on Ethernet. We should only observe the configuration to be
-                // installed on v4 because the device installed by this test doesn't
-                // match the Ethernet device class.
-                assert_eq!(
-                    control.get_configuration().await.expect("get_configuration FIDL error"),
-                    Ok(fnet_interfaces_admin::Configuration {
-                        ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                            forwarding: Some(true),
-                            multicast_forwarding: Some(true),
-                            igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
-                                version: Some(fnet_interfaces_admin::IgmpVersion::V3),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        }),
-                        ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                            forwarding: Some(false),
-                            multicast_forwarding: Some(false),
-                            mld: Some(fnet_interfaces_admin::MldConfiguration {
-                                version: Some(fnet_interfaces_admin::MldVersion::V2),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    })
-                );
+                let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = control
+                    .get_configuration()
+                    .await
+                    .expect("get_configuration FIDL error")
+                    .expect("get_configuration error");
+                let ipv4 = ipv4.expect("missing ipv4");
+                let ipv6 = ipv6.expect("missing ipv6");
+                // The configuration installs forwarding on v4 on Virtual
+                // interfaces and v6 on Ethernet. We should only observe the
+                // configuration to be installed on v4 because the device
+                // installed by this test doesn't match the Ethernet device
+                // class.
+                assert_eq!(ipv4.forwarding, Some(true));
+                assert_eq!(ipv4.multicast_forwarding, Some(true));
+                assert_eq!(ipv6.forwarding, Some(false));
+                assert_eq!(ipv6.multicast_forwarding, Some(false));
             }
             .boxed_local()
         },
