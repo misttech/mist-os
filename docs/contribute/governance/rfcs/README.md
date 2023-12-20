@@ -2,7 +2,8 @@
 
 # Fuchsia RFCs
 
-The Fuchsia RFC process is intended to provide a consistent and transparent path
+The [Fuchsia RFC process](rfc_process.md)
+is intended to provide a consistent and transparent path
 for making project-wide, technical decisions. For example, the RFC process can
 be used to evolve the project roadmap and the system architecture.
 
@@ -11,24 +12,18 @@ form](rfc_process.md). It is also summarized below.
 
 ## Summary of the process
 
-- Review [when to use the process](rfc_process.md#when-to-use-the-process) i.e.
-  the criteria for requiring an RFC.
+- Review [when to use the process](rfc_process.md#when-to-use-the-process).
 - Socialize your proposal.
-- [Draft](rfc_process.md#draft) your RFC using this [template](TEMPLATE.md).
-  When ready for feedback from stakeholders, upload your CL and share it broadly
-  to <eng-council-discuss@fuchsia.dev>. See also [creating an
-  RFC](create_rfc.md) and [RFC best practices](best_practices.md).
+- [Draft](rfc_process.md#draft) your RFC using this [template](TEMPLATE.md)
+  and share with stakeholders. See [creating an RFC](create_rfc.md) and
+  [RFC best practices](best_practices.md).
 - As conversations on your proposal converge, and stakeholders indicate their
-  support (+1 on the CL), or their opposition (-1 on the CL), email
-  <eng-council@fuchsia.dev> to ask the Eng Council to move your proposal to
-  [Last Call](rfc_process.md#last-call).
+  support, email <eng-council@fuchsia.dev> to ask the Eng Council
+  to move your proposal to [Last Call](rfc_process.md#last-call).
 - After a waiting period of at least 7 days, the Eng Council will accept or
   reject your proposal, or ask that you iterate with stakeholders further.
-  - If your RFC is accepted, a member of the Eng Council will comment on your
-    change stating that the RFC is accepted, will assign the RFC a number and
-    mark your change Code-Review +2. Your RFC can now be landed.
-  - If your RFC is rejected, a member of the Eng Council will draft a rejection
-    rationale with you for inclusion in the RFC.
+
+For detailed information, follow the [RFC process](rfc_process.md).
 
 ## Summary of the process (deck)
 
