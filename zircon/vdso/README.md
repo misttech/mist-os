@@ -16,10 +16,7 @@ expressly avoid this and attempt to frame things in a more general way with
 
 ### Naming
 
-Library `zx` adheres to standard FIDL [style guide][fidl-naming]... except for
-a handful of legacy 'snake case' uses (e.g., `zx/status`). Updating these
-definitions to be adhering and camel case is tracked by
-[fxbug.dev/109734][109734].
+Library `zx` adheres to standard FIDL [style guide][fidl-naming].
 
 ### Experimental types
 
@@ -293,7 +290,6 @@ specification that does not have to piggy back off of protocols
 
 
 [105758]: http://fxbug.dev/105758
-[109734]: http://fxbug.dev/109734
 [110021]: http://fxbug.dev/110021
 [110294]: http://fxbug.dev/110294
 [byor]: https://fuchsia.dev/fuchsia-src/concepts/principles/simple?hl=en

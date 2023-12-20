@@ -1453,13 +1453,13 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 			// TODO(fxbug.dev/105758, fxbug.dev/113897): The name of an aliased
 			// error type does not yet survive into the IR (just the full
 			// resolution). So, to account for the major case of wanting to use
-			// `zx/status` as an error type - while in its alias form - we
-			// hackily replace any int32 error specifications with a `zx/status`
+			// `zx/Status` as an error type - while in its alias form - we
+			// hackily replace any int32 error specifications with a `zx/Status`
 			// int32 alias if present in the library.
 			//
 			// Once one of these bugs is fixed, this workaround can be removed.
 			if syscall.ReturnType.Kind == TypeKindInteger && syscall.ReturnType.Type == string(fidlgen.Int32) {
-				if status, ok := decls["zx/status"]; ok { // TODO(fxbug.dev/109734): Should be "zx/Status".
+				if status, ok := decls["zx/Status"]; ok {
 					int32Type := TypeDescriptor{
 						Type: string(fidlgen.Int32),
 						Kind: TypeKindInteger,
@@ -1467,7 +1467,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 					}
 					if alias, ok := status.(*Alias); ok && alias.Value == int32Type {
 						syscall.ReturnType = &TypeDescriptor{
-							Type: "zx/status",
+							Type: "zx/Status",
 							Kind: TypeKindAlias,
 							Decl: status,
 							Size: 4,

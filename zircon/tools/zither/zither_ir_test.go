@@ -1608,7 +1608,7 @@ func TestCanSummarizeSyscallsWithZxStatusErrors(t *testing.T) {
 	ir := fidlgentest.EndToEndTest{T: t}.WithWorkingDirectory(wd).Single(`
 library zx;
 
-alias status = int32;
+alias Status = int32;
 
 @transport("Syscall")
 closed protocol Foo {
@@ -1616,7 +1616,7 @@ closed protocol Foo {
 		in bool;
 	}) -> (struct{
 		out bool;
-	}) error status;
+	}) error Status;
 };
 `)
 
@@ -1659,10 +1659,10 @@ closed protocol Foo {
 						},
 					},
 					ReturnType: &TypeDescriptor{
-						Type: "zx/status",
+						Type: "zx/Status",
 						Kind: TypeKindAlias,
 						Decl: &Alias{
-							decl: decl{Name: fidlgen.MustReadName("zx/status")},
+							decl: decl{Name: fidlgen.MustReadName("zx/Status")},
 							Value: TypeDescriptor{
 								Type: "int32",
 								Kind: TypeKindInteger,

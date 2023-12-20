@@ -118,7 +118,7 @@ func ffiType(desc zither.TypeDescriptor) string {
 	case zither.TypeKindAlias:
 		// TODO(fxbug.dev/110021): These types are currently misdefined as
 		// `uint64` aliases (instead of `uintptr` ones).
-		if desc.Type == "zx/paddr" || desc.Type == "zx/vaddr" {
+		if desc.Type == "zx/Paddr" || desc.Type == "zx/Vaddr" {
 			return "uintptr"
 		}
 		alias := desc.Decl.(*zither.Alias)
