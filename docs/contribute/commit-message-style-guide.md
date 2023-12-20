@@ -1,9 +1,11 @@
 # Commit message style guide
 
-The [Git project provides guidelines](https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project),
-including how to compose commit messages.
-When writing a commit message, follow these additional guidelines:
+The
+[Git project provides general guidelines](https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project),
+including how to compose commit messages. When writing a commit message, follow
+these guidelines:
 
++   [General guidelines](#general-guidelines)
 +   [Add a required tag and optional subtag(s).](#add-required-tag)
 +   [Add a paragraph.](#add-paragraph)
 +   [Add an associated bug.](#add-bug)
@@ -12,13 +14,32 @@ When writing a commit message, follow these additional guidelines:
 +   [Add a buffer line before the Change-Id.](#add-buffer)
 +   [Use Change-Id to refer to related changes](#use-change-id)
 
+## General guidelines {#general-guidelines}
+
+*   Add an empty line between the capitalized first line (summary of the commit)
+    and [the additional detailed description](#add-paragraph).
+*   If possible, limit the first line to 50 characters and
+    [the detailed description](#add-paragraph) to 72 characters per line.
+    *   The detailed description is recommended but can be omitted if the change
+        is well explained by the first line.
+    *   The 50 characters limit is not a hard limit. Especially when using
+        multiple [tags](#add-required-tag) it can be hard to formulate a
+        meaningful summary in 50 characters.
+*   Make use of [issue tracker integration](#add-bug), but not the in first
+    line.
+*   Use the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) to
+    summarize the commit, e.g. "Fix memory leak in file.cc", not "I fixed a
+    memory leak the file.cc".
+*   Do not reference relative points in time, private URLs, individuals, private
+    API keys, passwords, user names, etc.
+
 ## Add required tag {#add-required-tag}
 
-The required `[tag]` helps readers of the commit tell what subject your change is
-about. The format is simply a keyword between brackets, for example, `[docs]`. The
-keyword has no specific meaning, but should help readers identify the subject
-easily. More specific tags or multiple tags can also be used to specify more
-fine-grained subjects, for example,`[docs][fidl]`.
+The required `[tag]` in the first line helps readers of the commit tell what
+subject your change is about. The format is simply a keyword between brackets,
+for example, `[docs]`. The keyword has no specific meaning, but should help
+readers identify the subject easily. More specific tags or multiple tags can
+also be used to specify more fine-grained subjects, for example,`[docs][fidl]`.
 The following example shows required tags in the commit message subject:
 
 ```none {:.devsite-disable-click-to-copy}
@@ -37,15 +58,14 @@ used previously. See these examples:
 *   [https://fuchsia-review.googlesource.com/c/fuchsia/+/441776](https://fuchsia-review.googlesource.com/c/fuchsia/+/441776){:.external}
 *   [https://fuchsia-review.googlesource.com/c/topaz/+/114013](https://fuchsia-review.googlesource.com/c/topaz/+/114013){:.external}
 
-Commit message tags are required. If the subject of a commit message
-doesn't include tags, Gerrit flags your
-change with `Needs Label: Commit-Message-has-tags`.
+Commit message tags are required. If the subject of a commit message doesn't
+include tags, Gerrit flags your change with `Needs Label:
+Commit-Message-has-tags`.
 
 ## Add paragraph {#add-paragraph}
 
-The paragraph underneath the header line describes in better detail what the
-reason for the change is, and in general brief terms describe what it is
-intended to do,
+The paragraph underneath the header line describes the change in better detail.
+Ensure the *reason and intention* of the change are clear:
 [for example](https://fuchsia-review.googlesource.com/c/fuchsia/+/569681):
 
 ```none {:.devsite-disable-click-to-copy}
@@ -77,9 +97,9 @@ Test: Added test X.
 
 The difference between `Bug:` and `Fixed:` is that `Fixed:` automatically closes
 the issue for you once your change is submitted, whereas `Bug:` only comments on
-your issue once submitted. If you have multiple changes attached to your issue, use
-the `Bug:` tag for all the changes up until the final change. Use `Fixed:` on
-the final change, so that the issue is closed.
+your issue once submitted. If you have multiple changes attached to your issue,
+use the `Bug:` tag for all the changes up until the final change. Use `Fixed:`
+on the final change, so that the issue is closed.
 
 ## Indicate multiple steps {#indicate-multiple-steps}
 
@@ -93,9 +113,9 @@ the totality of the change. When possible, it is encouraged to provide all steps
 to complete the migration in each commit log (but that may be impractical in
 some cases).
 
-Here's an example of a [commit
-message](https://fuchsia-review.googlesource.com/c/fuchsia/+/423314) with
-multiple steps:
+Here's an example of a
+[commit message](https://fuchsia-review.googlesource.com/c/fuchsia/+/423314)
+with multiple steps:
 
 ```none {:.devsite-disable-click-to-copy}
 [fidl][go] Support for flexible enums (1/3)
@@ -124,14 +144,14 @@ The `Test:` line is necessary to indicate what type of test to run to make sure
 your change is working. You can add multiple different tests in this line, for
 example, `fx test setui_service_tests, setui_client_interface_test`. You can
 also add explanations of what tests you added below. If you did not add or
-modify tests, you can specify `None:`, with an explanation of why it doesn't need
-to be tested, for example, `None: documentation change only`.
+modify tests, you can specify `None:`, with an explanation of why it doesn't
+need to be tested, for example, `None: documentation change only`.
 
 If you added new tests, you can get deflake runs automatically by adding the
 `Multiply:` line with the test to run multiple times.
 
-The following example shows `Test:` and `Multiply:` in the [commit
-message](https://fuchsia-review.googlesource.com/c/fuchsia/+/537303):
+The following example shows `Test:` and `Multiply:` in the
+[commit message](https://fuchsia-review.googlesource.com/c/fuchsia/+/537303):
 
 ```none {:.devsite-disable-click-to-copy}
 [SetUI] Correct internal items' visibility Part II
@@ -152,10 +172,9 @@ Note: To add multiple to more than one test, you can either separate multiple
 entries with commas on a single line, or add multiple `Multiply:` lines as shown
 in the above example.
 
-If the testing instructions are complex,
-create an issue and provide a link to that issue in
-the change description. If the change doesn't intend to change behavior,
-indicate that fact in the commit message.
+If the testing instructions are complex, create an issue and provide a link to
+that issue in the change description. If the change doesn't intend to change
+behavior, indicate that fact in the commit message.
 
 In some cases, certain behavior changes cannot be tested because Fuchsia lacks
 some particular piece of infrastructure. If so, create an issue in the tracker
@@ -170,8 +189,8 @@ Test: Manually tested that [...]. Automated testing needs US-XXXX.
 Developers are responsible for high-quality automated testing of their code.
 Reviewers are responsible for pushing back on changes that do not include
 sufficient tests. See
-[Fuchsia testability rubrics](/docs/development/testing/testability_rubric.md) for
-more information on how to introduce testable and tested code in the Fuchsia
+[Fuchsia testability rubrics](/docs/development/testing/testability_rubric.md)
+for more information on how to introduce testable and tested code in the Fuchsia
 project.
 
 ## Add a buffer line before Change-Id {#add-buffer}
@@ -181,32 +200,29 @@ want to add a buffer line between your other lines and the Change-Id, in case
 you use `git commit --amend`, so that Gerrit doesn't parse the Change-Id as a
 regular line, and add a second ID to it.
 
-For more specific details, see the [Git interpret trailer
-rules](https://git-scm.com/docs/git-interpret-trailers).
+For more specific details, see the
+[Git interpret trailer rules](https://git-scm.com/docs/git-interpret-trailers).
 
 ## Use Change-Id to refer to related changes {#use-change-id}
 
-To reference another Gerrit change in a commit message,
-always use the Change-Id.
+To reference another Gerrit change in a commit message, always use the
+Change-Id.
 
 Using the Change-Id is preferred since:
 
-The git SHA is only known after a change is merged,
-and while guidance could be given to use the Change-Id in one case,
-and the git SHA in the other, prefer uniform guidance.
-Furthermore, you cannot reference other repositories using the git SHA.
+The git SHA is only known after a change is merged, and while guidance could be
+given to use the Change-Id in one case, and the git SHA in the other, prefer
+uniform guidance. Furthermore, you cannot reference other repositories using the
+git SHA.
 
-The link to the change is assigned by Gerrit,
-and is not part of the persistent history of the repository.
-Should the review mechanism change,
-the Change-Id will continue to be part of the recorded history,
-whereas the change's number will not.
-There are also rare occurrences where change numbers may be lost,
-for example, due to re-indexing issues.
+The link to the change is assigned by Gerrit, and is not part of the persistent
+history of the repository. Should the review mechanism change, the Change-Id
+will continue to be part of the recorded history, whereas the change's number
+will not. There are also rare occurrences where change numbers may be lost, for
+example, due to re-indexing issues.
 
 For instance, to refer to the change that added
-[RFC-0042](/docs/contribute/governance/rfcs/0042_non_nullable_types.md),
-use `I32b966810d21a249647887fa45b61720ad01714c`,
-and not the git SHA `5d40ee8c42d1b0e4d8b690786da12a0a947c1aaa`
-or the link to the change,
+[RFC-0042](/docs/contribute/governance/rfcs/0042_non_nullable_types.md), use
+`I32b966810d21a249647887fa45b61720ad01714c`, and not the git SHA
+`5d40ee8c42d1b0e4d8b690786da12a0a947c1aaa` or the link to the change,
 https://fuchsia-review.googlesource.com/c/fuchsia/+/284569.
