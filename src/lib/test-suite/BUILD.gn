@@ -21,6 +21,7 @@ source_set("test_suite_lib") {
     ":measure_tape_for_case",
     "//sdk/fidl/fuchsia.test:fuchsia.test_hlcpp",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
