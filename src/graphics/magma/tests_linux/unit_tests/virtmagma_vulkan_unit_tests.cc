@@ -7,7 +7,7 @@
 // TODO(fxbug.dev/27262): support shaders as a first-class target type
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnewline-eof"
-#include "src/graphics/lib/magma/tests_linux/unit_tests/basic_compute.h"
+#include "src/graphics/magma/tests_linux/unit_tests/basic_compute.h"
 #pragma clang diagnostic pop
 
 #include <sstream>
