@@ -124,8 +124,8 @@ class NodeManager {
   // It returns a node page if it succeeds to find one at |path|.
   zx::result<LockedPage> FindLockedDnodePage(NodePath &path);
 
-  zx_status_t RestoreNodeSummary(uint32_t segno, SummaryBlock &sum);
   void GetNodeInfo(nid_t nid, NodeInfo &out);
+  void SetNodeAddr(NodeInfo &ni, block_t new_blkaddr);
 
   pgoff_t FsyncNodePages(nid_t ino) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
@@ -133,8 +133,6 @@ class NodeManager {
 
   bool FlushNatsInJournal();
   zx_status_t FlushNatEntries();
-
-  zx::result<block_t> GetBlockAddrForDirtyNodePage(LockedPage &page, bool is_reclaim = false);
 
   zx_status_t RecoverInodePage(NodePage &page);
 
@@ -200,7 +198,6 @@ class NodeManager {
   void DelFromNatCache(NatEntry &entry) __TA_REQUIRES_SHARED(nat_tree_lock_);
   NatEntry *GrabNatEntry(nid_t nid) __TA_REQUIRES_SHARED(nat_tree_lock_);
   void CacheNatEntry(nid_t nid, RawNatEntry &raw_entry);
-  void SetNodeAddr(NodeInfo &ni, block_t new_blkaddr);
   int TryToFreeNats(int nr_shrink);
 
   void BuildFreeNids() __TA_EXCLUDES(free_nid_tree_lock_) __TA_EXCLUDES(build_lock_);

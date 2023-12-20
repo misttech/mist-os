@@ -550,10 +550,11 @@ std::vector<bool> FileCache::GetDirtyPagesInfo(pgoff_t index, size_t max_scan) {
   return read_blocks;
 }
 
-std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOperation &operation) {
+std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation &operation) {
   std::vector<LockedPage> pages;
   pgoff_t nwritten = 0;
 
+  std::lock_guard tree_lock(tree_lock_);
   auto current = page_tree_.lower_bound(operation.start);
   // Get Pages from |operation.start| to |operation.end|.
   while (nwritten <= operation.to_write && current != page_tree_.end() &&
@@ -603,74 +604,6 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOper
     }
   }
   return pages;
-}
-
-// TODO: Consider using a global lock as below
-// if (!IsDir())
-//   mutex_lock(&superblock_info->writepages);
-// Writeback()
-// if (!IsDir())
-//   mutex_unlock(&superblock_info->writepages);
-// fs()->RemoveDirtyDirInode(this);
-pgoff_t FileCache::Writeback(WritebackOperation &operation) {
-  pgoff_t nwritten = 0;
-  std::vector<std::unique_ptr<VmoCleaner>> cleaners;
-  std::vector<LockedPage> pages;
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    pages = GetLockedDirtyPagesUnsafe(operation);
-  }
-
-  PageList pages_to_disk;
-  for (auto &page : pages) {
-    ZX_DEBUG_ASSERT(page->IsUptodate());
-    zx::result<block_t> addr_or;
-    if (operation.page_cb) {
-      // |page_cb| conducts additional process for the last page of node and meta vnodes.
-      bool is_last_page = page.get() == pages.back().get();
-      operation.page_cb(page.CopyRefPtr(), is_last_page);
-    }
-    if (vnode_->IsMeta()) {
-      addr_or = fs()->GetSegmentManager().GetBlockAddrForDirtyMetaPage(page, operation.bReclaim);
-    } else if (vnode_->IsNode()) {
-      addr_or = fs()->GetNodeManager().GetBlockAddrForDirtyNodePage(page, operation.bReclaim);
-    } else {
-      addr_or = vnode_->GetBlockAddrForDirtyDataPage(page, operation.bReclaim);
-    }
-    if (addr_or.is_error()) {
-      if (page->IsUptodate() && addr_or.status_value() != ZX_ERR_NOT_FOUND) {
-        // In case of failure, we just redirty it.
-        page.SetDirty();
-        FX_LOGS(WARNING) << "failed to allocate a block." << addr_or.status_value();
-      }
-      page->ClearWriteback();
-    } else {
-      ZX_ASSERT(*addr_or != kNullAddr && *addr_or != kNewAddr);
-      // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for the page.
-      // TODO(b/293977738): VmoCleaner is instantiated on a per-page basis, so
-      // ZX_PAGER_OP_WRITEBACK_BEGIN is called for each dirty page. We need to change it to work on
-      // a per-range basis for efficient system calls.
-      if (vmo_manager_->IsPaged()) {
-        cleaners.push_back(std::make_unique<VmoCleaner>(
-            operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_), page->GetKey(), page->GetKey() + 1));
-      }
-      pages_to_disk.push_back(page.release());
-      ++nwritten;
-      if (!(nwritten % kDefaultBlocksPerSegment)) {
-        fs()->ScheduleWriter(nullptr, std::move(pages_to_disk));
-        cleaners.clear();
-      }
-    }
-    page.reset();
-  }
-  if (!pages_to_disk.is_empty() || operation.bSync) {
-    sync_completion_t completion;
-    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk), true);
-    if (operation.bSync) {
-      sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    }
-  }
-  return nwritten;
 }
 
 }  // namespace f2fs

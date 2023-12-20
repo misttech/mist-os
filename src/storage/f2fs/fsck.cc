@@ -865,8 +865,8 @@ zx_status_t FsckWorker::RepairNat() {
 
       // Lookup the journal first.
       bool found = false;
-      for (int i = 0; i < NatsInCursum(&summary_block); ++i) {
-        if (LeToCpu(NidInJournal(&summary_block, i)) == nid) {
+      for (int i = 0; i < NatsInCursum(*summary_block); ++i) {
+        if (LeToCpu(NidInJournal(*summary_block, i)) == nid) {
           // If found, bring in the last entry.
           summary_block->nat_j.entries[i].nid =
               summary_block->nat_j.entries[LeToCpu(summary_block->n_nats) - 1].nid;
@@ -943,8 +943,8 @@ zx_status_t FsckWorker::RepairSit() {
 
     // Lookup the journal first.
     bool found = false;
-    for (int i = 0; i < SitsInCursum(&summary_block); ++i) {
-      if (LeToCpu(SegnoInJournal(&summary_block, i)) == segno) {
+    for (int i = 0; i < SitsInCursum(*summary_block); ++i) {
+      if (LeToCpu(SegnoInJournal(*summary_block, i)) == segno) {
         SitEntry &sit = summary_block->sit_j.entries[i].se;
         memcpy(sit.valid_map, raw_main_bitmap + sit_byte_offset, kSitVBlockMapSize);
         sit.vblocks = 0;
@@ -963,7 +963,7 @@ zx_status_t FsckWorker::RepairSit() {
 
     // If not found in journal, go for the Sit.
     std::unique_ptr<BlockBuffer<SitBlock>> sit_block = GetCurrentSitPage(segno);
-    uint32_t offset = segment_manager_->SitBlockOffset(segno);
+    uint32_t offset = SitBlockOffset(segno);
     block_t sit_block_addr = sit_i.sit_base_addr + offset;
 
     if (sit_i.sit_bitmap.GetOne(ToMsbFirst(offset))) {
@@ -1442,7 +1442,6 @@ zx_status_t FsckWorker::BuildSitInfo() {
   sit_i->written_valid_blocks = LeToCpu(safemath::checked_cast<uint32_t>(ckpt.valid_block_count));
   sit_i->bitmap_size = bitmap_size;
   sit_i->dirty_sentries = 0;
-  sit_i->sents_per_block = kSitEntryPerBlock;
   sit_i->elapsed_time = LeToCpu(ckpt.elapsed_time);
 
   segment_manager_->SetSitInfo(std::move(sit_i));
@@ -1527,7 +1526,7 @@ zx_status_t FsckWorker::ReadNormalSummaries(CursegType type) {
   uint32_t segno = 0;
   block_t block_address = 0;
 
-  if (segment_manager_->IsDataSeg(type)) {
+  if (IsDataSeg(type)) {
     segno = LeToCpu(ckpt.cur_data_segno[static_cast<int>(type)]);
     blk_off = LeToCpu(ckpt.cur_data_blkoff[type - CursegType::kCursegHotData]);
 
@@ -1550,7 +1549,7 @@ zx_status_t FsckWorker::ReadNormalSummaries(CursegType type) {
   BlockBuffer<SummaryBlock> summary_block;
   ReadBlock(&summary_block, block_address);
 
-  if (segment_manager_->IsNodeSeg(type)) {
+  if (IsNodeSeg(type)) {
     if (superblock_info_->TestCpFlags(CpFlag::kCpUmountFlag)) {
 #if 0  // do not change original value
       Summary *sum_entry = &sum_blk->entries[0];
@@ -1611,7 +1610,7 @@ inline void FsckWorker::CheckSegmentRange(uint32_t segno) {
 
 std::unique_ptr<BlockBuffer<SitBlock>> FsckWorker::GetCurrentSitPage(uint32_t segno) {
   SitInfo &sit_i = segment_manager_->GetSitInfo();
-  uint32_t offset = segment_manager_->SitBlockOffset(segno);
+  uint32_t offset = SitBlockOffset(segno);
   block_t block_address = sit_i.sit_base_addr + offset;
   auto sit_block_ptr = std::make_unique<BlockBuffer<SitBlock>>();
 
@@ -1771,8 +1770,8 @@ void FsckWorker::BuildSitEntries() {
     SitEntry sit;
     bool found = false;
 
-    for (int i = 0; i < SitsInCursum(sum); ++i) {
-      if (LeToCpu(SegnoInJournal(sum, i)) == segno) {
+    for (int i = 0; i < SitsInCursum(*sum); ++i) {
+      if (LeToCpu(SegnoInJournal(*sum, i)) == segno) {
         sit = sum->sit_j.entries[i].se;
         found = true;
         break;
@@ -1853,9 +1852,9 @@ zx::result<RawNatEntry> FsckWorker::LookupNatInJournal(nid_t nid) {
   CursegInfo *curseg = segment_manager_->CURSEG_I(CursegType::kCursegHotData);
   SummaryBlock *sum = &curseg->sum_blk;
 
-  for (int i = 0; i < NatsInCursum(sum); ++i) {
-    if (LeToCpu(NidInJournal(sum, i)) == nid) {
-      RawNatEntry ret = NatInJournal(sum, i);
+  for (int i = 0; i < NatsInCursum(*sum); ++i) {
+    if (LeToCpu(NidInJournal(*sum, i)) == nid) {
+      RawNatEntry ret = NatInJournal(*sum, i);
       if (fsck_options_.verbose) {
         FX_LOGS(INFO) << "\tnid [0x" << nid << "] in nat cache";
       }

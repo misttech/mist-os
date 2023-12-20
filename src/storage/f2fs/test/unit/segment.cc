@@ -41,7 +41,7 @@ TEST_F(SegmentManagerTest, BlkChaining) {
   }
 }
 
-TEST_F(SegmentManagerTest, DirtyToFree) {
+TEST_F(SegmentManagerTest, DirtyToFree) TA_NO_THREAD_SAFETY_ANALYSIS {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
 
   // check the precond. before making dirty segments
@@ -95,7 +95,7 @@ TEST_F(SegmentManagerTest, DirtyToFree) {
   ASSERT_FALSE(fs_->GetSegmentManager().PrefreeSegments());
 }
 
-TEST_F(SegmentManagerTest, BalanceFs) {
+TEST_F(SegmentManagerTest, BalanceFs) TA_NO_THREAD_SAFETY_ANALYSIS {
   uint32_t nfree_segs = fs_->GetSegmentManager().FreeSegments();
 
   fs_->ClearOnRecovery();
@@ -158,7 +158,7 @@ TEST_F(SegmentManagerTest, GetNewSegmentHeap) {
   }
 }
 
-TEST_F(SegmentManagerTest, GetVictimSelPolicy) {
+TEST_F(SegmentManagerTest, GetVictimSelPolicy) TA_NO_THREAD_SAFETY_ANALYSIS {
   VictimSelPolicy policy = fs_->GetSegmentManager().GetVictimSelPolicy(
       GcType::kFgGc, CursegType::kCursegHotNode, AllocMode::kSSR);
   ASSERT_EQ(policy.gc_mode, GcMode::kGcGreedy);
@@ -169,13 +169,13 @@ TEST_F(SegmentManagerTest, GetVictimSelPolicy) {
   ASSERT_EQ(policy.gc_mode, GcMode::kGcGreedy);
   ASSERT_EQ(policy.ofs_unit, fs_->GetSuperblockInfo().GetSegsPerSec());
   ASSERT_EQ(policy.offset,
-            fs_->GetSuperblockInfo().GetLastVictim(static_cast<int>(GcMode::kGcGreedy)));
+            fs_->GetSegmentManager().GetLastVictim(static_cast<int>(GcMode::kGcGreedy)));
 
   policy = fs_->GetSegmentManager().GetVictimSelPolicy(GcType::kBgGc, CursegType::kNoCheckType,
                                                        AllocMode::kLFS);
   ASSERT_EQ(policy.gc_mode, GcMode::kGcCb);
   ASSERT_EQ(policy.ofs_unit, fs_->GetSuperblockInfo().GetSegsPerSec());
-  ASSERT_EQ(policy.offset, fs_->GetSuperblockInfo().GetLastVictim(static_cast<int>(GcMode::kGcCb)));
+  ASSERT_EQ(policy.offset, fs_->GetSegmentManager().GetLastVictim(static_cast<int>(GcMode::kGcCb)));
 
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
   dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirty)] = kMaxSearchLimit + 2;
@@ -184,7 +184,7 @@ TEST_F(SegmentManagerTest, GetVictimSelPolicy) {
   ASSERT_EQ(policy.max_search, kMaxSearchLimit);
 }
 
-TEST_F(SegmentManagerTest, GetMaxCost) {
+TEST_F(SegmentManagerTest, GetMaxCost) TA_NO_THREAD_SAFETY_ANALYSIS {
   VictimSelPolicy policy = fs_->GetSegmentManager().GetVictimSelPolicy(
       GcType::kFgGc, CursegType::kCursegHotNode, AllocMode::kSSR);
   policy.min_cost = fs_->GetSegmentManager().GetMaxCost(policy);
@@ -204,7 +204,7 @@ TEST_F(SegmentManagerTest, GetMaxCost) {
   ASSERT_EQ(policy.min_cost, std::numeric_limits<uint32_t>::max());
 }
 
-TEST_F(SegmentManagerTest, GetVictimByDefault) {
+TEST_F(SegmentManagerTest, GetVictimByDefault) TA_NO_THREAD_SAFETY_ANALYSIS {
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
 
   uint32_t target_segno;
@@ -215,11 +215,10 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
     }
   }
   ASSERT_NE(target_segno, fs_->GetSegmentManager().TotalSegs());
-  fs_->GetSegmentManager().GetSegmentEntry(target_segno).type =
-      static_cast<uint8_t>(CursegType::kCursegHotNode);
+  fs_->GetSegmentManager().SetSegmentEntryType(target_segno, CursegType::kCursegHotNode);
 
   // 1. Test SSR victim
-  fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcType::kBgGc), target_segno);
+  fs_->GetSegmentManager().SetLastVictim(static_cast<int>(GcType::kBgGc), target_segno);
   if (!dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno)) {
     dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].SetOne(target_segno);
     ++dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)];
@@ -232,7 +231,7 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
   ASSERT_EQ(get_victim, target_segno);
 
   // 2. Test FgGc victim
-  fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcType::kFgGc), target_segno);
+  fs_->GetSegmentManager().SetLastVictim(static_cast<int>(GcType::kFgGc), target_segno);
   if (!dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno)) {
     dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].SetOne(target_segno);
     ++dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirty)];
@@ -245,7 +244,8 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
   ASSERT_EQ(get_victim, target_segno);
 
   // 3. Skip if cur_victim_sec is set (SSR)
-  ASSERT_EQ(fs_->GetGcManager().GetCurVictimSec(), fs_->GetSegmentManager().GetSecNo(target_segno));
+  ASSERT_EQ(fs_->GetSegmentManager().GetCurVictimSec(),
+            fs_->GetSegmentManager().GetSecNo(target_segno));
   ASSERT_TRUE(
       dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno));
   ASSERT_EQ(dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)], 1);
@@ -254,7 +254,7 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
   ASSERT_TRUE(victim_or.is_error());
 
   // 4. Skip if victim_secmap is set (kBgGc)
-  fs_->GetGcManager().SetCurVictimSec(kNullSecNo);
+  fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
   ASSERT_TRUE(
       dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno));
   ASSERT_EQ(dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirty)], 1);
@@ -264,7 +264,7 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
   ASSERT_TRUE(victim_or.is_error());
 }
 
-TEST_F(SegmentManagerTest, AllocateNewSegments) {
+TEST_F(SegmentManagerTest, AllocateNewSegments) TA_NO_THREAD_SAFETY_ANALYSIS {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
 
   uint32_t temp_free_segment = fs_->GetSegmentManager().FreeSegments();
@@ -283,7 +283,7 @@ TEST_F(SegmentManagerTest, AllocateNewSegments) {
   ASSERT_EQ(temp_free_segment - 3, fs_->GetSegmentManager().FreeSegments());
 }
 
-TEST_F(SegmentManagerTest, DirtySegments) {
+TEST_F(SegmentManagerTest, DirtySegments) TA_NO_THREAD_SAFETY_ANALYSIS {
   // read the root inode block
   LockedPage root_node_page;
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
@@ -302,7 +302,7 @@ TEST_F(SegmentManagerTest, DirtySegments) {
   ASSERT_EQ(fs_->GetSegmentManager().DirtySegments(), dirtyDataSegments + dirtyNodeSegments);
 }
 
-TEST(SegmentManagerOptionTest, Section) {
+TEST(SegmentManagerOptionTest, Section) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.segs_per_sec = 4;
@@ -349,7 +349,7 @@ TEST(SegmentManagerOptionTest, Section) {
   FileTester::Unmount(std::move(fs), &bc);
 }
 
-TEST(SegmentManagerOptionTest, GetNewSegmentHeap) {
+TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = true;
@@ -401,7 +401,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) {
   FileTester::Unmount(std::move(fs), &bc);
 }
 
-TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) {
+TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = false;
@@ -503,7 +503,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
   char buf[4 * kPageSize] = {
       1,
   };
-  while (!fs->GetSegmentManager().NeedInplaceUpdate(file.get())) {
+  while (!fs->GetSegmentManager().NeedInplaceUpdate(file->IsDir())) {
     size_t out_end, out_actual;
     if (auto ret = FileTester::Append(file.get(), buf, sizeof(buf), &out_end, &out_actual);
         ret == ZX_ERR_NO_SPACE) {
@@ -517,7 +517,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
 
   // Since kMountForceLfs is on, f2fs doesn't allocate segments in ssr manner.
   ASSERT_EQ(fs->GetSegmentManager().NeedSSR(), false);
-  ASSERT_EQ(fs->GetSegmentManager().NeedInplaceUpdate(file.get()), false);
+  ASSERT_EQ(fs->GetSegmentManager().NeedInplaceUpdate(file->IsDir()), false);
 
   // Make SSR, IPU enable
   fs->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
@@ -537,7 +537,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
   EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
 }
 
-TEST(SegmentManagerExceptionTest, BuildSitEntriesDiskFail) {
+TEST(SegmentManagerExceptionTest, BuildSitEntriesDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 

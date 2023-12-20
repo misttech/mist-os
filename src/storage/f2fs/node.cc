@@ -343,15 +343,10 @@ int NodeManager::TryToFreeNats(int nr_shrink) {
 
 // This function returns always success
 void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
-  CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   nid_t start_nid = StartNid(nid);
-  NatBlock *nat_blk;
   RawNatEntry ne;
   int i;
-
   out.nid = nid;
-
   {
     // Check nat cache
     fs::SharedLock nat_lock(nat_tree_lock_);
@@ -364,20 +359,20 @@ void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
     }
   }
 
-  {
+  fs_->GetSegmentManager().GetSummaryBlock(CursegType::kCursegHotData, [&](SummaryBlock &sum) {
     // Check current segment summary
-    fs::SharedLock curseg_lock(curseg->curseg_mutex);
     i = LookupJournalInCursum(sum, JournalType::kNatJournal, nid, 0);
     if (i >= 0) {
       ne = NatInJournal(sum, i);
       NodeInfoFromRawNat(out, ne);
     }
-  }
+    return ZX_OK;
+  });
   if (i < 0) {
     LockedPage page;
     // Fill NodeInfo from nat page
     GetCurrentNatPage(start_nid, &page);
-    nat_blk = page->GetAddress<NatBlock>();
+    NatBlock *nat_blk = page->GetAddress<NatBlock>();
     ne = nat_blk->entries[nid - start_nid];
 
     NodeInfoFromRawNat(out, ne);
@@ -614,30 +609,6 @@ pgoff_t NodeManager::FsyncNodePages(nid_t ino) {
   return fs_->GetNodeVnode().Writeback(op);
 }
 
-zx::result<block_t> NodeManager::GetBlockAddrForDirtyNodePage(LockedPage &page, bool is_reclaim) {
-  page->WaitOnWriteback();
-  block_t new_addr = kNullAddr;
-  if (page->ClearDirtyForIo()) {
-    page->SetWriteback();
-    // get old block addr of this node page
-    nid_t nid = page.GetPage<NodePage>().NidOfNode();
-    ZX_DEBUG_ASSERT(page->GetIndex() == nid);
-
-    NodeInfo ni;
-    GetNodeInfo(nid, ni);
-    // This page is already truncated
-    if (ni.blk_addr == kNullAddr) {
-      return zx::error(ZX_ERR_NOT_FOUND);
-    }
-
-    auto addr_or = fs_->GetSegmentManager().GetBlockAddrForNodePage(page, nid, ni.blk_addr);
-    ZX_ASSERT(addr_or.is_ok());
-    new_addr = *addr_or;
-    SetNodeAddr(ni, new_addr);
-  }
-  return zx::ok(new_addr);
-}
-
 #if 0  // porting needed
 int NodeManager::F2fsWriteNodePages(struct address_space *mapping, WritebackControl *wbc) {
   // struct SuperblockInfo *superblock_info = F2FS_SB(mapping->host->i_sb);
@@ -744,11 +715,8 @@ void NodeManager::BuildFreeNids() {
     next_scan_nid_ = nid;
   }
 
-  {
-    // find free nids from current sum_pages
-    CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-    std::lock_guard curseg_lock(curseg->curseg_mutex);
-    SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
+  // find free nids from current sum_pages
+  fs_->GetSegmentManager().GetSummaryBlock(CursegType::kCursegHotData, [&](SummaryBlock &sum) {
     for (int i = 0; i < NatsInCursum(sum); ++i) {
       block_t addr = LeToCpu(NatInJournal(sum, i).block_addr);
       nid_t nid = LeToCpu(NidInJournal(sum, i));
@@ -758,7 +726,8 @@ void NodeManager::BuildFreeNids() {
         RemoveFreeNid(nid);
       }
     }
-  }
+    return ZX_OK;
+  });
 
   // remove the free nids from current allocated nids
   std::lock_guard lock(free_nid_tree_lock_);
@@ -832,69 +801,51 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
   return ZX_OK;
 }
 
-zx_status_t NodeManager::RestoreNodeSummary(uint32_t segno, SummaryBlock &sum) {
-  uint32_t last_offset = superblock_info_.GetBlocksPerSeg();
-  block_t addr = fs_->GetSegmentManager().StartBlock(segno);
-  Summary *sum_entry = &sum.entries[0];
-
-  for (uint32_t i = 0; i < last_offset; ++i, ++sum_entry, ++addr) {
-    LockedPage page;
-    if (zx_status_t ret = fs_->GetMetaPage(addr, &page); ret != ZX_OK) {
-      return ret;
-    }
-
-    sum_entry->nid = page->GetAddress<Node>()->footer.nid;
-    sum_entry->version = 0;
-    sum_entry->ofs_in_node = 0;
-  }
-  return ZX_OK;
-}
-
 bool NodeManager::FlushNatsInJournal() {
-  CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   int i;
-
-  std::lock_guard curseg_lock(curseg->curseg_mutex);
-
-  {
-    fs::SharedLock nat_lock(nat_tree_lock_);
-    size_t dirty_nat_cnt = dirty_nat_list_.size_slow();
-    if ((NatsInCursum(sum) + dirty_nat_cnt) <= kNatJournalEntries) {
-      return false;
-    }
-  }
-
-  for (i = 0; i < NatsInCursum(sum); ++i) {
-    NatEntry *cache_entry = nullptr;
-    RawNatEntry raw_entry = NatInJournal(sum, i);
-    nid_t nid = LeToCpu(NidInJournal(sum, i));
-
-    while (!cache_entry) {
-      std::lock_guard nat_lock(nat_tree_lock_);
-      cache_entry = LookupNatCache(nid);
-      if (cache_entry) {
-        SetNatCacheDirty(*cache_entry);
-      } else {
-        cache_entry = GrabNatEntry(nid);
-        if (!cache_entry) {
-          continue;
+  zx_status_t status =
+      fs_->GetSegmentManager().SetSummaryBlock(CursegType::kCursegHotData, [&](SummaryBlock &sum) {
+        {
+          fs::SharedLock nat_lock(nat_tree_lock_);
+          size_t dirty_nat_cnt = dirty_nat_list_.size_slow();
+          if ((NatsInCursum(sum) + dirty_nat_cnt) <= kNatJournalEntries) {
+            return ZX_ERR_OUT_OF_RANGE;
+          }
         }
-        cache_entry->SetBlockAddress(LeToCpu(raw_entry.block_addr));
-        cache_entry->SetIno(LeToCpu(raw_entry.ino));
-        cache_entry->SetVersion(raw_entry.version);
-        SetNatCacheDirty(*cache_entry);
-      }
-    }
+
+        for (i = 0; i < NatsInCursum(sum); ++i) {
+          NatEntry *cache_entry = nullptr;
+          RawNatEntry raw_entry = NatInJournal(sum, i);
+          nid_t nid = LeToCpu(NidInJournal(sum, i));
+
+          while (!cache_entry) {
+            std::lock_guard nat_lock(nat_tree_lock_);
+            cache_entry = LookupNatCache(nid);
+            if (cache_entry) {
+              SetNatCacheDirty(*cache_entry);
+            } else {
+              cache_entry = GrabNatEntry(nid);
+              if (!cache_entry) {
+                continue;
+              }
+              cache_entry->SetBlockAddress(LeToCpu(raw_entry.block_addr));
+              cache_entry->SetIno(LeToCpu(raw_entry.ino));
+              cache_entry->SetVersion(raw_entry.version);
+              SetNatCacheDirty(*cache_entry);
+            }
+          }
+        }
+        UpdateNatsInCursum(sum, -i);
+        return ZX_OK;
+      });
+  if (status != ZX_OK) {
+    return false;
   }
-  UpdateNatsInCursum(sum, -i);
   return true;
 }
 
 // This function is called during the checkpointing process.
 zx_status_t NodeManager::FlushNatEntries() {
-  CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   LockedPage page;
   NatBlock *nat_blk = nullptr;
   nid_t start_nid = 0, end_nid = 0;
@@ -905,81 +856,86 @@ zx_status_t NodeManager::FlushNatEntries() {
 #if 0  // porting needed
   //	if (!flushed)
 #endif
-  std::lock_guard curseg_lock(curseg->curseg_mutex);
 
   // 1) flush dirty nat caches
-  {
-    std::lock_guard nat_lock(nat_tree_lock_);
-    for (auto iter = dirty_nat_list_.begin(); iter != dirty_nat_list_.end();) {
-      nid_t nid;
-      RawNatEntry raw_ne;
-      int offset = -1;
-      [[maybe_unused]] block_t old_blkaddr, new_blkaddr;
+  zx_status_t status =
+      fs_->GetSegmentManager().SetSummaryBlock(CursegType::kCursegHotData, [&](SummaryBlock &sum) {
+        std::lock_guard nat_lock(nat_tree_lock_);
+        for (auto iter = dirty_nat_list_.begin(); iter != dirty_nat_list_.end();) {
+          nid_t nid;
+          RawNatEntry raw_ne;
+          int offset = -1;
+          [[maybe_unused]] block_t old_blkaddr, new_blkaddr;
 
-      // During each iteration, |iter| can be removed from |dirty_nat_list_|.
-      // Therefore, make a copy of |iter| and move to the next element before futher operations.
-      NatEntry *cache_entry = iter.CopyPointer();
-      ++iter;
+          // During each iteration, |iter| can be removed from |dirty_nat_list_|.
+          // Therefore, make a copy of |iter| and move to the next element before futher operations.
+          NatEntry *cache_entry = iter.CopyPointer();
+          ++iter;
 
-      nid = cache_entry->GetNid();
+          nid = cache_entry->GetNid();
 
-      if (cache_entry->GetBlockAddress() == kNewAddr)
-        continue;
+          if (cache_entry->GetBlockAddress() == kNewAddr)
+            continue;
 
-      if (!flushed) {
-        // if there is room for nat enries in curseg->sumpage
-        offset = LookupJournalInCursum(sum, JournalType::kNatJournal, nid, 1);
-      }
-
-      if (offset >= 0) {  // flush to journal
-        raw_ne = NatInJournal(sum, offset);
-        old_blkaddr = LeToCpu(raw_ne.block_addr);
-      } else {  // flush to NAT block
-        if (!page || (start_nid > nid || nid > end_nid)) {
-          if (page) {
-            page.SetDirty();
-            page.reset();
+          if (!flushed) {
+            // if there is room for nat enries in curseg->sumpage
+            offset = LookupJournalInCursum(sum, JournalType::kNatJournal, nid, 1);
           }
-          start_nid = StartNid(nid);
-          end_nid = start_nid + kNatEntryPerBlock - 1;
 
-          // get nat block with dirty flag, increased reference
-          // count, mapped and lock
-          auto page_or = GetNextNatPage(start_nid);
-          if (page_or.is_error()) {
-            return page_or.error_value();
+          if (offset >= 0) {  // flush to journal
+            raw_ne = NatInJournal(sum, offset);
+            old_blkaddr = LeToCpu(raw_ne.block_addr);
+          } else {  // flush to NAT block
+            if (!page || (start_nid > nid || nid > end_nid)) {
+              if (page) {
+                page.SetDirty();
+                page.reset();
+              }
+              start_nid = StartNid(nid);
+              end_nid = start_nid + kNatEntryPerBlock - 1;
+
+              // get nat block with dirty flag, increased reference
+              // count, mapped and lock
+              auto page_or = GetNextNatPage(start_nid);
+              if (page_or.is_error()) {
+                return page_or.error_value();
+              }
+              page = std::move(*page_or);
+              nat_blk = page->GetAddress<NatBlock>();
+            }
+
+            ZX_ASSERT(nat_blk);
+            raw_ne = nat_blk->entries[nid - start_nid];
+            old_blkaddr = LeToCpu(raw_ne.block_addr);
           }
-          page = std::move(*page_or);
-          nat_blk = page->GetAddress<NatBlock>();
+
+          new_blkaddr = cache_entry->GetBlockAddress();
+
+          raw_ne.ino = CpuToLe(cache_entry->GetIno());
+          raw_ne.block_addr = CpuToLe(new_blkaddr);
+          raw_ne.version = cache_entry->GetVersion();
+
+          if (offset < 0) {
+            nat_blk->entries[nid - start_nid] = raw_ne;
+          } else {
+            SetNatInJournal(sum, offset, raw_ne);
+            SetNidInJournal(sum, offset, CpuToLe(nid));
+          }
+
+          if (cache_entry->GetBlockAddress() == kNullAddr) {
+            DelFromNatCache(*cache_entry);
+            // We can reuse this freed nid at this point
+            AddFreeNid(nid);
+          } else {
+            ClearNatCacheDirty(*cache_entry);
+            cache_entry->SetCheckpointed();
+          }
         }
+        return ZX_OK;
+      });
 
-        ZX_ASSERT(nat_blk);
-        raw_ne = nat_blk->entries[nid - start_nid];
-        old_blkaddr = LeToCpu(raw_ne.block_addr);
-      }
-
-      new_blkaddr = cache_entry->GetBlockAddress();
-
-      raw_ne.ino = CpuToLe(cache_entry->GetIno());
-      raw_ne.block_addr = CpuToLe(new_blkaddr);
-      raw_ne.version = cache_entry->GetVersion();
-
-      if (offset < 0) {
-        nat_blk->entries[nid - start_nid] = raw_ne;
-      } else {
-        SetNatInJournal(sum, offset, raw_ne);
-        SetNidInJournal(sum, offset, CpuToLe(nid));
-      }
-
-      if (cache_entry->GetBlockAddress() == kNullAddr) {
-        DelFromNatCache(*cache_entry);
-        // We can reuse this freed nid at this point
-        AddFreeNid(nid);
-      } else {
-        ClearNatCacheDirty(*cache_entry);
-        cache_entry->SetCheckpointed();
-      }
-    }
+  if (status != ZX_OK) {
+    return status;
   }
 
   // Write out last modified NAT block

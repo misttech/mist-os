@@ -392,76 +392,97 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
 // }
 #endif
 
-zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
-  size_t index = page->GetIndex();
-  auto path_or = GetNodePath(*this, index);
-  if (path_or.is_error()) {
-    return path_or.take_error();
+block_t VnodeF2fs::GetBlockAddr(LockedPage &page) {
+  ZX_DEBUG_ASSERT(page->IsUptodate());
+  if (!page->ClearDirtyForIo()) {
+    return kNullAddr;
   }
-  auto dnode_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
-  if (dnode_page_or.is_error()) {
-    return dnode_page_or.take_error();
+  if (IsMeta()) {
+    block_t addr = safemath::checked_cast<block_t>(page->GetIndex());
+    ZX_ASSERT(page->SetBlockAddr(addr).is_ok());
+    return addr;
   }
-  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
-  block_t old_blk_addr = (*dnode_page_or).GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
+  ZX_DEBUG_ASSERT(IsNode());
+  nid_t nid = page.GetPage<NodePage>().NidOfNode();
+  ZX_DEBUG_ASSERT(page->GetIndex() == nid);
+
+  NodeInfo ni;
+  fs_->GetNodeManager().GetNodeInfo(nid, ni);
+  block_t old_addr = ni.blk_addr;
+
   // This page is already truncated
-  if (old_blk_addr == kNullAddr) {
-    return zx::error(ZX_ERR_NOT_FOUND);
+  if (old_addr == kNullAddr) {
+    return kNullAddr;
   }
 
-  block_t new_blk_addr = kNullAddr;
-  if (old_blk_addr != kNewAddr && !page->IsColdData() &&
-      fs()->GetSegmentManager().NeedInplaceUpdate(this)) {
-    new_blk_addr = old_blk_addr;
-  } else {
-    pgoff_t file_offset = page->GetIndex();
-    auto addr_or = fs()->GetSegmentManager().GetBlockAddrForDataPage(
-        page, (*dnode_page_or).GetPage<NodePage>().NidOfNode(), ofs_in_dnode, old_blk_addr);
-    ZX_ASSERT(addr_or.is_ok());
-    new_blk_addr = *addr_or;
-    (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_blk_addr);
-    UpdateExtentCache(new_blk_addr, file_offset);
-    UpdateVersion(superblock_info_.GetCheckpointVer());
-  }
+  Summary sum;
+  SetSummary(&sum, nid, 0, ni.version);
+  block_t new_addr =
+      fs_->GetSegmentManager().GetBlockAddrOnSegment(page, old_addr, &sum, PageType::kNode);
+  ZX_DEBUG_ASSERT(new_addr != kNullAddr && new_addr != kNewAddr && new_addr != old_addr);
 
-  return zx::ok(new_blk_addr);
+  fs_->GetNodeManager().SetNodeAddr(ni, new_addr);
+  ZX_ASSERT(page->SetBlockAddr(new_addr).is_ok());
+  return new_addr;
 }
 
-zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim) {
+block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
+  ZX_DEBUG_ASSERT(page->IsUptodate());
+  ZX_DEBUG_ASSERT(!IsMeta());
+  ZX_DEBUG_ASSERT(!IsNode());
+  if (!page->ClearDirtyForIo()) {
+    return kNullAddr;
+  }
   const pgoff_t end_index = GetSize() / kPageSize;
-  block_t blk_addr = kNullAddr;
-
   if (page->GetIndex() >= end_index) {
     unsigned offset = GetSize() & (kPageSize - 1);
     if ((page->GetIndex() >= end_index + 1) || !offset) {
-      // This page is already truncated
-      page->ClearDirtyForIo();
-      return zx::error(ZX_ERR_NOT_FOUND);
+      return kNullAddr;
     }
-    // The lock and writeback flags prevent its data to be changed or truncated during this
-    // writeback.
+  }
+  auto path_or = GetNodePath(*this, page->GetIndex());
+  if (path_or.is_error()) {
+    return kNullAddr;
   }
 
-  // TODO: Consider skipping the wb for hot/warm blocks
-  // since a higher temp. block has more chances to be updated sooner.
-  // if (superblock_info.IsOnRecovery()) {
-  // TODO: Tracks pages skipping wb
-  // ++wbc->pages_skipped;
-  // page->SetDirty();
-  // return kAopWritepageActivate;
-  //}
-
-  if (page->ClearDirtyForIo()) {
-    page->SetWriteback();
-    auto addr_or = GetBlockAddrForDataPage(page);
-    if (addr_or.is_error()) {
-      // TODO: Tracks pages skipping wb
-      // ++wbc->pages_skipped;
-      return addr_or.take_error();
+  auto dnode_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
+  if (dnode_page_or.is_error()) {
+    if (page->IsUptodate() && dnode_page_or.status_value() != ZX_ERR_NOT_FOUND) {
+      // In case of failure, we just redirty it.
+      page.SetDirty();
+      FX_LOGS(WARNING) << "failed to allocate a block." << dnode_page_or.status_string();
     }
-    blk_addr = *addr_or;
+    return kNullAddr;
   }
-  return zx::ok(blk_addr);
+
+  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
+  block_t old_addr = (*dnode_page_or).GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
+  // This page is already truncated
+  if (old_addr == kNullAddr) {
+    return kNullAddr;
+  }
+  // Check if IPU is allowed
+  if (old_addr != kNewAddr && !page->IsColdData() &&
+      fs_->GetSegmentManager().NeedInplaceUpdate(IsDir())) {
+    return old_addr;
+  }
+
+  // Allocate a new addr
+  NodeInfo ni;
+  nid_t nid = (*dnode_page_or).GetPage<NodePage>().NidOfNode();
+  fs_->GetNodeManager().GetNodeInfo(nid, ni);
+
+  Summary sum;
+  SetSummary(&sum, nid, ofs_in_dnode, ni.version);
+  block_t new_addr =
+      fs_->GetSegmentManager().GetBlockAddrOnSegment(page, old_addr, &sum, PageType::kData);
+  ZX_DEBUG_ASSERT(new_addr != kNullAddr && new_addr != kNewAddr && new_addr != old_addr);
+
+  (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_addr);
+  UpdateExtentCache(new_addr, page->GetIndex());
+  UpdateVersion(superblock_info_.GetCheckpointVer());
+  ZX_ASSERT(page->SetBlockAddr(new_addr).is_ok());
+  return new_addr;
 }
 
 zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, const size_t len) {

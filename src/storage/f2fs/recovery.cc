@@ -132,7 +132,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   size_t blkoff =
       segment_manager_->GetSegOffFromSeg0(blkaddr) & (superblock_info_->GetBlocksPerSeg() - 1);
   Summary sum;
-  SegmentEntry &sentry = GetSegmentManager().GetSegmentEntry(segno);
+  const SegmentEntry &sentry = GetSegmentManager().GetSegmentEntry(segno);
   if (!sentry.cur_valid_map.GetOne(ToMsbFirst(blkoff))) {
     return;
   }
@@ -224,8 +224,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
       // Check the previous node page having this index
       CheckIndexInPrevNodes(dest);
 
-      GetSegmentManager().SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(),
-                                     offset_in_dnode, ni.version);
+      SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(), offset_in_dnode, ni.version);
 
       // Write dummy data page
       GetSegmentManager().RecoverDataPage(sum, src, dest);
@@ -236,7 +235,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   }
 
   // Write node page in place
-  GetSegmentManager().SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(), 0, 0);
+  SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(), 0, 0);
   if (dnode_page.GetPage<NodePage>().IsInode()) {
     vnode.SetDirty();
   }

@@ -365,6 +365,10 @@ class FileCache {
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
 
+  // It returns a set of locked dirty Pages that meet |operation|.
+  std::vector<LockedPage> GetLockedDirtyPages(const WritebackOperation &operation)
+      __TA_EXCLUDES(tree_lock_);
+
  private:
   // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,
   // it returns ZX_ERR_UNAVAILABLE after waiting for |page| to be unlocked. While waiting,
@@ -374,9 +378,6 @@ class FileCache {
   // it is not allowed to acquire |tree_lock_| with |page| locked. Then, a caller may retry it
   // with the same |page|.
   zx::result<LockedPage> GetLockedPage(fbl::RefPtr<Page> page) __TA_REQUIRES(tree_lock_);
-  // It returns a set of locked dirty Pages that meet |operation|.
-  std::vector<LockedPage> GetLockedDirtyPagesUnsafe(const WritebackOperation &operation)
-      __TA_REQUIRES(tree_lock_);
   zx::result<LockedPage> GetLockedPageFromRawUnsafe(Page *raw_page) __TA_REQUIRES(tree_lock_);
   zx::result<LockedPage> GetPageUnsafe(const pgoff_t index) __TA_REQUIRES(tree_lock_);
   zx_status_t AddPageUnsafe(const fbl::RefPtr<Page> &page) __TA_REQUIRES(tree_lock_);

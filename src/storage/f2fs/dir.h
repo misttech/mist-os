@@ -106,6 +106,8 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   void VmoRead(uint64_t offset, uint64_t length) final;
   zx::result<PageBitmap> GetBitmap(fbl::RefPtr<Page> dentry_page) final;
 
+  block_t GetBlockAddr(LockedPage &page) final;
+
  private:
   // helper
   bool IsMultimediaFile(VnodeF2fs &vnode, std::string_view sub);

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zircon-internal/thread_annotations.h>
+
 #include <algorithm>
 #include <random>
 
@@ -82,7 +84,7 @@ TEST_F(GcManagerTest, CpError) {
   ASSERT_EQ(result.error_value(), ZX_ERR_BAD_STATE);
 }
 
-TEST_F(GcManagerTest, CheckpointDiskReadFailOnSyncFs) {
+TEST_F(GcManagerTest, CheckpointDiskReadFailOnSyncFs) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;
@@ -114,7 +116,7 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnSyncFs) {
   }
 }
 
-TEST_F(GcManagerTest, CheckpointDiskReadFailOnGc) {
+TEST_F(GcManagerTest, CheckpointDiskReadFailOnGc) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;
@@ -142,7 +144,7 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnGc) {
   }
 }
 
-TEST_F(GcManagerTest, CheckpointDiskReadFailOnGcPreFree) {
+TEST_F(GcManagerTest, CheckpointDiskReadFailOnGcPreFree) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;
@@ -287,19 +289,19 @@ class GcManagerTestWithLargeSec
   }
 };
 
-TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) {
+TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) TA_NO_THREAD_SAFETY_ANALYSIS {
   MakeGcTriggerCondition();
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
 
   // Get Victim
   uint32_t last_victim =
-      fs_->GetSuperblockInfo().GetLastVictim(static_cast<int>(GcMode::kGcGreedy));
+      fs_->GetSegmentManager().GetLastVictim(static_cast<int>(GcMode::kGcGreedy));
   auto victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
       GcType::kFgGc, CursegType::kNoCheckType, AllocMode::kLFS);
   ASSERT_FALSE(victim_seg_or.is_error());
   uint32_t victim_seg = victim_seg_or.value();
-  fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcMode::kGcGreedy), last_victim);
-  fs_->GetGcManager().SetCurVictimSec(kNullSecNo);
+  fs_->GetSegmentManager().SetLastVictim(static_cast<int>(GcMode::kGcGreedy), last_victim);
+  fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
 
   // Check at least one of victim seg is dirty
   bool is_dirty = false;
@@ -331,19 +333,19 @@ TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) {
   }
 }
 
-TEST_P(GcManagerTestWithLargeSec, SegmentFreeInfo) {
+TEST_P(GcManagerTestWithLargeSec, SegmentFreeInfo) TA_NO_THREAD_SAFETY_ANALYSIS {
   MakeGcTriggerCondition();
   FreeSegmapInfo *free_info = &fs_->GetSegmentManager().GetFreeSegmentInfo();
 
   // Get Victim
   uint32_t last_victim =
-      fs_->GetSuperblockInfo().GetLastVictim(static_cast<int>(GcMode::kGcGreedy));
+      fs_->GetSegmentManager().GetLastVictim(static_cast<int>(GcMode::kGcGreedy));
   auto victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
       GcType::kFgGc, CursegType::kNoCheckType, AllocMode::kLFS);
   ASSERT_FALSE(victim_seg_or.is_error());
   uint32_t victim_seg = victim_seg_or.value();
-  fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcMode::kGcGreedy), last_victim);
-  fs_->GetGcManager().SetCurVictimSec(kNullSecNo);
+  fs_->GetSegmentManager().SetLastVictim(static_cast<int>(GcMode::kGcGreedy), last_victim);
+  fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
   uint32_t victim_sec = fs_->GetSegmentManager().GetSecNo(victim_seg);
 
   // Check victim sec is not free

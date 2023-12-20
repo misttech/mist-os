@@ -4,6 +4,8 @@
 
 #include "unit_lib.h"
 
+#include <lib/zircon-internal/thread_annotations.h>
+
 #include <gtest/gtest.h>
 
 #include "src/storage/f2fs/f2fs.h"
@@ -416,7 +418,7 @@ void MapTester::CheckBlkaddrsFree(F2fs *fs, std::unordered_set<block_t> &blkaddr
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
   for (auto blkaddr : blkaddrs) {
     SegmentManager &manager = fs->GetSegmentManager();
-    SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
+    const SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
     uint32_t offset = manager.GetSegOffFromSeg0(blkaddr) & (superblock_info.GetBlocksPerSeg() - 1);
     ASSERT_EQ(se.ckpt_valid_map.GetOne(ToMsbFirst(offset)), false);
   }
@@ -426,7 +428,7 @@ void MapTester::CheckBlkaddrsInuse(F2fs *fs, std::unordered_set<block_t> &blkadd
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
   for (auto blkaddr : blkaddrs) {
     SegmentManager &manager = fs->GetSegmentManager();
-    SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
+    const SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
     uint32_t offset = manager.GetSegOffFromSeg0(blkaddr) & (superblock_info.GetBlocksPerSeg() - 1);
     ASSERT_NE(se.ckpt_valid_map.GetOne(ToMsbFirst(offset)), false);
   }
@@ -482,10 +484,10 @@ void MapTester::DoWriteNat(F2fs *fs, nid_t nid, block_t blkaddr, uint8_t version
   nm_i->dirty_nat_list_.push_back(cache_entry);
 }
 
-void MapTester::DoWriteSit(F2fs *fs, CursegType type, uint32_t exp_segno, block_t *new_blkaddr) {
+void MapTester::DoWriteSit(F2fs *fs, CursegType type, uint32_t exp_segno,
+                           block_t *new_blkaddr) TA_NO_THREAD_SAFETY_ANALYSIS {
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
   SegmentManager &segment_manager = fs->GetSegmentManager();
-  SitInfo &sit_i = fs->GetSegmentManager().GetSitInfo();
 
   if (!segment_manager.HasCursegSpace(type)) {
     segment_manager.AllocateSegmentByDefault(type, false);
@@ -500,7 +502,6 @@ void MapTester::DoWriteSit(F2fs *fs, CursegType type, uint32_t exp_segno, block_
   *new_blkaddr = segment_manager.NextFreeBlkAddr(type);
   uint32_t old_cursegno = curseg->segno;
 
-  std::lock_guard sentry_lock(sit_i.sentry_lock);
   segment_manager.RefreshNextBlkoff(curseg);
   superblock_info.IncBlockCount(curseg->alloc_type);
 

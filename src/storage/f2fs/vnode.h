@@ -169,7 +169,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx::result<std::vector<block_t>> GetDataBlockAddresses(pgoff_t index, size_t count,
                                                          bool read_only = false);
 
-  zx::result<block_t> GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim);
+  virtual block_t GetBlockAddr(LockedPage &page);
   zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
@@ -436,7 +436,7 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetPages(page_offsets);
   }
 
-  pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
+  pgoff_t Writeback(WritebackOperation &operation);
 
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
                                           bool zero = true) {
@@ -444,16 +444,6 @@ class VnodeF2fs : public fs::PagedVnode,
   }
   void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
   void SetOrphan();
-
-  PageType GetPageType() {
-    if (IsNode()) {
-      return PageType::kNode;
-    } else if (IsMeta()) {
-      return PageType::kMeta;
-    } else {
-      return PageType::kData;
-    }
-  }
 
   // For testing
   bool HasPagedVmo() __TA_EXCLUDES(mutex_) {
@@ -466,6 +456,8 @@ class VnodeF2fs : public fs::PagedVnode,
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
 
  protected:
+  block_t GetBlockAddrOnDataSegment(LockedPage &page);
+
   void RecycleNode() override;
   VmoManager &vmo_manager() const { return *vmo_manager_; }
   void ReportPagerError(const uint32_t op, const uint64_t offset, const uint64_t length,
@@ -475,7 +467,6 @@ class VnodeF2fs : public fs::PagedVnode,
   SuperblockInfo &superblock_info_;
 
  private:
-  zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page);
   zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode> *out_redirect) final
       __TA_EXCLUDES(mutex_);
   zx_status_t CloseNode() final;

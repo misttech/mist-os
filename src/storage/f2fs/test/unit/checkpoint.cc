@@ -5,6 +5,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zircon-internal/thread_annotations.h>
 
 #include <random>
 #include <vector>
@@ -552,9 +553,11 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
   DoCheckpoints(check_recover_orphan_inode, kCheckpointLoopCnt);
 }
 
-TEST_F(CheckpointTest, CompactedSummaries) {
-  CheckpointCallback check_compacted_summaries = [this](uint32_t expect_cp_position,
-                                                        uint32_t expect_cp_ver, bool after_mkfs) {
+TEST_F(CheckpointTest, CompactedSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
+  CheckpointCallback check_compacted_summaries = [this](
+                                                     uint32_t expect_cp_position,
+                                                     uint32_t expect_cp_ver,
+                                                     bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     DisableFsck();
 
     LockedPage cp_page;
@@ -630,7 +633,7 @@ TEST_F(CheckpointTest, CompactedSummaries) {
           continue;
         }
 
-        segment_manager.SetSummary(&sum, 3, j, static_cast<uint8_t>(cp->checkpoint_ver));
+        SetSummary(&sum, 3, j, static_cast<uint8_t>(cp->checkpoint_ver));
         segment_manager.AddSumEntry(static_cast<CursegType>(i), &sum, j);
 
         MapTester::DoWriteSit(fs_.get(), static_cast<CursegType>(i), kNullSegNo, &new_blkaddr);
@@ -646,9 +649,10 @@ TEST_F(CheckpointTest, CompactedSummaries) {
   DoCheckpoints(check_compacted_summaries, kCheckpointLoopCnt);
 }
 
-TEST_F(CheckpointTest, NormalSummaries) {
+TEST_F(CheckpointTest, NormalSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
   CheckpointCallback check_normal_summaries = [this](uint32_t expect_cp_position,
-                                                     uint32_t expect_cp_ver, bool after_mkfs) {
+                                                     uint32_t expect_cp_ver,
+                                                     bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     DisableFsck();
 
     LockedPage cp_page;
@@ -696,7 +700,7 @@ TEST_F(CheckpointTest, NormalSummaries) {
 
           nid_t nid = curseg->sum_blk->entries[j].nid;
           ASSERT_EQ(nid, cp->checkpoint_ver - kMkfsCheckpointVersion);
-          if (!segment_manager.IsNodeSeg(static_cast<CursegType>(i))) {
+          if (!IsNodeSeg(static_cast<CursegType>(i))) {
             ASSERT_EQ(static_cast<uint64_t>(curseg->sum_blk->entries[j].version),
                       cp->checkpoint_ver - 1);
             uint16_t ofs_in_node = curseg->sum_blk->entries[j].ofs_in_node;
@@ -720,8 +724,8 @@ TEST_F(CheckpointTest, NormalSummaries) {
           continue;
         }
 
-        segment_manager.SetSummary(&sum, static_cast<nid_t>(cp->checkpoint_ver), j,
-                                   static_cast<uint8_t>(cp->checkpoint_ver));
+        SetSummary(&sum, static_cast<nid_t>(cp->checkpoint_ver), j,
+                   static_cast<uint8_t>(cp->checkpoint_ver));
         segment_manager.AddSumEntry(static_cast<CursegType>(i), &sum, j);
 
         MapTester::DoWriteSit(fs_.get(), static_cast<CursegType>(i), kNullSegNo, &new_blkaddr);
@@ -737,11 +741,11 @@ TEST_F(CheckpointTest, NormalSummaries) {
   DoCheckpoints(check_normal_summaries, kCheckpointLoopCnt);
 }
 
-TEST_F(CheckpointTest, SitJournal) {
+TEST_F(CheckpointTest, SitJournal) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   CheckpointCallback check_sit_journal = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
-                                                bool after_mkfs) {
+                                                bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     LockedPage cp_page;
     SegmentManager &segment_manager = fs_->GetSegmentManager();
     auto &segnos = GetPrevValues();
@@ -760,8 +764,8 @@ TEST_F(CheckpointTest, SitJournal) {
       CursegInfo *curseg = segment_manager.CURSEG_I(CursegType::kCursegColdData);
 
       SummaryBlock *sum = &curseg->sum_blk;
-      for (int i = 0; i < SitsInCursum(sum); ++i) {
-        uint32_t segno = LeToCpu(SegnoInJournal(sum, i));
+      for (int i = 0; i < SitsInCursum(*sum); ++i) {
+        uint32_t segno = LeToCpu(SegnoInJournal(*sum, i));
         ASSERT_EQ(segno, segnos[i]);
       }
     }
@@ -771,7 +775,7 @@ TEST_F(CheckpointTest, SitJournal) {
       CursegInfo *curseg = segment_manager.CURSEG_I(CursegType::kCursegColdData);
 
       // Clear SIT journal
-      if (SitsInCursum(&curseg->sum_blk) >= static_cast<int>(kSitJournalEntries)) {
+      if (SitsInCursum(*curseg->sum_blk) >= static_cast<int>(kSitJournalEntries)) {
         SitInfo &sit_i = segment_manager.GetSitInfo();
         RawBitmap &bitmap = sit_i.dirty_sentries_bitmap;
         block_t nsegs = segment_manager.TotalSegs();
@@ -814,11 +818,11 @@ TEST_F(CheckpointTest, SitJournal) {
   DoCheckpoints(check_sit_journal, kCheckpointLoopCnt);
 }
 
-TEST_F(CheckpointTest, NatJournal) {
+TEST_F(CheckpointTest, NatJournal) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   CheckpointCallback check_nat_journal = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
-                                                bool after_mkfs) {
+                                                bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
     NodeManager &node_manager = fs_->GetNodeManager();
     SegmentManager &segment_manager = fs_->GetSegmentManager();
@@ -843,14 +847,14 @@ TEST_F(CheckpointTest, NatJournal) {
 
       // 3. Check recovered journal
       SummaryBlock *sum = &curseg->sum_blk;
-      for (int i = 0; i < NatsInCursum(sum); ++i) {
-        ASSERT_EQ(NidInJournal(sum, i), nids[i]);
-        ASSERT_EQ(NatInJournal(sum, i).version, cp->checkpoint_ver - kMkfsCheckpointVersion);
+      for (int i = 0; i < NatsInCursum(*sum); ++i) {
+        ASSERT_EQ(NidInJournal(*sum, i), nids[i]);
+        ASSERT_EQ(NatInJournal(*sum, i).version, cp->checkpoint_ver - kMkfsCheckpointVersion);
       }
 
       // 4. Fill compact data summary
       // Clear NAT journal
-      if (NatsInCursum(&curseg->sum_blk) >= static_cast<int>(kNatJournalEntries)) {
+      if (NatsInCursum(*curseg->sum_blk) >= static_cast<int>(kNatJournalEntries)) {
         // Add dummy dirty NAT entries
         MapTester::DoWriteNat(fs_.get(), nid_offset, nid_offset,
                               static_cast<uint8_t>(cp->checkpoint_ver));
@@ -1060,7 +1064,7 @@ TEST_F(CheckpointTest, FlushNatEntriesDiskFail) {
   }
 }
 
-TEST_F(CheckpointTest, FlushSitEntriesDiskFail) {
+TEST_F(CheckpointTest, FlushSitEntriesDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;
@@ -1142,7 +1146,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
   fs_->GetSuperblockInfo().ClearCpFlags(CpFlag::kCpErrorFlag);
 }
 
-TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) {
+TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;
@@ -1169,7 +1173,7 @@ TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) {
   }
 }
 
-TEST_F(CheckpointTest, ReadNormalSummaryDiskFail) {
+TEST_F(CheckpointTest, ReadNormalSummaryDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
   WritebackOperation op;

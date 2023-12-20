@@ -133,7 +133,7 @@ TEST_F(NodeManagerTest, NatCache) {
   ASSERT_EQ(num_tree, static_cast<size_t>(0));
   ASSERT_EQ(num_clean, static_cast<size_t>(0));
   ASSERT_EQ(num_dirty, static_cast<size_t>(0));
-  ASSERT_EQ(NatsInCursum(sum), static_cast<int>(kMaxNodeCnt + 1));
+  ASSERT_EQ(NatsInCursum(*sum), static_cast<int>(kMaxNodeCnt + 1));
 
   // Lookup NAT journal
   for (auto ino : inos) {
@@ -156,7 +156,7 @@ TEST_F(NodeManagerTest, NatCache) {
 
   // Fill NAT journal
   fs_->SyncFs();
-  ASSERT_EQ(NatsInCursum(sum), static_cast<int>(kNatJournalEntries - 1));
+  ASSERT_EQ(NatsInCursum(*sum), static_cast<int>(kNatJournalEntries - 1));
 
   // Fill NAT cache over journal size
   FileTester::CreateChildren(fs_.get(), vnodes, journal_inos, root_dir_, "NATJournalFlush_", 2);
@@ -165,7 +165,7 @@ TEST_F(NodeManagerTest, NatCache) {
 
   // Flush NAT journal
   fs_->SyncFs();
-  ASSERT_EQ(NatsInCursum(sum), static_cast<int>(0));
+  ASSERT_EQ(NatsInCursum(*sum), static_cast<int>(0));
 
   // Flush NAT cache
   MapTester::RemoveAllNatEntries(node_manager);

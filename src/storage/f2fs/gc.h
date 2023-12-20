@@ -22,15 +22,10 @@ class GcManager {
   void DisableFgGc() { disable_gc_for_test_ = true; }
   void EnableFgGc() { disable_gc_for_test_ = false; }
 
-  void SetCurVictimSec(uint32_t secno) { cur_victim_sec_ = secno; }
-  uint32_t GetCurVictimSec() const { return cur_victim_sec_; }
-
  private:
   friend class GcTester;
-  zx::result<uint32_t> GetGcVictim(GcType gc_type, CursegType type);
   zx_status_t DoGarbageCollect(uint32_t segno, GcType gc_type) __TA_REQUIRES(f2fs::GetGlobalLock());
 
-  bool CheckValidMap(uint32_t segno, uint64_t offset);
   zx_status_t GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type)
       __TA_REQUIRES(f2fs::GetGlobalLock());
 
@@ -44,10 +39,12 @@ class GcManager {
   SuperblockInfo &superblock_info_;
   uint32_t cur_victim_sec_;  // current victim section num
   std::binary_semaphore run_{1};
+  SegmentManager &segment_manager_;
 
   // For testing
   bool disable_gc_for_test_ = false;
 };
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_GC_H_

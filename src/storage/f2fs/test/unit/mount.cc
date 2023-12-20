@@ -84,7 +84,7 @@ void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir
   {
     LockedPage page;
     vn->GrabCachePage(0, &page);
-    type = fs->GetSegmentManager().GetSegmentType(*page, PageType::kData);
+    type = GetSegmentType(*page, PageType::kData, fs->GetSuperblockInfo().GetActiveLogs());
     out.push_back(type);
   }
 
@@ -96,7 +96,7 @@ void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir
     page.Zero();
     node_page->FillNodeFooter(static_cast<nid_t>(node_page->GetIndex()), vn->Ino(), inode_ofs);
     node_page->SetColdNode(vn->IsDir());
-    type = fs->GetSegmentManager().GetSegmentType(*node_page, PageType::kNode);
+    type = GetSegmentType(*node_page, PageType::kNode, fs->GetSuperblockInfo().GetActiveLogs());
     out.push_back(type);
   }
 
@@ -109,7 +109,7 @@ void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir
     node_page->FillNodeFooter(static_cast<nid_t>(node_page->GetIndex()), vn->Ino(),
                               indirect_node_ofs);
     node_page->SetColdNode(vn->IsDir());
-    type = fs->GetSegmentManager().GetSegmentType(*node_page, PageType::kNode);
+    type = GetSegmentType(*node_page, PageType::kNode, fs->GetSuperblockInfo().GetActiveLogs());
     out.push_back(type);
   }
 

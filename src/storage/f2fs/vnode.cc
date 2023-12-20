@@ -1191,4 +1191,56 @@ zx::result<LockedPage> VnodeF2fs::NewInodePage() {
   return zx::ok(std::move(*page_or));
 }
 
+// TODO: Consider using a global lock as below
+// if (!IsDir())
+//   mutex_lock(&superblock_info->writepages);
+// Writeback()
+// if (!IsDir())
+//   mutex_unlock(&superblock_info->writepages);
+// fs()->RemoveDirtyDirInode(this);
+pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
+  pgoff_t nwritten = 0;
+  std::vector<std::unique_ptr<VmoCleaner>> cleaners;
+  std::vector<LockedPage> pages = file_cache_->GetLockedDirtyPages(operation);
+  PageList pages_to_disk;
+  for (auto &page : pages) {
+    page->WaitOnWriteback();
+    block_t addr = GetBlockAddr(page);
+    ZX_DEBUG_ASSERT(addr != kNewAddr);
+    if (addr == kNullAddr) {
+      page.release();
+      continue;
+    }
+    page->SetWriteback();
+    if (operation.page_cb) {
+      // |page_cb| conducts additional process for the last page of node and meta vnodes.
+      bool is_last_page = page.get() == pages.back().get();
+      operation.page_cb(page.CopyRefPtr(), is_last_page);
+    }
+    // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for the page.
+    // TODO(b/293977738): VmoCleaner is instantiated on a per-page basis, so
+    // ZX_PAGER_OP_WRITEBACK_BEGIN is called for each dirty page. We need to change it to work on
+    // a per-range basis for efficient system calls.
+    if (vmo_manager_->IsPaged()) {
+      cleaners.push_back(std::make_unique<VmoCleaner>(operation.bSync, fbl::RefPtr<VnodeF2fs>(this),
+                                                      page->GetKey(), page->GetKey() + 1));
+    }
+    pages_to_disk.push_back(page.release());
+    ++nwritten;
+
+    if (!(nwritten % kDefaultBlocksPerSegment)) {
+      fs()->ScheduleWriter(nullptr, std::move(pages_to_disk));
+      cleaners.clear();
+    }
+  }
+  if (!pages_to_disk.is_empty() || operation.bSync) {
+    sync_completion_t completion;
+    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk));
+    if (operation.bSync) {
+      sync_completion_wait(&completion, ZX_TIME_INFINITE);
+    }
+  }
+  return nwritten;
+}
+
 }  // namespace f2fs

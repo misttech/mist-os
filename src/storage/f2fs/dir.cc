@@ -677,4 +677,6 @@ zx::result<PageBitmap> Dir::GetBitmap(fbl::RefPtr<Page> dentry_page) {
                            kNrDentryInBlock));
 }
 
+block_t Dir::GetBlockAddr(LockedPage &page) { return GetBlockAddrOnDataSegment(page); }
+
 }  // namespace f2fs

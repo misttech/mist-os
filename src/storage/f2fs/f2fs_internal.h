@@ -14,22 +14,22 @@ namespace f2fs {
 
 class VnodeF2fs;
 
-inline int NatsInCursum(SummaryBlock *sum) { return LeToCpu(sum->n_nats); }
-inline int SitsInCursum(SummaryBlock *sum) { return LeToCpu(sum->n_sits); }
+inline int NatsInCursum(const SummaryBlock &sum) { return LeToCpu(sum.n_nats); }
+inline int SitsInCursum(const SummaryBlock &sum) { return LeToCpu(sum.n_sits); }
 
-inline RawNatEntry NatInJournal(SummaryBlock *sum, int i) { return sum->nat_j.entries[i].ne; }
-inline void SetNatInJournal(SummaryBlock *sum, int i, RawNatEntry raw_ne) {
-  sum->nat_j.entries[i].ne = raw_ne;
+inline RawNatEntry NatInJournal(const SummaryBlock &sum, int i) { return sum.nat_j.entries[i].ne; }
+inline void SetNatInJournal(SummaryBlock &sum, int i, RawNatEntry &raw_ne) {
+  sum.nat_j.entries[i].ne = raw_ne;
 }
-inline nid_t NidInJournal(SummaryBlock *sum, int i) { return sum->nat_j.entries[i].nid; }
-inline void SetNidInJournal(SummaryBlock *sum, int i, nid_t nid) {
-  sum->nat_j.entries[i].nid = nid;
-}
+inline nid_t NidInJournal(const SummaryBlock &sum, int i) { return sum.nat_j.entries[i].nid; }
+inline void SetNidInJournal(SummaryBlock &sum, int i, nid_t nid) { sum.nat_j.entries[i].nid = nid; }
 
-inline SitEntry &SitInJournal(SummaryBlock *sum, int i) { return sum->sit_j.entries[i].se; }
-inline uint32_t SegnoInJournal(SummaryBlock *sum, int i) { return sum->sit_j.entries[i].segno; }
-inline void SetSegnoInJournal(SummaryBlock *sum, int i, uint32_t segno) {
-  sum->sit_j.entries[i].segno = segno;
+inline SitEntry &SitInJournal(SummaryBlock &sum, int i) { return sum.sit_j.entries[i].se; }
+inline uint32_t SegnoInJournal(const SummaryBlock &sum, int i) {
+  return sum.sit_j.entries[i].segno;
+}
+inline void SetSegnoInJournal(SummaryBlock &sum, int i, uint32_t segno) {
+  sum.sit_j.entries[i].segno = segno;
 }
 
 // For INODE and NODE manager
@@ -309,8 +309,6 @@ class SuperblockInfo {
   void IncSegmentCount(int type) { ++segment_count_[type]; }
   uint64_t GetSegmentCount(int type) const { return segment_count_[type]; }
   void IncBlockCount(int type) { ++block_count_[type]; }
-  uint32_t GetLastVictim(int mode) const { return last_victim_[mode]; }
-  void SetLastVictim(int mode, uint32_t last_victim) { last_victim_[mode] = last_victim; }
 
   void IncreasePageCount(CountType count_type) {
     // Use release-acquire ordering with nr_pages_.
@@ -463,7 +461,6 @@ class SuperblockInfo {
   uint64_t checkpoint_ver_ = 0;
   uint64_t segment_count_[2] = {0};  // # of allocated segments
   uint64_t block_count_[2] = {0};    // # of allocated blocks
-  uint32_t last_victim_[2] = {0};    // last victim segment #
 
   std::vector<std::string> extension_list_;
 
