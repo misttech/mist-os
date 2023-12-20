@@ -231,13 +231,14 @@ to processes in a secure way.
 
 The VMO hierarchy that sysmem uses can cause problems for these tools. For
 example, `mem` ignores VMOs that don't have any [committed][memoryusage]
-memory to avoid cluttering the output. That causes mem to ignore leaf VMOs
-because it's the root VMO in the tree that actually allocated the memory. Mem
-has some hacks to propagate memory information down the tree for VMOs that
-are children of `SysmemContiguousPool` and `SysmemAmlogicProtectedPool` - it
-looks at the "size" of the leaf VMO and assumes that all that memory is
-allocated. This works only for fixed-size pools that are allocated with no
-overlap, which is why it's restricted to a hard-coded set of pools.
+memory (allocated memory with physical memory backing it) to avoid cluttering
+the output. That causes mem to ignore leaf VMOs because it's the root VMO in
+the tree that actually allocated the memory. Mem has some hacks to propagate
+memory information down the tree for VMOs that are children of
+`SysmemContiguousPool` and `SysmemAmlogicProtectedPool` - it looks at the
+"size" of the leaf VMO and assumes that all that memory is allocated. This
+works only for fixed-size pools that are allocated with no overlap, which is
+why it's restricted to a hard-coded set of pools.
 
 External heap VMOs are also complicated since they don't actually take up
 memory inside the [guest virtual machine][guest]. As such, mem is doing the
