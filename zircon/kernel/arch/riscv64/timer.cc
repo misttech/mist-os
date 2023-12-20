@@ -75,8 +75,6 @@ zx_status_t riscv_sbi_timer_shutdown() {
   return ZX_OK;
 }
 
-bool platform_usermode_can_access_tick_registers() { return false; }
-
 const pdev_timer_ops riscv_sbi_timer_ops = {
     .current_ticks = riscv_sbi_current_ticks,
     .set_oneshot_timer = riscv_sbi_set_oneshot_timer,

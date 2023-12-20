@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #include "internal.h"
 
-#include <platform.h>
+#include <platform/timer.h>
 
 extern "C" {
 

@@ -8,8 +8,9 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_DEADLINE_H_
 
 #include <assert.h>
-#include <platform.h>
 #include <zircon/types.h>
+
+#include <platform/timer.h>
 
 enum slack_mode : uint32_t {
   TIMER_SLACK_CENTER = ZX_TIMER_SLACK_CENTER,  // slack is centered around deadline

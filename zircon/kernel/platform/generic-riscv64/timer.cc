@@ -31,3 +31,5 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
 void platform_stop_timer() { timer_stop(); }
 
 void platform_shutdown_timer() { timer_shutdown(); }
+
+bool platform_usermode_can_access_tick_registers() { return false; }

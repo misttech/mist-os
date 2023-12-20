@@ -9,12 +9,14 @@
 #define ZIRCON_KERNEL_INCLUDE_PLATFORM_H_
 
 #include <lib/zbi-format/reboot.h>
+#include <lib/zx/result.h>
 #include <sys/types.h>
 #include <zircon/boot/crash-reason.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-__BEGIN_CDECLS
+#include <dev/power.h>
+#include <kernel/cpu.h>
 
 #define BOOT_CPU_ID 0
 
@@ -26,43 +28,14 @@ typedef enum {
   HALT_ACTION_SHUTDOWN,           // Shutdown and power off.
 } platform_halt_action;
 
-/* current time in nanoseconds */
-zx_time_t current_time(void);
-
-/* high-precision timer ticks per second */
-zx_ticks_t ticks_per_second(void);
-
-/* Reads a platform-specific fixed-rate monotonic counter
- * The "raw" form of the counter should give the current counter value (and is
- * almost certainly not what you want).  The normal form will give the counter
- * value, potentially adjusted by a constant used to make the ticks timeline
- * start ticking from 0 when the system boots.
- */
-zx_ticks_t platform_current_raw_ticks(void);
-zx_ticks_t platform_current_ticks(void);
-
-/* Access the platform specific offset from the raw ticks timeline to the ticks
- * timeline.  The only current legit uses for this function are when
- * initializing the RO data for the VDSO, and when fixing up timer values during
- * vmexit on ARM (see arch/arm64/hypervisor/vmexit.cc).
- */
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset(void);
-
-/* high-precision timer current_ticks */
-static inline zx_ticks_t current_ticks(void) { return platform_current_ticks(); }
-
-/* a bool indicating whether or not user mode has direct access to the registers
- * which allow directly observing the tick counter or not. */
-bool platform_usermode_can_access_tick_registers(void);
-
 /* super early platform initialization, before almost everything */
-void platform_early_init(void);
+void platform_early_init();
 
 /* Perform any set up required before virtual memory is enabled, or the heap is set up. */
-void platform_prevm_init(void);
+void platform_prevm_init();
 
 /* later init, after the kernel has come up */
-void platform_init(void);
+void platform_init();
 
 /* platform_halt halts the system and performs the |suggested_action|.
  *
@@ -85,58 +58,32 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
                             bool halt_on_panic) __NO_RETURN;
 
 /* optionally stop the current cpu in a way the platform finds appropriate */
-void platform_halt_cpu(void);
+void platform_halt_cpu();
 
 // Called just before initiating a system suspend to give the platform layer a
 // chance to save state.  Must be called with interrupts disabled.
-void platform_prep_suspend(void);
+void platform_prep_suspend();
 
 // Called immediately after resuming from a system suspend to let the platform layer
 // reinitialize arch components.  Must be called with interrupts disabled.
-void platform_resume(void);
+void platform_resume();
 
 // Returns true if this system has a debug serial port that is enabled
-bool platform_serial_enabled(void);
+bool platform_serial_enabled();
 
 // Returns true if the early graphics console is enabled
-bool platform_early_console_enabled(void);
+bool platform_early_console_enabled();
 
 // Accessors for the HW reboot reason which may or may not have been delivered
 // by the bootloader.
 void platform_set_hw_reboot_reason(zbi_hw_reboot_reason_t reason);
-zbi_hw_reboot_reason_t platform_hw_reboot_reason(void);
+zbi_hw_reboot_reason_t platform_hw_reboot_reason();
 
 // TODO(fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
 extern zx_paddr_t gAcpiRsdp;
 
 // TODO(fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
 extern zx_paddr_t gSmbiosPhys;
-
-__END_CDECLS
-
-#ifdef __cplusplus
-
-#include <lib/arch/ticks.h>
-#include <lib/zx/result.h>
-
-#include <dev/power.h>
-#include <kernel/cpu.h>
-#include <ktl/string_view.h>
-
-namespace affine {
-class Ratio;  // Fwd decl.
-}  // namespace affine
-
-// Setter/getter pair for the ratio which defines the relationship between the
-// system's tick counter, and the current_time/clock_monotonic clock.  This gets
-// set once by architecture specific plaform code, after an appropriate ticks
-// source has been selected and characterized.
-void platform_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time);
-const affine::Ratio& platform_get_ticks_to_time_ratio(void);
-
-// Convert a sample taken early on to a proper zx_ticks_t, if possible.
-// This returns 0 if early samples are not convertible.
-zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample);
 
 // platform_panic_start informs the system that a panic message is about
 // to be printed and that platform_halt will be called shortly.  The
@@ -150,7 +97,5 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid);
 
 // Get the state of a CPU.
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id);
-
-#endif  // __cplusplus
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_H_

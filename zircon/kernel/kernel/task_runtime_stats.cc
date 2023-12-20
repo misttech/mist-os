@@ -8,7 +8,8 @@
 #include "kernel/task_runtime_stats.h"
 
 #include <lib/affine/ratio.h>
-#include <platform.h>
+
+#include <platform/timer.h>
 
 void TaskRuntimeStats::AccumulateRuntimeTo(zx_info_task_runtime_t* info) const {
   info->cpu_time = zx_duration_add_duration(info->cpu_time, cpu_time);

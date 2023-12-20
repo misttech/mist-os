@@ -6,7 +6,7 @@
 #include <cpuid.h>
 #include <lib/arch/intrin.h>
 
-#include <platform.h>
+#include <platform/timer.h>
 
 extern "C" {
 

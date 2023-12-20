@@ -4,7 +4,8 @@
 
 #include <lib/arch/intrin.h>
 #include <lib/concurrent/seqlock.inc.h>
-#include <platform.h>
+
+#include <platform/timer.h>
 
 namespace internal {
 

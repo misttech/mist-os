@@ -7,10 +7,10 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_EVENT_LIMITER_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_EVENT_LIMITER_H_
 
-#include <platform.h>
 #include <zircon/types.h>
 
 #include <ktl/atomic.h>
+#include <platform/timer.h>
 
 // An EventLimiter allows an action to only be taken every K seconds in a thread-safe manner.
 //

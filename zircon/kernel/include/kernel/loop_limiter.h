@@ -8,12 +8,12 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_LOOP_LIMITER_H_
 
 #include <lib/affine/ratio.h>
-#include <platform.h>
 #include <zircon/types.h>
 
 #include <cstdint>
 
 #include <ktl/move.h>
+#include <platform/timer.h>
 
 // LoopLimiter is used to detect when a thread is looping for "too long".
 //
