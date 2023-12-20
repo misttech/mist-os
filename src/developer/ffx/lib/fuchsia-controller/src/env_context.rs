@@ -5,16 +5,18 @@
 use crate::LibContext;
 use anyhow::Result;
 use camino::Utf8PathBuf;
-use errors::ffx_error;
+use errors::{ffx_error, map_daemon_error};
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon::DaemonConfig;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use fidl::endpoints::Proxy;
+use ffx_target::add_manual_target;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl::AsHandleRef;
-use fidl_fuchsia_developer_ffx::TargetProxy;
+use fidl_fuchsia_developer_ffx::{TargetCollectionMarker, TargetCollectionProxy, TargetProxy};
 use fuchsia_zircon_types as zx_types;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
@@ -115,6 +117,28 @@ impl EnvContext {
 
     pub async fn target_proxy_factory(&self) -> Result<TargetProxy> {
         self.injector.target_factory().await
+    }
+
+    pub async fn target_collection_proxy_factory(&self) -> Result<TargetCollectionProxy> {
+        let daemon = self.injector.daemon_factory().await?;
+        let (client, server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()?;
+        let protocol = <TargetCollectionMarker as DiscoverableProtocolMarker>::PROTOCOL_NAME;
+        daemon
+            .connect_to_protocol(protocol, server.into_channel())
+            .await?
+            .map_err(|err| map_daemon_error(protocol, err))?;
+        Ok(client)
+    }
+
+    pub async fn target_add(
+        &self,
+        addr: IpAddr,
+        scope_id: u32,
+        port: u16,
+        wait: bool,
+    ) -> Result<()> {
+        let tc_proxy = self.target_collection_proxy_factory().await?;
+        add_manual_target(&tc_proxy, addr, scope_id, port, wait).await
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {

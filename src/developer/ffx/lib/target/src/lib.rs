@@ -3,14 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use errors::FfxError;
+use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    DaemonError, DaemonProxy, TargetCollectionMarker, TargetInfo, TargetMarker, TargetQuery,
+    self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
+    TargetInfo, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-use futures::{select, Future, FutureExt};
+use fidl_fuchsia_net as net;
+use futures::{select, Future, FutureExt, TryStreamExt};
+use std::net::IpAddr;
 use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
@@ -223,6 +226,50 @@ pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<S
     let target = context.get(TARGET_DEFAULT_KEY).await?;
     info!("Default target resolved to {target:?}");
     Ok(target)
+}
+
+pub async fn add_manual_target(
+    target_collection_proxy: &TargetCollectionProxy,
+    addr: IpAddr,
+    scope_id: u32,
+    port: u16,
+    wait: bool,
+) -> Result<()> {
+    let ip = match addr {
+        IpAddr::V6(i) => net::IpAddress::Ipv6(net::Ipv6Address { addr: i.octets().into() }),
+        IpAddr::V4(i) => net::IpAddress::Ipv4(net::Ipv4Address { addr: i.octets().into() }),
+    };
+    let addr = if port > 0 {
+        ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, port, scope_id })
+    } else {
+        ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
+    };
+
+    let (client, mut stream) =
+        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>()
+            .context("create endpoints")?;
+    target_collection_proxy
+        .add_target(
+            &addr,
+            &ffx::AddTargetConfig { verify_connection: Some(wait), ..Default::default() },
+            client,
+        )
+        .context("calling AddTarget")?;
+    let res = if let Ok(Some(req)) = stream.try_next().await {
+        match req {
+            ffx::AddTargetResponder_Request::Success { .. } => Ok(()),
+            ffx::AddTargetResponder_Request::Error { err, .. } => Err(err),
+        }
+    } else {
+        ffx_bail!("ffx lost connection to the daemon before receiving a response.");
+    };
+    res.map_err(|e| {
+        let err = e.connection_error.unwrap();
+        let logs = e.connection_error_logs.map(|v| v.join("\n"));
+        let is_default_target = false;
+        let target = Some(format!("{addr:?}"));
+        FfxError::TargetConnectionError { err, target, is_default_target, logs }.into()
+    })
 }
 
 #[cfg(test)]

@@ -13,14 +13,15 @@ ffx_plugin("ffx_target_add") {
 
   sources = [ "src/lib.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/netext:lib",
-    "//src/lib/fidl/rust/fidl",
+    "//src/developer/ffx/lib/target:lib",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:futures",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/lib/fuchsia-async",
+  ]
 }

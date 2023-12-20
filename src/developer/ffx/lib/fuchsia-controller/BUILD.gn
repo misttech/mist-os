@@ -75,6 +75,7 @@ rustc_staticlib("lib") {
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/timeout:lib",

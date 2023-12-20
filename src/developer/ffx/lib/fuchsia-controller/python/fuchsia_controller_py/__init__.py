@@ -201,6 +201,18 @@ class Context:
             )
         )
 
+    def target_add(self, target: str, wait: bool):
+        """Adds a target to the ffx daemon manually.
+
+        Args:
+            target: A string denoting the IP address of the target.
+            wait: Determines whether or not to wait for the target to connect
+                  to RCS
+        """
+        fuchsia_controller_internal.context_target_add(
+            self._handle, target, wait
+        )
+
     def target_wait(self, timeout: float) -> bool:
         """Waits for the target to be ready.
 

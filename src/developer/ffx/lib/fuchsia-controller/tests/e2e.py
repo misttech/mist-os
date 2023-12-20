@@ -33,6 +33,15 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             isolate_dir=self._get_isolate_dir(),
         )
 
+    def test_target_add_invalid_args(self):
+        ctx = self._make_ctx()
+        with self.assertRaises(ValueError):
+            ctx.target_add("this is definitely not an IP", False)
+
+    def test_target_add_nowait(self):
+        ctx = self._make_ctx()
+        ctx.target_add("127.0.0.1", False)
+
     def test_config_get_nonexistent(self):
         ctx = self._make_ctx()
         self.assertEqual(ctx.config_get_string("foobarzzzzzzo==?"), None)

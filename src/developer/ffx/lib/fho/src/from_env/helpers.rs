@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use super::FhoEnvironment;
-use ffx_command::{user_error, Error, FfxContext, Result};
+use ffx_command::{Error, FfxContext, Result};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
-use fidl_fuchsia_developer_ffx::DaemonError;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::time::Duration;
 
@@ -62,37 +61,6 @@ where
     Ok(proxy)
 }
 
-pub fn map_daemon_error(svc_name: &str, err: DaemonError) -> Error {
-    match err {
-        DaemonError::ProtocolNotFound => user_error!(
-            "The daemon protocol '{svc_name}' did not match any protocols on the daemon
-If you are not developing this plugin or the protocol it connects to, then this is a bug
-
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-        ),
-        DaemonError::ProtocolOpenError => user_error!(
-            "The daemon protocol '{svc_name}' failed to open on the daemon.
-
-If you are developing the protocol, there may be an internal failure when invoking the start
-function. See the ffx.daemon.log for details at `ffx config get log.dir -p sub`.
-
-If you are NOT developing this plugin or the protocol it connects to, then this is a bug.
-
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-        ),
-        unexpected => user_error!(
-"While attempting to open the daemon protocol '{svc_name}', received an unexpected error:
-
-{unexpected:?}
-
-This is not intended behavior and is a bug.
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-
-        ),
-    }
-    .into()
-}
-
 pub async fn load_daemon_protocol<P>(env: &FhoEnvironment) -> Result<P>
 where
     P: Proxy + Clone + 'static,
@@ -106,7 +74,7 @@ where
         .connect_to_protocol(svc_name, server_end.into_channel())
         .await
         .bug_context("Connecting to protocol")?
-        .map_err(|err| map_daemon_error(svc_name, err))?;
+        .map_err(|err| Error::User(errors::map_daemon_error(svc_name, err)))?;
 
     Ok(proxy)
 }

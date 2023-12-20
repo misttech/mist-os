@@ -42,6 +42,26 @@ extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* 
 // Attempts to wait (blocking) for a target to become available. Waits for `timeout_seconds`
 // fractional seconds before timing out.
 extern zx_status_t ffx_target_wait(ffx_env_context_t* ctx, double timeout_seconds);
+// Adds a fuchsia-target to the daemon instance of ffx.
+// Setting `wait` to true waits for an RCS connection to become available on the target before
+// returning.
+//
+// Returns ZX_OK on success.
+//
+// Errors:
+// -- ZX_ERR_INTERNAL: on internal ffx error.
+// -- ZX_ERR_INVALID_ARGS: the given target is valid (should be formatted as
+//    either an IP address or an IP/Port pair
+//
+// Examples:
+//   To add a remote target forwarded via ssh:
+//
+//   ffx_target_add(ctx, "127.0.0.1:8022");
+//
+//   Or to add a target using its IPV6:
+//
+//   ffx_target_add(ctx, "fe80::32fd:38ff:fea8:a00a");
+extern zx_status_t ffx_target_add(ffx_env_context_t* ctx, const char* target, bool wait);
 extern void ffx_close_handle(zx_handle_t handle);
 
 extern void ffx_channel_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out0,

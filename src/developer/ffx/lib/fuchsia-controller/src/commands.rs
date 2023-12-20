@@ -16,6 +16,7 @@ use fuchsia_zircon_types as zx_types;
 use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::mem::MaybeUninit;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
@@ -128,6 +129,14 @@ pub(crate) enum LibraryCommand {
     SocketWrite {
         socket: fidl::Socket,
         buf: ExtBuffer<u8>,
+        responder: Responder<zx_status::Status>,
+    },
+    TargetAdd {
+        env: Arc<EnvContext>,
+        addr: IpAddr,
+        scope_id: u32,
+        port: u16,
+        wait: bool,
         responder: Responder<zx_status::Status>,
     },
     TargetWait {
@@ -455,10 +464,21 @@ impl LibraryCommand {
                 };
                 responder.send(status).unwrap();
             }
+            Self::TargetAdd { env, addr, scope_id, port, wait, responder } => {
+                let res = match env.target_add(addr, scope_id, port, wait).await {
+                    Ok(_) => zx_status::Status::OK,
+                    Err(e) => {
+                        env.write_err(e);
+                        zx_status::Status::INTERNAL
+                    }
+                };
+                responder.send(res).unwrap();
+            }
             Self::TargetWait { env, timeout: timeout_float, responder } => {
                 let target = match env.target_proxy_factory().await {
                     Ok(t) => t,
                     Err(e) => {
+                        eprintln!("====> Failing to get target proxy");
                         env.write_err(e);
                         responder.send(zx_status::Status::INTERNAL).unwrap();
                         return;
@@ -467,6 +487,7 @@ impl LibraryCommand {
                 let default_target = match ffx_target::resolve_default_target(&env.context).await {
                     Ok(t) => t,
                     Err(e) => {
+                        eprintln!("====> Failing to resolve default target");
                         env.write_err(e);
                         responder.send(zx_status::Status::INTERNAL).unwrap();
                         return;
@@ -474,20 +495,29 @@ impl LibraryCommand {
                 };
                 let knock_fut = async {
                     loop {
+                        eprintln!("====> Knocking target");
                         break match knock_target(&target).await {
                             Ok(()) => Ok(()),
                             Err(KnockError::NonCriticalError(_)) => continue,
-                            Err(KnockError::CriticalError(e)) => Err(e),
+                            Err(KnockError::CriticalError(e)) => {
+                                eprintln!("====> Failed knocking target: {e:?}");
+                                Err(e)
+                            }
                         };
                     }
                 };
+                let dur = Duration::from_secs_f64(timeout_float);
+                eprintln!("====> Waiting for target knock fut for {dur:?} seconds");
                 let err = match timeout(Duration::from_secs_f64(timeout_float), knock_fut).await {
                     Ok(res) => match res {
                         Ok(()) => {
                             responder.send(zx_status::Status::OK).unwrap();
                             return;
                         }
-                        Err(e) => e,
+                        Err(e) => {
+                            eprintln!("====> Future returned error");
+                            e
+                        }
                     },
                     Err(e) => {
                         anyhow::anyhow!(

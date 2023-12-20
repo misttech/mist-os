@@ -8,6 +8,7 @@ import logging
 import os
 import os.path
 import time
+import ipaddress
 from typing import Any, Callable, Coroutine, Dict, List
 
 import fidl.fuchsia_developer_ffx as ffx
@@ -48,11 +49,30 @@ class FuchsiaDevice(object):
             ctx_config["log.dir"] = log_dir
         isolate = IsolateDir(dir=isolation_path)
         logging.info(
-            f"Loading context, isolate_dir={isolation_path}, log_dir={log_dir}"
+            f"Loading context, isolate_dir={isolation_path}, log_dir={log_dir}, target={self.target}"
         )
+        try:
+            ip = ipaddress.ip_address(self.target)
+            logging.info(
+                f"Target '{self.target}' is an IP address. Disabling mDNS discovery."
+            )
+            if isinstance(ip, ipaddress.IPv6Address):
+                self.target = f"[{self.target}]"
+            ctx_config["discovery.mdns.enabled"] = "false"
+
+        except ValueError:
+            logging.info(
+                f"Target '{self.target}' determined to be nodename. Enabling mDNS discovery."
+            )
+            # It is likely necessary to set mDNS discovery to the underlying
+            # config (after context creation) in order for this to function
+            # properly. This, for the time being, is the same as what
+            # Lacewing does.
+            ctx_config["discovery.mdns.enabled"] = "true"
         self.ctx = Context(
             isolate_dir=isolate, target=self.target, config=ctx_config
         )
+        self.ctx.target_add(self.target, True)
 
     async def wait_offline(self, timeout=TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
@@ -64,12 +84,13 @@ class FuchsiaDevice(object):
         Raises:
             TimeoutError: in the event that the timeout is reached.
         """
+        logging.info(f"Waiting for target '{self.target}' to go offline")
         start_time = time.time()
         end_time = start_time + timeout
         while time.time() < end_time:
             try:
                 logging.debug(
-                    f"Attempting to get proxy info from {self.config['name']}"
+                    f"Attempting to get proxy info from target '{self.target}'"
                 )
                 assert self.ctx is not None
                 target = ffx.Target.Client(self.ctx.connect_target_proxy())
@@ -81,7 +102,7 @@ class FuchsiaDevice(object):
                     break
             except RuntimeError:
                 logging.debug(
-                    f"Determined {self.config['name']} has shut down due runtime error."
+                    f"Determined {self.target} has shut down due runtime error."
                 )
                 break
             await asyncio.sleep(TIMEOUTS["SLEEP"])
@@ -89,6 +110,9 @@ class FuchsiaDevice(object):
             raise TimeoutError(
                 f"'{self.config['name']}' failed to go offline in {timeout}s."
             )
+        logging.info(
+            f"Target '{self.target}' is now offline after {time.time() - start_time} seconds"
+        )
 
     async def wait_online(self, timeout=TIMEOUTS["ONLINE"]) -> None:
         """Waits for the Fuchsia device to come online.
@@ -104,11 +128,16 @@ class FuchsiaDevice(object):
             TimeoutError: in the event that the timeout has been reached before the target device
             is considered online.
         """
+        start_time = time.time()
+        logging.info(f"Waiting for target '{self.target}' to come back online.")
         try:
             assert self.ctx is not None
             self.ctx.target_wait(timeout)
         except ZxStatus:
             raise TimeoutError()
+        logging.info(
+            f"Target '{self.target}' back online after {time.time() - start_time} seconds."
+        )
 
 
 def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:

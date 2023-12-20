@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(target_os = "fuchsia"))]
+use anyhow::anyhow;
+
 use std::process::ExitStatus;
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -98,6 +101,40 @@ pub fn target_string(matcher: &Option<String>, is_default: &bool) -> String {
             "".to_string()
         },
     )
+}
+
+/// Convenience function for converting protocol connection requests into more
+/// diagnosable/actionable errors for the user.
+#[cfg(not(target_os = "fuchsia"))]
+pub fn map_daemon_error(svc_name: &str, err: DaemonError) -> anyhow::Error {
+    match err {
+        DaemonError::ProtocolNotFound => anyhow!(
+            "The daemon protocol '{svc_name}' did not match any protocols on the daemon
+If you are not developing this plugin or the protocol it connects to, then this is a bug
+
+Please report it at http://fxbug.dev/new/ffx+User+Bug."
+        ),
+        DaemonError::ProtocolOpenError => anyhow!(
+            "The daemon protocol '{svc_name}' failed to open on the daemon.
+
+If you are developing the protocol, there may be an internal failure when invoking the start
+function. See the ffx.daemon.log for details at `ffx config get log.dir -p sub`.
+
+If you are NOT developing this plugin or the protocol it connects to, then this is a bug.
+
+Please report it at http://fxbug.dev/new/ffx+User+Bug."
+        ),
+        unexpected => anyhow!(
+"While attempting to open the daemon protocol '{svc_name}', received an unexpected error:
+
+{unexpected:?}
+
+This is not intended behavior and is a bug.
+Please report it at http://fxbug.dev/new/ffx+User+Bug."
+
+        ),
+    }
+    .into()
 }
 
 // Utility macro for constructing a FfxError::Error with a simple error string.

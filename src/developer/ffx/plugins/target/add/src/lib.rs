@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use errors::{ffx_bail, ffx_error, FfxError};
+use errors::ffx_error;
+use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::{self as ffx, TargetCollectionProxy};
-use fidl_fuchsia_net as net;
-use futures::TryStreamExt;
+use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use netext::parse_address_parts;
-use std::net::IpAddr;
 
 #[derive(FfxTool)]
 pub struct AddTool {
@@ -49,46 +47,17 @@ pub async fn add_impl(
     } else {
         0
     };
-    let ip = match addr {
-        IpAddr::V6(i) => net::IpAddress::Ipv6(net::Ipv6Address { addr: i.octets().into() }),
-        IpAddr::V4(i) => net::IpAddress::Ipv4(net::Ipv4Address { addr: i.octets().into() }),
-    };
-    let addr = if let Some(port) = port {
-        ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, port, scope_id })
-    } else {
-        ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
-    };
-
-    let (client, mut stream) =
-        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>()
-            .bug_context("create endpoints")?;
-    target_collection_proxy
-        .add_target(
-            &addr,
-            &ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
-            client,
-        )
-        .user_message("Failed to call AddTarget")?;
-    let res = if let Ok(Some(req)) = stream.try_next().await {
-        match req {
-            ffx::AddTargetResponder_Request::Success { .. } => Ok(()),
-            ffx::AddTargetResponder_Request::Error { err, .. } => Err(err),
-        }
-    } else {
-        ffx_bail!("ffx lost connection to the daemon before receiving a response.");
-    };
-    res.map_err(|e| {
-        let err = e.connection_error.unwrap();
-        let logs = e.connection_error_logs.map(|v| v.join("\n"));
-        let is_default_target = false;
-        let target = Some(format!("{}", cmd.addr));
-        FfxError::TargetConnectionError { err, target, is_default_target, logs }.into()
-    })
+    add_manual_target(&target_collection_proxy, addr, scope_id, port.unwrap_or(0), !cmd.nowait)
+        .await
+        .map(Into::into)
+        .map_err(Into::into)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl_fuchsia_developer_ffx as ffx;
+    use fidl_fuchsia_net as net;
 
     fn setup_fake_target_collection<T: 'static + Fn(ffx::TargetAddrInfo) + Send>(
         test: T,

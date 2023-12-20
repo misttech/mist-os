@@ -608,6 +608,31 @@ PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromLong(descriptor);
 }
 
+PyObject *context_target_add(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  const char *target = nullptr;
+  bool wait = false;
+  if (!PyArg_ParseTuple(args, "Osb", &obj, &target, &wait)) {
+    return nullptr;
+  }
+  auto context = DowncastPyObject<PythonContext>(obj);
+  if (!context) {
+    return nullptr;
+  }
+  zx_status_t status = ffx_target_add(context->context(), target, wait);
+  if (status != ZX_OK) {
+    switch (status) {
+      case ZX_ERR_INVALID_ARGS:
+        PyErr_Format(PyExc_ValueError, "invalid address passed as target: '%s'", target);
+        break;
+      default:
+        mod::dump_python_err();
+    }
+    return nullptr;
+  }
+  Py_RETURN_NONE;
+}
+
 PyObject *context_target_wait(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
   double seconds = 0;
@@ -1022,6 +1047,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
      METH_VARARGS, nullptr},
     {"context_connect_remote_control_proxy",
      reinterpret_cast<PyCFunction>(context_connect_remote_control_proxy), METH_VARARGS, nullptr},
+    {"context_target_add", reinterpret_cast<PyCFunction>(context_target_add), METH_VARARGS,
+     nullptr},
     {"context_target_wait", reinterpret_cast<PyCFunction>(context_target_wait), METH_VARARGS,
      nullptr},
     {"context_config_get_string", reinterpret_cast<PyCFunction>(context_config_get_string),

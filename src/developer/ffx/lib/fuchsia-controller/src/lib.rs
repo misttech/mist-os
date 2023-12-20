@@ -16,6 +16,7 @@ use crate::lib_context::LibContext;
 use fidl::HandleBased;
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
+use netext::parse_address_parts;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
@@ -146,6 +147,39 @@ pub unsafe extern "C" fn ffx_target_wait(ctx: *mut EnvContext, timeout: f64) -> 
     let ctx = unsafe { get_arc(ctx) };
     let (responder, rx) = mpsc::sync_channel(1);
     ctx.lib_ctx().run(LibraryCommand::TargetWait { env: ctx.clone(), timeout, responder });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_target_add(
+    ctx: *mut EnvContext,
+    target: *const i8,
+    wait: bool,
+) -> zx_status::Status {
+    let target =
+        unsafe { CStr::from_ptr(target) }.to_str().expect("valid target string").to_owned();
+    let (addr, scope, port) = match parse_address_parts(target.as_str()) {
+        Ok(res) => res,
+        Err(_) => return zx_status::Status::INVALID_ARGS,
+    };
+    let scope_id = if let Some(scope) = scope {
+        match netext::get_verified_scope_id(scope) {
+            Ok(scope) => scope,
+            Err(_) => return zx_status::Status::INVALID_ARGS,
+        }
+    } else {
+        0
+    };
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    ctx.lib_ctx().run(LibraryCommand::TargetAdd {
+        env: ctx.clone(),
+        addr,
+        scope_id,
+        port: port.unwrap_or(0),
+        wait,
+        responder,
+    });
     rx.recv().unwrap()
 }
 
