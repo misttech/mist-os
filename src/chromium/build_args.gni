@@ -4,8 +4,8 @@
 
 declare_args() {
   # This variable specifies a fully qualified Chromium build output directory,
-  # such as `/home/$USER/chrome/src/out/fuchsia`, from which `chrome`,
-  # `cast_runner`, and `web_engine` will be obtained.
+  # such as `/home/$USER/chrome/src/out/fuchsia`, from which `web_engine` will
+  # be obtained.
   # All of those targets must exist in the output directory.
   # If unset, the prebuilt packages from CIPD will be used.
   chromium_build_dir = ""
