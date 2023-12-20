@@ -102,7 +102,7 @@ type Routine = table {
                 /// The priority of the routine relative to other routines
                 /// installed on the same hook.
                 ///
-                /// Interpreted as 0 if unset.
+                /// Interpreted as `DEFAULT_ROUTINE_PRIORITY` if unset.
                 2: priority Priority;
             };
         };
@@ -137,7 +137,7 @@ type Routine = table {
                 /// The priority of the routine relative to other routines
                 /// installed on the same hook.
                 ///
-                /// Interpreted as 0 if unset.
+                /// Interpreted as `DEFAULT_ROUTINE_PRIORITY` if unset.
                 2: priority Priority;
             };
         };

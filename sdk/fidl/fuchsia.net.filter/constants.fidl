@@ -17,3 +17,7 @@ library fuchsia.net.filter;
 // the FIDL message header + 16 for the vector), so we selected the maximum N
 // where 32 + N * 1536 <= 64 KiB.
 const MAX_BATCH_SIZE uint16 = 42;
+
+/// The default priority of a routine relative to other routines installed on
+/// the same hook.
+const DEFAULT_ROUTINE_PRIORITY Priority = 0;
