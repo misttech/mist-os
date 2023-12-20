@@ -158,9 +158,8 @@ TEST_F(UinputTest, UiDevCreateTouchscreen) {
   EXPECT_EQ(res, 0);
 }
 
-TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
-  GTEST_SKIP() << "b/310963779";
-
+TEST_F(UinputTest, UiDevCreateTouchscreenEvIoGid) {
+  GTEST_SKIP() << "b/302172833 does not support touchscreen creation yet";
   auto ls_before = lsDir("/dev/input");
 
   int res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_ABS);
@@ -180,7 +179,6 @@ TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
 
   auto new_device_name = diff[0];
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
-  EXPECT_EQ(new_device_name, "");
 
   auto new_device_fd =
       test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
@@ -193,9 +191,7 @@ TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
   EXPECT_EQ(got_input_id.product, usetup.id.product);
 }
 
-TEST_F(UinputTest, UiDevCreateTouchscreenEvIoGid) {
-  GTEST_SKIP() << "b/310963779";
-
+TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
   auto ls_before = lsDir("/dev/input");
   uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 5}};
   strcpy(usetup.name, "Example device");
@@ -211,7 +207,6 @@ TEST_F(UinputTest, UiDevCreateTouchscreenEvIoGid) {
 
   auto new_device_name = diff[0];
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
-  EXPECT_EQ(new_device_name, "");
 
   auto new_device_fd =
       test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
