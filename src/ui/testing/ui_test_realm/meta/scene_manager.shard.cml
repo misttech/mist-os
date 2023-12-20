@@ -22,6 +22,10 @@
             // test component exists yet.
         },
         {
+            name: "mock_cobalt",
+            url: "#meta/mock_cobalt.cm",
+        },
+        {
             name: "input-helper",
             url: "#meta/input-helper.cm",
         },
@@ -36,6 +40,11 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [ "#input-helper" ],
+        },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#mock_cobalt",
+            to: [ "#scene_manager" ],
         },
         {
             protocol: [ "fuchsia.input.injection.InputDeviceRegistry" ],
