@@ -32,6 +32,9 @@ class Screenshot {
   //              is seen by the user.
   Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation);
 
+  // An empty screenshot.
+  Screenshot();
+
   // Returns the |Pixel| located at (x,y) coordinates. |x| and |y| should range from [0,width_) and
   // [0,height_) respectively.
   //
@@ -71,11 +74,20 @@ class Screenshot {
 
   uint64_t height() const { return height_; }
 
+  // Loads the screenshot from a PNG file.
+  bool LoadFromPng(const std::string& png_filename);
+
   // Dumps the screenshot as a BGRA raw file to /custom_artifacts. Returns true if it is successful.
   // Note that the custom_artifacts storage capability needs to be added to the test. See
   // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts
   // for more details.
   bool DumpToCustomArtifacts(const std::string& filename = "screenshot.bgra") const;
+
+  // Dumps the screenshot as a PNG file to /custom_artifacts. Returns true if it is successful.
+  // Note that the custom_artifacts storage capability needs to be added to the test. See
+  // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts
+  // for more details.
+  bool DumpPngToCustomArtifacts(const std::string& filename = "screenshot.png") const;
 
  private:
   // Populates |screenshot_| by converting the linear array of bytes in |screenshot_vmo| of size |4

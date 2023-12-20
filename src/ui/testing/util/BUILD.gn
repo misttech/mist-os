@@ -66,6 +66,7 @@ source_set("screenshot_helper") {
 
   public_deps = [
     "//sdk/lib/syslog/cpp",
+    "//third_party/libpng",
     "//zircon/system/ulib/zx",
   ]
 }
