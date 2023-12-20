@@ -17,5 +17,12 @@
                 "client_explicitly_removes_address_when_lease_expires_ns[23]",
             ],
         },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                // TODO(b/42077866): Implement Rebinding state.
+                "client_rebinds_same_lease_to_other_server_ns[23]",
+            ],
+        },
     ],
 }

@@ -38,23 +38,40 @@ struct DhcpTestRealm<'a> {
     _network: netemul::TestNetwork<'a>,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum DhcpServerAddress {
+    Primary,
+    Secondary,
+}
+
+fn server_test_config(address: DhcpServerAddress) -> dhcpv4_helper::TestConfig {
+    dhcpv4_helper::TestConfig::new(
+        match address {
+            DhcpServerAddress::Primary => 1,
+            DhcpServerAddress::Secondary => 2,
+        },
+        3..6,
+    )
+}
+
 impl<'a> DhcpTestRealm<'a> {
-    async fn start_dhcp_server(&self) {
-        self.start_dhcp_server_with_options([], []).await
+    async fn start_dhcp_server(&self, address: DhcpServerAddress) {
+        self.start_dhcp_server_with_options(address, [], []).await
     }
 
     async fn start_dhcp_server_with_options(
         &self,
+        address: DhcpServerAddress,
         parameters: impl IntoIterator<Item = fnet_dhcp::Parameter>,
         options: impl IntoIterator<Item = fnet_dhcp::Option_>,
     ) {
         let Self { server_realm, server_iface, client_realm: _, client_iface: _, _network: _ } =
             self;
 
+        let config = server_test_config(address);
+
         server_iface
-            .add_address_and_subnet_route(
-                dhcpv4_helper::DEFAULT_TEST_CONFIG.server_addr_with_prefix().into_ext(),
-            )
+            .add_address_and_subnet_route(config.server_addr_with_prefix().into_ext())
             .await
             .expect("add address should succeed");
 
@@ -64,7 +81,7 @@ impl<'a> DhcpTestRealm<'a> {
 
         dhcpv4_helper::set_server_settings(
             &server_proxy,
-            dhcpv4_helper::DEFAULT_TEST_CONFIG
+            config
                 .dhcp_parameters()
                 .into_iter()
                 .chain([fnet_dhcp::Parameter::BoundDeviceNames(vec![server_iface
@@ -83,13 +100,54 @@ impl<'a> DhcpTestRealm<'a> {
             .expect("start_serving should succeed");
     }
 
-    async fn stop_dhcp_server(&self) {
-        let Self { server_realm, server_iface: _, client_realm: _, client_iface: _, _network: _ } =
+    async fn switch_dhcp_server_address(
+        &self,
+        old_address: DhcpServerAddress,
+        new_address: DhcpServerAddress,
+    ) {
+        let Self { server_realm, server_iface, client_realm: _, client_iface: _, _network: _ } =
             self;
         let server_proxy = server_realm
             .connect_to_protocol::<fnet_dhcp::Server_Marker>()
             .expect("connect to Server_ protocol should succeed");
         server_proxy.stop_serving().await.expect("stop_serving should not encounter FIDL error");
+        let old_config = server_test_config(old_address);
+        assert!(server_iface
+            .del_address_and_subnet_route(old_config.server_addr_with_prefix().into_ext())
+            .await
+            .expect("removing address should succeed"));
+
+        let new_config = server_test_config(new_address);
+        server_proxy
+            .set_parameter(&fnet_dhcp::Parameter::IpAddrs(vec![new_config.server_addr]))
+            .await
+            .expect("setting parameter shouldn't have FIDL error")
+            .expect("setting new server addr should succeed");
+
+        server_iface
+            .add_address_and_subnet_route(new_config.server_addr_with_prefix().into_ext())
+            .await
+            .expect("add address should succeed");
+        server_proxy
+            .start_serving()
+            .await
+            .expect("start_serving should not encounter FIDL error")
+            .expect("start_serving should succeed");
+    }
+
+    async fn stop_dhcp_server(&self, address: DhcpServerAddress) {
+        let Self { server_realm, server_iface, client_realm: _, client_iface: _, _network: _ } =
+            self;
+        let server_proxy = server_realm
+            .connect_to_protocol::<fnet_dhcp::Server_Marker>()
+            .expect("connect to Server_ protocol should succeed");
+        server_proxy.stop_serving().await.expect("stop_serving should not encounter FIDL error");
+
+        let config = server_test_config(address);
+        assert!(server_iface
+            .del_address_and_subnet_route(config.server_addr_with_prefix().into_ext())
+            .await
+            .expect("removing address should succeed"));
     }
 }
 
@@ -336,15 +394,45 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
     assert_matches!(on_exit, ClientEvent::OnExit { reason: ClientExitReason::GracefulShutdown })
 }
 
+enum AspServerEnd {
+    ServerEnd(fidl::endpoints::ServerEnd<fnet_interfaces_admin::AddressStateProviderMarker>),
+    Stream(fnet_interfaces_admin::AddressStateProviderRequestStream),
+}
+
+impl AspServerEnd {
+    fn into_stream(self) -> fnet_interfaces_admin::AddressStateProviderRequestStream {
+        match self {
+            AspServerEnd::ServerEnd(server_end) => {
+                server_end.into_stream().expect("into_stream should succeed")
+            }
+            AspServerEnd::Stream(stream) => stream,
+        }
+    }
+}
+
+impl From<fidl::endpoints::ServerEnd<fnet_interfaces_admin::AddressStateProviderMarker>>
+    for AspServerEnd
+{
+    fn from(
+        value: fidl::endpoints::ServerEnd<fnet_interfaces_admin::AddressStateProviderMarker>,
+    ) -> Self {
+        Self::ServerEnd(value)
+    }
+}
+
+impl From<fnet_interfaces_admin::AddressStateProviderRequestStream> for AspServerEnd {
+    fn from(value: fnet_interfaces_admin::AddressStateProviderRequestStream) -> Self {
+        Self::Stream(value)
+    }
+}
+
 async fn assert_client_shutdown(
     client: fnet_dhcp::ClientProxy,
-    address_state_provider: fidl::endpoints::ServerEnd<
-        fnet_interfaces_admin::AddressStateProviderMarker,
-    >,
+    address_state_provider: impl Into<AspServerEnd>,
 ) {
+    let address_state_provider = address_state_provider.into();
     let asp_server_fut = async move {
-        let request_stream =
-            address_state_provider.into_stream().expect("into_stream should succeed");
+        let request_stream = address_state_provider.into_stream();
         pin_mut!(request_stream);
 
         let control_handle = assert_matches!(
@@ -376,7 +464,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
         _network: _,
     } = &create_test_realm::<N>(&sandbox, name).await;
 
-    test_realm.start_dhcp_server().await;
+    test_realm.start_dhcp_server(DhcpServerAddress::Primary).await;
 
     let provider =
         client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
@@ -404,7 +492,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
         address,
         fnet::Ipv4AddressWithPrefix {
             addr: net_types::ip::Ipv4Addr::from(
-                dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
+                server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
             )
             .into_ext(),
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
@@ -427,6 +515,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
 
     test_realm
         .start_dhcp_server_with_options(
+            DhcpServerAddress::Primary,
             [fnet_dhcp::Parameter::Lease(fnet_dhcp::LeaseLength {
                 default: Some(5), // short enough to expire during this test
                 ..Default::default()
@@ -461,7 +550,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
         address,
         fnet::Ipv4AddressWithPrefix {
             addr: net_types::ip::Ipv4Addr::from(
-                dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
+                server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
             )
             .into_ext(),
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
@@ -478,7 +567,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
         .expect("should succeed");
 
     // Stop the DHCP server to prevent it from renewing the lease.
-    test_realm.stop_dhcp_server().await;
+    test_realm.stop_dhcp_server(DhcpServerAddress::Primary).await;
 
     // The client should fail to renew and have the lease expire, causing it to
     // remove the address.
@@ -493,6 +582,133 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
     control_handle
         .send_on_address_removed(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
         .expect("should succeed");
+}
+
+#[netstack_test]
+async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
+    let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
+    let test_realm @ DhcpTestRealm {
+        client_realm,
+        client_iface,
+        server_realm: _,
+        server_iface: _,
+        _network: _,
+    } = &create_test_realm::<N>(&sandbox, name).await;
+
+    // Have a shorter lease length so that this test fails faster when Rebinding
+    // doesn't work or is not implemented.
+    const LEASE_LENGTH_SECS: u32 = 20;
+
+    test_realm
+        .start_dhcp_server_with_options(
+            DhcpServerAddress::Primary,
+            [fnet_dhcp::Parameter::Lease(fnet_dhcp::LeaseLength {
+                default: Some(LEASE_LENGTH_SECS),
+                ..Default::default()
+            })],
+            // Force the client to start rebinding sooner so that we have more
+            // time to complete the rebind (this helps avoid flakes due to CI
+            // timing woes).
+            [
+                // These are not 0 because we still need to give the DHCP server
+                // time to stop and then start again with a different address
+                // before the client tries to rebind.
+                fnet_dhcp::Option_::RenewalTimeValue(LEASE_LENGTH_SECS / 2),
+                fnet_dhcp::Option_::RebindingTimeValue(LEASE_LENGTH_SECS / 2),
+            ],
+        )
+        .await;
+
+    let provider =
+        client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
+
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
+
+    let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+    pin_mut!(config_stream);
+
+    let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
+
+    assert_eq!(dns_servers, Vec::new());
+    assert_eq!(routers, Vec::new());
+
+    let fnet_dhcp_ext::Address { address, address_parameters, address_state_provider } =
+        address.expect("address should be present in response");
+    assert_eq!(
+        address,
+        fnet::Ipv4AddressWithPrefix {
+            addr: net_types::ip::Ipv4Addr::from(
+                server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
+            )
+            .into_ext(),
+            prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
+        }
+    );
+    let fnet_interfaces_admin::AddressParameters { initial_properties, .. } = address_parameters;
+    let fnet_interfaces_admin::AddressProperties { valid_lifetime_end, .. } =
+        initial_properties.expect("should be set");
+    let initial_valid_lifetime_end = valid_lifetime_end.expect("valid_lifetime_end should be set");
+
+    // Install the address so that the client doesn't error while trying to renew.
+    client_iface
+        .add_address_and_subnet_route(fnet::Subnet {
+            addr: fnet::IpAddress::Ipv4(address.addr),
+            prefix_len: address.prefix_len,
+        })
+        .await
+        .expect("should succeed");
+
+    // Switch the DHCP server to a different address so that the client can't
+    // find it at the old one.
+    test_realm
+        .switch_dhcp_server_address(DhcpServerAddress::Primary, DhcpServerAddress::Secondary)
+        .await;
+
+    // The client should successfully renew without ever removing the address.
+    let mut request_stream = address_state_provider.into_stream().expect("should succeed");
+
+    {
+        let request_stream = &mut request_stream;
+        pin_mut!(request_stream);
+        let request = request_stream
+            .try_next()
+            .await
+            .expect("should succeed")
+            .expect("should not have ended");
+        let (responder, valid_lifetime_end) = assert_matches!(
+            request,
+            fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
+                address_properties: fnet_interfaces_admin::AddressProperties {
+                    valid_lifetime_end: Some(valid_lifetime_end),
+                    ..
+                },
+                responder,
+            } => (responder, valid_lifetime_end),
+            "client should successfully renew and update the address's valid lifetime"
+        );
+        assert!(
+            valid_lifetime_end > initial_valid_lifetime_end,
+            "valid lifetime should be extended"
+        );
+        responder.send().expect("responding to UpdateAddressProperties should succeed");
+    }
+
+    let shutdown_fut = assert_client_shutdown(client.clone(), request_stream);
+    // We still need to drive the client's event loop while shutting it down.
+    let watch_fut = client.watch_configuration();
+
+    let (watch_result, ()) = join!(watch_fut, shutdown_fut);
+    assert_matches!(
+        watch_result,
+        Err(fidl::Error::ClientChannelClosed { status: _, protocol_name: _ })
+    );
 }
 
 const DEBUG_PRINT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
@@ -611,7 +827,7 @@ async fn client_handles_address_removal<N: Netstack>(
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let test_realm = create_test_realm::<N>(&sandbox, name).await;
 
-    test_realm.start_dhcp_server().await;
+    test_realm.start_dhcp_server(DhcpServerAddress::Primary).await;
 
     let DhcpTestRealm {
         client_realm,
@@ -647,7 +863,7 @@ async fn client_handles_address_removal<N: Netstack>(
         address,
         fnet::Ipv4AddressWithPrefix {
             addr: net_types::ip::Ipv4Addr::from(
-                dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
+                server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
             )
             .into_ext(),
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
@@ -712,7 +928,9 @@ async fn client_handles_address_removal<N: Netstack>(
         address,
         fnet::Ipv4AddressWithPrefix {
             addr: net_types::ip::Ipv4Addr::from(std::net::Ipv4Addr::from(
-                u32::from(dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start) + 1
+                u32::from(
+                    server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
+                ) + 1
             ))
             .into_ext(),
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),

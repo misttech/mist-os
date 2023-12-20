@@ -7,10 +7,12 @@
 
 #![deny(missing_docs)]
 
+use std::ops::Range;
+
 use dhcpv4::protocol::IntoFidlExt as _;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
-use net_declare::{fidl_ip_v4, net::prefix_length_v4, std_ip_v4};
+use net_declare::net::prefix_length_v4;
 use net_types::ip::{Ipv4, PrefixLength};
 
 /// Encapsulates a minimal configuration needed to test a DHCP client/server combination.
@@ -23,6 +25,52 @@ pub struct TestConfig {
 }
 
 impl TestConfig {
+    /// Given offsets for the server's own address and the managed address pool,
+    /// constructs a `TestConfig` for a DHCP server managing addresses in the
+    /// 192.168.0.0/25 subnet.
+    pub const fn new(server_addr_offset: u8, pool_offsets: Range<u8>) -> Self {
+        const fn from_offset(offset: u8) -> std::net::Ipv4Addr {
+            std::net::Ipv4Addr::new(192, 168, 0, offset)
+        }
+
+        let Range { start, end } = pool_offsets;
+
+        let max_offset = 1u8
+            << const_unwrap::const_unwrap_option(
+                32u8.checked_sub(DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get()),
+            );
+
+        assert!(
+            server_addr_offset < max_offset,
+            "server_addr_offset must fit within default address pool prefix"
+        );
+        assert!(pool_offsets.start < pool_offsets.end, "pool_offsets start must be less than end");
+        assert!(
+            pool_offsets.start < max_offset,
+            "pool_offsets.start must fit within default address pool prefix"
+        );
+        assert!(
+            pool_offsets.end < max_offset,
+            "pool_offsets.end must fit within default address pool prefix"
+        );
+
+        let server_addr =
+            fidl_fuchsia_net::Ipv4Address { addr: from_offset(server_addr_offset).octets() };
+        let pool_range_start = from_offset(start);
+        let pool_range_stop = from_offset(end);
+
+        Self {
+            server_addr,
+            managed_addrs: dhcpv4::configuration::ManagedAddresses {
+                mask: dhcpv4::configuration::SubnetMask::new(
+                    DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH,
+                ),
+                pool_range_start,
+                pool_range_stop,
+            },
+        }
+    }
+
     /// The IPv4 address a client will acquire from the server.
     pub fn expected_acquired(&self) -> fidl_fuchsia_net::Subnet {
         let Self {
@@ -64,14 +112,7 @@ impl TestConfig {
 pub const DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH: PrefixLength<Ipv4> = prefix_length_v4!(25);
 
 /// Default configuration.
-pub const DEFAULT_TEST_CONFIG: TestConfig = TestConfig {
-    server_addr: fidl_ip_v4!("192.168.0.1"),
-    managed_addrs: dhcpv4::configuration::ManagedAddresses {
-        mask: dhcpv4::configuration::SubnetMask::new(DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH),
-        pool_range_start: std_ip_v4!("192.168.0.2"),
-        pool_range_stop: std_ip_v4!("192.168.0.5"),
-    },
-};
+pub const DEFAULT_TEST_CONFIG: TestConfig = TestConfig::new(1, 2..5);
 
 /// Set DHCPv4 server settings.
 pub async fn set_server_settings(
