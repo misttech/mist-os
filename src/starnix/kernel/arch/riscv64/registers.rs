@@ -4,7 +4,7 @@
 
 use fuchsia_zircon as zx;
 
-use starnix_uapi::uapi::user_regs_struct;
+use starnix_uapi::{error, errors::Errno, uapi::user_regs_struct};
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
@@ -128,6 +128,81 @@ impl RegisterState {
             t5: self.real_registers.t5,
             t6: self.real_registers.t6,
         }
+    }
+
+    pub fn get_user_register(&self, offset: usize) -> Result<usize, Errno> {
+        if offset >= std::mem::size_of::<user_regs_struct>() {
+            return error!(EINVAL);
+        }
+
+        let val = if offset == memoffset::offset_of!(user_regs_struct, pc) {
+            self.real_registers.pc
+        } else if offset == memoffset::offset_of!(user_regs_struct, ra) {
+            self.real_registers.ra
+        } else if offset == memoffset::offset_of!(user_regs_struct, sp) {
+            self.real_registers.sp
+        } else if offset == memoffset::offset_of!(user_regs_struct, gp) {
+            self.real_registers.gp
+        } else if offset == memoffset::offset_of!(user_regs_struct, tp) {
+            self.real_registers.tp
+        } else if offset == memoffset::offset_of!(user_regs_struct, t0) {
+            self.real_registers.t0
+        } else if offset == memoffset::offset_of!(user_regs_struct, t1) {
+            self.real_registers.t1
+        } else if offset == memoffset::offset_of!(user_regs_struct, t2) {
+            self.real_registers.t2
+        } else if offset == memoffset::offset_of!(user_regs_struct, s0) {
+            self.real_registers.s0
+        } else if offset == memoffset::offset_of!(user_regs_struct, s1) {
+            self.real_registers.s1
+        } else if offset == memoffset::offset_of!(user_regs_struct, a0) {
+            self.real_registers.a0
+        } else if offset == memoffset::offset_of!(user_regs_struct, a1) {
+            self.real_registers.a1
+        } else if offset == memoffset::offset_of!(user_regs_struct, a2) {
+            self.real_registers.a2
+        } else if offset == memoffset::offset_of!(user_regs_struct, a3) {
+            self.real_registers.a3
+        } else if offset == memoffset::offset_of!(user_regs_struct, a4) {
+            self.real_registers.a4
+        } else if offset == memoffset::offset_of!(user_regs_struct, a5) {
+            self.real_registers.a5
+        } else if offset == memoffset::offset_of!(user_regs_struct, a6) {
+            self.real_registers.a6
+        } else if offset == memoffset::offset_of!(user_regs_struct, a7) {
+            self.real_registers.a7
+        } else if offset == memoffset::offset_of!(user_regs_struct, s2) {
+            self.real_registers.s2
+        } else if offset == memoffset::offset_of!(user_regs_struct, s3) {
+            self.real_registers.s3
+        } else if offset == memoffset::offset_of!(user_regs_struct, s4) {
+            self.real_registers.s4
+        } else if offset == memoffset::offset_of!(user_regs_struct, s5) {
+            self.real_registers.s5
+        } else if offset == memoffset::offset_of!(user_regs_struct, s6) {
+            self.real_registers.s6
+        } else if offset == memoffset::offset_of!(user_regs_struct, s7) {
+            self.real_registers.s7
+        } else if offset == memoffset::offset_of!(user_regs_struct, s8) {
+            self.real_registers.s8
+        } else if offset == memoffset::offset_of!(user_regs_struct, s9) {
+            self.real_registers.s9
+        } else if offset == memoffset::offset_of!(user_regs_struct, s10) {
+            self.real_registers.s10
+        } else if offset == memoffset::offset_of!(user_regs_struct, s11) {
+            self.real_registers.s11
+        } else if offset == memoffset::offset_of!(user_regs_struct, t3) {
+            self.real_registers.t3
+        } else if offset == memoffset::offset_of!(user_regs_struct, t4) {
+            self.real_registers.t4
+        } else if offset == memoffset::offset_of!(user_regs_struct, t5) {
+            self.real_registers.t5
+        } else if offset == memoffset::offset_of!(user_regs_struct, t6) {
+            self.real_registers.t6
+        } else {
+            return error!(EINVAL);
+        };
+        Ok(val as usize)
     }
 }
 

@@ -4,6 +4,8 @@
 
 use fuchsia_zircon as zx;
 
+use starnix_uapi::{error, errors::Errno, user_regs_struct};
+
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
 ///
@@ -93,6 +95,32 @@ impl RegisterState {
     /// Resets the register that contains the application status flags.
     pub fn reset_flags(&mut self) {
         self.real_registers.cpsr = 0;
+    }
+
+    /// Returns the value of the register at the offset in the user_regs_struct
+    /// data type.
+    pub fn get_user_register(&self, offset: usize) -> Result<usize, Errno> {
+        if offset >= std::mem::size_of::<user_regs_struct>() {
+            return error!(EINVAL);
+        }
+        let val = if offset == memoffset::offset_of!(user_regs_struct, sp) {
+            self.real_registers.sp
+        } else if offset == memoffset::offset_of!(user_regs_struct, pc) {
+            self.real_registers.pc
+        } else if offset == memoffset::offset_of!(user_regs_struct, pstate) {
+            self.real_registers.cpsr
+        } else if offset
+            == memoffset::offset_of!(user_regs_struct, regs) + 30 * std::mem::size_of::<u64>()
+        {
+            // The 30th register is stored as lr in self.real_registers
+            self.real_registers.lr
+        } else if offset % std::mem::align_of::<u64>() == 0 {
+            let index = (offset - memoffset::offset_of!(user_regs_struct, regs)) >> 3;
+            self.real_registers.r[index]
+        } else {
+            return error!(EINVAL);
+        };
+        Ok(val as usize)
     }
 }
 

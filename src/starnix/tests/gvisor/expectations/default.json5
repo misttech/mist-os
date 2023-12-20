@@ -556,7 +556,6 @@
                 "PtraceTest.85",
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
-                "PtraceTest.GetRegSet",
                 "PtraceTest.Int3",
                 "PtraceTest.SeizeSetOptions",
                 "PtraceTest.Sysemu_PokeUser",
@@ -767,7 +766,6 @@
                 "SyncFileRangeTest.CannotSyncFileRangeOnUnopenedFd",
 
                 // sysret_test
-                "SysretTest.JustDetach",
                 "SysretTest.BadRip",
                 "SysretTest.BadRsp",
 

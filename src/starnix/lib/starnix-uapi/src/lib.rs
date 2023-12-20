@@ -6,6 +6,7 @@ pub mod arc_key;
 pub mod as_any;
 pub mod auth;
 pub mod device_type;
+pub mod elf;
 pub mod errors;
 pub mod file_mode;
 pub mod inotify_mask;

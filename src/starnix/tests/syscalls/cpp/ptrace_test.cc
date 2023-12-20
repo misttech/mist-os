@@ -2,10 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <elf.h>
 #include <signal.h>
+#include <string.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
+#include <sys/user.h>
 #include <syscall.h>
 #include <time.h>
+
+#ifdef __riscv
+#include <asm/ptrace.h>
+#endif  // __riscv
 
 #include <gtest/gtest.h>
 
@@ -227,4 +235,69 @@ exit_loop:
 
   EXPECT_EQ(found, true) << "Never found nanosleep call";
   EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
+}
+
+TEST(PtraceTest, GetGeneralRegs) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  pid_t child_pid = helper.RunInForkedProcess([] {
+    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+
+    // Use kill explicitly because we check the syscall argument register below.
+    kill(getpid(), SIGSTOP);
+
+    _exit(0);
+  });
+  ASSERT_NE(child_pid, 0);
+
+  // Wait for the child to send itself SIGSTOP and enter signal-delivery-stop.
+  int status;
+  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+
+#if defined(__x86_64__)
+#define __REG rsi
+#elif defined(__aarch64__)
+#define __REG regs[1]
+#elif defined(__riscv)
+#define __REG a1
+#else
+#error "Test does not support architecture for PTRACE_GETREGS";
+#endif
+
+  // Get the general registers with PTRACE_GETREGSET
+  struct user_regs_struct regs_set;
+  struct iovec iov;
+  iov.iov_base = &regs_set;
+  iov.iov_len = sizeof(regs_set);
+  EXPECT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), 0)
+      << "Error " << errno << " " << strerror(errno);
+
+  // Read exactly the full register set.
+  EXPECT_EQ(iov.iov_len, sizeof(regs_set));
+
+  // Child called kill(2), with SIGSTOP as arg 2.
+  EXPECT_EQ(regs_set.__REG, static_cast<unsigned long>(SIGSTOP));
+
+  // The appropriate defines for this are not in the ptrace header for arm64.
+#ifdef __x86_64__
+  // Get the general registers, with PTRACE_GETREGS
+  struct user_regs_struct regs_old;
+  EXPECT_EQ(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs_old), 0)
+      << "Error " << errno << " " << strerror(errno);
+
+  EXPECT_EQ(regs_old.__REG, static_cast<unsigned long>(SIGSTOP));
+#endif
+
+  // Get the appropriate general register with PTRACE_PEEKUSER
+  EXPECT_EQ(ptrace(PTRACE_PEEKUSER, child_pid, offsetof(struct user_regs_struct, __REG), nullptr),
+            SIGSTOP)
+      << "Error " << errno << " " << strerror(errno);
+
+  // Suppress SIGSTOP and resume the child.
+  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
+  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+
+  // Let's see that process exited normally.
+  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << " status " << status;
 }

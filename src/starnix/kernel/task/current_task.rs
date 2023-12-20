@@ -283,7 +283,7 @@ impl CurrentTask {
     /// When the callback is done, the run_state is restored to `RunState::Running`.
     ///
     /// This function is typically used just before blocking the current task on some operation.
-    /// The given `run_state` registers the mechasim for interrupting the blocking operation with
+    /// The given `run_state` registers the mechanism for interrupting the blocking operation with
     /// the task and the given `callback` actually blocks the task.
     ///
     /// This function can only be called in the `RunState::Running` state and cannot set the

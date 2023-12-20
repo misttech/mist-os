@@ -17,6 +17,7 @@ rustc_library("starnix-uapi") {
     "src/as_any.rs",
     "src/auth.rs",
     "src/device_type.rs",
+    "src/elf.rs",
     "src/errors.rs",
     "src/file_mode.rs",
     "src/inotify_mask.rs",

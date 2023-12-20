@@ -38,3 +38,22 @@ impl From<SigSet> for sigset_t {
         sigset_t { sig: [val.0] }
     }
 }
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+pub struct user_regs_struct {
+    pub regs: [u64; 31usize],
+    pub sp: u64,
+    pub pc: u64,
+    pub pstate: u64,
+}
+
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+pub struct user_fpsimd_struct {
+    pub vregs: [crate::__uint128_t; 32usize],
+    pub fpsr: u32,
+    pub fpcr: u32,
+    pub _padding_0: [u8; 8usize],
+}

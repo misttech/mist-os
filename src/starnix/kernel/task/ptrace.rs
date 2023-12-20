@@ -21,20 +21,27 @@ use starnix_sync::{LockBefore, Locked, MmDumpable};
 use starnix_syscalls::{decls::SyscallDecl, SyscallResult};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
+    elf::ElfNoteType,
     errno, error,
     errors::Errno,
+    iovec,
     ownership::{OwnedRef, WeakRef},
     pid_t, ptrace_syscall_info,
     signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP, SIGTRAP},
     user_address::{UserAddress, UserRef},
-    PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_STOP, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK,
-    PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_O_TRACESYSGOOD,
-    PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS,
-    PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY,
-    PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
+    user_regs_struct, PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_STOP, PTRACE_GETREGSET,
+    PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
+    PTRACE_LISTEN, PTRACE_O_TRACESYSGOOD, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
+    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK,
+    PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE,
+    SI_MAX_SIZE,
 };
+
 use std::sync::{atomic::Ordering, Arc};
 use zerocopy::FromBytes;
+
+#[cfg(any(target_arch = "x86_64"))]
+use starnix_uapi::{user, PTRACE_GETREGS};
 
 /// For most of the time, for the purposes of ptrace, a tracee is either "going"
 /// or "stopped".  However, after certain ptrace calls, there are special rules
@@ -482,6 +489,59 @@ pub fn ptrace_dispatch(
             tracee.mm().vmo_write_object(ptr, &val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
+        PTRACE_PEEKUSR => {
+            if let Some(ptrace) = &state.ptrace {
+                if let Some(ref thread_state) = ptrace.tracee_thread_state {
+                    let val = ptrace_peekuser(thread_state, addr.ptr() as usize)?;
+                    let dst: UserRef<usize> = UserRef::from(data);
+                    current_task.mm().write_object(dst, &val)?;
+                    return Ok(starnix_syscalls::SUCCESS);
+                }
+            }
+            error!(ESRCH)
+        }
+        PTRACE_GETREGSET => {
+            if let Some(ptrace) = &state.ptrace {
+                if let Some(ref thread_state) = ptrace.tracee_thread_state {
+                    let uiv: UserRef<iovec> = UserRef::from(data);
+                    let iv = current_task.mm().vmo_read_object(uiv)?;
+                    let base = iv.iov_base.addr;
+                    let len = iv.iov_len;
+                    ptrace_getregset(
+                        current_task,
+                        thread_state,
+                        ElfNoteType::try_from(addr.ptr() as usize)?,
+                        base,
+                        &mut (len as usize),
+                    )?;
+                    current_task.write_object(
+                        UserRef::<usize>::new(UserAddress::from_ptr(
+                            uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_base),
+                        )),
+                        &(len as usize),
+                    )?;
+                    return Ok(starnix_syscalls::SUCCESS);
+                }
+            }
+            error!(ESRCH)
+        }
+        #[cfg(target_arch = "x86_64")]
+        PTRACE_GETREGS => {
+            if let Some(ptrace) = &state.ptrace {
+                if let Some(ref thread_state) = ptrace.tracee_thread_state {
+                    let mut len = usize::MAX;
+                    ptrace_getregset(
+                        current_task,
+                        thread_state,
+                        ElfNoteType::PrStatus,
+                        data.ptr() as u64,
+                        &mut len,
+                    )?;
+                    return Ok(starnix_syscalls::SUCCESS);
+                }
+            }
+            error!(ESRCH)
+        }
         PTRACE_SETSIGMASK => {
             // addr is the size of the buffer pointed to
             // by data, but has to be sizeof(sigset_t).
@@ -681,6 +741,47 @@ where
         send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
     }
     Ok(starnix_syscalls::SUCCESS)
+}
+
+/// Implementation of ptrace(PTRACE_PEEKUSER).  The user struct holds the
+/// registers and other information about the process.  See ptrace(2) and
+/// sys/user.h for full details.
+pub fn ptrace_peekuser(thread_state: &ThreadState, offset: usize) -> Result<usize, Errno> {
+    #[cfg(any(target_arch = "x86_64"))]
+    if offset >= std::mem::size_of::<user>() {
+        return error!(EIO);
+    }
+    if offset < std::mem::size_of::<user_regs_struct>() {
+        return thread_state.registers.get_user_register(offset);
+    }
+    error!(EIO)
+}
+
+pub fn ptrace_getregset(
+    current_task: &CurrentTask,
+    thread_state: &ThreadState,
+    regset_type: ElfNoteType,
+    base: u64,
+    len: &mut usize,
+) -> Result<(), Errno> {
+    match regset_type {
+        ElfNoteType::PrStatus => {
+            *len = std::cmp::min(*len, std::mem::size_of::<user_regs_struct>());
+            let mut i: usize = 0;
+            while i < *len {
+                let val = thread_state.registers.get_user_register(i)?;
+                current_task.write_object(
+                    UserRef::<usize>::new(UserAddress::from_ptr((base as usize) + i)),
+                    &val,
+                )?;
+                i += std::mem::size_of::<usize>();
+            }
+            Ok(())
+        }
+        _ => {
+            error!(EINVAL)
+        }
+    }
 }
 
 pub fn ptrace_set_scope(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
