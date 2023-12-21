@@ -364,6 +364,17 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:15
 
+### bazel_remote
+
+Configure bazel to build remotely where supported.
+This option requires that bazel invocations have direct
+external network access, and that users are authenticated to
+access the configured RBE instance.
+
+**Current value (from the default):** `false`
+
+From //build/bazel/bazel_action.gni:21
+
 ### bless_goldens
 
 TODO(fxbug.dev/100321): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
@@ -7490,9 +7501,8 @@ From //build/config/sanitizers/sanitizer_default_options.gni:82
 
 ### sdk_archive_labels
 
-Extra generate_final_idk() or sdk_collection() archive labels to be
-uploaded to the artifacts store. This is an extension mechanism for SDK
-bits outside of the main repository.
+Extra idk_archive() labels to be uploaded to the artifacts store. This is an
+extension mechanism for IDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
@@ -7500,7 +7510,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:120
+From //BUILD.gn:119
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7508,7 +7518,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:120
+From //BUILD.gn:119
 
 ### sdk_cross_compile_host_tools
 
@@ -7599,7 +7609,7 @@ From //build/sdk/config.gni:44
 
 Set to true to build IDK atoms for all supported API levels that are listed
 in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
-of the generate_final_idk() template.
+of the idk() template.
 
 TODO(fxbug.dev/306723826): Deal with the fact that the mac builders are too
 slow to enable this setting, and therefore the mac IDK won't have
