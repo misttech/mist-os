@@ -13,6 +13,7 @@ source_set("backoff") {
 
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/zx",
   ]
