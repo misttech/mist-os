@@ -1287,32 +1287,41 @@ closed protocol Object {
     ///     // The name of this VMO.
     ///     char name[ZX_MAX_NAME_LEN];
     ///
-    ///     // The size of this VMO.
+    ///     // The size of this VMO; i.e., the amount of virtual address space it
+    ///     // would consume if mapped.
     ///     uint64_t size_bytes;
     ///
-    ///     // If this VMO is a child, the koid of its parent. Otherwise, zero.
+    ///     // If this VMO is a child , the koid of its parent. Otherwise, zero.
+    ///     // See |flags| for the type of child.
     ///     zx_koid_t parent_koid;
     ///
     ///     // The number of children of this VMO, if any.
     ///     size_t num_children;
     ///
     ///     // The number of times this VMO is currently mapped into VMARs.
+    ///     // Note that the same process will often map the same VMO twice,
+    ///     // and both mappings will be counted here. (I.e., this is not a count
+    ///     // of the number of processes that map this VMO; see share_count.)
     ///     size_t num_mappings;
     ///
     ///     // An estimate of the number of unique address spaces that
-    ///     // this VMO is mapped into.
+    ///     // this VMO is mapped into. Every process has its own address space,
+    ///     // and so does the kernel.
     ///     size_t share_count;
     ///
     ///     // Bitwise OR of ZX_INFO_VMO_* values.
     ///     uint32_t flags;
     ///
     ///     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
-    ///     // memory currently allocated to this VMO.
+    ///     // memory currently allocated to this VMO; i.e., the amount of physical
+    ///     // memory it consumes. Undefined otherwise.
     ///     uint64_t committed_bytes;
     ///
     ///     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
-    ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the handle rights of the
-    ///     // containing IOB.
+    ///     //
+    ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
+    ///     // handle rights for the IOB region and containing IOB.
+    ///     //
     ///     // Undefined otherwise.
     ///     zx_rights_t handle_rights;
     ///
@@ -1567,6 +1576,11 @@ closed protocol Object {
     ///     // The number of PAGE_SIZE pages in the mapped region of the VMO or
     ///     // IOB region that are backed by physical memory.
     ///     size_t committed_pages;
+    ///     // The number of PAGE_SIZE pages of content that have been populated and are
+    ///     // being tracked in the mapped region of the VMO or IOB region. This can be
+    ///     // greater than |committed_pages| where pages might be compressed or otherwise
+    ///     // tracked in a way that does not correlate directly to being committed.
+    ///     size_t populated_pages;
     /// } zx_info_maps_mapping_t;
     /// ```
     ///
@@ -1627,7 +1641,7 @@ closed protocol Object {
     ///     // See |flags| for the type of child.
     ///     zx_koid_t parent_koid;
     ///
-    ///     // The number of child of this VMO, if any.
+    ///     // The number of children of this VMO, if any.
     ///     size_t num_children;
     ///
     ///     // The number of times this VMO is currently mapped into VMARs.
@@ -1652,7 +1666,7 @@ closed protocol Object {
     ///     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
     ///     //
     ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
-    ///     // handle rights for the region and containing IOB
+    ///     // handle rights for the IOB region and containing IOB.
     ///     //
     ///     // Undefined otherwise.
     ///     zx_rights_t handle_rights;

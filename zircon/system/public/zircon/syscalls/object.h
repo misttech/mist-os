@@ -364,17 +364,17 @@ typedef struct zx_info_maps_mapping {
     // Bitwise OR of ZX_VM_PERM_{READ,WRITE,EXECUTE} values.
     zx_vm_option_t mmu_flags;
     uint8_t padding1[4];
-    // koid of the mapped VMO.
+    // koid of the mapped VMO or IOB region.
     zx_koid_t vmo_koid;
-    // Offset into the above VMO.
+    // Offset into the above VMO or IOB region.
     uint64_t vmo_offset;
-    // The number of PAGE_SIZE pages in the mapped region of the VMO
-    // that are backed by physical memory.
+    // The number of PAGE_SIZE pages in the mapped region of the VMO or
+    // IOB region that are backed by physical memory.
     size_t committed_pages;
     // The number of PAGE_SIZE pages of content that have been populated and are
-    // being tracked in the mapped region of the VMO. This can be greater than
-    // |committed_pages| where pages might be compressed or otherwise tracked in
-    // a way that does not correlate directly to being committed.
+    // being tracked in the mapped region of the VMO or IOB region. This can be
+    // greater than |committed_pages| where pages might be compressed or otherwise
+    // tracked in a way that does not correlate directly to being committed.
     size_t populated_pages;
 } zx_info_maps_mapping_t;
 
@@ -492,11 +492,11 @@ typedef struct zx_info_vmo {
     // would consume if mapped.
     uint64_t size_bytes;
 
-    // If this VMO is a clone, the koid of its parent. Otherwise, zero.
-    // See |flags| for the type of clone.
+    // If this VMO is a child, the koid of its parent. Otherwise, zero.
+    // See |flags| for the type of child.
     zx_koid_t parent_koid;
 
-    // The number of clones of this VMO, if any.
+    // The number of children of this VMO, if any.
     size_t num_children;
 
     // The number of times this VMO is currently mapped into VMARs.
@@ -521,6 +521,10 @@ typedef struct zx_info_vmo {
     uint64_t committed_bytes;
 
     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
+    //
+    // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
+    // handle rights for the IOB region and containing IOB.
+    //
     // Undefined otherwise.
     zx_rights_t handle_rights;
 
