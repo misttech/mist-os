@@ -39,7 +39,7 @@ type Role = strict enum {
     UNKNOWN = 1;
     /// Something on screen that can be clicked/activated, that has a single function.
     BUTTON = 2;
-    /// Header text, e.g. something tagged <h1> in HTML.
+    /// Header text, e.g. something tagged &lt;h1&gt; in HTML.
     HEADER = 3;
     /// An image or graphic.
     IMAGE = 4;
@@ -58,7 +58,7 @@ type Role = strict enum {
     LIST = 10;
 
     /// Role used to represent an element in a list, including its marker and
-    /// its content. For example, a element tagged <li>, or an element with the
+    /// its content. For example, a element tagged &lt;li&gt;, or an element with the
     /// ARIA listitem role.
     LIST_ELEMENT = 11;
 
@@ -86,7 +86,7 @@ type Role = strict enum {
     CELL = 18;
 
     /// Role used to represent a column header. For example, an element with
-    /// the html tag <th>.
+    /// the html tag &lt;th&gt;.
     COLUMN_HEADER = 19;
 
     /// Role used to represent an aria-rowgroup-like element.
@@ -120,7 +120,7 @@ type LabelOrigin = strict enum {
     /// assistive technology have special modes to deal with tables, a runtime
     /// should mark its label with this type of origin so that users know what
     /// the table is about when they navigate in the table mode. For example,
-    /// a <caption> html tag sets the label.
+    /// a &lt;caption&gt; html tag sets the label.
     CAPTION = 4;
     /// This node receives its label from the contents present in the
     /// application. For example, text from a web page becomes the label of
@@ -133,7 +133,7 @@ type LabelOrigin = strict enum {
     /// aria-labeledby.
     RELATED_ELEMENT = 7;
     /// This element's label is represented by a visual tooltip. For example,
-    /// as if from a <title> html tag.
+    /// as if from a &lt;title&gt; html tag.
     TITLE = 8;
     /// The label comes from an user-entered value.
     VALUE = 9;
