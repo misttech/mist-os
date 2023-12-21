@@ -511,6 +511,21 @@ closed protocol WlanSoftmacBridge {
         1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.Status;
 
+    /// Join a specific BSS in which we will participate.
+    /// This applies regardless of if we are hosting the BSS or joining it
+    /// (indicated by the `remote` flag in `JoinBssRequest`).
+    /// If successful, the device will switch to the correct channel and perform
+    /// any internal filtering/timing operations required to join the BSS.
+    /// For client STAs, this is the first step before authenticating.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.JoinBss")
+    strict JoinBss(struct {
+        join_request fuchsia.wlan.common.JoinBssRequest;
+    }) -> () error zx.Status;
+
     /// Enables hardware Beaconing.
     ///
     /// This method cannot be called while beaconing is enabled and so
@@ -750,7 +765,7 @@ closed protocol WlanSoftmac {
     ///
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict JoinBss(struct {
         join_request fuchsia.wlan.common.JoinBssRequest;
     }) -> () error zx.Status;

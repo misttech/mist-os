@@ -282,41 +282,6 @@ zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::
   return ConvertChannelBandwidth(in.cbw, &out->cbw);
 }
 
-zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
-                                  fuchsia_wlan_common::wire::JoinBssRequest* out,
-                                  fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_common::wire::JoinBssRequest::Builder(arena);
-  builder.remote(in.remote);
-  fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> bssid;
-  memcpy(bssid.begin(), in.bssid, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  builder.bssid(bssid);
-  builder.beacon_period(in.beacon_period);
-
-  switch (in.bss_type) {
-    case BSS_TYPE_UNKNOWN:
-      builder.bss_type(fuchsia_wlan_common::wire::BssType::kUnknown);
-      break;
-    case BSS_TYPE_INFRASTRUCTURE:
-      builder.bss_type(fuchsia_wlan_common::wire::BssType::kInfrastructure);
-      break;
-    case BSS_TYPE_INDEPENDENT:
-      builder.bss_type(fuchsia_wlan_common::wire::BssType::kIndependent);
-      break;
-    case BSS_TYPE_MESH:
-      builder.bss_type(fuchsia_wlan_common::wire::BssType::kMesh);
-      break;
-    case BSS_TYPE_PERSONAL:
-      builder.bss_type(fuchsia_wlan_common::wire::BssType::kPersonal);
-      break;
-    default:
-      lerror("BssType is not supported: %u", in.bss_type);
-      return ZX_ERR_INVALID_ARGS;
-  }
-
-  *out = builder.Build();
-  return ZX_OK;
-}
-
 zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena) {

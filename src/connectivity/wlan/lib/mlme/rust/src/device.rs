@@ -259,7 +259,7 @@ pub trait DeviceOps {
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
     ) -> Result<(), zx::Status>;
-    fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status>;
+    fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status>;
     fn enable_beaconing(
         &mut self,
         request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
@@ -519,8 +519,11 @@ impl DeviceOps for Device {
         )
     }
 
-    fn join_bss(&mut self, mut cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.join_bss)(self.raw_device.device, &mut cfg))
+    fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
+        Self::flatten_and_log_error(
+            "JoinBss",
+            self.wlan_softmac_bridge_proxy.join_bss(request, zx::Time::INFINITE),
+        )
     }
 
     fn enable_beaconing(
@@ -703,9 +706,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Configure the device's BSS.
-    /// |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
-    join_bss: extern "C" fn(device: *mut c_void, cfg: &mut banjo_common::JoinBssRequest) -> i32,
 }
 
 pub mod test_utils {
@@ -716,9 +716,9 @@ pub mod test_utils {
             ddk_converter,
             error::Error,
         },
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-        fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+        fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
+        fuchsia_async as fasync,
         fuchsia_zircon::HandleBased,
         ieee80211::Bssid,
         std::{
@@ -869,7 +869,7 @@ pub mod test_utils {
         pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: fidl_common::SecuritySupport,
         pub spectrum_management_support: fidl_common::SpectrumManagementSupport,
-        pub join_bss_request: Option<banjo_common::JoinBssRequest>,
+        pub join_bss_request: Option<fidl_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
@@ -1078,8 +1078,8 @@ pub mod test_utils {
             Err(zx::Status::NOT_SUPPORTED)
         }
 
-        fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().join_bss_request.replace(cfg);
+        fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
+            self.state.lock().unwrap().join_bss_request.replace(request.clone());
             Ok(())
         }
 
@@ -1628,11 +1628,12 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .join_bss(banjo_common::JoinBssRequest {
-                bssid: [1, 2, 3, 4, 5, 6],
-                bss_type: banjo_common::BssType::PERSONAL,
-                remote: true,
-                beacon_period: 100,
+            .join_bss(&fidl_common::JoinBssRequest {
+                bssid: Some([1, 2, 3, 4, 5, 6]),
+                bss_type: Some(fidl_common::BssType::Personal),
+                remote: Some(true),
+                beacon_period: Some(100),
+                ..Default::default()
             })
             .expect("error configuring bss");
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
@@ -1714,11 +1715,12 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .join_bss(banjo_common::JoinBssRequest {
-                bssid: [1, 2, 3, 4, 5, 6],
-                bss_type: banjo_common::BssType::PERSONAL,
-                remote: true,
-                beacon_period: 100,
+            .join_bss(&fidl_common::JoinBssRequest {
+                bssid: Some([1, 2, 3, 4, 5, 6]),
+                bss_type: Some(fidl_common::BssType::Personal),
+                remote: Some(true),
+                beacon_period: Some(100),
+                ..Default::default()
             })
             .expect("error configuring bss");
 

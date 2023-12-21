@@ -45,9 +45,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       .set_key = [](void* device_interface, wlan_key_configuration_t* key) -> zx_status_t {
         return AsDeviceInterface(device_interface)->InstallKey(key);
       },
-      .join_bss = [](void* device_interface, join_bss_request_t* cfg) -> zx_status_t {
-        return AsDeviceInterface(device_interface)->JoinBss(cfg);
-      },
   };
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
@@ -209,6 +206,14 @@ void SoftmacBridge::CancelScan(CancelScanRequestView request,
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::CancelScan> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->CancelScan(*request);
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
+void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) {
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::JoinBss> dispatcher =
+      [request](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->JoinBss(request->join_request);
       };
   DispatchAndComplete(__func__, dispatcher, completer);
 }

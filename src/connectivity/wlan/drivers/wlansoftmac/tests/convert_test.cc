@@ -28,7 +28,6 @@ static constexpr uint8_t kFakeKey[wlan_ieee80211::kMaxKeyLen] = {
     6, 9, 3, 9, 9, 3, 7, 5, 1, 0, 5, 8, 2, 0, 9, 7, 4, 9, 4, 4, 5, 9, 2, 3, 0, 7, 8, 1, 6, 4, 0, 6};
 static constexpr size_t kFakePacketSize = 50;
 
-static constexpr bool kPopulaterBool = true;
 static constexpr uint8_t kRandomPopulaterUint8 = 118;
 static constexpr uint16_t kRandomPopulaterUint16 = 53535;
 static constexpr uint32_t kRandomPopulaterUint32 = 4062722468;
@@ -44,7 +43,6 @@ static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
 static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
     wlan_softmac::WlanProtection::kRxTx;
 static constexpr wlan_common::WlanKeyType kFakeFidlKeyType = wlan_common::WlanKeyType::kGroup;
-static constexpr wlan_common::BssType kFakeFidlBssType = wlan_common::BssType::kMesh;
 static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
     wlan_common::WlanTxResultCode::kSuccess;
 static constexpr wlan_softmac::WlanRxInfoFlags kFakeRxFlags =
@@ -58,7 +56,6 @@ static constexpr uint32_t kFakeBanjoPhyType = WLAN_PHY_TYPE_ERP;
 static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
 static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
 static constexpr uint8_t kFakeBanjoKeyType = WLAN_KEY_TYPE_GROUP;
-static constexpr uint32_t kFakeBanjoBssType = BSS_TYPE_MESH;
 static constexpr uint8_t kFakeBanjoTxResultCode = WLAN_TX_RESULT_CODE_SUCCESS;
 
 /* Test cases*/
@@ -225,36 +222,6 @@ TEST_F(ConvertTest, ToFidlChannel) {
   // Assign an invalid value to cbw, and the conversion will fail.
   in.cbw = kRandomPopulaterUint32;
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, ConvertChannel(in, &out));
-}
-
-TEST_F(ConvertTest, ToFidlJoinBssRequest) {
-  log::Instance::Init(0);
-  // Populate join_bss_request_t
-  join_bss_request_t in = {
-      .bss_type = kFakeBanjoBssType,
-      .remote = kPopulaterBool,
-      .beacon_period = kRandomPopulaterUint16,
-  };
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    in.bssid[i] = kFakeMacAddr[i];
-  }
-
-  // Conduct conversion
-  wlan_common::JoinBssRequest out;
-  fidl::Arena fidl_arena;
-  EXPECT_EQ(ZX_OK, ConvertJoinBssRequest(in, &out, fidl_arena));
-
-  // Verify outputs
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    EXPECT_EQ(kFakeMacAddr[i], out.bssid().data()[i]);
-  }
-  EXPECT_EQ(kFakeFidlBssType, out.bss_type());
-  EXPECT_EQ(kPopulaterBool, out.remote());
-  EXPECT_EQ(kRandomPopulaterUint16, out.beacon_period());
-
-  // Assign an invalid value to cbw, and the conversion will fail.
-  in.bss_type = kRandomPopulaterUint32;
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out, fidl_arena));
 }
 
 TEST_F(ConvertTest, ToFidlKeyConfig) {

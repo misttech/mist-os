@@ -378,33 +378,6 @@ zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::JoinBss(join_bss_request_t* cfg) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  fuchsia_wlan_common::wire::JoinBssRequest fidl_bss_config;
-  zx_status_t status = ConvertJoinBssRequest(*cfg, &fidl_bss_config, *arena);
-  if (status != ZX_OK) {
-    lerror("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto result = client_.sync().buffer(*std::move(arena))->JoinBss(fidl_bss_config);
-  if (!result.ok()) {
-    lerror("Config bss failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    lerror("Config bss failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t SoftmacBinding::InstallKey(wlan_key_configuration_t* key_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {

@@ -44,6 +44,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void StartActiveScan(StartActiveScanRequestView request,
                        StartActiveScanCompleter::Sync& completer) final;
   void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) final;
+  void JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) final;
   void EnableBeaconing(EnableBeaconingRequestView request,
                        EnableBeaconingCompleter::Sync& completer) final;
   void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) final;

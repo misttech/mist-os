@@ -4,11 +4,10 @@
 
 #include "wlantap-mac.h"
 
-#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
-#include <lib/fidl/cpp/wire/channel.h>
-
 #include <wlan/common/channel.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
+#include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
 #include "utils.h"
 
 namespace {

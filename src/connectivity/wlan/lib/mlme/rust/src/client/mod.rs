@@ -22,7 +22,7 @@ use {
         logger,
     },
     anyhow::{self, format_err},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -424,17 +424,18 @@ impl<D: DeviceOps> ClientMlme<D> {
         self.set_main_channel(bss.channel.into())
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
-        let bss_config = banjo_common::JoinBssRequest {
-            bssid: bss.bssid.to_array(),
-            bss_type: banjo_common::BssType::INFRASTRUCTURE,
-            remote: true,
-            beacon_period: bss.beacon_period,
+        let join_bss_request = fidl_common::JoinBssRequest {
+            bssid: Some(bss.bssid.to_array()),
+            bss_type: Some(fidl_common::BssType::Infrastructure),
+            remote: Some(true),
+            beacon_period: Some(bss.beacon_period),
+            ..Default::default()
         };
 
         // Configure driver to pass frames from this BSS to MLME. Otherwise they will be dropped.
         self.ctx
             .device
-            .join_bss(bss_config)
+            .join_bss(&join_bss_request)
             .map(|()| join_caps)
             .map_err(|status| Error::Status(format!("Error setting BSS in driver"), status))
     }
@@ -1261,8 +1262,8 @@ mod tests {
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_async as fasync,
+        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
+        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
         futures::task::Poll,
         ieee80211::MacAddrBytes,
         lazy_static::lazy_static,

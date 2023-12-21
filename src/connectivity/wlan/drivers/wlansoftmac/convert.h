@@ -26,9 +26,6 @@ zx_status_t ConvertTxPacket(const uint8_t* data_in, size_t data_len_in,
                             const wlan_tx_info_t& info_in,
                             fuchsia_wlan_softmac::wire::WlanTxPacket* out);
 zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::WlanChannel* out);
-zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
-                                  fuchsia_wlan_common::wire::JoinBssRequest* out,
-                                  fidl::AnyArena& arena);
 zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena);

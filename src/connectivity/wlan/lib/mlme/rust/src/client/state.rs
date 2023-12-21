@@ -1452,11 +1452,12 @@ mod tests {
                 .set_channel(fake_wlan_channel().into())
                 .expect("fake device is obedient");
             self.fake_device
-                .join_bss(banjo_common::JoinBssRequest {
-                    bssid: [1, 2, 3, 4, 5, 6],
-                    bss_type: banjo_common::BssType::PERSONAL,
-                    remote: true,
-                    beacon_period: 100,
+                .join_bss(&fidl_common::JoinBssRequest {
+                    bssid: Some([1, 2, 3, 4, 5, 6]),
+                    bss_type: Some(fidl_common::BssType::Personal),
+                    remote: Some(true),
+                    beacon_period: Some(100),
+                    ..Default::default()
                 })
                 .expect("error configuring bss");
             self.make_base_ctx()
