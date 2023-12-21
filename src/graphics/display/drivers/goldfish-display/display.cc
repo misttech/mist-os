@@ -22,6 +22,7 @@
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/result.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -41,6 +42,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -312,9 +314,11 @@ uint32_t GetColorBufferFormatFromSysmemPixelFormat(
 
 }  // namespace
 
-zx_status_t Display::ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
-                                    zx::vmo vmo, size_t offset) {
+zx::result<display::DriverImageId> Display::ImportVmoImage(
+    const image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format, zx::vmo vmo,
+    size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
+  color_buffer->is_linear_format = image->type == IMAGE_TYPE_SIMPLE;
   const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
 
   fidl::Arena unused_arena;
@@ -332,15 +336,16 @@ zx_status_t Display::ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelF
   color_buffer->height = image->height;
   color_buffer->format = color_buffer_format;
 
-  auto status = rc_->CreateColorBuffer(image->width, image->height, color_buffer_format);
-  if (status.is_error()) {
-    zxlogf(ERROR, "%s: failed to create color buffer", kTag);
-    return status.error_value();
+  zx::result<HostColorBufferId> create_result =
+      rc_->CreateColorBuffer(image->width, image->height, color_buffer_format);
+  if (create_result.is_error()) {
+    zxlogf(ERROR, "%s: failed to create color buffer: %s", kTag, create_result.status_string());
+    return create_result.take_error();
   }
-  color_buffer->host_color_buffer_id = status.value();
+  color_buffer->host_color_buffer_id = create_result.value();
 
-  image->handle = reinterpret_cast<uint64_t>(color_buffer.release());
-  return ZX_OK;
+  const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
+  return zx::ok(image_id);
 }
 
 zx_status_t Display::DisplayControllerImplImportBufferCollection(
@@ -449,7 +454,13 @@ zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
   if (collection_info.settings().buffer_settings().heap() !=
       fuchsia_sysmem::HeapType::kGoldfishDeviceLocal) {
     const auto& pixel_format = collection_info.settings().image_format_constraints().pixel_format();
-    return ImportVmoImage(image, pixel_format, std::move(vmo), offset);
+    zx::result<display::DriverImageId> import_vmo_result =
+        ImportVmoImage(image, pixel_format, std::move(vmo), offset);
+    if (import_vmo_result.is_ok()) {
+      image->handle = display::ToBanjoDriverImageId(import_vmo_result.value());
+      return ZX_OK;
+    }
+    return import_vmo_result.error_value();
   }
 
   if (offset != 0) {
@@ -458,16 +469,22 @@ zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
   }
 
   auto color_buffer = std::make_unique<ColorBuffer>();
+  color_buffer->is_linear_format = image->type == IMAGE_TYPE_SIMPLE;
   color_buffer->vmo = std::move(vmo);
-  image->handle = reinterpret_cast<uint64_t>(color_buffer.release());
+  const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
+  image->handle = display::ToBanjoDriverImageId(image_id);
   return ZX_OK;
 }
 
 void Display::DisplayControllerImplReleaseImage(image_t* image) {
+  // TODO(b/314126995): This method may only access the `handle` member of
+  // `image`. An upcoming CL will change the ReleaseImage() API to only provide
+  // the image handle.
+
   auto color_buffer = reinterpret_cast<ColorBuffer*>(image->handle);
 
   // Color buffer is owned by image in the linear case.
-  if (image->type == IMAGE_TYPE_SIMPLE) {
+  if (color_buffer->is_linear_format) {
     rc_->CloseColorBuffer(color_buffer->host_color_buffer_id);
   }
 

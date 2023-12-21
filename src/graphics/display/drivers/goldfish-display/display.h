@@ -15,6 +15,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <lib/zx/result.h>
 #include <threads.h>
 #include <zircon/types.h>
 
@@ -32,6 +33,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace goldfish {
 
@@ -133,6 +135,10 @@ class Display : public DisplayType,
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t format = 0;
+
+    // TODO(costan): Rename to reflect ownership.
+    bool is_linear_format = false;
+
     zx::vmo vmo;
     fzl::PinnedVmo pinned_vmo;
   };
@@ -188,8 +194,9 @@ class Display : public DisplayType,
   // until the device is released.
   zx_status_t InitSysmemAllocatorClientLocked() TA_REQ(lock_);
 
-  zx_status_t ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
-                             zx::vmo vmo, size_t offset);
+  zx::result<display::DriverImageId> ImportVmoImage(const image_t* image,
+                                                    const fuchsia_sysmem::PixelFormat& pixel_format,
+                                                    zx::vmo vmo, size_t offset);
   zx_status_t PresentDisplayConfig(display::DisplayId display_id,
                                    const DisplayConfig& display_config);
   zx_status_t SetupDisplay(display::DisplayId display_id);
