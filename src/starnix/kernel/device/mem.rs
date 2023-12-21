@@ -12,13 +12,13 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
         fileops_impl_seekless, Anon, FdEvents, FileHandle, FileObject, FileOps, FileWriteGuardRef,
-        FsNode, FsNodeInfo, NamespaceNode,
+        FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
     },
 };
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
-use starnix_logging::log_info;
+use starnix_logging::{log_info, not_implemented};
 use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
@@ -228,7 +228,31 @@ pub fn open_kmsg(
 struct DevKmsg(Option<Mutex<LogSubscription>>);
 
 impl FileOps for DevKmsg {
-    fileops_impl_seekless!();
+    fn has_persistent_offsets(&self) -> bool {
+        false
+    }
+
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn seek(
+        &self,
+        _file: &crate::vfs::FileObject,
+        _current_task: &crate::task::CurrentTask,
+        _current_offset: starnix_uapi::off_t,
+        target: crate::vfs::SeekTarget,
+    ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
+        // TODO(fxbug.dev/317135298): build these.
+        match target {
+            SeekTarget::Set(_) => not_implemented!("/dev/kmsg: SEEK_SET"),
+            SeekTarget::End(_) => not_implemented!("/dev/kmsg: SEEK_END"),
+            SeekTarget::Data(_) => not_implemented!("/dev/kmsg: SEEK_DATA"),
+            SeekTarget::Cur(_) => not_implemented!("/dev/kmsg: SEEK_CUR"),
+            SeekTarget::Hole(_) => not_implemented!("/dev/kmsg: SEEK_HOLE"),
+        }
+        Ok(0)
+    }
 
     fn wait_async(
         &self,
