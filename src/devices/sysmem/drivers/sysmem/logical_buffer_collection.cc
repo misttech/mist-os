@@ -4205,6 +4205,20 @@ void LogicalBufferCollection::LogConstraints(
       LOG_BOOL_FIELD(FROM_HERE, indent, bmc, cpu_domain_supported);
       LOG_BOOL_FIELD(FROM_HERE, indent, bmc, ram_domain_supported);
       LOG_BOOL_FIELD(FROM_HERE, indent, bmc, inaccessible_domain_supported);
+
+      size_t heap_permitted_count =
+          bmc.heap_permitted().has_value() ? bmc.heap_permitted()->size() : 0;
+      LogInfo(FROM_HERE, "%*sheap_permitted.count() %zu", indent.num_spaces(), "",
+              heap_permitted_count);
+      {
+        // scope indent
+        auto indent = indent_tracker.Nested();
+        for (size_t i = 0; i < heap_permitted_count; i++) {
+          const uint64_t heap_id = safe_cast<uint64_t>(bmc.heap_permitted()->at(i));
+          LogInfo(FROM_HERE, "%*sheap_permitted[%zu] : %" PRIx64, indent.num_spaces(), "", i,
+                  heap_id);
+        }
+      }
     }
 
     uint32_t image_format_constraints_count =
