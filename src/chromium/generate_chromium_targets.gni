@@ -266,16 +266,6 @@ if (is_host) {
       ]
     }
 
-    # TODO(fxrev.dev/769058): Remove once fxbug.dev/117321 is fixed.
-    prebuilt_test_manifest("chromium_cast_runner_tests") {
-      manifest_name = "cast_runner_tests_manifest.json"
-      environments = [ nuc_env ]
-      log_settings = {
-        max_severity = "ERROR"
-      }
-      deps = [ ":chromium_test_base_deps" ]
-    }
-
     icu_tzdata_config_data("tzdata_for_base_unittests") {
       for_pkg = "base_unittests"
       testonly = true
@@ -293,7 +283,6 @@ if (is_host) {
       visibility += [ "//src:*" ]
 
       deps = [
-        ":chromium_cast_runner_tests",
         ":chromium_common_tests",
         ":chromium_web_engine_tests",
         ":web_engine_shell",
