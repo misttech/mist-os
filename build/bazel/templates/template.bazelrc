@@ -79,6 +79,8 @@ build:remote --define=EXECUTOR=remote
 build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
 build:remote --incompatible_strict_action_env=true
 build:remote --google_default_credentials=true
+# Only accept outputs from remote execution on the back-end (remote workers).
+build:remote --noremote_upload_local_results
 
 # Setup sponge (go/sponge-bazel)
 build:sponge --bes_backend=buildeventservice-pa.googleapis.com

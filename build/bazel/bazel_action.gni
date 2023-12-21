@@ -13,6 +13,12 @@ declare_args() {
   # uses the //:console pool to print its output directly
   # to stdout/stderr during the Ninja build.
   bazel_quiet = false
+
+  # Configure bazel to build remotely where supported.
+  # This option requires that bazel invocations have direct
+  # external network access, and that users are authenticated to
+  # access the configured RBE instance.
+  bazel_remote = false
 }
 
 # Wrap a Bazel command with a GN action.
@@ -130,6 +136,13 @@ declare_args() {
 #     invocations.
 #     Type: boolean
 #     Default: true
+#
+#   remote: (optional)
+#     Set this to true to override the global default `bazel_remote`
+#     setting which controls whether the underlying bazel invocation
+#     will build remotely using RBE.
+#     Type: boolean
+#     Default: `bazel_remote` (global)
 #
 #   deps:
 #   metadata:
@@ -401,6 +414,14 @@ template("bazel_action") {
       if (invoker.command != "query") {
         args += [ "--show_result=0" ]
       }
+    }
+
+    _remote = bazel_remote
+    if (defined(invoker.remote)) {
+      _remote = invoker.remote
+    }
+    if (_remote) {
+      args += [ "--config=remote" ]
     }
 
     if (defined(invoker.extra_bazel_args)) {
