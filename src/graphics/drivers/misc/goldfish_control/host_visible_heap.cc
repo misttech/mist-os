@@ -25,7 +25,6 @@
 #include <fbl/algorithm.h>
 
 #include "src/graphics/drivers/misc/goldfish_control/control_device.h"
-#include "src/lib/fsl/handles/object_info.h"
 
 namespace goldfish {
 
