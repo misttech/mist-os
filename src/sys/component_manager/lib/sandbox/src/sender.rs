@@ -143,6 +143,8 @@ mod tests {
     use fidl::endpoints::create_endpoints;
     use fidl_fuchsia_unknown as funknown;
 
+    // NOTE: sending-and-receiving tests are written in `receiver.rs`.
+
     /// Tests that a Sender can be cloned via `fuchsia.unknown/Cloneable.Clone2`
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]

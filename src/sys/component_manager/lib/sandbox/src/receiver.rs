@@ -8,9 +8,9 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{
-    channel::mpsc,
+    channel::mpsc::{self, UnboundedReceiver},
     future::{self, Either},
-    lock::{MappedMutexGuard, Mutex, MutexGuard},
+    lock::Mutex,
     StreamExt,
 };
 use std::fmt::Debug;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 #[derive(Capability, Derivative)]
 #[derivative(Debug)]
 pub struct Receiver<T: Default + Debug + Send + Sync + 'static> {
-    inner: Arc<Mutex<PeekableReceiver<T>>>,
+    inner: Arc<Mutex<UnboundedReceiver<Message<T>>>>,
     sender: mpsc::UnboundedSender<Message<T>>,
 
     /// The FIDL representation of this `Receiver`.
@@ -40,11 +40,7 @@ impl<T: Default + Debug + Send + Sync + 'static> Clone for Receiver<T> {
 impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::unbounded();
-        Self {
-            inner: Arc::new(Mutex::new(PeekableReceiver::<T>::new(receiver))),
-            sender,
-            server_end: None,
-        }
+        Self { inner: Arc::new(Mutex::new(receiver)), sender, server_end: None }
     }
 
     pub fn new_sender(&self) -> Sender<T> {
@@ -53,15 +49,7 @@ impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
 
     pub async fn receive(&self) -> Message<T> {
         let mut receiver_guard = self.inner.lock().await;
-        receiver_guard.read().await
-    }
-
-    pub async fn peek<'a>(&'a self) -> MappedMutexGuard<'a, PeekableReceiver<T>, Message<T>> {
-        let mut receiver_guard = self.inner.lock().await;
-        receiver_guard.load_peek_value().await;
-        MutexGuard::map(receiver_guard, |receiver: &mut PeekableReceiver<T>| {
-            receiver.peek_value_mut().unwrap()
-        })
+        receiver_guard.next().await.expect("this is infallible, we're also holding a sender")
     }
 
     pub async fn handle_receiver(&self, receiver_proxy: fsandbox::ReceiverProxy) {
@@ -124,40 +112,65 @@ impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>> for fsandbox:
     }
 }
 
-/// This provides very similar functionality to `futures::stream::Peekable`, but allows a reference
-/// to a peeked value to be acquired outside of an async block, which is necessary to provide a
-/// `MappedMutexGuard` of the peeked value.
-pub struct PeekableReceiver<T: Default + Debug + Send + Sync + 'static> {
-    receiver: mpsc::UnboundedReceiver<Message<T>>,
-    peeked_value: Option<Message<T>>,
-}
+#[cfg(test)]
+mod tests {
+    use fidl_fuchsia_io as fio;
+    use zx::Peered;
 
-impl<T: Default + Debug + Send + Sync + 'static> PeekableReceiver<T> {
-    fn new(receiver: mpsc::UnboundedReceiver<Message<T>>) -> Self {
-        Self { receiver, peeked_value: None }
+    use super::*;
+
+    #[fuchsia::test]
+    async fn send_and_receive() {
+        let receiver = Receiver::<()>::new();
+        let sender = receiver.new_sender();
+
+        let (ch1, ch2) = zx::Channel::create();
+        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+
+        let message = receiver.receive().await;
+
+        // Check connectivity.
+        message.payload.channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
+        ch2.wait_handle(zx::Signals::USER_1, zx::Time::INFINITE).unwrap();
     }
 
-    /// Returns the peeked value, if any.
-    fn peek_value_mut(&mut self) -> Option<&mut Message<T>> {
-        self.peeked_value.as_mut()
+    #[fuchsia::test]
+    async fn send_fail_when_receiver_dropped() {
+        let receiver = Receiver::<()>::new();
+        let sender = receiver.new_sender();
+
+        drop(receiver);
+
+        let (ch1, _ch2) = zx::Channel::create();
+        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap_err();
     }
 
-    /// Blocks until a value has been loaded.
-    async fn load_peek_value(&mut self) {
-        if self.peeked_value.is_some() {
-            return;
-        }
-        self.peeked_value = Some(
-            self.receiver.next().await.expect("this is infallible, we're also holding a sender"),
-        );
-    }
+    #[fuchsia::test]
+    async fn receiver_fidl() {
+        let receiver = Receiver::<()>::new();
+        let sender = receiver.new_sender();
 
-    /// Reads a new value from the receiver, and returns the value.
-    async fn read(&mut self) -> Message<T> {
-        if let Some(value) = self.peeked_value.take() {
-            value
-        } else {
-            self.receiver.next().await.expect("this is infallible, we're also holding a sender")
+        let (ch1, ch2) = zx::Channel::create();
+        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+
+        let (receiver_proxy, mut receiver_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::ReceiverMarker>().unwrap();
+
+        let handler_fut = receiver.handle_receiver(receiver_proxy);
+        let receive_fut = receiver_stream.next();
+        let Either::Right((message, _)) =
+            future::select(pin!(handler_fut), pin!(receive_fut)).await
+        else {
+            panic!("Handler should not finish");
+        };
+        let message = message.unwrap().unwrap();
+        match message {
+            fsandbox::ReceiverRequest::Receive { channel, .. } => {
+                // Check connectivity.
+                channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
+                ch2.wait_handle(zx::Signals::USER_1, zx::Time::INFINITE).unwrap();
+            }
+            _ => panic!("Unexpected message"),
         }
     }
 }
