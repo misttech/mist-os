@@ -65,6 +65,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -1078,23 +1079,27 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image,
   }
 
   gtt_region->set_bytes_per_row(format.value().bytes_per_row);
-  image->handle = gtt_region->base();
+  const display::DriverImageId image_id(gtt_region->base());
   imported_images_.push_back(std::move(gtt_region));
 
   ZX_DEBUG_ASSERT_MSG(
-      imported_image_pixel_formats_.find(image->handle) == imported_image_pixel_formats_.end(),
-      "Image handle (%lu) exists in imported image pixel formats map", image->handle);
+      imported_image_pixel_formats_.find(image_id) == imported_image_pixel_formats_.end(),
+      "Image ID %" PRIu64 " exists in imported image pixel formats map", image_id.value());
   imported_image_pixel_formats_.emplace(
-      image->handle, sysmem::V2CopyFromV1PixelFormat(format.value().pixel_format));
+      image_id, sysmem::V2CopyFromV1PixelFormat(format.value().pixel_format));
 
+  image->handle = display::ToBanjoDriverImageId(image_id);
   return ZX_OK;
 }
 
 void Controller::DisplayControllerImplReleaseImage(image_t* image) {
+  const uint64_t gtt_region_base = image->handle;
+  const display::DriverImageId image_id(gtt_region_base);
+
   fbl::AutoLock lock(&gtt_lock_);
-  imported_image_pixel_formats_.erase(image->handle);
+  imported_image_pixel_formats_.erase(image_id);
   for (unsigned i = 0; i < imported_images_.size(); i++) {
-    if (imported_images_[i]->base() == image->handle) {
+    if (imported_images_[i]->base() == gtt_region_base) {
       imported_images_[i]->ClearRegion();
       imported_images_.erase(i);
       return;
@@ -1102,13 +1107,14 @@ void Controller::DisplayControllerImplReleaseImage(image_t* image) {
   }
 }
 
-PixelFormatAndModifier Controller::GetImportedImagePixelFormat(const image_t* image) const {
+PixelFormatAndModifier Controller::GetImportedImagePixelFormat(
+    display::DriverImageId image_id) const {
   fbl::AutoLock lock(&gtt_lock_);
-  auto it = imported_image_pixel_formats_.find(image->handle);
+  auto it = imported_image_pixel_formats_.find(image_id);
   if (it != imported_image_pixel_formats_.end()) {
     return it->second;
   }
-  ZX_ASSERT_MSG(false, "imported image (handle %lu) not found", image->handle);
+  ZX_ASSERT_MSG(false, "Imported image ID %" PRIu64 " not found", image_id.value());
 }
 
 const std::unique_ptr<GttRegionImpl>& Controller::GetGttRegionImpl(uint64_t handle) {
@@ -1206,9 +1212,10 @@ bool Controller::CalculateMinimumAllocations(
         // need to populate the image_t.handle of pending layers first so that
         // the image of primary layer can be correctly resolved.
         constexpr int bytes_per_pixel = 4;
-        if (primary->image.handle != 0) {
+        const display::DriverImageId primary_image_id(primary->image.handle);
+        if (primary_image_id != display::kInvalidDriverImageId) {
           ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
-                                                 GetImportedImagePixelFormat(&primary->image)));
+                                                 GetImportedImagePixelFormat(primary_image_id)));
         }
 
         if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
@@ -1382,9 +1389,10 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
         constexpr int bytes_per_pixel = 4;
         // Plane buffers are recalculated only on valid configurations. So all
         // images must be valid.
-        ZX_DEBUG_ASSERT(primary->image.handle != 0);
+        const display::DriverImageId primary_image_id(primary->image.handle);
+        ZX_DEBUG_ASSERT(primary_image_id != display::kInvalidDriverImageId);
         ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
-                                               GetImportedImagePixelFormat(&primary->image)));
+                                               GetImportedImagePixelFormat(primary_image_id)));
 
         data_rate_bytes_per_frame[pipe_id][plane_num] =
             uint64_t{scaled_width} * scaled_height * bytes_per_pixel;

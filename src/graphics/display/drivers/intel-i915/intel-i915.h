@@ -43,6 +43,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace i915 {
 
@@ -189,9 +190,11 @@ class Controller : public DeviceType,
   // GTT. Returns the Gtt region representing the image.
   const GttRegion& SetupGttImage(const image_t* image, uint32_t rotation);
 
-  // Returns the pixel format negotiated by sysmem for an imported `image`.
-  // `image` must be successfully imported and not yet released.
-  PixelFormatAndModifier GetImportedImagePixelFormat(const image_t* image) const;
+  // The pixel format negotiated by sysmem for an imported image.
+  //
+  // `image_id` must correspond to an image that was successfully imported, and
+  // was not released.
+  PixelFormatAndModifier GetImportedImagePixelFormat(display::DriverImageId image_id) const;
 
  private:
   // Perform short-running initialization of all subcomponents and instruct the DDK to publish the
@@ -301,7 +304,7 @@ class Controller : public DeviceType,
   fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_gtt_regions_ __TA_GUARDED(gtt_lock_);
 
   // Pixel formats of imported images.
-  std::unordered_map</*handle*/ uint64_t, PixelFormatAndModifier> imported_image_pixel_formats_
+  std::unordered_map<display::DriverImageId, PixelFormatAndModifier> imported_image_pixel_formats_
       __TA_GUARDED(gtt_lock_);
 
   IgdOpRegion igd_opregion_;  // Read only, no locking
