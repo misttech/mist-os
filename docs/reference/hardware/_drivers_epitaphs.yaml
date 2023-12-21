@@ -512,3 +512,9 @@
   available_in_git: 'bac3eb01d7ec72f7c07cfbf5808996700168bb7d'
   areas: ['ACPI']
   path: '/src/devices/acpi/drivers/acpi-lid'
+- short_description: 'ACPI CrOs EC Motion driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '960395'
+  available_in_git: '50b5c5cf1075f4a85597af0aca07c84707f2c675'
+  areas: ['Misc']
+  path: '/src/devices/mcu/drivers/chromiumos-ec-core/motion.cc'

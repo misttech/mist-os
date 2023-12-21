@@ -8,12 +8,6 @@ class ChromiumosEcCore;
 
 void BindSubdrivers(ChromiumosEcCore* ec);
 
-namespace motion {
-
-void RegisterMotionDriver(ChromiumosEcCore* ec);
-
-}  // namespace motion
-
 namespace usb_pd {
 
 void RegisterUsbPdDriver(ChromiumosEcCore* ec);
