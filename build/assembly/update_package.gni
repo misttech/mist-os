@@ -55,7 +55,7 @@ template("update_package") {
         "$gendir/update_images_firmware/meta/fuchsia.abi/abi-revision"
     board = "$gendir/board"
     epoch = "$gendir/epoch.json"
-    images = "$gendir/images.json.orig"
+    images = "$gendir/images.json"
     packages = "$gendir/packages.json"
   }
 

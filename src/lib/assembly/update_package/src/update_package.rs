@@ -394,11 +394,7 @@ impl UpdatePackageBuilder {
             &self.gendir,
         )?;
         builder.package.add_contents_as_blob(
-            // Emit images.json as images.json.orig so the system-updater can differentiate
-            // between an images.json that hasn't been modified by downstream tooling and one
-            // that has. Once that tooling is modified to also modify/rename this manifest,
-            // this can be updated to write to images.json directly.
-            "images.json.orig",
+            "images.json",
             to_string(&assembly_manifest)?,
             &self.gendir,
         )?;
@@ -490,7 +486,7 @@ mod tests {
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
         builder.build().unwrap();
 
-        let file = File::open(outdir.join("images.json.orig")).unwrap();
+        let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
         let i: serde_json::Value = serde_json::from_reader(reader).unwrap();
 
@@ -544,7 +540,7 @@ mod tests {
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
             firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            images.json.orig=e6c8327e0477561b2e1ee26ea881c47c7cff127b3242165ac0a689e5d22ee656\n\
+            images.json=e6c8327e0477561b2e1ee26ea881c47c7cff127b3242165ac0a689e5d22ee656\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
             zbi.signed=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
@@ -656,11 +652,11 @@ mod tests {
         let update_package = builder.build().unwrap();
         assert_eq!(
             update_package.merkle,
-            "8af272283f1e7287aefda3c332ca8aacc77b407f0eabafc2b603a19640fd43ce".parse().unwrap()
+            "96398b173d44befde2a67d651cb12e8853b49054e8b7daf4527fe5846d537bb2".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
 
-        let file = File::open(outdir.join("images.json.orig")).unwrap();
+        let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
         let i: serde_json::Value = serde_json::from_reader(reader).unwrap();
         assert_eq!(
@@ -731,7 +727,7 @@ mod tests {
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
             firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            images.json.orig=7ba3dd799c26f18d02d79ef063d9aa34c14bdbf2cde4f934af07e2ec9b30d36d\n\
+            images.json=7ba3dd799c26f18d02d79ef063d9aa34c14bdbf2cde4f934af07e2ec9b30d36d\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             recovery=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             recovery.vbmeta=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
@@ -810,7 +806,7 @@ mod tests {
         builder.build().unwrap();
 
         // Ensure the generated images.json manifest is empty.
-        let file = File::open(outdir.join("images.json.orig")).unwrap();
+        let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
         let i: ::update_package::VersionedImagePackagesManifest =
             serde_json::from_reader(reader).unwrap();
