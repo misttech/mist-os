@@ -49,10 +49,6 @@ declare_args() {
   sdk_sub_build_max_load_average = ""
 }
 
-# Set the legacy value to allow soft transition of vendor repos.
-# TODO(ddorwin): Remove this after the transition.
-sdk_no_host_tools = sdk_inside_sub_build
-
 # The list of all cpu architectures for the prebuild fuchsia binaries that go
 # into the IDK archive.
 idk_target_cpus = [
