@@ -48,6 +48,18 @@
       "short": null,
       "description": "filter on products of <version>.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "branch"
+        }
+      },
+      "optionality": "optional",
+      "long": "--branch",
+      "short": null,
+      "description": "filter on products of <branch>.",
+      "hidden": false
     }
   ],
   "notes": [],

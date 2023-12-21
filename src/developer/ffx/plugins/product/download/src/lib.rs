@@ -10,7 +10,6 @@ use ::gcs::client::{Client, ProgressResponse, ProgressState};
 use anyhow::{anyhow, Context, Result};
 use async_fs::rename;
 use errors::ffx_bail;
-use ffx_config::sdk::SdkVersion;
 use ffx_core::ffx_plugin;
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
@@ -110,29 +109,13 @@ pub async fn preprocess_cmd<I: structured_ui::Interface + Sync>(
 
     // If the manifest_url look like a product name, we try to convert it into a
     // transfer manifest url.
-    let version = match cmd.version {
-        Some(version) => version,
-        None => {
-            let sdk = ffx_config::global_env_context()
-                .context("loading global environment context")?
-                .get_sdk()
-                .await
-                .context("getting sdk env context")?;
-            match sdk.get_version() {
-                SdkVersion::Version(version) => version.to_string(),
-                SdkVersion::InTree => {
-                    ffx_bail!("Using in-tree sdk. Please specify the version through '--version'")
-                }
-                SdkVersion::Unknown => ffx_bail!("Unable to determine SDK version. Please specify the version through '--version'"),
-            }
-        }
-    };
-    let products = pb_list_impl(&cmd.auth, cmd.base_url.clone(), &version, ui)
-        .await?
-        .iter()
-        .cloned()
-        .filter(|x| x.name == cmd.manifest_url)
-        .collect::<Vec<_>>();
+    let products =
+        pb_list_impl(&cmd.auth, cmd.base_url.clone(), cmd.version.clone(), cmd.branch.clone(), ui)
+            .await?
+            .iter()
+            .cloned()
+            .filter(|x| x.name == cmd.manifest_url)
+            .collect::<Vec<_>>();
 
     if products.len() != 1 {
         ffx_bail!(
@@ -141,11 +124,8 @@ pub async fn preprocess_cmd<I: structured_ui::Interface + Sync>(
         );
     }
 
-    let processed_cmd = DownloadCommand {
-        manifest_url: products[0].transfer_manifest_url.clone(),
-        version: Some(version),
-        ..cmd
-    };
+    let processed_cmd =
+        DownloadCommand { manifest_url: products[0].transfer_manifest_url.clone(), ..cmd };
     Ok(processed_cmd)
 }
 
@@ -258,7 +238,15 @@ mod test {
         let product_dir = test_dir.path().join("download");
         let base_url = Some(format!("file:{}", test_env.home.display()));
         let version = Some(String::from("fake_version"));
-        let cmd = DownloadCommand { force, auth, manifest_url, product_dir, base_url, version };
+        let cmd = DownloadCommand {
+            force,
+            auth,
+            manifest_url,
+            product_dir,
+            base_url,
+            version,
+            branch: None,
+        };
 
         let processed_cmd = preprocess_cmd(cmd.clone(), &ui).await.expect("testing preprocess cmd");
 

@@ -175,6 +175,50 @@ where
     Ok(String::from_utf8_lossy(&result).to_string())
 }
 
+/// List objects from GCS.
+pub async fn list_from_gcs<I>(
+    bucket: &str,
+    prefix: &str,
+    auth_flow: &AuthFlowChoice,
+    ui: &I,
+    client: &Client,
+) -> Result<Vec<String>>
+where
+    I: structured_ui::Interface + Sync,
+{
+    loop {
+        match client.list(bucket, prefix).await.context("listing all the objects.") {
+            Ok(result) => return Ok(result),
+            Err(e) => match e.downcast_ref::<GcsError>() {
+                Some(GcsError::NeedNewAccessToken) => {
+                    tracing::debug!("list_from_gcs got NeedNewAccessToken");
+                    let access_token = handle_new_access_token(auth_flow, ui)
+                        .await
+                        .context("Getting new access token.")?;
+                    client.set_access_token(access_token).await;
+                }
+                Some(GcsError::NotFound(b, p)) => {
+                    tracing::warn!("[gs://{}/{} not found]", b, p);
+                    bail!("Data not found from gs://{}/{}, error {:?}", b, p, e,);
+                }
+                Some(gcs_err) => bail!(
+                    "Cannot get data from gs://{}/{}, error {:?}, {:?}",
+                    bucket,
+                    prefix,
+                    e,
+                    gcs_err,
+                ),
+                None => bail!(
+                    "Cannot get data from gs://{}/{} to string (Non-GcsError), error {:?}",
+                    bucket,
+                    prefix,
+                    e,
+                ),
+            },
+        }
+    }
+}
+
 /// Prompt the user to visit the OAUTH2 permissions web page and enter a new
 /// authorization code, then convert that to a refresh token and write that
 /// refresh token to the ~/.boto file.
@@ -183,7 +227,6 @@ where
     I: structured_ui::Interface + Sync,
 {
     tracing::debug!("update_refresh_token");
-    println!("\nThe refresh token needs to be updated.");
     let refresh_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce => {
             auth::pkce::new_refresh_token(ui).await.context("get refresh token")?

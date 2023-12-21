@@ -34,7 +34,7 @@ use std::{
 };
 
 pub use crate::{
-    gcs::handle_new_access_token,
+    gcs::{handle_new_access_token, list_from_gcs},
     pbms::{get_product_dir, get_storage_dir},
     transfer_manifest::transfer_download,
 };

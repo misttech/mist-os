@@ -52,7 +52,8 @@ where
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Lookup Begin ----------------------------");
 
-    let products = pb_list_impl(auth, override_base_url, version, ui).await?;
+    let products =
+        pb_list_impl(auth, override_base_url, Some(version.to_string()), None, ui).await?;
 
     tracing::debug!("Looking for product bundle {}, version {}", name, version);
     let mut products = products

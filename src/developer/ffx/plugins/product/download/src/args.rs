@@ -47,4 +47,8 @@ pub struct DownloadCommand {
     /// filter on products of <version>.
     #[argh(option)]
     pub version: Option<String>,
+
+    /// filter on products of <branch>.
+    #[argh(option)]
+    pub branch: Option<String>,
 }
