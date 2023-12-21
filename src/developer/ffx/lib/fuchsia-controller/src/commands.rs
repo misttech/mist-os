@@ -478,7 +478,6 @@ impl LibraryCommand {
                 let target = match env.target_proxy_factory().await {
                     Ok(t) => t,
                     Err(e) => {
-                        eprintln!("====> Failing to get target proxy");
                         env.write_err(e);
                         responder.send(zx_status::Status::INTERNAL).unwrap();
                         return;
@@ -487,7 +486,6 @@ impl LibraryCommand {
                 let default_target = match ffx_target::resolve_default_target(&env.context).await {
                     Ok(t) => t,
                     Err(e) => {
-                        eprintln!("====> Failing to resolve default target");
                         env.write_err(e);
                         responder.send(zx_status::Status::INTERNAL).unwrap();
                         return;
@@ -495,29 +493,20 @@ impl LibraryCommand {
                 };
                 let knock_fut = async {
                     loop {
-                        eprintln!("====> Knocking target");
                         break match knock_target(&target).await {
                             Ok(()) => Ok(()),
                             Err(KnockError::NonCriticalError(_)) => continue,
-                            Err(KnockError::CriticalError(e)) => {
-                                eprintln!("====> Failed knocking target: {e:?}");
-                                Err(e)
-                            }
+                            Err(KnockError::CriticalError(e)) => Err(e),
                         };
                     }
                 };
-                let dur = Duration::from_secs_f64(timeout_float);
-                eprintln!("====> Waiting for target knock fut for {dur:?} seconds");
                 let err = match timeout(Duration::from_secs_f64(timeout_float), knock_fut).await {
                     Ok(res) => match res {
                         Ok(()) => {
                             responder.send(zx_status::Status::OK).unwrap();
                             return;
                         }
-                        Err(e) => {
-                            eprintln!("====> Future returned error");
-                            e
-                        }
+                        Err(e) => e,
                     },
                     Err(e) => {
                         anyhow::anyhow!(
