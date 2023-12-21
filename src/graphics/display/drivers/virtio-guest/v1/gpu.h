@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
+#include <lib/zx/result.h>
 #include <semaphore.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -22,6 +23,7 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace virtio_display {
 
@@ -122,8 +124,9 @@ class GpuDevice : public virtio::Device,
   // Internal routines
   template <typename RequestType, typename ResponseType>
   void send_command_response(const RequestType* cmd, ResponseType** res);
-  zx_status_t Import(zx::vmo vmo, image_t* image, size_t offset, uint32_t pixel_size,
-                     uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format);
+  zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_t* image, size_t offset,
+                                            uint32_t pixel_size, uint32_t row_bytes,
+                                            fuchsia_images2::wire::PixelFormat pixel_format);
 
   zx_status_t get_display_info();
   zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,

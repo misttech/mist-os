@@ -11,6 +11,7 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/result.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -29,6 +30,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -228,20 +230,27 @@ zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image,
     return buffer_info_result.error_value();
   }
   BufferInfo& buffer_info = buffer_info_result.value();
-  return Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
-                buffer_info.bytes_per_row, buffer_info.pixel_format);
+  zx::result<display::DriverImageId> import_result =
+      Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
+             buffer_info.bytes_per_row, buffer_info.pixel_format);
+  if (import_result.is_ok()) {
+    image->handle = display::ToBanjoDriverImageId(import_result.value());
+    return ZX_OK;
+  }
+  return import_result.error_value();
 }
 
-zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32_t pixel_size,
-                              uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format) {
+zx::result<display::DriverImageId> GpuDevice::Import(
+    zx::vmo vmo, const image_t* image, size_t offset, uint32_t pixel_size, uint32_t row_bytes,
+    fuchsia_images2::wire::PixelFormat pixel_format) {
   if (image->type != IMAGE_TYPE_SIMPLE) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::AllocChecker ac;
   auto import_data = fbl::make_unique_checked<imported_image_t>(&ac);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   unsigned size = ZX_ROUNDUP(row_bytes * image->height, zx_system_get_page_size());
@@ -250,28 +259,31 @@ zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32
                                 &import_data->pmt);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to pin VMO: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
   status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height,
                                 pixel_format);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate 2D resource: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
   status = attach_backing(import_data->resource_id, paddr, size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to attach resource backing store: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  image->handle = reinterpret_cast<uint64_t>(import_data.release());
-
-  return ZX_OK;
+  display::DriverImageId image_id(reinterpret_cast<uint64_t>(import_data.release()));
+  return zx::ok(image_id);
 }
 
 void GpuDevice::DisplayControllerImplReleaseImage(image_t* image) {
+  // TODO(b/314126995): This method may only access the `handle` member of
+  // `image`. An upcoming CL will change the ReleaseImage() API to only provide
+  // the image handle.
+
   delete reinterpret_cast<imported_image_t*>(image->handle);
 }
 
