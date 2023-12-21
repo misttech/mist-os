@@ -14,25 +14,6 @@
 namespace wlan {
 
 // FIDL to banjo conversions.
-zx_status_t ConvertMacRole(const fuchsia_wlan_common::wire::WlanMacRole& in, wlan_mac_role_t* out) {
-  switch (in) {
-    case fuchsia_wlan_common::wire::WlanMacRole::kAp:
-      *out = WLAN_MAC_ROLE_AP;
-      break;
-    case fuchsia_wlan_common::wire::WlanMacRole::kClient:
-      *out = WLAN_MAC_ROLE_CLIENT;
-      break;
-    case fuchsia_wlan_common::wire::WlanMacRole::kMesh:
-      *out = WLAN_MAC_ROLE_MESH;
-      break;
-    default:
-      lerror("WlanMacRole is not supported: %u", static_cast<uint32_t>(in));
-      return ZX_ERR_INVALID_ARGS;
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t ConvertWlanPhyType(const fuchsia_wlan_common::wire::WlanPhyType& in,
                                wlan_phy_type_t* out) {
   switch (in) {

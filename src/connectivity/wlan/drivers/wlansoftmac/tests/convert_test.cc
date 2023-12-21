@@ -36,7 +36,6 @@ static constexpr int8_t kRandomPopulaterInt8 = -95;
 static constexpr int16_t kRandomPopulaterInt16 = -24679;
 
 // Fake metadata -- FIDL
-static constexpr wlan_common::WlanMacRole kFakeFidlMacRole = wlan_common::WlanMacRole::kAp;
 static constexpr wlan_common::WlanPhyType kFakeFidlPhyType = wlan_common::WlanPhyType::kErp;
 static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
     wlan_common::ChannelBandwidth::kCbw160;
@@ -51,7 +50,6 @@ static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
     wlan_softmac::WlanRxInfoValid::TruncatingUnknown(kRandomPopulaterUint32);
 
 // Fake metadata -- banjo
-static constexpr uint32_t kFakeBanjoMacRole = WLAN_MAC_ROLE_AP;
 static constexpr uint32_t kFakeBanjoPhyType = WLAN_PHY_TYPE_ERP;
 static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
 static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
@@ -148,17 +146,6 @@ TEST_F(ConvertTest, ToBanjoTxStatus) {
 }
 
 // banjo to FIDL types tests.
-TEST_F(ConvertTest, ToFidlMacRole) {
-  log::Instance::Init(0);
-  wlan_common::WlanMacRole out;
-  EXPECT_EQ(ZX_OK, ConvertMacRole(kFakeBanjoMacRole, &out));
-
-  EXPECT_EQ(kFakeFidlMacRole, out);
-
-  // Input the invalid value, and the conversion will fail.
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertMacRole(kRandomPopulaterUint32, &out));
-}
-
 TEST_F(ConvertTest, ToFidlTxPacket) {
   log::Instance::Init(0);
   // Populate wlan_tx_info_t
