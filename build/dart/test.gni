@@ -182,7 +182,11 @@ template("dart_test") {
     target = get_label_info(":${_main_target_name}", "label_with_toolchain")
     path = _invocation
 
-    forward_variables_from(invoker, [ "environments" ])
+    forward_variables_from(invoker,
+                           [
+                             "environments",
+                             "timeout_secs",
+                           ])
 
     deps = [ ":$_snapshot_target_name" ]
     if (is_host) {
