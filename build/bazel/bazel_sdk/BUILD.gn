@@ -4,8 +4,9 @@
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
-import("//build/sdk/generate_final_idk.gni")
+import("//build/sdk/idk.gni")
 import("//build/sdk/sdk_collection.gni")
 
 # The list of target cpu architectures supported by @fuchsia_sdk.
@@ -15,20 +16,21 @@ if (bazel_fuchsia_sdk_all_cpus) {
   _fuchsia_sdk_target_cpus = [ target_cpu ]
 }
 
-# Ensure that the //build/bazel/bazel_sdk:idk.exported target
+# Ensure that the //build/bazel/bazel_sdk:idk target
 # populates `$OUTPUT_DIR/sdk/exported/bazel_fuchsia_sdk_idk`.
-#
-generate_final_idk("idk") {
+idk("idk") {
   output_name = "bazel_fuchsia_sdk_idk"
   sdk_collection_label = bazel_fuchsia_sdk_collection
   target_cpus = _fuchsia_sdk_target_cpus
 
-  if (bazel_fuchsia_sdk_content != "core") {
+  if (bazel_fuchsia_sdk_content == "core") {
+    api_levels = platform_version.supported_fuchsia_api_levels
+  } else {
     # Never include binaries from previous API levels when not using the
     # "core" set of SDK atom collections to generate this IDK. This is
     # necessary because many atoms in the "driver" set cannot compile
     # on older API levels.
-    extra_api_levels = []
+    api_levels = []
   }
 }
 

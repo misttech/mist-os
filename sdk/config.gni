@@ -14,7 +14,7 @@ declare_args() {
 
   # Set to true to build IDK atoms for all supported API levels that are listed
   # in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
-  # of the generate_final_idk() template.
+  # of the idk() template.
   #
   # TODO(fxbug.dev/306723826): Deal with the fact that the mac builders are too
   # slow to enable this setting, and therefore the mac IDK won't have

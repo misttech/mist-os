@@ -97,7 +97,7 @@ action("generate_main_workspace") {
   ]
 
   # This dependency is needed to properly populate the @fuchsia_sdk repository.
-  deps = [ "//build/bazel/bazel_sdk:idk.exported" ]
+  deps = [ "//build/bazel/bazel_sdk:idk" ]
 
   # This dependency is needed to properly populate the @internal_sdk repository
   # used experimentally to migrate non-SDK GN targets to Bazel

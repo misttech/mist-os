@@ -5,10 +5,12 @@
 # Definitions to build each of the Fuchsia SDKs.
 
 import("//build/config/build_api_module.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/dart/toolchain.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/sdk/config.gni")
-import("//build/sdk/generate_final_idk.gni")
+import("//build/sdk/idk.gni")
+import("//build/sdk/idk_archive.gni")
 import("//build/sdk/sdk_collection.gni")
 import("//build/sdk/sdk_documentation.gni")
 import("//build/sdk/sdk_final_manifest_golden.gni")
@@ -20,19 +22,6 @@ visibility = [ ":*" ]
 
 assert(sdk_inside_supported_api_sub_build ==
        (sdk_inside_sub_build && override_target_api_level != -1))
-
-# Another list of validation targets, these will only be built in the
-# top-level build, and should depend on //sdk:final_fuchsia_idk.exported
-# directly to validate its content.
-_fuchsia_core_idk_final_validation_deps =
-    [ ":final_fuchsia_idk_manifest_golden" ]
-if (host_os == "linux") {
-  _fuchsia_core_idk_final_validation_deps += [
-    # Run the Bazel SDK test suite against the final exported directory,
-    # TODO(fxbug.dev/124321): Make the Bazel SDK test suite runnable on MacOS!
-    "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
-  ]
-}
 
 # A list of sdk_collection() targets that correspond to all
 # IDK targets in the "public" and "partner" category. For now
@@ -99,13 +88,43 @@ generated_file("plasa_manifest") {
   deps = _sdk_public_deps
 }
 
+# Generates, validates, and archive the "final" IDK, including prebuilt binaries
+# for several target_cpu architectures and API levels.
+group("final_fuchsia_idk") {
+  visibility += [ "*" ]
+  deps = [
+    ":final_fuchsia_idk.archive",
+    ":final_fuchsia_idk.exported",
+    ":final_fuchsia_idk.validation",
+  ]
+  testonly = true
+}
+
 # This targets generates a "final" IDK archive, including prebuilt binaries for
 # several target_cpu architectures.
-generate_final_idk("final_fuchsia_idk") {
+idk("final_fuchsia_idk.exported") {
   visibility += [ "*" ]
   output_name = "fuchsia_idk"
   sdk_collection_label = ":core"
-  final_validation_target_labels = _fuchsia_core_idk_final_validation_deps
+  target_cpus = idk_target_cpus
+  api_levels = platform_version.supported_fuchsia_api_levels
+}
+
+idk_archive("final_fuchsia_idk.archive") {
+  visibility += [ "*" ]
+  idk = ":final_fuchsia_idk.exported"
+  idk_output_name = "fuchsia_idk"
+}
+
+group("final_fuchsia_idk.validation") {
+  deps = [ ":final_fuchsia_idk_manifest_golden" ]
+  if (host_os == "linux") {
+    deps += [
+      # Run the Bazel SDK test suite against the final exported directory,
+      # TODO(fxbug.dev/124321): Make the Bazel SDK test suite runnable on MacOS!
+      "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
+    ]
+  }
   testonly = true
 }
 
@@ -113,7 +132,6 @@ sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
   golden = "manifests/fuchsia_idk.manifest"
   idk_name = "fuchsia_idk"
   idk_exported_label = ":final_fuchsia_idk.exported"
-  testonly = true
 }
 
 # NOTHING TO SEE HERE FOLKS.
@@ -693,10 +711,24 @@ copy("idk_build_tools") {
 }
 
 # Firmware IDK. See /src/firmware/README.md
-generate_final_idk("firmware") {
+group("firmware") {
+  deps = [
+    ":firmware.archive",
+    ":firmware.exported",
+    ":firmware_manifest_golden",
+  ]
+}
+
+idk("firmware.exported") {
   output_name = "firmware"
   sdk_collection_label = ":firmware_collection"
-  final_validation_target_labels = [ ":firmware_manifest_golden" ]
+  target_cpus = idk_target_cpus
+  api_levels = platform_version.supported_fuchsia_api_levels
+}
+
+idk_archive("firmware.archive") {
+  idk = ":firmware.exported"
+  idk_output_name = "firmware"
 }
 
 sdk_final_manifest_golden("firmware_manifest_golden") {

@@ -13,7 +13,7 @@ import("//build/sdk/config.gni")
 #     Path to the golden file listing the current IDK contents.
 #
 #   idk_exported_label (required)
-#     Label for the final exported IDK. Looks like ":fuchsia_idk.exported".
+#     Label for the `idk` build rule.
 #
 #   idk_name (required)
 #     Name of the IDK, i.e., the directory name under $root_build_dir/sdk/exported

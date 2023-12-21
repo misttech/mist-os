@@ -25,8 +25,7 @@ import("sdk_molecule.gni")
 # files as the exported directory described above.
 #
 # This last feature is only provided for legacy reasons and will be removed
-# soon. IDK archives should be generated with generate_final_idk()
-# instead.
+# soon. IDK archives should be generated with idk_archive() instead.
 #
 # Parameters
 #
