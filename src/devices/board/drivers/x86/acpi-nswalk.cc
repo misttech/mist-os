@@ -88,11 +88,6 @@ zx_status_t acpi_suspend(zx_device_t* device, uint8_t requested_state, bool enab
 
 zx_status_t publish_acpi_devices(acpi::Manager* manager, zx_device_t* platform_bus,
                                  zx_device_t* acpi_root) {
-  zx_status_t status = pwrbtn_init(acpi_root);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "acpi: failed to initialize pwrbtn device: %d", status);
-  }
-
   acpi::Acpi* acpi = manager->acpi();
 
   auto result = manager->DiscoverDevices();

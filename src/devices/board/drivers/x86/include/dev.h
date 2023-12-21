@@ -28,6 +28,5 @@
 #define CID_LENGTH 8
 
 zx_status_t ec_init(zx_device_t* parent, ACPI_HANDLE acpi_handle);
-zx_status_t pwrbtn_init(zx_device_t* parent);
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_DEV_H_

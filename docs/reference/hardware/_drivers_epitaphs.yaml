@@ -518,3 +518,9 @@
   available_in_git: '50b5c5cf1075f4a85597af0aca07c84707f2c675'
   areas: ['Misc']
   path: '/src/devices/mcu/drivers/chromiumos-ec-core/motion.cc'
+- short_description: 'ACPI power button driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '960101'
+  available_in_git: 'cc1b532c420edb4dfa938192fc729a3089858189'
+  areas: ['ACPI']
+  path: '/src/devices/board/drivers/x86/acpi-dev/dev-pwrbtn.cc'
