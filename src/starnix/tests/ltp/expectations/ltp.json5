@@ -124,7 +124,6 @@
                 "io_submit01",
                 "io_submit02",
                 "io_submit03",
-                "ioctl07",
                 "ioctl_loop04",
                 "ioctl_loop05",
                 "ioperm01",

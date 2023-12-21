@@ -12934,6 +12934,13 @@ pub const ASHMEM_UNPIN: __u32 = 1074296584;
 pub const ASHMEM_GET_PIN_STATUS: __u32 = 30473;
 pub const ASHMEM_PURGE_ALL_CACHES: __u32 = 30474;
 pub const ASHMEM_GET_FILE_ID: __u32 = 2148038411;
+pub const RNDGETENTCNT: __u32 = 2147766784;
+pub const RNDADDTOENTCNT: __u32 = 1074024961;
+pub const RNDGETPOOL: __u32 = 2148028930;
+pub const RNDADDENTROPY: __u32 = 1074287107;
+pub const RNDZAPENTCNT: __u32 = 20996;
+pub const RNDCLEARPOOL: __u32 = 20998;
+pub const RNDRESEEDCRNG: __u32 = 20999;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct xt_match {

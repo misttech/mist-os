@@ -6,7 +6,8 @@ use crate::{
     device::{kobject::DeviceMetadata, simple_device_ops, DeviceMode},
     fs::sysfs::DeviceDirectory,
     mm::{
-        create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
+        create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions,
+        MemoryAccessorExt, ProtectionFlags,
     },
     task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter},
     vfs::{
@@ -208,6 +209,24 @@ impl FileOps for DevRandom {
             let read_bytes = cprng_draw_uninit(bytes);
             Ok(read_bytes.len())
         })
+    }
+
+    fn ioctl(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: starnix_syscalls::SyscallArg,
+    ) -> Result<starnix_syscalls::SyscallResult, Errno> {
+        match request {
+            starnix_uapi::RNDGETENTCNT => {
+                let addr = starnix_uapi::user_address::UserRef::<i32>::new(UserAddress::from(arg));
+                // Linux just returns 256 no matter what (as observed on 6.5.6).
+                let result = 256;
+                current_task.write_object(addr, &result).map(|_| starnix_syscalls::SUCCESS)
+            }
+            _ => crate::vfs::default_ioctl(file, current_task, request, arg),
+        }
     }
 }
 

@@ -54,6 +54,15 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
+        dir.subdir(current_task, b"random", 0o555, |dir| {
+            dir.entry(
+                current_task,
+                b"entropy_avail",
+                BytesFile::new_node(b"256".to_vec()),
+                mode!(IFREG, 0o444),
+            );
+            dir.entry(current_task, b"actions_logged", SeccompActionsLogged::new_node(), mode);
+        });
         dir.entry(current_task, b"tainted", KernelTaintedFile::new_node(), mode);
         dir.subdir(current_task, b"seccomp", 0o555, |dir| {
             dir.entry(
