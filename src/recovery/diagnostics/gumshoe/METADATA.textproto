@@ -7,10 +7,3 @@ last_reviewed_date: {
   month: 4
   day: 17
 }
-
-trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Gumshoe"
-  }
-}

@@ -13,9 +13,8 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "EngProd"
+  issue_tracker: {
+    component_id: 1478090
   }
 }
 

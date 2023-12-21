@@ -9,9 +9,8 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Security"
+  issue_tracker: {
+    component_id: 1477581
   }
 }
 

@@ -9,8 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Tools>fx"
+  issue_tracker: {
+    component_id: 1360790
   }
 }

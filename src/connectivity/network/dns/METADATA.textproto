@@ -9,8 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "NetworkStack>DNS"
+  issue_tracker: {
+    component_id: 1477856
   }
 }

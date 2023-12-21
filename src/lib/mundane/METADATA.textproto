@@ -9,8 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Security>mundanecrypto"
+  issue_tracker: {
+    component_id: 1478459
   }
 }

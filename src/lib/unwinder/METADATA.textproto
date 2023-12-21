@@ -9,8 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Tools>zxdb"
+  issue_tracker: {
+    component_id: 1389559
   }
 }

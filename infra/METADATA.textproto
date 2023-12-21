@@ -4,8 +4,7 @@ last_reviewed_date: {
     day: 12
 }
 trackers: {
-    monorail: {
-        project: "fuchsia"
-        component: "Infra"
+    issue_tracker: {
+    component_id: 1478093
     }
 }

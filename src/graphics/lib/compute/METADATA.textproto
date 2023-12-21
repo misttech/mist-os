@@ -9,8 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Spinel"
+  issue_tracker: {
+    component_id: 1477604
   }
 }

@@ -11,9 +11,8 @@ last_reviewed_date: {
 trackers: {
   # TODO(fxbug.dev/132769): Migrate Flake fetcher to Buganizer.
   # This component is for Flake fetcher use only.
-  monorail: {
-    project: "fuchsia"
-    component: "ComponentFramework>SDK"
+  issue_tracker: {
+    component_id: 1404357
   }
   # Fuchsia > Component Framework > SDK
   issue_tracker: {
