@@ -166,10 +166,8 @@ static inline bool is_designware(const zx_pci_init_arg_t* arg) {
 // zx_status_t zx_pci_init
 zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t> _init_buf,
                          uint32_t len) {
-  // TODO(fxbug.dev/30918): finer grained validation
-  // TODO(security): Add additional access checks
   zx_status_t status;
-  if ((status = validate_resource(handle, ZX_RSRC_KIND_ROOT)) < 0) {
+  if ((status = validate_resource(handle, ZX_RSRC_KIND_MMIO)) < 0) {
     return status;
   }
 

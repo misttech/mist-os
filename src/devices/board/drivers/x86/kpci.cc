@@ -569,8 +569,7 @@ zx_status_t pci_init(zx_device_t* platform_bus, ACPI_HANDLE object,
     return AE_ERROR;
   }
 
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_init(get_root_resource(platform_bus), arg, arg_size);
+  status = zx_pci_init(get_mmio_resource(platform_bus), arg, arg_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: error %d in zx_pci_init", status);
     return AE_ERROR;
