@@ -1,0 +1,372 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#![cfg(test)]
+
+use assert_matches::assert_matches;
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
+use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use futures::{FutureExt as _, StreamExt as _};
+use netstack_testing_common::{
+    realms::{Netstack3, TestSandboxExt as _},
+    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+};
+use netstack_testing_macros::netstack_test;
+use std::collections::{HashMap, HashSet};
+
+#[netstack_test]
+async fn watcher_existing(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+
+    // There should be no resources on startup.
+    {
+        let stream = fnet_filter_ext::event_stream_from_state(state.clone())
+            .expect("get filter event stream");
+        futures::pin_mut!(stream);
+        let observed: Vec<_> =
+            fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+        assert_eq!(observed, Vec::new());
+    }
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let resources = [fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+        id: fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned()),
+        domain: fnet_filter_ext::Domain::AllIp,
+    })];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let observed: HashMap<fnet_filter_ext::ControllerId, fnet_filter_ext::Resource> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert_eq!(
+        observed,
+        resources
+            .into_iter()
+            .map(|resource| (controller.id().clone(), resource))
+            .collect::<HashMap<_, _>>()
+    );
+}
+
+#[netstack_test]
+async fn watcher_observe_updates(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    assert_eq!(
+        stream.next().await.expect("wait for idle").expect("wait for idle"),
+        fnet_filter_ext::Event::Idle
+    );
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+    let namespace = fnet_filter_ext::NamespaceId(String::from("test"));
+    let routine =
+        fnet_filter_ext::RoutineId { namespace: namespace.clone(), name: String::from("ingress") };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+            id: namespace.clone(),
+            domain: fnet_filter_ext::Domain::AllIp,
+        }),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine.clone(),
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId { routine, index: 0 },
+            matchers: fnet_filter_ext::Matchers {
+                transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                    src_port: None,
+                    dst_port: Some(
+                        fnet_filter_ext::PortMatcher::new(22, 22, /* invert */ false)
+                            .expect("valid port range"),
+                    ),
+                }),
+                ..Default::default()
+            },
+            action: fnet_filter_ext::Action::Drop,
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    assert_matches!(
+        stream.next().on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None).await,
+        None,
+        "changes should not be broadcast until committed"
+    );
+
+    controller.commit().await.expect("commit pending changes");
+    for resource in &resources {
+        let (controller_id, added_resource) = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_filter_ext::Event::Added(id, resource))) => (id, resource),
+            "added resources should be broadcast to watcher"
+        );
+        assert_eq!(&controller_id, controller.id());
+        assert_eq!(&added_resource, resource);
+    }
+    assert_matches!(
+        stream.next().await,
+        Some(Ok(fnet_filter_ext::Event::EndOfUpdate)),
+        "transactional updates should be demarcated with EndOfUpdate event"
+    );
+
+    controller
+        .push_changes(
+            resources
+                .iter()
+                .cloned()
+                .map(|resource| fnet_filter_ext::Change::Remove(resource.id()))
+                .collect(),
+        )
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+    for resource in &resources {
+        let (controller_id, removed_resource) = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_filter_ext::Event::Removed(id, resource))) => (id, resource),
+            "removed resources should be broadcast to watcher"
+        );
+        assert_eq!(&controller_id, controller.id());
+        assert_eq!(removed_resource, resource.id());
+    }
+    assert_matches!(
+        stream.next().await,
+        Some(Ok(fnet_filter_ext::Event::EndOfUpdate)),
+        "transactional updates should be demarcated with EndOfUpdate event"
+    );
+}
+
+#[netstack_test]
+async fn watcher_events_scoped_to_controllers(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    assert_eq!(
+        stream.next().await.expect("wait for idle").expect("wait for idle"),
+        fnet_filter_ext::Event::Idle
+    );
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let namespace = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+        id: fnet_filter_ext::NamespaceId(String::from("test")),
+        domain: fnet_filter_ext::Domain::AllIp,
+    });
+    let create_controller_and_commit_updates = |name: &'static str| async {
+        let mut controller = fnet_filter_ext::Controller::new(
+            &control,
+            &fnet_filter_ext::ControllerId(name.to_owned()),
+        )
+        .await
+        .expect("create controller");
+        controller
+            .push_changes(vec![fnet_filter_ext::Change::Create(namespace.clone())])
+            .await
+            .expect("push changes");
+        controller.commit().await.expect("commit pending changes");
+    };
+
+    // Add two identical resources under different controllers.
+    futures::future::join(
+        create_controller_and_commit_updates("controller-a"),
+        create_controller_and_commit_updates("controller-b"),
+    )
+    .await;
+
+    let mut expected_controllers = HashSet::from(["controller-a", "controller-b"]);
+    while !expected_controllers.is_empty() {
+        let (fnet_filter_ext::ControllerId(id), added_resource) = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_filter_ext::Event::Added(id, resource))) => (id, resource),
+            "added resources should be broadcast to watcher"
+        );
+        assert!(expected_controllers.remove(id.as_str()));
+        assert_eq!(added_resource, namespace);
+        assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_filter_ext::Event::EndOfUpdate)),
+            "transactional updates should be demarcated with EndOfUpdate event"
+        );
+    }
+}
+
+#[netstack_test]
+async fn watcher_already_pending(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let (watcher, server_end) =
+        fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>().expect("create proxy");
+    state.get_watcher(&fnet_filter::WatcherOptions::default(), server_end).expect("get watcher");
+
+    let events = watcher.watch().await.expect("get existing resources");
+    assert_eq!(events, &[fnet_filter::Event::Idle(fnet_filter::Empty {})]);
+
+    // Call `Watch` twice and the netstack should close the channel.
+    assert_matches!(
+        futures::future::join(watcher.watch(), watcher.watch()).await,
+        (
+            Err(fidl::Error::ClientChannelClosed { status: fidl::Status::PEER_CLOSED, .. }),
+            Err(fidl::Error::ClientChannelClosed { status: fidl::Status::PEER_CLOSED, .. }),
+        )
+    );
+    assert!(watcher.is_closed());
+}
+
+#[netstack_test]
+async fn watcher_channel_closed_if_not_polled(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let (watcher, server_end) =
+        fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>().expect("create proxy");
+    state.get_watcher(&fnet_filter::WatcherOptions::default(), server_end).expect("get watcher");
+
+    let events = watcher.watch().await.expect("get existing resources");
+    assert_eq!(events, &[fnet_filter::Event::Idle(fnet_filter::Empty {})]);
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller = fnet_filter_ext::Controller::new(
+        &control,
+        &fnet_filter_ext::ControllerId(String::from("test")),
+    )
+    .await
+    .expect("create controller");
+
+    async fn create_and_remove_namespace(controller: &mut fnet_filter_ext::Controller) {
+        const NAMESPACE_ID: &str = "namespace";
+        controller
+            .push_changes(vec![fnet_filter_ext::Change::Create(
+                fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+                    id: fnet_filter_ext::NamespaceId(NAMESPACE_ID.to_owned()),
+                    domain: fnet_filter_ext::Domain::AllIp,
+                }),
+            )])
+            .await
+            .expect("push changes");
+        controller.commit().await.expect("commit pending changes");
+
+        controller
+            .push_changes(vec![fnet_filter_ext::Change::Remove(
+                fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId(
+                    NAMESPACE_ID.to_owned(),
+                )),
+            )])
+            .await
+            .expect("push changes");
+        controller.commit().await.expect("commit pending changes");
+    }
+
+    // Repeatedly add and remove resources, causing events to be queued
+    // server-side for the watcher.
+    let perform_updates = async {
+        loop {
+            create_and_remove_namespace(&mut controller).await
+        }
+    }
+    .fuse();
+    futures::pin_mut!(perform_updates);
+
+    // Wait for the watcher channel to be closed as a result.
+    let mut event_stream = watcher.take_event_stream();
+    futures::select! {
+        event = event_stream.next() => assert_matches!(event, None),
+        _ = perform_updates => unreachable!(),
+    }
+}
+
+#[netstack_test]
+async fn on_id_assigned(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    let controller_id = fnet_filter_ext::ControllerId(String::from("test"));
+    let open_new_controller = || async {
+        fnet_filter_ext::Controller::new(&control, &controller_id).await.expect("create controller")
+    };
+
+    let mut controller = open_new_controller().await;
+    assert_eq!(controller.id(), &controller_id);
+
+    // The netstack should deduplicate IDs if there are conflicts.
+    let other_controller = open_new_controller().await;
+    assert_ne!(other_controller.id(), &controller_id);
+
+    // Add a resource with the first controller and initialize a watcher so that
+    // we'll be able to observe its removal.
+    let resource = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+        id: fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned()),
+        domain: fnet_filter_ext::Domain::AllIp,
+    });
+    controller
+        .push_changes(vec![fnet_filter_ext::Change::Create(resource.clone())])
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let observed: HashMap<fnet_filter_ext::ControllerId, fnet_filter_ext::Resource> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert_eq!(observed, HashMap::from([(controller.id().clone(), resource.clone())]));
+
+    // If the first controller is closed, its ID can be reused.
+    //
+    // NB: to avoid a race between the server-side handling of the channel
+    // closure and opening a new controller with the same ID, we wait to observe
+    // removal of the controller's resources.
+    drop(controller);
+    let (controller, removed_resource) = assert_matches!(
+        stream.next().await.expect("observe resource removal"),
+        Ok(fnet_filter_ext::Event::Removed(id, resource)) => (id, resource)
+    );
+    assert_eq!(controller, controller_id);
+    assert_eq!(removed_resource, resource.id());
+
+    let controller = open_new_controller().await;
+    assert_eq!(controller.id(), &controller_id);
+}

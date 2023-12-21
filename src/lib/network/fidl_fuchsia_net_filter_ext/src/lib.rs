@@ -596,7 +596,21 @@ pub struct PortMatcher {
     pub invert: bool,
 }
 
+/// Errors when creating a `PortMatcher`.
+#[derive(Debug, Error, PartialEq)]
+pub enum PortMatcherError {
+    #[error("invalid port range (start must be <= end)")]
+    InvalidPortRange,
+}
+
 impl PortMatcher {
+    pub fn new(start: u16, end: u16, invert: bool) -> Result<Self, PortMatcherError> {
+        if start > end {
+            return Err(PortMatcherError::InvalidPortRange);
+        }
+        Ok(Self { start, end, invert })
+    }
+
     pub fn start(&self) -> u16 {
         self.start
     }

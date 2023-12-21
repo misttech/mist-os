@@ -11,7 +11,8 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter;
+use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -70,7 +71,7 @@ impl NetstackVersion {
         macro_rules! common_services_and {
             ($($name:expr),*) => {[
                 fnet_debug::InterfacesMarker::PROTOCOL_NAME,
-                fnet_filter::FilterMarker::PROTOCOL_NAME,
+                fnet_filter_deprecated::FilterMarker::PROTOCOL_NAME,
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
@@ -102,7 +103,10 @@ impl NetstackVersion {
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),
-            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(),
+            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(
+                fnet_filter::ControlMarker::PROTOCOL_NAME,
+                fnet_filter::StateMarker::PROTOCOL_NAME,
+            ),
         }
     }
 }
@@ -370,7 +374,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                 [
                                     fnetemul::Capability::LogSink(fnetemul::Empty {}),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
-                                        fnet_filter::FilterMarker,
+                                        fnet_filter_deprecated::FilterMarker,
                                     >(
                                         constants::netstack::COMPONENT_NAME,
                                     )),

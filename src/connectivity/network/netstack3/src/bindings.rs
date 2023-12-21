@@ -1039,7 +1039,9 @@ pub(crate) enum Service {
     DnsServerWatcher(fidl_fuchsia_net_name::DnsServerWatcherRequestStream),
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
-    Filter(fidl_fuchsia_net_filter_deprecated::FilterRequestStream),
+    FilterControl(fidl_fuchsia_net_filter::ControlRequestStream),
+    FilterState(fidl_fuchsia_net_filter::StateRequestStream),
+    FilterDeprecated(fidl_fuchsia_net_filter_deprecated::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
@@ -1236,6 +1238,8 @@ impl NetstackSeed {
 
         let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
 
+        let filter_update_dispatcher = filter_worker::UpdateDispatcher::default();
+
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
         // `Future` returned by this function fails to implement `Send` with the
@@ -1387,8 +1391,22 @@ impl NetstackSeed {
                         Service::DnsServerWatcher(dns) => {
                             dns.serve_with(|rs| name_worker::serve(netstack.clone(), rs)).await
                         }
-                        Service::Filter(filter) => {
-                            filter.serve_with(|rs| filter_worker::serve(rs)).await
+                        Service::FilterState(filter) => {
+                            filter
+                                .serve_with(|rs| {
+                                    filter_worker::serve_state(rs, &filter_update_dispatcher)
+                                })
+                                .await
+                        }
+                        Service::FilterControl(filter) => {
+                            filter
+                                .serve_with(|rs| {
+                                    filter_worker::serve_control(rs, &filter_update_dispatcher)
+                                })
+                                .await
+                        }
+                        Service::FilterDeprecated(filter) => {
+                            filter.serve_with(|rs| filter_worker::serve_deprecated(rs)).await
                         }
                         Service::Neighbor(neighbor) => {
                             neighbor

@@ -16,6 +16,7 @@ rustc_library("netstack_testing_common") {
     "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
     "//sdk/fidl/fuchsia.net.dhcpv6:fuchsia.net.dhcpv6_rust",
+    "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",

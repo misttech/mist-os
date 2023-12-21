@@ -138,7 +138,7 @@ macro_rules! impl_service_marker {
 
 impl_service_marker!(fidl_fuchsia_net_debug::DiagnosticsMarker, DebugDiagnostics, server_end);
 impl_service_marker!(fidl_fuchsia_net_debug::InterfacesMarker, DebugInterfaces);
-impl_service_marker!(fidl_fuchsia_net_filter_deprecated::FilterMarker, Filter);
+impl_service_marker!(fidl_fuchsia_net_filter_deprecated::FilterMarker, FilterDeprecated);
 impl_service_marker!(fidl_fuchsia_net_interfaces::StateMarker, Interfaces);
 impl_service_marker!(fidl_fuchsia_net_interfaces_admin::InstallerMarker, InterfacesAdmin);
 impl_service_marker!(fidl_fuchsia_net_neighbor::ViewMarker, Neighbor);
