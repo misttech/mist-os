@@ -169,3 +169,9 @@ py_binary(
     srcs = ["elf_sizes.py"],
     python_version = "PY3",
 )
+
+py_binary(
+    name = "ensure_build_config",
+    srcs = ["ensure_build_config.py"],
+    python_version = "PY3",
+)
