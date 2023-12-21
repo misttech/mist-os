@@ -3269,6 +3269,7 @@ async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>
 
     let set_config = Some(finterfaces_admin::NudConfiguration {
         max_multicast_solicitations: Some(2),
+        max_unicast_solicitations: Some(3),
         ..Default::default()
     });
     let (set_config, expect_err) = match I::VERSION {
@@ -3316,4 +3317,76 @@ async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>
         .expect("get configuration error");
     let nud_config = to_ip_nud_configuration::<I>(nud_config);
     assert_matches!(nud_config, None);
+}
+
+/// Tests that setting and getting maximum unicast solicitations works.
+///
+/// Note that differently from the multicast solicitations test, we don't look
+/// at the wire behavior after setting. We rely on unit tests for that because
+/// the set up is more trouble than it's worth.
+#[netstack_test]
+async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("create netstack realm");
+
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "client").await.expect("join network");
+
+    let make_nud_config = |v: u16| {
+        let nud = Some(finterfaces_admin::NudConfiguration {
+            max_unicast_solicitations: Some(v),
+            ..Default::default()
+        });
+        match I::VERSION {
+            net_types::ip::IpVersion::V4 => finterfaces_admin::Configuration {
+                ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                    arp: Some(finterfaces_admin::ArpConfiguration { nud, ..Default::default() }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            net_types::ip::IpVersion::V6 => finterfaces_admin::Configuration {
+                ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                    ndp: Some(finterfaces_admin::NdpConfiguration { nud, ..Default::default() }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        }
+    };
+
+    // Setting a zero value should fail.
+    assert_matches!(
+        iface.control().set_configuration(make_nud_config(0)).await,
+        Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalZeroValue)),
+        "can't set to zero"
+    );
+
+    // Set a higher value than the default and attempt a neighbor resolution
+    // that will not complete, counting the number of solicitations we see on
+    // the wire.
+    const WANT_SOLICITS: u16 = 4;
+    let config = iface
+        .control()
+        .set_configuration(make_nud_config(WANT_SOLICITS))
+        .await
+        .expect("setting configuration")
+        .expect("setting more solicitations");
+    let finterfaces_admin::NudConfiguration { max_unicast_solicitations, .. } =
+        to_ip_nud_configuration::<I>(config).expect("missing nud config");
+    // Previous value is the default as defined in RFC 4861.
+    const DEFAULT_MAX_UNICAST_SOLICITATIONS: u16 = 3;
+    assert_eq!(max_unicast_solicitations, Some(DEFAULT_MAX_UNICAST_SOLICITATIONS));
+    let finterfaces_admin::NudConfiguration { max_unicast_solicitations, .. } = {
+        let config = iface
+            .control()
+            .get_configuration()
+            .await
+            .expect("get configuration failed")
+            .expect("get configuration error");
+        to_ip_nud_configuration::<I>(config).expect("nud present")
+    };
+    assert_eq!(max_unicast_solicitations, Some(WANT_SOLICITS));
 }

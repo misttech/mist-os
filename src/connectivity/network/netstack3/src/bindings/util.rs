@@ -1267,10 +1267,14 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
     fn try_from_fidl(fidl: fnet_interfaces_admin::NudConfiguration) -> Result<Self, Self::Error> {
         let fnet_interfaces_admin::NudConfiguration {
             max_multicast_solicitations,
+            max_unicast_solicitations,
             __source_breaking,
         } = fidl;
         Ok(NudUserConfigUpdate {
             max_multicast_solicitations: max_multicast_solicitations
+                .map(TryIntoCore::try_into_core)
+                .transpose()?,
+            max_unicast_solicitations: max_unicast_solicitations
                 .map(TryIntoCore::try_into_core)
                 .transpose()?,
             ..Default::default()
@@ -1280,10 +1284,10 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
 
 impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
     fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
-        let NudUserConfigUpdate { max_unicast_solicitations: _, max_multicast_solicitations } =
-            self;
+        let NudUserConfigUpdate { max_unicast_solicitations, max_multicast_solicitations } = self;
         fnet_interfaces_admin::NudConfiguration {
             max_multicast_solicitations: max_multicast_solicitations.map(|c| c.get()),
+            max_unicast_solicitations: max_unicast_solicitations.map(|c| c.get()),
             __source_breaking: fidl::marker::SourceBreaking,
         }
     }

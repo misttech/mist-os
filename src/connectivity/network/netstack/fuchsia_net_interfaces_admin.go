@@ -576,6 +576,7 @@ func (ci *adminControlImpl) getNetworkEndpoint(netProto tcpip.NetworkProtocolNum
 func toAdminNudConfiguration(stackNud stack.NUDConfigurations) admin.NudConfiguration {
 	var adminNud admin.NudConfiguration
 	adminNud.SetMaxMulticastSolicitations(uint16(stackNud.MaxMulticastProbes))
+	adminNud.SetMaxUnicastSolicitations(uint16(stackNud.MaxUnicastProbes))
 	return adminNud
 }
 
@@ -599,6 +600,12 @@ func (ci *adminControlImpl) applyNUDConfig(netProto tcpip.NetworkProtocolNumber,
 		prev := stackNudConfig.MaxMulticastProbes
 		stackNudConfig.MaxMulticastProbes = uint32(nudConfig.MaxMulticastSolicitations)
 		previousNudConfig.SetMaxMulticastSolicitations(uint16(prev))
+		needsNudUpdate = true
+	}
+	if nudConfig.HasMaxUnicastSolicitations() {
+		prev := stackNudConfig.MaxUnicastProbes
+		stackNudConfig.MaxUnicastProbes = uint32(nudConfig.MaxUnicastSolicitations)
+		previousNudConfig.SetMaxUnicastSolicitations(uint16(prev))
 		needsNudUpdate = true
 	}
 
@@ -675,6 +682,9 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 				if config.Ipv4.Arp.Nud.HasMaxMulticastSolicitations() && config.Ipv4.Arp.Nud.MaxMulticastSolicitations == 0 {
 					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
 				}
+				if config.Ipv4.Arp.Nud.HasMaxUnicastSolicitations() && config.Ipv4.Arp.Nud.MaxUnicastSolicitations == 0 {
+					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+				}
 			}
 		}
 	}
@@ -707,6 +717,9 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 		if config.Ipv6.HasNdp() {
 			if config.Ipv6.Ndp.HasNud() {
 				if config.Ipv6.Ndp.Nud.HasMaxMulticastSolicitations() && config.Ipv6.Ndp.Nud.MaxMulticastSolicitations == 0 {
+					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+				}
+				if config.Ipv6.Ndp.Nud.HasMaxUnicastSolicitations() && config.Ipv6.Ndp.Nud.MaxUnicastSolicitations == 0 {
 					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
 				}
 			}

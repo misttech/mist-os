@@ -19,6 +19,11 @@ type NudConfiguration = table {
     /// Must be nonzero. `ILLEGAL_ZERO_VALUE` is returned on
     /// [`Control.SetConfiguration`] otherwise.
     1: max_multicast_solicitations uint16;
+    /// The number of unicast solicitations before considering a neighbor
+    /// unreachable.
+    ///
+    /// Must be nonzero.
+    2: max_unicast_solicitations uint16;
 };
 
 /// The configuration for an interface.
