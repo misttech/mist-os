@@ -274,10 +274,6 @@
                 // fxbug.dev/135993
                 "open04",
 
-                // sys_eventfd() is supported only on x86, so the test is skipped on arm64.
-                // TODO(b/290879459): Remove once we stop using hardcoded skipped test list.
-                "eventfd01",
-
                 // Flaky test.
                 "cve-2017-17052",
                 "io_pgetevents01",
