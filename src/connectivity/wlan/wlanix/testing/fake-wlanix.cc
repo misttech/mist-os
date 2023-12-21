@@ -227,6 +227,10 @@ void FakeWlanix::AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetw
   fidl::BindServer(dispatcher_, std::move(request->network()), this);
 }
 
+void FakeWlanix::Disconnect(DisconnectCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceDisconnect});
+}
+
 void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

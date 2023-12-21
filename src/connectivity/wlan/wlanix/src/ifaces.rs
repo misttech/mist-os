@@ -108,6 +108,7 @@ pub(crate) trait ClientIface: Sync + Send {
         passphrase: Option<Vec<u8>>,
         requested_bssid: Option<Bssid>,
     ) -> Result<ConnectedResult, Error>;
+    async fn disconnect(&self) -> Result<(), Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -236,6 +237,11 @@ impl ClientIface for SmeClientIface {
             Err(format_err!("Connect failed with status code: {:?}", sme_result.code))
         }
     }
+
+    async fn disconnect(&self) -> Result<(), Error> {
+        self.sme_proxy.disconnect(fidl_sme::UserDisconnectReason::Unknown).await?;
+        Ok(())
+    }
 }
 
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
@@ -310,22 +316,27 @@ pub mod test_utils {
         }
     }
 
+    #[derive(Debug, Clone)]
+    pub enum ClientIfaceCall {
+        TriggerScan,
+        AbortScan,
+        GetLastScanResults,
+        ConnectToNetwork { ssid: Vec<u8>, passphrase: Option<Vec<u8>>, bssid: Option<Bssid> },
+        Disconnect,
+    }
+
     pub struct TestClientIface {
-        pub connected_ssid: Mutex<Option<Vec<u8>>>,
-        pub connected_passphrase: Mutex<Option<Vec<u8>>>,
-        pub connect_req_bssid: Mutex<Option<Bssid>>,
         pub transaction_handle: Mutex<Option<fidl_sme::ConnectTransactionControlHandle>>,
         scan_end_receiver: Mutex<Option<oneshot::Receiver<Result<ScanEnd, Error>>>>,
+        pub calls: Arc<Mutex<Vec<ClientIfaceCall>>>,
     }
 
     impl TestClientIface {
         pub fn new() -> Self {
             Self {
-                connected_ssid: Mutex::new(None),
-                connected_passphrase: Mutex::new(None),
-                connect_req_bssid: Mutex::new(None),
                 transaction_handle: Mutex::new(None),
                 scan_end_receiver: Mutex::new(None),
+                calls: Arc::new(Mutex::new(vec![])),
             }
         }
     }
@@ -333,6 +344,7 @@ pub mod test_utils {
     #[async_trait]
     impl ClientIface for TestClientIface {
         async fn trigger_scan(&self) -> Result<ScanEnd, Error> {
+            self.calls.lock().push(ClientIfaceCall::TriggerScan);
             let scan_end_receiver = self.scan_end_receiver.lock().take();
             match scan_end_receiver {
                 Some(receiver) => receiver.await.expect("scan_end_signal failed"),
@@ -340,9 +352,11 @@ pub mod test_utils {
             }
         }
         async fn abort_scan(&self) -> Result<(), Error> {
+            self.calls.lock().push(ClientIfaceCall::AbortScan);
             Ok(())
         }
         fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult> {
+            self.calls.lock().push(ClientIfaceCall::GetLastScanResults);
             vec![fake_scan_result()]
         }
         async fn connect_to_network(
@@ -351,9 +365,11 @@ pub mod test_utils {
             passphrase: Option<Vec<u8>>,
             bssid: Option<Bssid>,
         ) -> Result<ConnectedResult, Error> {
-            *self.connected_ssid.lock() = Some(ssid.to_vec());
-            *self.connected_passphrase.lock() = passphrase;
-            *self.connect_req_bssid.lock() = bssid;
+            self.calls.lock().push(ClientIfaceCall::ConnectToNetwork {
+                ssid: ssid.to_vec(),
+                passphrase: passphrase.clone(),
+                bssid,
+            });
             let (proxy, server) =
                 fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
                     .expect("Failed to create fidl endpoints");
@@ -366,6 +382,10 @@ pub mod test_utils {
                 bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
                 transaction_stream: proxy.take_event_stream(),
             })
+        }
+        async fn disconnect(&self) -> Result<(), Error> {
+            self.calls.lock().push(ClientIfaceCall::Disconnect);
+            Ok(())
         }
     }
 
@@ -394,6 +414,11 @@ pub mod test_utils {
                 },
                 sender,
             )
+        }
+
+        pub fn get_iface_call_history(&self) -> Arc<Mutex<Vec<ClientIfaceCall>>> {
+            let iface = self.client_iface.as_ref().expect("client iface should exist");
+            Arc::clone(&iface.calls)
         }
     }
 
@@ -727,5 +752,25 @@ mod tests {
         let connect_result =
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
         assert_variant!(connect_result, Err(_e));
+    }
+
+    #[test]
+    fn test_disconnect() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        let mut disconnect_fut = iface.disconnect();
+        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        let (disconnect_reason, disconnect_responder) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { reason, responder }))) => (reason, responder));
+        assert_eq!(disconnect_reason, fidl_sme::UserDisconnectReason::Unknown);
+
+        assert_variant!(disconnect_responder.send(), Ok(()));
+        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
     }
 }

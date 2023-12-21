@@ -41,6 +41,7 @@ enum class CommandTag {
   kSupplicantUnknownMethod,
   kSupplicantStaIfaceRegisterCallback,
   kSupplicantStaIfaceAddNetwork,
+  kSupplicantStaIfaceDisconnect,
   kSupplicantStaIfaceUnknownMethod,
   kSupplicantStaNetworkSetBssid,
   kSupplicantStaNetworkClearBssid,
@@ -122,6 +123,7 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
       RegisterCallbackCompleter::Sync& completer) override;
   void AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetworkRequest* request,
                   AddNetworkCompleter::Sync& completer) override;
+  void Disconnect(DisconnectCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

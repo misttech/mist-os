@@ -480,6 +480,15 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 .await;
             }
         }
+        fidl_wlanix::SupplicantStaIfaceRequest::Disconnect { responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::Disconnect");
+            if let Err(e) = iface.disconnect().await {
+                warn!("iface.disconnect() error: {}", e);
+            }
+            if let Err(e) = responder.send() {
+                warn!("Failed to send disconnect response: {}", e);
+            }
+        }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
         }
@@ -1016,7 +1025,7 @@ mod tests {
         super::*,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         futures::{pin_mut, task::Poll, Future},
-        ifaces::test_utils::TestIfaceManager,
+        ifaces::test_utils::{ClientIfaceCall, TestIfaceManager},
         std::pin::Pin,
         wlan_common::assert_variant,
     };
@@ -1262,6 +1271,21 @@ mod tests {
     }
 
     #[test]
+    fn test_supplicant_sta_iface_disconnect() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut disconnect_fut = test_helper.supplicant_sta_iface_proxy.disconnect();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut disconnect_fut),
+            Poll::Ready(Ok(()))
+        );
+    }
+
+    #[test]
     fn test_supplicant_sta_open_network_connect_flow() {
         let (mut test_helper, mut test_fut) = setup_supplicant_test();
 
@@ -1288,18 +1312,14 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
-            Some(vec![b'f', b'o', b'o'])
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let (ssid, passphrase, bssid) = assert_variant!(
+            iface_calls.lock()[0].clone(),
+            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
         );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_passphrase.lock(),
-            None
-        );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connect_req_bssid.lock(),
-            None
-        );
+        assert_eq!(ssid, vec![b'f', b'o', b'o']);
+        assert_eq!(passphrase, None);
+        assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
@@ -1346,18 +1366,14 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
-            Some(vec![b'f', b'o', b'o'])
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let (ssid, passphrase, bssid) = assert_variant!(
+            iface_calls.lock()[0].clone(),
+            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
         );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_passphrase.lock(),
-            Some(vec![b'p', b'a', b's', b's'])
-        );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connect_req_bssid.lock(),
-            None
-        );
+        assert_eq!(ssid, vec![b'f', b'o', b'o']);
+        assert_eq!(passphrase, Some(vec![b'p', b'a', b's', b's']));
+        assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
@@ -1400,18 +1416,14 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
-            Some(vec![b'f', b'o', b'o'])
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let (ssid, passphrase, bssid) = assert_variant!(
+            iface_calls.lock()[0].clone(),
+            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
         );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_passphrase.lock(),
-            None
-        );
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connect_req_bssid.lock(),
-            Some(Bssid::from([1, 2, 3, 4, 5, 6]))
-        );
+        assert_eq!(ssid, vec![b'f', b'o', b'o']);
+        assert_eq!(passphrase, None);
+        assert_eq!(bssid, Some(Bssid::from([1, 2, 3, 4, 5, 6])));
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
@@ -1458,10 +1470,12 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_eq!(
-            *test_helper.iface_manager.client_iface.as_ref().unwrap().connect_req_bssid.lock(),
-            None
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let bssid = assert_variant!(
+            iface_calls.lock()[0].clone(),
+            ClientIfaceCall::ConnectToNetwork { bssid, .. } => bssid
         );
+        assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
@@ -1471,7 +1485,7 @@ mod tests {
     struct SupplicantTestHelper {
         _wlanix_proxy: fidl_wlanix::WlanixProxy,
         _supplicant_proxy: fidl_wlanix::SupplicantProxy,
-        _supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
+        supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
         nl80211_proxy: fidl_wlanix::Nl80211Proxy,
         supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
         supplicant_sta_iface_callback_stream: fidl_wlanix::SupplicantStaIfaceCallbackRequestStream,
@@ -1546,7 +1560,7 @@ mod tests {
         let test_helper = SupplicantTestHelper {
             _wlanix_proxy: wlanix_proxy,
             _supplicant_proxy: supplicant_proxy,
-            _supplicant_sta_iface_proxy: supplicant_sta_iface_proxy,
+            supplicant_sta_iface_proxy,
             nl80211_proxy,
             supplicant_sta_network_proxy,
             supplicant_sta_iface_callback_stream,
