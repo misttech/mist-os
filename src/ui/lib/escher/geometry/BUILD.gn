@@ -4,6 +4,7 @@
 
 source_set("escher_geometry") {
   public_deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/ui/lib/escher/util:escher_geometry_utils",
     "//third_party/glm",
   ]

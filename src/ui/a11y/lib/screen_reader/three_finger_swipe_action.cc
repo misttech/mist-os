@@ -7,6 +7,7 @@
 #include <fuchsia/accessibility/gesture/cpp/fidl.h>
 #include <fuchsia/accessibility/tts/cpp/fidl.h>
 #include <lib/fidl/cpp/string.h>
+#include <lib/syslog/cpp/macros.h>
 
 namespace a11y {
 

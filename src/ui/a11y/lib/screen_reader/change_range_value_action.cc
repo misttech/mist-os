@@ -4,6 +4,8 @@
 
 #include "src/ui/a11y/lib/screen_reader/change_range_value_action.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "fuchsia/accessibility/semantics/cpp/fidl.h"
 #include "src/ui/a11y/lib/screen_reader/default_action.h"
 #include "src/ui/a11y/lib/screen_reader/util/util.h"

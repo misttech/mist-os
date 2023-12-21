@@ -4,6 +4,8 @@
 
 #include "src/ui/lib/escher/vk/chained_semaphore_generator.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/ui/lib/escher/renderer/semaphore.h"
 
 #include <vulkan/vulkan.hpp>

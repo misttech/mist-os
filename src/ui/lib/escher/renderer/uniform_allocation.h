@@ -5,6 +5,8 @@
 #ifndef SRC_UI_LIB_ESCHER_RENDERER_UNIFORM_ALLOCATION_H_
 #define SRC_UI_LIB_ESCHER_RENDERER_UNIFORM_ALLOCATION_H_
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/ui/lib/escher/forward_declarations.h"
 
 #include <vulkan/vulkan.hpp>
