@@ -4,12 +4,64 @@
 
 #include "src/developer/debug/debug_agent/debug_agent_server.h"
 
+#include <lib/fit/result.h>
 #include <zircon/errors.h>
 
 #include "src/developer/debug/debug_agent/debug_agent.h"
-#include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/shared/message_loop_fuchsia.h"
 
 namespace debug_agent {
+
+namespace {
+
+// Process names are short, just 32 bytes, and fidl messages have 64k to work with. So we can
+// include 2048 process names in a single message. Realistically, DebugAgent will never be attached
+// to that many processes at once, so we don't need to hit the absolute limit.
+constexpr size_t kMaxBatchedProcessNames = 1024;
+
+class AttachedProcessIterator : public fidl::Server<fuchsia_debugger::AttachedProcessIterator> {
+ public:
+  explicit AttachedProcessIterator(fxl::WeakPtr<DebugAgent> debug_agent)
+      : debug_agent_(std::move(debug_agent)) {}
+
+  void GetNext(GetNextCompleter::Sync& completer) override {
+    // First request, get the attached processes. This is unbounded, so we will always receive all
+    // of the processes that DebugAgent is attached to.
+    if (reply_.processes.empty()) {
+      FX_CHECK(debug_agent_);
+
+      debug_ipc::StatusRequest request;
+      debug_agent_->OnStatus(request, &reply_);
+      it_ = reply_.processes.begin();
+    }
+
+    std::vector<std::string> names;
+    for (; it_ != reply_.processes.end() && names.size() < kMaxBatchedProcessNames; ++it_) {
+      names.push_back(it_->process_name);
+    }
+
+    completer.Reply(fuchsia_debugger::AttachedProcessIteratorGetNextResponse{
+        {.process_names = std::move(names)}});
+  }
+
+ private:
+  fxl::WeakPtr<DebugAgent> debug_agent_;
+  debug_ipc::StatusReply reply_ = {};
+  std::vector<debug_ipc::ProcessRecord>::iterator it_;
+};
+
+}  // namespace
+
+void DebugAgentServer::GetAttachedProcesses(GetAttachedProcessesRequest& request,
+                                            GetAttachedProcessesCompleter::Sync& completer) {
+  FX_CHECK(debug_agent_);
+
+  // Create and bind the iterator.
+  fidl::BindServer(
+      debug::MessageLoopFuchsia::Current()->dispatcher(),
+      fidl::ServerEnd<fuchsia_debugger::AttachedProcessIterator>(std::move(request.iterator())),
+      std::make_unique<AttachedProcessIterator>(debug_agent_->GetWeakPtr()), nullptr);
+}
 
 void DebugAgentServer::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
   FX_CHECK(debug_agent_);
@@ -28,13 +80,7 @@ void DebugAgentServer::Connect(ConnectRequest& request, ConnectCompleter::Sync& 
 }
 
 void DebugAgentServer::OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
-                                   fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
-  if (info.is_peer_closed()) {
-    debug_agent_->Disconnect();
-    debug::MessageLoop::Current()->QuitNow();
-  }
-  // Ignore other messages.
-}
+                                   fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {}
 
 void DebugAgentServer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_debugger::DebugAgent> metadata,

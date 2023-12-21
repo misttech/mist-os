@@ -4,7 +4,15 @@
 @available(added=16)
 library fuchsia.debugger;
 
+using fuchsia.component;
 using zx;
+
+@available(added=HEAD)
+closed protocol AttachedProcessIterator {
+    strict GetNext() -> (struct {
+        process_names vector<string:zx.MAX_NAME_LEN>:MAX;
+    });
+};
 
 @discoverable
 open protocol DebugAgent {
@@ -14,6 +22,27 @@ open protocol DebugAgent {
     flexible Connect(resource struct {
         socket zx.Handle:SOCKET;
     }) -> () error zx.Status;
+
+    /// Iterator over all processes that this agent is attached to. Note this is
+    /// not the same as the set of installed filters, but rather the set of
+    /// filters that matched and were later successfully attached.
+    @available(added=HEAD)
+    flexible GetAttachedProcesses(resource struct {
+        iterator server_end:AttachedProcessIterator;
+    });
+};
+
+@available(added=HEAD)
+type Agent = resource struct {
+    name fuchsia.component.child_name;
+    client_end client_end:DebugAgent;
+};
+
+@available(added=HEAD)
+closed protocol AgentIterator {
+    strict GetNext() -> (resource struct {
+        agents vector<Agent>:MAX;
+    });
 };
 
 @discoverable
@@ -26,4 +55,9 @@ open protocol Launcher {
     flexible Launch(resource struct {
         agent server_end:DebugAgent;
     }) -> () error zx.Status;
+
+    /// Iterator over all DebugAgent instances.
+    flexible GetAgents(resource struct {
+        iterator server_end:AgentIterator;
+    });
 };

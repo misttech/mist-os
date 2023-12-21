@@ -9,7 +9,10 @@ fidl("fuchsia.debugger") {
 
   sources = [ "debug_agent.fidl" ]
 
-  public_deps = [ "//zircon/vdso/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component",
+    "//zircon/vdso/zx",
+  ]
 
   enable_hlcpp = true
 }

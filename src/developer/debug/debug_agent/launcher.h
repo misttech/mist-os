@@ -16,6 +16,8 @@ class DebugAgentLauncher : public fidl::Server<fuchsia_debugger::Launcher> {
  public:
   void Launch(LaunchRequest& request, LaunchCompleter::Sync& completer) override;
 
+  void GetAgents(GetAgentsRequest& request, GetAgentsCompleter::Sync& completer) override;
+
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::Launcher> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FX_LOGS(WARNING) << "Unknown method: " << metadata.method_ordinal;

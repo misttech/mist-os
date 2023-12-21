@@ -87,7 +87,9 @@ void DebugAgent::TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedSt
   adapter_->set_stream(&stream->stream());
   stream->set_data_available_callback([this]() { adapter_->OnStreamReadable(); });
   stream->set_error_callback([this]() {
+    // Unconditionally quit when the debug_ipc socket is closed.
     Disconnect();
+    ClearState();
     debug::MessageLoop::Current()->QuitNow();
   });
 
@@ -119,9 +121,10 @@ void DebugAgent::Disconnect() {
 
   // Release all resources associated with the previous connection.
   buffered_stream_->Reset();
+}
 
+void DebugAgent::ClearState() {
   // Reset debugging State
-  // TODO(jruthe): remove this to preserve state across connections.
   debug::LogBackend::Unset();
 
   // Stop watching for process starting.

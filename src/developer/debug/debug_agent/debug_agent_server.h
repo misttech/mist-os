@@ -17,6 +17,8 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent> {
  public:
   explicit DebugAgentServer(fxl::WeakPtr<DebugAgent> agent) : debug_agent_(std::move(agent)) {}
 
+  void GetAttachedProcesses(GetAttachedProcessesRequest& request,
+                            GetAttachedProcessesCompleter::Sync& completer) override;
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
   void OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
                    fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end);

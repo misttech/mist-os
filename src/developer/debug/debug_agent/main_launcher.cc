@@ -9,16 +9,21 @@
 // fuchshia_debugger::DebugAgent protocol. This server_end is bound to the
 // DebugAgent's MessageLoop from main.
 
+#include <fidl/fuchsia.component.decl/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
 #include <fidl/fuchsia.debugger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/spawn.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/process.h>
+#include <zircon/errors.h>
 #include <zircon/processargs.h>
 
 #include <map>
@@ -129,6 +134,9 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
 
     clients_.insert({client_handle, std::move(client)});
   }
+
+  void GetAttachedProcesses(GetAttachedProcessesRequest& request,
+                            GetAttachedProcessesCompleter::Sync& completer) override {}
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::DebugAgent> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {

@@ -45,7 +45,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   SystemInterface& system_interface() { return *system_interface_; }
   const std::map<uint32_t, Breakpoint>& breakpoints() { return breakpoints_; }
 
-  bool is_connected() const { return !!buffered_stream_; }
+  bool is_connected() const { return !!buffered_stream_ && buffered_stream_->IsValid(); }
 
   // Wire |stream| up to |adapter_| and then pass it to |Connect|.
   void TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedStream> stream);
@@ -80,6 +80,9 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   // will not be affected.
   std::vector<debug_ipc::ProcessThreadId> ClientSuspendAll(
       zx_koid_t except_process = ZX_KOID_INVALID, zx_koid_t except_thread = ZX_KOID_INVALID);
+
+  // Clear all state and release all attached processes.
+  void ClearState();
 
   // Send notification to the client.
   template <typename NotifyType>
