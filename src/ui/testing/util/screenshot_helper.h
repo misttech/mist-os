@@ -89,6 +89,10 @@ class Screenshot {
   // for more details.
   bool DumpPngToCustomArtifacts(const std::string& filename = "screenshot.png") const;
 
+  // Returns the top pixels in the histogram and prints logs.
+  std::vector<std::pair<uint32_t, utils::Pixel>> LogHistogramTopPixels(
+      int num_top_pixels = 10) const;
+
  private:
   // Populates |screenshot_| by converting the linear array of bytes in |screenshot_vmo| of size |4
   // * width_ * height_| to a 2D vector of |Pixel|s of size |height_ * width_|.

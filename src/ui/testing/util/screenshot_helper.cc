@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <unordered_map>
 
@@ -128,7 +129,8 @@ bool Screenshot::DumpPngToCustomArtifacts(const std::string& filename) const {
     return false;
   }
 
-  png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr /* error_ptr */, nullptr /* error_fn */, nullptr /* warn_fn */);
+  png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr /* error_ptr */,
+                                            nullptr /* error_fn */, nullptr /* warn_fn */);
   FX_CHECK(png);
   png_infop png_info = png_create_info_struct(png);
   FX_CHECK(png_info);
@@ -175,7 +177,8 @@ bool Screenshot::LoadFromPng(const std::string& png_filename) {
     return false;
   }
 
-  png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr /* error_ptr */, nullptr /* error_fn */, nullptr /* warn_fn */);
+  png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr /* error_ptr */,
+                                           nullptr /* error_fn */, nullptr /* warn_fn */);
   FX_CHECK(png);
   png_infop png_info = png_create_info_struct(png);
   FX_CHECK(png_info);
@@ -208,7 +211,7 @@ bool Screenshot::LoadFromPng(const std::string& png_filename) {
   std::vector<uint8_t*> row_ptrs(height_);
   for (size_t y = 0; y < height_; ++y) {
     // Initialize row memory with empty pixels.
-    screenshot_.emplace_back(width_, Pixel(0,0,0,0));
+    screenshot_.emplace_back(width_, Pixel(0, 0, 0, 0));
     row_ptrs[y] = reinterpret_cast<uint8_t*>(screenshot_[y].data());
   }
   png_set_bgr(png);
@@ -220,6 +223,28 @@ bool Screenshot::LoadFromPng(const std::string& png_filename) {
   FX_LOGS(INFO) << "Screenshot loaded from " << png_filename;
 
   return true;
+}
+
+std::vector<std::pair<uint32_t, utils::Pixel>> Screenshot::LogHistogramTopPixels(
+    int num_top_pixels) const {
+  auto histogram = Histogram();
+  std::vector<std::pair<uint32_t, utils::Pixel>> vec;
+  std::transform(
+      histogram.begin(), histogram.end(), std::inserter(vec, vec.begin()),
+      [](const std::pair<utils::Pixel, uint32_t> p) { return std::make_pair(p.second, p.first); });
+  std::stable_sort(vec.begin(), vec.end(),
+                   [](const auto& a, const auto& b) { return a.first > b.first; });
+
+  std::vector<std::pair<uint32_t, utils::Pixel>> top;
+  std::copy(vec.begin(), vec.begin() + std::min<ptrdiff_t>(vec.size(), num_top_pixels),
+            std::back_inserter(top));
+
+  std::cout << "Histogram top:" << std::endl;
+  for (const auto& elems : top) {
+    std::cout << "{ " << elems.second << " value: " << elems.first << " }" << std::endl;
+  }
+  std::cout << "--------------" << std::endl;
+  return top;
 }
 
 void Screenshot::ExtractScreenshotFromVMO(uint8_t* screenshot_vmo) {
