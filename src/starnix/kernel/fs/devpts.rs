@@ -488,7 +488,7 @@ macro_rules! not_implemented_ioctl_requests {
                     error!(ENOSYS)
                 }
             )+
-            _ => error!(EINVAL),
+            _ => error!(ENOTTY),
         }
     }};
 }
@@ -582,6 +582,25 @@ fn shared_ioctl(
             }
             Ok(SUCCESS)
         }
+        TCGETA => {
+            let termio = {
+                let terminal_state = terminal.read();
+                let termios = terminal_state.termios();
+                let mut cc = [0; 8];
+                cc.copy_from_slice(&termios.c_cc[0..8]);
+                uapi::termio {
+                    c_iflag: termios.c_iflag as u16,
+                    c_oflag: termios.c_oflag as u16,
+                    c_cflag: termios.c_cflag as u16,
+                    c_lflag: termios.c_lflag as u16,
+                    c_line: termios.c_line,
+                    c_cc: cc,
+                    __bindgen_padding_0: 0,
+                }
+            };
+            current_task.write_object(UserRef::<uapi::termio>::new(user_addr), &termio)?;
+            Ok(SUCCESS)
+        }
         TCGETS => {
             // N.B. TCGETS on the main terminal actually returns the configuration of the replica
             // end.
@@ -621,7 +640,7 @@ fn shared_ioctl(
         #[rustfmt::skip]
         unsupported => devpts_not_implemented_ioctl_requests!(
             unsupported, is_main,
-            TCGETA | TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL
+            TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL
             | TIOCNXCL | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET
             | TIOCGSOFTCAR | TIOCSSOFTCAR | TIOCLINUX | TIOCCONS | TIOCGSERIAL | TIOCSSERIAL
             | TIOCPKT | FIONBIO | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485
@@ -810,10 +829,10 @@ mod tests {
         let fs = dev_pts_fs(&task, Default::default());
 
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        assert_eq!(ptmx.ioctl(&task, 42, Default::default()), error!(EINVAL));
+        assert_eq!(ptmx.ioctl(&task, 42, Default::default()), error!(ENOTTY));
 
         let pts_file = open_file(&task, fs, b"0").expect("open file");
-        assert_eq!(pts_file.ioctl(&task, 42, Default::default()), error!(EINVAL));
+        assert_eq!(pts_file.ioctl(&task, 42, Default::default()), error!(ENOTTY));
     }
 
     #[::fuchsia::test]
