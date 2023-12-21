@@ -65,7 +65,6 @@
 //src/connectivity/wlan/testing/wlantap-driver:wlantap_driver-driver
 //src/developer/adb/drivers/usb-adb-function:usb-adb-function-driver
 //src/devices/acpi/drivers/acpi-battery:driver
-//src/devices/acpi/drivers/acpi-lid:driver
 //src/devices/acpi/drivers/intel-thermal:driver
 //src/devices/adc/drivers/adc:adc-driver
 //src/devices/adc/drivers/aml-saradc:aml-saradc-driver

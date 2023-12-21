@@ -506,3 +506,9 @@
   available_in_git: '7984ed3781551d6fff0c511a049a884825bef7a77'
   areas: ['Block']
   path: '/src/devices/block/drivers/abr-shim'
+- short_description: 'ACPI lid driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '960393'
+  available_in_git: 'bac3eb01d7ec72f7c07cfbf5808996700168bb7d'
+  areas: ['ACPI']
+  path: '/src/devices/acpi/drivers/acpi-lid'
