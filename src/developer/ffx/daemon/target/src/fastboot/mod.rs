@@ -7,7 +7,6 @@ use crate::{
         client::{FastbootImpl, InterfaceFactory},
         network::{tcp::TcpNetworkFactory, udp::UdpNetworkFactory},
     },
-    is_usb_discovery_disabled,
     target::Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -140,7 +139,10 @@ impl InterfaceFactory<Interface> for UsbFactory {
     }
 
     async fn is_target_discovery_enabled(&self) -> bool {
-        !is_usb_discovery_disabled().await
+        let Some(context) = ffx_config::global_env_context() else {
+            return true;
+        };
+        !ffx_config::is_usb_discovery_disabled(&context).await
     }
 }
 

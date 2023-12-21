@@ -43,7 +43,7 @@ pub struct Config {
     runtime: ConfigMap,
 }
 
-struct PriorityIterator<'a> {
+pub(crate) struct PriorityIterator<'a> {
     curr: Option<ConfigLevel>,
     config: &'a Config,
 }
@@ -292,7 +292,7 @@ impl Config {
         file.remove(key)
     }
 
-    fn iter(&self) -> PriorityIterator<'_> {
+    pub(crate) fn iter(&self) -> PriorityIterator<'_> {
         PriorityIterator { curr: None, config: self }
     }
 

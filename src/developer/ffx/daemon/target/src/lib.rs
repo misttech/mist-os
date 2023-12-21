@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ffx_config::get;
 use std::time::Duration;
 
 pub const FASTBOOT_CHECK_INTERVAL: Duration = Duration::from_secs(10);
@@ -21,15 +20,8 @@ pub(crate) const ZEDBOOT_MAX_AGE: Duration =
 /// RCS connection retry delay.
 pub(crate) const RETRY_DELAY: Duration = Duration::from_millis(200);
 
-/// Disables fastboot usb discovery if set to true.
-const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
-
 pub mod fastboot;
 mod overnet;
 pub mod target;
 pub mod target_collection;
 pub mod zedboot;
-
-pub async fn is_usb_discovery_disabled() -> bool {
-    get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false)
-}

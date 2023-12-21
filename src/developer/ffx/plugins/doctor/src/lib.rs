@@ -2111,6 +2111,7 @@ mod test {
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
                    \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\n",
@@ -2118,6 +2119,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2173,6 +2175,7 @@ mod test {
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
@@ -2188,6 +2191,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2243,6 +2247,7 @@ mod test {
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
                    \n    [✓] Daemon found: [1]\
@@ -2251,6 +2256,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2306,6 +2312,7 @@ mod test {
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
@@ -2321,6 +2328,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2376,6 +2384,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -2391,6 +2400,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2568,6 +2578,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -2591,6 +2602,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2650,6 +2662,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -2679,6 +2692,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2698,6 +2712,7 @@ mod test {
                 \n    [✓] Kind of Environment: Isolated environment with an isolated root of {isolated_root}\
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n        [✓] {global_file} locked by {global_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
@@ -2710,6 +2725,7 @@ mod test {
                 \n[✓] No issues found\n",
                 isolated_root=test_env.isolate_root.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2768,6 +2784,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -2791,6 +2808,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -2850,6 +2868,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -2865,6 +2884,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -3003,6 +3023,7 @@ mod test {
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
                     \n        [✓] {user_file} locked by {user_file}.lock\
+                    \n        [✓] {global_file} locked by {global_file}.lock\
                     \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
@@ -3017,7 +3038,8 @@ mod test {
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
                     env_file=test_env.env_file.path().display(),
-                user_file=test_env.user_file.path().display(),
+                    user_file=test_env.user_file.path().display(),
+                    global_file=test_env.global_file.path().display(),
                 ))),
                 TestStepEntry::step(StepType::GeneratingRecord),
                 TestStepEntry::result(StepResult::Success),
@@ -3083,6 +3105,7 @@ mod test {
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
                     \n        [✓] {user_file} locked by {user_file}.lock\
+                    \n        [✓] {global_file} locked by {global_file}.lock\
                     \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
@@ -3097,7 +3120,8 @@ mod test {
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
                     env_file=test_env.env_file.path().display(),
-                user_file=test_env.user_file.path().display(),
+                    user_file=test_env.user_file.path().display(),
+                    global_file=test_env.global_file.path().display(),
                 ))),
                 // Error will occur here.
             ])
@@ -3183,6 +3207,7 @@ mod test {
                 \n    [✓] No build directory discovered in the environment.\
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n        [✓] {global_file} locked by {global_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
@@ -3212,6 +3237,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -3231,6 +3257,7 @@ mod test {
                 \n    [✓] Kind of Environment: Isolated environment with an isolated root of {isolated_root}\
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n        [✓] {global_file} locked by {global_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
@@ -3244,6 +3271,7 @@ mod test {
                 run 'ffx doctor -v' for more details.\n",
                 isolated_root=test_env.isolate_root.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -3299,6 +3327,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -3317,6 +3346,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -3372,6 +3402,7 @@ mod test {
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
@@ -3388,6 +3419,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
             )
         );
     }
@@ -3461,6 +3493,7 @@ mod test {
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n        [✓] {global_file} locked by {global_file}.lock\
             \n    [✗] Private key {priv_key} does not exist. Check configuration or run `ffx doctor --repair-keys`\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
@@ -3479,6 +3512,7 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+                global_file=test_env.global_file.path().display(),
                 priv_key = priv_key.display()
             )
         );

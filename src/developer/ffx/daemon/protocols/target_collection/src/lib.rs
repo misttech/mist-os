@@ -34,8 +34,6 @@ mod emulator_targets;
 mod reboot;
 mod target_handle;
 
-const CONFIG_MDNS_AUTOCONNECT: &'static str = "discovery.mdns.autoconnect";
-
 #[ffx_protocol(ffx::MdnsMarker, ffx::FastbootTargetStreamMarker)]
 pub struct TargetCollectionProtocol {
     tasks: TaskManager,
@@ -495,8 +493,11 @@ impl FidlProtocol for TargetCollectionProtocol {
                     | ffx::MdnsEventType::TargetRediscovered(t) => {
                         // For backwards compatibility.
                         // Immediately mark the target as used then run the host pipe.
-                        let autoconnect =
-                            ffx_config::get(CONFIG_MDNS_AUTOCONNECT).await.unwrap_or(false);
+                        let autoconnect = if let Some(ctx) = ffx_config::global_env_context() {
+                            !ffx_config::is_mdns_autoconnect_disabled(&ctx).await
+                        } else {
+                            true
+                        };
                         handle_discovered_target(&tc_clone, t, &node_clone, autoconnect);
                     }
                     _ => {}

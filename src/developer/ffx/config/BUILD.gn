@@ -46,6 +46,7 @@ rustc_library("lib") {
   ]
 
   sources = [
+    "src/aliases.rs",
     "src/api/mod.rs",
     "src/api/query.rs",
     "src/api/value.rs",

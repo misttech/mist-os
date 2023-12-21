@@ -17,12 +17,17 @@ pub mod keys;
 pub mod logging;
 pub mod runtime;
 
+mod aliases;
 mod cache;
 mod mapping;
 mod nested;
 mod paths;
 mod storage;
 
+pub use aliases::{
+    is_analytics_disabled, is_mdns_autoconnect_disabled, is_mdns_discovery_disabled,
+    is_usb_discovery_disabled,
+};
 pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
@@ -213,6 +218,7 @@ mod test {
     use super::*;
     // This is to get the FfxConfigBacked derive to compile, as it
     // creates a token stream referencing `ffx_config` on the inside.
+    use crate::ConfigLevel;
     use crate::{self as ffx_config};
     use serde_json::{json, Value};
     use std::{collections::HashSet, path::PathBuf};

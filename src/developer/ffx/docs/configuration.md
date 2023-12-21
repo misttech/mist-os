@@ -83,6 +83,13 @@ When updating, please add the value in alphabetical order.
 :                                         : target is in fastboot, and to      :
 :                                         : communicate directly with it as    :
 :                                         : opposed to doing discovery.        :
+| `ffx.isolated`                          | "Alias" for encapsulation of       :
+:                                         : config options used to request     :
+:                                         : isolation. Currently affects:      :
+:                                         : `fastboot.usb.disabled`,           :
+:                                         : `ffx.analytics.disabled`,          :
+:                                         : `discovery.mdns.enabled`,          :
+:                                         : `discovery.mdns.autoconnect`       :
 | `log.dir`                               | Location for ffx and daemon logs   |
 | `log.enabled`                           | Whether logging is enabled         |
 | `log.include_spans`                     | Whether spans (function names,     |

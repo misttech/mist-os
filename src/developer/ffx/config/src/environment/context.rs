@@ -4,6 +4,7 @@
 
 use crate::{
     api::{value::ValueStrategy, ConfigError, ConfigValue},
+    is_analytics_disabled,
     storage::Config,
     BuildOverride, ConfigMap, ConfigQuery, Environment,
 };
@@ -201,7 +202,7 @@ impl EnvironmentContext {
             false
         } else {
             // note: double negative to turn this into an affirmative
-            !self.get("ffx.analytics.disabled").await.unwrap_or(false)
+            !is_analytics_disabled(self).await
         }
     }
 

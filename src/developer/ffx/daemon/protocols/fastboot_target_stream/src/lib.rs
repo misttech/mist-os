@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ffx_daemon_target::{is_usb_discovery_disabled, FASTBOOT_CHECK_INTERVAL};
+use ffx_config::is_usb_discovery_disabled;
+use ffx_daemon_target::FASTBOOT_CHECK_INTERVAL;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
@@ -52,10 +53,11 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::new(Inner { events_in: receiver, events_out: sender });
         self.inner.replace(inner.clone());
         let inner = Rc::downgrade(&inner);
-        let is_disabled: bool = is_usb_discovery_disabled().await;
-        // Probably could avoid creating the entire inner object but that refactoring can wait
-        if is_disabled {
-            return Ok(());
+        if let Some(context) = ffx_config::global_env_context() {
+            // Probably could avoid creating the entire inner object but that refactoring can wait
+            if is_usb_discovery_disabled(&context).await {
+                return Ok(());
+            }
         }
         self.fastboot_task.replace(Task::local(async move {
             loop {
