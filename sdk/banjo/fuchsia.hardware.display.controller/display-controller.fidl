@@ -603,6 +603,6 @@ closed protocol DisplayControllerImpl {
     /// Returns true if display capture is supported and the previous capture is
     /// completed. False otherwise.
     strict IsCaptureCompleted() -> (struct {
-        b bool;
+        is_capture_completed bool;
     });
 };
