@@ -25,13 +25,15 @@ TEST(UnitTests, UnitTests) {
   RegisteredTestDriver test_driver;
   ASSERT_NO_FATAL_FAILURE(test_driver.Init());
   std::optional<fidl::ClientEnd<fuchsia_device::Controller>> parent_device;
-  auto parent_topological_path = test_driver.GetParentTopologicalPath();
-  ASSERT_TRUE(parent_topological_path);
-  auto parent_device_result = component::Connect<fuchsia_device::Controller>(
-      *parent_topological_path + "/device_controller");
+  if (test_driver.is_dfv2()) {
+    auto parent_device_result = component::Connect<fuchsia_device::Controller>(
+        std::string(test_driver.GetParentTopologicalPath()) + "/device_controller");
 
-  EXPECT_EQ(ZX_OK, parent_device_result.status_value());
-  parent_device = std::move(*parent_device_result);
+    EXPECT_EQ(ZX_OK, parent_device_result.status_value());
+    parent_device = std::move(*parent_device_result);
+  } else {
+    parent_device = magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
+  }
   // The test driver will run unit tests on startup.
   magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetTestDriverSuffix());
   // Reload the production driver so later tests shouldn't be affected.

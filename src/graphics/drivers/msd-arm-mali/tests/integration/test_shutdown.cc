@@ -95,14 +95,16 @@ static void test_shutdown(uint32_t iters) {
         // connections while the device is torn down, just so it's easier to test that device
         // creation is working.
         std::unique_lock lock(connection_create_mutex);
-        auto parent_topological_path = test_driver.GetParentTopologicalPath();
-        ASSERT_TRUE(parent_topological_path);
+        if (test_driver.is_dfv2()) {
+          auto parent_device = component::Connect<fuchsia_device::Controller>(
+              std::string(test_driver.GetParentTopologicalPath()) + "/device_controller");
 
-        auto parent_device = component::Connect<fuchsia_device::Controller>(
-            *parent_topological_path + "/device_controller");
-
-        EXPECT_EQ(ZX_OK, parent_device.status_value());
-        magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetRebindDriverSuffix());
+          EXPECT_EQ(ZX_OK, parent_device.status_value());
+          magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetRebindDriverSuffix());
+        } else {
+          magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI,
+                                                          test_driver.GetRebindDriverSuffix());
+        }
         count += kRestartCount;
       }
       std::this_thread::yield();
