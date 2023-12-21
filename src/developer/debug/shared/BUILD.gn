@@ -55,6 +55,7 @@ sdk_source_set("shared") {
 
   public_deps = [
     "//sdk/lib/fit-promise",
+    "//sdk/lib/syslog/cpp",
     "//src/developer/debug/shared/logging",
     "//src/lib/containers/cpp",
     "//src/lib/fxl",

@@ -5,6 +5,8 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_COMMAND_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_COMMAND_H_
 
+#include <lib/syslog/cpp/macros.h>
+
 #include <initializer_list>
 #include <map>
 #include <string>

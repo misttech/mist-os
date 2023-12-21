@@ -202,6 +202,7 @@ static_library("console") {
   deps = []
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/developer/debug/zxdb/client",
     "//src/developer/debug/zxdb/expr",
     "//src/lib/analytics/cpp/core_dev_tools",
