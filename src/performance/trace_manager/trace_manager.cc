@@ -8,6 +8,7 @@
 #include <lib/fidl/cpp/clone.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
 #include <algorithm>
