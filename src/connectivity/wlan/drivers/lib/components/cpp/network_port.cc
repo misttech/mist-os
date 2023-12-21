@@ -3,7 +3,7 @@
 
 #include "src/connectivity/wlan/drivers/lib/components/cpp/include/wlan/drivers/components/network_port.h"
 
-#include <lib/ddk/debug.h>
+#include "src/connectivity/wlan/drivers/lib/components/cpp/log.h"
 
 namespace wlan::drivers::components {
 
@@ -22,7 +22,7 @@ zx_status_t NetworkPort::Init(Role role) {
   std::lock_guard lock(netdev_ifc_mutex_);
   role_ = role;
   if (!netdev_ifc_.is_valid()) {
-    zxlogf(WARNING, "netdev_ifc_ invalid, port likely removed.");
+    LOGF(WARNING, "netdev_ifc_ invalid, port likely removed.");
     return ZX_ERR_BAD_STATE;
   }
 
@@ -32,7 +32,6 @@ zx_status_t NetworkPort::Init(Role role) {
   netdev_ifc_.AddPort(
       port_id_, this, &network_port_protocol_ops_,
       [](void* ctx, zx_status_t status) {
-        zxlogf(WARNING, "AddPort callback called: %s", zx_status_get_string(status));
         auto& [port_added, out_status] = *static_cast<Context*>(ctx);
         out_status = status;
         port_added.Signal();
@@ -41,7 +40,7 @@ zx_status_t NetworkPort::Init(Role role) {
   auto& [port_added, status] = context;
   port_added.Wait();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+    LOGF(ERROR, "Failed to add port: %s", zx_status_get_string(status));
     netdev_ifc_.clear();
     return status;
   }
@@ -51,7 +50,7 @@ zx_status_t NetworkPort::Init(Role role) {
 void NetworkPort::RemovePort() {
   std::lock_guard lock(netdev_ifc_mutex_);
   if (!netdev_ifc_.is_valid()) {
-    zxlogf(WARNING, "netdev_ifc_ invalid, port likely removed.");
+    LOGF(WARNING, "netdev_ifc_ invalid, port likely removed.");
     return;
   }
   netdev_ifc_.RemovePort(port_id_);
@@ -71,7 +70,7 @@ void NetworkPort::SetPortOnline(bool online) {
   if (netdev_ifc_.is_valid()) {
     netdev_ifc_.PortStatusChanged(port_id_, &status);
   } else {
-    zxlogf(WARNING, "netdev_ifc_ invalid, port likely removed.");
+    LOGF(WARNING, "netdev_ifc_ invalid, port likely removed.");
   }
 }
 

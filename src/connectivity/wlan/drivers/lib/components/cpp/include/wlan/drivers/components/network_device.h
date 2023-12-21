@@ -5,18 +5,22 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_NETWORK_DEVICE_H_
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
+#include <optional>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/frame_container.h>
 #include <wlan/drivers/components/internal/async_txn.h>
 
 namespace wlan::drivers::components {
+
+using fuchsia_driver_framework::NodeController;
 
 // This class is intended to make it easier to construct and work with a
 // fuchsia.hardware.network.device device (called netdev here) and its interfaces. The user should
@@ -27,7 +31,8 @@ namespace wlan::drivers::components {
 // device Callbacks::NetDevInit will be called and is a suitable place to perform any setup that
 // could fail and prevent the creation of the device by returning an error code. When the device
 // is destroyed Callbacks::NetDevRelease will be called which should be used to perform any cleanup.
-class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevice> {
+class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevice>,
+                            public fidl::WireAsyncEventHandler<NodeController> {
  public:
   class Callbacks {
    public:
@@ -120,14 +125,27 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     virtual void NetDevSetSnoopEnabled(bool snoop) = 0;
   };
 
+  // Construct a NetworkDevice object with a DDK parent, used for DFv1 usage.
+  // TODO(b/317249253) Cleanup DFv1 code once it is deprecated (or all fullmac drivers have been
+  // ported over to DFv2).
   NetworkDevice(zx_device_t* parent, Callbacks* callbacks);
+  // Construct a NetworkDevice object without a DDK parent, used for DFv2 usage.
+  explicit NetworkDevice(Callbacks* callbacks);
+
   virtual ~NetworkDevice();
   NetworkDevice(const NetworkDevice&) = delete;
   NetworkDevice& operator=(const NetworkDevice&) = delete;
 
-  // Initialize the NetworkDevice, this should be called by the device driver when it's ready for
-  // the NetworkDevice to start. The device will show up as deviceName in the device tree.
+  // Initialize the NetworkDevice for use with DFv1, attempting to use this with the DFv2
+  // constructor will trigger an assert. This should be called by the device driver when it's ready
+  // for the NetworkDevice to start. The device will show up as deviceName in the device tree.
+  // TODO(b/317249253) Cleanup DFv1 code once it is deprecated (or all fullmac drivers have been
+  // ported over to DFv2).
   zx_status_t Init(const char* deviceName);
+  // Initialize the NetworkDevice for use with DFv2, attempting to use this with the DFv1
+  // constructor will trigger an assert. This should be called by the device driver when it's ready
+  // for the NetworkDevice to start. This will bind the client end to the dispatcher.
+  void Init(fidl::ClientEnd<NodeController> client_end, async_dispatcher_t* dispatcher);
 
   // Remove the NetworkDevice, this calls DdkRemove. The removal is not complete until NetDevRelease
   // is called on the Callbacks interface.
@@ -138,6 +156,15 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   void Release();
 
   network_device_ifc_protocol_t NetDevIfcProto() const;
+  network_device_impl_protocol_ops_t* NetDevImplProtoOps() {
+    return const_cast<network_device_impl_protocol_ops_t*>(netdev_proto_.ops);
+  }
+  // Get compatiblity banjo config when running with DFv2.
+  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
+    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_NETWORK_DEVICE_IMPL};
+    config.callbacks[ZX_PROTOCOL_NETWORK_DEVICE_IMPL] = banjo_server_.callback();
+    return config;
+  }
 
   // Notify NetworkDevice of a single incoming RX frame. This method exists for convenience but the
   // driver should prefer to complete as many frames as possible in one call instead of making
@@ -178,6 +205,10 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   void NetworkDeviceImplReleaseVmo(uint8_t id);
   void NetworkDeviceImplSetSnoop(bool snoop);
 
+  // fidl::WireAsyncEventHandler<NodeController> implementation
+  void handle_unknown_event(fidl::UnknownEventMetadata<NodeController> metadata) override {}
+  void on_fidl_error(::fidl::UnbindInfo error) override;
+
  private:
   zx_status_t AddNetworkDevice(const char* deviceName);
   bool ShouldCompleteFrame(const Frame& frame);
@@ -189,9 +220,12 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   std::mutex started_mutex_;
   network_device_impl_protocol_t netdev_proto_;
   ::ddk::NetworkDeviceIfcProtocolClient netdev_ifc_;
+  std::optional<fidl::WireClient<NodeController>> controller_node_;
   uint8_t* vmo_addrs_[MAX_VMOS] = {};
   uint64_t vmo_lengths_[MAX_VMOS] = {};
   std::vector<Frame> tx_frames_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_NETWORK_DEVICE_IMPL, this,
+                                    &network_device_impl_protocol_ops_};
 };
 
 }  // namespace wlan::drivers::components

@@ -6,6 +6,7 @@
 
 #include <functional>
 
+#include <sdk/lib/driver/logging/cpp/logger.h>
 #include <wlan/drivers/components/frame_container.h>
 #include <wlan/drivers/components/frame_storage.h>
 #include <wlan/drivers/components/network_device.h>
@@ -23,10 +24,14 @@ using wlan::drivers::components::FrameContainer;
 using wlan::drivers::components::FrameStorage;
 using wlan::drivers::components::NetworkDevice;
 
+using fuchsia_logger::LogSink;
+
 // Test implementation of the NetworkDevice base class we're testing
 struct TestNetworkDevice : public NetworkDevice::Callbacks {
+  TestNetworkDevice() : network_device_(this) {}
   explicit TestNetworkDevice(zx_device_t* parent) : network_device_(parent, this) {}
   void NetDevRelease() override {
+    release_called_.Signal();
     if (release_.HasExpectations()) {
       release_.Call();
     }
@@ -61,6 +66,7 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
   void NetDevReleaseVmo(uint8_t vmo_id) override { release_vmo_.Call(vmo_id); }
   void NetDevSetSnoopEnabled(bool snoop) override { set_snoop_enabled_.Call(snoop); }
 
+  libsync::Completion release_called_;
   mock_function::MockFunction<void> release_;
   mock_function::MockFunction<zx_status_t> init_;
   mock_function::MockFunction<void, NetworkDevice::Callbacks::StartTxn> start_;
@@ -77,9 +83,16 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
   NetworkDevice network_device_;
 };
 
-TEST(NetworkDeviceTest, Constructible) { TestNetworkDevice device(nullptr); }
+TEST(NetworkDeviceTest, ConstructibleDFv1) { TestNetworkDevice device(nullptr); }
 
-TEST(NetworkDeviceTest, InitRelease) {
+TEST(NetworkDeviceTest, ConstructibleDFv2) {
+  fdf::Logger logger("test", FUCHSIA_LOG_INFO, zx::socket{}, fidl::WireClient<LogSink>{});
+  fdf::Logger::SetGlobalInstance(&logger);
+
+  TestNetworkDevice device;
+}
+
+TEST(NetworkDeviceTest, InitReleaseDFv1) {
   auto parent = MockDevice::FakeRootParent();
   TestNetworkDevice device(parent.get());
 
