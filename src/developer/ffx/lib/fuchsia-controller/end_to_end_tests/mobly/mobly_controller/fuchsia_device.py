@@ -72,7 +72,10 @@ class FuchsiaDevice(object):
         self.ctx = Context(
             isolate_dir=isolate, target=self.target, config=ctx_config
         )
-        self.ctx.target_add(self.target, True)
+        # Only add the target if the IP address has been supplied. Else we're
+        # using mDNS.
+        if ctx_config["discovery.mdns.enabled"] == "false":
+            self.ctx.target_add(self.target, True)
 
     async def wait_offline(self, timeout=TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
