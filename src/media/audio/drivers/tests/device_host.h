@@ -49,8 +49,9 @@ class DeviceHost {
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> device_watchers_;
 
   // While the test suite is running, we spawn a number of virtual_audio driver instances.
-  static constexpr size_t kNumVirtualAudioDevicesToAdd = 5;
+  static constexpr size_t kNumVirtualAudioDevicesToAdd = 6;
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr codec_ = nullptr;
   fuchsia::virtualaudio::DevicePtr composite_ = nullptr;
   fuchsia::virtualaudio::DevicePtr dai_input_ = nullptr;
   fuchsia::virtualaudio::DevicePtr dai_output_ = nullptr;

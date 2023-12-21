@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_codec.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
@@ -23,8 +24,8 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
   std::optional<bool> is_input;
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
-      zxlogf(ERROR, "Codec device type creation not supported");
-      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+      is_input = cfg.device_specific()->codec()->is_input();
+      break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
       // Composite drivers do not have a direction (is_input is undefined).
       break;
@@ -59,8 +60,8 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
 
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
-      zxlogf(ERROR, "Codec device type creation not supported");
-      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+      device->driver_ = std::make_unique<VirtualAudioCodec>(cfg, device, dev_node);
+      break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
       device->driver_ = std::make_unique<VirtualAudioComposite>(cfg, device, dev_node);
       break;

@@ -23,6 +23,7 @@
 
 #include <iterator>
 #include <limits>
+#include <optional>
 
 #include <fbl/algorithm.h>
 
@@ -77,6 +78,7 @@ class VirtualAudioUtil {
     SET_STREAM_CONFIG,
     SET_IN,
     SET_OUT,
+    SET_NO_DIRECTION,
     WAIT,
     HELP,
     INVALID,
@@ -119,6 +121,7 @@ class VirtualAudioUtil {
   static constexpr char kStreamConfigSwitch[] = "stream";
   static constexpr char kDirectionInSwitch[] = "in";
   static constexpr char kDirectionOutSwitch[] = "out";
+  static constexpr char kDirectionlessSwitch[] = "no-direction";
   static constexpr char kWaitSwitch[] = "wait";
   static constexpr char kHelp1Switch[] = "help";
   static constexpr char kHelp2Switch[] = "?";
@@ -187,6 +190,7 @@ class VirtualAudioUtil {
       {kStreamConfigSwitch, Command::SET_STREAM_CONFIG},
       {kDirectionInSwitch, Command::SET_IN},
       {kDirectionOutSwitch, Command::SET_OUT},
+      {kDirectionlessSwitch, Command::SET_NO_DIRECTION},
       {kWaitSwitch, Command::WAIT},
       {kHelp1Switch, Command::HELP},
       {kHelp2Switch, Command::HELP},
@@ -230,7 +234,8 @@ class VirtualAudioUtil {
   bool SetRingBufferRestrictions(const std::string& rb_restr_str);
   bool SetGainProps(const std::string& gain_props_str);
   bool SetPlugProps(const std::string& plug_props_str);
-  bool ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type, bool is_input);
+  bool ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
+                          std::optional<bool> is_input);
   bool ResetAllConfigurations();
 
   // Methods using the FIDL Device interface
@@ -243,7 +248,7 @@ class VirtualAudioUtil {
   bool GetPosition();
   bool SetNotificationFrequency(const std::string& override_notifs_str);
   bool AdjustClockRate(const std::string& clock_adjust_str);
-  bool SetDirection(bool is_input);
+  bool SetDirection(std::optional<bool> is_input);
 
   // Convenience method that allows us to set configuration without having to check
   // that some FIDL table members have been defined.
@@ -254,6 +259,7 @@ class VirtualAudioUtil {
   bool key_quit_ = false;
 
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr codec_ = nullptr;
   fuchsia::virtualaudio::DevicePtr codec_input_ = nullptr;
   fuchsia::virtualaudio::DevicePtr codec_output_ = nullptr;
   fuchsia::virtualaudio::DevicePtr composite_ = nullptr;
@@ -262,6 +268,7 @@ class VirtualAudioUtil {
   fuchsia::virtualaudio::DevicePtr stream_config_input_ = nullptr;
   fuchsia::virtualaudio::DevicePtr stream_config_output_ = nullptr;
 
+  fuchsia::virtualaudio::Configuration codec_config_;
   fuchsia::virtualaudio::Configuration codec_input_config_;
   fuchsia::virtualaudio::Configuration codec_output_config_;
   fuchsia::virtualaudio::Configuration composite_config_;
@@ -270,7 +277,7 @@ class VirtualAudioUtil {
   fuchsia::virtualaudio::Configuration stream_config_input_config_;
   fuchsia::virtualaudio::Configuration stream_config_output_config_;
 
-  bool configuring_input_ = false;  // Not applicable for Composite devices.
+  std::optional<bool> configuring_input_;  // Not applicable for Composite devices.
   static zx::vmo ring_buffer_vmo_;
 
   static uint32_t BytesPerSample(uint32_t format);
@@ -289,28 +296,31 @@ class VirtualAudioUtil {
   fuchsia::virtualaudio::DevicePtr* device() {
     switch (config()->device_specific().Which()) {
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
-        return configuring_input_ ? &codec_input_ : &codec_output_;
+        return configuring_input_ ? (*configuring_input_ ? &codec_input_ : &codec_output_)
+                                  : &codec_;
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite:
         return &composite_;
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
-        return configuring_input_ ? &dai_input_ : &dai_output_;
+        return configuring_input_.value_or(false) ? &dai_input_ : &dai_output_;
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig:
-        return configuring_input_ ? &stream_config_input_ : &stream_config_output_;
+        return configuring_input_.value_or(false) ? &stream_config_input_ : &stream_config_output_;
       default:
         ZX_ASSERT_MSG(0, "Unknown device type");
     }
   }
   fuchsia::virtualaudio::Configuration* ConfigForDevice(
-      bool is_input, fuchsia::virtualaudio::DeviceType device_type) {
+      std::optional<bool> is_input, fuchsia::virtualaudio::DeviceType device_type) {
     switch (device_type) {
       case fuchsia::virtualaudio::DeviceType::CODEC:
-        return is_input ? &codec_input_config_ : &codec_output_config_;
+        return is_input ? (*is_input ? &codec_input_config_ : &codec_output_config_)
+                        : &codec_config_;
       case fuchsia::virtualaudio::DeviceType::COMPOSITE:
         return &composite_config_;
       case fuchsia::virtualaudio::DeviceType::DAI:
-        return is_input ? &dai_input_config_ : &dai_output_config_;
+        return is_input.value_or(false) ? &dai_input_config_ : &dai_output_config_;
       case fuchsia::virtualaudio::DeviceType::STREAM_CONFIG:
-        return is_input ? &stream_config_input_config_ : &stream_config_output_config_;
+        return is_input.value_or(false) ? &stream_config_input_config_
+                                        : &stream_config_output_config_;
       default:
         ZX_ASSERT_MSG(0, "Unknown device type");
     }
@@ -387,6 +397,7 @@ void VirtualAudioUtil::Run(fxl::CommandLine* cmdline) {
   ParseAndExecute(cmdline);
 
   // We are done!  Disconnect any error handlers.
+  codec_.set_error_handler(nullptr);
   codec_input_.set_error_handler(nullptr);
   codec_output_.set_error_handler(nullptr);
   composite_.set_error_handler(nullptr);
@@ -511,6 +522,15 @@ void VirtualAudioUtil::SetUpEvents() {
 }
 
 bool VirtualAudioUtil::ResetAllConfigurations() {
+  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, true)) {
+    return false;
+  }
+  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, false)) {
+    return false;
+  }
+  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, std::nullopt)) {
+    return false;
+  }
   // Composite drivers do not have a direction (is_input is undefined); just use `true`.
   if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, true)) {
     return false;
@@ -694,6 +714,9 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
     case Command::SET_OUT:
       success = SetDirection(false);
       break;
+    case Command::SET_NO_DIRECTION:
+      success = SetDirection(std::nullopt);
+      break;
     case Command::WAIT:
       success = WaitForKey();
       break;
@@ -726,6 +749,8 @@ void VirtualAudioUtil::Usage() {
   printf("  --%s\t\t\t  Switch to an Input configuration (same device type)\n", kDirectionInSwitch);
   printf("  --%s\t\t\t  Switch to an Output configuration (same device type)\n",
          kDirectionOutSwitch);
+  printf("  --%s\t  Switch to a direction-less configuration (same device type)\n",
+         kDirectionlessSwitch);
 
   printf("\n  The following commands customize a device configuration, before it is added\n");
   printf("  --%s[=<DEVICE_NAME>]\t  Set the device name (default '%s')\n", kDeviceNameSwitch,
@@ -1436,20 +1461,39 @@ bool VirtualAudioUtil::AdjustClockRate(const std::string& clock_adjust_str) {
   return WaitForCallback();
 }
 
-bool VirtualAudioUtil::SetDirection(bool is_input) {
+bool VirtualAudioUtil::SetDirection(std::optional<bool> is_input) {
   configuring_input_ = is_input;
   switch (device_type_) {
     case fuchsia::virtualaudio::DeviceType::CODEC:
-      config()->mutable_device_specific()->codec().set_is_input(is_input);
+      // `is_input` is optional for a codec device.
+      if (is_input.has_value()) {
+        config()->mutable_device_specific()->codec().set_is_input(*is_input);
+      } else {
+        config()->mutable_device_specific()->codec().clear_is_input();
+      }
       return true;
     case fuchsia::virtualaudio::DeviceType::COMPOSITE:
-      return false;  // Can't set a direction on a composite device.
+      // Can't set a direction on a composite device.
+      return false;
     case fuchsia::virtualaudio::DeviceType::DAI:
-      config()->mutable_device_specific()->dai().set_is_input(is_input);
-      return true;
+      // Note: although `is_input` is a required DaiProperties field, a badly-behaved driver might
+      // still fail to set it. That said, this incorrect behavior isn't possible in VAD yet.
+      // So (for now at least) it is required for all virtual_audio DAI instances.
+      if (is_input.has_value()) {
+        config()->mutable_device_specific()->dai().set_is_input(*is_input);
+        return true;
+      }
+      return false;
     case fuchsia::virtualaudio::DeviceType::STREAM_CONFIG:
-      config()->mutable_device_specific()->stream_config().set_is_input(is_input);
-      return true;
+      // Note: `is_input` is a required StreamProperties field, however a badly-behaved driver might
+      // still fail to set it. That said, this incorrect behavior isn't possible in VAD yet: it uses
+      // this bool when registering the stream_config in devfs (`audio-input` vs. `audio-output`).
+      // So (for now at least) it is required for all virtual_audio StreamConfig instances.
+      if (is_input.has_value()) {
+        config()->mutable_device_specific()->stream_config().set_is_input(*is_input);
+        return true;
+      }
+      return false;
     default:
       printf("ERROR: Unknown device type\n");
       return false;
@@ -1457,13 +1501,15 @@ bool VirtualAudioUtil::SetDirection(bool is_input) {
 }
 
 bool VirtualAudioUtil::ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
-                                          bool is_input) {
+                                          std::optional<bool> is_input) {
   zx_status_t status = ZX_OK;
   fuchsia::virtualaudio::Direction direction;
-  direction.set_is_input(is_input);
+  if (is_input) {
+    direction.set_is_input(*is_input);
+  }
   fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
-  if ((status = controller_->GetDefaultConfiguration(device_type, std::move(direction),
-                                                     &config_result)) == ZX_OK) {
+  status = controller_->GetDefaultConfiguration(device_type, std::move(direction), &config_result);
+  if (status == ZX_OK) {
     if (config_result.is_err()) {
       status = config_result.err();
     }
@@ -1501,7 +1547,8 @@ bool VirtualAudioUtil::AddDevice() {
   }
 
   device()->set_error_handler([is_input = configuring_input_](zx_status_t error) {
-    printf("%s device disconnected (%d)!\n", is_input ? "input" : "output", error);
+    printf("%s device disconnected (%d)!\n",
+           is_input ? (*is_input ? "input" : "output") : "directionless", error);
     QuitLoop();
   });
 

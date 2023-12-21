@@ -169,6 +169,7 @@ void DeviceHost::AddVirtualDevices() {
       << " virtual_audio devices with unspecified direction already exist (should be 0)";
 
   // Composite has no directionality; for this testing, Codec directionality is not applicable.
+  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::CODEC, codec_);
   AddVirtualDevice(fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
 
   AddVirtualDevice(fuchsia::virtualaudio::DeviceType::DAI, dai_input_, true);
@@ -251,6 +252,7 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
 
   libsync::Completion done;
   async::PostTask(device_loop_.dispatcher(), [this, &done]() {
+    codec_.set_error_handler(nullptr);
     composite_.set_error_handler(nullptr);
     dai_input_.set_error_handler(nullptr);
     dai_output_.set_error_handler(nullptr);
