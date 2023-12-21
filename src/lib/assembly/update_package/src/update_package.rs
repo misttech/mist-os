@@ -125,29 +125,6 @@ impl ImageMapping {
         Self { source: source.into(), destination: destination.as_ref().to_string() }
     }
 
-    /// Create an ImageMapping from the |image| and |slot|.
-    fn try_from(image: &Image, slot: &Slot) -> Result<Self> {
-        match slot {
-            Slot::Primary(_) => match image {
-                Image::ZBI { path: _, signed: true } => {
-                    Ok(ImageMapping::new(image.source(), "zbi.signed"))
-                }
-                Image::ZBI { path: _, signed: false } => {
-                    Ok(ImageMapping::new(image.source(), "zbi"))
-                }
-                Image::VBMeta(_) => Ok(ImageMapping::new(image.source(), "fuchsia.vbmeta")),
-                _ => Err(anyhow!("Invalid primary image mapping")),
-            },
-            Slot::Recovery(_) => match image {
-                Image::ZBI { path: _, signed: _ } => {
-                    Ok(ImageMapping::new(image.source(), "recovery"))
-                }
-                Image::VBMeta(_) => Ok(ImageMapping::new(image.source(), "recovery.vbmeta")),
-                _ => Err(anyhow!("Invalid recovery image mapping")),
-            },
-        }
-    }
-
     fn metadata(&self, url: PinnedAbsolutePackageUrl) -> Result<ImageMetadata> {
         ImageMetadata::for_path(&self.source, url, self.destination.clone())
             .with_context(|| format!("Failed to read/hash {:?}", self.source))
@@ -233,20 +210,6 @@ impl UpdatePackageBuilder {
     /// Add |packages| to the update.
     pub fn add_packages(&mut self, packages: UpdatePackagesManifest) {
         self.packages.append(packages);
-    }
-
-    /// Add the ZBI and VBMeta from the |slot| to the |map|.
-    fn add_images_to_builder(slot: &Slot, builder: &mut PackageBuilder) -> Result<()> {
-        let mappings: Vec<ImageMapping> = slot
-            .manifest()
-            .images
-            .iter()
-            .filter_map(|i| ImageMapping::try_from(i, slot).ok())
-            .collect();
-        for ImageMapping { source, destination } in mappings {
-            builder.add_file_as_blob(destination, source.to_string())?;
-        }
-        Ok(())
     }
 
     /// Start building an update package or one of its subpackages, performing the steps that
@@ -404,23 +367,7 @@ impl UpdatePackageBuilder {
             &self.gendir,
         )?;
         builder.package.add_contents_as_blob("board", &self.board_name, &self.gendir)?;
-
         builder.package.add_file_as_blob("version", self.version_file.path_to_string()?)?;
-
-        // Add the images.
-        let slots = vec![&self.slot_primary, &self.slot_recovery];
-        for slot in slots.iter().filter_map(|s| s.as_ref()) {
-            Self::add_images_to_builder(slot, &mut builder.package)?;
-        }
-
-        // Add the bootloaders.
-        for bootloader in &self.partitions.bootloader_partitions {
-            let destination = match bootloader.partition_type.as_str() {
-                "" => "firmware".to_string(),
-                t => format!("firmware_{}", t),
-            };
-            builder.package.add_file_as_blob(destination, bootloader.image.to_string())?;
-        }
         let (_, manifest) = builder.build()?;
         let merkle = manifest.hash();
         package_manifests.push(manifest);
@@ -539,11 +486,9 @@ mod tests {
         let expected_contents = "\
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             images.json=e6c8327e0477561b2e1ee26ea881c47c7cff127b3242165ac0a689e5d22ee656\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
-            zbi.signed=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
         "
         .to_string();
         assert_eq!(expected_contents, contents);
@@ -652,7 +597,7 @@ mod tests {
         let update_package = builder.build().unwrap();
         assert_eq!(
             update_package.merkle,
-            "96398b173d44befde2a67d651cb12e8853b49054e8b7daf4527fe5846d537bb2".parse().unwrap()
+            "e14832faa860680fe05f242e0caa634e66809438832e2e52b78fed727003b3da".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
 
@@ -726,13 +671,9 @@ mod tests {
         let expected_contents = "\
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             images.json=7ba3dd799c26f18d02d79ef063d9aa34c14bdbf2cde4f934af07e2ec9b30d36d\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
-            recovery=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            recovery.vbmeta=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
-            zbi.signed=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
         "
         .to_string();
         assert_eq!(expected_contents, contents);
