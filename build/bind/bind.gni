@@ -808,19 +808,6 @@ template("bind_library") {
       # Adds metadata for bind_test().
       test_sources = rebase_path(get_target_outputs(":${test_data_target}"),
                                  root_build_dir)
-
-      if (is_fuchsia) {
-        component_catalog = [
-          {
-            if (defined(invoker.name)) {
-              sdk_id = "sdk://bind/${invoker.name}"
-            } else {
-              sdk_id = "sdk://bind/$target_name"
-            }
-            label = get_label_info(":$target_name", "label_with_toolchain")
-          },
-        ]
-      }
     }
 
     deps = [ ":${test_data_target}" ]

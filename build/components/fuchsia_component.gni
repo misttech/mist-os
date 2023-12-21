@@ -96,16 +96,6 @@ template("fuchsia_component_manifest") {
 
         component_manifest_path = [ manifest ]
         component_manifest_path_barrier = []
-
-        if (!defined(component_catalog)) {
-          component_catalog = []
-        }
-        component_catalog += [
-          {
-            component_manifest_path = manifest
-            label = get_label_info(":$target_name", "label_with_toolchain")
-          },
-        ]
       }
     }
 
@@ -358,25 +348,6 @@ template("fuchsia_component") {
       _check_references_target = ":$_check_references_target"
     }
 
-    component_catalog_target = "${target_name}.component_catalog"
-    generated_file(component_catalog_target) {
-      forward_variables_from(invoker,
-                             [
-                               "applicable_licenses",
-                               "testonly",
-                               "deps",
-                               "public_deps",
-                             ])
-      outputs = [ "$target_out_dir/${component_catalog_target}.json" ]
-      output_conversion = "json"
-      data_keys = [ "component_catalog" ]
-      visibility = [ ":*" ]
-      if (!defined(deps)) {
-        deps = []
-      }
-      deps += [ cm_label ]
-    }
-
     # We want to adopt the outputs of the cm_label, so we
     # copy them to a new directory.
     copy(target_name) {
@@ -384,14 +355,16 @@ template("fuchsia_component") {
                              [
                                "applicable_licenses",
                                "testonly",
+                               "deps",
+                               "public_deps",
                              ])
       sources = _manifest_outputs
       outputs = [ "$target_out_dir/${target_name}_component_manifest/{{source_file_part}}" ]
 
-      deps = [
-        ":$component_catalog_target",
-        cm_label,
-      ]
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ cm_label ]
       if (check_references) {
         deps += [ _check_references_target ]
       }

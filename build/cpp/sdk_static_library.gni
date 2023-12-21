@@ -175,14 +175,6 @@ template("sdk_static_library") {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
-      if (is_fuchsia) {
-        component_catalog = [
-          {
-            sdk_id = sdk_id
-            label = get_label_info(":$target_name", "label_with_toolchain")
-          },
-        ]
-      }
     }
   }
 
