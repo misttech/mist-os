@@ -6,6 +6,7 @@ source_set("fuzzer_test") {
   testonly = true
   sources = [ "fuzzer_test.cc" ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//third_party/googletest:gtest",
   ]
