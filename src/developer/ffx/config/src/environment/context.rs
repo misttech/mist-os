@@ -155,6 +155,14 @@ impl EnvironmentContext {
         }
     }
 
+    pub fn is_isolated(&self) -> bool {
+        match self.kind {
+            EnvironmentKind::ConfigDomain { isolate_root: Some(..), .. }
+            | EnvironmentKind::Isolated { .. } => true,
+            _ => false,
+        }
+    }
+
     /// Initialize an environment type that has no meaningful context, using only global and
     /// user level configuration.
     pub fn no_context(
@@ -428,10 +436,14 @@ impl EnvironmentContext {
 
     pub fn get_default_overrides(&self) -> ConfigMap {
         use EnvironmentKind::*;
-        match &self.kind {
+        let mut cm = match &self.kind {
             ConfigDomain { domain, .. } => domain.get_config_defaults().clone(),
             _ => ConfigMap::default(),
+        };
+        if self.is_isolated() {
+            crate::aliases::add_isolation_default(&mut cm);
         }
+        cm
     }
 
     /// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
@@ -631,6 +643,7 @@ mod test {
         .expect("config domain context");
 
         check_config_domain_paths(&context, &domain_root).await;
+        assert!(!context.is_isolated());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -704,5 +717,6 @@ mod test {
         assert_eq!(context.get_cache_path().unwrap(), isolate_dir.join("cache"));
         assert_eq!(context.get_config_path().unwrap(), isolate_dir.join("config"));
         assert_eq!(context.get_data_path().unwrap(), isolate_dir.join("data"));
+        assert!(context.is_isolated());
     }
 }
