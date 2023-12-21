@@ -9,7 +9,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,29 +58,29 @@ size_t LoopbackDevice::ScoPacketLength() {
 }
 
 zx_status_t LoopbackDevice::BtHciOpenCommandChannel(zx::channel in) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciOpenCommandChannel";
+  zxlogf(TRACE, "LoopbackDevice::BtHciOpenCommandChannel");
   return HciOpenChannel(&cmd_channel_, in.release());
 }
 
 zx_status_t LoopbackDevice::BtHciOpenAclDataChannel(zx::channel in) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciOpenAclDataChannel";
+  zxlogf(TRACE, "LoopbackDevice::BtHciOpenAclDataChannel");
   return HciOpenChannel(&acl_channel_, in.release());
 }
 
 zx_status_t LoopbackDevice::BtHciOpenSnoopChannel(zx::channel in) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciOpenSnoopChannel";
+  zxlogf(TRACE, "LoopbackDevice::BtHciOpenSnoopChannel");
   return HciOpenChannel(&snoop_channel_, in.release());
 }
 
 zx_status_t LoopbackDevice::BtHciOpenScoChannel(zx::channel in) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciOpenScoChannel";
+  zxlogf(TRACE, "LoopbackDevice::BtHciOpenScoChannel");
   return HciOpenChannel(&sco_channel_, in.release());
 }
 
 zx_status_t LoopbackDevice::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
 void LoopbackDevice::ChannelCleanupLocked(zx::channel* channel) {
-  FX_LOGS(TRACE) << "LoopbackDevice::ChannelCleanupLocked";
+  zxlogf(TRACE, "LoopbackDevice::ChannelCleanupLocked");
   if (!channel->is_valid()) {
     return;
   }
@@ -103,7 +102,7 @@ void LoopbackDevice::ChannelCleanupLocked(zx::channel* channel) {
 }
 
 void LoopbackDevice::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size_t length) {
-  FX_LOGS(TRACE) << "LoopbackDevice::SnoopChannelWriteLocked";
+  zxlogf(TRACE, "LoopbackDevice::SnoopChannelWriteLocked");
   if (!snoop_channel_.is_valid()) {
     return;
   }
@@ -120,8 +119,8 @@ void LoopbackDevice::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size
 
   if (status != ZX_OK) {
     if (status != ZX_ERR_PEER_CLOSED) {
-      FX_LOGS(ERROR) << "bt-loopback-device: failed to write to snoop channel"
-                     << zx_status_get_string(status);
+      zxlogf(ERROR, "bt-loopback-device: failed to write to snoop channel %s",
+             zx_status_get_string(status));
     }
 
     // It should be safe to clean up the channel right here as the work thread
@@ -131,17 +130,17 @@ void LoopbackDevice::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size
 }
 
 void LoopbackDevice::HciBeginShutdown() {
-  FX_LOGS(TRACE) << "LoopbackDevice::HciBeginShutdown";
+  zxlogf(TRACE, "LoopbackDevice::HciBeginShutdown");
   bool was_shutting_down = shutting_down_.exchange(true, std::memory_order_relaxed);
   if (!was_shutting_down) {
-    FX_LOGS(TRACE) << "LoopbackDevice::HciBeginShutdown !was_shutting_down";
+    zxlogf(TRACE, "LoopbackDevice::HciBeginShutdown !was_shutting_down");
     DdkAsyncRemove();
   }
 }
 
 void LoopbackDevice::OnChannelSignal(Wait* wait, zx_status_t status,
                                      const zx_packet_signal_t* signal) {
-  FX_LOGS(TRACE) << "OnChannelSignal";
+  zxlogf(TRACE, "OnChannelSignal");
   {
     std::lock_guard guard(mutex_);
     wait->pending = false;
@@ -167,12 +166,12 @@ void LoopbackDevice::OnChannelSignal(Wait* wait, zx_status_t status,
 }
 
 zx_status_t LoopbackDevice::HciOpenChannel(zx::channel* in_channel, zx_handle_t in) {
-  FX_LOGS(TRACE) << "LoopbackDevice::HciOpenChannel";
+  zxlogf(TRACE, "LoopbackDevice::HciOpenChannel");
   std::lock_guard guard(mutex_);
   zx_status_t result = ZX_OK;
 
   if (in_channel->is_valid()) {
-    FX_LOGS(ERROR) << "LoopbackDevice: already bound, failing";
+    zxlogf(ERROR, "LoopbackDevice: already bound, failing");
     result = ZX_ERR_ALREADY_BOUND;
     return result;
   }
@@ -198,8 +197,8 @@ zx_status_t LoopbackDevice::HciOpenChannel(zx::channel* in_channel, zx_handle_t 
 }
 
 void LoopbackDevice::HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pending) {
-  FX_LOGS(TRACE) << "HciHandleIncomingChannel readable:" << int(pending & ZX_CHANNEL_READABLE)
-                 << ", closed: " << int(pending & ZX_CHANNEL_PEER_CLOSED);
+  zxlogf(TRACE, "HciHandleIncomingChannel readable:%d, closed: %d",
+         int(pending & ZX_CHANNEL_READABLE), int(pending & ZX_CHANNEL_PEER_CLOSED));
   // If we are in the process of shutting down, we are done.
   if (atomic_load_explicit(&shutting_down_, std::memory_order_relaxed)) {
     return;
@@ -207,7 +206,7 @@ void LoopbackDevice::HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pe
 
   // Channel may have been closed since signal was received.
   if (!chan->is_valid()) {
-    FX_LOGS(ERROR) << "channel is invalid";
+    zxlogf(ERROR, "channel is invalid");
     return;
   }
 
@@ -223,11 +222,11 @@ void LoopbackDevice::HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pe
       status = zx_channel_read(chan->get(), 0, read_buffer, nullptr, kAclMaxFrameSize, 0, &length,
                                nullptr);
       if (status == ZX_ERR_SHOULD_WAIT) {
-        FX_LOGS(WARNING) << "ignoring ZX_ERR_SHOULD_WAIT when reading incoming channel";
+        zxlogf(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading incoming channel");
         return;
       }
       if (status != ZX_OK) {
-        FX_LOGS(ERROR) << "failed to read from incoming channel " << zx_status_get_string(status);
+        zxlogf(ERROR, "failed to read from incoming channel %s", zx_status_get_string(status));
         ChannelCleanupLocked(chan);
         return;
       }
@@ -258,8 +257,8 @@ void LoopbackDevice::HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pe
                                               &sco_channel_, BT_HCI_SNOOP_TYPE_SCO);
           break;
         default:
-          FX_LOGS(ERROR) << "unsupported HCI packet type " << cur_uart_packet_type_
-                         << " received. We may be out of sync";
+          zxlogf(ERROR, "unsupported HCI packet type %i received. We may be out of sync",
+                 int(cur_uart_packet_type_));
           cur_uart_packet_type_ = kHciNone;
           return;
       }
@@ -296,9 +295,10 @@ void LoopbackDevice::ProcessNextUartPacketFromReadBuffer(
   }
 
   if (packet_length > buffer_size) {
-    FX_LOGS(ERROR) << "packet_length is too large (" << packet_length << " > " << buffer_size
-                   << ") during packet reassembly. Dropping and "
-                      "attempting to re-sync.";
+    zxlogf(ERROR,
+           "packet_length is too large (%zu > %zu) during packet reassembly. Dropping and "
+           "attempting to re-sync.",
+           packet_length, buffer_size);
 
     // Reset the reassembly state machine.
     *buffer_offset = 1;
@@ -331,7 +331,7 @@ void LoopbackDevice::ProcessNextUartPacketFromReadBuffer(
   if (channel->is_valid()) {
     zx_status_t status = channel->write(/*flags=*/0, &buffer[1], packet_length - 1, nullptr, 0);
     if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "failed to write packet: " << zx_status_get_string(status);
+      zxlogf(ERROR, "failed to write packet: %s", zx_status_get_string(status));
       ChannelCleanupLocked(&acl_channel_);
     }
   }
@@ -345,10 +345,10 @@ void LoopbackDevice::ProcessNextUartPacketFromReadBuffer(
 }
 
 void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pending) {
-  FX_LOGS(TRACE) << "LoopbackDevice::HciHandleClientChannel";
+  zxlogf(TRACE, "LoopbackDevice::HciHandleClientChannel");
   // Channel may have been closed since signal was received.
   if (!chan->is_valid()) {
-    FX_LOGS(ERROR) << "chan invalid";
+    zxlogf(ERROR, "chan invalid");
     return;
   }
 
@@ -380,7 +380,7 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
     return;
   }
 
-  FX_LOGS(TRACE) << "LoopbackDevice::HciHandleClientChannel handling " << chan_name;
+  zxlogf(TRACE, "LoopbackDevice::HciHandleClientChannel handling %s", chan_name);
 
   // Handle the read signal first.  If we are also peer closed, we want to make
   // sure that we have processed all of the pending messages before cleaning up.
@@ -393,12 +393,12 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
       status =
           zx_channel_read(chan->get(), 0, write_buffer_ + 1, nullptr, length, 0, &length, nullptr);
       if (status == ZX_ERR_SHOULD_WAIT) {
-        FX_LOGS(WARNING) << "ignoring ZX_ERR_SHOULD_WAIT when reading " << chan_name << " channel";
+        zxlogf(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading %s channel", chan_name);
         return;
       }
       if (status != ZX_OK) {
-        FX_LOGS(ERROR) << "hci_read_thread: failed to read from " << chan_name << " channel "
-                       << zx_status_get_string(status);
+        zxlogf(ERROR, "hci_read_thread: failed to read from %s channel %s", chan_name,
+               zx_status_get_string(status));
         ChannelCleanupLocked(chan);
         return;
       }
@@ -411,7 +411,7 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
       if (in_channel_.is_valid()) {
         status = in_channel_.write(/*flags=*/0, write_buffer_, length, nullptr, 0);
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "failed to write packet: " << zx_status_get_string(status);
+          zxlogf(ERROR, "failed to write packet: %s", zx_status_get_string(status));
         }
       }
     }
@@ -421,7 +421,7 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
   }
 
   if (pending & ZX_CHANNEL_PEER_CLOSED) {
-    FX_LOGS(DEBUG) << "received closed signal for " << chan_name << " channel";
+    zxlogf(DEBUG, "received closed signal for %s channel", chan_name);
     std::lock_guard guard(mutex_);
     ChannelCleanupLocked(chan);
   }
@@ -430,19 +430,19 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
 void LoopbackDevice::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
                                        sco_sample_rate_t sample_rate,
                                        bt_hci_configure_sco_callback callback, void* cookie) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciConfigureSco";
+  zxlogf(TRACE, "LoopbackDevice::BtHciConfigureSco");
   // UART doesn't require any SCO configuration.
   callback(cookie, ZX_OK);
 }
 
 void LoopbackDevice::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
-  FX_LOGS(TRACE) << "LoopbackDevice::BtHciResetSco";
+  zxlogf(TRACE, "LoopbackDevice::BtHciResetSco");
   // UART doesn't require any SCO configuration, so there's nothing to do.
   callback(cookie, ZX_OK);
 }
 
 void LoopbackDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  FX_LOGS(TRACE) << "LoopbackDevice::DdkUnbind";
+  zxlogf(TRACE, "LoopbackDevice::DdkUnbind");
   // We are now shutting down.  Make sure that any pending callbacks in
   // flight from the serial_impl are nerfed and that our thread is shut down.
   std::atomic_store_explicit(&shutting_down_, true, std::memory_order_relaxed);
@@ -469,7 +469,7 @@ void LoopbackDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void LoopbackDevice::DdkRelease() {
-  FX_LOGS(TRACE) << "LoopbackDevice::DdkRelease";
+  zxlogf(TRACE, "LoopbackDevice::DdkRelease");
   // Driver manager is given a raw pointer to this dynamically allocated object in Create(), so
   // when DdkRelease() is called we need to free the allocated memory.
   delete this;
@@ -502,7 +502,7 @@ zx_status_t LoopbackDevice::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
 }
 
 zx_status_t LoopbackDevice::Bind(zx_handle_t channel, std::string_view name) {
-  FX_LOGS(TRACE) << "LoopbackDevice::Bind";
+  zxlogf(TRACE, "LoopbackDevice::Bind");
   zx_status_t result = ZX_OK;
   {
     std::lock_guard guard(mutex_);
@@ -522,7 +522,7 @@ zx_status_t LoopbackDevice::Bind(zx_handle_t channel, std::string_view name) {
     loop_.emplace(&kAsyncLoopConfigNoAttachToCurrentThread);
     result = loop_->StartThread("bt-loopback-device");
     if (result != ZX_OK) {
-      FX_LOGS(ERROR) << "failed to start thread: " << zx_status_get_string(result);
+      zxlogf(ERROR, "failed to start thread: %s", zx_status_get_string(result));
       DdkRelease();
       return result;
     }
@@ -530,7 +530,7 @@ zx_status_t LoopbackDevice::Bind(zx_handle_t channel, std::string_view name) {
   }
 
   {
-    FX_LOGS(TRACE) << "LoopbackDevice::Bind setup in channel waiter";
+    zxlogf(TRACE, "LoopbackDevice::Bind setup in channel waiter");
     std::lock_guard guard(mutex_);
     // Setup up incoming channel waiter.
     in_channel_.reset(channel);

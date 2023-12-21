@@ -35,7 +35,6 @@ source_set("common") {
     "//sdk/fidl/fuchsia.bluetooth.test:fuchsia.bluetooth.test_hlcpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/syslog/cpp",
     "//src/connectivity/bluetooth/core/bt-host/fidl:helpers",
     "//src/connectivity/bluetooth/core/bt-host/hci",
     "//src/connectivity/bluetooth/core/bt-host/testing:fake_controller",
@@ -62,10 +61,7 @@ fuchsia_driver("fuchsia_driver") {
   output_name = "bt-hci-virtual"
   testonly = true
   sources = []
-  deps = [
-    ":common",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("driver") {
