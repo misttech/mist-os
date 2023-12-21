@@ -3,221 +3,194 @@
 // found in the LICENSE file.
 
 use {
-    crate::zbi::collection::{BootFsCollection, CmdlineCollection, ZbiError},
-    anyhow::{bail, format_err, Context, Result},
+    crate::core::package::reader::{PackageReader, PackagesFromUpdateReader},
+    crate::core::util::types::PartialPackageDefinition,
+    crate::zbi::collection::Zbi,
+    anyhow::{anyhow, bail, format_err, Context, Result},
     fuchsia_hash::Hash,
-    fuchsia_url::{PackageName, PackageVariant},
+    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant},
     scrutiny::prelude::{DataCollector, DataModel},
     scrutiny_utils::{
         artifact::{ArtifactReader, FileArtifactReader},
-        bootfs::BootfsReader,
+        bootfs::{BootfsFileIndex, BootfsPackageIndex, BootfsReader},
         key_value::parse_key_value,
-        package::{open_update_package, read_content_blob},
+        package::PackageIndexContents,
         url::from_package_name_variant_path,
         zbi::{ZbiReader, ZbiType},
     },
     std::collections::HashMap,
-    std::path::PathBuf,
+    std::path::{Path, PathBuf},
     std::str::FromStr,
     std::sync::Arc,
+    tracing::{info, warn},
+    update_package::parse_image_packages_json,
 };
 
 /// The path of the file in bootfs that lists all the bootfs packages.
 const BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";
-/// The path to the unsigned fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_PATH: &str = "zbi";
-/// The path to the signed fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_SIGNED_PATH: &str = "zbi.signed";
-/// The path to the unsigned recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_PATH: &str = "recovery";
-/// The path to the signed recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_SIGNED_PATH: &str = "recovery.signed";
+/// The path of the file in bootfs that lists all the bootfs packages.
+const IMAGES_JSON_PATH: &str = "images.json";
+const IMAGES_JSON_ORIG_PATH: &str = "images.json.orig";
 
-/// A collector that returns the bootfs files in a product.
-//
-// TODO(fxbug.dev/98030): This collector should support the update package -> images package -> ...
-// flow.
+/// A collector that returns the zbi contents in a product.
 #[derive(Default)]
-pub struct BootFsCollector;
+pub struct ZbiCollector;
 
-impl DataCollector for BootFsCollector {
+impl DataCollector for ZbiCollector {
     fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
-        let recovery = model_config.is_recovery();
-        let update_package_path = model_config.update_package_path();
-        let blobs_directory = model_config.blobs_directory();
+        let blobs_directory = &model_config.blobs_directory();
+        let artifact_reader = FileArtifactReader::new(&PathBuf::new(), blobs_directory);
+        let mut package_reader: Box<dyn PackageReader> = Box::new(PackagesFromUpdateReader::new(
+            &model_config.update_package_path(),
+            Box::new(artifact_reader.clone()),
+        ));
+        let mut artifact_reader: Box<dyn ArtifactReader> = Box::new(artifact_reader);
 
-        // Initialize artifact reader; early exit on initialization failure.
-        let mut artifact_reader: Box<dyn ArtifactReader> =
-            Box::new(FileArtifactReader::new(&PathBuf::new(), &blobs_directory));
+        let update_package = package_reader
+            .read_update_package_definition()
+            .context("Failed to read update package definition for package data collector")?;
+        let zbi = extract_zbi_from_update_package(
+            &mut artifact_reader,
+            &mut package_reader,
+            &update_package,
+            model.config().is_recovery(),
+        )?;
+        model.set(zbi)?;
 
-        let mut far_reader = open_update_package(&update_package_path, &mut artifact_reader)
-            .map_err(|err| ZbiError::FailedToOpenUpdatePackage {
-                update_package_path: update_package_path.clone(),
-                io_error: format!("{:?}", err),
-            })?;
-        let (zbi_path, zbi_signed_path) = if recovery {
-            (RECOVERY_ZBI_PATH, RECOVERY_ZBI_SIGNED_PATH)
-        } else {
-            (FUCHSIA_ZBI_PATH, FUCHSIA_ZBI_SIGNED_PATH)
-        };
-        let zbi_buffer = read_content_blob(&mut far_reader, &mut artifact_reader, zbi_signed_path)
-            .or_else(|signed_err| {
-                read_content_blob(&mut far_reader, &mut artifact_reader, zbi_path).map_err(|err| {
-                    ZbiError::FailedToReadZbi {
-                        update_package_path: update_package_path.clone(),
-                        io_error: format!("{:?}\n{:?}", signed_err, err),
-                    }
-                })
-            })?;
-        let mut reader = ZbiReader::new(zbi_buffer);
-        let zbi_sections = reader.parse().map_err(|zbi_error| ZbiError::FailedToParseZbi {
-            update_package_path: update_package_path.clone(),
-            zbi_error: zbi_error.to_string(),
-        })?;
-
-        for section in zbi_sections.iter() {
-            if section.section_type == ZbiType::StorageBootfs {
-                let mut bootfs_reader = BootfsReader::new(section.buffer.clone());
-                let bootfs_data = bootfs_reader.parse().map_err(|bootfs_error| {
-                    ZbiError::FailedToParseBootfs {
-                        update_package_path: update_package_path.clone(),
-                        bootfs_error: bootfs_error.to_string(),
-                    }
-                })?;
-
-                // Add the bootfs files.
-                let files = bootfs_data.iter().map(|(k, _)| k.clone()).collect();
-                let mut collection = BootFsCollection { files, packages: Some(HashMap::new()) };
-
-                // Add the bootfs packages.
-                let mut package_index_found = false;
-                for (file_name, data) in bootfs_data.iter() {
-                    if file_name == BOOT_PACKAGE_INDEX {
-                        // Ensure that we only find a single package index file in bootfs.
-                        if package_index_found {
-                            bail!("Multiple bootfs package index files found");
-                        }
-                        package_index_found = true;
-
-                        let bootfs_pkg_contents = std::str::from_utf8(&data)?;
-                        let bootfs_pkgs = parse_key_value(bootfs_pkg_contents)?;
-
-                        collection.packages = Some(bootfs_pkgs
-                            .into_iter()
-                            .map(|(name_and_variant, merkle)| {
-                                let url = from_package_name_variant_path(name_and_variant)?;
-                                let merkle = Hash::from_str(&merkle)?;
-                                Ok(((url.name().clone(), url.variant().map(|v| v.clone())), merkle))
-                            })
-                            // Handle errors via collect
-                            // Iter<Result<_, __>> into Result<Vec<_>, __>.
-                            .collect::<Result<Vec<((PackageName, Option<PackageVariant>), Hash)>>>()
-                            .map_err(|err| {
-                                format_err!(
-                                    "Failed to parse bootfs package index name/variant=merkle: {:?}",
-                                    err)
-                            })?
-                            // Collect Vec<(_, __)> into HashMap<_, __>.
-                            .into_iter()
-                            .collect::<HashMap<(PackageName, Option<PackageVariant>), Hash>>());
-                    }
-                }
-
-                model.set(collection).with_context(|| {
-                    format!(
-                        "Failed to collect bootfs files in ZBI from update package at {:?}",
-                        update_package_path,
-                    )
-                })?;
-            }
-        }
         Ok(())
     }
 }
 
-/// A collector that returns the kernel cmdline in a product.
-//
-// TODO(fxbug.dev/98030): This collector should support the update package -> images package -> ...
-// flow.
-#[derive(Default)]
-pub struct CmdlineCollector;
+/// Extracts the ZBI from the update package and parses it into the ZBI
+/// model.
+fn extract_zbi_from_update_package(
+    artifact_reader: &mut Box<dyn ArtifactReader>,
+    package_reader: &mut Box<dyn PackageReader>,
+    update_package: &PartialPackageDefinition,
+    recovery: bool,
+) -> Result<Zbi> {
+    info!("Extracting the ZBI from update package");
 
-impl DataCollector for CmdlineCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
-        let model_config = model.config();
-        let recovery = model_config.is_recovery();
-        let update_package_path = model_config.update_package_path();
-        let blobs_directory = model_config.blobs_directory();
+    let zbi_hash =
+        lookup_zbi_hash_in_images_json(artifact_reader, package_reader, update_package, recovery)?;
 
-        // Initialize artifact reader; early exit on initialization failure.
-        let mut artifact_reader: Box<dyn ArtifactReader> =
-            Box::new(FileArtifactReader::new(&PathBuf::new(), &blobs_directory));
+    let zbi_data = artifact_reader.read_bytes(&Path::new(&zbi_hash.to_string()))?;
+    let mut zbi_reader = ZbiReader::new(zbi_data);
+    let sections = zbi_reader.parse()?;
+    let mut bootfs_files = HashMap::new();
+    let mut cmdline = vec![];
+    info!(total = sections.len(), "Extracted sections from the ZBI");
+    for section in sections.iter() {
+        info!(section_type = ?section.section_type, "Extracted sections");
+        if section.section_type == ZbiType::StorageBootfs {
+            let mut bootfs_reader = BootfsReader::new(section.buffer.clone());
+            let bootfs_result = bootfs_reader.parse();
+            if let Err(err) = bootfs_result {
+                warn!(%err, "Bootfs parse failed");
+            } else {
+                bootfs_files = bootfs_result.unwrap();
+                info!(total = bootfs_files.len(), "Bootfs found files");
+            }
+        } else if section.section_type == ZbiType::Cmdline {
+            let mut cmd_buffer = section.buffer.clone();
+            // The cmdline.blk contains a trailing 0.
+            cmd_buffer.truncate(cmd_buffer.len() - 1);
+            let cmd_str = std::str::from_utf8(&cmd_buffer)
+                .context("Failed to convert kernel arguments to utf-8")?;
+            let mut cmd = cmd_str.split(' ').map(ToString::to_string).collect::<Vec<String>>();
+            cmd.sort();
+            cmdline.extend(cmd);
+        }
+    }
 
-        let mut far_reader = open_update_package(&update_package_path, &mut artifact_reader)
-            .map_err(|err| ZbiError::FailedToOpenUpdatePackage {
-                update_package_path: update_package_path.clone(),
-                io_error: format!("{:?}", err),
-            })?;
-        let (zbi_path, zbi_signed_path) = if recovery {
-            (RECOVERY_ZBI_PATH, RECOVERY_ZBI_SIGNED_PATH)
+    // Find the bootfs package index
+    let bootfs_pkg_contents = bootfs_files.iter().find_map(|(file_name, data)| {
+        if file_name == BOOT_PACKAGE_INDEX {
+            Some(data)
         } else {
-            (FUCHSIA_ZBI_PATH, FUCHSIA_ZBI_SIGNED_PATH)
-        };
-        let zbi_buffer = read_content_blob(&mut far_reader, &mut artifact_reader, zbi_signed_path)
-            .or_else(|signed_err| {
-                read_content_blob(&mut far_reader, &mut artifact_reader, zbi_path).map_err(|err| {
-                    ZbiError::FailedToReadZbi {
-                        update_package_path: update_package_path.clone(),
-                        io_error: format!("{:?}\n{:?}", signed_err, err),
-                    }
-                })
-            })?;
-        let mut reader = ZbiReader::new(zbi_buffer);
-        let zbi_sections = reader.parse().map_err(|zbi_error| ZbiError::FailedToParseZbi {
-            update_package_path: update_package_path.clone(),
-            zbi_error: zbi_error.to_string(),
+            None
+        }
+    });
+    let bootfs_packages: Option<Result<PackageIndexContents>> = bootfs_pkg_contents.map(|data| {
+        let bootfs_pkg_contents = std::str::from_utf8(&data)?;
+        let bootfs_pkgs = parse_key_value(bootfs_pkg_contents)?;
+        let bootfs_pkgs = bootfs_pkgs
+            .into_iter()
+            .map(|(name_and_variant, merkle)| {
+                let url = from_package_name_variant_path(name_and_variant)?;
+                let merkle = Hash::from_str(&merkle)?;
+                Ok(((url.name().clone(), url.variant().map(|v| v.clone())), merkle))
+            })
+            // Handle errors via collect
+            // Iter<Result<_, __>> into Result<Vec<_>, __>.
+            .collect::<Result<Vec<((PackageName, Option<PackageVariant>), Hash)>>>()
+            .map_err(|err| {
+                format_err!("Failed to parse bootfs package index name/variant=merkle: {:?}", err)
+            })?
+            // Collect Vec<(_, __)> into HashMap<_, __>.
+            .into_iter()
+            .collect::<PackageIndexContents>();
+        Ok(bootfs_pkgs)
+    });
+    let bootfs_files = BootfsFileIndex { bootfs_files };
+    let bootfs_packages = BootfsPackageIndex { bootfs_pkgs: bootfs_packages.transpose()? };
+    let mut deps = artifact_reader.get_deps();
+    deps.extend(package_reader.get_deps());
+    Ok(Zbi { deps, sections, bootfs_files, bootfs_packages, cmdline })
+}
+
+fn lookup_zbi_hash_in_images_json(
+    artifact_reader: &mut Box<dyn ArtifactReader>,
+    package_reader: &mut Box<dyn PackageReader>,
+    update_package: &PartialPackageDefinition,
+    recovery: bool,
+) -> Result<Hash> {
+    let images_json_hash = update_package
+        .contents
+        .get(&PathBuf::from(IMAGES_JSON_PATH))
+        .or(update_package.contents.get(&PathBuf::from(IMAGES_JSON_ORIG_PATH)))
+        .ok_or(anyhow!("Update package contains no images manifest entry"))?;
+    let images_json_contents = artifact_reader
+        .read_bytes(&Path::new(&images_json_hash.to_string()))
+        .context("Failed to open images manifest blob designated in update package")?;
+    let image_packages_manifest = parse_image_packages_json(images_json_contents.as_slice())
+        .context("Failed to parse images manifest in update package")?;
+    let metadata = if recovery {
+        image_packages_manifest
+            .recovery()
+            .ok_or(anyhow!("Update package images manifest contains no recovery boot slot images"))
+    } else {
+        image_packages_manifest
+            .fuchsia()
+            .ok_or(anyhow!("Update package images manifest contains no fuchsia boot slot images"))
+    }?;
+
+    let images_component_url = metadata.zbi().url();
+    let images_package_url = match metadata.zbi().url().package_url() {
+        AbsolutePackageUrl::Unpinned(_) => bail!("Images package is not pinned"),
+        AbsolutePackageUrl::Pinned(pinned) => pinned,
+    };
+    let images_package =
+        package_reader.read_package_definition(&images_package_url).with_context(|| {
+            format!(
+                "Failed to located update package images package with URL {}",
+                images_package_url
+            )
         })?;
 
-        let mut cmdline_found = false;
-        for section in zbi_sections.iter() {
-            if section.section_type == ZbiType::Cmdline {
-                // Ensure that we only find a single package index file in bootfs.
-                if cmdline_found {
-                    bail!("Multiple kernel cmdlines found");
-                }
-                cmdline_found = true;
-
-                let mut cmdline_buffer = section.buffer.clone();
-                // The cmdline.blk contains a trailing 0.
-                cmdline_buffer.truncate(cmdline_buffer.len() - 1);
-                let cmdline_str = std::str::from_utf8(&cmdline_buffer)
-                    .context("Failed to convert kernel arguments to utf-8")?;
-                let mut cmdline =
-                    cmdline_str.split(' ').map(ToString::to_string).collect::<Vec<String>>();
-                cmdline.sort();
-
-                let collection = CmdlineCollection { cmdline };
-                model.set(collection).with_context(|| {
-                    format!(
-                        "Failed to collect cmdline in ZBI from update package at {:?}",
-                        update_package_path,
-                    )
-                })?;
-            }
-        }
-        if !cmdline_found {
-            bail!("Could not find a kernel cmdline in the ZBI");
-        }
-
-        Ok(())
-    }
+    let zbi_path = PathBuf::from(images_component_url.resource());
+    images_package.contents.get(&zbi_path).map(Hash::clone).ok_or(anyhow!(
+        "Update package images package contains no {} zbi entry {:?}",
+        if recovery { "recovery" } else { "fuchsia" },
+        zbi_path
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{BootFsCollector, CmdlineCollector};
-    use crate::zbi::collection::{BootFsCollection, CmdlineCollection};
+    use super::ZbiCollector;
+    use crate::zbi::collection::Zbi;
     use scrutiny::prelude::{DataCollector, DataModel};
     use scrutiny_config::ModelConfig;
     use std::sync::Arc;
@@ -228,19 +201,19 @@ mod tests {
     fn bootfs() {
         let model = ModelConfig::from_product_bundle(PRODUCT_BUNDLE_PATH).unwrap();
         let data_model = Arc::new(DataModel::new(model).unwrap());
-        let collector = BootFsCollector {};
+        let collector = ZbiCollector {};
         collector.collect(data_model.clone()).unwrap();
-        let collection = data_model.get::<BootFsCollection>().unwrap();
-        assert!(collection.files.contains(&"path/to/version".to_string()));
+        let collection = data_model.get::<Zbi>().unwrap();
+        assert!(collection.bootfs_files.bootfs_files.contains_key(&"path/to/version".to_string()));
     }
 
     #[test]
     fn cmdline() {
         let model = ModelConfig::from_product_bundle(PRODUCT_BUNDLE_PATH).unwrap();
         let data_model = Arc::new(DataModel::new(model).unwrap());
-        let collector = CmdlineCollector {};
+        let collector = ZbiCollector {};
         collector.collect(data_model.clone()).unwrap();
-        let collection = data_model.get::<CmdlineCollection>().unwrap();
+        let collection = data_model.get::<Zbi>().unwrap();
         assert_eq!(collection.cmdline, vec!["abc".to_string(), "def".to_string(),]);
     }
 }

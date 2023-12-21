@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::core::collection::{Components, Manifests, Packages, Zbi},
+    crate::core::collection::{Components, Manifests, Packages},
+    crate::zbi::Zbi,
     anyhow::Result,
     scrutiny::{model::controller::DataController, model::model::DataModel},
     scrutiny_utils::usage::UsageBuilder,
@@ -37,7 +38,7 @@ impl DataController for ModelStatsController {
 
         if let Ok(zbi) = model.get::<Zbi>() {
             zbi_sections = zbi.sections.len();
-            bootfs_files = zbi.bootfs.len();
+            bootfs_files = zbi.bootfs_files.bootfs_files.len();
         }
         if let Ok(components) = model.get::<Components>() {
             components_len = components.len();

@@ -55,8 +55,13 @@ impl TryFrom<&Command> for Query {
 fn verify_route_sources(query: Query) -> Result<HashSet<PathBuf>> {
     let command =
         CommandBuilder::new("verify.route_sources").param("input", query.config_path).build();
-    let plugins =
-        vec!["AdditionalBootConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
+    let plugins = vec![
+        "ZbiPlugin",
+        "AdditionalBootConfigPlugin",
+        "StaticPkgsPlugin",
+        "CorePlugin",
+        "VerifyPlugin",
+    ];
     let model = if query.recovery {
         ModelConfig::from_product_bundle_recovery(&query.product_bundle)
     } else {

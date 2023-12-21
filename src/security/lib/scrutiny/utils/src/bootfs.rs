@@ -6,9 +6,12 @@ use {
     crate::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents},
     anyhow::{Error, Result},
     byteorder::{LittleEndian, ReadBytesExt},
-    serde::{Deserialize, Serialize},
+    serde::de::{SeqAccess, Visitor},
+    serde::ser::SerializeSeq,
+    serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::collections::HashMap,
     std::convert::{TryFrom, TryInto},
+    std::fmt,
     std::io::{Cursor, Read, Seek, SeekFrom},
     thiserror::Error,
     tracing::trace,
@@ -67,11 +70,21 @@ pub enum BootfsError {
     BootfsMagicInvalid,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug)]
+#[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, Debug)]
 pub struct BootfsPackageIndex {
     // Must be optional to re-use otherwise identical serde logic.
     #[serde(serialize_with = "serialize_pkg_index", deserialize_with = "deserialize_pkg_index")]
     pub bootfs_pkgs: Option<PackageIndexContents>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, Debug)]
+pub struct BootfsFileIndex {
+    // File names to data contained in bootfs.
+    #[serde(
+        serialize_with = "serialize_bootfs_file_index",
+        deserialize_with = "deserialize_bootfs_file_index"
+    )]
+    pub bootfs_files: HashMap<String, Vec<u8>>,
 }
 
 /// Responsible for extracting the zbi from the package and reading the zbi
@@ -130,6 +143,62 @@ impl BootfsReader {
         }
         Ok(files)
     }
+}
+
+/// Serialize a set of bootfs files.
+/// We avoid the default serializer because we want to serialize it as a vector of file names,
+/// and prevent serializing the content of all the files.
+pub fn serialize_bootfs_file_index<S>(
+    files: &HashMap<String, Vec<u8>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let keys: Vec<&String> = files.keys().collect();
+    let mut seq = serializer.serialize_seq(Some(keys.len()))?;
+    for key in keys {
+        seq.serialize_element(key)?;
+    }
+    seq.end()
+}
+
+/// Deserialize a set of bootfs files.
+/// We avoid the default serializer because we want to serialize it as a vector of file names,
+/// and prevent serializing the content of all the files.
+pub fn deserialize_bootfs_file_index<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<String, Vec<u8>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct VecVisitor;
+
+    impl<'de> Visitor<'de> for VecVisitor {
+        type Value = HashMap<String, Vec<u8>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("bootfs file map")
+        }
+
+        fn visit_seq<A>(self, mut seq_access: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut map = HashMap::with_capacity(seq_access.size_hint().unwrap_or(0));
+            loop {
+                let element: Option<String> = seq_access.next_element()?;
+                let _ = match element {
+                    None => break,
+                    Some(name) => map.insert(name, vec![]),
+                };
+            }
+            Ok(map)
+        }
+    }
+
+    let visitor = VecVisitor;
+    deserializer.deserialize_seq(visitor)
 }
 
 /// Test helpers for pre-computed bootfs images.

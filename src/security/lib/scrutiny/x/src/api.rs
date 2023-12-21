@@ -458,6 +458,12 @@ pub trait AsBytes: Display + Debug {
     fn as_bytes(&self) -> &[u8];
 }
 
+impl AsBytes for fuchsia_url::Hash {
+    fn as_bytes(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
 impl PartialEq for dyn AsBytes {
     fn eq(&self, other: &dyn AsBytes) -> bool {
         self.as_bytes() == other.as_bytes()

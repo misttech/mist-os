@@ -7,25 +7,17 @@ use {
         AdditionalBootConfigCollection, AdditionalBootConfigContents, AdditionalBootConfigError,
         AdditionalBootConfigParseError,
     },
+    crate::zbi::Zbi,
     anyhow::{Context, Result},
     scrutiny::model::{collector::DataCollector, model::DataModel},
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        bootfs::BootfsReader,
-        package::{open_update_package, read_content_blob},
-        zbi::{ZbiReader, ZbiType},
+    scrutiny_utils::{bootfs::BootfsReader, zbi::ZbiType},
+    std::{
+        collections::{HashMap, HashSet},
+        path::Path,
+        str::from_utf8,
+        sync::Arc,
     },
-    std::{collections::HashMap, path::Path, path::PathBuf, str::from_utf8, sync::Arc},
 };
-
-/// The path to the unsigned fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_PATH: &str = "zbi";
-/// The path to the signed fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_SIGNED_PATH: &str = "zbi.signed";
-/// The path to the unsigned recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_PATH: &str = "recovery";
-/// The path to the signed recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_SIGNED_PATH: &str = "recovery.signed";
 
 // Load the additional boot configuration file by following update package -> zbi -> bootfs -> additional boot config
 // file. The zbi is assumed to be stored at the file path "zbi.signed" or "zbi" in the update
@@ -37,11 +29,10 @@ const RECOVERY_ZBI_SIGNED_PATH: &str = "recovery.signed";
 // TODO(fxbug.dev/98030): This function should support the update package -> images package -> ...
 // flow.
 fn load_additional_boot_args<P1: AsRef<Path>, P2: AsRef<Path>>(
+    model: Arc<DataModel>,
     update_package_path: P1,
-    artifact_reader: &mut Box<dyn ArtifactReader>,
     additional_boot_args_path: P2,
-    recovery: bool,
-) -> Result<AdditionalBootConfigContents, AdditionalBootConfigError> {
+) -> Result<AdditionalBootConfigCollection, AdditionalBootConfigError> {
     let additional_boot_args_path_ref = additional_boot_args_path.as_ref();
     let additional_boot_args_path_str =
         additional_boot_args_path_ref.to_str().ok_or_else(|| {
@@ -50,36 +41,8 @@ fn load_additional_boot_args<P1: AsRef<Path>, P2: AsRef<Path>>(
             }
         })?;
     let update_package_path_ref = update_package_path.as_ref();
-    let mut far_reader =
-        open_update_package(update_package_path_ref, artifact_reader).map_err(|err| {
-            AdditionalBootConfigError::FailedToOpenUpdatePackage {
-                update_package_path: update_package_path_ref.to_path_buf(),
-                io_error: format!("{:?}", err),
-            }
-        })?;
-    let (zbi_path, zbi_signed_path) = if recovery {
-        (RECOVERY_ZBI_PATH, RECOVERY_ZBI_SIGNED_PATH)
-    } else {
-        (FUCHSIA_ZBI_PATH, FUCHSIA_ZBI_SIGNED_PATH)
-    };
-    let zbi_buffer = read_content_blob(&mut far_reader, artifact_reader, zbi_signed_path).or_else(
-        |signed_err| {
-            read_content_blob(&mut far_reader, artifact_reader, zbi_path).map_err(|err| {
-                AdditionalBootConfigError::FailedToReadZbi {
-                    update_package_path: update_package_path_ref.to_path_buf(),
-                    io_error: format!("{:?}\n{:?}", signed_err, err),
-                }
-            })
-        },
-    )?;
-    let mut reader = ZbiReader::new(zbi_buffer);
-    let zbi_sections =
-        reader.parse().map_err(|zbi_error| AdditionalBootConfigError::FailedToParseZbi {
-            update_package_path: update_package_path_ref.to_path_buf(),
-            zbi_error: zbi_error.to_string(),
-        })?;
-
-    for section in zbi_sections.iter() {
+    let zbi = model.get::<Zbi>().unwrap();
+    for section in zbi.sections.iter() {
         if section.section_type == ZbiType::StorageBootfs {
             let mut bootfs_reader = BootfsReader::new(section.buffer.clone());
             let bootfs_data = bootfs_reader.parse().map_err(|bootfs_error| {
@@ -90,23 +53,28 @@ fn load_additional_boot_args<P1: AsRef<Path>, P2: AsRef<Path>>(
             })?;
             for (file, data) in bootfs_data.iter() {
                 if file == additional_boot_args_path_str {
-                    return Ok(parse_additional_boot_args_contents(from_utf8(&data).map_err(
-                        |utf8_error| {
+                    let additional_boot_args = parse_additional_boot_args_contents(
+                        from_utf8(&data).map_err(|utf8_error| {
                             AdditionalBootConfigError::FailedToParseUtf8AdditionalBootConfig {
                                 update_package_path: update_package_path_ref.to_path_buf(),
                                 additional_boot_args_path: additional_boot_args_path_ref
                                     .to_path_buf(),
                                 utf8_error: utf8_error.to_string(),
                             }
-                        },
-                    )?)
+                        })?,
+                    )
                     .map_err(|parse_error| {
                         AdditionalBootConfigError::FailedToParseAdditionalBootConfigFormat {
                             update_package_path: update_package_path_ref.to_path_buf(),
                             additional_boot_args_path: additional_boot_args_path_ref.to_path_buf(),
                             parse_error,
                         }
-                    })?);
+                    })?;
+                    return Ok(AdditionalBootConfigCollection {
+                        deps: zbi.deps.clone(),
+                        additional_boot_args: Some(additional_boot_args),
+                        errors: vec![],
+                    });
                 }
             }
         }
@@ -152,34 +120,23 @@ pub struct AdditionalBootConfigCollector;
 impl DataCollector for AdditionalBootConfigCollector {
     fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
-        let recovery = model_config.is_recovery();
         let update_package_path = model_config.update_package_path();
-        let blobs_directory = model_config.blobs_directory();
         let additional_boot_args_path = model_config.additional_boot_args_path();
-
-        // Initialize artifact reader; early exit on initialization failure.
-        let mut artifact_reader: Box<dyn ArtifactReader> =
-            Box::new(FileArtifactReader::new(&PathBuf::new(), &blobs_directory));
 
         // Execute query using deps-tracking artifact reader.
         let result = load_additional_boot_args(
+            model.clone(),
             &update_package_path,
-            &mut artifact_reader,
             &additional_boot_args_path,
-            recovery,
         );
 
         // Store result in model.
         model
             .set(match result {
-                Ok(additional_boot_args) => AdditionalBootConfigCollection {
-                    additional_boot_args: Some(additional_boot_args),
-                    deps: artifact_reader.get_deps(),
-                    errors: vec![],
-                },
+                Ok(collection) => collection,
                 Err(err) => AdditionalBootConfigCollection {
                     additional_boot_args: None,
-                    deps: artifact_reader.get_deps(),
+                    deps: HashSet::new(),
                     errors: vec![err],
                 },
             })

@@ -3,36 +3,55 @@
 // found in the LICENSE file.
 
 use super::api;
+use super::api::BlobError;
 use super::api::Package as _;
+use super::api::PackageResolverUrl;
 use super::blob::BlobDirectoryError;
+use super::package::Error as PackageError;
+use super::package::Package;
 use super::product_bundle::ProductBundle;
 use super::update_package::Error as UpdatePackageError;
 use super::update_package::UpdatePackage;
 use super::zbi::Error as ZbiError;
 use super::zbi::Zbi;
+use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;
 use thiserror::Error;
+use update_package::parse_image_packages_json;
 
-/// The path to the unsigned fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_PATH: &str = "zbi";
-/// The path to the signed fuchsia ZBI image relative to the update package root.
-const FUCHSIA_ZBI_SIGNED_PATH: &str = "zbi.signed";
-/// The path to the unsigned recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_PATH: &str = "recovery";
-/// The path to the signed recovery ZBI image relative to the update package root.
-const RECOVERY_ZBI_SIGNED_PATH: &str = "recovery.signed";
+const IMAGES_JSON_PATH: &str = "images.json";
+const IMAGES_JSON_ORIG_PATH: &str = "images.json.orig";
 
 /// Errors that may occur when constructing a [`System`].
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("failed to extract blob directory from product bundle: {0}")]
     BlobDirectory(#[from] BlobDirectoryError),
+    #[error("failed to read images json blob from update package")]
+    ReadImagesJsonBlob(#[from] BlobError),
+    #[error("failed to read images json from update package")]
+    ReadImagesJson,
+    #[error("failed to parse images json from update package")]
+    ParseImagesJson,
+    #[error("failed to find a main slot in the images json")]
+    MissingMainSlot,
+    #[error("failed to find a recovery slot in the images json")]
+    MissingRecoverySlot,
     #[error("failed to construct update package: {0}")]
     UpdatePackage(#[from] UpdatePackageError),
-    #[error("failed to find zbi as content blob in update package at path \"{zbi_signed_path}\" or \"{zbi_path}\"")]
-    MissingZbiBlob { zbi_signed_path: Box<dyn api::Path>, zbi_path: Box<dyn api::Path> },
-    #[error("failed to load zbi from update package: {0}")]
-    Zbi(#[from] ZbiError),
+    #[error("failed to find images json as content blob in update package at path \"{images_json_path}\" or \"{images_json_orig_path}\"")]
+    MissingImagesJsonBlob {
+        images_json_path: Box<dyn api::Path>,
+        images_json_orig_path: Box<dyn api::Path>,
+    },
+    #[error("failed to find zbi as content blob in update package")]
+    MissingZbiBlob,
+    #[error("failed to load zbi because package is unpinned: {zbi_package_url}")]
+    ZbiPackageUrlUnpinned { zbi_package_url: AbsolutePackageUrl },
+    #[error("failed to load images package from blob set: {0}")]
+    ImagesFromBlob(#[from] PackageError),
+    #[error("failed to load zbi from from blob set: {0}")]
+    ZbiFromBlob(#[from] ZbiError),
 }
 
 #[derive(Clone)]
@@ -46,22 +65,61 @@ impl System {
         let update_package = UpdatePackage::new(
             Some(product_bundle.data_source().clone()),
             product_bundle.update_package_hash().clone(),
-            blob_set,
+            blob_set.clone(),
         )?;
-        let (zbi_path, zbi_signed_path): (Box<dyn api::Path>, Box<dyn api::Path>) = match variant {
+
+        // Read and parse the images json from the update package.
+        let images_json_path: Box<dyn api::Path> = Box::new(IMAGES_JSON_PATH);
+        let images_json_orig_path: Box<dyn api::Path> = Box::new(IMAGES_JSON_ORIG_PATH);
+        let (_, images_json_blob) = update_package
+            .content_blobs()
+            .find(|(path, _blob)| path == &images_json_path)
+            .or_else(|| {
+                update_package.content_blobs().find(|(path, _blob)| path == &images_json_orig_path)
+            })
+            .ok_or_else(|| Error::MissingImagesJsonBlob {
+                images_json_path,
+                images_json_orig_path,
+            })?;
+        let mut images_json_contents = vec![];
+        images_json_blob
+            .reader_seeker()?
+            .read_to_end(&mut images_json_contents)
+            .map_err(|_error| Error::ReadImagesJson)?;
+        let image_packages_manifest = parse_image_packages_json(&images_json_contents)
+            .map_err(|_error| Error::ParseImagesJson)?;
+
+        // Get the metadata for either the main or recovery slot.
+        let metadata = match variant {
             api::SystemVariant::Recovery => {
-                (Box::new(RECOVERY_ZBI_PATH), Box::new(RECOVERY_ZBI_SIGNED_PATH))
+                image_packages_manifest.recovery().ok_or(Error::MissingMainSlot)?
             }
             api::SystemVariant::Main => {
-                (Box::new(FUCHSIA_ZBI_PATH), Box::new(FUCHSIA_ZBI_SIGNED_PATH))
+                image_packages_manifest.fuchsia().ok_or(Error::MissingRecoverySlot)?
             }
         };
-        let (actual_zbi_path, zbi_blob) = update_package
-            .content_blobs()
-            .find(|(path, _blob)| path == &zbi_signed_path)
-            .or_else(|| update_package.content_blobs().find(|(path, _blob)| path == &zbi_path))
-            .ok_or_else(|| Error::MissingZbiBlob { zbi_signed_path, zbi_path })?;
-        let zbi = Zbi::new(Some(update_package.data_source()), actual_zbi_path, zbi_blob)?;
+
+        // Read the appropriate images package.
+        let zbi_package_url = metadata.zbi().url().package_url().clone();
+        let zbi_hash = zbi_package_url.hash().clone().ok_or_else(|| {
+            Error::ZbiPackageUrlUnpinned { zbi_package_url: zbi_package_url.clone() }
+        })?;
+        let images_json_blob =
+            blob_set.blob(Box::new(zbi_hash)).map_err(|_error| Error::MissingZbiBlob)?;
+        let images_json_url = PackageResolverUrl::Package(zbi_package_url.into());
+        let images_json_package = Package::new(
+            Some(update_package.data_source()),
+            images_json_url,
+            images_json_blob,
+            blob_set,
+        )?;
+
+        // Read the zbi from the images package.
+        let zbi_resource = metadata.zbi().url().resource().to_string();
+        let zbi_path: Box<dyn api::Path> = Box::new(zbi_resource);
+        let (_, zbi_blob) =
+            images_json_package.content_blobs().find(|(path, _blob)| path == &zbi_path).unwrap();
+        let zbi = Zbi::new(Some(update_package.data_source()), zbi_path, zbi_blob)?;
         Ok(Self(Rc::new(SystemData {
             variant,
             build_dir,

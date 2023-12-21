@@ -17,6 +17,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let command =
         CommandBuilder::new("verify.pre_signing").param("policy_path", policy_path.clone()).build();
     let plugins = vec![
+        "ZbiPlugin".to_string(),
         "AdditionalBootConfigPlugin".to_string(),
         "CorePlugin".to_string(),
         "StaticPkgsPlugin".to_string(),

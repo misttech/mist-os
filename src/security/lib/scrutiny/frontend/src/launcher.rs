@@ -30,12 +30,12 @@ pub fn launch_from_config(config: Config) -> Result<String> {
     // These plugins only apply when the model contains valid paths, because the blobs and update
     // package must be present.
     if !model_is_empty {
+        scrutiny.plugin(ZbiPlugin::new())?;
         scrutiny.plugin(AdditionalBootConfigPlugin::new())?;
         scrutiny.plugin(StaticPkgsPlugin::new())?;
         scrutiny.plugin(CorePlugin::new())?;
         scrutiny.plugin(VerifyPlugin::new())?;
         scrutiny.plugin(SearchPlugin::new())?;
-        scrutiny.plugin(ZbiPlugin::new())?;
     }
     scrutiny.run()
 }

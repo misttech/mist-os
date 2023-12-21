@@ -6,11 +6,14 @@ mod collection;
 mod collector;
 mod controller;
 
-pub use collection::{BootFsCollection, CmdlineCollection};
+pub use collection::Zbi;
 
 use {
-    collector::{BootFsCollector, CmdlineCollector},
-    controller::{BootFsController, CmdlineController},
+    collector::ZbiCollector,
+    controller::{
+        BootFsFilesController, BootFsPackagesController, ZbiCmdlineController,
+        ZbiSectionsController,
+    },
     scrutiny::prelude::*,
     std::sync::Arc,
 };
@@ -19,12 +22,13 @@ plugin!(
     ZbiPlugin,
     PluginHooks::new(
         collectors! {
-            "BootFsCollector" => BootFsCollector::default(),
-            "CmdlineCollector" => CmdlineCollector::default(),
+            "ZbiCollector" => ZbiCollector::default(),
         },
         controllers! {
-            "/zbi/bootfs" => BootFsController::default(),
-            "/zbi/cmdline" => CmdlineController::default(),
+            "/zbi/bootfs" => BootFsFilesController::default(),
+            "/zbi/bootfs_packages" => BootFsPackagesController::default(),
+            "/zbi/cmdline" => ZbiCmdlineController::default(),
+            "/zbi/sections" => ZbiSectionsController::default(),
         }
     ),
     vec![]

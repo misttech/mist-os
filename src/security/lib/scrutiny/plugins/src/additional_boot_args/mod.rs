@@ -25,5 +25,5 @@ plugin!(
             "/devmgr/config" => ExtractAdditionalBootConfigController::default(),
         }
     ),
-    vec![]
+    vec![PluginDescriptor::new("ZbiPlugin")]
 );

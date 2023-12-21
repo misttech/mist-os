@@ -189,7 +189,7 @@ pub mod test {
         builder.add_slot_images(Slot::Primary(AssemblyManifest {
             images: vec![Image::ZBI { path: zbi_path.to_path_buf(), signed: true }],
         }));
-        builder.build().expect("build update package");
+        let update_package = builder.build().expect("build update package");
 
         let pkg_manifest = PackageManifest::try_load_from(
             Utf8Path::from_path(&pkg_dir.path().join("update_package_manifest.json"))
@@ -198,13 +198,20 @@ pub mod test {
         .expect("load update package manifest");
 
         let hash = pkg_manifest.hash();
-        let blobs = pkg_manifest
-            .blobs()
-            .into_iter()
-            .map(|blob_info| {
-                std::fs::read(&blob_info.source_path).expect("read blob from package manifest")
-            })
-            .collect::<Vec<_>>();
+        let mut blobs = Vec::<Vec<u8>>::new();
+        for pkg_manifest in update_package.package_manifests {
+            blobs.extend(
+                pkg_manifest
+                    .blobs()
+                    .into_iter()
+                    .map(|blob_info| {
+                        std::fs::read(&blob_info.source_path)
+                            .expect("read blob from package manifest")
+                    })
+                    .collect::<Vec<Vec<u8>>>(),
+            );
+        }
+
         FakeUpdatePackage { hash, blobs }
     });
 }

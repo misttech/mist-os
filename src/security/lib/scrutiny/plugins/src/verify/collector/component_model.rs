@@ -5,10 +5,11 @@
 use {
     crate::{
         core::{
-            collection::{Components, CoreDataDeps, ManifestData, Manifests, Zbi},
+            collection::{Components, CoreDataDeps, ManifestData, Manifests},
             package::collector::ROOT_RESOURCE,
         },
         verify::collection::V2ComponentModel,
+        zbi::Zbi,
     },
     anyhow::{anyhow, Context, Result},
     cm_config::RuntimeConfig,
@@ -132,7 +133,7 @@ impl V2ComponentModelDataCollector {
     }
 
     fn get_runtime_config(&self, config_path: &str, zbi: &Zbi) -> Result<RuntimeConfig> {
-        match zbi.bootfs.get(config_path) {
+        match zbi.bootfs_files.bootfs_files.get(config_path) {
             Some(config_data) => Ok(RuntimeConfig::try_from(
                 unpersist::<component_internal::Config>(&config_data)
                     .context("Unable to decode runtime config")?,
@@ -152,7 +153,7 @@ impl V2ComponentModelDataCollector {
                 let split: Vec<&str> = path.split_inclusive("/").collect();
                 if split.as_slice()[..2] == ["/", "boot/"] {
                     let remainder = split[2..].join("");
-                    match zbi.bootfs.get(&remainder) {
+                    match zbi.bootfs_files.bootfs_files.get(&remainder) {
                         Some(index_data) => {
                             let fidl_index =
                                 unpersist::<component_internal::ComponentIdIndex>(index_data)

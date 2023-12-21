@@ -289,6 +289,7 @@ impl PluginConfig {
     pub fn default() -> PluginConfig {
         PluginConfig {
             plugins: vec![
+                "ZbiPlugin".to_string(),
                 "AdditionalBootConfigPlugin".to_string(),
                 "StaticPkgsPlugin".to_string(),
                 "CorePlugin".to_string(),

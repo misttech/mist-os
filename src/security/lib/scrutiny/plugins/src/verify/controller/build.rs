@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::core::collection::Zbi,
+    crate::zbi::Zbi,
     anyhow::Result,
     scrutiny::{model::controller::DataController, model::model::*},
     serde::{Deserialize, Serialize},
@@ -37,7 +37,7 @@ impl DataController for VerifyBuildController {
         let zbi = model.get::<Zbi>()?;
         Ok(json! {SecurityProperties {
             zbi: ZbiProperties {
-                debug_syscalls_enabled: zbi.cmdline.contains("kernel.enable-debugging-syscalls=true"),
+                debug_syscalls_enabled: zbi.cmdline.contains(&"kernel.enable-debugging-syscalls=true".to_string()),
             },
         }})
     }
@@ -50,8 +50,13 @@ impl DataController for VerifyBuildController {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::core::collection::Zbi, scrutiny_testing::fake::*,
-        scrutiny_utils::zbi::ZbiSection, serde_json::json, std::collections::HashMap,
+        super::*,
+        crate::zbi::Zbi,
+        scrutiny_testing::fake::*,
+        scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
+        scrutiny_utils::zbi::ZbiSection,
+        serde_json::json,
+        std::collections::HashSet,
     };
 
     fn data_model() -> Arc<DataModel> {
@@ -59,15 +64,22 @@ mod tests {
     }
 
     fn zbi() -> Zbi {
-        let bootfs: HashMap<String, Vec<u8>> = HashMap::default();
+        let bootfs_files = BootfsFileIndex::default();
         let sections: Vec<ZbiSection> = Vec::default();
-        return Zbi { sections: sections, bootfs: bootfs, cmdline: "".to_string() };
+        return Zbi {
+            deps: HashSet::default(),
+            sections: sections,
+            bootfs_files,
+            bootfs_packages: BootfsPackageIndex::default(),
+            cmdline: vec![],
+        };
     }
 
     #[test]
     fn test_zbi_cmdline_verify_no_debug_syscalls_exists() {
         let model = data_model();
-        let zbi = Zbi { cmdline: "{kernel.enable-debugging-syscalls=false}".to_string(), ..zbi() };
+        let zbi =
+            Zbi { cmdline: vec!["kernel.enable-debugging-syscalls=false".to_string()], ..zbi() };
         model.set(zbi).unwrap();
         let verify = VerifyBuildController::default();
         let response: SecurityProperties =
@@ -78,7 +90,8 @@ mod tests {
     #[test]
     fn test_zbi_cmdline_verify_debug_syscalls_exist() {
         let model = data_model();
-        let zbi = Zbi { cmdline: "{kernel.enable-debugging-syscalls=true}".to_string(), ..zbi() };
+        let zbi =
+            Zbi { cmdline: vec!["kernel.enable-debugging-syscalls=true".to_string()], ..zbi() };
         model.set(zbi).unwrap();
         let verify = VerifyBuildController::default();
         let response: SecurityProperties =

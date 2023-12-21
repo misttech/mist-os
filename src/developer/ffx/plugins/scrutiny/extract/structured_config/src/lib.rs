@@ -22,6 +22,7 @@ pub async fn scrutiny_structured_config(cmd: ScrutinyStructuredConfigCommand) ->
     }?;
     let command = CommandBuilder::new("verify.structured_config.extract").build();
     let plugins = vec![
+        "ZbiPlugin".to_string(),
         "CorePlugin".to_string(),
         "AdditionalBootConfigPlugin".to_string(),
         "StaticPkgsPlugin".to_string(),

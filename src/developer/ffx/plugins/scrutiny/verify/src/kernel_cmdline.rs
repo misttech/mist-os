@@ -6,7 +6,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use ffx_scrutiny_verify_args::kernel_cmdline::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
-use scrutiny_plugins::zbi::CmdlineCollection;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
 use serde_json;
 use std::{
@@ -46,9 +45,9 @@ fn verify_kernel_cmdline<P: AsRef<Path>>(query: &Query, golden_paths: &Vec<P>) -
     let scrutiny_output =
         launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
 
-    let cmdline_collection: CmdlineCollection = serde_json::from_str(&scrutiny_output)
+    let cmdline: Vec<String> = serde_json::from_str(&scrutiny_output)
         .context(format!("Failed to deserialize scrutiny output: {}", scrutiny_output))?;
-    let cmdline = cmdline_collection.cmdline;
+
     let golden_file =
         GoldenFile::from_files(&golden_paths).context("Failed to open golden files")?;
     match golden_file.compare(cmdline) {

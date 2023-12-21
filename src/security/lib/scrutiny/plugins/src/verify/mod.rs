@@ -183,12 +183,13 @@ mod tests {
         crate::{
             core::collection::{
                 testing::fake_component_src_pkg, Component, Components, CoreDataDeps, Manifest,
-                ManifestData, Manifests, Zbi,
+                ManifestData, Manifests,
             },
             verify::{
                 collection::V2ComponentModel,
                 collector::component_model::{DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL},
             },
+            zbi::Zbi,
         },
         anyhow::Result,
         cm_config::RuntimeConfig,
@@ -207,6 +208,7 @@ mod tests {
         moniker::{Moniker, MonikerBase},
         routing::{component_instance::ComponentInstanceInterface, environment::RunnerRegistry},
         scrutiny_testing::fake::*,
+        scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
         serde_json::json,
         std::{collections::HashMap, convert::TryFrom},
         url::Url,
@@ -542,7 +544,7 @@ mod tests {
         component_id_index_path: Option<String>,
         component_id_index: component_id_index::Index,
     ) -> Zbi {
-        let mut bootfs: HashMap<String, Vec<u8>> = HashMap::default();
+        let mut bootfs_files: HashMap<String, Vec<u8>> = HashMap::default();
         let mut runtime_config = component_internal::Config::default();
         runtime_config.root_component_url = root_component_url;
         runtime_config.component_id_index_path = component_id_index_path.clone();
@@ -550,7 +552,7 @@ mod tests {
         if let Some(path) = component_id_index_path {
             let split_index_path: Vec<&str> = path.split_inclusive("/").collect();
             if split_index_path.as_slice()[..2] == ["/", "boot/"] {
-                bootfs.insert(
+                bootfs_files.insert(
                     split_index_path[2..].join(""),
                     fidl::persist(
                         &component_internal::ComponentIdIndex::try_from(component_id_index)
@@ -561,8 +563,16 @@ mod tests {
             }
         }
 
-        bootfs.insert(DEFAULT_CONFIG_PATH.to_string(), fidl::persist(&runtime_config).unwrap());
-        return Zbi { sections: Vec::default(), bootfs, cmdline: "".to_string() };
+        bootfs_files
+            .insert(DEFAULT_CONFIG_PATH.to_string(), fidl::persist(&runtime_config).unwrap());
+        let bootfs_files = BootfsFileIndex { bootfs_files };
+        return Zbi {
+            deps: HashSet::default(),
+            sections: Vec::default(),
+            bootfs_files,
+            bootfs_packages: BootfsPackageIndex::default(),
+            cmdline: vec![],
+        };
     }
 
     fn json_pretty(data: &serde_json::Value) -> String {

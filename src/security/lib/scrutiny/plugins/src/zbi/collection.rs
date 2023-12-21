@@ -4,8 +4,10 @@
 
 use {
     scrutiny::prelude::DataCollection,
-    scrutiny_utils::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents},
+    scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
+    scrutiny_utils::zbi::ZbiSection,
     serde::{Deserialize, Serialize},
+    std::collections::HashSet,
     std::path::PathBuf,
     thiserror::Error,
 };
@@ -24,34 +26,25 @@ pub enum ZbiError {
     FailedToParseBootfs { update_package_path: PathBuf, bootfs_error: String },
 }
 
-/// The collected bootfs artifacts from reading the ZBI.
-#[derive(Deserialize, Serialize)]
-pub struct BootFsCollection {
-    pub files: Vec<String>,
-    #[serde(serialize_with = "serialize_pkg_index", deserialize_with = "deserialize_pkg_index")]
-    pub packages: Option<PackageIndexContents>,
-}
-
-impl DataCollection for BootFsCollection {
-    fn collection_name() -> String {
-        "BootFS Collection".to_string()
-    }
-    fn collection_description() -> String {
-        "Contains bootfs files loaded from a ZBI".to_string()
-    }
-}
-
-/// The collected kernel cmdline arguments from reading the ZBI.
-#[derive(Deserialize, Serialize)]
-pub struct CmdlineCollection {
+/// Defines all of the parsed information in the ZBI.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct Zbi {
+    pub deps: HashSet<PathBuf>,
+    // Raw section data for each zbi section. This section isn't serialized to
+    // disk because it occupies a large amount of space.
+    #[serde(skip)]
+    pub sections: Vec<ZbiSection>,
+    pub bootfs_files: BootfsFileIndex,
+    pub bootfs_packages: BootfsPackageIndex,
     pub cmdline: Vec<String>,
 }
 
-impl DataCollection for CmdlineCollection {
+impl DataCollection for Zbi {
     fn collection_name() -> String {
-        "Kernel Cmdline Collection".to_string()
+        "ZBI Collection".to_string()
     }
     fn collection_description() -> String {
-        "Contains the kernel cmdline loaded from a ZBI".to_string()
+        "Contains all the items found in the zircon boot image (ZBI) in the update package"
+            .to_string()
     }
 }

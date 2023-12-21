@@ -15,6 +15,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .param("policy", policy_path.clone())
         .build();
     let plugins = vec![
+        "ZbiPlugin".to_string(),
         "CorePlugin".to_string(),
         "AdditionalBootConfigPlugin".to_string(),
         "StaticPkgsPlugin".to_string(),
