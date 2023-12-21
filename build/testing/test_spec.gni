@@ -515,7 +515,15 @@ template("test_spec") {
         # are known to run slower, so they need not be explicitly included in
         # the allowlist.
         !defined(invoker.image_overrides) && !defined(invoker.product_bundle)) {
-      deps += [ "//build/testing/timeouts:per_test_timeout_allowlist" ]
+      dir = string_replace(get_label_info(invoker.target, "dir"), "//", "")
+      split = string_split(dir, "/")
+      if (split[0] == "vendor") {
+        # Use the vendor repo's allowlist.
+        deps += [ "//vendor/" + split[1] +
+                  "/build/testing/timeouts:per_test_timeout_allowlist" ]
+      } else {
+        deps += [ "//build/testing/timeouts:per_test_timeout_allowlist" ]
+      }
     }
   }
 
