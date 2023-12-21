@@ -152,13 +152,11 @@ TEST(Protocol, StatusReply) {
 
 TEST(Protocol, RunBinaryRequest) {
   RunBinaryRequest initial;
-  initial.inferior_type = InferiorType::kBinary;
   initial.argv.push_back("/usr/bin/WINWORD.EXE");
   initial.argv.push_back("--dosmode");
 
   RunBinaryRequest second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
-  EXPECT_EQ(second.inferior_type, InferiorType::kBinary);
   ASSERT_EQ(initial.argv.size(), second.argv.size());
   for (size_t i = 0; i < initial.argv.size(); i++)
     EXPECT_EQ(initial.argv[i], second.argv[i]);

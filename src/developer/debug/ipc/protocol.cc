@@ -22,22 +22,6 @@ const char* MsgHeader::TypeToString(MsgHeader::Type type) {
   return "<Unknown>";
 }
 
-const char* InferiorTypeToString(InferiorType type) {
-  switch (type) {
-    case InferiorType::kBinary:
-      return "Binary";
-    case InferiorType::kComponent:
-      return "Component";
-    case InferiorType::kTest:
-      return "Test";
-    case InferiorType::kLast:
-      return "Last";
-  }
-
-  FX_NOTREACHED();
-  return "<invalid>";
-}
-
 const char* NotifyIO::TypeToString(Type type) {
   switch (type) {
     case Type::kStderr:

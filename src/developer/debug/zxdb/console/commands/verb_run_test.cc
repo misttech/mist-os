@@ -75,7 +75,6 @@ void RunTest(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
       return cmd_context->ReportError(Err("\"--realm\" is not supported in this IPC version."));
     }
     debug_ipc::RunBinaryRequest request;
-    request.inferior_type = debug_ipc::InferiorType::kTest;
     request.argv = cmd.args();
 
     cmd.target()->session()->remote_api()->RunBinary(

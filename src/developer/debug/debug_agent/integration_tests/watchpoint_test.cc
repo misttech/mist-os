@@ -166,7 +166,6 @@ std::pair<RunBinaryRequest, RunBinaryReply> GetLaunchRequest(const WatchpointStr
                                                              std::string exe) {
   RunBinaryRequest launch_request = {};
   launch_request.argv = {exe};
-  launch_request.inferior_type = InferiorType::kBinary;
   return {launch_request, {}};
 }
 

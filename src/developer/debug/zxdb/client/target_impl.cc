@@ -105,7 +105,6 @@ void TargetImpl::Launch(CallbackWithTimestamp callback) {
   state_ = State::kStarting;
 
   debug_ipc::RunBinaryRequest request;
-  request.inferior_type = debug_ipc::InferiorType::kBinary;
   request.argv = args_;
   session()->remote_api()->RunBinary(
       request, [callback = std::move(callback), weak_target = impl_weak_factory_.GetWeakPtr()](

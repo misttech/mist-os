@@ -68,27 +68,6 @@ void RunVerbRunComponent(const Command& cmd, fxl::RefPtr<CommandContext> cmd_con
   warning.Append(" run-component won't work for many v2 components. See \"help run-component\".\n");
   cmd_context->Output(warning);
 
-  // Launch the component.
-  if (cmd.target()->session()->ipc_version() < 56) {
-    // For compatibility.
-    // TODO: remove me after kMinimumProtocolVersion >= 56.
-    debug_ipc::RunBinaryRequest request;
-    request.inferior_type = debug_ipc::InferiorType::kComponent;
-    request.argv = cmd.args();
-
-    cmd.target()->session()->remote_api()->RunBinary(
-        request, [cmd_context](Err err, debug_ipc::RunBinaryReply reply) mutable {
-          if (!err.has_error() && reply.status.has_error()) {
-            return cmd_context->ReportError(
-                Err("Failed to launch component: %s", reply.status.message().c_str()));
-          }
-          if (err.has_error()) {
-            cmd_context->ReportError(err);
-          }
-        });
-    return;
-  }
-
   debug_ipc::RunComponentRequest request;
   request.url = cmd.args()[0];
   cmd.target()->session()->remote_api()->RunComponent(

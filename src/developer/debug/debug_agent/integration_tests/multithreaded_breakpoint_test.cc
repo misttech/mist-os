@@ -119,7 +119,6 @@ std::pair<RunBinaryRequest, RunBinaryReply> GetLaunchRequest(const BreakpointStr
                                                              std::string exe) {
   RunBinaryRequest launch_request = {};
   launch_request.argv = {exe, fxl::StringPrintf("%lu", backend.thread_count())};
-  launch_request.inferior_type = InferiorType::kBinary;
   return {launch_request, {}};
 }
 

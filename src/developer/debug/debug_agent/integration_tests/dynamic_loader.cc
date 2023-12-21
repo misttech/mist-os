@@ -153,7 +153,6 @@ TEST(DynamicLoader, LoadUnload) {
 
     debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv = {"/pkg/bin/load_so_exe"};
-    launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
 
     debug_ipc::RunBinaryReply launch_reply;
     agent.OnRunBinary(launch_request, &launch_reply);

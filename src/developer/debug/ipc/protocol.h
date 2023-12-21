@@ -59,10 +59,10 @@ constexpr uint32_t kCurrentProtocolVersion = 58;
 //   - INITIAL_VERSION_FOR_API_LEVEL_CURRENT = kCurrentProtocolVersion
 //   - CURRENT_SUPPORTED_API_LEVEL = FUCHSIA_API_LEVEL
 
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 55
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 56
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 56
-#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 56
-#define CURRENT_SUPPORTED_API_LEVEL 15
+#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 58
+#define CURRENT_SUPPORTED_API_LEVEL 16
 
 #if !defined(FUCHSIA_API_LEVEL)
 // This is a workaround when using this library in the @internal_sdk, as the SDK
@@ -235,14 +235,6 @@ struct HelloReply {
     }
   }
 };
-
-enum class InferiorType : uint32_t {
-  kBinary,
-  kComponent,
-  kTest,
-  kLast,
-};
-const char* InferiorTypeToString(InferiorType);
 
 // Status ------------------------------------------------------------------------------------------
 //
@@ -616,22 +608,10 @@ struct WriteRegistersReply {
 // Run -------------------------------------------------------------------------
 
 struct RunBinaryRequest {
-#if INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 < 56
-  // TODO: remove inferior_type field after kMinimumProtocolVersion >= 56
-  InferiorType inferior_type = InferiorType::kBinary;
-#endif
-
   // argv[0] is the app to launch.
   std::vector<std::string> argv;
 
-  void Serialize(Serializer& ser, uint32_t ver) {
-    if (ver < 56) {
-      ser | inferior_type;
-    } else {
-      FX_CHECK(inferior_type == InferiorType::kBinary);
-    }
-    ser | argv;
-  }
+  void Serialize(Serializer& ser, uint32_t ver) { ser | argv; }
 };
 struct RunBinaryReply {
   uint64_t timestamp = kTimestampDefault;

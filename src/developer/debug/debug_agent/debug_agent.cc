@@ -227,35 +227,8 @@ void DebugAgent::OnRunBinary(const debug_ipc::RunBinaryRequest& request,
     reply->status = debug::Status("No launch arguments provided");
     return;
   }
-  switch (request.inferior_type) {
-    case debug_ipc::InferiorType::kBinary:
-      LaunchProcess(request, reply);
-      return;
-    case debug_ipc::InferiorType::kComponent: {
-      // For compatibility
-      if (request.argv.size() != 1) {
-        reply->status = debug::Status("run-component cannot accept command line arguments");
-        return;
-      }
-      debug_ipc::RunComponentReply run_component_reply;
-      OnRunComponent({.url = request.argv[0]}, &run_component_reply);
-      reply->status = run_component_reply.status;
-      return;
-    }
-    case debug_ipc::InferiorType::kTest: {
-      // For compatibility
-      debug_ipc::RunTestReply run_test_reply;
-      // argv.empty() is checked above.
-      OnRunTest(
-          {.url = request.argv[0], .case_filters = {request.argv.begin() + 1, request.argv.end()}},
-          &run_test_reply);
-      reply->status = run_test_reply.status;
-      return;
-    }
-    case debug_ipc::InferiorType::kLast:
-      reply->status = debug::Status("Invalid inferior type to launch.");
-      return;
-  }
+
+  LaunchProcess(request, reply);
 }
 
 void DebugAgent::OnRunComponent(const debug_ipc::RunComponentRequest& request,

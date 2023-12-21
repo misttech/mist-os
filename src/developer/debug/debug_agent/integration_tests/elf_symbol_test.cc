@@ -96,7 +96,6 @@ TEST(ElfSymbol, Lookup) {
     // We launch the test binary.
     debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
-    launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
     debug_ipc::RunBinaryReply launch_reply;
     remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_EQ(launch_reply.status, ZX_OK)

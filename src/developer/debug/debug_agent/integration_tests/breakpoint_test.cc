@@ -159,7 +159,6 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     // We launch the test binary.
     debug_ipc::RunBinaryRequest launch_request = {};
     launch_request.argv.push_back(kTestExecutablePath);
-    launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
     debug_ipc::RunBinaryReply launch_reply;
     remote_api->OnRunBinary(launch_request, &launch_reply);
     ASSERT_TRUE(launch_reply.status.ok());
@@ -291,7 +290,6 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
 
     // We launch the test binary.
     debug_ipc::RunBinaryRequest launch_request = {};
-    launch_request.inferior_type = debug_ipc::InferiorType::kBinary;
     launch_request.argv.push_back(kTestExecutablePath);
     debug_ipc::RunBinaryReply launch_reply;
     remote_api->OnRunBinary(launch_request, &launch_reply);
