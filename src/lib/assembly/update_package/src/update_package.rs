@@ -58,6 +58,9 @@ pub struct UpdatePackageBuilder {
     /// None will default to the latest ABI.
     abi_revision: Option<u64>,
 
+    /// The repository to use for the images packages.
+    repository: RepositoryUrl,
+
     /// Directory to write outputs.
     outdir: Utf8PathBuf,
 
@@ -156,6 +159,7 @@ struct SubpackageBuilder {
     package: PackageBuilder,
     package_name: String,
     far_path: Utf8PathBuf,
+    repository: RepositoryUrl,
     gendir: Utf8PathBuf,
 }
 
@@ -163,15 +167,15 @@ impl SubpackageBuilder {
     /// Build and publish an update package or one of its subpackages. Returns a merkle-pinned
     /// fuchsia-pkg:// URL for the package with the hostname set to "fuchsia.com".
     fn build(self) -> Result<(PinnedAbsolutePackageUrl, PackageManifest)> {
-        let SubpackageBuilder { package: builder, package_name, far_path, gendir } = self;
+        let SubpackageBuilder { package: builder, package_name, far_path, repository, gendir } =
+            self;
 
         let manifest = builder
             .build(&gendir, &far_path)
             .with_context(|| format!("Failed to build the {package_name} package"))?;
 
         let url = PinnedAbsolutePackageUrl::new(
-            RepositoryUrl::parse_host("fuchsia.com".to_string())
-                .expect("valid host from static string"),
+            repository,
             manifest.package_path().name().clone(),
             Some(manifest.package_path().variant().clone()),
             manifest.hash(),
@@ -201,6 +205,8 @@ impl UpdatePackageBuilder {
             slot_recovery: None,
             packages: UpdatePackagesManifest::default(),
             abi_revision,
+            repository: RepositoryUrl::parse_host("fuchsia.com".to_string())
+                .expect("valid host from static string"),
             outdir: outdir.as_ref().to_path_buf(),
             gendir: outdir.as_ref().to_path_buf(),
         }
@@ -274,7 +280,18 @@ impl UpdatePackageBuilder {
         let far_path = self.outdir.join(format!("{package_name}.far"));
         let gendir = self.gendir.join(&package_name);
 
-        Ok(SubpackageBuilder { package: builder, package_name, far_path, gendir })
+        Ok(SubpackageBuilder {
+            package: builder,
+            package_name,
+            far_path,
+            repository: self.repository.clone(),
+            gendir,
+        })
+    }
+
+    /// Set a custom repository to use when building the images packages.
+    pub fn set_repository(&mut self, repository: RepositoryUrl) {
+        self.repository = repository;
     }
 
     /// Build the update package and associated update images packages.
@@ -470,6 +487,7 @@ mod tests {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
         }));
 
+        builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
         builder.build().unwrap();
 
         let file = File::open(outdir.join("images.json.orig")).unwrap();
@@ -486,14 +504,14 @@ mod tests {
                                 "size": 0,
                                 "slot": "fuchsia",
                                 "type": "zbi",
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
                             },
                     ],
                     "firmware":
                             [{
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
                                 "type": "tpl",
                             }],
 
@@ -526,7 +544,7 @@ mod tests {
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
             firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            images.json.orig=4c29cb325c36ede30f6a9b8eaea52ca967e476120294661455ab2f707fc0a119\n\
+            images.json.orig=e6c8327e0477561b2e1ee26ea881c47c7cff127b3242165ac0a689e5d22ee656\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
             zbi.signed=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
@@ -634,10 +652,11 @@ mod tests {
         }));
 
         // Build and ensure the output is correct.
+        builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
         let update_package = builder.build().unwrap();
         assert_eq!(
             update_package.merkle,
-            "51d6f1a674d4e7c80ac60d44aebe1a60c2d046a16b263d39bae57592f8ac0ad0".parse().unwrap()
+            "8af272283f1e7287aefda3c332ca8aacc77b407f0eabafc2b603a19640fd43ce".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
 
@@ -654,14 +673,14 @@ mod tests {
                                 "slot": "fuchsia",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
                             },
                             {
                                 "type": "zbi",
                                 "slot": "recovery",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#zbi",
 
                             },
 
@@ -670,7 +689,7 @@ mod tests {
                                 "slot": "recovery",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#vbmeta",
+                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#vbmeta",
 
                             },
 
@@ -680,7 +699,7 @@ mod tests {
                                 "type" : "tpl",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://fuchsia.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
                             },
                     ],
                 },
@@ -712,7 +731,7 @@ mod tests {
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
             firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            images.json.orig=02c9cbf70f9d07fba7265d3507a7cce0045c6b16e094f5cc10b7f661b16648df\n\
+            images.json.orig=7ba3dd799c26f18d02d79ef063d9aa34c14bdbf2cde4f934af07e2ec9b30d36d\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             recovery=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             recovery.vbmeta=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\

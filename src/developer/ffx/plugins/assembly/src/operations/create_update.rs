@@ -51,6 +51,12 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
         builder.set_name(name);
     }
 
+    // Use the provided repo for the update images packages if necessary.
+    if let Some(default_repo) = &args.rewrite_default_repo {
+        let default_repo = RepositoryUrl::parse_host(default_repo.clone())?;
+        builder.set_repository(default_repo);
+    }
+
     // Add the packages to update.
     if let Some(manifest) = &system_a_manifest {
         let mut packages = create_update_packages_manifest(manifest)?;
@@ -61,8 +67,8 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
         };
 
         // Rewrite all the package URLs to use this repo as the repository.
-        if let Some(default_repo) = args.rewrite_default_repo {
-            let default_repo = RepositoryUrl::parse_host(default_repo)?;
+        if let Some(default_repo) = &args.rewrite_default_repo {
+            let default_repo = RepositoryUrl::parse_host(default_repo.clone())?;
             packages.set_repository(default_repo);
         }
 
