@@ -498,12 +498,12 @@ static acpi::status<> pci_report_current_resources_device_cb(ACPI_HANDLE object,
  * Walks the ACPI namespace and use the reported current resources to inform
    the kernel PCI interface about what memory it shouldn't use.
  *
- * @param root_resource_handle The handle to pass to the kernel when talking
+ * @param mmio_resource_handle The handle to pass to the kernel when talking
  * to the PCI driver.
  *
  * @return ZX_OK on success
  */
-zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t root_resource_handle) {
+zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t mmio_resource_handle) {
   // First we search for resources to add, then we subtract out things that
   // are being consumed elsewhere.  This forces an ordering on the
   // operations so that it should be consistent, and should protect against
@@ -512,7 +512,7 @@ zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t root_reso
   // Walk the device tree and add to the PCIe IO ranges any resources
   // "produced" by the PCI root in the ACPI namespace.
   struct report_current_resources_ctx ctx = {
-      .pci_handle = root_resource_handle,
+      .pci_handle = mmio_resource_handle,
       .device_is_root_bridge = false,
       .add_pass = true,
   };
@@ -526,7 +526,7 @@ zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t root_reso
 
   // Removes resources we believe are in use by other parts of the platform
   ctx = (struct report_current_resources_ctx){
-      .pci_handle = root_resource_handle,
+      .pci_handle = mmio_resource_handle,
       .device_is_root_bridge = false,
       .add_pass = false,
   };
@@ -554,9 +554,8 @@ zx_status_t pci_init(zx_device_t* platform_bus, ACPI_HANDLE object,
                      acpi::UniquePtr<ACPI_DEVICE_INFO> info, acpi::Manager* manager,
                      std::vector<pci_bdf_t> acpi_bdfs) {
   // Report current resources to kernel PCI driver
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx_status_t status =
-      pci_report_current_resources(manager->acpi(), get_root_resource(platform_bus));
+      pci_report_current_resources(manager->acpi(), get_mmio_resource(platform_bus));
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: WARNING: ACPI failed to report all current resources!");
   }
