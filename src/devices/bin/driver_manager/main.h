@@ -23,9 +23,6 @@ zx::result<zx::resource> get_root_resource();
 // be present.
 zx::result<zx::resource> get_mexec_resource();
 
-int RunDfv1(driver_manager_config::Config config,
-            fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args);
-
 int RunDfv2(driver_manager_config::Config config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args);
 

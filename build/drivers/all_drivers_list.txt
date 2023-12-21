@@ -71,11 +71,6 @@
 //src/devices/bin/driver-index:fake-driver
 //src/devices/bin/driver-index:fake-driver2
 //src/devices/bin/driver-index:fake-fallback-driver
-//src/devices/bin/driver_host/tests:driver-host-restart-driver-driver
-//src/devices/bin/driver_host/tests:driver-host-test-child-driver-driver
-//src/devices/bin/driver_host/tests:driver-host-test-driver-driver
-//src/devices/bin/driver_host/tests:unit-test-fail-driver
-//src/devices/bin/driver_host/tests:unit-test-pass-driver
 //src/devices/bin/driver_host2:test_driver_driver
 //src/devices/bin/driver_host2:test_not_driver_driver
 //src/devices/block/drivers/ahci:ahci-driver
@@ -141,8 +136,6 @@
 //src/devices/i2c/drivers/aml-i2c:aml-i2c-dfv2-driver
 //src/devices/i2c/drivers/i2c:i2c-driver
 //src/devices/i2c/drivers/intel-i2c:intel-i2c-driver
-//src/devices/internal/drivers/fragment:fragment-driver
-//src/devices/internal/drivers/fragment:fragment.proxy-driver
 //src/devices/light-sensor/drivers/ams-light:ams-light-driver
 //src/devices/mcu/drivers/chromiumos-ec-core:driver
 //src/devices/mcu/drivers/chromiumos-ec-lpc:driver
@@ -200,8 +193,6 @@
 //src/devices/temperature/drivers/shtv3:shtv3-driver
 //src/devices/temperature/drivers/tmp112:tmp112-driver
 //src/devices/tests/autobind:driver
-//src/devices/tests/banjo-proxy:child-driver
-//src/devices/tests/banjo-proxy:parent-driver
 //src/devices/tests/bind-fail-test:fuchsia_driver
 //src/devices/tests/bindlib-codegen-test:child-driver-driver
 //src/devices/tests/bindlib-codegen-test:parent-driver-driver

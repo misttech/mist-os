@@ -884,7 +884,6 @@ config("Wno-conversion") {
     "//src/devices/bus/lib/virtio:*",
     "//src/devices/cpu/drivers/aml-cpu-legacy:*",
     "//src/devices/i2c/drivers/intel-i2c:*",
-    "//src/devices/internal/drivers/fragment:*",
     "//src/devices/lib/amlogic:*",
     "//src/devices/lib/fidl-metadata/test:*",
     "//src/devices/lib/goldfish/pipe_io:*",

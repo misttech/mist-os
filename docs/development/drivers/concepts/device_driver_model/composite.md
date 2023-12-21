@@ -258,7 +258,7 @@ initially shown:
 ![Figure: Composite hardware device using proxies](images/composite-proxy.png)
 
 The fragments are bound to an internal driver (located in the
-[//src/devices/internal/drivers/fragment][fragment] directory).
+fragment directory).
 
 The driver handles proxying across process boundaries if necessary.
 This proxying uses the `DEVICE_ADD_MUST_ISOLATE` mechanism (introduced
@@ -284,16 +284,11 @@ So, in order to implement a new protocol proxy, one must modify the
 messages to the normal device, and modify the `fragment.so` driver to
 service those messages appropriately.
 
-The fragment proxy is implemented in
-[/src/devices/internal/drivers/fragment/fragment-proxy.cc][fragment-proxy.cc], and
-the other half in
-[/src/devices/internal/drivers/fragment/fragment.cc][fragment.cc].
+The fragment proxy is implemented in fragment-proxy.cc, and
+the other half in fragment.cc.
 
 <!-- xrefs -->
 
-[fragment-proxy.cc]: /src/devices/internal/drivers/fragment/fragment-proxy.cc
-[fragment.cc]: /src/devices/internal/drivers/fragment/fragment.cc
-[fragment]: /src/devices/internal/drivers/fragment/
 [driver.h]: /src/lib/ddk/include/ddk/driver.h
 [isolate]: /docs/development/drivers/developer_guide/driver-development.md#isolate-devices
 

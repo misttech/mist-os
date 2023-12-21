@@ -24,7 +24,6 @@ declare_args() {
 }
 
 source_set("src") {
-  assert_no_deps = [ "//src/devices/bin/driver_host:driver" ]
   sources = [
     "address_manager.cc",
     "address_manager.h",

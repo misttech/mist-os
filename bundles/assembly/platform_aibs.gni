@@ -19,7 +19,6 @@ bootstrap_user_platform_aib_names = [
   "bootstrap",
 
   # Driver Framework
-  "driver_framework_v1",
   "driver_framework_v2",
 
   # Graphics

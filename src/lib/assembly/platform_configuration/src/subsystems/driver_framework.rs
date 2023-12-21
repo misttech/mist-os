@@ -15,15 +15,10 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         let mut disabled_drivers = driver_framework_config.disabled_drivers.clone();
-        let use_dfv2 = context.board_info.provides_feature("fuchsia::driver_framework_v2_support");
-        if use_dfv2 {
-            // TODO(http://fxbug.dev/102096): Remove this once DFv2 is enabled by default and there
-            // exists only one da7219 driver.
-            disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
-            builder.platform_bundle("driver_framework_v2");
-        } else {
-            builder.platform_bundle("driver_framework_v1");
-        }
+        // TODO(http://fxbug.dev/102096): Remove this once DFv2 is enabled by default and there
+        // exists only one da7219 driver.
+        disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
+        builder.platform_bundle("driver_framework_v2");
 
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
 
@@ -56,7 +51,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("delay_fallback_until_base_drivers_indexed", delay_fallback)?
             .field("suspend_timeout_fallback", true)?
             .field("verbose", false)?
-            .field("use_driver_framework_v2", use_dfv2)?
+            .field("use_driver_framework_v2", true)?
             .field("driver_host_crash_policy", format!("{driver_host_crash_policy}"))?
             .field("root_driver", "fuchsia-boot:///platform-bus#meta/platform-bus.cm")?
             .field(
