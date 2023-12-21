@@ -220,7 +220,7 @@ __NO_INLINE static void bench_cset() {
 }
 
 __NO_INLINE static void bench_cset_wide() {
-  uint32_t* buf = (uint32_t*)malloc(BUFSIZE);
+  uint64_t* buf = (uint64_t*)malloc(BUFSIZE);
   if (buf == nullptr) {
     TRACEF("error: malloc failed\n");
     return;
@@ -248,7 +248,7 @@ __NO_INLINE static void bench_cset_wide() {
 
   uint64_t bytes_cycle = (BUFSIZE * ITER * 1000ULL) / count;
   printf("took %" PRIu64
-         " cycles to clear a buffer of size %zu %zu times 8 words at a time "
+         " cycles to clear a buffer 64 bytes at a time of size %zu %zu times "
          "(%" PRIu64 " bytes), %" PRIu64 ".%03" PRIu64 " bytes/cycle\n",
          count, BUFSIZE, ITER, BUFSIZE * ITER, bytes_cycle / 1000, bytes_cycle % 1000);
 
