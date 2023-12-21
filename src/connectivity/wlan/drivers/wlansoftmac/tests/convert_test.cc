@@ -204,26 +204,6 @@ TEST_F(ConvertTest, ToFidlTxPacket) {
   free(data_in);
 }
 
-TEST_F(ConvertTest, ToFidlChannel) {
-  log::Instance::Init(0);
-  wlan_channel_t in = {
-      .primary = kFakeChannel,
-      .cbw = kFakeBanjoChannelBandwidth,
-      .secondary80 = kFakeChannel,
-  };
-
-  wlan_common::WlanChannel out;
-  EXPECT_EQ(ZX_OK, ConvertChannel(in, &out));
-
-  EXPECT_EQ(kFakeChannel, out.primary);
-  EXPECT_EQ(kFakeFidlChannelBandwidth, out.cbw);
-  EXPECT_EQ(kFakeChannel, out.secondary80);
-
-  // Assign an invalid value to cbw, and the conversion will fail.
-  in.cbw = kRandomPopulaterUint32;
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, ConvertChannel(in, &out));
-}
-
 TEST_F(ConvertTest, ToFidlKeyConfig) {
   log::Instance::Init(0);
   // Create tmp non-const key from const key.

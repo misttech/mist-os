@@ -276,12 +276,6 @@ zx_status_t ConvertTxPacket(const uint8_t* data_in, const size_t data_len_in,
   return ConvertTxInfo(info_in, &out->info);
 }
 
-zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::WlanChannel* out) {
-  out->primary = in.primary;
-  out->secondary80 = in.secondary80;
-  return ConvertChannelBandwidth(in.cbw, &out->cbw);
-}
-
 zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena) {
