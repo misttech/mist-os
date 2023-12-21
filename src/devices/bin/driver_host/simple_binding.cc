@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/misc/drivers/compat/simple_binding.h"
+#include "src/devices/bin/driver_host/simple_binding.h"
 
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/transaction.h>

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_COMPOSITE_NODE_SPEC_UTIL_H_
-#define SRC_DEVICES_MISC_DRIVERS_COMPAT_COMPOSITE_NODE_SPEC_UTIL_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/ddk/device.h>
@@ -165,4 +165,4 @@ zx::result<fuchsia_driver_framework::wire::ParentSpec> ConvertNodeRepresentation
   });
 }
 
-#endif  // SRC_DEVICES_MISC_DRIVERS_COMPAT_COMPOSITE_NODE_SPEC_UTIL_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_

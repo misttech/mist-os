@@ -2,9 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-shared_library("driver") {
-  sources = [ "api.cc" ]
-  deps = [ "//src/lib/ddk" ]
+group("driver") {
+  deps = [ "//src/devices/bin/driver_host:driver" ]
 
   #  ________  _________  ________  ________
   # |\   ____\|\___   ___\\   __  \|\   __  \
@@ -77,7 +76,7 @@ shared_library("driver") {
     "//src/developer/adb/drivers/usb-adb-function:*",
     "//src/devices/acpi/drivers/acpi-battery:*",
     "//src/devices/acpi/drivers/intel-thermal:*",
-    "//src/devices/bin/driver_manager:*",
+    "//src/devices/bin/driver_host/tests:*",
     "//src/devices/block/drivers/ahci:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/block/drivers/block-verity:*",
@@ -125,6 +124,8 @@ shared_library("driver") {
     "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/i2c/drivers/i2c:*",
     "//src/devices/i2c/drivers/intel-i2c:*",
+    "//src/devices/internal/drivers/fragment:*",
+    "//src/devices/internal/drivers/fragment:*",
     "//src/devices/lib:*",
     "//src/devices/lib/acpi:*",
     "//src/devices/lib/acpi/mock:*",

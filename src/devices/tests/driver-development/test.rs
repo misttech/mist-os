@@ -303,8 +303,178 @@ async fn test_get_driver_info_not_found_filter_dfv2() -> Result<()> {
     Ok(())
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-#[ignore]
+// GetDeviceInfo tests
+// DFv1
+#[fasync::run_singlethreaded(test)]
+async fn test_get_device_info_no_filter_dfv1() -> Result<()> {
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
+
+    let device_nodes = test_utils::create_device_topology(device_infos);
+    assert_eq!(device_nodes.len(), 1);
+
+    let root_sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(root_sys_test_info)) = &root_sys_test.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(
+        root_sys_test_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test"
+    );
+
+    assert_eq!(
+        root_sys_test_info
+            .bound_driver_libname
+            .as_ref()
+            .expect("DFv1 driver missing bound driver libname"),
+        PARENT_DRIVER_URL
+    );
+    assert_eq!(root_sys_test.num_children, 1);
+    assert_eq!(root_sys_test.child_nodes.len(), 1);
+
+    let sample_driver = &root_sys_test.child_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test/sample_driver"
+    );
+    assert_eq!(
+        sample_driver_info
+            .bound_driver_libname
+            .as_ref()
+            .expect("DFv1 driver missing bound driver libname"),
+        SAMPLE_DRIVER_URL
+    );
+    assert_eq!(sample_driver.num_children, 0);
+    assert!(sample_driver.child_nodes.is_empty());
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_get_device_info_with_filter_dfv1() -> Result<()> {
+    const DEVICE_FILTER: [&str; 1] = ["/dev/sys/test"];
+
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let device_infos =
+        get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
+
+    let device_nodes = test_utils::create_device_topology(device_infos);
+    assert_eq!(device_nodes.len(), 1);
+
+    let sys_test = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sys_test_info)) = &sys_test.info.versioned_info else {
+        panic!("wrong info type");
+    };
+    assert_eq!(
+        sys_test_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test"
+    );
+    assert_eq!(
+        sys_test_info
+            .bound_driver_libname
+            .as_ref()
+            .expect("DFv1 driver missing bound driver libname"),
+        PARENT_DRIVER_URL
+    );
+    assert_eq!(sys_test.num_children, 1);
+    assert!(sys_test.child_nodes.is_empty());
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_get_device_info_with_duplicate_filter_dfv1() -> Result<()> {
+    const DEVICE_FILTER: [&str; 2] = ["/dev/sys/test/sample_driver", "/dev/sys/test/sample_driver"];
+
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let device_infos =
+        get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
+
+    let device_nodes = test_utils::create_device_topology(device_infos);
+    assert_eq!(device_nodes.len(), 2);
+
+    let sample_driver = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test/sample_driver"
+    );
+    assert_eq!(
+        sample_driver_info
+            .bound_driver_libname
+            .as_ref()
+            .expect("DFv1 driver missing bound driver libname"),
+        SAMPLE_DRIVER_URL
+    );
+    assert!(sample_driver.child_nodes.is_empty());
+
+    let sample_driver = &device_nodes[1];
+    let Some(fdd::VersionedNodeInfo::V1(sample_driver_info)) = &sample_driver.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+
+    assert_eq!(
+        sample_driver_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test/sample_driver"
+    );
+    assert_eq!(
+        sample_driver_info
+            .bound_driver_libname
+            .as_ref()
+            .expect("DFv1 driver missing bound driver libname"),
+        SAMPLE_DRIVER_URL
+    );
+    assert_eq!(sample_driver.num_children, 0);
+    assert!(sample_driver.child_nodes.is_empty());
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_get_device_info_with_partial_filter_dfv1() -> Result<()> {
+    const DEVICE_FILTER: [&str; 1] = ["/dev/sys/test/sample"];
+
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let device_infos =
+        get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ false).await?;
+    assert_eq!(device_infos.len(), 1);
+
+    let device_nodes = test_utils::create_device_topology(device_infos);
+    assert_eq!(device_nodes.len(), 1);
+
+    let matched_node = &device_nodes[0];
+    let Some(fdd::VersionedNodeInfo::V1(matched_node_info)) = &matched_node.info.versioned_info
+    else {
+        panic!("wrong info type");
+    };
+    assert_eq!(
+        matched_node_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
+        "/dev/sys/test/sample_driver"
+    );
+
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_get_device_info_not_found_filter_dfv1() -> Result<()> {
+    const DEVICE_FILTER: [&str; 1] = ["foo"];
+
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let device_infos =
+        get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
+    assert_eq!(device_infos.len(), 0);
+    Ok(())
+}
+
 #[fasync::run_singlethreaded(test)]
 async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["sample"];
@@ -474,6 +644,15 @@ async fn test_get_device_info_not_found_filter_dfv2() -> Result<()> {
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
     assert!(device_infos.is_empty());
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_is_dfv2_in_dfv1() -> Result<()> {
+    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let is_dfv2 =
+        driver_dev.is_dfv2().await.context("FIDL call to check if DFv2 is enabled failed")?;
+    assert!(!is_dfv2);
     Ok(())
 }
 

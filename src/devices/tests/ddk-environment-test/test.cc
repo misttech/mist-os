@@ -39,8 +39,7 @@ class EnvironmentTest : public zxtest::Test {
   IsolatedDevmgr devmgr_;
 };
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(EnvironmentTest, DISABLED_GetServiceList) {
+TEST_F(EnvironmentTest, GetServiceList) {
   const fidl::WireResult result = client_->GetServiceList();
   ASSERT_OK(result.status());
   const fidl::WireResponse response = result.value();

@@ -1,0 +1,9 @@
+{
+    "short_description": "Driver Framework fragment driver",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}

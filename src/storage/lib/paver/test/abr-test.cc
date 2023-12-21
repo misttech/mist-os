@@ -145,10 +145,6 @@ class CurrentSlotUuidTest : public zxtest::Test {
         fidl::WireCall(disk_->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
     ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
     ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
-
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                   "sys/platform/00:00:2d/ramctl/ramdisk-0/block/part-000/block")
-                  .status_value());
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }

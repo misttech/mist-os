@@ -182,11 +182,9 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
   fuchsia_hardware_network::wire::PortId port_id_;
 };
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbAx88179Test, DISABLED_SetupShutdownTest) { ASSERT_NO_FATAL_FAILURE(); }
+TEST_F(UsbAx88179Test, SetupShutdownTest) { ASSERT_NO_FATAL_FAILURE(); }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbAx88179Test, DISABLED_OfflineByDefault) {
+TEST_F(UsbAx88179Test, OfflineByDefault) {
   ASSERT_NO_FATAL_FAILURE(ConnectNetdeviceClient());
 
   ASSERT_NO_FATAL_FAILURE(StartDevice());
@@ -196,8 +194,7 @@ TEST_F(UsbAx88179Test, DISABLED_OfflineByDefault) {
   ASSERT_FALSE(online.value());
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbAx88179Test, DISABLED_SetOnlineAfterStart) {
+TEST_F(UsbAx88179Test, SetOnlineAfterStart) {
   ASSERT_NO_FATAL_FAILURE(ConnectNetdeviceClient());
 
   ASSERT_NO_FATAL_FAILURE(StartDevice());
@@ -208,8 +205,7 @@ TEST_F(UsbAx88179Test, DISABLED_SetOnlineAfterStart) {
 }
 
 // This is for https://fxbug.dev/40786#c41.
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbAx88179Test, DISABLED_SetOnlineBeforeStart) {
+TEST_F(UsbAx88179Test, SetOnlineBeforeStart) {
   ASSERT_NO_FATAL_FAILURE(ConnectNetdeviceClient());
 
   ASSERT_NO_FATAL_FAILURE(SetDeviceOnline());

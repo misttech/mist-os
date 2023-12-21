@@ -53,13 +53,6 @@ fuchsia_unittest_package("hci-emulator-client-tests") {
     "//src/connectivity/bluetooth/hci/virtual:driver",
     "//src/devices/bus/drivers/platform",
   ]
-
-  test_specs = {
-    log_settings = {
-      # Spurious error logs expected during driver shutdown as it races with bind.
-      max_severity = "ERROR"
-    }
-  }
 }
 
 group("tests") {

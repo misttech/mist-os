@@ -117,8 +117,7 @@ void VirtualBusTest::InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusT
                 ZX_ERR_STOP);
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(VirtualBusTest, DISABLED_ShortTransfer) {
+TEST_F(VirtualBusTest, ShortTransfer) {
   ASSERT_TRUE(test_->RunShortPacketTest().value().success);
   ASSERT_NO_FATAL_FAILURE();
 }

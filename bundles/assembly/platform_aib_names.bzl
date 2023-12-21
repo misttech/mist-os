@@ -12,6 +12,7 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "zircon",
     "bootstrap",
+    "driver_framework_v1",
     "driver_framework_v2",
     "empty_live_usb",
     "emulator_support",

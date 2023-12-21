@@ -20,6 +20,7 @@ group("driver_test_realm") {
     "//src/devices/bin/driver-index:boot-driver-manifest",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver-index:test_config",
+    "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_host2:component",
   ]
 }
@@ -37,6 +38,7 @@ group("realm_builder_version") {
     "//src/devices/bin/driver-index:boot-driver-manifest",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver-index:test_config",
+    "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_host2:component",
   ]
 }

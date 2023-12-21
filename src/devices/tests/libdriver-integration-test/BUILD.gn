@@ -49,6 +49,8 @@ test("tests") {
 fuchsia_unittest_package("libdriver-integration-test") {
   deps = [
     ":tests",
+    "//src/devices/internal/drivers/fragment",
+    "//src/devices/internal/drivers/fragment:fragment.proxy",
     "//src/devices/misc/drivers/test",
     "//src/devices/tests/mock-device",
     "//src/devices/tests/sysdev",

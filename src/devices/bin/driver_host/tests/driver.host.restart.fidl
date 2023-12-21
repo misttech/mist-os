@@ -1,0 +1,14 @@
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.device.restarttest;
+
+using zx;
+
+/// Interface for communication between tests and the test device.
+closed protocol TestDevice {
+    /// Get the pid of the driver.
+    strict GetPid() -> (struct {
+        pid zx.Koid;
+    }) error zx.Status;
+};

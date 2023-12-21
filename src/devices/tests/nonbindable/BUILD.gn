@@ -54,6 +54,7 @@ test("nonbindable-test") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm",
+    "//src/devices/internal/drivers/fragment",
     "//src/devices/misc/drivers/test-parent",
     "//src/lib/fxl/test:gtest_main",
   ]

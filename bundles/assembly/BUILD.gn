@@ -1819,6 +1819,15 @@ assembly_input_bundle("diagnostics_triage_detect_mali") {
   config_data_labels = [ "//src/diagnostics/config/triage:mali-detect" ]
 }
 
+# Driver Framework V1 support
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("driver_framework_v1") {
+  bootfs_packages = [ "//src/devices/bin/driver_manager:dfv1_package" ]
+}
+
 # Driver Framework V2 support
 #
 # feature_set_levels: minimal

@@ -6,8 +6,7 @@
 
 #include <gtest/gtest.h>
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST(SimpleDriverTestRealmTest, DISABLED_DriversExist) {
+TEST(SimpleDriverTestRealmTest, DriversExist) {
   ASSERT_EQ(device_watcher::RecursiveWaitForFile("/dev/sys/test/root").status_value(), ZX_OK);
   ASSERT_EQ(device_watcher::RecursiveWaitForFile("/dev/sys/test/leaf").status_value(), ZX_OK);
   ASSERT_EQ(

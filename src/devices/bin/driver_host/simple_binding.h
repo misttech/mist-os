@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_SIMPLE_BINDING_H_
-#define SRC_DEVICES_MISC_DRIVERS_COMPAT_SIMPLE_BINDING_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_SIMPLE_BINDING_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_SIMPLE_BINDING_H_
 
 #include <lib/async/wait.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -94,4 +94,4 @@ zx_status_t BeginWait(std::unique_ptr<SimpleBinding>* unique_binding);
 
 }  // namespace devfs
 
-#endif  // SRC_DEVICES_MISC_DRIVERS_COMPAT_SIMPLE_BINDING_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_SIMPLE_BINDING_H_

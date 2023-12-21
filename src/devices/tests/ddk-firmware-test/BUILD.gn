@@ -106,6 +106,7 @@ fuchsia_test_package("ddk-firmware-test-package") {
     "//src/devices/bin/driver-index:boot-driver-manifest",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver-index:test_config",
+    "//src/devices/bin/driver_host:driver_host",
     "//src/devices/misc/drivers/test-parent",
   ]
 }

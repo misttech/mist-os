@@ -360,8 +360,7 @@ void TransmitAndReceive(NetworkDeviceInterface& a, NetworkDeviceInterface& b,
   }
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbCdcEcmTest, DISABLED_TransmitReceive) {
+TEST_F(UsbCdcEcmTest, TransmitReceive) {
   fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
   NetworkDeviceInterface peripheral(caller.directory(), peripheral_path_,
                                     "usb-cdc-function-peripheral");

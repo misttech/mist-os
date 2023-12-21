@@ -28,6 +28,7 @@ test("fidl-bindlib-generation-test") {
     "parent-driver",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/simple",
+    "//src/devices/internal/drivers/fragment",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

@@ -1,0 +1,9 @@
+{
+    "short_description": "Driver Framework fragment proxy driver",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}
