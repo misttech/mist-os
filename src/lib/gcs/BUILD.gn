@@ -41,6 +41,7 @@ rustc_library("lib") {
     "src/auth/pkce.rs",
     "src/client.rs",
     "src/error.rs",
+    "src/exponential_backoff.rs",
     "src/gs_url.rs",
     "src/lib.rs",
     "src/mock_https_client.rs",

@@ -5,16 +5,15 @@
 //! Provide Google Cloud Storage (GCS) access.
 
 use {
-    crate::error::GcsError,
-    anyhow::{bail, Context, Error, Result},
+    crate::{error::GcsError, exponential_backoff::default_backoff_strategy},
+    anyhow::{bail, Context, Result},
     async_lock::Mutex,
-    fuchsia_backoff::{retry_or_last_error, Backoff},
+    fuchsia_backoff::retry_or_last_error,
     fuchsia_hyper::HttpsClient,
     http::{request, StatusCode},
     hyper::{self, Body, Method, Request, Response},
-    rand::{rngs::StdRng, Rng, SeedableRng},
     serde_json,
-    std::{cmp, fmt, string::String, time::Duration},
+    std::{fmt, string::String},
     url::Url,
 };
 
@@ -172,68 +171,18 @@ impl TokenStore {
         https_client: &HttpsClient,
         url: Url,
     ) -> Result<Response<Body>> {
-        struct ExponentialBackoff {
-            rng: StdRng,
-            backoff_base: u64,
-            backoff_budget: u64,
-            transient_errors: u32,
-        }
-
-        // Exponential backoff impl with backoff time budget and FullJitter:
-        // https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-        impl Backoff<Error> for ExponentialBackoff {
-            fn next_backoff(&mut self, err: &Error) -> Option<Duration> {
-                // Handle transient errors.
-                if err.is::<hyper::Error>()
-                    || matches!(
-                        err.downcast_ref::<GcsError>(),
-                        Some(GcsError::HttpTransientError(_))
-                    )
-                {
-                    self.transient_errors += 1;
-                    if self.backoff_budget > 0 {
-                        let backoff_time = cmp::min(
-                            self.rng.gen_range(0..self.backoff_base.pow(self.transient_errors)),
-                            self.backoff_budget,
-                        );
-
-                        self.backoff_budget -= backoff_time;
-                        return Some(Duration::from_millis(backoff_time));
-                    } else {
-                        eprintln!(
-                            "A network request failed after {} attempts.",
-                            self.transient_errors
-                        );
-                    }
-                }
-                // Ignore non-transient errors (eg: NeedNewAccessToken or
-                // non-transient [GcsError]s).
-                None
+        retry_or_last_error(default_backoff_strategy(), || async {
+            let result =
+                self.send_request(https_client, url.clone()).await.context("send_request")?;
+            let status = result.status();
+            // Retry on http errors 408 | 429 | 500..=599.
+            if matches!(status, StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_MANY_REQUESTS)
+                || status.is_server_error()
+            {
+                bail!(GcsError::HttpTransientError(result.status()))
             }
-        }
-
-        retry_or_last_error(
-            // Keep retrying up to a 5 second cumulative backoff. Given these
-            // constants, we'll expect to handle up to ~6 transient failures.
-            ExponentialBackoff {
-                rng: StdRng::from_entropy(),
-                backoff_base: 4,
-                backoff_budget: 5000,
-                transient_errors: 0,
-            },
-            || async {
-                let result =
-                    self.send_request(https_client, url.clone()).await.context("send_request")?;
-                let status = result.status();
-                // Retry on http errors 408 | 429 | 500..=599.
-                if matches!(status, StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_MANY_REQUESTS)
-                    || status.is_server_error()
-                {
-                    bail!(GcsError::HttpTransientError(result.status()))
-                }
-                Ok(result)
-            },
-        )
+            Ok(result)
+        })
         .await
         .context("send_request with retries")
     }

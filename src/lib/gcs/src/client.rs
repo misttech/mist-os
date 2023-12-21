@@ -5,8 +5,9 @@
 //! Download blob data from Google Cloud Storage (GCS).
 
 use {
-    crate::token_store::TokenStore,
+    crate::{exponential_backoff::default_backoff_strategy, token_store::TokenStore},
     anyhow::{bail, Context, Result},
+    fuchsia_backoff::retry_or_last_error,
     fuchsia_hyper::{new_https_client, HttpsClient},
     hyper::{body::HttpBody as _, header::CONTENT_LENGTH, Body, Response, StatusCode},
     std::{
@@ -169,23 +170,23 @@ impl Client {
                     create_dir_all(&parent)
                         .with_context(|| format!("creating dir all for {:?}", parent))?;
                 }
-                let mut file = File::create(&output_path).context("create file")?;
                 let url = format!("gs://{}/", bucket);
                 count += 1;
                 let dir_progress =
                     ProgressState { name: &url, at: count, of: total, units: "files" };
-                self.write(bucket, &object, &mut file, &|file_progress| {
+                self.fetch_with_progress(bucket, &object, &output_path, &|fetch_progress| {
                     assert!(
-                        file_progress.at <= file_progress.of,
+                        fetch_progress.at <= fetch_progress.of,
                         "At {} of {}",
-                        file_progress.at,
-                        file_progress.of
+                        fetch_progress.at,
+                        fetch_progress.of
                     );
-                    progress(dir_progress.clone(), file_progress)
+                    progress(dir_progress.clone(), fetch_progress)
                 })
                 .await
                 .context("write object")?;
                 use std::io::{Seek, SeekFrom};
+                let mut file = File::open(&output_path).context("open file")?;
                 let file_size = file.seek(SeekFrom::End(0)).context("getting file size")?;
                 tracing::debug!(
                     "Wrote gs://{}/{} to {:?}, {} bytes in {} seconds.",
@@ -200,9 +201,13 @@ impl Client {
         Ok(())
     }
 
-    /// Save content of a stored object (blob) from GCS at location `output`.
+    /// Save content of a stored object (blob) from GCS at location `output`,
+    /// retrying in the case of common transient errors
+    /// (eg: "connection reset by peer").
     ///
     /// Wraps call to `self.write` which wraps `self.stream()`.
+    ///
+    /// See https://cloud.google.com/storage/docs/retry-strategy.
     pub async fn fetch_with_progress<P, F>(
         &self,
         bucket: &str,
@@ -214,8 +219,12 @@ impl Client {
         P: AsRef<Path>,
         F: Fn(ProgressState<'_>) -> ProgressResult,
     {
-        let mut file = File::create(output.as_ref())?;
-        self.write(bucket, object, &mut file, progress).await
+        retry_or_last_error(default_backoff_strategy(), || async {
+            let mut file = File::create(output.as_ref()).context("create file")?;
+            self.write(bucket, object, &mut file, progress).await.context("write")
+        })
+        .await
+        .context("write with retries")
     }
 
     /// As `fetch_with_progress()` without a progress callback.
@@ -228,8 +237,8 @@ impl Client {
     where
         P: AsRef<Path>,
     {
-        let mut file = File::create(output.as_ref())?;
-        self.write(bucket, object, &mut file, &|_| Ok(ProgressResponse::Continue)).await?;
+        self.fetch_with_progress(bucket, object, output, &|_| Ok(ProgressResponse::Continue))
+            .await?;
         Ok(())
     }
 
@@ -239,6 +248,9 @@ impl Client {
     }
 
     /// Write content of a stored object (blob) from GCS to writer.
+    ///
+    /// Callers are expected to handle transient network errors and retry the
+    /// function call accordingly (eg: "connection reset by peer").
     ///
     /// Wraps call to `self.stream`.
     pub async fn write<W, F>(
