@@ -11,6 +11,7 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
@@ -93,6 +94,22 @@ HotPlugDetection::~HotPlugDetection() {
     zx_status_t status = thrd_status_to_zx_status(thrd_join(*hpd_thread_, nullptr));
     if (status != ZX_OK) {
       zxlogf(ERROR, "GPIO interrupt thread join failed: %s", zx_status_get_string(status));
+    }
+  }
+
+  // After the interrupt handler thread is joined, the interrupt is unused
+  // and we can safely release the interrupt.
+  if (pin_gpio_.is_valid()) {
+    fidl::WireResult release_result = pin_gpio_->ReleaseInterrupt();
+    if (!release_result.ok()) {
+      zxlogf(ERROR, "Failed to connect to GPIO FIDL protocol: %s", release_result.status_string());
+    } else {
+      fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& release_response =
+          release_result.value();
+      if (release_response.is_error()) {
+        zxlogf(ERROR, "Failed to release GPIO interrupt: %s",
+               zx_status_get_string(release_response.error_value()));
+      }
     }
   }
 }

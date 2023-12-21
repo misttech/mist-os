@@ -14,6 +14,7 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <memory>
 #include <optional>
 
 #include <fbl/auto_lock.h>
@@ -35,18 +36,7 @@ struct GpioResources {
 
 class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
  public:
-  void SetUp() override {
-    zx_status_t status =
-        zx::interrupt::create(zx::resource(), 0u, ZX_INTERRUPT_VIRTUAL, &pin_gpio_interrupt_);
-    ASSERT_OK(status);
-
-    zx::interrupt gpio_interrupt;
-    status = pin_gpio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &gpio_interrupt);
-    ASSERT_OK(status);
-
-    pin_gpio_.SetInterrupt(zx::ok(std::move(gpio_interrupt)));
-    pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{0u}));
-  }
+  void SetUp() override { pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{0u})); }
 
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> GetPinGpioClient() { return pin_gpio_.Connect(); }
 
@@ -70,6 +60,11 @@ class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
   }
 
   std::unique_ptr<HotPlugDetection> CreateAndInitHotPlugDetection() {
+    // The existing pin GPIO interrupt may be invalid or have been destroyed
+    // and cannot be used; we need to create a new virtual interrupt for each
+    // new HotPlugDetection created.
+    ResetPinGpioInterrupt();
+
     GpioResources pin_gpio_resources = GetPinGpioResources();
     auto hpd = std::make_unique<HotPlugDetection>(
         std::move(pin_gpio_resources.client), std::move(pin_gpio_resources.interrupt),
@@ -82,6 +77,25 @@ class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
     EXPECT_OK(init_result.status_value());
 
     return hpd;
+  }
+
+  void DestroyHotPlugDetection(std::unique_ptr<HotPlugDetection>& hpd) {
+    // HotPlugDetection::~HotPlugDetection() releases the GPIO interrupt using
+    // synchronous FIDL calls, so it must run on a separate thread while the
+    // test loop handles GPIO FIDL calls.
+    PerformBlockingWork([&] { hpd.reset(); });
+  }
+
+  void ResetPinGpioInterrupt() {
+    zx_status_t status =
+        zx::interrupt::create(zx::resource(), 0u, ZX_INTERRUPT_VIRTUAL, &pin_gpio_interrupt_);
+    ASSERT_OK(status);
+
+    zx::interrupt gpio_interrupt;
+    status = pin_gpio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &gpio_interrupt);
+    ASSERT_OK(status);
+
+    pin_gpio_.SetInterrupt(zx::ok(std::move(gpio_interrupt)));
   }
 
   void RecordHotPlugDetectionState(HotPlugDetectionState state) {
@@ -104,6 +118,7 @@ class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
 
 TEST_F(HotPlugDetectionTest, NoHotplugEvents) {
   std::unique_ptr<HotPlugDetection> hpd = CreateAndInitHotPlugDetection();
+  DestroyHotPlugDetection(hpd);
 }
 
 TEST_F(HotPlugDetectionTest, DisplayPlug) {
@@ -115,6 +130,8 @@ TEST_F(HotPlugDetectionTest, DisplayPlug) {
   RunLoopUntil([&] { return GetHotPlugDetectionStates().size() >= 1; });
   EXPECT_THAT(GetHotPlugDetectionStates(), testing::ElementsAre(HotPlugDetectionState::kDetected));
   EXPECT_EQ(pin_gpio_.GetPolarity(), fuchsia_hardware_gpio::GpioPolarity::kLow);
+
+  DestroyHotPlugDetection(hpd);
 }
 
 TEST_F(HotPlugDetectionTest, DisplayPlugUnplug) {
@@ -135,6 +152,8 @@ TEST_F(HotPlugDetectionTest, DisplayPlugUnplug) {
       testing::ElementsAre(HotPlugDetectionState::kDetected, HotPlugDetectionState::kNotDetected));
 
   EXPECT_EQ(pin_gpio_.GetPolarity(), fuchsia_hardware_gpio::GpioPolarity::kHigh);
+
+  DestroyHotPlugDetection(hpd);
 }
 
 TEST_F(HotPlugDetectionTest, SpuriousPlugInterrupt) {
@@ -157,6 +176,8 @@ TEST_F(HotPlugDetectionTest, SpuriousPlugInterrupt) {
   EXPECT_EQ(num_state_changes_after_hotplug_gpio_read, num_state_changes_before_hotplug_gpio_read);
 
   EXPECT_THAT(GetHotPlugDetectionStates(), testing::IsEmpty());
+
+  DestroyHotPlugDetection(hpd);
 }
 
 TEST_F(HotPlugDetectionTest, SpuriousUnplugInterrupt) {
@@ -193,6 +214,40 @@ TEST_F(HotPlugDetectionTest, SpuriousUnplugInterrupt) {
   // GPIO reading doesn't change.
   EXPECT_EQ(num_state_changes_after_second_hotplug_gpio_read,
             num_state_changes_before_second_hotplug_gpio_read);
+
+  DestroyHotPlugDetection(hpd);
+}
+
+TEST_F(HotPlugDetectionTest, MultipleHotPlugDetectionInstances) {
+  std::unique_ptr<HotPlugDetection> hpd1 = CreateAndInitHotPlugDetection();
+
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{1u}));
+  RunLoopUntil([&] { return GetHotPlugDetectionStates().size() >= 1; });
+
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{0u}));
+  RunLoopUntil([&] { return GetHotPlugDetectionStates().size() >= 2; });
+
+  EXPECT_THAT(
+      GetHotPlugDetectionStates(),
+      testing::ElementsAre(HotPlugDetectionState::kDetected, HotPlugDetectionState::kNotDetected));
+  DestroyHotPlugDetection(hpd1);
+
+  std::unique_ptr<HotPlugDetection> hpd2 = CreateAndInitHotPlugDetection();
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{1u}));
+  RunLoopUntil([&] { return GetHotPlugDetectionStates().size() >= 3; });
+
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{0u}));
+  RunLoopUntil([&] { return GetHotPlugDetectionStates().size() >= 4; });
+
+  EXPECT_THAT(
+      GetHotPlugDetectionStates(),
+      testing::ElementsAre(HotPlugDetectionState::kDetected, HotPlugDetectionState::kNotDetected,
+                           HotPlugDetectionState::kDetected, HotPlugDetectionState::kNotDetected));
+  DestroyHotPlugDetection(hpd2);
 }
 
 }  // namespace
