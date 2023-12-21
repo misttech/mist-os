@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{task::CurrentTask, vfs::OutputBuffer};
+use crate::{
+    task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter},
+    vfs::{FdEvents, OutputBuffer},
+};
 use diagnostics_data::{Data, Logs, Severity};
-use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, SinkExt, StreamExt};
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
-use starnix_logging::not_implemented;
 use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{CAP_SYSLOG, CAP_SYS_ADMIN},
-    errors::{errno, error, Errno},
+    errors::{errno, error, Errno, EAGAIN},
 };
 use std::{
     cmp,
     collections::VecDeque,
     io::{self, Write},
+    sync::{mpsc, Arc},
     time::Duration,
 };
 
@@ -34,7 +34,7 @@ pub struct Syslog {
 
 impl Syslog {
     pub fn init(&self, system_task: &CurrentTask) -> Result<(), anyhow::Error> {
-        let subscription = LogSubscription::snapshot_then_subscribe(system_task, false)?;
+        let subscription = LogSubscription::snapshot_then_subscribe(system_task)?;
         self.syscall_subscription.set(Mutex::new(subscription)).expect("syslog.set called once");
         Ok(())
     }
@@ -45,7 +45,7 @@ impl Syslog {
         out: &mut dyn OutputBuffer,
     ) -> Result<i32, Errno> {
         Self::check_credentials(&current_task)?;
-        let mut subscription = self.syscall_subscription.get().expect("syslog initialized").lock();
+        let mut subscription = self.subscription()?.lock();
         if let Some(log) = subscription.try_next()? {
             let size_to_write = cmp::min(log.len(), out.available() as usize);
             out.write(&log[..size_to_write])?;
@@ -53,8 +53,51 @@ impl Syslog {
         }
         Ok(0)
     }
+    pub fn wait(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Result<WaitCanceler, Errno> {
+        Ok(self.subscription()?.lock().wait(waiter, events, handler))
+    }
 
-    pub fn read_all(&self, out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
+    pub fn blocking_read(
+        &self,
+        current_task: &CurrentTask,
+        out: &mut dyn OutputBuffer,
+    ) -> Result<i32, Errno> {
+        Self::check_credentials(&current_task)?;
+        let mut subscription = self.subscription()?.lock();
+        let mut write_log = |log: Vec<u8>| {
+            let size_to_write = cmp::min(log.len(), out.available() as usize);
+            out.write(&log[..size_to_write])?;
+            Ok(size_to_write as i32)
+        };
+        match subscription.try_next() {
+            Err(errno) if errno == EAGAIN => {}
+            Err(errno) => return Err(errno),
+            Ok(Some(log)) => return write_log(log),
+            Ok(None) => return Ok(0),
+        }
+        let waiter = Waiter::new();
+        loop {
+            let _w = subscription.wait(
+                &waiter,
+                FdEvents::POLLIN | FdEvents::POLLHUP,
+                WaitCallback::none(),
+            );
+            match subscription.try_next() {
+                Err(errno) if errno == EAGAIN => {}
+                Err(errno) => return Err(errno),
+                Ok(Some(log)) => return write_log(log),
+                Ok(None) => return Ok(0),
+            }
+            waiter.wait_until(current_task, zx::Time::INFINITE)?;
+        }
+    }
+
+    pub fn read_all(out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
         let mut subscription = LogSubscription::snapshot()?;
         let mut buffer = ResultBuffer::new(out.available());
         while let Some(log_result) = subscription.next() {
@@ -67,21 +110,21 @@ impl Syslog {
 
     pub fn size_unread(&self, current_task: &CurrentTask) -> Result<i32, Errno> {
         Self::check_credentials(&current_task)?;
-        not_implemented!("syslog: size_unread");
-        Ok(0)
+        let mut subscription = self.subscription()?.lock();
+        Ok(subscription.available()?.try_into().unwrap_or(std::i32::MAX))
     }
 
-    pub fn size_buffer(&self) -> Result<i32, Errno> {
+    pub fn size_buffer() -> Result<i32, Errno> {
         // For now always return a constant for this.
         Ok(BUFFER_SIZE)
     }
 
-    pub fn snapshot_then_subscribe(
-        &self,
-        current_task: &CurrentTask,
-        non_blocking: bool,
-    ) -> Result<LogSubscription, Errno> {
-        LogSubscription::snapshot_then_subscribe(current_task, non_blocking)
+    pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
+        LogSubscription::snapshot_then_subscribe(current_task)
+    }
+
+    fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
+        self.syscall_subscription.get().ok_or(errno!(ENOENT))
     }
 
     fn check_credentials(current_task: &CurrentTask) -> Result<(), Errno> {
@@ -94,12 +137,10 @@ impl Syslog {
 }
 
 #[derive(Debug)]
-pub enum LogSubscription {
-    Blocking {
-        iterator: fdiagnostics::BatchIteratorSynchronousProxy,
-        pending: VecDeque<Data<Logs>>,
-    },
-    NonBlocking(mpsc::Receiver<Result<Vec<u8>, Errno>>),
+pub struct LogSubscription {
+    pending: Option<Vec<u8>>,
+    receiver: mpsc::Receiver<Result<Vec<u8>, Errno>>,
+    waiters: Arc<WaitQueue>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,45 +151,75 @@ enum OneOrMany<T> {
 }
 
 impl LogSubscription {
-    fn snapshot() -> Result<Self, Errno> {
-        Self::blocking(fdiagnostics::StreamMode::Snapshot)
+    pub fn wait(&self, waiter: &Waiter, events: FdEvents, handler: EventHandler) -> WaitCanceler {
+        self.waiters.wait_async_fd_events(waiter, events, handler)
     }
 
-    fn snapshot_then_subscribe(
-        current_task: &CurrentTask,
-        non_blocking: bool,
-    ) -> Result<Self, Errno> {
-        if non_blocking {
-            let (mut snd, rcv) = mpsc::channel(1);
-            current_task.kernel().kthreads.spawner().spawn(move |_, _| {
-                let mut executor = fasync::LocalExecutor::new();
-                executor.run_singlethreaded(async {
-                    let reader = ArchiveReader::new();
-                    let (mut logs, _) =
-                        reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
-                    while let Some(data) = logs.next().await {
-                        if snd.is_closed() {
-                            return;
-                        }
-                        match format_log(data) {
-                            Ok(Some(log)) => {
-                                let _ = snd.send(Ok(log)).await;
-                            }
-                            Err(_err) => {
-                                let _ = snd.send(Err(errno!(EIO))).await;
-                            }
-                            Ok(None) => {}
-                        }
-                    }
-                });
-            });
-            Ok(Self::NonBlocking(rcv))
-        } else {
-            Self::blocking(fdiagnostics::StreamMode::SnapshotThenSubscribe)
+    pub fn available(&mut self) -> Result<usize, Errno> {
+        if let Some(log) = &self.pending {
+            return Ok(log.len());
+        }
+        match self.try_next() {
+            Err(err) if err == EAGAIN => Ok(0),
+            Err(err) => Err(err),
+            Ok(Some(log)) => {
+                let size = log.len();
+                self.pending.replace(log);
+                return Ok(size);
+            }
+            Ok(None) => Ok(0),
         }
     }
 
-    fn blocking(mode: fdiagnostics::StreamMode) -> Result<Self, Errno> {
+    fn snapshot() -> Result<LogIterator, Errno> {
+        LogIterator::new(fdiagnostics::StreamMode::Snapshot)
+    }
+
+    fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<Self, Errno> {
+        let iterator = LogIterator::new(fdiagnostics::StreamMode::SnapshotThenSubscribe)?;
+        let (snd, receiver) = mpsc::sync_channel(1);
+        let waiters = Arc::new(WaitQueue::default());
+        let waiters_clone = waiters.clone();
+        current_task.kernel().kthreads.spawner().spawn(move |_, _| {
+            scopeguard::defer! {
+                waiters_clone.notify_fd_events(FdEvents::POLLHUP);
+            };
+            for log in iterator {
+                if snd.send(log).is_err() {
+                    break;
+                };
+                waiters_clone.notify_fd_events(FdEvents::POLLIN);
+            }
+        });
+
+        Ok(Self { receiver, waiters, pending: Default::default() })
+    }
+
+    fn try_next(&mut self) -> Result<Option<Vec<u8>>, Errno> {
+        if let Some(value) = self.pending.take() {
+            return Ok(Some(value));
+        }
+        match self.receiver.try_recv() {
+            // We got the next log.
+            Ok(Ok(log)) => Ok(Some(log)),
+            // An error happened attempting to get the next log.
+            Ok(Err(err)) => Err(err),
+            // The channel was closed and there's no more messages in the queue.
+            Err(mpsc::TryRecvError::Disconnected) => Ok(None),
+            // No messages available but the channel hasn't closed.
+            Err(mpsc::TryRecvError::Empty) => Err(errno!(EAGAIN)),
+        }
+    }
+}
+
+struct LogIterator {
+    iterator: fdiagnostics::BatchIteratorSynchronousProxy,
+    pending_formatted_contents: VecDeque<fdiagnostics::FormattedContent>,
+    pending_datas: VecDeque<Data<Logs>>,
+}
+
+impl LogIterator {
+    fn new(mode: fdiagnostics::StreamMode) -> Result<Self, Errno> {
         let accessor = connect_to_protocol_sync::<fdiagnostics::ArchiveAccessorMarker>()
             .map_err(|_| errno!(ENOENT, format!("Failed to connecto to ArchiveAccessor")))?;
         let stream_parameters = fdiagnostics::StreamParameters {
@@ -165,66 +236,75 @@ impl LogSubscription {
         accessor.stream_diagnostics(&stream_parameters, server_end).map_err(|err| {
             errno!(EIO, format!("ArchiveAccessor/StreamDiagnostics failed: {err}"))
         })?;
-        let iterator = fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel());
-        Ok(Self::Blocking { iterator, pending: VecDeque::new() })
+        Ok(Self {
+            iterator: fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel()),
+            pending_formatted_contents: VecDeque::new(),
+            pending_datas: VecDeque::new(),
+        })
     }
 
     // TODO(b/315520045): implement and use a more efficient approach for fetching logs that
     // doesn't involve having to parse JSON...
-    fn try_next(&mut self) -> Result<Option<Vec<u8>>, Errno> {
-        match self {
-            Self::NonBlocking(receiver) => match receiver.try_next() {
-                // We got the next log.
-                Ok(Some(Ok(log))) => Ok(Some(log)),
-                // An error happened attempting to get the next log.
-                Ok(Some(Err(err))) => Err(err),
-                // The channel was closed and there's no more messages in the queue.
-                Ok(None) => Ok(None),
-                // No messages available but the channel hasn't closed.
-                Err(_) => Err(errno!(EAGAIN)),
-            },
-            Self::Blocking { iterator, pending } => loop {
-                while let Some(data) = pending.pop_front() {
-                    if let Some(log) = format_log(data).map_err(|_| errno!(EIO))? {
-                        return Ok(Some(log));
+    fn get_next(&mut self) -> Result<Option<Vec<u8>>, Errno> {
+        'main_loop: loop {
+            while let Some(data) = self.pending_datas.pop_front() {
+                if let Some(log) = format_log(data).map_err(|_| errno!(EIO))? {
+                    return Ok(Some(log));
+                }
+            }
+            while let Some(formatted_content) = self.pending_formatted_contents.pop_front() {
+                let output: OneOrMany<Data<Logs>> = match formatted_content {
+                    fdiagnostics::FormattedContent::Json(data) => {
+                        let mut buf = vec![0; data.size as usize];
+                        data.vmo.read(&mut buf, 0).map_err(|err| {
+                            errno!(EIO, format!("failed to read logs vmo: {err}"))
+                        })?;
+                        serde_json::from_slice(&buf)
+                            .map_err(|_| errno!(EIO, format!("archivist returned invalid data")))?
+                    }
+                    format => {
+                        unreachable!("we only request and expect one format. Got: {format:?}")
+                    }
+                };
+                match output {
+                    OneOrMany::One(data) => {
+                        if let Some(log) = format_log(data).map_err(|_| errno!(EIO))? {
+                            return Ok(Some(log));
+                        }
+                    }
+                    OneOrMany::Many(datas) => {
+                        if datas.len() > 0 {
+                            self.pending_datas.extend(datas);
+                            continue 'main_loop;
+                        }
                     }
                 }
-                let next_batch = iterator
-                    .get_next(zx::Time::INFINITE)
-                    .map_err(|_| errno!(ENOENT))?
-                    .map_err(|_| errno!(ENOENT))?;
-                if next_batch.is_empty() {
-                    return Ok(None);
-                }
-                for formatted_content in next_batch {
-                    let output: OneOrMany<Data<Logs>> = match formatted_content {
-                        fdiagnostics::FormattedContent::Json(data) => {
-                            let mut buf = vec![0; data.size as usize];
-                            data.vmo.read(&mut buf, 0).map_err(|err| {
-                                errno!(EIO, format!("failed to read logs vmo: {err}"))
-                            })?;
-                            serde_json::from_slice(&buf).map_err(|_| {
-                                errno!(EIO, format!("archivist returned invalid data"))
-                            })?
-                        }
-                        format => {
-                            unreachable!("we only request and expect one format. Got: {format:?}")
-                        }
-                    };
-                    match output {
-                        OneOrMany::One(data) => pending.push_back(data),
-                        OneOrMany::Many(datas) => pending.extend(datas.into_iter()),
-                    }
-                }
-            },
+            }
+            let next_batch = self
+                .iterator
+                .get_next(zx::Time::INFINITE)
+                .map_err(|_| errno!(ENOENT))?
+                .map_err(|_| errno!(ENOENT))?;
+            if next_batch.is_empty() {
+                return Ok(None);
+            }
+            self.pending_formatted_contents = VecDeque::from(next_batch);
         }
+    }
+}
+
+impl Iterator for LogIterator {
+    type Item = Result<Vec<u8>, Errno>;
+
+    fn next(&mut self) -> Option<Result<Vec<u8>, Errno>> {
+        self.get_next().transpose()
     }
 }
 
 impl Iterator for LogSubscription {
     type Item = Result<Vec<u8>, Errno>;
 
-    fn next(&mut self) -> Option<Result<Vec<u8>, Errno>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
 }
@@ -267,11 +347,6 @@ impl Into<Vec<u8>> for ResultBuffer {
 }
 
 fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
-    if let Some(msg) = data.msg() {
-        if msg.contains("DBG:") {
-            return Ok(None);
-        }
-    }
     let mut formatted_tags = match data.tags() {
         None => vec![],
         Some(tags) => {

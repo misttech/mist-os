@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/klog.h>
 #include <unistd.h>
+
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -45,14 +48,14 @@ TEST_F(SyslogTest, SyslogReadAll) {
   close(kmsg_fd);
 
   int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
-  char* buf = (char*)malloc(size);
-  int size_read = klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf, size);
+  std::string buf;
+  buf.resize(size);
+  int size_read = klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf.data(), static_cast<int>(buf.size()));
   if (size_read <= 0) {
     printf("Failed to read: %s\n", strerror(errno));
     FAIL();
   }
-  EXPECT_NE(strstr(buf, "Hello from the read-all test"), nullptr);
-  free(buf);
+  EXPECT_NE(buf.find("Hello from the read-all test"), std::string::npos);
 }
 
 TEST_F(SyslogTest, Read) {
@@ -97,15 +100,16 @@ TEST_F(SyslogTest, Read) {
 
   // Check that all logs are present when reading using SYSLOG_ACTION_READ_ALL
   int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
-  char* buf_all = (char*)malloc(size);
-  int size_read = klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf_all, size);
+  std::string buf_all;
+  buf_all.resize(size);
+  int size_read =
+      klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf_all.data(), static_cast<int>(buf_all.size()));
   if (size_read <= 0) {
     printf("Failed to read: %s\n", strerror(errno));
     FAIL();
   }
-  EXPECT_NE(strstr(buf_all, "SyslogRead -- first"), nullptr);
-  EXPECT_NE(strstr(buf_all, "SyslogRead -- second"), nullptr);
-  free(buf_all);
+  EXPECT_NE(buf_all.find("SyslogRead -- first"), std::string::npos);
+  EXPECT_NE(buf_all.find("SyslogRead -- second"), std::string::npos);
 
   close(kmsg_fd);
 }
@@ -156,4 +160,47 @@ TEST_F(SyslogTest, NonBlockingRead) {
   }
   EXPECT_EQ(errno, EAGAIN);
   close(fd);
+}
+
+TEST_F(SyslogTest, ProcKmsgPoll) {
+  int kmsg_fd = open("/dev/kmsg", O_WRONLY);
+  if (kmsg_fd < 0) {
+    printf("Failed to open /dev/kmsg -> %s\n", strerror(errno));
+    FAIL();
+  }
+  dprintf(kmsg_fd, "ProcKmsgPoll -- log one\n");
+
+  int proc_kmsg_fd = open("/proc/kmsg", O_RDONLY);
+
+  // Drain the logs.
+  char buf[4096];
+  do {
+    size_t size_read = read(proc_kmsg_fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+  } while (strstr(buf, "ProcKmsgPoll -- log one") == nullptr);
+
+  struct pollfd fds[] = {{
+      .fd = proc_kmsg_fd,
+      .events = POLLIN,
+      .revents = 42,
+  }};
+
+  // With no timeout, this returns immediately.
+  EXPECT_EQ(0, poll(fds, 1, 0));
+
+  // Ensure syslog returns that the unread size is 0.
+  EXPECT_EQ(0, klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0));
+
+  // Write a log.
+  dprintf(kmsg_fd, "ProcKmsgPoll -- log two\n");
+
+  // Wait for the log to be ready to read.
+  EXPECT_EQ(1, poll(fds, 1, -1));
+  EXPECT_EQ(POLLIN, fds[0].revents);
+
+  // Syslog isn't empty anymore.
+  EXPECT_GT(klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0), 0);
+
+  close(kmsg_fd);
+  close(proc_kmsg_fd);
 }

@@ -8,11 +8,11 @@ use crate::{
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
-    task::{CurrentTask, LogSubscription},
+    task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNode,
-        FsNodeInfo, NamespaceNode,
+        fileops_impl_seekless, Anon, FdEvents, FileHandle, FileObject, FileOps, FileWriteGuardRef,
+        FsNode, FsNodeInfo, NamespaceNode,
     },
 };
 use fuchsia_zircon::{
@@ -218,12 +218,7 @@ pub fn open_kmsg(
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     let subscription = if flags.can_read() {
-        Some(Mutex::new(
-            current_task
-                .kernel()
-                .syslog
-                .snapshot_then_subscribe(&current_task, flags.contains(OpenFlags::NONBLOCK))?,
-        ))
+        Some(Mutex::new(Syslog::snapshot_then_subscribe(&current_task)?))
     } else {
         None
     };
@@ -235,19 +230,45 @@ struct DevKmsg(Option<Mutex<LogSubscription>>);
 impl FileOps for DevKmsg {
     fileops_impl_seekless!();
 
-    fn read(
+    fn wait_async(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        self.0.as_ref().map(|subscription| subscription.lock().wait(waiter, events, handler))
+    }
+
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        let mut events = FdEvents::empty();
+        if let Some(subscription) = self.0.as_ref() {
+            if subscription.lock().available()? > 0 {
+                events |= FdEvents::POLLIN;
+            }
+        }
+        Ok(events)
+    }
+
+    fn read(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let result = match self.0.as_ref().unwrap().lock().next() {
-            Some(Ok(log)) => data.write(&log),
-            Some(Err(err)) => Err(err),
-            None => Ok(0),
-        };
-        result
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            match self.0.as_ref().unwrap().lock().next() {
+                Some(Ok(log)) => data.write(&log),
+                Some(Err(err)) => Err(err),
+                None => Ok(0),
+            }
+        })
     }
 
     fn write(

@@ -180,31 +180,37 @@ impl FileOps for ProcKmsgFile {
     fn wait_async(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         waiter: &Waiter,
-        _events: FdEvents,
-        _handler: EventHandler,
+        events: FdEvents,
+        handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(waiter.fake_wait())
+        current_task.kernel().syslog.wait(waiter, events, handler).ok()
     }
 
     fn query_events(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(FdEvents::empty())
+        let mut events = FdEvents::empty();
+        if current_task.kernel().syslog.size_unread(current_task)? > 0 {
+            events |= FdEvents::POLLIN;
+        }
+        Ok(events)
     }
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let bytes_written = current_task.kernel().syslog.read(current_task, data)?;
-        Ok(bytes_written as usize)
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            let bytes_written = current_task.kernel().syslog.read(current_task, data)?;
+            Ok(bytes_written as usize)
+        })
     }
 
     fn write(

@@ -15,7 +15,7 @@ use crate::{
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
-        PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
+        PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Syslog, Task,
         PR_SET_PTRACER_ANY,
     },
     vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer},
@@ -1665,7 +1665,7 @@ pub fn sys_syslog(
             }
             let mut output_buffer =
                 UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
-            current_task.kernel().syslog.read(current_task, &mut output_buffer)
+            current_task.kernel().syslog.blocking_read(current_task, &mut output_buffer)
         }
         SyslogAction::ReadAll => {
             if address.is_null() || length < 0 {
@@ -1673,10 +1673,10 @@ pub fn sys_syslog(
             }
             let mut output_buffer =
                 UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
-            current_task.kernel().syslog.read_all(&mut output_buffer)
+            Syslog::read_all(&mut output_buffer)
         }
         SyslogAction::SizeUnread => current_task.kernel().syslog.size_unread(current_task),
-        SyslogAction::SizeBuffer => current_task.kernel().syslog.size_buffer(),
+        SyslogAction::SizeBuffer => Syslog::size_buffer(),
         SyslogAction::Close => {
             not_implemented!("syslog: close");
             Ok(0)
