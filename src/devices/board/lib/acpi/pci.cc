@@ -195,12 +195,12 @@ static acpi::status<> walk_devices_callback(ACPI_HANDLE object, ResourceContext*
  * Walks the ACPI namespace and use the reported current resources to inform
    the kernel PCI interface about what memory it shouldn't use.
  *
- * @param root_resource_handle The handle to pass to the kernel when talking
+ * @param mmio_resource_handle The handle to pass to the kernel when talking
  * to the PCI driver.
  *
  * @return ZX_OK on success
  */
-zx_status_t scan_acpi_tree_for_resources(acpi::Acpi* acpi, zx_handle_t root_resource_handle) {
+zx_status_t scan_acpi_tree_for_resources(acpi::Acpi* acpi, zx_handle_t mmio_resource_handle) {
   // First we search for resources to add, then we subtract out things that
   // are being consumed elsewhere.  This forces an ordering on the
   // operations so that it should be consistent, and should protect against
@@ -209,7 +209,7 @@ zx_status_t scan_acpi_tree_for_resources(acpi::Acpi* acpi, zx_handle_t root_reso
   // Walk the device tree and add to the PCIe IO ranges any resources
   // "produced" by the PCI root in the ACPI namespace.
   ResourceContext ctx = {
-      .pci_handle = root_resource_handle,
+      .pci_handle = mmio_resource_handle,
       .device_is_root_bridge = false,
       .add_pass = true,
   };
@@ -421,7 +421,7 @@ zx_status_t pci_root_host_init(zx_device_t* parent, acpi::Acpi* acpi) {
            zx_status_get_string(st));
   }
 
-  st = scan_acpi_tree_for_resources(acpi, get_root_resource(parent));
+  st = scan_acpi_tree_for_resources(acpi, get_mmio_resource(parent));
   if (st != ZX_OK) {
     zxlogf(ERROR, "Scanning acpi resources failed: %s", zx_status_get_string(st));
     return st;
