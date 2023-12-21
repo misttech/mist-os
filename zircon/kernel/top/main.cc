@@ -89,16 +89,17 @@ void lk_main(paddr_t handoff_paddr) {
   // that code must be changed as well. See fxbug.dev/59963#c20.
   dprintf(ALWAYS, "printing enabled\n");
 
+  // At this point the physmap (set up in start.S) is available and all static
+  // constructors (if needed) have been run.
+  HandoffFromPhys(handoff_paddr);
+  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
+
   lk_primary_cpu_init_level(LK_INIT_LEVEL_EARLIEST, LK_INIT_LEVEL_ARCH_EARLY - 1);
 
   // Carry out any early architecture-specific and platform-specific init
   // required to get the boot CPU and platform into a known state.
   arch_early_init();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_EARLY, LK_INIT_LEVEL_PLATFORM_EARLY - 1);
-
-  // At this point the physmap is available.
-  HandoffFromPhys(handoff_paddr);
-  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
 
   platform_early_init();
   DriverHandoffEarly(*gPhysHandoff);
