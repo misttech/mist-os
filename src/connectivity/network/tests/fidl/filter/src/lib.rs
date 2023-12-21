@@ -202,13 +202,16 @@ async fn watcher_events_scoped_to_controllers(name: &str) {
             .await
             .expect("push changes");
         controller.commit().await.expect("commit pending changes");
+        controller
     };
 
-    // Add two identical resources under different controllers.
-    futures::future::join(
+    // Add two identical resources under different controllers. Note that we
+    // retain the controllers as dropping them would cause their resources to be
+    // removed.
+    let _controllers = futures::future::join_all([
         create_controller_and_commit_updates("controller-a"),
         create_controller_and_commit_updates("controller-b"),
-    )
+    ])
     .await;
 
     let mut expected_controllers = HashSet::from(["controller-a", "controller-b"]);
