@@ -280,3 +280,17 @@ pub async fn wait_for_online(
     .await
     .with_context(|| format!("wait for online {}", want_online))
 }
+
+/// Helpers for `netemul::TestInterface`.
+#[async_trait::async_trait]
+pub trait TestInterfaceExt {
+    /// Calls [`crate::nud::apply_nud_flake_workaround`] for this interface.
+    async fn apply_nud_flake_workaround(&self) -> Result;
+}
+
+#[async_trait::async_trait]
+impl<'a> TestInterfaceExt for netemul::TestInterface<'a> {
+    async fn apply_nud_flake_workaround(&self) -> Result {
+        crate::nud::apply_nud_flake_workaround(self.control()).await
+    }
+}

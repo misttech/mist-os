@@ -24,6 +24,7 @@ use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet};
 use netstack_testing_common::{
+    interfaces::TestInterfaceExt as _,
     packets,
     realms::{KnownServiceProvider, Netstack2, TestSandboxExt as _},
 };
@@ -1333,6 +1334,7 @@ async fn ping(
         .await
         .expect("join_network failed for target_realm");
     target_ep.add_address_and_subnet_route(target_subnet).await.expect("configure address");
+    target_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     if disable_target_interface {
         // Disable the target interface and wait for it to achieve the disabled
@@ -1351,7 +1353,7 @@ async fn ping(
         .await;
     }
 
-    let _system_ep = realm
+    let system_ep = realm
         .join_network_with(
             &network,
             INTERFACE1_NAME,
@@ -1360,6 +1362,7 @@ async fn ping(
         )
         .await
         .expect("join_network failed for base realm");
+    system_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()

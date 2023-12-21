@@ -5,6 +5,8 @@
 //! Useful NUD functions for tests.
 
 use anyhow::Context;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use futures::StreamExt as _;
 use net_types::SpecifiedAddress as _;
 
@@ -117,4 +119,48 @@ pub fn create_metadata_stream<'a>(
             extract_frame_metadata(data)
         }
     })
+}
+
+/// Works around CQ timing flakes due to NUD failures.
+///
+/// Many tests can have flakes reduced by applying this workaround. Typically
+/// tests that have more than 1 netstack and use pings or sockets between stacks
+/// can observe spurious NUD failures due to infra timing woes. That can be
+/// worked around by setting the number of NUD probes to a very high value. Any
+/// test that is not directly verifying neighbor behavior can use this
+/// workaround to get rid of flakes.
+pub async fn apply_nud_flake_workaround(
+    control: &fnet_interfaces_ext::admin::Control,
+) -> crate::Result {
+    control
+        .set_configuration(fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                arp: Some(fnet_interfaces_admin::ArpConfiguration {
+                    nud: Some(fnet_interfaces_admin::NudConfiguration {
+                        max_multicast_solicitations: Some(u16::MAX),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    nud: Some(fnet_interfaces_admin::NudConfiguration {
+                        max_multicast_solicitations: Some(u16::MAX),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| e.into())
+        .and_then(|r| {
+            r.map(|fnet_interfaces_admin::Configuration { .. }| ())
+                .map_err(|e| anyhow::anyhow!("can't set device configuration: {e:?}"))
+        })
+        .context("apply nud flake workaround")
 }

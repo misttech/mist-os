@@ -31,7 +31,7 @@ use netstack_testing_common::{
         add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device,
         TUN_DEFAULT_PORT_ID,
     },
-    interfaces::{self, add_address_wait_assigned},
+    interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _},
     realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
@@ -2269,6 +2269,7 @@ async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
             .await
             .expect("install interface");
         interface.add_address_and_subnet_route(addr_subnet).await.expect("configure address");
+        interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
         interface
     }
