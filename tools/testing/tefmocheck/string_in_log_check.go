@@ -340,7 +340,9 @@ func fuchsiaLogChecks() []FailureModeCheck {
 
 	ret = append(ret, []FailureModeCheck{
 		// These may be in the output of tests, but the syslogType doesn't contain any test output.
-		&stringInLogCheck{String: "ASSERT FAILED", Type: syslogType},
+		// `ASSERT FAILED` may show up in crash hexdumps, so prepend with a space to match it when
+		// it's at the start of a logline.
+		&stringInLogCheck{String: " ASSERT FAILED", Type: syslogType},
 		&stringInLogCheck{String: "DEVICE SUSPEND TIMED OUT", Type: syslogType},
 		&stringInLogCheck{
 			String: "Got no package for fuchsia-pkg://",
