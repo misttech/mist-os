@@ -344,18 +344,16 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         }
     }
 
-    state.set_stopped(StopState::Waking, None, None);
-
-    if detach {
-        state.set_ptrace(None)?;
-    }
-    drop(state);
-    tracee.thread_group.set_stopped(StopState::Waking, None, false);
-
     if let Some(siginfo) = siginfo {
-        // siginfo is replacing the signal that caused the ptrace-stop we're currently
-        // in, so has to go first.
-        send_signal_first(&tracee, siginfo);
+        // This will wake up the task for us.
+        send_signal_first(&tracee, state, siginfo);
+    } else {
+        state.set_stopped(StopState::Waking, None, None);
+        drop(state);
+        tracee.thread_group.set_stopped(StopState::Waking, None, false);
+    }
+    if detach {
+        tracee.write().set_ptrace(None)?;
     }
     Ok(())
 }
@@ -376,7 +374,7 @@ fn ptrace_interrupt(tracee: &Task) -> Result<(), Errno> {
             state.set_stopped(StopState::PtraceEventStopped, signal, None);
         } else {
             state.set_stopped(
-                StopState::PtraceEventStopped,
+                StopState::PtraceEventStopping,
                 Some(SignalInfo::default(SIGTRAP)),
                 None,
             );
@@ -405,14 +403,16 @@ fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
 }
 
 pub fn ptrace_detach(
-    thread_group: &ThreadGroup,
+    thread_group: Arc<ThreadGroup>,
     tracee: &Task,
     data: &UserAddress,
 ) -> Result<(), Errno> {
     if let Err(x) = ptrace_cont(&tracee, &data, true) {
         return Err(x);
     }
-    thread_group.ptracees.lock().remove(&tracee.get_tid());
+    let tid = tracee.get_tid();
+    thread_group.ptracees.lock().remove(&tid);
+    thread_group.write().zombie_ptracees.retain(|zombie| zombie.pid != tid);
     Ok(())
 }
 
@@ -460,7 +460,7 @@ pub fn ptrace_dispatch(
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
-            ptrace_detach(current_task.thread_group.as_ref(), tracee.as_ref(), &data)?;
+            ptrace_detach(current_task.thread_group.clone(), tracee.as_ref(), &data)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         _ => {}
@@ -652,7 +652,21 @@ fn do_attach(
 ) -> Result<(), Errno> {
     if let Some(task_ref) = task.upgrade() {
         thread_group.ptracees.lock().insert(task_ref.get_tid(), (&task_ref).into());
-        task_ref.write().set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type)))?;
+        {
+            let process_state = &mut task_ref.thread_group.write();
+            let mut state = task_ref.write();
+            state.set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type)))?;
+            // If the tracee is already stopped, make sure that the tracer can
+            // identify that right away.
+            if process_state.is_waitable()
+                && process_state.base.load_stopped() == StopState::GroupStopped
+                && task_ref.load_stopped() == StopState::GroupStopped
+            {
+                if let Some(ref mut ptrace) = &mut state.ptrace {
+                    ptrace.last_signal_waitable = true;
+                }
+            }
+        }
         return Ok(());
     }
     // The tracee is either the current thread, or there is a live ref to it outside

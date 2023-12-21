@@ -1069,9 +1069,6 @@
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
 
-                // TODO(fxbug.dev/137018): Fix flake
-                "PtraceTest.Seize_Interrupt_Listen",
-
                 // TODO(fxbug.dev/129161): Fix flake.
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",

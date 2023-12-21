@@ -475,6 +475,8 @@ where
                 task_complete(run_result);
             }
 
+            current_task.set_ptrace_zombie();
+
             // `release` must be called as the absolute last action on this thread to ensure that
             // any deferred release are done before it.
             current_task.release(());

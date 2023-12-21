@@ -8,9 +8,9 @@ use crate::{
     signals::{SignalInfo, SignalState},
     task::{
         set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-        Kernel, ProcessEntryRef, PtraceState, PtraceStatus, SchedulerPolicy,
+        Kernel, ProcessEntryRef, ProcessExitInfo, PtraceState, PtraceStatus, SchedulerPolicy,
         SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadState,
-        UtsNamespaceHandle, Waiter,
+        UtsNamespaceHandle, Waiter, ZombieProcess,
     },
     vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
 };
@@ -716,6 +716,56 @@ impl Task {
         self.flags.load(Ordering::Relaxed)
     }
 
+    /// When the task exits, if there is a notification that needs to propagate
+    /// to a ptracer, make sure it will propagate.
+    pub fn set_ptrace_zombie(&self) {
+        let pids = self.thread_group.kernel.pids.write();
+        let (pgid, ppid) = {
+            let group_state = self.thread_group.read();
+            (
+                group_state.process_group.leader,
+                group_state.parent.as_ref().map_or(0, |parent| parent.leader),
+            )
+        };
+        let mut state = self.write();
+        state.set_stopped(StopState::ForceAwake, None, None);
+        if let Some(ref mut ptrace) = &mut state.ptrace {
+            // Add a zombie that the ptracer will notice.
+            ptrace.last_signal_waitable = true;
+            let tracer_pid = ptrace.pid;
+            if tracer_pid == ppid {
+                // The tracer is the parent, and will get notified of this
+                // task's exit without this extra work.
+                return;
+            }
+            let weak_init = pids.get_task(tracer_pid);
+            if let Some(tracer_task) = weak_init.upgrade() {
+                drop(state);
+                let mut tracer_state = tracer_task.thread_group.write();
+
+                let exit_status = self.exit_status().unwrap_or_else(|| {
+                    starnix_logging::log_error!("Exiting without an exit code.");
+                    ExitStatus::Exit(u8::MAX)
+                });
+                let (uid, exit_signal) = {
+                    let persistent_state = self.persistent_info.lock();
+                    (persistent_state.creds().uid, persistent_state.exit_signal().clone())
+                };
+                let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
+                let zombie = OwnedRef::new(ZombieProcess {
+                    pid: self.id,
+                    pgid,
+                    uid,
+                    exit_info: exit_info.clone(),
+                    // ptrace doesn't need this.
+                    time_stats: TaskTimeStats::default(),
+                    is_canonical: false,
+                });
+                tracer_state.zombie_ptracees.push(zombie);
+            };
+        }
+    }
+
     pub fn exit_status(&self) -> Option<ExitStatus> {
         self.is_exitted().then(|| self.read().exit_status.clone()).flatten()
     }
@@ -1158,19 +1208,19 @@ impl Releasable for Task {
     type Context<'a> = ThreadState;
 
     fn release(mut self, thread_state: ThreadState) {
+        self.thread_group.remove(&self);
+
         // Disconnect from tracer, if one is present.
         let ptracer_pid = self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.pid);
         if let Some(ptracer_pid) = ptracer_pid {
             if let Some(ProcessEntryRef::Process(tg)) =
                 self.kernel().pids.read().get_process(ptracer_pid)
             {
-                let pid = self.get_pid();
+                let pid = self.id;
                 tg.ptracees.lock().remove(&pid);
             }
             let _ = self.mutable_state.get_mut().set_ptrace(None);
         }
-
-        self.thread_group.remove(&self);
 
         // Release the fd table.
         self.files.release(());

@@ -19,12 +19,6 @@
 
                 // TODO(): Make these tests reliably pass in Starnix then re-enable.
                 "FcntlLockTest.*",
-
-                // fxbug.dev/135691
-                "PtraceTest.SetSigInfo*",
-
-                // TODO(http://fxbug.dev/136515)
-                "PtraceTest.InterruptAfterListen",
             ],
         },
         {

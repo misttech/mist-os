@@ -108,53 +108,67 @@ pub fn process_completed_restricted_exit(
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Errno> {
-    // Checking for a signal might cause the task to exit, so check before processing exit
-    {
-        let flags = current_task.flags();
+    loop {
+        // Checking for a signal might cause the task to exit, so check before processing exit
         {
-            let CurrentTask {
-                task,
-                thread_state: ThreadState { registers, extended_pstate, .. },
-                ..
-            } = current_task;
-            let task_state = task.write();
-            if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
-                || (!flags.contains(TaskFlags::EXITED)
-                    && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
+            let flags = current_task.flags();
             {
-                if !task.is_exitted() {
-                    dequeue_signal(task, task_state, registers, extended_pstate);
+                let CurrentTask {
+                    task,
+                    thread_state: ThreadState { registers, extended_pstate, .. },
+                    ..
+                } = current_task;
+                let task_state = task.write();
+                if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
+                    || (!flags.contains(TaskFlags::EXITED)
+                        && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
+                {
+                    if !task.is_exitted() {
+                        dequeue_signal(task, task_state, registers, extended_pstate);
+                    }
                 }
+                // The syscall may need to restart for a non-signal-related
+                // reason. This call does nothing if we aren't restarting.
+                prepare_to_restart_syscall(registers, None);
             }
-            // The syscall may need to restart for a non-signal-related
-            // reason. This call does nothing if we aren't restarting.
-            prepare_to_restart_syscall(registers, None);
-        }
-    }
-
-    let exit_status = current_task.exit_status();
-    if let Some(exit_status) = exit_status {
-        log_trace!("exiting with status {:?}", exit_status);
-        if let Some(error_context) = error_context {
-            match exit_status {
-                ExitStatus::Exit(value) if value == 0 => {}
-                _ => {
-                    log_trace!(
-                        "last failing syscall before exit: {:?}, failed with {:?}",
-                        error_context.syscall,
-                        error_context.error
-                    );
-                }
-            };
         }
 
-        Ok(Some(exit_status))
-    } else {
-        // Block a stopped process after it's had a chance to handle signals, since a signal might
-        // cause it to stop.
-        current_task.block_while_stopped();
+        let exit_status = current_task.exit_status();
+        if let Some(exit_status) = exit_status {
+            log_trace!("exiting with status {:?}", exit_status);
+            if let Some(error_context) = error_context {
+                match exit_status {
+                    ExitStatus::Exit(value) if value == 0 => {}
+                    _ => {
+                        log_trace!(
+                            "last failing syscall before exit: {:?}, failed with {:?}",
+                            error_context.syscall,
+                            error_context.error
+                        );
+                    }
+                };
+            }
 
-        Ok(None)
+            return Ok(Some(exit_status));
+        } else {
+            // Block a stopped process after it's had a chance to handle signals, since a signal might
+            // cause it to stop.
+            current_task.block_while_stopped();
+            let flags = current_task.flags();
+            // If ptrace_cont has sent a signal, process it immediately.  This
+            // seems to match Linux behavior.
+            if current_task
+                .read()
+                .ptrace
+                .as_ref()
+                .map_or(false, |ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
+                && flags.contains(TaskFlags::SIGNALS_AVAILABLE)
+                && !current_task.is_exitted()
+            {
+                continue;
+            }
+            return Ok(None);
+        }
     }
 }
 

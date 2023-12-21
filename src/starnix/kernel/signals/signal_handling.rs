@@ -45,25 +45,31 @@ enum SignalPriority {
 
 // `send_signal*()` calls below may fail only for real-time signals (with EAGAIN). They are
 // expected to succeed for all othe rsignals.
-pub fn send_signal_first(task: &Task, siginfo: SignalInfo) {
-    send_signal_prio(task, siginfo, SignalPriority::First)
+pub fn send_signal_first(task: &Task, task_state: TaskWriteGuard<'_>, siginfo: SignalInfo) {
+    send_signal_prio(task, task_state, siginfo, SignalPriority::First, true)
         .expect("send_signal(SignalPriority::First) is not expected to fail")
 }
 
 // Sends `signal` to `task`. The signal must be a standard (i.e. not real-time) signal.
 pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
     debug_assert!(!siginfo.signal.is_real_time());
-    send_signal_prio(task, siginfo, SignalPriority::Last)
+    let state = task.write();
+    send_signal_prio(task, state, siginfo, SignalPriority::Last, false)
         .expect("send_signal(SignalPriority::First) is not expected to fail for standard signals.")
 }
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
-    send_signal_prio(task, siginfo, SignalPriority::Last)
+    let state = task.write();
+    send_signal_prio(task, state, siginfo, SignalPriority::Last, false)
 }
 
-fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> Result<(), Errno> {
-    let mut task_state = task.write();
-
+fn send_signal_prio(
+    task: &Task,
+    mut task_state: TaskWriteGuard<'_>,
+    siginfo: SignalInfo,
+    prio: SignalPriority,
+    force_wake: bool,
+) -> Result<(), Errno> {
     let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
     let was_masked =
         task_state.signals.saved_mask().map_or(false, |mask| mask.has_signal(siginfo.signal));
@@ -100,12 +106,12 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> R
 
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
-    if siginfo.signal == SIGCONT {
-        task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
-        task.write().set_stopped(StopState::Waking, None, None);
-    } else if siginfo.signal == SIGKILL {
+    if siginfo.signal == SIGKILL {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
         task.write().set_stopped(StopState::ForceWaking, None, None);
+    } else if siginfo.signal == SIGCONT || force_wake {
+        task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
+        task.write().set_stopped(StopState::Waking, None, None);
     }
 
     Ok(())

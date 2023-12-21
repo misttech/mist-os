@@ -686,7 +686,7 @@ fn wait_on_pid(
             // task lock.  We therefore have to check to see if a tracee has
             // become waitable again, after we acquire the lock.
             if let Some(tracee) =
-                current_task.thread_group.get_waitable_ptracee(selector, options, &pids)
+                current_task.thread_group.get_waitable_ptracee(selector, options, &mut pids)
             {
                 return Ok(Some(tracee));
             }
@@ -712,7 +712,7 @@ fn wait_on_pid(
                         }
                     },
                 );
-                if has_waitable_tracee {
+                if has_waitable_tracee || thread_group.zombie_ptracees.len() != 0 {
                     continue;
                 }
                 match thread_group.get_waitable_child(selector, options, &mut pids) {

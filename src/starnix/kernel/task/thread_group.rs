@@ -74,6 +74,9 @@ pub struct ThreadGroupMutableState {
     /// Child tasks that have exited, but not yet been waited for.
     pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
 
+    /// ptracees that have exited, but not yet been waited for.
+    pub zombie_ptracees: Vec<OwnedRef<ZombieProcess>>,
+
     /// WaitQueue for updates to the WaitResults of tasks in this group.
     pub child_status_waiters: WaitQueue,
 
@@ -253,6 +256,10 @@ pub struct ZombieProcess {
 
     /// Cumulative time stats for the process and its children.
     pub time_stats: TaskTimeStats,
+
+    /// Whether dropping this ZombieProcess should imply removing the pid from
+    /// the PidTable
+    pub is_canonical: bool,
 }
 
 impl ZombieProcess {
@@ -268,6 +275,7 @@ impl ZombieProcess {
             uid: credentials.uid,
             exit_info,
             time_stats,
+            is_canonical: true,
         })
     }
 
@@ -285,7 +293,9 @@ impl Releasable for ZombieProcess {
     type Context<'a> = &'a mut PidTable;
 
     fn release(self, pids: &mut PidTable) {
-        pids.remove_zombie(self.pid);
+        if self.is_canonical {
+            pids.remove_zombie(self.pid);
+        }
     }
 }
 
@@ -320,6 +330,7 @@ impl ThreadGroup {
                 tasks: BTreeMap::new(),
                 children: BTreeMap::new(),
                 zombie_children: vec![],
+                zombie_ptracees: vec![],
                 child_status_waiters: WaitQueue::default(),
                 is_child_subreaper: false,
                 process_group: Arc::clone(&process_group),
@@ -374,7 +385,7 @@ impl ThreadGroup {
         let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
         for tracee in tracees {
             if let Some(task_ref) = self.kernel.pids.read().get_task(tracee).clone().upgrade() {
-                let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
+                let _ = ptrace_detach(self.clone(), task_ref.as_ref(), &UserAddress::NULL);
             }
         }
 
@@ -937,12 +948,26 @@ impl ThreadGroup {
     /// thread is deemed to have seen the tracee ptrace-stop for the purposes of
     /// PTRACE_LISTEN.
     pub fn get_waitable_ptracee(
-        &self,
+        self: &Arc<Self>,
         selector: ProcessSelector,
         options: &WaitingOptions,
-        pids: &PidTable,
+        pids: &mut PidTable,
     ) -> Option<WaitResult> {
         let mut tasks = vec![];
+
+        {
+            let mut state = self.write();
+            let waitable_zombie = state.get_waitable_zombie(
+                &|state: &mut ThreadGroupMutableState| &mut state.zombie_ptracees,
+                selector,
+                options,
+                pids,
+            );
+            if waitable_zombie.is_some() {
+                return waitable_zombie;
+            }
+        }
+
         self.get_ptracees_and(selector, pids, &mut |task: WeakRef<Task>, _| {
             tasks.push(task);
         });
@@ -972,21 +997,28 @@ impl ThreadGroup {
                     process_state.base.time_stats() + process_state.children_time_stats;
                 let task_stopped = task_ref.load_stopped();
 
+                #[derive(PartialEq)]
+                enum ExitType {
+                    None,
+                    Cont,
+                    Stop,
+                    Kill,
+                }
                 if process_state.is_waitable() {
                     let ptrace = &mut task_state.ptrace;
                     // The information for processes, if we were in group stop.
-                    let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
                     let process_stopped = process_state.base.load_stopped();
+                    let mut fn_type = ExitType::None;
                     if process_stopped == StopState::Awake && options.wait_for_continued {
-                        exit_status_fn = Some(&ExitStatus::Continue);
+                        fn_type = ExitType::Cont;
                     }
                     // Tasks that are ptrace'd always get stop notifications.
                     if process_stopped == StopState::GroupStopped
                         && (options.wait_for_stopped || ptrace.is_some())
                     {
-                        exit_status_fn = Some(&ExitStatus::Stop);
+                        fn_type = ExitType::Stop;
                     }
-                    if let Some(mut exit_status_fn) = exit_status_fn {
+                    if fn_type != ExitType::None {
                         let siginfo = if options.keep_waitable_state {
                             process_state.last_signal.clone()
                         } else {
@@ -999,9 +1031,14 @@ impl ThreadGroup {
                                 siginfo.code |= (PTRACE_EVENT_STOP as i32) << 8;
                             }
                             if siginfo.signal == SIGKILL {
-                                exit_status_fn = &ExitStatus::Kill
+                                fn_type = ExitType::Kill;
                             }
-                            exit_status = Some(exit_status_fn(siginfo));
+                            exit_status = match fn_type {
+                                ExitType::Stop => Some(ExitStatus::Stop(siginfo)),
+                                ExitType::Cont => Some(ExitStatus::Continue(siginfo)),
+                                ExitType::Kill => Some(ExitStatus::Kill(siginfo)),
+                                _ => None,
+                            };
                         }
                         // Clear the wait status of the ptrace, because we're
                         // using the tg status instead.
@@ -1014,23 +1051,28 @@ impl ThreadGroup {
                 if exit_status == None {
                     if let Some(ptrace) = task_state.ptrace.as_mut() {
                         // The information for the task, if we were in a non-group stop.
-                        let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
+                        let mut fn_type = ExitType::None;
                         if task_stopped == StopState::Awake {
-                            exit_status_fn = Some(&ExitStatus::Continue);
+                            fn_type = ExitType::Cont;
                         }
                         if task_stopped.is_stopping_or_stopped()
                             || ptrace.stop_status == PtraceStatus::Listening
                         {
-                            exit_status_fn = Some(&ExitStatus::Stop);
+                            fn_type = ExitType::Stop;
                         }
-                        if let Some(mut exit_status_fn) = exit_status_fn {
+                        if fn_type != ExitType::None {
                             if let Some(siginfo) =
                                 ptrace.get_last_signal(options.keep_waitable_state)
                             {
                                 if siginfo.signal == SIGKILL {
-                                    exit_status_fn = &ExitStatus::Kill
+                                    fn_type = ExitType::Kill;
                                 }
-                                exit_status = Some(exit_status_fn(siginfo));
+                                exit_status = match fn_type {
+                                    ExitType::Stop => Some(ExitStatus::Stop(siginfo)),
+                                    ExitType::Cont => Some(ExitStatus::Continue(siginfo)),
+                                    ExitType::Kill => Some(ExitStatus::Kill(siginfo)),
+                                    _ => None,
+                                };
                             }
                         }
                         pid = task_ref.get_tid();
@@ -1116,6 +1158,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
 
     pub fn get_waitable_zombie(
         &mut self,
+        zombie_list: &dyn Fn(&mut ThreadGroupMutableState) -> &mut Vec<OwnedRef<ZombieProcess>>,
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
@@ -1141,22 +1184,21 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         };
 
         // We look for the last zombie in the vector that matches pid selector and waiting options
-        let selected_zombie_position = self
-            .zombie_children
+        let selected_zombie_position = zombie_list(self)
             .iter()
             .rev()
             .position(|zombie: &OwnedRef<ZombieProcess>| {
                 zombie_matches_wait_options(zombie) && zombie_matches_pid_selector(zombie)
             })
             .map(|position_starting_from_the_back| {
-                self.zombie_children.len() - 1 - position_starting_from_the_back
+                zombie_list(self).len() - 1 - position_starting_from_the_back
             });
 
         selected_zombie_position.map(|position| {
             if options.keep_waitable_state {
-                self.zombie_children[position].to_wait_result()
+                zombie_list(self)[position].to_wait_result()
             } else {
-                let zombie = self.zombie_children.remove(position);
+                let zombie = zombie_list(self).remove(position);
                 self.children_time_stats += zombie.time_stats;
                 let result = zombie.to_wait_result();
                 zombie.release(pids);
@@ -1251,10 +1293,14 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 };
                 let child_stopped = child.base.load_stopped();
                 if child_stopped == StopState::Awake && options.wait_for_continued {
-                    return Ok(Some(build_wait_result(child, &ExitStatus::Continue)));
+                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                        ExitStatus::Continue(siginfo)
+                    })));
                 }
                 if child_stopped == StopState::GroupStopped && options.wait_for_stopped {
-                    return Ok(Some(build_wait_result(child, &ExitStatus::Stop)));
+                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                        ExitStatus::Stop(siginfo)
+                    })));
                 }
             }
         }
@@ -1274,7 +1320,12 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         pids: &mut PidTable,
     ) -> Result<Option<WaitResult>, Errno> {
         if options.wait_for_exited {
-            if let Some(waitable_zombie) = self.get_waitable_zombie(selector, options, pids) {
+            if let Some(waitable_zombie) = self.get_waitable_zombie(
+                &|state: &mut ThreadGroupMutableState| &mut state.zombie_children,
+                selector,
+                options,
+                pids,
+            ) {
                 return Ok(Some(waitable_zombie));
             }
         }
