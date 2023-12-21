@@ -66,15 +66,15 @@ class SimpleDisplay : public DeviceType,
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(image_t* image,
+  zx_status_t DisplayControllerImplImportImage(const image_t* image,
                                                uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index);
+                                               uint32_t index, uint64_t* out_image_handle);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  void DisplayControllerImplReleaseImage(image_t* image);
+  void DisplayControllerImplReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayControllerImplCheckConfiguration(
       const display_config_t** display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,

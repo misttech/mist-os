@@ -415,19 +415,18 @@ closed protocol DisplayControllerImpl {
 
     /// Imports an image from a imported BufferCollection into the driver.
     ///
-    /// Sets `image->handle` iff the image is imported successfully.
-    ///
-    /// Returns ZX_OK if the image is imported succesfully.
+    /// Returns ZX_OK and the imported image's handle, if the image is imported
+    /// succesfully.
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
     strict ImportImage(struct {
-        @in_out
         image Image;
         collection_id uint64;
         index uint32;
     }) -> (struct {
         s zx.Status;
+        image_handle uint64;
     });
 
     /// Import BufferCollection backed VMO pointed to by `index`.
@@ -454,8 +453,7 @@ closed protocol DisplayControllerImpl {
     /// any images passed to apply_config will not be released until a vsync occurs with a
     /// more recent image.
     strict ReleaseImage(struct {
-        @in_out
-        image Image;
+        image_handle uint64;
     }) -> ();
 
     /// Validates the given configuration.

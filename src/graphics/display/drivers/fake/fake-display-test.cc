@@ -474,8 +474,9 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
   invalid_config.type = IMAGE_TYPE_CAPTURE;
+  uint64_t image_handle = 0;
   EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
-                                                        /*index=*/0),
+                                                        /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
@@ -483,27 +484,30 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  image_handle = 0;
   EXPECT_EQ(
       display()->DisplayControllerImplImportImage(&invalid_config, kBanjoInvalidBufferCollectionId,
-                                                  /*index=*/0),
+                                                  /*index=*/0, &image_handle),
       ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
-                                                        kInvalidBufferCollectionIndex),
-            ZX_ERR_OUT_OF_RANGE);
+  image_handle = 0;
+  EXPECT_EQ(
+      display()->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+                                                  kInvalidBufferCollectionIndex, &image_handle),
+      ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   image_t valid_config = kDefaultConfig;
-  EXPECT_EQ(valid_config.handle, 0u);
+  image_handle = 0;
   EXPECT_OK(display()->DisplayControllerImplImportImage(&valid_config, kBanjoBufferCollectionId,
-                                                        /*index=*/0));
-  EXPECT_NE(valid_config.handle, 0u);
+                                                        /*index=*/0, &image_handle));
+  EXPECT_NE(image_handle, 0u);
 
   // Release the image.
-  display()->DisplayControllerImplReleaseImage(&valid_config);
+  display()->DisplayControllerImplReleaseImage(image_handle);
 
   EXPECT_OK(display()->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }
@@ -679,9 +683,12 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   EXPECT_NE(capture_handle, INVALID_ID);
 
   // Import framebuffer image.
-  EXPECT_OK(display()->DisplayControllerImplImportImage(
-      &framebuffer_config, kBanjoFramebufferBufferCollectionId, /*index=*/0));
-  EXPECT_NE(framebuffer_config.handle, INVALID_ID);
+  uint64_t framebuffer_image_handle = 0;
+  EXPECT_OK(display()->DisplayControllerImplImportImage(&framebuffer_config,
+                                                        kBanjoFramebufferBufferCollectionId,
+                                                        /*index=*/0, &framebuffer_image_handle));
+  EXPECT_NE(framebuffer_image_handle, INVALID_ID);
+  framebuffer_config.handle = framebuffer_image_handle;
 
   // Create display configuration.
   layer_t layer = CreatePrimaryLayerConfig(framebuffer_config);
@@ -757,7 +764,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   // Release the image.
   // TODO(fxbug.dev/128574): Consider adding RAII handles to release the
   // imported images and buffer collections.
-  display()->DisplayControllerImplReleaseImage(&framebuffer_config);
+  display()->DisplayControllerImplReleaseImage(framebuffer_image_handle);
   display()->DisplayControllerImplReleaseCapture(capture_handle);
 
   EXPECT_OK(

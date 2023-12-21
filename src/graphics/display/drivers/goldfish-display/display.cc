@@ -393,9 +393,9 @@ zx_status_t Display::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
+zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
                                                       uint64_t banjo_driver_buffer_collection_id,
-                                                      uint32_t index) {
+                                                      uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -457,7 +457,7 @@ zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
     zx::result<display::DriverImageId> import_vmo_result =
         ImportVmoImage(image, pixel_format, std::move(vmo), offset);
     if (import_vmo_result.is_ok()) {
-      image->handle = display::ToBanjoDriverImageId(import_vmo_result.value());
+      *out_image_handle = display::ToBanjoDriverImageId(import_vmo_result.value());
       return ZX_OK;
     }
     return import_vmo_result.error_value();
@@ -472,16 +472,12 @@ zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
   color_buffer->is_linear_format = image->type == IMAGE_TYPE_SIMPLE;
   color_buffer->vmo = std::move(vmo);
   const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
-  image->handle = display::ToBanjoDriverImageId(image_id);
+  *out_image_handle = display::ToBanjoDriverImageId(image_id);
   return ZX_OK;
 }
 
-void Display::DisplayControllerImplReleaseImage(image_t* image) {
-  // TODO(b/314126995): This method may only access the `handle` member of
-  // `image`. An upcoming CL will change the ReleaseImage() API to only provide
-  // the image handle.
-
-  auto color_buffer = reinterpret_cast<ColorBuffer*>(image->handle);
+void Display::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+  auto color_buffer = reinterpret_cast<ColorBuffer*>(image_handle);
 
   // Color buffer is owned by image in the linear case.
   if (color_buffer->is_linear_format) {

@@ -217,7 +217,8 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplImportImage(
-    image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index) {
+    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+    uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -288,14 +289,14 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_NO_MEMORY;
   }
 
-  image->handle = display::ToBanjoDriverImageId(driver_image_id);
+  *out_image_handle = display::ToBanjoDriverImageId(driver_image_id);
   imported_images_.insert(std::move(import_info));
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayControllerImplReleaseImage(image_t* image) {
+void FakeDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   fbl::AutoLock lock(&image_mutex_);
-  display::DriverImageId driver_image_id = display::ToDriverImageId(image->handle);
+  display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
   if (imported_images_.erase(driver_image_id) == nullptr) {
     zxlogf(ERROR, "Failed to release display Image (handle %" PRIu64 ")", driver_image_id.value());
   }

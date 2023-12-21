@@ -283,7 +283,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
-    image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index) {
+    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+    uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
@@ -423,15 +424,15 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
   }
   // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
   // the driver. Do not use pointers as handles.
-  image->handle = reinterpret_cast<uint64_t>(import_info.get());
+  *out_image_handle = reinterpret_cast<uint64_t>(import_info.get());
   fbl::AutoLock lock(&image_mutex_);
   imported_images_.push_back(std::move(import_info));
   return status;
 }
 
-void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
+void AmlogicDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   fbl::AutoLock lock(&image_mutex_);
-  auto info = reinterpret_cast<ImageInfo*>(image->handle);
+  auto info = reinterpret_cast<ImageInfo*>(image_handle);
   imported_images_.erase(*info);
 }
 

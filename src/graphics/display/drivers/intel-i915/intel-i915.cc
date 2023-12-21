@@ -936,9 +936,10 @@ zx_status_t Controller::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Controller::DisplayControllerImplImportImage(image_t* image,
+zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
                                                          uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index) {
+                                                         uint32_t index,
+                                                         uint64_t* out_image_handle) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -1088,12 +1089,12 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image,
   imported_image_pixel_formats_.emplace(
       image_id, sysmem::V2CopyFromV1PixelFormat(format.value().pixel_format));
 
-  image->handle = display::ToBanjoDriverImageId(image_id);
+  *out_image_handle = display::ToBanjoDriverImageId(image_id);
   return ZX_OK;
 }
 
-void Controller::DisplayControllerImplReleaseImage(image_t* image) {
-  const uint64_t gtt_region_base = image->handle;
+void Controller::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+  const uint64_t gtt_region_base = image_handle;
   const display::DriverImageId image_id(gtt_region_base);
 
   fbl::AutoLock lock(&gtt_lock_);

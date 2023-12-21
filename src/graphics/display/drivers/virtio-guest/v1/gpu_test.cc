@@ -380,9 +380,10 @@ TEST_F(VirtioGpuTest, ImportImage) {
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
   constexpr uint64_t kBanjoInvalidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
+  uint64_t image_handle = 0;
   PerformBlockingWork([&] {
     EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoInvalidCollectionId,
-                                      /*index=*/0),
+                                      /*index=*/0, &image_handle),
               ZX_ERR_NOT_FOUND);
   });
 
@@ -391,7 +392,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   uint32_t kInvalidIndex = 100;
   PerformBlockingWork([&] {
     EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoBufferCollectionId,
-                                      kInvalidIndex),
+                                      kInvalidIndex, &image_handle),
               ZX_ERR_OUT_OF_RANGE);
   });
 

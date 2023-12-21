@@ -394,36 +394,41 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   uint64_t kBanjoInvalidCollectionId = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0),
+  uint64_t image_handle = 0;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0,
+                                                     &image_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, kInvalidIndex),
-      ZX_ERR_OUT_OF_RANGE);
+  image_handle = 0;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+                                                     kInvalidIndex, &image_handle),
+            ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad width
   invalid_image = kDefaultImage;
   invalid_image.width = invalid_image.width * 2;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, /*index=*/0),
-      ZX_ERR_INVALID_ARGS);
+  image_handle = 0;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+                                                     /*index=*/0, &image_handle),
+            ZX_ERR_INVALID_ARGS);
 
   // Invalid import: bad height
   invalid_image = kDefaultImage;
   invalid_image.height = invalid_image.height * 2;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, /*index=*/0),
-      ZX_ERR_INVALID_ARGS);
+  image_handle = 0;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+                                                     /*index=*/0, &image_handle),
+            ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_t valid_image = kDefaultImage;
-  EXPECT_EQ(valid_image.handle, 0u);
-  EXPECT_OK(
-      display.DisplayControllerImplImportImage(&valid_image, kBanjoCollectionId, /*index=*/0));
-  EXPECT_NE(valid_image.handle, 0u);
+  image_handle = 0;
+  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBanjoCollectionId, /*index=*/0,
+                                                     &image_handle));
+  EXPECT_NE(image_handle, 0u);
 
   // Release buffer collection.
   EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoCollectionId));

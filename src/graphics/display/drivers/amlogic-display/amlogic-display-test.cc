@@ -509,33 +509,36 @@ TEST_F(FakeSysmemTest, ImportImage) {
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
   invalid_config.type = IMAGE_TYPE_CAPTURE;
+  uint64_t image_handle = 0;
   EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
-                                                       /*index=*/0),
+                                                       /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
   invalid_config = kDefaultConfig;
   EXPECT_EQ(
       display_->DisplayControllerImplImportImage(&invalid_config, kBanjoInvalidBufferCollectionId,
-                                                 /*index=*/0),
+                                                 /*index=*/0, &image_handle),
       ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
-                                                       kInvalidBufferCollectionIndex),
-            ZX_ERR_OUT_OF_RANGE);
+  image_handle = 0;
+  EXPECT_EQ(
+      display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+                                                 kInvalidBufferCollectionIndex, &image_handle),
+      ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   image_t valid_config = kDefaultConfig;
-  EXPECT_EQ(valid_config.handle, 0u);
+  image_handle = 0;
   EXPECT_OK(display_->DisplayControllerImplImportImage(&valid_config, kBanjoBufferCollectionId,
-                                                       /*index=*/0));
-  EXPECT_NE(valid_config.handle, 0u);
+                                                       /*index=*/0, &image_handle));
+  EXPECT_NE(image_handle, 0u);
 
   // Release the image.
-  display_->DisplayControllerImplReleaseImage(&valid_config);
+  display_->DisplayControllerImplReleaseImage(image_handle);
 
   EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }

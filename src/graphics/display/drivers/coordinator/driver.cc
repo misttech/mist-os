@@ -32,7 +32,7 @@ zx_status_t Driver::Bind() {
   return ZX_OK;
 }
 
-void Driver::ReleaseImage(image_t* image) { dc_.ReleaseImage(image); }
+void Driver::ReleaseImage(image_t* image) { dc_.ReleaseImage(image->handle); }
 
 zx_status_t Driver::ReleaseCapture(DriverCaptureImageId driver_capture_image_id) {
   return dc_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
@@ -66,7 +66,11 @@ zx_status_t Driver::SetDisplayCaptureInterface(display_capture_interface_protoco
 
 zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collection_id,
                                 uint32_t index) {
-  return dc_.ImportImage(image, ToBanjoDriverBufferCollectionId(collection_id), index);
+  uint64_t image_handle = 0;
+  zx_status_t status =
+      dc_.ImportImage(image, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
+  image->handle = image_handle;
+  return status;
 }
 
 zx_status_t Driver::ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,

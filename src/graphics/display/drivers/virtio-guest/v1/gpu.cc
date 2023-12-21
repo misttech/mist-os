@@ -212,9 +212,10 @@ zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image,
+zx_status_t GpuDevice::DisplayControllerImplImportImage(const image_t* image,
                                                         uint64_t banjo_driver_buffer_collection_id,
-                                                        uint32_t index) {
+                                                        uint32_t index,
+                                                        uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -234,7 +235,7 @@ zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image,
       Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
              buffer_info.bytes_per_row, buffer_info.pixel_format);
   if (import_result.is_ok()) {
-    image->handle = display::ToBanjoDriverImageId(import_result.value());
+    *out_image_handle = display::ToBanjoDriverImageId(import_result.value());
     return ZX_OK;
   }
   return import_result.error_value();
@@ -279,12 +280,8 @@ zx::result<display::DriverImageId> GpuDevice::Import(
   return zx::ok(image_id);
 }
 
-void GpuDevice::DisplayControllerImplReleaseImage(image_t* image) {
-  // TODO(b/314126995): This method may only access the `handle` member of
-  // `image`. An upcoming CL will change the ReleaseImage() API to only provide
-  // the image handle.
-
-  delete reinterpret_cast<imported_image_t*>(image->handle);
+void GpuDevice::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+  delete reinterpret_cast<imported_image_t*>(image_handle);
 }
 
 config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
