@@ -14,6 +14,7 @@ source_set("async-watchdog") {
   ]
 
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/debug:backtrace-request",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",

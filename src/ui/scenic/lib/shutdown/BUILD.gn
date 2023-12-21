@@ -12,6 +12,7 @@ source_set("shutdown") {
 
   public_deps = [
     "//sdk/lib/fit-promise",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
 
