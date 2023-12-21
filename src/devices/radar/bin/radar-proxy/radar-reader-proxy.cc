@@ -5,6 +5,7 @@
 #include "radar-reader-proxy.h"
 
 #include <lib/fit/defer.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
 namespace radar {
