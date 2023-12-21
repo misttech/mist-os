@@ -51,7 +51,7 @@ TEST_F(ManagerTest, TestFindsNodes) {
 
   // Root node is always first, and has no name.
   Node* node = manager.nodes()[0].get();
-  ASSERT_STREQ("", node->name().data());
+  ASSERT_STREQ("dt-root", node->name().data());
 
   // example-device node should be next.
   node = manager.nodes()[1].get();
@@ -347,8 +347,7 @@ TEST_F(ManagerTest, TestSkipDisabledNodes) {
 
   auto pbus_node0 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 0);
   ASSERT_TRUE(pbus_node0.name().has_value());
-  // Root node has no name.
-  ASSERT_EQ(0lu, pbus_node0.name()->size());
+  ASSERT_EQ(pbus_node0.name(), "dt-root");
   auto pbus_node1 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1);
   ASSERT_TRUE(pbus_node1.name().has_value());
   ASSERT_NE(nullptr, strstr("status-okay-device", pbus_node1.name()->data()));

@@ -610,6 +610,8 @@ zx_status_t PlatformDevice::Start() {
   char name[ZX_DEVICE_NAME_MAX];
   if (vid_ == PDEV_VID_GENERIC && pid_ == PDEV_PID_GENERIC && did_ == PDEV_DID_KPCI) {
     strlcpy(name, "pci", sizeof(name));
+  } else if (did_ == PDEV_DID_DEVICETREE_NODE) {
+    strlcpy(name, name_, sizeof(name));
   } else {
     if (instance_id_ == 0) {
       // For backwards compatability, we elide instance id when it is 0.

@@ -39,8 +39,8 @@ class ExampleBoardTest : public zxtest::Test {
 TEST_F(ExampleBoardTest, DevicetreeEnumeration) {
   std::vector<std::string> device_node_paths = {
       "sys/platform/pt",
-      "sys/platform/00:00:32",
-      "sys/platform/00:00:32:1",
+      "sys/platform/dt-root",
+      "sys/platform/sample-device-0",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

@@ -33,6 +33,8 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
 
   if (parent_) {
     parent_->children_.push_back(this);
+  } else {
+    name_ = "dt-root";
   }
 
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;

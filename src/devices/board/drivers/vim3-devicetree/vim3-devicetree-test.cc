@@ -37,13 +37,13 @@ class Vim3DevicetreeTest : public zxtest::Test {
 
 TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
   std::vector<std::string> device_node_paths = {
-      "sys/platform/pt",          // vim3-devicetree board driver
-      "sys/platform/00:00:32",    // devicetree root
-      "sys/platform/00:00:32:2",  // interrupt-controller
-      "sys/platform/00:00:32:4",  // i2c_AO
-      "sys/platform/00:00:32:6",  // i2c3
-      "sys/platform/00:00:32:7",  // amlogic-clk
-      "sys/platform/00:00:32:a",  // sysmem
+      "sys/platform/pt",
+      "sys/platform/dt-root",
+      "sys/platform/interrupt-controller-ffc01000",
+      "sys/platform/i2c-1c000",
+      "sys/platform/i2c-5000",
+      "sys/platform/clock-controller-ff63c000",
+      "sys/platform/fuchsia,contiguous",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());
