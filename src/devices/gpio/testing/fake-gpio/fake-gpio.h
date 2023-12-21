@@ -146,6 +146,7 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
   // Interrupt used for GetInterrupt requests.
   zx::result<zx::interrupt> interrupt_;
+  std::atomic<bool> interrupt_used_ = false;
 
   fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
 };

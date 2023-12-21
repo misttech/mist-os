@@ -6,7 +6,9 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/common_types.h>
 #include <lib/async/default.h>
+#include <zircon/errors.h>
 
+#include <atomic>
 #include <variant>
 
 namespace fake_gpio {
@@ -31,9 +33,13 @@ FakeGpio::FakeGpio() : write_callback_(DefaultWriteCallback) {
 void FakeGpio::GetInterrupt(GetInterruptRequestView request,
                             GetInterruptCompleter::Sync& completer) {
   if (interrupt_.is_ok()) {
-    zx::interrupt interrupt;
-    ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
-    completer.ReplySuccess(std::move(interrupt));
+    if (!interrupt_used_.exchange(/*desired=*/true, std::memory_order_relaxed)) {
+      zx::interrupt interrupt;
+      ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
+      completer.ReplySuccess(std::move(interrupt));
+    } else {
+      completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    }
   } else {
     completer.ReplyError(interrupt_.error_value());
   }
@@ -98,6 +104,7 @@ void FakeGpio::Read(ReadCompleter::Sync& completer) {
 }
 
 void FakeGpio::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
+  interrupt_used_.store(false);
   completer.ReplySuccess();
 }
 
