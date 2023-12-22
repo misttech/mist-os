@@ -23,12 +23,33 @@ async fn main() {
         run_pipe_writer(&mut event_stream).await;
     }
 
-    let snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
-    let summaries = SelfProfilesReport::from_snapshot(&snapshot).unwrap();
-    assert_ne!(summaries, &[], "summaries should not be empty");
-    let summary = &summaries[0];
-    println!("{summary}"); // print this so that infra shows it for future debugging
+    let first_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let first_summaries = SelfProfilesReport::from_snapshot(&first_snapshot).unwrap();
+    assert_ne!(first_summaries, &[], "summaries should not be empty");
+    let first_summary = &first_summaries[0];
+    println!("first run: {first_summary}"); // print this so that infra shows it for future debugging
+    check_summary_expected(&first_summary);
 
+    // Run the workload again, which should approximately double our metrics.
+    for _ in 0..ITERATION_COUNT {
+        run_pipe_writer(&mut event_stream).await;
+    }
+
+    let second_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let second_summaries = SelfProfilesReport::from_snapshot(&second_snapshot).unwrap();
+    assert_ne!(second_summaries, &[], "summaries should not be empty");
+
+    // Diff this report against the first one to see what changed.
+    let second_summary = second_summaries[0].delta_from(&first_summary).unwrap();
+    println!("second run: {second_summary}"); // print this so that infra shows it for future debugging
+
+    // The second report should be approximately the same as the first and report the same number
+    // of durations.
+    check_summary_expected(&second_summary);
+}
+
+#[track_caller]
+fn check_summary_expected(summary: &SelfProfilesReport) {
     let mut restricted = None;
     let mut normal = None;
     for (name, child) in summary.root_summary().children() {

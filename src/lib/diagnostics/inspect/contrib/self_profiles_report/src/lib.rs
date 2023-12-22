@@ -63,6 +63,19 @@ impl SelfProfilesReport {
 
         leaves
     }
+
+    pub fn delta_from(&self, baseline: &Self) -> Result<Self, ComparisonError> {
+        if self.name != baseline.name {
+            return Err(ComparisonError::MismatchedNames {
+                lhs: self.name.clone(),
+                rhs: baseline.name.clone(),
+            });
+        }
+        Ok(Self {
+            name: self.name.clone(),
+            root_summary: self.root_summary.delta_from(&baseline.root_summary)?,
+        })
+    }
 }
 
 impl std::fmt::Display for SelfProfilesReport {
@@ -147,7 +160,7 @@ impl DurationSummaryBuilder {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DurationSummary {
     count: u64,
     runtime: TaskRuntimeInfo,
@@ -282,6 +295,38 @@ impl DurationSummary {
 
         tree
     }
+
+    fn delta_from(&self, baseline: &Self) -> Result<Self, ComparisonError> {
+        let count = self.count - baseline.count;
+        let runtime = self.runtime - baseline.runtime;
+        if self.location != baseline.location {
+            return Err(ComparisonError::MismatchedLocations {
+                lhs: self.location.clone(),
+                rhs: baseline.location.clone(),
+            });
+        }
+
+        let mut delta_children = BTreeMap::<String, Self>::new();
+        let baseline_children = baseline
+            .children
+            .iter()
+            .map(/*invoke auto ref */ |(n, s)| (n, s))
+            .collect::<BTreeMap<_, _>>();
+        for (name, summary) in &self.children {
+            if let Some(baseline_summary) = baseline_children.get(name) {
+                delta_children.insert(name.clone(), summary.delta_from(baseline_summary)?);
+            } else {
+                delta_children.insert(name.clone(), summary.clone());
+            }
+        }
+
+        // Sort children by how much time they occupied.
+        let mut children = delta_children.into_iter().collect::<Vec<_>>();
+        children.sort_by_key(|(_, analysis)| analysis.runtime.cpu_time);
+        children.reverse();
+
+        Ok(Self { count, runtime, children, location: self.location.clone() })
+    }
 }
 
 impl std::fmt::Display for DurationSummary {
@@ -334,6 +379,15 @@ impl std::fmt::Display for DurationRuntimeWithPercentage {
 
 fn ns_to_ms(ns: i64) -> String {
     format!("{:^5.3}ms", ns as f64 / 1_000_000.0)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ComparisonError {
+    #[error("Can't compare profiles from two different sources `{lhs}` and `{rhs}`.")]
+    MismatchedNames { lhs: String, rhs: String },
+
+    #[error("Can't compare profiles which disagree on the source location for a duration: `{lhs}` vs `{rhs}`")]
+    MismatchedLocations { lhs: String, rhs: String },
 }
 
 /// Failures that can occur when analyzing Starnix traces.

@@ -32,11 +32,9 @@ async fn main() {
     }
     let first_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
     let first_summaries = SelfProfilesReport::from_snapshot(&first_snapshot).unwrap();
-    assert_eq!(
-        first_summaries.len(),
-        1,
-        "there must only be one summary, found {first_summaries:?}"
-    );
+    assert_eq!(first_summaries.len(), 1, "must only be one summary, found {first_summaries:?}");
+    let first_summary = &first_summaries[0];
+    check_summary_expected(first_summary, 100);
 
     // Make sure the profile stays unchanged when profiling is stopped.
     puppet.stop_profiling().await.unwrap();
@@ -49,13 +47,33 @@ async fn main() {
         second_summaries, first_summaries,
         "profiled code with profiling stopped should update profiles"
     );
+    check_summary_expected(&second_summaries[0], 100);
+
+    // Run the workload again with profiling on so we can compare against the first run as baseline.
+    puppet.start_profiling().await.unwrap();
+    for _ in 0..75 {
+        puppet.run_profiled_function().await.unwrap();
+    }
+    let third_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let third_summaries = SelfProfilesReport::from_snapshot(&third_snapshot).unwrap();
+    assert_eq!(third_summaries.len(), 1, "must only be one summary, found {third_summaries:?}");
+    let third_summary = &third_summaries[0];
+
+    // This report should have observed both the first and third runs.
+    check_summary_expected(third_summary, 175);
+
+    // Using the first as a baseline should show us only the runs from the last loop.
+    check_summary_expected(&third_summary.delta_from(first_summary).unwrap(), 75);
+}
+
+#[track_caller]
+fn check_summary_expected(summary: &SelfProfilesReport, num_runs: u64) {
+    assert_eq!(summary.name(), "puppet");
 
     // The puppet creates its own root duration below the top-level catchall node.
-    let summary = &first_summaries[0];
-    assert_eq!(summary.name(), "puppet");
     let (root_name, actual_root) = summary.root_summary().children().next().unwrap();
     assert_eq!(root_name, "RootDuration");
-    assert_eq!(actual_root.count(), 100);
+    assert_eq!(actual_root.count(), num_runs);
     assert!(
         actual_root.location().starts_with(&*EXPECTED_LOCATION_PREFIX),
         "location {} must start with {}",
@@ -69,25 +87,25 @@ async fn main() {
     let mut actual_children = actual_root.children();
     let (first_name, first_duration) = actual_children.next().unwrap();
     assert_eq!(first_name, "FirstNestedDuration");
-    check_duration(first_duration, 1000, 1000);
+    check_duration(first_duration, num_runs * 10, num_runs * 10);
 
     let (second_name, second_duration) = actual_children.next().unwrap();
     assert_eq!(second_name, "SecondNestedDuration");
-    check_duration(second_duration, 100, 300);
+    check_duration(second_duration, num_runs, num_runs * 3);
 
     let (third_name, third_duration) = actual_children.next().unwrap();
     assert_eq!(third_name, "ThirdNestedDuration");
-    check_duration(third_duration, 100, 200);
+    check_duration(third_duration, num_runs, num_runs * 2);
 
     let (fourth_name, fourth_duration) = actual_children.next().unwrap();
     assert_eq!(fourth_name, "FourthNestedDuration");
-    check_duration(fourth_duration, 100, 100);
+    check_duration(fourth_duration, num_runs, num_runs);
 
     // There should be a single leaf duration shared across all parents.
     let mut leaves = summary.leaf_durations().into_iter();
     let (leaf_name, leaf_duration) = leaves.next().unwrap();
     assert_eq!(leaf_name, "LeafDuration");
-    check_leaf_duration(&leaf_duration, 1600);
+    check_leaf_duration(&leaf_duration, num_runs * 16);
     assert_approx_eq(actual_root.cpu_time(), leaf_duration.cpu_time());
     assert_eq!(leaves.next(), None);
 
