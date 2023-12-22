@@ -239,6 +239,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
 
     // C. clock rate check
     CheckClockRate(renderer_->reference_clock(), clock_slew_ppm);
+    Unbind(renderer_);
   }
 
   // Send a flat signal (step function) of size num_frames_input, using a reference clock with the
@@ -347,6 +348,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
 
     // E. clock rate check
     CheckClockRate(renderer_->reference_clock(), clock_slew_ppm);
+    Unbind(renderer_);
   }
 
   // Send a sine wave using a clock with given slew. The output should be a sine wave at slewed
@@ -503,6 +505,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
 
     // F. clock rate check
     CheckClockRate(renderer_->reference_clock(), clock_slew_ppm);
+    Unbind(renderer_);
   }
 
   const TypedFormat<ASF::FLOAT> format_;

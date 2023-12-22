@@ -112,6 +112,7 @@ TEST_F(AudioCapturerPipelineTest, CaptureWithPts) {
   capturer_->fidl().events().OnPacketProduced = nullptr;
   capturer_->fidl()->StopAsyncCapture(AddCallback("StopAsyncCapture"));
   ExpectCallbacks();
+  Unbind(capturer_);
 
   // The captured data should be silence up to start_time, followed by the input_buffer,
   // followed by more silence.
@@ -197,6 +198,7 @@ TEST_F(AudioCapturerPipelineSWGainTest, CaptureWithSWGain) {
   RunLoopWithTimeoutOrUntil([&found_nonsilent_frame]() { return found_nonsilent_frame; },
                             zx::sec(5));
   EXPECT_TRUE(found_nonsilent_frame);
+  Unbind(capturer_);
 }
 
 class AudioLoopbackPipelineTest : public HermeticAudioTest {
@@ -299,6 +301,10 @@ class AudioLoopbackPipelineTest : public HermeticAudioTest {
     capturer->fidl().events().OnPacketProduced = nullptr;
     capturer->fidl()->StopAsyncCapture(AddCallback("StopAsyncCapture"));
     ExpectCallbacks();
+    Unbind(capturer);
+    for (auto& r : renderers) {
+      Unbind(r.renderer);
+    }
 
     // Find the first output frame.
     auto first_output_value = expected_output.samples()[0];
@@ -313,8 +319,7 @@ class AudioLoopbackPipelineTest : public HermeticAudioTest {
     auto first_output_time = zx::time(packet_it->pts) + zx::nsec(ns_per_frame.Scale(frame));
     EXPECT_LT(std::abs((start_time - first_output_time + delay_before_data).get()),
               ns_per_frame.Scale(1))
-        << "first frame output at unexpected time:"
-        << "\n  expected time = " << start_time.get()
+        << "first frame output at unexpected time:" << "\n  expected time = " << start_time.get()
         << "\n       got time = " << first_output_time.get()
         << "\n    packet time = " << packet_it->pts;
 
@@ -438,6 +443,7 @@ TEST_F(AudioCapturerReleaseTest, AsyncCapture_PacketsManuallyReleased) {
   const zx::duration kLoopTimeout = zx::sec(10);
   RunLoopWithTimeoutOrUntil([this, &count]() { return ErrorOccurred() || count > 2 * kNumPackets; },
                             kLoopTimeout);
+  Unbind(capturer_);
 
   ASSERT_FALSE(ErrorOccurred());
   ASSERT_GT(count, 2 * kNumPackets);
@@ -524,6 +530,7 @@ TEST_F(AudioCapturerReleaseTest, AsyncCapture_PacketsNotManuallyReleased) {
                                               {"overflows", {.nonzero_uints = {"count"}}},
                                           },
                                   });
+  Unbind(capturer_);
 }
 
 ////// Need to add similar tests for the Capture pipeline

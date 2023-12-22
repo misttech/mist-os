@@ -70,6 +70,7 @@ TEST_F(ActivityReporterTest, AddAndRemove) {
   Unbind(r2);
   ExpectCallbacks();
   EXPECT_THAT(active_usages, UnorderedElementsAre());
+  Unbind(r1);
 }
 
 TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentCalls) {

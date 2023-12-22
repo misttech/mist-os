@@ -90,6 +90,7 @@ void HermeticStepTest::Run(const HermeticStepTest::TestCase<InputFormat, OutputF
   renderer->WaitForPackets(this, packets);
 
   auto ring_buffer = device->SnapshotRingBuffer();
+  Unbind(renderer);
   // If underflows occurred during our testing, SKIP (don't pass or fail).
   // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
   if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
@@ -101,7 +102,7 @@ void HermeticStepTest::Run(const HermeticStepTest::TestCase<InputFormat, OutputF
   // "settled". Due to filter width, the step's leading edge may not be instantaneous, so we search
   // from buffer start and end toward the middle, finding the first frames with half the expected
   // magnitude, then advance inward by the stabilization widths to ensure we look at a fully
-  // stabilized index. , then split the difference.
+  // stabilized index, then split the difference.
   for (auto chan = 0; chan < tc.output_format.channels(); ++chan) {
     auto output_chan_buffer = AudioBufferSlice<OutputFormat>(&ring_buffer).GetChannel(chan);
 

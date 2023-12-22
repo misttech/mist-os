@@ -115,6 +115,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderSameFrameRate) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -152,6 +153,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderFasterFrameRate) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -204,6 +206,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderSlowerFrameRate) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -265,6 +268,7 @@ TEST_F(AudioRendererPipelineTestInt16, PlayRampUp) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, {packets[0], packets[1]});
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -339,6 +343,7 @@ TEST_F(AudioRendererPipelineTestInt16, PauseRampDown) {
       << "Pause received pause_ref_time " << pause_ref_time
       << " in the future (now=" << renderer_ref_time.get() << ")";
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -544,6 +549,7 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
   // followed by zeros until restart_pts, then second_input (num_packets), then the remaining bytes
   // should be zeros.
   ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -601,6 +607,7 @@ TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
   // Now wait for all packets to be rendered.
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -671,6 +678,7 @@ TEST_F(AudioRendererPipelineTestInt16, SetGainBeforeSetFormat) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -720,6 +728,7 @@ TEST_F(AudioRendererPipelineTestFloat, NoDistortionOnGainChanges) {
   // Now wait for all packets to be rendered.
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -847,6 +856,8 @@ class AudioRendererGainLimitsTest : public AudioRendererPipelineTestFloat {
     renderer->PlaySynchronized(this, output_, 0);
     renderer->WaitForPackets(this, packets);
     auto ring_buffer = output_->SnapshotRingBuffer();
+    gain_control.Unbind();
+    Unbind(renderer);
 
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
@@ -1020,6 +1031,7 @@ TEST_F(AudioRendererPipelineUnderflowTest, HasUnderflow) {
                                    {"pipeline underflows", {.nonzero_uints = {"count"}}},
                                },
                        });
+  Unbind(renderer_);
 }
 
 class AudioRendererEffectsV1Test : public AudioRendererPipelineTestInt16 {
@@ -1093,6 +1105,7 @@ TEST_F(AudioRendererEffectsV1Test, RenderWithEffects) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -1158,6 +1171,7 @@ TEST_F(AudioRendererEffectsV1Test, EffectsControllerUpdateEffect) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -1250,6 +1264,7 @@ TEST_F(AudioRendererEffectsV2Test, RenderWithEffects) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -1421,6 +1436,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
   auto second_packets = renderer->AppendSlice(second_buffer, frames_per_packet, restart_pts);
   renderer->WaitForPackets(this, second_packets);
   ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -1471,6 +1487,7 @@ TEST_F(AudioRendererPipelineTuningTest, AudioTunerUpdateEffect) {
   renderer->PlaySynchronized(this, output_, 0);
   renderer->WaitForPackets(this, packets);
   auto ring_buffer = output_->SnapshotRingBuffer();
+  Unbind(renderer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).

@@ -230,6 +230,8 @@ TEST_F(AudioAdminTest, SingleRenderStream) {
 
   capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -288,6 +290,8 @@ TEST_F(AudioAdminTest, RenderMuteCapture) {
       });
   capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -359,6 +363,9 @@ void AudioAdminTest::TestCaptureMuteRender(bool set_usage_to_disable) {
   // Capture 10 samples of audio.
   loopback_capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer);
+  Unbind(capturer);
+  Unbind(loopback_capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -431,6 +438,9 @@ TEST_F(AudioAdminTest, DualRenderStreamMix) {
 
   capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer1);
+  Unbind(renderer2);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -508,6 +518,9 @@ TEST_F(AudioAdminTest, DualRenderStreamDucking) {
 
   capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer1);
+  Unbind(renderer2);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -575,6 +588,9 @@ TEST_F(AudioAdminTest, DualRenderStreamMute) {
 
   capturer->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer1);
+  Unbind(renderer2);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -645,6 +661,9 @@ TEST_F(AudioAdminTest, DualCaptureStreamNone) {
   capturer1->fidl()->StartAsyncCapture(10);
   capturer2->fidl()->StartAsyncCapture(10);
   ExpectCallbacks();
+  Unbind(renderer);
+  Unbind(capturer1);
+  Unbind(capturer2);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
@@ -718,6 +737,9 @@ TEST_F(AudioAdminTest, DISABLED_DualCaptureStreamMute) {
   capturer1->fidl()->StartAsyncCapture(10);
   capturer2->fidl()->StartAsyncCapture(10);
   RunLoopUntil([&captured1, &captured2]() { return captured1 && captured2; });
+  Unbind(renderer);
+  Unbind(capturer1);
+  Unbind(capturer2);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).

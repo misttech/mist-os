@@ -132,6 +132,7 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
     renderer->WaitForPackets(this, packets);
 
     auto ring_buffer = device->SnapshotRingBuffer();
+    Unbind(renderer);
 
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).

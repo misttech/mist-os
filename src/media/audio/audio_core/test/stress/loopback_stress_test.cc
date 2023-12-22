@@ -149,6 +149,8 @@ TEST_F(AudioLoopbackStressTest, SingleLongCapture) {
   capturer->fidl().events().OnPacketProduced = nullptr;
   capturer->fidl()->StopAsyncCaptureNoReply();
   RunLoopUntilIdle();
+  Unbind(renderer);
+  Unbind(capturer);
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).

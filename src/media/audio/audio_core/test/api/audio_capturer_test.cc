@@ -590,6 +590,7 @@ TEST_F(AudioCapturerTest, CaptureAsyncNoDevice) {
   EXPECT_NE(capture_packet->payload_size, 0u);
   auto buffer = capturer->payload().SnapshotSlice<ASF::SIGNED_16>(capture_packet->payload_offset,
                                                                   capture_packet->payload_size);
+  Unbind(capturer);
   ASSERT_EQ(1, buffer.format().channels());
   for (int64_t frame = 0; frame < buffer.NumFrames(); ++frame) {
     ASSERT_EQ(buffer.SampleAt(frame, 0), 0) << "at frame " << frame;
