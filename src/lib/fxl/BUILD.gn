@@ -128,6 +128,13 @@ sdk_source_set("functional") {
   ]
 }
 
+# Transitional target for things depending on the CLI
+# parts of fxl. Eventually CLI-specific functionality
+# will be removed from the main "fxl" target, and moved to this one.
+group("fxl_cli") {
+  public_deps = [ ":fxl" ]
+}
+
 sdk_source_set("fxl") {
   category = "internal"
   sources = [
