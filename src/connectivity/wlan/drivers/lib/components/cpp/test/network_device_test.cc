@@ -1,10 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <lib/async/cpp/task.h>
 #include <lib/mock-function/mock-function.h>
 #include <lib/stdcompat/span.h>
-
-#include <functional>
 
 #include <sdk/lib/driver/logging/cpp/logger.h>
 #include <wlan/drivers/components/frame_container.h>
@@ -31,10 +30,10 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
   TestNetworkDevice() : network_device_(this) {}
   explicit TestNetworkDevice(zx_device_t* parent) : network_device_(parent, this) {}
   void NetDevRelease() override {
-    release_called_.Signal();
     if (release_.HasExpectations()) {
       release_.Call();
     }
+    release_called_.Signal();
   }
   void NetDevInit(NetworkDevice::Callbacks::InitTxn txn) override {
     if (init_.HasExpectations()) {
@@ -107,6 +106,35 @@ TEST(NetworkDeviceTest, InitReleaseDFv1) {
   device.release_.ExpectCall();
   parent.reset();
   device.release_.VerifyAndClear();
+}
+
+TEST(NetworkDeviceTest, InitReleaseDFv2) {
+  fdf_testing::DriverRuntime runtime;
+
+  fdf::Logger logger("test", FUCHSIA_LOG_INFO, zx::socket{}, fidl::WireClient<LogSink>{});
+  fdf::Logger::SetGlobalInstance(&logger);
+
+  // Env dispatcher runs in the background because we need to make sync calls into it.
+  fdf::UnownedSynchronizedDispatcher dispatcher = runtime.StartBackgroundDispatcher();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ASSERT_OK(endpoints.status_value());
+
+  std::unique_ptr<TestNetworkDevice> device;
+
+  libsync::Completion initialized;
+  async::PostTask(dispatcher->async_dispatcher(), [&] {
+    device = std::make_unique<TestNetworkDevice>();
+    device->network_device_.Init(std::move(endpoints->client), dispatcher->async_dispatcher());
+    initialized.Signal();
+  });
+  initialized.Wait();
+
+  // Closing the node server channel should shut everything down.
+  device->release_.ExpectCall();
+  endpoints->server.Close(ZX_OK);
+  // In DFv2 the call to release is asynchronous, wait for it to happen.
+  device->release_called_.Wait();
+  device->release_.VerifyAndClear();
 }
 
 TEST(NetworkDeviceTest, PrepareVmo) {

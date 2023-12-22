@@ -16,6 +16,7 @@ test("components_test") {
   deps = [
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest:zxtest",
   ]
