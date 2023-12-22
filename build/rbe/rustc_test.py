@@ -178,18 +178,33 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.emit, {"link": [], "dep-info": [str(depfile)]})
         self.assertEqual(r.depfile, depfile)
 
-    def test_emit_link_and_rmeta(self):
+    def test_emit_link_and_unnamed_rmeta(self):
         rmeta = Path("foo.rmeta")
         r = rustc.RustAction(
             [
                 "../tools/rustc",
-                f"--emit=metadata,link",
+                "--emit=metadata,link",
                 "../foo/lib.rs",
                 "-o",
                 "foo.rlib",
             ]
         )
         self.assertEqual(r.emit, {"link": [], "metadata": []})
+        self.assertEqual(r.rmeta, rmeta)
+        self.assertIn(rmeta, set(r.extra_output_files()))
+
+    def test_emit_link_and_named_rmeta(self):
+        rmeta = Path("bar.rmeta")
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+                f"--emit=metadata={rmeta},link",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+            ]
+        )
+        self.assertEqual(r.emit, {"link": [], "metadata": [str(rmeta)]})
         self.assertEqual(r.rmeta, rmeta)
         self.assertIn(rmeta, set(r.extra_output_files()))
 

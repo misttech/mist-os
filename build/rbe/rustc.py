@@ -341,7 +341,11 @@ class RustAction(object):
     @property
     def rmeta(self) -> Optional[Path]:
         if self.emit_metadata and self.output_file:
-            return Path(self._output_file_base + ".rmeta")
+            return Path(
+                cl_utils.last_value_of_dict_flag(
+                    self.emit, "metadata", self._output_file_base + ".rmeta"
+                )
+            )
         return None
 
     @property
