@@ -30,6 +30,7 @@ source_set("common_srcs") {
   sources = [
     "gpu.cc",
     "gpu.h",
+    "gpu_driver.cc",
     "virtio-abi.cc",
     "virtio-abi.h",
   ]
@@ -38,6 +39,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bus/lib/virtio",
+    "//src/devices/lib/driver",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -53,14 +55,10 @@ fuchsia_driver("virtio_gpu-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "gpu_driver.cc" ]
   deps = [
     ":common_srcs",
     ":virtio_gpu_bind_v1",
     "//sdk/lib/syslog/cpp:backend",
-    "//src/devices/bus/lib/virtio",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
   ]
 }
 
@@ -93,7 +91,6 @@ test("virtio-gpu-test") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//sdk/lib/async-loop-testing/cpp",
-    "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
