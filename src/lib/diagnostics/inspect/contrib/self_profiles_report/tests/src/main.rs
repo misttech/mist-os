@@ -84,10 +84,10 @@ async fn main() {
     check_duration(fourth_duration, 100, 100);
 
     // There should be a single leaf duration shared across all parents.
-    let mut leaves = summary.leaf_durations();
+    let mut leaves = summary.leaf_durations().into_iter();
     let (leaf_name, leaf_duration) = leaves.next().unwrap();
     assert_eq!(leaf_name, "LeafDuration");
-    check_leaf_duration(leaf_duration, 1600);
+    check_leaf_duration(&leaf_duration, 1600);
     assert_approx_eq(actual_root.cpu_time(), leaf_duration.cpu_time());
     assert_eq!(leaves.next(), None);
 

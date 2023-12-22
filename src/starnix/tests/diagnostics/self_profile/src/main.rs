@@ -66,6 +66,7 @@ async fn main() {
 
     let restricted_leaf = summary
         .leaf_durations()
+        .into_iter()
         .find(|(n, _)| *n == "RestrictedMode")
         .map(|(_, d)| d)
         .expect("leaf durations must contain RestrictedMode");

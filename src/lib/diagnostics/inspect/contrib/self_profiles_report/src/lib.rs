@@ -14,35 +14,35 @@ const CHILD_PROPORTION_DISPLAY_THRESHOLD: f64 = 0.005;
 pub struct SelfProfilesReport {
     name: String,
     root_summary: DurationSummary,
-    leaf_durations: Vec<(String, DurationSummary)>,
 }
 
 impl SelfProfilesReport {
     pub fn from_snapshot(data: &[InspectData]) -> Result<Vec<Self>, AnalysisError> {
         let mut summaries = vec![];
         for d in data {
-            if let Some(payload) = d.payload.as_ref() {
-                for child_node in &payload.children {
-                    if child_node.get_property("__profile_durations_root").and_then(|p| p.boolean())
-                        == Some(true)
-                    {
-                        summaries.push(Self::from_node(&d.moniker, child_node)?);
-                    }
-                }
+            if let Some(s) = Self::from_single_snapshot(d) {
+                summaries.push(s?);
             }
         }
         Ok(summaries)
     }
 
+    pub fn from_single_snapshot(data: &InspectData) -> Option<Result<Self, AnalysisError>> {
+        if let Some(payload) = data.payload.as_ref() {
+            for child_node in &payload.children {
+                if child_node.get_property("__profile_durations_root").and_then(|p| p.boolean())
+                    == Some(true)
+                {
+                    return Some(Self::from_node(&data.moniker, child_node));
+                }
+            }
+        }
+        None
+    }
+
     fn from_node(name: &str, node: &DiagnosticsHierarchy) -> Result<Self, AnalysisError> {
-        let mut summary_map = BTreeMap::new();
-        let root_summary = DurationSummaryBuilder::from_inspect(node)?.build(&mut summary_map);
-
-        let mut leaf_durations = summary_map.into_iter().collect::<Vec<_>>();
-        leaf_durations.sort_by_key(|d| d.1.runtime.cpu_time);
-        leaf_durations.reverse();
-
-        Ok(Self { name: name.to_owned(), root_summary, leaf_durations })
+        let root_summary = DurationSummaryBuilder::from_inspect(node)?.build();
+        Ok(Self { name: name.to_owned(), root_summary })
     }
 
     pub fn name(&self) -> &str {
@@ -53,8 +53,15 @@ impl SelfProfilesReport {
         &self.root_summary
     }
 
-    pub fn leaf_durations(&self) -> impl Iterator<Item = (&str, &DurationSummary)> {
-        self.leaf_durations.iter().map(|(name, leaf)| (name.as_str(), leaf))
+    pub fn leaf_durations(&self) -> Vec<(String, DurationSummary)> {
+        let mut leaves = BTreeMap::new();
+        self.root_summary.summarize_leaves(&self.name, &mut leaves);
+
+        let mut leaves = leaves.into_iter().collect::<Vec<_>>();
+        leaves.sort_by_key(|d| d.1.runtime.cpu_time);
+        leaves.reverse();
+
+        leaves
     }
 }
 
@@ -63,12 +70,12 @@ impl std::fmt::Display for SelfProfilesReport {
         writeln!(f, "Profile duration summary for `{}`:\n\n{}\n", self.name, self.root_summary)?;
 
         writeln!(f, "Rolled up leaf durations:\n")?;
-        for (name, duration) in &self.leaf_durations {
+        for (name, duration) in self.leaf_durations() {
             let root_runtime = self.root_summary.runtime;
             let proportion_of_total =
                 duration.runtime.cpu_time as f64 / root_runtime.cpu_time as f64;
             if proportion_of_total >= CHILD_PROPORTION_DISPLAY_THRESHOLD {
-                write!(f, "{}", duration.display_tree(name, root_runtime))?;
+                write!(f, "{}", duration.display_tree(&name, root_runtime))?;
             }
         }
 
@@ -121,27 +128,10 @@ impl DurationSummaryBuilder {
         Ok((node.name.clone(), Self { count, runtime, children, location }))
     }
 
-    fn build(&self, leaf_summaries: &mut BTreeMap<String, DurationSummary>) -> DurationSummary {
+    fn build(&self) -> DurationSummary {
         let mut children = vec![];
         for (name, child) in &self.children {
-            if child.children.is_empty() {
-                match leaf_summaries.entry(name.clone()) {
-                    std::collections::btree_map::Entry::Vacant(v) => {
-                        v.insert(DurationSummary {
-                            count: child.count,
-                            runtime: child.runtime,
-                            location: child.location.clone(),
-                            children: vec![],
-                        });
-                    }
-                    std::collections::btree_map::Entry::Occupied(mut o) => {
-                        let leaf = o.get_mut();
-                        leaf.runtime += child.runtime;
-                        leaf.count += child.count;
-                    }
-                }
-            }
-            children.push((name.clone(), child.build(leaf_summaries)));
+            children.push((name.clone(), child.build()));
         }
 
         // Sort children by how much time they occupied.
@@ -205,6 +195,30 @@ impl DurationSummary {
     /// Child durations observed while this was executing.
     pub fn children(&self) -> impl Iterator<Item = (&str, &Self)> {
         self.children.iter().map(|(name, summary)| (name.as_str(), summary))
+    }
+
+    fn summarize_leaves(&self, own_name: &str, leaves: &mut BTreeMap<String, Self>) {
+        if self.children.is_empty() {
+            match leaves.entry(own_name.to_string()) {
+                std::collections::btree_map::Entry::Vacant(v) => {
+                    v.insert(DurationSummary {
+                        count: self.count,
+                        runtime: self.runtime,
+                        location: self.location.clone(),
+                        children: vec![],
+                    });
+                }
+                std::collections::btree_map::Entry::Occupied(mut o) => {
+                    let leaf = o.get_mut();
+                    leaf.runtime += self.runtime;
+                    leaf.count += self.count;
+                }
+            }
+        } else {
+            for (name, child) in &self.children {
+                child.summarize_leaves(&name, leaves);
+            }
+        }
     }
 
     fn display_leaf_no_location(
