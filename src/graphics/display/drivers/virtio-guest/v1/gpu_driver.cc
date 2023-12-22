@@ -5,11 +5,14 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/virtio/driver_utils.h>
-#include <zircon/types.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu.h"
 
-static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {
+namespace virtio_display {
+
+namespace {
+
+zx_status_t VirtioDisplayBind(void* ctx, zx_device_t* bus_device) {
   char flag[32];
   zx_status_t status =
       device_get_variable(bus_device, "driver.virtio-gpu.disable", flag, sizeof(flag), nullptr);
@@ -21,11 +24,13 @@ static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {
   return virtio::CreateAndBind<virtio_display::GpuDevice>(ctx, bus_device);
 }
 
-static const zx_driver_ops_t gpu_block_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = virtio_gpu_bind;
-  return ops;
-}();
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = VirtioDisplayBind,
+};
 
-ZIRCON_DRIVER(virtio_gpu, gpu_block_driver_ops, "zircon", "0.1");
+}  // namespace
+
+}  // namespace virtio_display
+
+ZIRCON_DRIVER(virtio_gpu, virtio_display::kDriverOps, "zircon", "0.1");
