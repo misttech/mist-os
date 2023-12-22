@@ -259,19 +259,43 @@ impl FileOps for DevKmsg {
     fn seek(
         &self,
         _file: &crate::vfs::FileObject,
-        _current_task: &crate::task::CurrentTask,
+        current_task: &crate::task::CurrentTask,
         _current_offset: starnix_uapi::off_t,
         target: crate::vfs::SeekTarget,
     ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-        // TODO(fxbug.dev/317135298): build these.
         match target {
-            SeekTarget::Set(_) => not_implemented!("/dev/kmsg: SEEK_SET"),
-            SeekTarget::End(_) => not_implemented!("/dev/kmsg: SEEK_END"),
-            SeekTarget::Data(_) => not_implemented!("/dev/kmsg: SEEK_DATA"),
-            SeekTarget::Cur(_) => not_implemented!("/dev/kmsg: SEEK_CUR"),
-            SeekTarget::Hole(_) => not_implemented!("/dev/kmsg: SEEK_HOLE"),
+            SeekTarget::Set(0) => {
+                let Some(ref subscription) = self.0 else {
+                    return Ok(0);
+                };
+                let mut guard = subscription.lock();
+                *guard = Syslog::snapshot_then_subscribe(current_task)?;
+                Ok(0)
+            }
+            SeekTarget::End(0) => {
+                let Some(ref subscription) = self.0 else {
+                    return Ok(0);
+                };
+                let mut guard = subscription.lock();
+                *guard = Syslog::subscribe(current_task)?;
+                Ok(0)
+            }
+            SeekTarget::Data(0) => {
+                not_implemented!("/dev/kmsg: SEEK_DATA");
+                Ok(0)
+            }
+            // The following are implemented as documented on:
+            // https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
+            // The only accepted seek targets are "SEEK_END,0", "SEEK_SET,0" and "SEEK_DATA,0"
+            // When given an invalid offset, ESPIPE is expected.
+            SeekTarget::End(_) | SeekTarget::Set(_) | SeekTarget::Data(_) => {
+                error!(ESPIPE, "Unsupported offset")
+            }
+            // According to the docs above and observations, this should be EINVAL, but dprintf
+            // fails if we make it EINVAL.
+            SeekTarget::Cur(_) => error!(ESPIPE),
+            SeekTarget::Hole(_) => error!(EINVAL, "Unsupported seek target"),
         }
-        Ok(0)
     }
 
     fn wait_async(

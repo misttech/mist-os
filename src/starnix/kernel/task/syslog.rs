@@ -60,6 +60,10 @@ impl Syslog {
         LogSubscription::snapshot_then_subscribe(current_task)
     }
 
+    pub fn subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
+        LogSubscription::subscribe(current_task)
+    }
+
     fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
         self.syscall_subscription.get().ok_or(errno!(ENOENT))
     }
@@ -179,8 +183,19 @@ impl LogSubscription {
         LogIterator::new(fdiagnostics::StreamMode::Snapshot)
     }
 
+    fn subscribe(current_task: &CurrentTask) -> Result<Self, Errno> {
+        Self::new_listening(current_task, fdiagnostics::StreamMode::Subscribe)
+    }
+
     fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<Self, Errno> {
-        let iterator = LogIterator::new(fdiagnostics::StreamMode::SnapshotThenSubscribe)?;
+        Self::new_listening(current_task, fdiagnostics::StreamMode::SnapshotThenSubscribe)
+    }
+
+    fn new_listening(
+        current_task: &CurrentTask,
+        mode: fdiagnostics::StreamMode,
+    ) -> Result<Self, Errno> {
+        let iterator = LogIterator::new(mode)?;
         let (snd, receiver) = mpsc::sync_channel(1);
         let waiters = Arc::new(WaitQueue::default());
         let waiters_clone = waiters.clone();

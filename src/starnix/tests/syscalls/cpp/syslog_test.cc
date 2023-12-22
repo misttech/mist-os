@@ -24,7 +24,7 @@ class SyslogTest : public ::testing::Test {
 TEST_F(SyslogTest, ReadDevKmsg) {
   int kmsg_fd = open("/dev/kmsg", O_RDWR);
   if (kmsg_fd < 0) {
-    printf("Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
     FAIL();
   }
   dprintf(kmsg_fd, "Hello from the dev/kmsg test\n");
@@ -41,7 +41,7 @@ TEST_F(SyslogTest, ReadDevKmsg) {
 TEST_F(SyslogTest, SyslogReadAll) {
   int kmsg_fd = open("/dev/kmsg", O_WRONLY);
   if (kmsg_fd < 0) {
-    printf("Failed to open /dev/kmsg -> %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
   dprintf(kmsg_fd, "Hello from the read-all test\n");
@@ -52,7 +52,7 @@ TEST_F(SyslogTest, SyslogReadAll) {
   buf.resize(size);
   int size_read = klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf.data(), static_cast<int>(buf.size()));
   if (size_read <= 0) {
-    printf("Failed to read: %s\n", strerror(errno));
+    fprintf(stderr, "Failed to read: %s\n", strerror(errno));
     FAIL();
   }
   EXPECT_NE(buf.find("Hello from the read-all test"), std::string::npos);
@@ -61,14 +61,14 @@ TEST_F(SyslogTest, SyslogReadAll) {
 TEST_F(SyslogTest, Read) {
   int kmsg_fd = open("/dev/kmsg", O_RDWR);
   if (kmsg_fd < 0) {
-    printf("Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
     FAIL();
   }
 
   // Write a first log.
   dprintf(kmsg_fd, "SyslogRead -- first\n");
 
-  // Read that first log we wrote.
+  //// Read that first log we wrote.
   char buf[4096];
   do {
     int size_read = klogctl(2 /* SYSLOG_ACTION_READ */, buf, sizeof(buf));
@@ -105,7 +105,7 @@ TEST_F(SyslogTest, Read) {
   int size_read =
       klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf_all.data(), static_cast<int>(buf_all.size()));
   if (size_read <= 0) {
-    printf("Failed to read: %s\n", strerror(errno));
+    fprintf(stderr, "Failed to read: %s\n", strerror(errno));
     FAIL();
   }
   EXPECT_NE(buf_all.find("SyslogRead -- first"), std::string::npos);
@@ -117,14 +117,14 @@ TEST_F(SyslogTest, Read) {
 TEST_F(SyslogTest, ReadProcKmsg) {
   int kmsg_fd = open("/dev/kmsg", O_WRONLY);
   if (kmsg_fd < 0) {
-    printf("Failed to open /dev/kmsg -> %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
   dprintf(kmsg_fd, "ReadProcKmsg -- log one\n");
 
   int proc_kmsg_fd = open("/proc/kmsg", O_RDONLY);
   if (proc_kmsg_fd < 0) {
-    printf("Failed to open /proc/kmsg -> %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /proc/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
 
@@ -165,7 +165,7 @@ TEST_F(SyslogTest, NonBlockingRead) {
 TEST_F(SyslogTest, ProcKmsgPoll) {
   int kmsg_fd = open("/dev/kmsg", O_WRONLY);
   if (kmsg_fd < 0) {
-    printf("Failed to open /dev/kmsg -> %s\n", strerror(errno));
+    fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
   dprintf(kmsg_fd, "ProcKmsgPoll -- log one\n");
@@ -203,4 +203,77 @@ TEST_F(SyslogTest, ProcKmsgPoll) {
 
   close(kmsg_fd);
   close(proc_kmsg_fd);
+}
+
+TEST_F(SyslogTest, DevKmsgSeekSet) {
+  int fd = open("/dev/kmsg", O_RDWR);
+  if (fd < 0) {
+    fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
+    FAIL();
+  }
+  dprintf(fd, "DevKmsgSeekSet: hello\n");
+
+  // Advance until we have read the log written above.
+  char buf[4096];
+  do {
+    size_t size_read = read(fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+  } while (strstr(buf, "DevKmsgSeekSet: hello") == nullptr);
+
+  // Seek to the beginning of the log.
+  lseek(fd, 0, SEEK_SET);
+
+  // We see the previous log again. If we had not done SEEK_SET,0. This would hang until some
+  // unseen log arrives.
+  std::fill_n(buf, 4096, 0);
+  do {
+    size_t size_read = read(fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+  } while (strstr(buf, "DevKmsgSeekSet: hello") == nullptr);
+
+  close(fd);
+}
+
+TEST_F(SyslogTest, DevKmsgSeekEnd) {
+  int fd = open("/dev/kmsg", O_RDWR);
+  if (fd < 0) {
+    fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
+    FAIL();
+  }
+  dprintf(fd, "DevKmsgSeekEnd: hello\n");
+
+  // Ensure the log has been written.
+  char buf[4096];
+  do {
+    size_t size_read = read(fd, buf, sizeof(buf));
+    ASSERT_GT(size_read, 0ul);
+  } while (strstr(buf, "DevKmsgSeekEnd: hello") == nullptr);
+  close(fd);
+
+  // Open a new file, and seek to the end of the log.
+  fd = open("/dev/kmsg", O_RDWR | O_NONBLOCK);
+  if (fd < 0) {
+    fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
+    FAIL();
+  }
+
+  lseek(fd, 0, SEEK_END);
+
+  // TODO(b/317135298): there's a race today in which we can't know precisely the moment at which
+  // we'll be subscribing. Therefore we need to re-emit this log as we read. The main thing this
+  // test asserts is that we don't see the previous log. As we improve the API between archivist and
+  // starnix we should have this single log here, read in a blocking way and stop emitting the log
+  // in the do-while below.
+  dprintf(fd, "DevKmsgSeekEnd: bye\n");
+
+  // We should see the second log but never the first one.
+  std::fill_n(buf, 4096, 0);
+  do {
+    size_t size_read = read(fd, buf, sizeof(buf));
+    dprintf(fd, "DevKmsgSeekEnd: bye\n");
+    ASSERT_GT(size_read, 0ul);
+    EXPECT_EQ(strstr(buf, "DevKmsgSeekEnd: hello"), nullptr);
+  } while (strstr(buf, "DevKmsgSeekEnd: bye") == nullptr);
+
+  close(fd);
 }

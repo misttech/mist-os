@@ -52,6 +52,7 @@ use std::{
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
 
+#[derive(Debug)]
 pub enum SeekTarget {
     /// Seek to the given offset relative to the start of the file.
     Set(off_t),
