@@ -5,8 +5,8 @@
 use crate::{
     device::{init_common_devices, parse_features, run_container_features},
     execution::{
-        create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
-        serve_component_runner, serve_container_controller, serve_graphical_presenter,
+        create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
+        expose_root, serve_component_runner, serve_container_controller, serve_graphical_presenter,
     },
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
     task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task, TaskBuilder},
@@ -387,7 +387,7 @@ async fn create_container(
 
     let init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
-    execute_task(
+    execute_task_with_prerun_result(
         init_task,
         move |_, init_task| init_task.exec(executable, argv[0].clone(), argv.clone(), vec![]),
         move |result| {

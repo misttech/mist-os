@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    execution::execute_task,
+    execution::execute_task_with_prerun_result,
     fs::{devpts::create_main_and_replica, fuchsia::create_fuchsia_pipe},
     task::{CurrentTask, ExitStatus, Kernel},
     vfs::{
@@ -92,7 +92,7 @@ async fn spawn_console(
         let window_size = to_winsize(payload.window_size);
         let current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
         let (sender, receiver) = oneshot::channel::<Result<u8, i32>>();
-        let pty = execute_task(
+        let pty = execute_task_with_prerun_result(
             current_task,
             move |_, current_task| {
                 let executable =

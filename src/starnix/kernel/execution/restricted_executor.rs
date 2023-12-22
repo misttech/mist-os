@@ -421,7 +421,7 @@ pub fn create_zircon_process(
     Ok(TaskInfo { thread: None, thread_group, memory_manager })
 }
 
-pub fn execute_task<F, R, G>(
+pub fn execute_task_with_prerun_result<F, R, G>(
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
@@ -435,6 +435,36 @@ where
     G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
     let (sender, receiver) = sync_channel::<Result<R, Errno>>(1);
+    execute_task(
+        task_builder,
+        move |current_task, locked| {
+            match pre_run(current_task, locked) {
+                Err(errno) => {
+                    let _ = sender.send(Err(errno.clone()));
+                    Err(errno)
+                }
+                Ok(value) => sender.send(Ok(value)).map_err(|error| {
+                    log_error!("Unable to send `pre_run` result: {error:?}");
+                    errno!(EINVAL)
+                }),
+            }
+        },
+        task_complete,
+    );
+    receiver.recv().map_err(|e| {
+        log_error!("Unable to retrieve result from `pre_run`: {e:?}");
+        errno!(EINVAL)
+    })?
+}
+
+pub fn execute_task<F, G>(task_builder: TaskBuilder, pre_run: F, task_complete: G)
+where
+    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<(), Errno>
+        + Send
+        + Sync
+        + 'static,
+    G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
+{
     // Set the process handle to the new task's process, so the new thread is spawned in that
     // process.
     let process_handle = task_builder.task.thread_group.process.raw_handle();
@@ -453,14 +483,9 @@ where
             let mut locked = Unlocked::new();
             let mut current_task: CurrentTask = task_builder.into();
             let pre_run_result = pre_run(&mut locked, &mut current_task);
-            let mut pre_run_failed = pre_run_result.is_err();
-
-            if let Err(error) = sender.send(pre_run_result) {
-                log_error!("Unable to send `pre_run` result: {error:?}");
-                pre_run_failed = true;
-            }
-
-            if !pre_run_failed {
+            if pre_run_result.is_err() {
+                log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
+            } else {
                 let run_result = match run_task(&mut locked, &mut current_task) {
                     Err(error) => {
                         log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
@@ -499,10 +524,6 @@ where
     if let Err(err) = ref_task.sync_scheduler_policy_to_role() {
         log_warn!(?err, "Couldn't update freshly spawned thread's profile.");
     }
-    receiver.recv().map_err(|e| {
-        log_error!("Unable to retrieve result from `pre_run`: {e:?}");
-        errno!(EINVAL)
-    })?
 }
 
 fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {

@@ -4,7 +4,9 @@
 
 use crate::{
     device::run_component_features,
-    execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
+    execution::{
+        create_filesystem_from_spec, execute_task_with_prerun_result, parse_numbered_handles,
+    },
     fs::fuchsia::RemoteFs,
     signals,
     task::{CurrentTask, ExitStatus, Task},
@@ -151,7 +153,7 @@ pub async fn start_component(
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let current_task = CurrentTask::create_init_child_process(system_task.kernel(), &binary_path)?;
 
-    let weak_task = execute_task(
+    let weak_task = execute_task_with_prerun_result(
         current_task,
         {
             let mount_record = mount_record.clone();

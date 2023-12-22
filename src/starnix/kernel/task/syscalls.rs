@@ -97,15 +97,9 @@ where
         new_task.thread_state.registers.set_thread_pointer_register(args.tls);
     }
 
-    let (tid, task_ref) = execute_task(
-        new_task,
-        |_, new_task| {
-            let tid = new_task.id;
-            let task_ref = new_task.weak_task();
-            Ok((tid, task_ref))
-        },
-        |_| {},
-    )?;
+    let tid = new_task.task.id;
+    let task_ref = WeakRef::from(&new_task.task);
+    execute_task(new_task, |_, _| Ok(()), |_| {});
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
         current_task.wait_for_execve(task_ref)?;
