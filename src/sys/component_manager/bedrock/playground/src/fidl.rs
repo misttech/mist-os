@@ -76,13 +76,12 @@ mod test {
         let response = "first";
 
         // Initialize the host and sender/receiver pair.
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
 
         // Serve an Echo request handler on the Receiver.
         fasync::Task::spawn(async move {
             loop {
-                let msg = receiver.receive().await;
+                let msg = receiver.receive().await.unwrap();
                 let stream: fecho::EchoRequestStream =
                     ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
                         .into_stream()

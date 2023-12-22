@@ -149,8 +149,7 @@ mod tests {
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]
     async fn fidl_clone() {
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
 
         // Send a channel through the Sender.
         let (ch1, _ch2) = zx::Channel::create();
@@ -173,7 +172,7 @@ mod tests {
 
         // The Receiver should receive two channels, one from each sender.
         for _ in 0..2 {
-            let _ch = receiver.receive().await;
+            let _ch = receiver.receive().await.unwrap();
         }
     }
 }

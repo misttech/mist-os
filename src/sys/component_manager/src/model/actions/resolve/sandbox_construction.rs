@@ -195,30 +195,28 @@ fn extend_dict_with_use(
             )
         }
         cm_rust::UseSource::Framework => {
-            let receiver = Receiver::new();
+            let (receiver, sender) = Receiver::new();
             let source_name = source_name.clone();
-            let receiver_clone = receiver.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name.clone()),
                     component,
                 }),
-                receiver_clone,
+                receiver,
             ));
-            new_terminating_router(receiver.new_sender())
+            new_terminating_router(sender)
         }
         cm_rust::UseSource::Capability(_) => {
-            let receiver = Receiver::new();
+            let (receiver, sender) = Receiver::new();
             let use_ = use_.clone();
-            let receiver_clone = receiver.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Use(use_.clone()),
                     component,
                 }),
-                receiver_clone,
+                receiver,
             ));
-            new_terminating_router(receiver.new_sender())
+            new_terminating_router(sender)
         }
         _ => return, // unsupported
     };
@@ -370,9 +368,9 @@ fn new_router_for_cm_hosted_receiver(
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
     cap_source_factory: CapabilitySourceFactory,
 ) -> Router {
-    let receiver = Receiver::new();
-    sources_and_receivers.push((cap_source_factory, receiver.clone()));
-    new_terminating_router(receiver.new_sender())
+    let (receiver, sender) = Receiver::new();
+    sources_and_receivers.push((cap_source_factory, receiver));
+    new_terminating_router(sender)
 }
 
 fn new_forwarding_router_to_child(

@@ -412,8 +412,8 @@ impl BuiltinDictBuilder {
             // capability to the dict.
             return;
         }
-        let receiver = Receiver::new();
-        let router = new_terminating_router(receiver.new_sender());
+        let (receiver, sender) = Receiver::new();
+        let router = new_terminating_router(sender);
         self.dict.insert_capability(iter::once(P::PROTOCOL_NAME), router);
 
         let capability_source = CapabilitySource::Builtin {
@@ -1251,8 +1251,8 @@ impl BuiltinEnvironment {
     ) where
         P: ProtocolMarker,
     {
-        let receiver = Receiver::new();
-        let router = new_terminating_router(receiver.new_sender());
+        let (receiver, sender) = Receiver::new();
+        let router = new_terminating_router(sender);
         self.dict.insert_capability(iter::once(name.as_str()), router);
 
         let capability_source = CapabilitySource::Builtin {

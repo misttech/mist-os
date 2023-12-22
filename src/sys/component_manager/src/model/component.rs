@@ -1380,8 +1380,8 @@ impl ResolvedInstanceState {
                     cm_rust::CapabilityDecl::Protocol(_) => (),
                     _ => continue,
                 }
-                let receiver = Receiver::new();
-                let router = new_terminating_router(receiver.new_sender());
+                let (receiver, sender) = Receiver::new();
+                let router = new_terminating_router(sender);
                 let router = router.with_policy_check(
                     CapabilitySource::Component {
                         capability: ComponentCapability::Protocol(match capability {

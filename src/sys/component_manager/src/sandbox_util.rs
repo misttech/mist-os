@@ -170,7 +170,8 @@ impl DictExt for Dict {
     /// Reads messages from Receivers in this Dict.
     ///
     /// Once a message is received, returns the name of the Dict that the Receiver was in and the
-    /// message that was received. Returns `None` if there are no Receivers in this Dict.
+    /// message that was received. Returns `None` if there are no Receivers in this Dict, or if
+    /// the senders to those receivers are all dropped.
     async fn read_receivers(&self) -> Option<(Name, Message<WeakComponentInstance>)> {
         let mut futures_unordered = FuturesUnordered::new();
         // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
@@ -184,12 +185,17 @@ impl DictExt for Dict {
             }
             drop(entries);
         }
-        if futures_unordered.is_empty() {
-            return None;
+        loop {
+            // Pick the next ready receiver or return when all receivers have terminated.
+            let Some((name, message)) = futures_unordered.next().await else {
+                return None;
+            };
+            let Some(message) = message else {
+                // One receiver terminated.
+                continue;
+            };
+            return Some((name.parse().unwrap(), message));
         }
-        let (name, message) =
-            futures_unordered.next().await.expect("FuturesUnordered is not empty");
-        return Some((name.parse().unwrap(), message));
     }
 }
 
@@ -277,8 +283,7 @@ impl LaunchTaskOnReceive {
     }
 
     pub async fn run(self) {
-        loop {
-            let message = self.receiver.receive().await;
+        while let Some(message) = self.receiver.receive().await {
             if let Some((policy_checker, capability_source)) = &self.policy {
                 if let Err(_e) =
                     policy_checker.can_route_capability(&capability_source, &message.target.moniker)
@@ -329,7 +334,7 @@ pub mod tests {
     async fn get_capability() {
         let sub_dict = Dict::new();
         sub_dict.lock_entries().insert("bar".to_string(), Box::new(Dict::new()));
-        let receiver: Receiver<()> = Receiver::new();
+        let (receiver, _) = Receiver::<()>::new();
         sub_dict.lock_entries().insert("baz".to_string(), Box::new(receiver));
 
         let test_dict = Dict::new();
@@ -351,7 +356,7 @@ pub mod tests {
         test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new());
         assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
 
-        let receiver: Receiver<()> = Receiver::new();
+        let (receiver, _) = Receiver::<()>::new();
         test_dict.insert_capability(["foo", "baz"].into_iter(), receiver);
         assert!(test_dict.get_capability::<Receiver<()>>(["foo", "baz"].into_iter()).is_some());
     }

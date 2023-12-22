@@ -98,8 +98,7 @@ impl FactoryCapabilityHost {
         sender_server: ServerEnd<fsandbox::SenderMarker>,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
     ) {
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });

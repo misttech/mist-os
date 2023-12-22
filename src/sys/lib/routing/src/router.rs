@@ -391,8 +391,7 @@ mod tests {
     async fn route_and_use_sender_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
-        let receiver: Receiver<()> = Receiver::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         let router = Router::new(move |_request, completer| {
             completer.complete(Ok(Box::new(sender.clone())))
         });

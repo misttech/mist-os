@@ -672,13 +672,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_sender_into_open() {
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
-        let msg = receiver.receive().await;
+        let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
             msg.payload.channel.basic_info().unwrap().koid
@@ -689,8 +688,7 @@ mod tests {
     fn test_sender_into_open_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -712,8 +710,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_sender_into_open_via_dict() {
         let dict = Dict::new();
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
         let open: Open = dict.try_into().unwrap();
@@ -721,7 +718,7 @@ mod tests {
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
-        let msg = receiver.receive().await;
+        let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
             msg.payload.channel.basic_info().unwrap().koid
@@ -733,8 +730,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let dict = Dict::new();
-        let receiver = Receiver::<()>::new();
-        let sender = receiver.new_sender();
+        let (receiver, sender) = Receiver::<()>::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
         let open: Open = dict.try_into().unwrap();

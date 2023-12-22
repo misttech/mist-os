@@ -197,8 +197,8 @@ impl ElfRunnerProgram {
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
     fn new(job: zx::Job, resources: Arc<ElfRunnerResources>) -> Self {
-        let elf_runner_receiver = Receiver::new();
-        let snapshot_provider_receiver = Receiver::new();
+        let (elf_runner_receiver, elf_runner_sender) = Receiver::new();
+        let (snapshot_provider_receiver, snapshot_provider_sender) = Receiver::new();
 
         let output = Dict::new();
         let svc = Dict::new();
@@ -206,11 +206,11 @@ impl ElfRunnerProgram {
             let mut entries = svc.lock_entries();
             entries.insert(
                 fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
-                Box::new(elf_runner_receiver.new_sender()),
+                Box::new(elf_runner_sender),
             );
             entries.insert(
                 freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
-                Box::new(snapshot_provider_receiver.new_sender()),
+                Box::new(snapshot_provider_sender),
             );
         }
         output.lock_entries().insert(SVC.to_string(), Box::new(svc));

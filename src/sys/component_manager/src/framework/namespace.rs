@@ -197,13 +197,12 @@ mod tests {
         let mut namespace_pairs = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<()>::new();
-            let sender = receiver.new_sender();
+            let (receiver, sender) = Receiver::<()>::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
                 loop {
-                    let msg = receiver.receive().await;
+                    let msg = receiver.receive().await.unwrap();
                     let stream: fecho::EchoRequestStream =
                         ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
                             .into_stream()
@@ -265,13 +264,11 @@ mod tests {
         let mut namespace_pairs = vec![];
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<()>::new();
-            let sender = receiver.new_sender();
+            let (receiver, sender) = Receiver::<()>::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
-                loop {
-                    let msg = receiver.receive().await;
+                while let Some(msg) = receiver.receive().await {
                     let stream: fecho::EchoRequestStream =
                         ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
                             .into_stream()
