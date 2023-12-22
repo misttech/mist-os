@@ -15,7 +15,7 @@ use crate::{
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
-        PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Syslog, Task,
+        PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
     vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer},
@@ -1652,6 +1652,7 @@ pub fn sys_syslog(
     length: i32,
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
+    let syslog = current_task.kernel().syslog.access(&current_task)?;
     match action {
         SyslogAction::Read => {
             if address.is_null() || length < 0 {
@@ -1659,7 +1660,7 @@ pub fn sys_syslog(
             }
             let mut output_buffer =
                 UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
-            current_task.kernel().syslog.blocking_read(current_task, &mut output_buffer)
+            syslog.blocking_read(current_task, &mut output_buffer)
         }
         SyslogAction::ReadAll => {
             if address.is_null() || length < 0 {
@@ -1667,18 +1668,11 @@ pub fn sys_syslog(
             }
             let mut output_buffer =
                 UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
-            Syslog::read_all(&mut output_buffer)
+            syslog.read_all(&mut output_buffer)
         }
-        SyslogAction::SizeUnread => current_task.kernel().syslog.size_unread(current_task),
-        SyslogAction::SizeBuffer => Syslog::size_buffer(),
-        SyslogAction::Close => {
-            not_implemented!("syslog: close");
-            Ok(0)
-        }
-        SyslogAction::Open => {
-            not_implemented!("syslog: open");
-            Ok(0)
-        }
+        SyslogAction::SizeUnread => syslog.size_unread(),
+        SyslogAction::SizeBuffer => syslog.size_buffer(),
+        SyslogAction::Close | SyslogAction::Open => Ok(0),
         SyslogAction::ReadClear => {
             not_implemented!("syslog: read clear");
             Ok(0)

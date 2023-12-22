@@ -177,7 +177,6 @@ gvisor_tests = [
   "sync_file_range_test",
   "sync_test",
   "sysinfo_test",
-  "syslog_test",
   "sysret_test",
   "tcp_socket_test",
   "tgkill_test",
@@ -239,13 +238,30 @@ gvisor_tests_run_as_root = [
   "tuntap_test",
   "uidgid_test",
   "uname_test",
+  "syslog_test",
 ]
 
 gvisor_tests_custom_manifest = [
-  "cgroup_test",
-  "exec_test",
-  "futex_test",
-  "setgid_test",
+  {
+    test_name = "cgroup_test"
+  },
+  {
+    test_name = "exec_test"
+  },
+  {
+    test_name = "futex_test"
+  },
+  {
+    test_name = "setgid_test"
+  },
+  {
+    test_name = "syslog_cap_syslog_test"
+    binary = "syslog_test"
+  },
+  {
+    test_name = "syslog_cap_sys_admin_test"
+    binary = "syslog_test"
+  },
 ]
 
 gvisor_benchmarks = [
@@ -371,7 +387,7 @@ template("gvisor_test_component") {
     ]
 
     if (defined(invoker.run_as_root) && invoker.run_as_root) {
-      sources += [ "meta/gvisor_run_as_root.shard.cml" ]
+      sources += [ "//src/starnix/tests/run_as_root.shard.cml" ]
     }
     if (use_gen_manifest) {
       deps = [ ":${test_name}_manifest" ]
@@ -477,10 +493,15 @@ foreach(test_name, gvisor_tests_run_as_root) {
   }
 }
 
-foreach(test_name, gvisor_tests_custom_manifest) {
+foreach(test, gvisor_tests_custom_manifest) {
+  test_name = test.test_name
+  binary_name = test_name
+  if (defined(test.binary)) {
+    binary_name = test.binary
+  }
   resource("${test_name}_bin") {
-    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
-    outputs = [ "data/tests/${test_name}" ]
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${binary_name}" ]
+    outputs = [ "data/tests/${binary_name}" ]
   }
   gvisor_tmpfs_and_fxfs_components(test_name) {
     use_gen_manifest = false
@@ -535,8 +556,8 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests") {
   foreach(test_name, gvisor_tests_run_as_root) {
     test_components += [ ":${test_name}" ]
   }
-  foreach(test_name, gvisor_tests_custom_manifest) {
-    test_components += [ ":${test_name}" ]
+  foreach(test, gvisor_tests_custom_manifest) {
+    test_components += [ ":${test.test_name}" ]
   }
 }
 
@@ -550,8 +571,8 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests_on_fxfs") {
   foreach(test_name, gvisor_tests_run_as_root) {
     test_components += [ ":${test_name}_use_persistent_storage" ]
   }
-  foreach(test_name, gvisor_tests_custom_manifest) {
-    test_components += [ ":${test_name}_use_persistent_storage" ]
+  foreach(test, gvisor_tests_custom_manifest) {
+    test_components += [ ":${test.test_name}_use_persistent_storage" ]
   }
 }
 

@@ -236,6 +236,7 @@ pub fn open_kmsg(
     _node: &FsNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
+    Syslog::validate_access(current_task)?;
     let subscription = if flags.can_read() {
         Some(Mutex::new(Syslog::snapshot_then_subscribe(&current_task)?))
     } else {

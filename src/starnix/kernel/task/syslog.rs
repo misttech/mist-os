@@ -35,17 +35,43 @@ pub struct Syslog {
 impl Syslog {
     pub fn init(&self, system_task: &CurrentTask) -> Result<(), anyhow::Error> {
         let subscription = LogSubscription::snapshot_then_subscribe(system_task)?;
-        self.syscall_subscription.set(Mutex::new(subscription)).expect("syslog.set called once");
+        self.syscall_subscription.set(Mutex::new(subscription)).expect("syslog inititialized once");
         Ok(())
     }
 
-    pub fn read(
-        &self,
-        current_task: &CurrentTask,
-        out: &mut dyn OutputBuffer,
-    ) -> Result<i32, Errno> {
-        Self::check_credentials(&current_task)?;
-        let mut subscription = self.subscription()?.lock();
+    // TODO(b/316630310): for now, all actions on the syslog are privileged.
+    // READ_ALL and SIZE_BUFFER should be granted unprivileged access if
+    // `/proc/sys/kernel/dmesg_restrict` is 0, which also allows to read /dev/kmsg.
+    pub fn access(&self, current_task: &CurrentTask) -> Result<GrantedSyslog<'_>, Errno> {
+        Self::validate_access(current_task)?;
+        let syscall_subscription = self.subscription()?;
+        Ok(GrantedSyslog { syscall_subscription })
+    }
+
+    pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
+        let credentials = current_task.creds();
+        if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
+            return Ok(());
+        }
+        error!(EPERM)
+    }
+
+    pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
+        LogSubscription::snapshot_then_subscribe(current_task)
+    }
+
+    fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
+        self.syscall_subscription.get().ok_or(errno!(ENOENT))
+    }
+}
+
+pub struct GrantedSyslog<'a> {
+    syscall_subscription: &'a Mutex<LogSubscription>,
+}
+
+impl GrantedSyslog<'_> {
+    pub fn read(&self, out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
+        let mut subscription = self.syscall_subscription.lock();
         if let Some(log) = subscription.try_next()? {
             let size_to_write = cmp::min(log.len(), out.available() as usize);
             out.write(&log[..size_to_write])?;
@@ -53,13 +79,9 @@ impl Syslog {
         }
         Ok(0)
     }
-    pub fn wait(
-        &self,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Result<WaitCanceler, Errno> {
-        Ok(self.subscription()?.lock().wait(waiter, events, handler))
+
+    pub fn wait(&self, waiter: &Waiter, events: FdEvents, handler: EventHandler) -> WaitCanceler {
+        self.syscall_subscription.lock().wait(waiter, events, handler)
     }
 
     pub fn blocking_read(
@@ -67,8 +89,7 @@ impl Syslog {
         current_task: &CurrentTask,
         out: &mut dyn OutputBuffer,
     ) -> Result<i32, Errno> {
-        Self::check_credentials(&current_task)?;
-        let mut subscription = self.subscription()?.lock();
+        let mut subscription = self.syscall_subscription.lock();
         let mut write_log = |log: Vec<u8>| {
             let size_to_write = cmp::min(log.len(), out.available() as usize);
             out.write(&log[..size_to_write])?;
@@ -97,7 +118,7 @@ impl Syslog {
         }
     }
 
-    pub fn read_all(out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
+    pub fn read_all(&self, out: &mut dyn OutputBuffer) -> Result<i32, Errno> {
         let mut subscription = LogSubscription::snapshot()?;
         let mut buffer = ResultBuffer::new(out.available());
         while let Some(log_result) = subscription.next() {
@@ -108,31 +129,14 @@ impl Syslog {
         Ok(result.len() as i32)
     }
 
-    pub fn size_unread(&self, current_task: &CurrentTask) -> Result<i32, Errno> {
-        Self::check_credentials(&current_task)?;
-        let mut subscription = self.subscription()?.lock();
+    pub fn size_unread(&self) -> Result<i32, Errno> {
+        let mut subscription = self.syscall_subscription.lock();
         Ok(subscription.available()?.try_into().unwrap_or(std::i32::MAX))
     }
 
-    pub fn size_buffer() -> Result<i32, Errno> {
+    pub fn size_buffer(&self) -> Result<i32, Errno> {
         // For now always return a constant for this.
         Ok(BUFFER_SIZE)
-    }
-
-    pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
-        LogSubscription::snapshot_then_subscribe(current_task)
-    }
-
-    fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
-        self.syscall_subscription.get().ok_or(errno!(ENOENT))
-    }
-
-    fn check_credentials(current_task: &CurrentTask) -> Result<(), Errno> {
-        let credentials = current_task.creds();
-        if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
-            return Ok(());
-        }
-        error!(EPERM)
     }
 }
 

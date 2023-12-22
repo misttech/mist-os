@@ -185,7 +185,8 @@ impl FileOps for ProcKmsgFile {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        current_task.kernel().syslog.wait(waiter, events, handler).ok()
+        let syslog = current_task.kernel().syslog.access(current_task).ok()?;
+        Some(syslog.wait(waiter, events, handler))
     }
 
     fn query_events(
@@ -193,8 +194,9 @@ impl FileOps for ProcKmsgFile {
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
+        let syslog = current_task.kernel().syslog.access(current_task)?;
         let mut events = FdEvents::empty();
-        if current_task.kernel().syslog.size_unread(current_task)? > 0 {
+        if syslog.size_unread()? > 0 {
             events |= FdEvents::POLLIN;
         }
         Ok(events)
@@ -207,8 +209,9 @@ impl FileOps for ProcKmsgFile {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        let syslog = current_task.kernel().syslog.access(current_task)?;
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            let bytes_written = current_task.kernel().syslog.read(current_task, data)?;
+            let bytes_written = syslog.read(data)?;
             Ok(bytes_written as usize)
         })
     }

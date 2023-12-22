@@ -5,6 +5,7 @@
     program: {
         runner: "starnix_container",
         binary: "data/tests/linux_kmsg_hello_world",
+        capabilities: [ "SYSLOG" ],
     },
     capabilities: [
         { protocol: "fuchsia.component.Binder" },
