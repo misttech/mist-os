@@ -356,8 +356,8 @@ zx_status_t AmlG12TdmStream::Init() {
   }
   snprintf(device_name_, sizeof(device_name_), "%s-audio-%s-%s", prod_name_, tdm_type, in_out);
 
-  // TODO(mpuryear): change this to the domain of the clock received from the board driver
-  clock_domain_ = 0;
+  // This audio subdevice is in the MONOTONIC clock domain.
+  clock_domain_ = fuchsia_hardware_audio::wire::kClockDomainMonotonic;
 
   return ZX_OK;
 }

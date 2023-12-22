@@ -825,7 +825,7 @@ impl Configurator for DefaultConfigurator {
             } else {
                 fidl_fuchsia_hardware_audio::PlugDetectCapabilities::CanAsyncNotify
             }),
-            clock_domain: Some(0u32),
+            clock_domain: Some(fidl_fuchsia_hardware_audio::CLOCK_DOMAIN_MONOTONIC),
             manufacturer: Some("Google".to_string()),
             product: Some(configurator_product),
             ..Default::default()
@@ -1335,7 +1335,7 @@ mod tests {
             plug_detect_capabilities: Some(
                 fidl_fuchsia_hardware_audio::PlugDetectCapabilities::Hardwired,
             ),
-            clock_domain: Some(0u32),
+            clock_domain: Some(fidl_fuchsia_hardware_audio::CLOCK_DOMAIN_MONOTONIC),
             manufacturer: Some("Test Manufacturer".to_string()),
             product: Some("Test Product".to_string()),
             ..Default::default()

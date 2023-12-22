@@ -473,11 +473,8 @@ void IntelHDAStreamConfigBase::OnGetStringLocked(const audio_proto::GetStringReq
 void IntelHDAStreamConfigBase::OnGetClockDomainLocked(audio_proto::GetClockDomainResp* out_resp) {
   ZX_DEBUG_ASSERT(out_resp != nullptr);
 
-  // By default we claim to be in the MONOTONIC clock domain.
-  // TODO(mpuryear): if the audio clock might possibly ever be in a different domain than the local
-  // system clock (either because it is trimmable [unlikely] or uses a different oscillator [even
-  // less likely]), handle that case here.
-  out_resp->clock_domain = 0;
+  // Unless overridden, this audio subdevice is in the MONOTONIC clock domain.
+  out_resp->clock_domain = audio_fidl::wire::kClockDomainMonotonic;
 }
 
 void IntelHDAStreamConfigBase::ProcessClientDeactivateLocked(StreamChannel* channel) {

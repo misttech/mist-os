@@ -283,7 +283,7 @@ class UsbAudioStream : public UsbAudioStreamBase,
   fbl::RefPtr<RingBufferChannel> rb_channel_ __TA_GUARDED(lock_);
   fbl::DoublyLinkedList<fbl::RefPtr<StreamChannel>> stream_channels_ __TA_GUARDED(lock_);
 
-  int32_t clock_domain_ = 0;
+  int32_t clock_domain_ = fuchsia_hardware_audio::wire::kClockDomainMonotonic;
 
   size_t selected_format_ndx_;
   uint32_t selected_frame_rate_;
@@ -311,8 +311,8 @@ class UsbAudioStream : public UsbAudioStreamBase,
 
   std::optional<StartCompleter::Async> start_completer_ __TA_GUARDED(req_lock_);
   std::optional<StopCompleter::Async> stop_completer_ __TA_GUARDED(req_lock_);
-  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_
-      __TA_GUARDED(req_lock_);
+  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_ __TA_GUARDED(
+      req_lock_);
   // We won't ever actually Reply on this Async completer (we don't dynamically change delays),
   // but WatchDelayInfo can't just call completer.ToAsync and immediately let it drop.
   std::optional<WatchDelayInfoCompleter::Async> delay_completer_;

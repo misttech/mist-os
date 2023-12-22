@@ -190,7 +190,7 @@ TEST_F(HdaStreamTest, GetStreamPropertiesDefaults) {
   EXPECT_EQ(result.value().properties.can_agc(), false);
   EXPECT_EQ(result.value().properties.plug_detect_capabilities(),
             audio_fidl::wire::PlugDetectCapabilities::kHardwired);
-  EXPECT_EQ(result.value().properties.clock_domain(), 0);
+  EXPECT_EQ(result.value().properties.clock_domain(), audio_fidl::wire::kClockDomainMonotonic);
 }
 
 TEST_F(HdaStreamTest, SetAndGetGainDefaults) {
@@ -298,7 +298,7 @@ TEST_F(HdaStreamTest2, GetStreamProperties) {
   EXPECT_EQ(result.value().properties.can_agc(), false);
   EXPECT_EQ(result.value().properties.plug_detect_capabilities(),
             audio_fidl::wire::PlugDetectCapabilities::kCanAsyncNotify);
-  EXPECT_EQ(result.value().properties.clock_domain(), 0);
+  EXPECT_EQ(result.value().properties.clock_domain(), audio_fidl::wire::kClockDomainMonotonic);
 }
 
 TEST_F(HdaStreamTest2, SetAndGetGain) {

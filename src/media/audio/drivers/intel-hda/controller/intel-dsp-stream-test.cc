@@ -198,7 +198,7 @@ TEST_F(SstStreamTest, GetStreamProperties) {
 
   // Must report a clock domain. Reports monotonic, i.e. 0.
   ASSERT_TRUE(properties.has_clock_domain());
-  ASSERT_EQ(properties.clock_domain(), 0);
+  ASSERT_EQ(properties.clock_domain(), fuchsia_hardware_audio::wire::kClockDomainMonotonic);
 }
 
 TEST_F(SstStreamTest, Reset) {

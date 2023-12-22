@@ -303,7 +303,7 @@ class SimpleAudioStream : public SimpleAudioStreamBase,
   char mfr_name_[64] __TA_GUARDED(domain_token()) = {};
   char prod_name_[64] __TA_GUARDED(domain_token()) = {};
   char device_name_[32] = {};
-  int32_t clock_domain_ __TA_GUARDED(domain_token()) = 0;
+  int32_t clock_domain_ __TA_GUARDED(domain_token()) = audio_fidl::wire::kClockDomainMonotonic;
 
   uint32_t frame_size_ __TA_GUARDED(domain_token()) = 0;
   uint32_t driver_transfer_bytes_ __TA_GUARDED(domain_token()) = 0;
@@ -461,8 +461,8 @@ class SimpleAudioStream : public SimpleAudioStreamBase,
   // position_completer_ with position_lock_.
   std::atomic<uint32_t> expected_notifications_per_ring_{0};
   fbl::Mutex position_lock_;
-  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_
-      __TA_GUARDED(position_lock_);
+  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_ __TA_GUARDED(
+      position_lock_);
   int64_t internal_delay_nsec_ __TA_GUARDED(domain_token()) = 0;
 
   async::Loop loop_;

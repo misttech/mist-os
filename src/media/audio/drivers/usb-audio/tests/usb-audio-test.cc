@@ -338,7 +338,7 @@ TEST_F(UsbAudioTest, GetStreamProperties) {
   auto result = stream_client->GetProperties();
   ASSERT_OK(result.status());
 
-  ASSERT_EQ(result.value().properties.clock_domain(), 0);
+  ASSERT_EQ(result.value().properties.clock_domain(), audio_fidl::wire::kClockDomainMonotonic);
   ASSERT_EQ(result.value().properties.min_gain_db(), -37.);
   ASSERT_EQ(result.value().properties.max_gain_db(), 0.);
   ASSERT_EQ(result.value().properties.gain_step_db(), 1.);

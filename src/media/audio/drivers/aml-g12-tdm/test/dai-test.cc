@@ -386,7 +386,7 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesOutputDai) {
 
   // Must report a clock domain. Reports monotonic, i.e. 0.
   ASSERT_TRUE(properties_out.has_clock_domain());
-  ASSERT_EQ(properties_out.clock_domain(), 0);
+  ASSERT_EQ(properties_out.clock_domain(), fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC);
 }
 
 TEST_F(AmlG12TdmDaiTest, GetPropertiesInputDai) {
@@ -425,7 +425,7 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesInputDai) {
 
   // Must report a clock domain. Reports monotonic, i.e. 0.
   ASSERT_TRUE(properties_out.has_clock_domain());
-  ASSERT_TRUE(properties_out.clock_domain() == 0);
+  ASSERT_EQ(properties_out.clock_domain(), fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC);
 }
 
 class AmlG12TdmDaiRingBufferTest : public AmlG12TdmDaiTest {
