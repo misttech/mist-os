@@ -56,10 +56,20 @@ impl MetricsLogger {
         Self(logger)
     }
 
+    /// Logs an warning occurrence metric using the Cobalt logger. Does not block execution.
+    pub fn log_warn<E: AsEventCode, S: Into<String>>(&self, event_code: E, message: S) {
+        tracing::warn!("{}", message.into());
+        self.send_metric(event_code);
+    }
+
     /// Logs an error occurrence metric using the Cobalt logger. Does not block execution.
     pub fn log_error<E: AsEventCode, S: Into<String>>(&self, event_code: E, message: S) {
         tracing::error!("{}", message.into());
+        self.send_metric(event_code);
+    }
 
+    // send metric, does not block the execution.
+    fn send_metric<E: AsEventCode>(&self, event_code: E) {
         let Some(c) = self.0.clone() else { return };
         let code = event_code.as_event_code();
         fuchsia_async::Task::spawn(async move {

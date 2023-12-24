@@ -387,7 +387,7 @@ impl InputPipeline {
                     // This error is usually benign in tests: it means that the setup does not
                     // support dynamic device discovery. Almost no tests support dynamic
                     // device discovery, and they also do not need those.
-                    metrics_logger.log_error(
+                    metrics_logger.log_warn(
                         InputPipelineErrorMetricDimensionEvent::InputPipelineUnableToWatchForNewInputDevices,
                         std::format!(
                             "Input pipeline is unable to watch for new input devices: {:?}",

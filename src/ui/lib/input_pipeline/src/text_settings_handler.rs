@@ -143,7 +143,7 @@ impl TextSettingsHandler {
                 // settings. If your tests does not need to change keymaps, or adjust
                 // key autorepeat rates, these are not relevant.
                 .unwrap_or_else(move |e: anyhow::Error| {
-                    metrics_logger_clone.log_error(
+                    metrics_logger_clone.log_warn(
                         InputPipelineErrorMetricDimensionEvent::TextSettingsHandlerCantRun,
                         std::format!("can't run: {:?}", e),
                     );
