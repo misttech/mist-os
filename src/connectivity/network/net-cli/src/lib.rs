@@ -1092,31 +1092,9 @@ async fn do_neigh<C: NetCliDepsConnector>(
                 interface,
                 ip_version,
                 base_reachable_time,
-                learn_base_reachable_time,
-                min_random_factor,
-                max_random_factor,
-                retransmit_timer,
-                learn_retransmit_timer,
-                delay_first_probe_time,
-                max_multicast_probes,
-                max_unicast_probes,
-                max_anycast_delay_time,
-                max_reachability_confirmations,
             }) => {
-                let updates = fneighbor::UnreachabilityConfig {
-                    base_reachable_time,
-                    learn_base_reachable_time,
-                    min_random_factor,
-                    max_random_factor,
-                    retransmit_timer,
-                    learn_retransmit_timer,
-                    delay_first_probe_time,
-                    max_multicast_probes,
-                    max_unicast_probes,
-                    max_anycast_delay_time,
-                    max_reachability_confirmations,
-                    ..Default::default()
-                };
+                let updates =
+                    fneighbor::UnreachabilityConfig { base_reachable_time, ..Default::default() };
                 let interface = interface.find_nicid(connector).await?;
                 let controller =
                     connect_with_context::<fneighbor::ControllerMarker, _>(connector).await?;

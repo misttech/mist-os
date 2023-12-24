@@ -1123,14 +1123,11 @@ async fn neigh_unreachability_config<N: Netstack>(name: &str) {
             Ok(original_config.clone()),
         );
 
-        // Update config with some non-defaults
+        // Update config with a non-default base reachable time.
         let mut updates = fidl_fuchsia_net_neighbor::UnreachabilityConfig::default();
         let updated_base_reachable_time =
             Some(fidl_fuchsia_net_neighbor::DEFAULT_BASE_REACHABLE_TIME * 2);
-        let updated_retransmit_timer =
-            Some(fidl_fuchsia_net_neighbor::DEFAULT_RETRANSMIT_TIMER / 2);
         updates.base_reachable_time = updated_base_reachable_time;
-        updates.retransmit_timer = updated_retransmit_timer;
         let () = controller
             .update_unreachability_config(alice.ep.id(), ip_version, &updates)
             .await
@@ -1148,7 +1145,6 @@ async fn neigh_unreachability_config<N: Netstack>(name: &str) {
             updated_config,
             Ok(fidl_fuchsia_net_neighbor::UnreachabilityConfig {
                 base_reachable_time: updated_base_reachable_time,
-                retransmit_timer: updated_retransmit_timer,
                 ..original_config
             })
         );

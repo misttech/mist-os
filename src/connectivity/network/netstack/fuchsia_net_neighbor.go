@@ -322,16 +322,6 @@ func (n *neighborImpl) GetUnreachabilityConfig(_ fidl.Context, interfaceID uint6
 
 	var resp neighbor.UnreachabilityConfig
 	resp.SetBaseReachableTime(config.BaseReachableTime.Nanoseconds())
-	resp.SetLearnBaseReachableTime(config.LearnBaseReachableTime)
-	resp.SetMinRandomFactor(config.MinRandomFactor)
-	resp.SetMaxRandomFactor(config.MaxRandomFactor)
-	resp.SetRetransmitTimer(config.RetransmitTimer.Nanoseconds())
-	resp.SetLearnRetransmitTimer(config.LearnRetransmitTimer)
-	resp.SetDelayFirstProbeTime(config.DelayFirstProbeTime.Nanoseconds())
-	resp.SetMaxMulticastProbes(config.MaxMulticastProbes)
-	resp.SetMaxUnicastProbes(config.MaxUnicastProbes)
-	resp.SetMaxAnycastDelayTime(config.MaxAnycastDelayTime.Nanoseconds())
-	resp.SetMaxReachabilityConfirmations(config.MaxReachabilityConfirmations)
 
 	return neighbor.ViewGetUnreachabilityConfigResultWithResponse(neighbor.ViewGetUnreachabilityConfigResponse{
 		Config: resp,
@@ -411,64 +401,6 @@ func (n *neighborImpl) UpdateUnreachabilityConfig(_ fidl.Context, interfaceID ui
 			return invalidArgsResult, nil
 		}
 		currentConfig.BaseReachableTime = time.Duration(config.GetBaseReachableTime())
-	}
-	if config.HasLearnBaseReachableTime() {
-		currentConfig.LearnBaseReachableTime = config.GetLearnBaseReachableTime()
-	}
-	if config.HasMinRandomFactor() {
-		if v := config.GetMinRandomFactor(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `min_random_factor` %f: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.MinRandomFactor = config.GetMinRandomFactor()
-	}
-	if config.HasMaxRandomFactor() {
-		if v := config.GetMaxRandomFactor(); v < currentConfig.MinRandomFactor {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `max_random_factor` %f: must be >= `min_random_factor` %f", v, currentConfig.MinRandomFactor)
-			return invalidArgsResult, nil
-		}
-		currentConfig.MaxRandomFactor = config.GetMaxRandomFactor()
-	}
-	if config.HasRetransmitTimer() {
-		if v := config.GetRetransmitTimer(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `retransmit_timer` %d: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.RetransmitTimer = time.Duration(config.GetRetransmitTimer())
-	}
-	if config.HasLearnRetransmitTimer() {
-		currentConfig.LearnRetransmitTimer = config.GetLearnRetransmitTimer()
-	}
-	if config.HasDelayFirstProbeTime() {
-		if v := config.GetDelayFirstProbeTime(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `delay_first_probe_time` %d: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.DelayFirstProbeTime = time.Duration(config.GetDelayFirstProbeTime())
-	}
-	if config.HasMaxMulticastProbes() {
-		if v := config.GetMaxMulticastProbes(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `max_multicast_probes` %d: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.MaxMulticastProbes = config.GetMaxMulticastProbes()
-	}
-	if config.HasMaxUnicastProbes() {
-		if v := config.GetMaxUnicastProbes(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `max_unicast_probes` %d: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.MaxUnicastProbes = config.GetMaxUnicastProbes()
-	}
-	if config.HasMaxAnycastDelayTime() {
-		if v := config.GetMaxAnycastDelayTime(); v < 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `max_anycast_delay_time` %d: must be >= 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.MaxAnycastDelayTime = time.Duration(config.GetMaxAnycastDelayTime())
-	}
-	if config.HasMaxReachabilityConfirmations() {
-		currentConfig.MaxReachabilityConfirmations = config.GetMaxReachabilityConfirmations()
 	}
 
 	if err := n.stack.SetNUDConfigurations(tcpip.NICID(interfaceID), netProto, currentConfig); err != nil {
