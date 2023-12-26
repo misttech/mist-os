@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    error::ParseWarning, session::ResolveCtx, string::StringRef, trace_header, ParseError,
-    ParseResult,
+    error::ParseWarning,
+    fxt_builder::FxtBuilder,
+    session::ResolveCtx,
+    string::{StringRef, STRING_REF_INLINE_BIT},
+    trace_header, ParseError, ParseResult,
 };
 use flyweights::FlyStr;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -31,10 +34,10 @@ impl Arg {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) struct RawArg<'a> {
-    pub(crate) name: StringRef<'a>,
-    pub(crate) value: RawArgValue<'a>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct RawArg<'a> {
+    pub name: StringRef<'a>,
+    pub value: RawArgValue<'a>,
 }
 
 impl<'a> RawArg<'a> {
@@ -82,6 +85,129 @@ impl<'a> RawArg<'a> {
             Ok((rem, Self { name, value }))
         } else {
             Err(nom::Err::Failure(ParseError::InvalidSize))
+        }
+    }
+
+    pub(crate) fn serialize(&self) -> Result<Vec<u8>, String> {
+        let arg_name_ref = match self.name {
+            StringRef::Index(id) => id.into(),
+            StringRef::Inline(name) => name.len() as u16 | STRING_REF_INLINE_BIT,
+            StringRef::Empty => {
+                return Err("Argument is missing a name.".to_string());
+            }
+        };
+
+        match &self.value {
+            RawArgValue::Null => {
+                let mut header = NullHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.build())
+            }
+            RawArgValue::Boolean(val) => {
+                let mut header = BoolHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                header.set_value(*val as u8);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.build())
+            }
+            RawArgValue::Signed32(val) => {
+                let mut header = I32Header::empty();
+                header.set_name_ref(arg_name_ref);
+                header.set_value(*val);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.build())
+            }
+            RawArgValue::Unsigned32(val) => {
+                let mut header = U32Header::empty();
+                header.set_name_ref(arg_name_ref);
+                header.set_value(*val);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.build())
+            }
+            RawArgValue::Signed64(val) => {
+                let mut header = I64Header::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(val.to_le_bytes()).build())
+            }
+            RawArgValue::Unsigned64(val) => {
+                let mut header = U64Header::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(val.to_le_bytes()).build())
+            }
+            RawArgValue::Double(val) => {
+                let mut header = F64Header::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(val.to_le_bytes()).build())
+            }
+            RawArgValue::String(str_val) => {
+                let mut header = StringHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                header.set_value_ref(match str_val {
+                    StringRef::Index(id) => (*id).into(),
+                    StringRef::Inline(val) => val.len() as u16 | STRING_REF_INLINE_BIT,
+                    StringRef::Empty => 0u16,
+                });
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                if let StringRef::Inline(value_str) = str_val {
+                    builder = builder.atom(value_str);
+                }
+                Ok(builder.build())
+            }
+            RawArgValue::Pointer(val) => {
+                let mut header = PtrHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(val.to_le_bytes()).build())
+            }
+            RawArgValue::KernelObj(val) => {
+                let mut header = KobjHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(val.to_le_bytes()).build())
+            }
+            RawArgValue::Unknown { raw_type, bytes } => {
+                let mut header = BaseArgHeader::empty();
+                header.set_raw_type(*raw_type);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                Ok(builder.atom(bytes).build())
+            }
         }
     }
 }
@@ -187,8 +313,8 @@ impl ArgValue {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum RawArgValue<'a> {
+#[derive(Clone, Debug, PartialEq)]
+pub enum RawArgValue<'a> {
     Null,
     Boolean(bool),
     Signed32(i32),
@@ -230,6 +356,10 @@ arg_header! {
 }
 
 arg_header! {
+    NullHeader (NULL_ARG_TYPE) {}
+}
+
+arg_header! {
     I32Header (I32_ARG_TYPE) {
         i32, value: 32, 63;
     }
@@ -242,9 +372,29 @@ arg_header! {
 }
 
 arg_header! {
+    I64Header (I64_ARG_TYPE) {}
+}
+
+arg_header! {
+    U64Header (U64_ARG_TYPE) {}
+}
+
+arg_header! {
+    F64Header (F64_ARG_TYPE) {}
+}
+
+arg_header! {
     StringHeader (STR_ARG_TYPE) {
         u16, value_ref: 32, 47;
     }
+}
+
+arg_header! {
+    PtrHeader (PTR_ARG_TYPE) {}
+}
+
+arg_header! {
+    KobjHeader (KOBJ_ARG_TYPE) {}
 }
 
 arg_header! {
@@ -256,7 +406,7 @@ arg_header! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{string::STRING_REF_INLINE_BIT, testing::FxtBuilder};
+    use crate::string::STRING_REF_INLINE_BIT;
     use std::num::NonZeroU16;
 
     #[test]
@@ -264,13 +414,14 @@ mod tests {
         let mut header = BaseArgHeader::empty();
         header.set_name_ref(10);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Null
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Null,
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
     #[test]
     fn null_arg_name_inline() {
@@ -278,10 +429,11 @@ mod tests {
         let mut header = BaseArgHeader::empty();
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Null },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
+        let raw_arg_record = RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Null };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -290,13 +442,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_value(-19);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Signed32(-19)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Signed32(-19),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -306,10 +459,12 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_value(-19);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Signed32(-19) },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Signed32(-19) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -318,13 +473,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_value(23);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Unsigned32(23)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Unsigned32(23),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -334,10 +490,12 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_value(23);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Unsigned32(23) },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Unsigned32(23) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -346,13 +504,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_raw_type(I64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom((-79i64).to_le_bytes()).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Signed64(-79)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom((-79i64).to_le_bytes()).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Signed64(-79),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -362,10 +521,13 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_raw_type(I64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom((-845i64).to_le_bytes()).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Signed64(-845) },
-        );
+        let arg_record_bytes =
+            FxtBuilder::new(header).atom(name).atom((-845i64).to_le_bytes()).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Signed64(-845) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -374,13 +536,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_raw_type(U64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(1024u64.to_le_bytes()).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Unsigned64(1024)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(1024u64.to_le_bytes()).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Unsigned64(1024),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -390,10 +553,13 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_raw_type(U64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom(4096u64.to_le_bytes()).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Unsigned64(4096) },
-        );
+        let arg_record_bytes =
+            FxtBuilder::new(header).atom(name).atom(4096u64.to_le_bytes()).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Unsigned64(4096) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -402,13 +568,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_raw_type(F64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(1007.893f64.to_le_bytes()).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Double(1007.893)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(1007.893f64.to_le_bytes()).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Double(1007.893),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -418,10 +585,13 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_raw_type(F64_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom(23634.1231f64.to_le_bytes()).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Double(23634.1231) },
-        );
+        let arg_record_bytes =
+            FxtBuilder::new(header).atom(name).atom(23634.1231f64.to_le_bytes()).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Double(23634.1231) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -430,13 +600,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_value_ref(11);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::String(StringRef::Index(NonZeroU16::new(11).unwrap()))
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::String(StringRef::Index(NonZeroU16::new(11).unwrap())),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -446,13 +617,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_value_ref(value.len() as u16 | STRING_REF_INLINE_BIT);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(value).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::String(StringRef::Inline(value))
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(value).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::String(StringRef::Inline(value)),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -462,13 +634,14 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_value_ref(13);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).build(),
-            RawArg {
-                name: StringRef::Inline(name),
-                value: RawArgValue::String(StringRef::Index(NonZeroU16::new(13).unwrap()))
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Inline(name),
+            value: RawArgValue::String(StringRef::Index(NonZeroU16::new(13).unwrap())),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -479,13 +652,14 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_value_ref(value.len() as u16 | STRING_REF_INLINE_BIT);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom(value).build(),
-            RawArg {
-                name: StringRef::Inline(name),
-                value: RawArgValue::String(StringRef::Inline(value))
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).atom(value).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Inline(name),
+            value: RawArgValue::String(StringRef::Inline(value)),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -494,13 +668,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_raw_type(PTR_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(256u64.to_le_bytes()).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Pointer(256)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(256u64.to_le_bytes()).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Pointer(256),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -510,10 +685,13 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_raw_type(PTR_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom(512u64.to_le_bytes()).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Pointer(512) },
-        );
+        let arg_record_bytes =
+            FxtBuilder::new(header).atom(name).atom(512u64.to_le_bytes()).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Pointer(512) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -522,13 +700,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_raw_type(KOBJ_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(17u64.to_le_bytes()).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::KernelObj(17)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(17u64.to_le_bytes()).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::KernelObj(17),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -538,10 +717,12 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_raw_type(KOBJ_ARG_TYPE);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).atom(21u64.to_le_bytes()).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::KernelObj(21) },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).atom(21u64.to_le_bytes()).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::KernelObj(21) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -550,13 +731,14 @@ mod tests {
         header.set_name_ref(10);
         header.set_value(true as u8);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).build(),
-            RawArg {
-                name: StringRef::Index(NonZeroU16::new(10).unwrap()),
-                value: RawArgValue::Boolean(true)
-            },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Boolean(true),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 
     #[test]
@@ -566,9 +748,11 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_value(true as u8);
 
-        assert_parses_to_arg!(
-            FxtBuilder::new(header).atom(name).build(),
-            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Boolean(true) },
-        );
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Boolean(true) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
     }
 }

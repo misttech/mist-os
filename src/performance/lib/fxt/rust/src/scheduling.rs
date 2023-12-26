@@ -360,8 +360,8 @@ mod tests {
     use super::*;
     use crate::{
         args::{I32Header, RawArgValue},
+        fxt_builder::FxtBuilder,
         string::{StringRef, STRING_REF_INLINE_BIT},
-        testing::FxtBuilder,
         RawTraceRecord,
     };
 

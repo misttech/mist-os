@@ -39,6 +39,7 @@ pub struct SessionParser<R> {
     resolver: ResolveCtx,
     reader_is_eof: bool,
     have_seen_magic_number: bool,
+    parsed_bytes: Vec<u8>,
 }
 
 impl<R: std::io::Read> SessionParser<R> {
@@ -49,6 +50,7 @@ impl<R: std::io::Read> SessionParser<R> {
             resolver: ResolveCtx::new(),
             reader_is_eof: false,
             have_seen_magic_number: false,
+            parsed_bytes: vec![],
         }
     }
 }
@@ -58,9 +60,14 @@ impl<R> SessionParser<R> {
         self.resolver.warnings()
     }
 
+    pub fn parsed_bytes(&self) -> &[u8] {
+        return &self.parsed_bytes;
+    }
+
     fn parse_next(&mut self) -> ParseOutcome {
         match RawTraceRecord::parse(&self.buffer) {
-            Ok((rem, ParsedWithOriginalBytes { parsed: raw_record, .. })) => {
+            Ok((rem, ParsedWithOriginalBytes { parsed: raw_record, bytes })) => {
+                self.parsed_bytes.extend(bytes);
                 // Make sure the first record we encounter is the magic number record.
                 if raw_record.is_magic_number() {
                     self.have_seen_magic_number = true;
@@ -129,6 +136,8 @@ macro_rules! fill_buffer {
 impl<R: std::io::Read> Iterator for SessionParser<R> {
     type Item = Result<TraceRecord, ParseError>;
     fn next(&mut self) -> Option<Self::Item> {
+        // Clear out previously parsed bytes
+        self.parsed_bytes.clear();
         loop {
             match self.parse_next() {
                 ParseOutcome::GotRecord(r) => return Some(Ok(r)),
@@ -164,6 +173,7 @@ impl<R: AsyncRead + Send + Unpin + 'static> SessionParser<R> {
                 resolver: ResolveCtx::new(),
                 reader_is_eof: false,
                 have_seen_magic_number: false,
+                parsed_bytes: vec![],
             };
 
             while let Some(next) = parser.next_async().await {
@@ -180,6 +190,8 @@ impl<R: AsyncRead + Send + Unpin + 'static> SessionParser<R> {
     }
 
     pub async fn next_async(&mut self) -> Option<Result<TraceRecord, ParseError>> {
+        // Clear out previously parsed bytes
+        self.parsed_bytes.clear();
         loop {
             match self.parse_next() {
                 ParseOutcome::GotRecord(r) => return Some(Ok(r)),
@@ -346,6 +358,7 @@ mod tests {
     use super::*;
     use crate::{
         event::{EventPayload, EventRecord},
+        fxt_builder::FxtBuilder,
         scheduling::{LegacyContextSwitchEvent, SchedulingRecord, ThreadState},
     };
     use futures::{SinkExt, StreamExt, TryStreamExt};
@@ -389,9 +402,7 @@ mod tests {
         // Add our bogus record with an unknown type, expecting to skip over it.
         let mut header = crate::BaseTraceHeader::empty();
         header.set_raw_type(14); // not currently a valid ordinal
-        session.extend(
-            crate::testing::FxtBuilder::new(header).atom(&(0u8..27u8).collect::<Vec<u8>>()).build(),
-        );
+        session.extend(FxtBuilder::new(header).atom(&(0u8..27u8).collect::<Vec<u8>>()).build());
 
         // Add the rest of the simple trace.
         session.extend(&SIMPLE_TRACE_FXT[8..]);
@@ -417,7 +428,7 @@ mod tests {
         header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
         header.set_event_type(crate::event::INSTANT_EVENT_TYPE);
 
-        let mut final_record = crate::testing::FxtBuilder::new(header)
+        let mut final_record = FxtBuilder::new(header)
             .atom(2048u64.to_le_bytes()) // timestamp
             .atom(512u64.to_le_bytes()) // process
             .atom(513u64.to_le_bytes()) // thread

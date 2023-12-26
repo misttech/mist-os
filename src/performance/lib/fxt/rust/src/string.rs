@@ -8,8 +8,8 @@ use std::num::NonZeroU16;
 
 pub(crate) const STRING_REF_INLINE_BIT: u16 = 1 << 15;
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum StringRef<'a> {
+#[derive(Clone, Debug, PartialEq)]
+pub enum StringRef<'a> {
     Empty,
     Index(NonZeroU16),
     Inline(&'a str),
@@ -129,7 +129,7 @@ mod tests {
         header.set_string_len(9);
 
         assert_parses_to_record!(
-            crate::testing::FxtBuilder::new(header).atom("hellooooo").build(),
+            crate::fxt_builder::FxtBuilder::new(header).atom("hellooooo").build(),
             RawTraceRecord::String(StringRecord { index: 10, value: "hellooooo" }),
         );
     }

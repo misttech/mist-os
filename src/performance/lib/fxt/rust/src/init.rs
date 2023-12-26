@@ -22,7 +22,7 @@ impl Ticks {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct InitRecord {
     pub ticks_per_second: u64,
 }
@@ -44,7 +44,7 @@ impl InitRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::RawTraceRecord;
+    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
 
     #[test]
     fn basic_ticks_to_monotonic() {
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn init_record() {
         assert_parses_to_record!(
-            crate::testing::FxtBuilder::new(InitHeader::empty()).atom(2u64.to_le_bytes()).build(),
+            FxtBuilder::new(InitHeader::empty()).atom(2u64.to_le_bytes()).build(),
             RawTraceRecord::Init(InitRecord { ticks_per_second: 2 }),
         );
     }

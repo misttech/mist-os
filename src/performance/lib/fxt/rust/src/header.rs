@@ -65,7 +65,6 @@ macro_rules! trace_header {
                 $(pub $field_ty, $getter, [<set_ $getter>]: $end_bit, $start_bit;)*
             }}
 
-            #[cfg(test)]
             #[allow(unused, unused_mut)]
             pub(crate) fn empty() -> Self {
                 let mut header = Self(0);
@@ -111,7 +110,6 @@ macro_rules! trace_header {
             }
         }
 
-        #[cfg(test)]
         impl crate::header::TraceHeader for $name {
             fn set_size_words(&mut self, n: u16) {
                 self.set_size_words(n.try_into().unwrap());
@@ -123,7 +121,6 @@ macro_rules! trace_header {
     };
 }
 
-#[cfg(test)]
 pub(crate) trait TraceHeader {
     fn set_size_words(&mut self, n: u16);
     fn to_le_bytes(&self) -> [u8; 8];

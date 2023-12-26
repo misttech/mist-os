@@ -10,6 +10,7 @@ mod args;
 mod blob;
 mod error;
 mod event;
+mod fxt_builder;
 mod header;
 mod init;
 mod log;
@@ -20,10 +21,10 @@ mod session;
 mod string;
 mod thread;
 
-pub use args::{Arg, ArgValue};
+pub use args::{Arg, ArgValue, RawArg, RawArgValue};
 pub use blob::{BlobRecord, BlobType, LargeBlobMetadata, LargeBlobRecord};
 pub use error::{ParseError, ParseWarning};
-pub use event::{EventPayload, EventRecord};
+pub use event::{symbolize, EventPayload, EventRecord, RawEventRecord};
 pub use log::LogRecord;
 pub use metadata::{Provider, ProviderEvent};
 pub use objects::{KernelObjRecord, UserspaceObjRecord};
@@ -31,12 +32,12 @@ pub use scheduling::{
     ContextSwitchEvent, LegacyContextSwitchEvent, SchedulingRecord, ThreadState, ThreadWakeupEvent,
 };
 pub use session::{parse_full_session, SessionParser};
+pub use string::StringRef;
 pub use thread::{ProcessKoid, ThreadKoid};
 
 use crate::{
     blob::{RawBlobRecord, RawLargeBlobRecord},
     error::ParseResult,
-    event::RawEventRecord,
     init::InitRecord,
     log::RawLogRecord,
     metadata::{MetadataRecord, TraceInfoMetadataRecord},

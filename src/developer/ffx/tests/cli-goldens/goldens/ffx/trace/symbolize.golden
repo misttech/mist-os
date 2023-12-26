@@ -17,10 +17,34 @@
           "arg_name": "ordinal"
         }
       },
-      "optionality": "required",
+      "optionality": "optional",
       "long": "--ordinal",
       "short": null,
       "description": "FIDL ordinal to be symbolized.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "fxt"
+        }
+      },
+      "optionality": "optional",
+      "long": "--fxt",
+      "short": null,
+      "description": "trace file to be symbolized.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "outfile"
+        }
+      },
+      "optionality": "optional",
+      "long": "--outfile",
+      "short": null,
+      "description": "symbolized file path. Defaults to overwriting the input file.",
       "hidden": false
     },
     {

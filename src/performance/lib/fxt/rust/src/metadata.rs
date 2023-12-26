@@ -199,7 +199,7 @@ metadata_header! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testing::FxtBuilder, RawTraceRecord};
+    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
 
     #[test]
     fn basic_provider_info() {

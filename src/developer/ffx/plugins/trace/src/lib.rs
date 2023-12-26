@@ -13,7 +13,9 @@ use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{
     ControllerProxy, ProviderInfo, ProviderSpec, ProviderStats, TraceConfig,
 };
+use flyweights::FlyStr;
 use futures::future::{BoxFuture, FutureExt};
+use fxt::{Arg, ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -21,7 +23,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeSet, HashMap},
     future::Future,
-    io::{stdin, Stdin},
+    io::{stdin, LineWriter, Stdin, Write},
     path::{Component, PathBuf},
     time::Duration,
 };
@@ -300,20 +302,22 @@ fn ir_files_list(env_ctx: &EnvironmentContext) -> Option<Vec<String>> {
     Some(ir_files)
 }
 
-fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) -> Result<()> {
+fn generate_symbolization_map(ir_files: Vec<String>) -> (HashMap<u64, String>, Vec<String>) {
+    let mut ord_fn_map = HashMap::new();
+    let mut warnings = vec![];
     // Scan through the list of ir files and look for the provided ordinal in the json contents.
     for ir_file in ir_files {
         let json_string = match std::fs::read_to_string(ir_file.clone()) {
             Ok(content) => content,
             Err(e) => {
-                writer.line(format!("WARNING: Failed to read {ir_file}. Reason: {e}"))?;
+                warnings.push(format!("WARNING: Failed to read {ir_file}. Reason: {e}"));
                 continue;
             }
         };
         let fidl_json: serde_json::Value = match serde_json::from_str(&json_string) {
             Ok(serialized_json) => serialized_json,
             Err(_) => {
-                writer.line(format!("WARNING: Failed to parse json in IR file {ir_file}"))?;
+                warnings.push(format!("WARNING: Failed to parse json in IR file {ir_file}"));
                 continue;
             }
         };
@@ -330,18 +334,29 @@ fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) ->
                 let Some(method_ordinal) = method["ordinal"].as_u64() else {
                     continue;
                 };
-                if method_ordinal == ordinal {
-                    let method_name = method["name"].as_str().unwrap_or("-");
-                    writer.line(format!("{} -> {}.{}", ordinal, protocol_name, method_name))?;
-                    return Ok(());
-                }
+                let method_name = method["name"].as_str().unwrap_or("-");
+                ord_fn_map.insert(method_ordinal, format!("{protocol_name}.{method_name}"));
             }
         }
     }
-    writer
-        .line(format!("Unable to symbolize ordinal {}. This could be because either:", ordinal))?;
-    writer.line("1. The ordinal is incorrect")?;
-    writer.line("2. The ordinal is not found in IR files in $FUCHSIA_BUILD_DIR/all_fidl_json.txt or the input IR files")?;
+    (ord_fn_map, warnings)
+}
+
+fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) -> Result<()> {
+    let (fidl_ordinal_map, warnings) = generate_symbolization_map(ir_files);
+    for warning in warnings {
+        writer.line(warning)?;
+    }
+    if fidl_ordinal_map.contains_key(&ordinal) {
+        writer.line(format!("{} -> {}", ordinal, fidl_ordinal_map[&ordinal]))?;
+    } else {
+        writer.line(format!(
+            "Unable to symbolize ordinal {}. This could be because either:",
+            ordinal
+        ))?;
+        writer.line("1. The ordinal is incorrect")?;
+        writer.line("2. The ordinal is not found in IR files in $FUCHSIA_BUILD_DIR/all_fidl_json.txt or the input IR files")?;
+    }
     Ok(())
 }
 
@@ -363,6 +378,66 @@ fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
     };
     writer.line(formatted_values)?;
     Ok(())
+}
+
+pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Result<Vec<u8>> {
+    let (_, mut raw_event_record) =
+        RawEventRecord::parse(bytes).expect("Unable to parse event record");
+    let mut new_args = vec![];
+    for arg in &raw_event_record.args {
+        if let &RawArgValue::Unsigned64(arg_value) = &arg.value {
+            if arg_value == ordinal {
+                let symbolized_arg = RawArg {
+                    name: StringRef::Inline("method"),
+                    value: RawArgValue::String(StringRef::Inline(method)),
+                };
+                new_args.push(symbolized_arg);
+                continue;
+            }
+        }
+        new_args.push(arg.clone());
+    }
+
+    raw_event_record.args = new_args;
+    raw_event_record.serialize().map_err(|e| anyhow!(e))
+}
+
+fn symbolize_trace_file(
+    trace_file: String,
+    outfile: String,
+    ctx: &EnvironmentContext,
+) -> Result<()> {
+    let content = std::fs::read(trace_file)?;
+    let mut parser = SessionParser::new(std::io::Cursor::new(content));
+    let output = std::fs::File::create(outfile.clone())?;
+    let mut output = LineWriter::new(output);
+
+    let (ord_map, _) = generate_symbolization_map(ir_files_list(ctx).unwrap_or_default());
+    let ordinal_arg_name = FlyStr::from("ordinal");
+    while let Some(record) = parser.next() {
+        let mut parsed_bytes = parser.parsed_bytes().to_owned();
+        output.write_all(match record {
+            Ok(fxt::TraceRecord::Event(fxt::EventRecord { category, args, .. }))
+                if category.as_str() == "kernel:ipc" =>
+            {
+                for arg in args {
+                    match arg {
+                        Arg { name, value: ArgValue::Unsigned64(ord) }
+                            if name == ordinal_arg_name && ord_map.contains_key(&ord) =>
+                        {
+                            parsed_bytes =
+                                symbolize_fidl_call(&parsed_bytes, ord, ord_map[&ord].as_str())
+                                    .unwrap_or(parsed_bytes)
+                        }
+                        _ => continue,
+                    }
+                }
+                &parsed_bytes
+            }
+            _ => &parsed_bytes,
+        })?;
+    }
+    Ok(output.flush()?)
 }
 
 type Writer = MachineWriter<TraceOutput>;
@@ -509,17 +584,25 @@ pub async fn trace(
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
-            let mut all_ir_files = opts.ir_path.clone();
-            let build_ir_files = match ir_files_list(&context) {
-                None => {
-                    writer.line("Unable to read list of FIDL IR files from $FUCHSIA_BUILD_DIR/all_fidl_json.txt.")?;
-                    writer.line("Only input IR files will be searched.")?;
-                    vec![]
-                }
-                Some(ir_files) => ir_files,
-            };
-            all_ir_files.extend(build_ir_files);
-            symbolize_ordinal(opts.ordinal, all_ir_files, writer)?;
+            if let Some(trace_file) = opts.fxt {
+                let outfile = opts.outfile.unwrap_or(trace_file.clone());
+                symbolize_trace_file(trace_file, outfile.clone(), &context)?;
+                writer.line(format!("Symbolized traces written to {outfile}"))?;
+            } else if let Some(ordinal) = opts.ordinal {
+                let mut all_ir_files = opts.ir_path.clone();
+                let build_ir_files = match ir_files_list(&context) {
+                    None => {
+                        writer.line("Unable to read list of FIDL IR files from $FUCHSIA_BUILD_DIR/all_fidl_json.txt.")?;
+                        writer.line("Only input IR files will be searched.")?;
+                        vec![]
+                    }
+                    Some(ir_files) => ir_files,
+                };
+                all_ir_files.extend(build_ir_files);
+                symbolize_ordinal(ordinal, all_ir_files, writer)?;
+            } else {
+                ffx_bail!("Either ordinal or trace file must be provided to symbolize");
+            }
         }
     }
     Ok(())
@@ -993,8 +1076,10 @@ mod tests {
             env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Symbolize(Symbolize {
-                    ordinal: 12345678,
+                    ordinal: Some(12345678),
                     ir_path: vec![fake_ir_path.to_string()],
+                    fxt: None,
+                    outfile: None,
                 }),
             },
             writer,
@@ -1014,8 +1099,10 @@ mod tests {
             env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Symbolize(Symbolize {
-                    ordinal: 12345678,
+                    ordinal: Some(12345678),
                     ir_path: vec![],
+                    fxt: None,
+                    outfile: None,
                 }),
             },
             writer,

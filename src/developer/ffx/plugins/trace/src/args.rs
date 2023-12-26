@@ -76,7 +76,15 @@ pub struct Status {}
 pub struct Symbolize {
     /// FIDL ordinal to be symbolized.
     #[argh(option)]
-    pub ordinal: u64,
+    pub ordinal: Option<u64>,
+
+    /// trace file to be symbolized.
+    #[argh(option)]
+    pub fxt: Option<String>,
+
+    /// symbolized file path. Defaults to overwriting the input file.
+    #[argh(option)]
+    pub outfile: Option<String>,
 
     /// additional IR files to use for symbolization. Path provided must be
     /// absolute or relative to $FUCHSIA_BUILD_DIR. If not provided, only the

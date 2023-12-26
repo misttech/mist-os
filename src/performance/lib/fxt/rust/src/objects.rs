@@ -202,7 +202,7 @@ impl From<u32> for KernelObjType {
 mod tests {
     use super::*;
     use crate::{
-        args::RawArgValue, string::STRING_REF_INLINE_BIT, testing::FxtBuilder, RawTraceRecord,
+        args::RawArgValue, fxt_builder::FxtBuilder, string::STRING_REF_INLINE_BIT, RawTraceRecord,
     };
     use std::num::{NonZeroU16, NonZeroU8};
 

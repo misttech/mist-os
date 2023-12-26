@@ -230,7 +230,7 @@ bitfield::bitfield! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testing::FxtBuilder, RawTraceRecord};
+    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
     use std::num::{NonZeroU16, NonZeroU8};
 
     #[test]
