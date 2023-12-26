@@ -4,13 +4,15 @@
 
 use {
     anyhow::{Error, Result},
-    fidl_fuchsia_input_injection::InputDeviceRegistryMarker,
     fidl_fuchsia_ui_test_input::RegistryRequestStream,
-    fuchsia_async as fasync,
-    fuchsia_component::{client::new_protocol_connector, server::ServiceFs},
+    fuchsia_component::server::ServiceFs,
     futures::StreamExt,
     tracing::info,
 };
+
+enum Service {
+    RegistryServer(RegistryRequestStream),
+}
 
 /// Note to contributors: This component is test-only, so it should panic liberally. Loud crashes
 /// are much easier to debug than silent failures. Please use `expect()` and `panic!` where
@@ -20,31 +22,15 @@ async fn main() -> Result<(), Error> {
     info!("starting input synthesis test component");
 
     let mut fs = ServiceFs::new_local();
-
-    fs.dir("svc").add_fidl_service(|stream: RegistryRequestStream| {
-        fasync::Task::local(async move {
-            let registry_connection = new_protocol_connector::<InputDeviceRegistryMarker>()
-                .expect("failed to connect to fuchsia.ui.test.input.Registry");
-            if registry_connection.exists().await.expect("failed to connect to fuchsia.ui.test.input.Registry")
-            {
-                input_testing::handle_registry_request_stream(
-                    stream,
-                    registry_connection
-                        .connect()
-                        .expect("failed to connect to input device registry protocol"),
-                )
-                .await;
-                info!("client closed fuchsia.ui.test.input.Registry connection");
-            } else {
-                panic!("failed to connect to fuchsia.ui.test.input.Registry: protocol node does not exist in /svc");
-            }
-        })
-        .detach();
-    });
-
+    fs.dir("svc").add_fidl_service(Service::RegistryServer);
     fs.take_and_serve_directory_handle()?;
+    fs.for_each_concurrent(None, |conn| async move {
+        let Service::RegistryServer(stream) = conn;
+        input_testing::handle_registry_request_stream(stream).await;
+    })
+    .await;
 
-    fs.collect::<()>().await;
+    info!("input helper exit");
 
     Ok(())
 }

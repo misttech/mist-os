@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_input::Key,
-    fidl_fuchsia_input_injection::InputDeviceRegistryProxy,
+    fidl_fuchsia_input_injection::InputDeviceRegistryMarker,
     fidl_fuchsia_input_report::{
         ConsumerControlInputReport, ContactInputReport, DeviceInfo, InputReport,
         KeyboardInputReport, MouseInputReport, TouchInputReport,
@@ -18,7 +18,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
-    futures::StreamExt,
+    futures::{StreamExt, TryStreamExt},
     keymaps::{
         inverse_keymap::{InverseKeymap, Shift},
         usages::{hid_usage_to_input3_key, Usages},
@@ -124,103 +124,134 @@ fn convert_keyboard_report_to_keys(report: &KeyboardReport) -> Vec<Key> {
 }
 
 /// Serves `fuchsia.ui.test.input.Registry`.
-pub async fn handle_registry_request_stream(
-    mut request_stream: RegistryRequestStream,
-    input_device_registry: InputDeviceRegistryProxy,
-) {
-    let mut registry = input_device_registry::InputDeviceRegistry::new(input_device_registry);
-    while let Some(request) = request_stream.next().await {
-        match request {
-            Ok(RegistryRequest::RegisterTouchScreen { payload, responder, .. }) => {
-                info!("register touchscreen");
-                let device =
-                    payload.device.expect("no touchscreen device provided in registration request");
-                let (min_x, max_x, min_y, max_y) = match payload.coordinate_unit {
-                    Some(CoordinateUnit::PhysicalPixels) => {
-                        let display_info_proxy = connect_to_protocol::<display_info::InfoMarker>()
-                            .expect("failed to connect to display info service");
-                        let display_dimensions = display_info_proxy
-                            .get_metrics()
-                            .await
-                            .expect("failed to get display metrics")
-                            .extent_in_px
-                            .expect("display metrics missing extent in px");
-                        (0, display_dimensions.width as i64, 0, display_dimensions.height as i64)
+pub async fn handle_registry_request_stream(request_stream: RegistryRequestStream) {
+    request_stream
+        .try_for_each_concurrent(None, |request| async {
+            let input_device_registry = connect_to_protocol::<InputDeviceRegistryMarker>()
+                .expect("connect to input_device_registry");
+            let mut registry =
+                input_device_registry::InputDeviceRegistry::new(input_device_registry);
+            let mut task_group = fasync::TaskGroup::new();
+
+            match request {
+                RegistryRequest::RegisterTouchScreen { payload, responder, .. } => {
+                    info!("register touchscreen");
+                    let device = payload
+                        .device
+                        .expect("no touchscreen device provided in registration request");
+                    let (min_x, max_x, min_y, max_y) = match payload.coordinate_unit {
+                        Some(CoordinateUnit::PhysicalPixels) => {
+                            let display_info_proxy =
+                                connect_to_protocol::<display_info::InfoMarker>()
+                                    .expect("failed to connect to display info service");
+                            let display_dimensions = display_info_proxy
+                                .get_metrics()
+                                .await
+                                .expect("failed to get display metrics")
+                                .extent_in_px
+                                .expect("display metrics missing extent in px");
+                            (
+                                0,
+                                display_dimensions.width as i64,
+                                0,
+                                display_dimensions.height as i64,
+                            )
+                        }
+                        _ => (-1000, 1000, -1000, 1000),
+                    };
+
+                    task_group.spawn(async move {
+                        let touchscreen_device = registry
+                            .add_touchscreen_device(min_x, max_x, min_y, max_y)
+                            .expect("failed to create fake touchscreen device");
+
+                        handle_touchscreen_request_stream(
+                            touchscreen_device,
+                            device
+                                .into_stream()
+                                .expect("failed to convert touchscreen device to stream"),
+                        )
+                        .await;
+                    });
+
+                    responder.send().expect("Failed to respond to RegisterTouchScreen request");
+                }
+                RegistryRequest::RegisterMediaButtonsDevice { payload, responder, .. } => {
+                    info!("register media buttons device");
+
+                    if let Some(device) = payload.device {
+                        task_group.spawn(async move {
+                            let media_buttons_device = registry
+                                .add_media_buttons_device()
+                                .expect("failed to create fake media buttons device");
+                            handle_media_buttons_device_request_stream(
+                                media_buttons_device,
+                                device
+                                    .into_stream()
+                                    .expect("failed to convert media buttons device to stream"),
+                            )
+                            .await;
+                        });
+                    } else {
+                        error!("no media buttons device provided in registration request");
                     }
-                    _ => (-1000, 1000, -1000, 1000),
-                };
 
-                let touchscreen_device = registry
-                    .add_touchscreen_device(min_x, max_x, min_y, max_y)
-                    .expect("failed to create fake touchscreen device");
-
-                handle_touchscreen_request_stream(
-                    touchscreen_device,
-                    device.into_stream().expect("failed to convert touchscreen device to stream"),
-                );
-
-                responder.send().expect("Failed to respond to RegisterTouchScreen request");
-            }
-            Ok(RegistryRequest::RegisterMediaButtonsDevice { payload, responder, .. }) => {
-                info!("register media buttons device");
-
-                if let Some(device) = payload.device {
-                    let media_buttons_device = registry
-                        .add_media_buttons_device()
-                        .expect("failed to create fake media buttons device");
-
-                    handle_media_buttons_device_request_stream(
-                        media_buttons_device,
-                        device
-                            .into_stream()
-                            .expect("failed to convert media buttons device to stream"),
-                    );
-                } else {
-                    error!("no media buttons device provided in registration request");
+                    responder
+                        .send()
+                        .expect("Failed to respond to RegisterMediaButtonsDevice request");
                 }
+                RegistryRequest::RegisterKeyboard { payload, responder, .. } => {
+                    info!("register keyboard device");
 
-                responder.send().expect("Failed to respond to RegisterMediaButtonsDevice request");
-            }
-            Ok(RegistryRequest::RegisterKeyboard { payload, responder, .. }) => {
-                info!("register keyboard device");
+                    if let Some(device) = payload.device {
+                        task_group.spawn(async move {
+                            let keyboard_device = registry
+                                .add_keyboard_device()
+                                .expect("failed to create fake keyboard device");
+                            handle_keyboard_request_stream(
+                                keyboard_device,
+                                device
+                                    .into_stream()
+                                    .expect("failed to convert keyboard device to stream"),
+                            )
+                            .await;
+                        });
+                    } else {
+                        error!("no keyboard device provided in registration request");
+                    }
 
-                if let Some(device) = payload.device {
-                    let keyboard_device = registry
-                        .add_keyboard_device()
-                        .expect("failed to create fake keyboard device");
-
-                    handle_keyboard_request_stream(
-                        keyboard_device,
-                        device.into_stream().expect("failed to convert keyboard device to stream"),
-                    );
-                } else {
-                    error!("no keyboard device provided in registration request");
+                    responder.send().expect("Failed to respond to RegisterKeyboard request");
                 }
+                RegistryRequest::RegisterMouse { payload, responder } => {
+                    info!("register mouse device");
 
-                responder.send().expect("Failed to respond to RegisterKeyboard request");
-            }
-            Ok(RegistryRequest::RegisterMouse { payload, responder }) => {
-                info!("register mouse device");
+                    if let Some(device) = payload.device {
+                        task_group.spawn(async move {
+                            let mouse_device = registry
+                                .add_mouse_device()
+                                .expect("failed to create fake mouse device");
 
-                if let Some(device) = payload.device {
-                    let mouse_device =
-                        registry.add_mouse_device().expect("failed to create fake mouse device");
+                            handle_mouse_request_stream(
+                                mouse_device,
+                                device
+                                    .into_stream()
+                                    .expect("failed to convert mouse device to stream"),
+                            )
+                            .await;
+                        });
+                    } else {
+                        error!("no mouse device provided in registration request");
+                    }
 
-                    handle_mouse_request_stream(
-                        mouse_device,
-                        device.into_stream().expect("failed to convert mouse device to stream"),
-                    );
-                } else {
-                    error!("no mouse device provided in registration request");
+                    responder.send().expect("Failed to respond to RegisterMouse request");
                 }
+            }
 
-                responder.send().expect("Failed to respond to RegisterMouse request");
-            }
-            Err(e) => {
-                error!("could not receive registry request: {:?}", e);
-            }
-        }
-    }
+            task_group.join().await;
+            Ok(())
+        })
+        .await
+        .expect("failed to serve test realm factory request stream");
 }
 
 fn input_report_for_touch_contacts(contacts: Vec<(u32, math::Vec_)>) -> InputReport {
@@ -250,61 +281,17 @@ fn input_report_for_touch_contacts(contacts: Vec<(u32, math::Vec_)>) -> InputRep
 }
 
 /// Serves `fuchsia.ui.test.input.TouchScreen`.
-fn handle_touchscreen_request_stream(
+async fn handle_touchscreen_request_stream(
     touchscreen_device: input_device::InputDevice,
     mut request_stream: TouchScreenRequestStream,
 ) {
-    fasync::Task::local(async move {
-        while let Some(request) = request_stream.next().await {
-            match request {
-                Ok(TouchScreenRequest::SimulateTap { payload, responder }) => {
-                    if let Some(tap_location) = payload.tap_location {
-                        touchscreen_device
-                            .send_input_report(input_report_for_touch_contacts(vec![(
-                                1,
-                                tap_location,
-                            )]))
-                            .expect("Failed to send tap input report");
-
-                        // Send a report with an empty set of touch contacts, so that input
-                        // pipeline generates a pointer event with phase == UP.
-                        touchscreen_device
-                            .send_input_report(input_report_for_touch_contacts(vec![]))
-                            .expect("failed to send empty input report");
-
-                        responder.send().expect("Failed to send SimulateTap response");
-                    } else {
-                        warn!("SimulateTap request missing tap location");
-                    }
-                }
-                Ok(TouchScreenRequest::SimulateSwipe { payload, responder }) => {
-                    // Compute the x- and y- displacements between successive touch events.
-                    let start_location = payload.start_location.expect("missing start location");
-                    let end_location = payload.end_location.expect("missing end location");
-                    let move_event_count =
-                        payload.move_event_count.expect("missing move event count");
-
-                    let start_x_f = start_location.x as f64;
-                    let start_y_f = start_location.y as f64;
-                    let end_x_f = end_location.x as f64;
-                    let end_y_f = end_location.y as f64;
-                    let move_event_count_f = move_event_count as f64;
-                    let step_size_x = (end_x_f - start_x_f) / move_event_count_f;
-                    let step_size_y = (end_y_f - start_y_f) / move_event_count_f;
-
-                    // Generate an event at `start_location`, followed by `move_event_count - 1`
-                    // evenly-spaced events, followed by an event at `end_location`.
-                    for i in 0..move_event_count + 1 {
-                        let i_f = i as f64;
-                        let event_x = start_x_f + (i_f * step_size_x);
-                        let event_y = start_y_f + (i_f * step_size_y);
-                        touchscreen_device
-                            .send_input_report(input_report_for_touch_contacts(vec![(
-                                1,
-                                math::Vec_ { x: event_x as i32, y: event_y as i32 },
-                            )]))
-                            .expect("Failed to send tap input report");
-                    }
+    while let Some(request) = request_stream.next().await {
+        match request {
+            Ok(TouchScreenRequest::SimulateTap { payload, responder }) => {
+                if let Some(tap_location) = payload.tap_location {
+                    touchscreen_device
+                        .send_input_report(input_report_for_touch_contacts(vec![(1, tap_location)]))
+                        .expect("Failed to send tap input report");
 
                     // Send a report with an empty set of touch contacts, so that input
                     // pipeline generates a pointer event with phase == UP.
@@ -312,204 +299,232 @@ fn handle_touchscreen_request_stream(
                         .send_input_report(input_report_for_touch_contacts(vec![]))
                         .expect("failed to send empty input report");
 
-                    responder.send().expect("Failed to send SimulateSwipe response");
-                }
-                Ok(TouchScreenRequest::SimulateMultiTap { payload: _, responder: _ }) => {
-                    todo!();
-                }
-                Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload: _, responder: _ }) => {
-                    todo!();
-                }
-                Ok(TouchScreenRequest::SimulateTouchEvent { report, responder }) => {
-                    let input_report = InputReport {
-                        event_time: Some(fasync::Time::now().into_nanos()),
-                        touch: Some(report),
-                        ..Default::default()
-                    };
-                    touchscreen_device
-                        .send_input_report(input_report)
-                        .expect("failed to send empty input report");
-                    responder.send().expect("Failed to send SimulateTouchEvent response");
-                }
-                Err(e) => {
-                    error!("Error on touchscreen channel: {}", e);
-                    return;
+                    responder.send().expect("Failed to send SimulateTap response");
+                } else {
+                    warn!("SimulateTap request missing tap location");
                 }
             }
+            Ok(TouchScreenRequest::SimulateSwipe { payload, responder }) => {
+                // Compute the x- and y- displacements between successive touch events.
+                let start_location = payload.start_location.expect("missing start location");
+                let end_location = payload.end_location.expect("missing end location");
+                let move_event_count = payload.move_event_count.expect("missing move event count");
+
+                let start_x_f = start_location.x as f64;
+                let start_y_f = start_location.y as f64;
+                let end_x_f = end_location.x as f64;
+                let end_y_f = end_location.y as f64;
+                let move_event_count_f = move_event_count as f64;
+                let step_size_x = (end_x_f - start_x_f) / move_event_count_f;
+                let step_size_y = (end_y_f - start_y_f) / move_event_count_f;
+
+                // Generate an event at `start_location`, followed by `move_event_count - 1`
+                // evenly-spaced events, followed by an event at `end_location`.
+                for i in 0..move_event_count + 1 {
+                    let i_f = i as f64;
+                    let event_x = start_x_f + (i_f * step_size_x);
+                    let event_y = start_y_f + (i_f * step_size_y);
+                    touchscreen_device
+                        .send_input_report(input_report_for_touch_contacts(vec![(
+                            1,
+                            math::Vec_ { x: event_x as i32, y: event_y as i32 },
+                        )]))
+                        .expect("Failed to send tap input report");
+                }
+
+                // Send a report with an empty set of touch contacts, so that input
+                // pipeline generates a pointer event with phase == UP.
+                touchscreen_device
+                    .send_input_report(input_report_for_touch_contacts(vec![]))
+                    .expect("failed to send empty input report");
+
+                responder.send().expect("Failed to send SimulateSwipe response");
+            }
+            Ok(TouchScreenRequest::SimulateMultiTap { payload: _, responder: _ }) => {
+                todo!();
+            }
+            Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload: _, responder: _ }) => {
+                todo!();
+            }
+            Ok(TouchScreenRequest::SimulateTouchEvent { report, responder }) => {
+                let input_report = InputReport {
+                    event_time: Some(fasync::Time::now().into_nanos()),
+                    touch: Some(report),
+                    ..Default::default()
+                };
+                touchscreen_device
+                    .send_input_report(input_report)
+                    .expect("failed to send empty input report");
+                responder.send().expect("Failed to send SimulateTouchEvent response");
+            }
+            Err(e) => {
+                error!("Error on touchscreen channel: {}", e);
+                return;
+            }
         }
-    })
-    .detach()
+    }
 }
 
 /// Serves `fuchsia.ui.test.input.MediaButtonsDevice`.
-fn handle_media_buttons_device_request_stream(
+async fn handle_media_buttons_device_request_stream(
     media_buttons_device: input_device::InputDevice,
     mut request_stream: MediaButtonsDeviceRequestStream,
 ) {
-    fasync::Task::local(async move {
-        while let Some(request) = request_stream.next().await {
-            match request {
-                Ok(MediaButtonsDeviceRequest::SimulateButtonPress { payload, responder }) => {
-                    if let Some(button) = payload.button {
-                        let media_buttons_input_report = ConsumerControlInputReport {
-                            pressed_buttons: Some(vec![button]),
-                            ..Default::default()
-                        };
+    while let Some(request) = request_stream.next().await {
+        match request {
+            Ok(MediaButtonsDeviceRequest::SimulateButtonPress { payload, responder }) => {
+                if let Some(button) = payload.button {
+                    let media_buttons_input_report = ConsumerControlInputReport {
+                        pressed_buttons: Some(vec![button]),
+                        ..Default::default()
+                    };
 
+                    let input_report = InputReport {
+                        event_time: Some(fasync::Time::now().into_nanos()),
+                        consumer_control: Some(media_buttons_input_report),
+                        ..Default::default()
+                    };
+
+                    media_buttons_device
+                        .send_input_report(input_report)
+                        .expect("Failed to send button press input report");
+
+                    // Send a report with an empty set of pressed buttons,
+                    // so that input pipeline generates a media buttons
+                    // event with the target button being released.
+                    let empty_report = InputReport {
+                        event_time: Some(fasync::Time::now().into_nanos()),
+                        consumer_control: Some(ConsumerControlInputReport {
+                            pressed_buttons: Some(vec![]),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    media_buttons_device
+                        .send_input_report(empty_report)
+                        .expect("Failed to send button release input report");
+
+                    responder.send().expect("Failed to send SimulateButtonPress response");
+                } else {
+                    warn!("SimulateButtonPress request missing button");
+                }
+            }
+            Err(e) => {
+                error!("Error on media buttons device channel: {}", e);
+                return;
+            }
+        }
+    }
+}
+
+/// Serves `fuchsia.ui.test.input.Keyboard`.
+async fn handle_keyboard_request_stream(
+    keyboard_device: input_device::InputDevice,
+    mut request_stream: KeyboardRequestStream,
+) {
+    while let Some(request) = request_stream.next().await {
+        match request {
+            Ok(KeyboardRequest::SimulateUsAsciiTextEntry { payload, responder }) => {
+                if let Some(text) = payload.text {
+                    let key_sequence = derive_key_sequence(&keymaps::US_QWERTY, &text)
+                        .expect("Failed to derive key sequence");
+
+                    let mut key_iter = key_sequence.into_iter().peekable();
+                    while let Some(keyboard_report) = key_iter.next() {
                         let input_report = InputReport {
                             event_time: Some(fasync::Time::now().into_nanos()),
-                            consumer_control: Some(media_buttons_input_report),
-                            ..Default::default()
-                        };
-
-                        media_buttons_device
-                            .send_input_report(input_report)
-                            .expect("Failed to send button press input report");
-
-                        // Send a report with an empty set of pressed buttons,
-                        // so that input pipeline generates a media buttons
-                        // event with the target button being released.
-                        let empty_report = InputReport {
-                            event_time: Some(fasync::Time::now().into_nanos()),
-                            consumer_control: Some(ConsumerControlInputReport {
-                                pressed_buttons: Some(vec![]),
+                            keyboard: Some(KeyboardInputReport {
+                                pressed_keys3: Some(convert_keyboard_report_to_keys(
+                                    &keyboard_report,
+                                )),
                                 ..Default::default()
                             }),
                             ..Default::default()
                         };
 
-                        media_buttons_device
-                            .send_input_report(empty_report)
-                            .expect("Failed to send button release input report");
+                        keyboard_device
+                            .send_input_report(input_report)
+                            .expect("Failed to send key event report");
 
-                        responder.send().expect("Failed to send SimulateButtonPress response");
-                    } else {
-                        warn!("SimulateButtonPress request missing button");
-                    }
-                }
-                Err(e) => {
-                    error!("Error on media buttons device channel: {}", e);
-                    return;
-                }
-            }
-        }
-    })
-    .detach()
-}
-
-/// Serves `fuchsia.ui.test.input.Keyboard`.
-fn handle_keyboard_request_stream(
-    keyboard_device: input_device::InputDevice,
-    mut request_stream: KeyboardRequestStream,
-) {
-    fasync::Task::local(async move {
-        while let Some(request) = request_stream.next().await {
-            match request {
-                Ok(KeyboardRequest::SimulateUsAsciiTextEntry { payload, responder }) => {
-                    if let Some(text) = payload.text {
-                        let key_sequence = derive_key_sequence(&keymaps::US_QWERTY, &text)
-                            .expect("Failed to derive key sequence");
-
-                        let mut key_iter = key_sequence.into_iter().peekable();
-                        while let Some(keyboard_report) = key_iter.next() {
-                            let input_report = InputReport {
-                                event_time: Some(fasync::Time::now().into_nanos()),
-                                keyboard: Some(KeyboardInputReport {
-                                    pressed_keys3: Some(convert_keyboard_report_to_keys(
-                                        &keyboard_report,
-                                    )),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            };
-
-                            keyboard_device
-                                .send_input_report(input_report)
-                                .expect("Failed to send key event report");
-
-                            if key_iter.peek().is_some() {
-                                fuchsia_async::Timer::new(Duration::from_millis(100)).await;
-                            }
+                        if key_iter.peek().is_some() {
+                            fuchsia_async::Timer::new(Duration::from_millis(100)).await;
                         }
-
-                        responder.send().expect("Failed to send SimulateTextEntry response");
-                    } else {
-                        warn!("SimulateTextEntry request missing text");
                     }
-                }
-                Ok(KeyboardRequest::SimulateKeyEvent { payload, responder }) => {
-                    let keyboard_report = payload.report.expect("no report");
-                    let input_report = InputReport {
-                        event_time: Some(fasync::Time::now().into_nanos()),
-                        keyboard: Some(keyboard_report),
-                        ..Default::default()
-                    };
 
-                    keyboard_device
-                        .send_input_report(input_report)
-                        .expect("Failed to send key event report");
-
-                    responder.send().expect("Failed to send SimulateKeyEvent response");
-                }
-                Err(e) => {
-                    error!("Error on keyboard device channel: {}", e);
-                    return;
+                    responder.send().expect("Failed to send SimulateTextEntry response");
+                } else {
+                    warn!("SimulateTextEntry request missing text");
                 }
             }
+            Ok(KeyboardRequest::SimulateKeyEvent { payload, responder }) => {
+                let keyboard_report = payload.report.expect("no report");
+                let input_report = InputReport {
+                    event_time: Some(fasync::Time::now().into_nanos()),
+                    keyboard: Some(keyboard_report),
+                    ..Default::default()
+                };
+
+                keyboard_device
+                    .send_input_report(input_report)
+                    .expect("Failed to send key event report");
+
+                responder.send().expect("Failed to send SimulateKeyEvent response");
+            }
+            Err(e) => {
+                error!("Error on keyboard device channel: {}", e);
+                return;
+            }
         }
-    })
-    .detach()
+    }
 }
 
 /// Serves `fuchsia.ui.test.input.Mouse`.
-fn handle_mouse_request_stream(
+async fn handle_mouse_request_stream(
     mouse_device: input_device::InputDevice,
     mut request_stream: MouseRequestStream,
 ) {
-    fasync::Task::local(async move {
-        while let Some(request) = request_stream.next().await {
-            match request {
-                Ok(MouseRequest::SimulateMouseEvent { payload, responder }) => {
-                    let mut mouse_input_report = MouseInputReport {
-                        movement_x: payload.movement_x,
-                        movement_y: payload.movement_y,
-                        scroll_v: payload.scroll_v_detent,
-                        scroll_h: payload.scroll_h_detent,
-                        ..Default::default()
-                    };
-                    if let Some(pressed_buttons) = payload.pressed_buttons {
-                        mouse_input_report.pressed_buttons = Some(
-                            pressed_buttons
-                                .into_iter()
-                                .map(|b| {
-                                    b.into_primitive()
-                                        .try_into()
-                                        .expect("failed to convert MouseButton to u8")
-                                })
-                                .collect(),
-                        );
-                    }
-
-                    let input_report = InputReport {
-                        event_time: Some(fasync::Time::now().into_nanos()),
-                        mouse: Some(mouse_input_report),
-                        ..Default::default()
-                    };
-
-                    mouse_device
-                        .send_input_report(input_report)
-                        .expect("Failed to send key event report");
-
-                    responder.send().expect("Failed to send SimulateMouseEvent response");
+    while let Some(request) = request_stream.next().await {
+        match request {
+            Ok(MouseRequest::SimulateMouseEvent { payload, responder }) => {
+                let mut mouse_input_report = MouseInputReport {
+                    movement_x: payload.movement_x,
+                    movement_y: payload.movement_y,
+                    scroll_v: payload.scroll_v_detent,
+                    scroll_h: payload.scroll_h_detent,
+                    ..Default::default()
+                };
+                if let Some(pressed_buttons) = payload.pressed_buttons {
+                    mouse_input_report.pressed_buttons = Some(
+                        pressed_buttons
+                            .into_iter()
+                            .map(|b| {
+                                b.into_primitive()
+                                    .try_into()
+                                    .expect("failed to convert MouseButton to u8")
+                            })
+                            .collect(),
+                    );
                 }
-                Err(e) => {
-                    error!("Error on keyboard device channel: {}", e);
-                    return;
-                }
+
+                let input_report = InputReport {
+                    event_time: Some(fasync::Time::now().into_nanos()),
+                    mouse: Some(mouse_input_report),
+                    ..Default::default()
+                };
+
+                mouse_device
+                    .send_input_report(input_report)
+                    .expect("Failed to send key event report");
+
+                responder.send().expect("Failed to send SimulateMouseEvent response");
+            }
+            Err(e) => {
+                error!("Error on keyboard device channel: {}", e);
+                return;
             }
         }
-    })
-    .detach()
+    }
 }
 
 #[cfg(test)]
