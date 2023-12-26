@@ -365,10 +365,6 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
         self.definition.proto
     }
 
-    pub(crate) fn options(&self) -> &O {
-        &self.options
-    }
-
     pub(crate) fn options_mut(&mut self) -> &mut O {
         &mut self.options
     }
@@ -2467,7 +2463,7 @@ mod tests {
 
         assert_eq!(socket.take_options(), START_OPTION);
         assert_eq!(socket.replace_options(NEW_OPTION), DEFAULT_OPTION);
-        assert_eq!(socket.options(), &NEW_OPTION);
+        assert_eq!(socket.options, NEW_OPTION);
     }
 
     #[ip_test]

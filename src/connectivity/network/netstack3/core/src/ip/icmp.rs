@@ -946,7 +946,7 @@ impl DatagramSocketSpec for Icmp {
     >;
 
     type ConnState<I: datagram::IpExt, D: Debug + Eq + core::hash::Hash> =
-        datagram::ConnState<I, D, Self, datagram::IpOptions<I, D, Self>>;
+        datagram::ConnState<I, I, D, Self>;
     // Store the remote port/id set by `connect`. This does not participate in
     // demuxing, so not part of the socketmap, but we need to store it so that
     // it can be reported later.

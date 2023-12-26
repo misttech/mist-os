@@ -268,13 +268,19 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug, O: Debug"))]
-pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized, O> {
-    pub(crate) socket: IpSock<I, D, O>,
+#[derivative(Debug(bound = "D: Debug"))]
+pub(crate) struct ConnState<
+    WireI: IpExt,
+    SocketI: IpExt,
+    D: Eq + Hash,
+    S: DatagramSocketSpec + ?Sized,
+> {
+    pub(crate) socket: IpSock<WireI, D, SocketHopLimits>,
+    pub(crate) ip_options: IpOptions<SocketI, D, S>,
     pub(crate) shutdown: Shutdown,
     pub(crate) addr: ConnAddr<
         ConnIpAddr<
-            I::Addr,
+            WireI::Addr,
             <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
             <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
         >,
@@ -304,36 +310,49 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
 }
 
 impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
-    AsRef<IpOptions<SocketI, D, S>> for ConnState<WireI, D, S, IpOptions<SocketI, D, S>>
+    AsRef<IpOptions<SocketI, D, S>> for ConnState<WireI, SocketI, D, S>
 {
     fn as_ref(&self) -> &IpOptions<SocketI, D, S> {
-        self.socket.options()
+        &self.ip_options
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<Shutdown> for ConnState<I, D, S, O> {
+impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
+    for ConnState<WireI, SocketI, D, S>
+{
     fn as_ref(&self) -> &Shutdown {
         &self.shutdown
     }
 }
 
 impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
-    AsMut<IpOptions<SocketI, D, S>> for ConnState<WireI, D, S, IpOptions<SocketI, D, S>>
+    AsMut<IpOptions<SocketI, D, S>> for ConnState<WireI, SocketI, D, S>
 {
     fn as_mut(&mut self) -> &mut IpOptions<SocketI, D, S> {
-        self.socket.options_mut()
+        &mut self.ip_options
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsMut<Shutdown> for ConnState<I, D, S, O> {
+impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
+    for ConnState<WireI, SocketI, D, S>
+{
     fn as_mut(&mut self) -> &mut Shutdown {
         &mut self.shutdown
     }
 }
 
-impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec, O> ConnState<I, D, S, O> {
+impl<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec>
+    ConnState<WireI, SocketI, D, S>
+{
     pub(crate) fn should_receive(&self) -> bool {
-        let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _, extra: _ } = self;
+        let Self {
+            shutdown,
+            socket: _,
+            ip_options: _,
+            clear_device_on_disconnect: _,
+            addr: _,
+            extra: _,
+        } = self;
         let Shutdown { receive, send: _ } = shutdown;
         !*receive
     }
@@ -348,9 +367,9 @@ pub(crate) enum DualStackConnState<
     S: DatagramSocketSpec + ?Sized,
 > {
     /// The [`ConnState`] for a socked connected with [`I::Version`].
-    ThisStack(ConnState<I, D, S, IpOptions<I, D, S>>),
+    ThisStack(ConnState<I, I, D, S>),
     /// The [`ConnState`] for a socked connected with [`I::OtherVersion`].
-    OtherStack(ConnState<I::OtherVersion, D, S, IpOptions<I, D, S>>),
+    OtherStack(ConnState<I::OtherVersion, I, D, S>),
 }
 
 impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
@@ -419,12 +438,14 @@ impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
     }
 }
 
+// TODO(https://fxbug.dev/42182532): Add a `PhantomData<I>` field to avoid using
+// IPv6 hoplimits for IPv4 packets on dualstack sockets.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct SocketHopLimits {
-    unicast: Option<NonZeroU8>,
+    pub(crate) unicast: Option<NonZeroU8>,
     // TODO(https://fxbug.dev/108323): Make this an Option<u8> to allow sending
     // multicast packets destined only for the local machine.
-    multicast: Option<NonZeroU8>,
+    pub(crate) multicast: Option<NonZeroU8>,
 }
 
 impl SocketHopLimits {
@@ -445,20 +466,13 @@ impl SocketHopLimits {
     }
 }
 
-// TODO(https://fxbug.dev/137046): Independently store IPv4 and Ipv6 socket
-// options. DualStack sockets require `SendOptions<I::OtherVersion`, which we
-// implement here by decoupling the `WireI` and `SocketI`. This effectively
-// uses the IPv6 hop_limits (SO_IPV6_UNICAST_HOPS & SO_IPV6_MULTICAST_HOPS) for
-// sent Ipv4 packets, rater than the IPv4 hop_limits
-// (SO_IP_TTL & SO_IP_MULTICAST_TTL).
-impl<WireI: IpExt, SocketI: IpExt, D, S: DatagramSocketSpec> SendOptions<WireI>
-    for IpOptions<SocketI, D, S>
-{
-    fn hop_limit(&self, destination: &SpecifiedAddr<WireI::Addr>) -> Option<NonZeroU8> {
+impl<I: Ip> SendOptions<I> for SocketHopLimits {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        let SocketHopLimits { unicast, multicast } = self;
         if destination.is_multicast() {
-            self.hop_limits.multicast
+            *multicast
         } else {
-            self.hop_limits.unicast
+            *unicast
         }
     }
 }
@@ -862,7 +876,7 @@ pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramS
             >,
         > + OwnedOrRefsBidirectionalConverter<
             S::ConnState<I, Self::WeakDeviceId>,
-            ConnState<I, Self::WeakDeviceId, S, IpOptions<I, Self::WeakDeviceId, S>>,
+            ConnState<I, I, Self::WeakDeviceId, S>,
         >;
 
     /// Returns an instance of a type that implements [`BidirectionalConverter`]
@@ -1201,7 +1215,7 @@ impl DualStackIpExt for Ipv4 {
     >;
     /// IPv4 sockets cannot connect on dual-stack addresses.
     type DualStackConnState<D: Eq + Hash + Debug, S: DatagramSocketSpec> =
-        ConnState<Self, D, S, IpOptions<Self, D, S>>;
+        ConnState<Self, Self, D, S>;
 
     fn into_dual_stack_bound_socket_id<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
@@ -1221,8 +1235,14 @@ impl DualStackIpExt for Ipv4 {
     fn conn_addr_from_state<D: Clone + Debug + Eq + Hash, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D> {
-        let ConnState { socket: _, shutdown: _, addr, clear_device_on_disconnect: _, extra: _ } =
-            state;
+        let ConnState {
+            socket: _,
+            ip_options: _,
+            shutdown: _,
+            addr,
+            clear_device_on_disconnect: _,
+            extra: _,
+        } = state;
         addr.clone()
     }
 }
@@ -1271,6 +1291,7 @@ impl DualStackIpExt for Ipv6 {
             DualStackConnState::OtherStack(state) => {
                 let ConnState {
                     socket: _,
+                    ip_options: _,
                     shutdown: _,
                     addr,
                     clear_device_on_disconnect: _,
@@ -1586,7 +1607,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
             BoundSocketStateType::Connected { state, sharing } => {
                 let ConnState {
                     addr,
-                    socket,
+                    socket: _,
+                    ip_options,
                     clear_device_on_disconnect: _,
                     shutdown: _,
                     extra: _,
@@ -1597,7 +1619,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
                 Remove::Connected {
                     concrete_addr: addr.clone(),
                     associated_addr,
-                    ip_options: socket.options().clone(),
+                    ip_options: ip_options.clone(),
                     sharing: sharing.clone(),
                     socket_id: S::make_bound_socket_map_id(socket_id),
                 }
@@ -1786,7 +1808,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     DualStackConnState::ThisStack(state) => {
                         let ConnState {
                             addr,
-                            socket,
+                            socket: _,
+                            ip_options,
                             clear_device_on_disconnect: _,
                             shutdown: _,
                             extra: _,
@@ -1798,7 +1821,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                         DualStackRemove::CurrentStack(Remove::Connected {
                             concrete_addr: addr.clone(),
                             associated_addr,
-                            ip_options: socket.options().clone(),
+                            ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
                             socket_id: S::make_bound_socket_map_id(socket_id),
                         })
@@ -1807,7 +1830,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                         sync_ctx.assert_dual_stack_enabled(&state);
                         let ConnState {
                             addr,
-                            socket,
+                            socket: _,
+                            ip_options,
                             clear_device_on_disconnect: _,
                             shutdown: _,
                             extra: _,
@@ -1819,7 +1843,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                         DualStackRemove::OtherStack(Remove::Connected {
                             concrete_addr: addr.clone(),
                             associated_addr,
-                            ip_options: socket.options().clone(),
+                            ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
                             socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                         })
@@ -2597,15 +2621,17 @@ pub enum ConnectError {
 }
 
 /// Parameters required to connect a socket.
-struct ConnectParameters<I: IpExt, D: WeakId, S: DatagramSocketSpec, O> {
-    local_ip: Option<SocketIpAddr<I::Addr>>,
+struct ConnectParameters<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec> {
+    local_ip: Option<SocketIpAddr<WireI::Addr>>,
     local_port: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-    remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
+    remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, D::Strong>,
     remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: Option<D>,
     sharing: S::SharingState,
-    ip_options: O,
-    socket_id: <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
+    ip_options: IpOptions<SocketI, D, S>,
+    send_options: SocketHopLimits,
+    socket_id:
+        <S::SocketMapSpec<WireI, D> as DatagramSocketMapSpec<WireI, D, S::AddrSpec>>::BoundSocketId,
     original_shutdown: Option<Shutdown>,
     extra: S::ConnStateExtra,
 }
@@ -2617,23 +2643,28 @@ struct ConnectParameters<I: IpExt, D: WeakId, S: DatagramSocketSpec, O> {
 /// state will only be reinserted if an error is encountered during connect.
 /// The output of `remove_original` is fed into `reinsert_original`.
 fn connect_inner<
-    I: IpExt,
+    WireI: IpExt,
+    SocketI: IpExt,
     D: WeakId,
     S: DatagramSocketSpec,
-    O,
     R,
     C,
-    SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>,
-    A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+    SC: IpSocketHandler<WireI, C, WeakDeviceId = D, DeviceId = D::Strong>,
+    A: LocalIdentifierAllocator<WireI, D, S::AddrSpec, C, S::SocketMapSpec<WireI, D>>,
 >(
-    connect_params: ConnectParameters<I, D, S, O>,
+    connect_params: ConnectParameters<WireI, SocketI, D, S>,
     sync_ctx: &mut SC,
     ctx: &mut C,
-    sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+    sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
     allocator: &mut A,
-    remove_original: impl FnOnce(&mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>) -> R,
-    reinsert_original: impl FnOnce(&mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>, R),
-) -> Result<ConnState<I, D, S, O>, ConnectError> {
+    remove_original: impl FnOnce(
+        &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
+    ) -> R,
+    reinsert_original: impl FnOnce(
+        &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
+        R,
+    ),
+) -> Result<ConnState<WireI, SocketI, D, S>, ConnectError> {
     let ConnectParameters {
         local_ip,
         local_port,
@@ -2642,24 +2673,28 @@ fn connect_inner<
         device,
         sharing,
         ip_options,
+        send_options,
         socket_id,
         original_shutdown,
         extra,
     } = connect_params;
 
     let (remote_ip, socket_device) =
-        crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(remote_ip, device.clone())?;
+        crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
+            remote_ip,
+            device.clone(),
+        )?;
 
     let clear_device_on_disconnect = device.is_none() && socket_device.is_some();
 
-    let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
+    let ip_sock = IpSocketHandler::<WireI, _>::new_ip_socket(
         sync_ctx,
         ctx,
         socket_device.as_ref().map(|d| d.as_ref()),
         local_ip.map(SocketIpAddr::into),
         remote_ip,
-        S::ip_proto::<I>(),
-        ip_options,
+        S::ip_proto::<WireI>(),
+        send_options,
     )
     .map_err(|(e, _ip_options)| e)?;
 
@@ -2704,6 +2739,7 @@ fn connect_inner<
     };
     Ok(ConnState {
         socket: ip_sock,
+        ip_options,
         clear_device_on_disconnect,
         shutdown: original_shutdown.unwrap_or(Shutdown::default()),
         addr: bound_addr,
@@ -2713,7 +2749,7 @@ fn connect_inner<
 
 /// State required to perform single-stack connection of a socket.
 struct SingleStackConnectOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
-    params: ConnectParameters<I, D, S, IpOptions<I, D, S>>,
+    params: ConnectParameters<I, I, D, S>,
     remove_op: Option<SingleStackRemoveOperation<I, D, S>>,
     sharing: S::SharingState,
 }
@@ -2742,6 +2778,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                         device: device.clone(),
                         sharing: sharing.clone(),
                         ip_options: ip_options.clone(),
+                        send_options: ip_options.hop_limits,
                         socket_id: S::make_bound_socket_map_id(socket_id),
                         original_shutdown: None,
                         extra,
@@ -2769,6 +2806,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                                 device: device.clone(),
                                 sharing: sharing.clone(),
                                 ip_options: ip_options.clone(),
+                                send_options: ip_options.hop_limits,
                                 socket_id: S::make_bound_socket_map_id(socket_id),
                                 original_shutdown: None,
                                 extra,
@@ -2779,7 +2817,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                     }
                     BoundSocketStateType::Connected { state, sharing } => {
                         let ConnState {
-                            socket,
+                            socket: _,
+                            ip_options,
                             shutdown,
                             addr:
                                 ConnAddr {
@@ -2797,7 +2836,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                                 remote_port,
                                 device: device.clone(),
                                 sharing: sharing.clone(),
-                                ip_options: socket.options().clone(),
+                                ip_options: ip_options.clone(),
+                                send_options: ip_options.hop_limits,
                                 socket_id: S::make_bound_socket_map_id(socket_id),
                                 original_shutdown: Some(shutdown.clone()),
                                 extra,
@@ -2828,7 +2868,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
         ctx: &mut C,
         socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
         allocator: &mut A,
-    ) -> Result<(ConnState<I, D, S, IpOptions<I, D, S>>, S::SharingState), ConnectError> {
+    ) -> Result<(ConnState<I, I, D, S>, S::SharingState), ConnectError> {
         let SingleStackConnectOperation { params, remove_op, sharing } = self;
         let remove_fn =
             |sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>| {
@@ -2849,10 +2889,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
 
 /// State required to perform dual-stack connection of a socket.
 struct DualStackConnectOperation<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> {
-    params: EitherStack<
-        ConnectParameters<I, D, S, IpOptions<I, D, S>>,
-        ConnectParameters<I::OtherVersion, D, S, IpOptions<I, D, S>>,
-    >,
+    params: EitherStack<ConnectParameters<I, I, D, S>, ConnectParameters<I::OtherVersion, I, D, S>>,
     remove_op: Option<DualStackRemoveOperation<I, D, S>>,
     sharing: S::SharingState,
 }
@@ -2884,6 +2921,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             device: device.clone(),
                             sharing: sharing.clone(),
                             ip_options: ip_options.clone(),
+                            send_options: ip_options.hop_limits,
                             socket_id: S::make_bound_socket_map_id(socket_id),
                             original_shutdown: None,
                             extra,
@@ -2901,6 +2939,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             device: device.clone(),
                             sharing: sharing.clone(),
                             ip_options: ip_options.clone(),
+                            send_options: ip_options.hop_limits.clone(),
                             socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                             original_shutdown: None,
                             extra,
@@ -2948,6 +2987,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -2970,6 +3010,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -2993,6 +3034,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits.clone(),
                                     socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -3015,6 +3057,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits.clone(),
                                     socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -3042,7 +3085,8 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             (
                                 DualStackRemoteIp::ThisStack(remote_ip),
                                 DualStackConnState::ThisStack(ConnState {
-                                    socket,
+                                    socket: _,
+                                    ip_options,
                                     shutdown,
                                     addr:
                                         ConnAddr {
@@ -3061,7 +3105,8 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     remote_port,
                                     device: device.clone(),
                                     sharing: sharing.clone(),
-                                    ip_options: socket.options().clone(),
+                                    ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: Some(shutdown.clone()),
                                     extra,
@@ -3073,7 +3118,8 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             (
                                 DualStackRemoteIp::OtherStack(remote_ip),
                                 DualStackConnState::OtherStack(ConnState {
-                                    socket,
+                                    socket: _,
+                                    ip_options,
                                     shutdown,
                                     addr:
                                         ConnAddr {
@@ -3092,7 +3138,8 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                                     remote_port,
                                     device: device.clone(),
                                     sharing: sharing.clone(),
-                                    ip_options: socket.options().clone(),
+                                    ip_options: ip_options.clone(),
+                                    send_options: ip_options.hop_limits.clone(),
                                     socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: Some(shutdown.clone()),
                                     extra,
@@ -3623,10 +3670,10 @@ pub(crate) fn send_conn<
             }
         };
 
-        struct SendParams<'a, WireI: IpExt, SocketI: IpExt, S: DatagramSocketSpec, D: WeakId> {
-            socket: &'a IpSock<WireI, D, IpOptions<SocketI, D, S>>,
+        struct SendParams<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId> {
+            socket: &'a IpSock<I, D, SocketHopLimits>,
             ip: &'a ConnIpAddr<
-                WireI::Addr,
+                I::Addr,
                 <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
                 <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
@@ -3641,8 +3688,8 @@ pub(crate) fn send_conn<
             DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
             SC: DatagramBoundStateContext<I, C, S>,
         > {
-            SendToThisStack((SendParams<'a, I, I, S, D>, &'a mut SC)),
-            SendToOtherStack((SendParams<'a, I::OtherVersion, I, S, D>, &'a mut DualStackSC)),
+            SendToThisStack((SendParams<'a, I, S, D>, &'a mut SC)),
+            SendToOtherStack((SendParams<'a, I::OtherVersion, S, D>, &'a mut DualStackSC)),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
             _Phantom((Never, PhantomData<C>)),
@@ -3652,6 +3699,7 @@ pub(crate) fn send_conn<
             MaybeDualStack::DualStack(dual_stack) => match dual_stack.converter().convert(state) {
                 DualStackConnState::ThisStack(ConnState {
                     socket,
+                    ip_options: _,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
@@ -3659,6 +3707,7 @@ pub(crate) fn send_conn<
                 }) => (shutdown, Operation::SendToThisStack((SendParams { socket, ip }, sync_ctx))),
                 DualStackConnState::OtherStack(ConnState {
                     socket,
+                    ip_options: _,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
@@ -3670,6 +3719,7 @@ pub(crate) fn send_conn<
             MaybeDualStack::NotDualStack(not_dual_stack) => {
                 let ConnState {
                     socket,
+                    ip_options: _,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
@@ -3762,13 +3812,12 @@ pub(crate) fn send_to<
             C: DatagramStateNonSyncContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
             SC: DatagramBoundStateContext<I, C, S>,
+            O: SendOptions<I>,
+            OtherO: SendOptions<I::OtherVersion>,
         > {
-            SendToThisStack((SendOneshotParameters<'a, I, S, D, IpOptions<I, D, S>>, &'a mut SC)),
+            SendToThisStack((SendOneshotParameters<'a, I, S, D, O>, &'a mut SC)),
             SendToOtherStack(
-                (
-                    SendOneshotParameters<'a, I::OtherVersion, S, D, IpOptions<I, D, S>>,
-                    &'a mut DualStackSC,
-                ),
+                (SendOneshotParameters<'a, I::OtherVersion, S, D, OtherO>, &'a mut DualStackSC),
             ),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
@@ -3798,7 +3847,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &ip_options,
+                                    send_options: &ip_options.hop_limits,
                                 },
                                 sync_ctx,
                             )),
@@ -3807,7 +3856,8 @@ pub(crate) fn send_to<
                     }
                     BoundSocketStateType::Connected { state, sharing: _ } => {
                         let ConnState {
-                            socket,
+                            socket: _,
+                            ip_options,
                             clear_device_on_disconnect: _,
                             shutdown,
                             addr:
@@ -3825,7 +3875,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options(),
+                                    send_options: &ip_options.hop_limits,
                                 },
                                 sync_ctx,
                             )),
@@ -3856,7 +3906,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options,
+                                send_options: &ip_options.hop_limits,
                             },
                             sync_ctx,
                         )),
@@ -3873,7 +3923,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options,
+                                send_options: &ip_options.hop_limits,
                             },
                             sync_ctx,
                         )),
@@ -3890,7 +3940,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options,
+                                send_options: &ip_options.hop_limits,
                             },
                             ds,
                         )),
@@ -3907,7 +3957,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options,
+                                send_options: &ip_options.hop_limits,
                             },
                             ds,
                         )),
@@ -3924,7 +3974,8 @@ pub(crate) fn send_to<
                         }
                         (
                             DualStackConnState::ThisStack(ConnState {
-                                socket,
+                                socket: _,
+                                ip_options,
                                 clear_device_on_disconnect: _,
                                 shutdown,
                                 addr:
@@ -3943,7 +3994,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options(),
+                                    send_options: &ip_options.hop_limits,
                                 },
                                 sync_ctx,
                             )),
@@ -3951,7 +4002,8 @@ pub(crate) fn send_to<
                         ),
                         (
                             DualStackConnState::OtherStack(ConnState {
-                                socket,
+                                socket: _,
+                                ip_options,
                                 clear_device_on_disconnect: _,
                                 shutdown,
                                 addr:
@@ -3970,7 +4022,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options(),
+                                    send_options: &ip_options.hop_limits,
                                 },
                                 ds,
                             )),
@@ -4073,7 +4125,7 @@ enum SetBoundDeviceParameters<'a, WireI: IpExt, SocketI: IpExt, D: WeakId, S: Da
         ip: &'a ListenerIpAddr<WireI::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
         device: &'a mut Option<D>,
     },
-    Connected(&'a mut ConnState<WireI, D, S, IpOptions<SocketI, D, S>>),
+    Connected(&'a mut ConnState<WireI, SocketI, D, S>),
 }
 
 /// Update the device for a bound socket.
@@ -4110,6 +4162,7 @@ fn set_bound_device_single_stack<
         } => (addr.as_ref(), None, device.as_ref()),
         SetBoundDeviceParameters::Connected(ConnState {
             socket: _,
+            ip_options: _,
             addr:
                 ConnAddr {
                     ip: ConnIpAddr { local: (local_ip, _local_id), remote: (remote_ip, _remote_id) },
@@ -4149,6 +4202,7 @@ fn set_bound_device_single_stack<
         }
         SetBoundDeviceParameters::Connected(ConnState {
             socket,
+            ip_options: _,
             addr,
             shutdown: _,
             clear_device_on_disconnect,
@@ -4167,7 +4221,7 @@ fn set_bound_device_single_stack<
                     // the insertion is successful.
                     Default::default(),
                 )
-                .map_err(|_: (IpSockCreationError, IpOptions<_, _, _>)| {
+                .map_err(|_: (IpSockCreationError, _)| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
                 })?;
             let new_device = new_socket.device().cloned();
@@ -4182,7 +4236,7 @@ fn set_bound_device_single_stack<
                 .map_err(|(ExistsError {}, _entry)| LocalAddressError::AddressInUse)?;
             // Since the move was successful, replace the old socket with
             // the new one but move the options over.
-            let _: IpOptions<_, _, _> = new_socket.replace_options(socket.take_options());
+            let _: SocketHopLimits = new_socket.replace_options(socket.take_options());
             *socket = new_socket;
             // If this operation explicitly sets the device for the socket, it
             // should no longer be cleared on disconnect.
@@ -4604,16 +4658,22 @@ pub(crate) fn set_multicast_membership<
     })
 }
 
-fn get_options_device_from_conn_state<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec, O>(
+fn get_options_device_from_conn_state<
+    WireI: IpExt,
+    SocketI: IpExt,
+    D: Eq + Hash,
+    S: DatagramSocketSpec,
+>(
     ConnState {
-        socket,
+        socket: _,
+        ip_options,
         clear_device_on_disconnect: _,
         shutdown: _,
         addr: ConnAddr { device, ip: _ },
         extra: _,
-    }: &ConnState<I, D, S, O>,
-) -> (&O, &Option<D>) {
-    (socket.options(), device)
+    }: &ConnState<WireI, SocketI, D, S>,
+) -> (&IpOptions<SocketI, D, S>, &Option<D>) {
+    (ip_options, device)
 }
 
 pub(crate) fn get_options_device<
