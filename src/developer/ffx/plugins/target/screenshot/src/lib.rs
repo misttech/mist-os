@@ -7,13 +7,16 @@ use {
     async_trait::async_trait,
     chrono::{Datelike, Local, Timelike},
     ffx_target_screenshot_args::{Format, ScreenshotCommand},
-    fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
+    ffx_writer::{MachineWriter, ToolIO},
+    fho::{moniker, FfxContext, FfxMain, FfxTool},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_math::SizeU,
     fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest},
     futures::stream::{FuturesOrdered, StreamExt},
     png::HasParameters,
+    serde::{Deserialize, Serialize},
     std::convert::{TryFrom, TryInto},
+    std::fmt::{Display, Formatter, Result as FmtResult},
     std::fs,
     std::io::BufWriter,
     std::io::Write,
@@ -88,14 +91,14 @@ fho::embedded_plugin!(ScreenshotTool);
 
 #[async_trait(?Send)]
 impl FfxMain for ScreenshotTool {
-    type Writer = SimpleWriter;
+    type Writer = MachineWriter<ScreenshotOutput>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         screenshot_impl(self.screenshot_proxy, self.cmd, &mut writer).await?;
         Ok(())
     }
 }
 
-async fn screenshot_impl<W: Write>(
+async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
     screenshot_proxy: ScreenshotProxy,
     cmd: ScreenshotCommand,
     writer: &mut W,
@@ -148,9 +151,20 @@ async fn screenshot_impl<W: Write>(
         }
     };
 
-    writeln!(writer, "Exported {}", screenshot_file_path.to_string_lossy())?;
+    writer.item(&ScreenshotOutput { output_file: screenshot_file_path })?;
 
     Ok(())
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ScreenshotOutput {
+    output_file: PathBuf,
+}
+
+impl Display for ScreenshotOutput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Exported {}", self.output_file.display())
+    }
 }
 
 fn default_output_dir() -> PathBuf {
@@ -227,9 +241,11 @@ fn bgra_to_rgba(img_data: &mut Vec<u8>) {
 mod test {
     use {
         super::*,
+        ffx_writer::{Format as WriterFormat, MachineWriter, TestBuffers},
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse},
         futures::TryStreamExt,
+        std::os::unix::ffi::OsStrExt,
         tempfile::tempdir,
     };
 
@@ -287,51 +303,29 @@ mod test {
         })
     }
 
-    async fn run_screenshot_test(cmd: ScreenshotCommand) {
+    async fn run_screenshot_test(cmd: ScreenshotCommand) -> ScreenshotOutput {
         let screenshot_proxy = setup_fake_screenshot_server();
 
-        let mut writer = Vec::new();
-        let file_format = cmd.format.clone();
-        let output_dir = cmd.output_directory.clone();
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(WriterFormat::Json), &test_buffers);
         let result = screenshot_impl(screenshot_proxy, cmd, &mut writer).await;
         assert!(result.is_ok());
 
-        let output = String::from_utf8(writer).unwrap();
-
-        let output_vec = output.split_whitespace().collect::<Vec<_>>();
-        assert!(output_vec.len() == 2);
-
-        assert!(output_vec[0].eq_ignore_ascii_case("Exported"));
-
-        // output_vec[1] holds the path to the exported file
-        match output_dir {
-            Some(dir) => {
-                assert!(output_vec[1].starts_with(dir.as_str()))
-            }
-            None => (),
-        };
-
-        match file_format {
-            Format::PNG => {
-                assert!(output_vec[1].ends_with("screenshot.png"));
-            }
-            Format::BGRA => {
-                assert!(output_vec[1].ends_with("screenshot.bgra"));
-            }
-            Format::RGBA => {
-                assert!(output_vec[1].ends_with("screenshot.rgba"));
-            }
-        }
-
-        let file_path = Path::new(output_vec[1]);
-
-        assert!(file_path.is_file());
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stderr, "", "no warnings or errors should be reported");
+        serde_json::from_str(&stdout).unwrap()
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_bgra() -> Result<()> {
-        run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::BGRA })
-            .await;
+        let ScreenshotOutput { output_file } =
+            run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::BGRA })
+                .await;
+        assert_eq!(
+            output_file.file_name().unwrap().as_bytes(),
+            "screenshot.bgra".as_bytes(),
+            "{output_file:?} must have filename==screenshot.bgra",
+        );
         Ok(())
     }
 
@@ -340,18 +334,25 @@ mod test {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");
         fs::create_dir_all(&output_dir)?;
-        run_screenshot_test(ScreenshotCommand {
+        let ScreenshotOutput { output_file } = run_screenshot_test(ScreenshotCommand {
             output_directory: Some(output_dir.to_string_lossy().to_string()),
             format: Format::BGRA,
         })
         .await;
+        assert_eq!(output_file, output_dir.join("screenshot.bgra"));
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_png() -> Result<()> {
-        run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::PNG })
-            .await;
+        let ScreenshotOutput { output_file } =
+            run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::PNG })
+                .await;
+        assert_eq!(
+            output_file.file_name().unwrap().as_bytes(),
+            "screenshot.png".as_bytes(),
+            "{output_file:?} must have filename==screenshot.png",
+        );
         Ok(())
     }
 
@@ -360,18 +361,25 @@ mod test {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");
         fs::create_dir_all(&output_dir)?;
-        run_screenshot_test(ScreenshotCommand {
+        let ScreenshotOutput { output_file } = run_screenshot_test(ScreenshotCommand {
             output_directory: Some(output_dir.to_string_lossy().to_string()),
             format: Format::PNG,
         })
         .await;
+        assert_eq!(output_file, output_dir.join("screenshot.png"));
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_rgba() -> Result<()> {
-        run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::RGBA })
-            .await;
+        let ScreenshotOutput { output_file } =
+            run_screenshot_test(ScreenshotCommand { output_directory: None, format: Format::RGBA })
+                .await;
+        assert_eq!(
+            output_file.file_name().unwrap().as_bytes(),
+            "screenshot.rgba".as_bytes(),
+            "{output_file:?} must have filename==screenshot.rgba",
+        );
         Ok(())
     }
 
@@ -380,11 +388,12 @@ mod test {
         // Create a test directory in TempFile::tempdir.
         let output_dir = PathBuf::from(tempdir().unwrap().path()).join("screenshot_test");
         fs::create_dir_all(&output_dir)?;
-        run_screenshot_test(ScreenshotCommand {
+        let ScreenshotOutput { output_file } = run_screenshot_test(ScreenshotCommand {
             output_directory: Some(output_dir.to_string_lossy().to_string()),
             format: Format::RGBA,
         })
         .await;
+        assert_eq!(output_file, output_dir.join("screenshot.rgba"));
         Ok(())
     }
 }
