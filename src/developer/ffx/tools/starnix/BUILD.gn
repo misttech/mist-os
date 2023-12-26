@@ -32,6 +32,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:signal-hook",
     "//third_party/rust_crates:termion",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [

@@ -14,9 +14,11 @@ use futures::stream::StreamExt;
 use futures::FutureExt;
 use signal_hook::{consts::signal::SIGINT, iterator::Signals};
 use std::io::ErrorKind;
+use std::net::{SocketAddrV4, TcpListener as SyncTcpListener};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tracing::info;
 
 use crate::common::*;
 
@@ -53,7 +55,7 @@ pub struct StarnixAdbCommand {
     pub moniker: Option<String>,
 
     /// which port to serve the adb server on
-    #[argh(option, short = 'p', default = "5556")]
+    #[argh(option, short = 'p', default = "find_open_port(5556)")]
     pub port: u16,
 
     /// path to the adb client command
@@ -63,6 +65,27 @@ pub struct StarnixAdbCommand {
     /// disable automatically running "adb connect"
     #[argh(switch)]
     pub no_autoconnect: bool,
+}
+
+fn find_open_port(start: u16) -> u16 {
+    let mut addr = SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), start);
+
+    info!("probing for an open port for the adb bridge...");
+    loop {
+        info!("probing {addr:?}...");
+        match SyncTcpListener::bind(addr) {
+            Ok(_) => {
+                info!("{addr:?} appears to be available");
+                return addr.port();
+            }
+            Err(e) => {
+                info!("{addr:?} appears unavailable: {e:?}");
+                addr.set_port(
+                    addr.port().checked_add(1).expect("should find open port before overflow"),
+                );
+            }
+        }
+    }
 }
 
 async fn connect_to_rcs(
