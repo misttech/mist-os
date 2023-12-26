@@ -174,8 +174,8 @@ use crate::{
     context::{InstantBindingsTypes, TimerContext, TracingContext},
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
-    error::{ExistsError, LocalAddressError, NotSupportedError, ZonedAddressError},
+    device::{self, AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakId},
+    error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         icmp::IcmpErrorCode,
         socket::{
@@ -1636,7 +1636,7 @@ pub(crate) trait SocketHandler<I: DualStackIpExt, C: NonSyncContext<Self::WeakDe
     fn get_info(
         &mut self,
         id: &TcpSocketId<I, Self::WeakDeviceId, C>,
-    ) -> Result<SocketInfo<I::Addr, Self::WeakDeviceId>, NotSupportedError>;
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
     fn do_send(&mut self, ctx: &mut C, conn_id: &TcpSocketId<I, Self::WeakDeviceId, C>);
     fn handle_timer(&mut self, ctx: &mut C, conn_id: WeakTcpSocketId<I, Self::WeakDeviceId, C>);
 
@@ -2471,24 +2471,53 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
     fn get_info(
         &mut self,
         id: &TcpSocketId<I, Self::WeakDeviceId, C>,
-    ) -> Result<SocketInfo<I::Addr, SC::WeakDeviceId>, NotSupportedError> {
-        self.with_socket_and_converter(id, |socket_state, converter| match socket_state {
-            TcpSocketState::Unbound(unbound) => Ok(SocketInfo::Unbound(unbound.into())),
-            TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => match converter
-            {
-                MaybeDualStack::NotDualStack(converter) => {
-                    let (_, addr) = converter.convert(conn);
-                    Ok(SocketInfo::Connection(addr.clone().into()))
-                }
-                MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
-                    EitherStack::ThisStack((_, addr)) => {
-                        Ok(SocketInfo::Connection(addr.clone().into()))
-                    }
-                    EitherStack::OtherStack(_) => Err(NotSupportedError),
-                },
-            },
+    ) -> SocketInfo<I::Addr, SC::WeakDeviceId> {
+        self.with_socket_and_converter(id, |socket_state, _converter| match socket_state {
+            TcpSocketState::Unbound(unbound) => SocketInfo::Unbound(unbound.into()),
+            TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct WrapIn<'a, I: DualStackIpExt, D: WeakId, BT: TcpBindingsTypes>(
+                    &'a I::ConnectionAndAddr<D, BT>,
+                );
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(A, IpAddress)]
+                struct WrapOut<A: IpAddress, D>(ConnectionInfo<A, D>);
+                let WrapOut(conn_info) = I::map_ip(
+                    WrapIn(conn),
+                    |WrapIn(single_stack_state)| {
+                        let (_, v4_addr) = single_stack_state;
+                        WrapOut(v4_addr.clone().into())
+                    },
+                    |WrapIn(dual_stack_state)| match dual_stack_state {
+                        EitherStack::ThisStack((_, v6_addr)) => WrapOut(v6_addr.clone().into()),
+                        EitherStack::OtherStack((_, v4_addr)) => {
+                            let ConnAddr {
+                                ip:
+                                    ConnIpAddr {
+                                        local: (local_ip, local_port),
+                                        remote: (remote_ip, remote_port),
+                                    },
+                                device,
+                            } = v4_addr;
+                            WrapOut(ConnectionInfo {
+                                local_addr: SocketAddr {
+                                    ip: maybe_zoned(local_ip.addr().to_ipv6_mapped(), device),
+                                    port: *local_port,
+                                },
+                                remote_addr: SocketAddr {
+                                    ip: maybe_zoned(remote_ip.addr().to_ipv6_mapped(), device),
+                                    port: *remote_port,
+                                },
+                                device: device.clone(),
+                            })
+                        }
+                    },
+                );
+                SocketInfo::Connection(conn_info)
+            }
             TcpSocketState::Bound(BoundSocketState::Listener((_listener, _sharing, addr))) => {
-                Ok(SocketInfo::Bound(addr.clone().into()))
+                SocketInfo::Bound(addr.clone().into())
             }
         })
     }
@@ -3872,7 +3901,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
 pub fn get_info<I: DualStackIpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: &TcpSocketId<I, WeakDeviceId<C>, C>,
-) -> Result<SocketInfo<I::Addr, WeakDeviceId<C>>, NotSupportedError> {
+) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -5269,7 +5298,7 @@ mod tests {
             .map(|()| {
                 assert_matches!(
                     SocketHandler::get_info(&mut sync_ctx, &socket),
-                    Ok(SocketInfo::Bound(bound)) => bound.port
+                    SocketInfo::Bound(bound) => bound.port
                 )
             });
         assert_eq!(result, expected_result.map_err(From::from));
@@ -5426,7 +5455,7 @@ mod tests {
 
             let info = assert_matches!(
                 SocketHandler::get_info(sync_ctx, &client_connection),
-                Ok(SocketInfo::Connection(info)) => info
+                SocketInfo::Connection(info) => info
             );
             // The local address picked for the connection is link-local, which
             // means the device for the connection must also be set (since the
@@ -5507,7 +5536,7 @@ mod tests {
 
             let info = assert_matches!(
                 SocketHandler::get_info(sync_ctx, &server_connection),
-                Ok(SocketInfo::Connection(info)) => info
+                SocketInfo::Connection(info) => info
             );
             // The local address picked for the connection is link-local, which
             // means the device for the connection must also be set (since the
@@ -5858,11 +5887,11 @@ mod tests {
         let info = SocketHandler::get_info(&mut sync_ctx, &socket);
         assert_eq!(
             info,
-            Ok(SocketInfo::Bound(BoundInfo {
+            SocketInfo::Bound(BoundInfo {
                 addr: addr.map(|a| a.into_inner().map_zone(FakeWeakDeviceId).into()),
                 port,
                 device: None
-            }))
+            })
         );
     }
 
@@ -5908,11 +5937,11 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_info(&mut sync_ctx, &socket),
-            Ok(SocketInfo::Connection(ConnectionInfo {
+            SocketInfo::Connection(ConnectionInfo {
                 local_addr: local.map_zone(FakeWeakDeviceId),
                 remote_addr: remote.map_zone(FakeWeakDeviceId),
                 device: None,
-            })),
+            }),
         );
     }
 
@@ -5992,7 +6021,7 @@ mod tests {
                         .expect("connection is available");
                 assert_matches!(
                     SocketHandler::get_info(sync_ctx, &server_conn),
-                    Ok(SocketInfo::Connection(info)) => info
+                    SocketInfo::Connection(info) => info
                 )
             });
 
@@ -6047,11 +6076,11 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_info(&mut sync_ctx, &socket),
-            Ok(SocketInfo::Bound(BoundInfo {
+            SocketInfo::Bound(BoundInfo {
                 addr: Some(local_addr.ip.into_inner().map_zone(FakeWeakDeviceId).into()),
                 port: local_addr.port,
                 device: Some(FakeWeakDeviceId(FakeDeviceId))
-            }))
+            })
         );
 
         SocketHandler::connect(
@@ -6065,11 +6094,11 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_info(&mut sync_ctx, &socket),
-            Ok(SocketInfo::Connection(ConnectionInfo {
+            SocketInfo::Connection(ConnectionInfo {
                 local_addr: local_addr.map_zone(FakeWeakDeviceId),
                 remote_addr: remote_addr.map_zone(FakeWeakDeviceId),
                 device: Some(FakeWeakDeviceId(FakeDeviceId))
-            }))
+            })
         );
     }
 
@@ -7725,5 +7754,22 @@ mod tests {
                 5
             );
         }
+
+        // Verify that the client is connected to the IPv4 remote and has been
+        // assigned an IPv4 local IP.
+        let info = assert_matches!(
+            SocketHandler::get_info(net.sync_ctx(LOCAL), &client),
+            SocketInfo::Connection(info) => info
+        );
+        let (local_ip, remote_ip) = assert_matches!(
+            info,
+            ConnectionInfo {
+                local_addr: SocketAddr { ip: local_ip, port: _ },
+                remote_addr: SocketAddr { ip: remote_ip, port: PORT_1 },
+                device: _
+            } => (local_ip.addr(), remote_ip.addr())
+        );
+        assert_eq!(remote_ip, Ipv4::FAKE_CONFIG.remote_ip.to_ipv6_mapped());
+        assert_matches!(local_ip.to_ipv4_mapped(), Some(_));
     }
 }

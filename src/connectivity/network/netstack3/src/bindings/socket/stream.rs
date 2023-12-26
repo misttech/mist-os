@@ -802,7 +802,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let fidl = match get_info::<I, _>(sync_ctx, id).map_err(IntoErrno::into_errno)? {
+        let fidl = match get_info::<I, _>(sync_ctx, id) {
             SocketInfo::Unbound(UnboundInfo { device: _ }) => {
                 Ok(<<I as IpSockAddrExt>::SocketAddress as SockAddr>::UNSPECIFIED)
             }
@@ -823,7 +823,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        match get_info::<I, _>(sync_ctx, id).map_err(IntoErrno::into_errno)? {
+        match get_info::<I, _>(sync_ctx, id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
                 info.remote_addr
