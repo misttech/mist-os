@@ -6,3 +6,6 @@
 name = "rustversion"
 version = "1.0.12"
 authors = ["The Fuchsia Authors <rust-fuchsia@fuchsia.com>"]
+
+[lib]
+proc-macro = true

@@ -903,6 +903,18 @@ group("structopt") {
 }
 
 if (!(current_os == "fuchsia")) {
+  group("strum") {
+    public_deps = [ ":strum-v0_25_0" ]
+  }
+}
+
+if (!(current_os == "fuchsia")) {
+  group("strum_macros") {
+    public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
+  }
+}
+
+if (!(current_os == "fuchsia")) {
   group("syn") {
     public_deps = [ ":syn-v1_0_98" ]
   }
@@ -4812,7 +4824,7 @@ rust_proc_macro("enum-as-inner-v0_5_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":heck-v0_4_0" ]
+  deps += [ ":heck-v0_4_1" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
   deps += [ ":syn-v1_0_98" ]
@@ -6286,18 +6298,18 @@ rust_library("heck-v0_3_1") {
   applicable_licenses = [ ":heck-v0_3_1.license" ]
 }
 
-license("heck-v0_4_0.license") {
+license("heck-v0_4_1.license") {
   public_package_name = "heck"
   license_files = [
-    "//third_party/rust_crates/vendor/heck-0.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/heck-0.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/heck-0.4.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/heck-0.4.1/LICENSE-MIT",
   ]
 }
 
-rust_library("heck-v0_4_0") {
+rust_library("heck-v0_4_1") {
   crate_name = "heck"
-  crate_root = "//third_party/rust_crates/vendor/heck-0.4.0/src/lib.rs"
-  output_name = "heck-d13199f44da95b73"
+  crate_root = "//third_party/rust_crates/vendor/heck-0.4.1/src/lib.rs"
+  output_name = "heck-f37b68fb3b2b9ab3"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -6307,14 +6319,14 @@ rust_library("heck-v0_4_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=d13199f44da95b73",
-    "-Cextra-filename=-d13199f44da95b73",
+    "-Cmetadata=f37b68fb3b2b9ab3",
+    "-Cextra-filename=-f37b68fb3b2b9ab3",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":heck-v0_4_0.license" ]
+  applicable_licenses = [ ":heck-v0_4_1.license" ]
 }
 
 license("hermit-abi-v0_1_8.license") {
@@ -10869,7 +10881,7 @@ rust_library("prost-build-v0_11_1") {
 
   deps = []
   deps += [ ":bytes-v1_0_1" ]
-  deps += [ ":heck-v0_4_0" ]
+  deps += [ ":heck-v0_4_1" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":log-v0_4_20" ]
@@ -12760,6 +12772,28 @@ rust_library("rustls-native-certs-v0_5_0") {
   applicable_licenses = [ ":rustls-native-certs-v0_5_0.license" ]
 }
 
+rust_proc_macro("rustversion-v1_0_12") {
+  crate_name = "rustversion"
+  crate_root = "//third_party/rust_crates/empty/rustversion/src/lib.rs"
+  output_name = "rustversion-744e65d5c3ea769d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=744e65d5c3ea769d",
+    "-Cextra-filename=-744e65d5c3ea769d",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
 license("rusty-fork-v0_3_0.license") {
   public_package_name = "rusty_fork"
   license_files = [
@@ -14470,6 +14504,68 @@ rust_proc_macro("structopt-derive-v0_2_14") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":structopt-derive-v0_2_14.license" ]
+}
+
+license("strum-v0_25_0.license") {
+  public_package_name = "strum"
+  license_files = [ "//third_party/rust_crates/vendor/strum-0.25.0/LICENSE" ]
+}
+
+rust_library("strum-v0_25_0") {
+  crate_name = "strum"
+  crate_root = "//third_party/rust_crates/vendor/strum-0.25.0/src/lib.rs"
+  output_name = "strum-fd23c935a83f9253"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=fd23c935a83f9253",
+    "-Cextra-filename=-fd23c935a83f9253",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":strum-v0_25_0.license" ]
+}
+
+license("strum_macros-v0_25_3.license") {
+  public_package_name = "strum_macros"
+  license_files =
+      [ "//third_party/rust_crates/vendor/strum_macros-0.25.3/LICENSE" ]
+}
+
+rust_proc_macro("strum_macros-v0_25_3") {
+  crate_name = "strum_macros"
+  crate_root = "//third_party/rust_crates/vendor/strum_macros-0.25.3/src/lib.rs"
+  output_name = "strum_macros-428e76e7ff188938"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":heck-v0_4_1" ]
+  deps += [ ":proc-macro2-v1_0_63" ]
+  deps += [ ":quote-v1_0_29" ]
+  deps += [ ":rustversion-v1_0_12($host_toolchain)" ]
+  deps += [ ":syn-v2_0_32" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=428e76e7ff188938",
+    "-Cextra-filename=-428e76e7ff188938",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":strum_macros-v0_25_3.license" ]
 }
 
 license("subtle-v2_4_1.license") {
