@@ -140,15 +140,10 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 
 void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     const added_display_args_t* displays_added, size_t added_count,
-    const uint64_t* displays_removed, size_t removed_count,
-    added_display_info_t* out_display_info_list, size_t display_info_count,
-    size_t* display_info_actual) {
-  ZX_DEBUG_ASSERT(!out_display_info_list || added_count == display_info_count);
-
+    const uint64_t* displays_removed, size_t removed_count) {
   fbl::Vector<fbl::RefPtr<DisplayInfo>> added_display_infos;
   fbl::Vector<DisplayId> removed_display_ids;
   std::unique_ptr<async::Task> task;
-  uint32_t added_success_count = 0;
 
   fbl::AllocChecker alloc_checker;
   if (added_count) {
@@ -204,26 +199,6 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
       ComputeEld(info->edid->base, eld);
       driver_.SetEld(info->id, eld.get(), eld.size());
     }
-    auto* display_info = out_display_info_list ? &out_display_info_list[i] : nullptr;
-    if (display_info && info->edid.has_value()) {
-      const edid::Edid& edid = info->edid->base;
-      display_info->is_hdmi_out = edid.is_hdmi();
-      display_info->is_standard_srgb_out = edid.is_standard_rgb();
-      display_info->audio_format_count = static_cast<uint32_t>(info->edid->audio.size());
-
-      static_assert(
-          sizeof(display_info->monitor_name) == sizeof(edid::Descriptor::Monitor::data) + 1,
-          "Possible overflow");
-      static_assert(
-          sizeof(display_info->monitor_name) == sizeof(edid::Descriptor::Monitor::data) + 1,
-          "Possible overflow");
-      strcpy(display_info->manufacturer_id, edid.manufacturer_id());
-      strcpy(display_info->monitor_name, edid.monitor_name());
-      strcpy(display_info->monitor_serial, edid.monitor_serial());
-      display_info->manufacturer_name = edid.manufacturer_name();
-      display_info->horizontal_size_mm = edid.horizontal_size_mm();
-      display_info->vertical_size_mm = edid.vertical_size_mm();
-    }
 
     if (displays_.insert_or_find(info)) {
       added_display_infos.push_back(std::move(info));
@@ -231,8 +206,6 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
       zxlogf(INFO, "Ignoring duplicate display");
     }
   }
-  if (display_info_actual)
-    *display_info_actual = added_success_count;
 
   task->set_handler([this, added_display_infos = std::move(added_display_infos),
                      removed_display_ids = std::move(removed_display_ids)](
@@ -243,6 +216,9 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
           PopulateDisplayTimings(added_display_info);
         }
       }
+
+      // TODO(b/317914671): Pass parsed display metadata to driver.
+
       fbl::AutoLock lock(mtx());
 
       fbl::Vector<DisplayId> added_ids;
@@ -267,7 +243,6 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
         ZX_DEBUG_ASSERT(primary_client_ != nullptr);
         primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
-
     } else {
       zxlogf(ERROR, "Failed to dispatch display change task %d", status);
     }

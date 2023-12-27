@@ -229,10 +229,9 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   if (display_attached_) {
-    added_display_info_t info{.is_standard_srgb_out = false};  // Random default
     added_display_args_t args;
     vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
-    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
+    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0);
   }
 }
 
@@ -1093,7 +1092,6 @@ void AmlogicDisplay::OnHotPlugStateChange(HotPlugDetectionState current_state) {
 
   bool display_added = false;
   added_display_args_t added_display_args;
-  added_display_info_t added_display_info;
 
   bool display_removed = false;
   display::DisplayId removed_display_id;
@@ -1129,9 +1127,7 @@ void AmlogicDisplay::OnHotPlugStateChange(HotPlugDetectionState current_state) {
 
     dc_intf_.OnDisplaysChanged(
         /*added_display_list=*/&added_display_args, added_display_count,
-        /*removed_display_list=*/&banjo_removed_display_id, removed_display_count,
-        /*out_display_info_list=*/&added_display_info,
-        /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
+        /*removed_display_list=*/&banjo_removed_display_id, removed_display_count);
   }
 }
 

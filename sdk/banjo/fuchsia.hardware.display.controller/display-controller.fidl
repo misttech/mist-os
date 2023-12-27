@@ -97,29 +97,6 @@ type AddedDisplayArgs = resource struct {
     cursor_info vector<CursorInfo>:MAX;
 };
 
-/// Out parameters will be populated before on_displays_changed returns.
-type AddedDisplayInfo = struct {
-    is_hdmi_out bool;
-    is_standard_srgb_out bool;
-
-    audio_format_count uint32;
-
-    /// All strings are null-terminated. |manufacturer_id| is guaranteed to have
-    /// length 3, all other strings may be empty.
-    manufacturer_id string:4;
-    /// non-null
-    manufacturer_name string:MAX;
-    /// null-terminated
-    monitor_name string:14;
-    /// null-terminated
-    monitor_serial string:14;
-
-    // physical horizontal size in millimeters
-    horizontal_size_mm uint32;
-    // physical vertical size in millimeters
-    vertical_size_mm uint32;
-};
-
 /// The client will not make any `ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL` calls into the device
 /// during these callbacks.
 @transport("Banjo")
@@ -136,8 +113,6 @@ closed protocol DisplayControllerInterface {
     strict OnDisplaysChanged(resource struct {
         added_displays vector<AddedDisplayArgs>:MAX;
         removed_display_ids vector<uint64>:MAX;
-    }) -> (struct {
-        display_info vector<AddedDisplayInfo>:MAX;
     });
 
     /// Events which are invoked when display vsync occurs.

@@ -266,7 +266,7 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   {
     fbl::AutoLock lock(&flush_lock_);
     dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(interface);
-    dc_intf_.OnDisplaysChanged(args.data(), args.size(), nullptr, 0, nullptr, 0, nullptr);
+    dc_intf_.OnDisplaysChanged(args.data(), args.size(), nullptr, 0);
   }
 }
 

@@ -134,7 +134,7 @@ void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
   added_display_args_t args;
   PopulateAddedDisplayArgs(&args);
-  controller_interface_client_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+  controller_interface_client_.OnDisplaysChanged(&args, 1, nullptr, 0);
 }
 
 zx_status_t FakeDisplay::ImportVmoImageForTesting(image_t* image, zx::vmo vmo, size_t offset) {
@@ -707,11 +707,9 @@ zx_status_t FakeDisplay::SetupDisplayInterface() {
     added_display_args_t args;
     PopulateAddedDisplayArgs(&args);
 
-    controller_interface_client_.OnDisplaysChanged(
-        &args, /*added_display_count=*/1,
-        /*removed_display_list=*/nullptr, /*removed_display_count=*/0,
-        /*out_display_info_list=*/nullptr, /*display_info_count=*/0,
-        /*out_display_info_actual=*/nullptr);
+    controller_interface_client_.OnDisplaysChanged(&args, /*added_display_count=*/1,
+                                                   /*removed_display_list=*/nullptr,
+                                                   /*removed_display_count=*/0);
   }
 
   return ZX_OK;

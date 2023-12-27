@@ -810,9 +810,7 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
 
 void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
                                        cpp20::span<const display::DisplayId> removed) {
-  size_t added_actual;
   added_display_args_t added_args[std::max(static_cast<size_t>(1), added.size())];
-  added_display_info_t added_info[std::max(static_cast<size_t>(1), added.size())];
   for (unsigned i = 0; i < added.size(); i++) {
     added_args[i].display_id = display::ToBanjoDisplayId(added[i]->id());
     added_args[i].edid_present = true;
@@ -827,17 +825,11 @@ void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
   for (unsigned i = 0; i < removed.size(); i++) {
     banjo_removed_display_ids[i] = display::ToBanjoDisplayId(removed[i]);
   }
-  dc_intf_.OnDisplaysChanged(added_args, added.size(), banjo_removed_display_ids, removed.size(),
-                             added_info, added.size(), &added_actual);
-  if (added.size() != added_actual) {
-    zxlogf(WARNING, "%lu displays could not be added", added.size() - added_actual);
-  }
-  for (unsigned i = 0; i < added_actual; i++) {
-    if (added[i]->type() == DisplayDevice::Type::kHdmi) {
-      added[i]->set_type(added_info[i].is_hdmi_out ? DisplayDevice::Type::kHdmi
-                                                   : DisplayDevice::Type::kDvi);
-    }
-  }
+  dc_intf_.OnDisplaysChanged(added_args, added.size(), banjo_removed_display_ids, removed.size());
+
+  // TODO(b/317914671): After the display coordinator provides display metadata
+  // to the drivers, each display's type should potentially be adjusted from
+  // HDMI to DVI, based on EDID information.
 }
 
 // DisplayControllerImpl methods

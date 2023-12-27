@@ -99,7 +99,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   args.pixel_format_list = &pixel_format;
   args.pixel_format_count = 1;
 
-  intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+  intf_.OnDisplaysChanged(&args, 1, nullptr, 0);
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(

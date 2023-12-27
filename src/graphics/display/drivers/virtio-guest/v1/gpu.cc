@@ -91,7 +91,7 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_format_list = kSupportedFormats.data(),
       .pixel_format_count = kSupportedFormats.size(),
   };
-  display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0, nullptr, 0, nullptr);
+  display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0);
 }
 
 zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
