@@ -66,6 +66,13 @@
             ],
             "bug": "",
             "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/chromedriver_latest/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
           }
         ]
       }
