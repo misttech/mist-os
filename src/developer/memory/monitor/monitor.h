@@ -47,19 +47,6 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
 
   void Watch(fidl::InterfaceHandle<fuchsia::memory::Watcher> watcher) override;
 
-  // Deprecated. Use `CollectJsonStats` instead.
-  // Writes a memory capture to |socket| in JSON, in UTF-8.
-  // See //src//developer/memory/metrics/printer.h for a
-  // description of the format of the JSON.
-  void WriteJsonCapture(zx::socket socket) override;
-
-  // Deprecated. Use `CollectJsonStats` instead.
-  // Writes a memory capture and the bucket definition to |socket| in JSON,
-  // in UTF-8.
-  // See //src//developer/memory/metrics/printer.h for a
-  // description of the format of the memory capture JSON.
-  void WriteJsonCaptureAndBuckets(zx::socket socket) override;
-
   // Writes a memory capture and the bucket definition to |socket| in JSON,
   // in UTF-8.
   // See the fuchsia.memory.inspection FIDL library for a

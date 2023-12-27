@@ -3,26 +3,11 @@
 // found in the LICENSE file.
 library fuchsia.memory;
 
-using zx;
-
 /// Interface used to register for memory notifications.
 @discoverable
 closed protocol Monitor {
     strict Watch(resource struct {
         watcher client_end:Watcher;
-    });
-
-    /// Writes to `socket` a JSON capture as a well-formed UTF-8 string.
-    @deprecated("Use fuchsia.memory.inspection.Collector")
-    strict WriteJsonCapture(resource struct {
-        socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
-    });
-
-    /// Writes to `socket` a JSON capture of the memory usage and the memory
-    /// bucket definition, as a well-formed UTF-8 string.
-    @deprecated("Use fuchsia.memory.inspection.Collector")
-    strict WriteJsonCaptureAndBuckets(resource struct {
-        socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };
 

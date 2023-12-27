@@ -287,27 +287,6 @@ void Monitor::Watch(fidl::InterfaceHandle<fuchsia::memory::Watcher> watcher) {
   SampleAndPost();
 }
 
-void Monitor::WriteJsonCapture(zx::socket socket) {
-  // Capture state and store it in a string.
-  Capture capture;
-  auto strategy = std::make_unique<StarnixCaptureStrategy>();
-  const zx_status_t capture_status = GetCapture(&capture, std::move(strategy));
-  if (capture_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(capture_status);
-    return;
-  }
-  std::stringstream stream;
-  Printer printer(stream);
-  printer.PrintCapture(capture);
-  // TODO(b/229972119): avoid a copy by having the stream write directly to the socket.
-  const std::string json_string = stream.str();
-
-  // Send string through socket.
-  fsl::BlockingCopyFromString(json_string, socket);
-}
-
-void Monitor::WriteJsonCaptureAndBuckets(zx::socket socket) { CollectJsonStats(std::move(socket)); }
-
 void Monitor::CollectJsonStats(zx::socket socket) {
   // We set |include_starnix_processes| to true to avoid any change of behavior to the current
   // clients.
