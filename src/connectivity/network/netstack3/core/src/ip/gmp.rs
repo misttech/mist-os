@@ -305,18 +305,18 @@ pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// state. Should be called anytime a configuration change occurs which
     /// results in GMP potentially being enabled. E.g. when IP or GMP
     /// transitions to being enabled.
-    fn gmp_handle_maybe_enabled(&mut self, ctx: &mut C, device: &Self::DeviceId);
+    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId);
 
     /// Handles GMP being disabled.
     ///
     /// All joined groups will transition to the non-member state but still
     /// remain locally joined.
-    fn gmp_handle_disabled(&mut self, ctx: &mut C, device: &Self::DeviceId);
+    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId);
 
     /// Joins the given multicast group.
     fn gmp_join_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupJoinResult;
@@ -324,7 +324,7 @@ pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Leaves the given multicast group.
     fn gmp_leave_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult;
@@ -345,30 +345,30 @@ impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpStateContext<I, C>>
 impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpContext<I, C>> GmpHandler<I, C>
     for SC
 {
-    fn gmp_handle_maybe_enabled(&mut self, ctx: &mut C, device: &Self::DeviceId) {
-        gmp_handle_maybe_enabled(self, ctx, device)
+    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId) {
+        gmp_handle_maybe_enabled(self, bindings_ctx, device)
     }
 
-    fn gmp_handle_disabled(&mut self, ctx: &mut C, device: &Self::DeviceId) {
-        gmp_handle_disabled(self, ctx, device)
+    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId) {
+        gmp_handle_disabled(self, bindings_ctx, device)
     }
 
     fn gmp_join_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &SC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupJoinResult {
-        gmp_join_group(self, ctx, device, group_addr)
+        gmp_join_group(self, bindings_ctx, device, group_addr)
     }
 
     fn gmp_leave_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &SC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult {
-        gmp_leave_group(self, ctx, device, group_addr)
+        gmp_leave_group(self, bindings_ctx, device, group_addr)
     }
 }
 
@@ -951,7 +951,7 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
     /// Sends a GMP message.
     fn send_message(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
         msg_type: GmpMessageType<Self::ProtocolSpecific>,
@@ -960,7 +960,7 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
     /// Runs protocol-specific actions.
     fn run_actions(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         actions: <Self::ProtocolSpecific as ProtocolSpecific>::Actions,
     );
@@ -969,8 +969,8 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
 }
 
 fn gmp_handle_timer<I, C, SC>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     GmpDelayedReportTimerId { device, group_addr }: GmpDelayedReportTimerId<I::Addr, SC::DeviceId>,
 ) where
     C: GmpNonSyncContext<I, SC::DeviceId>,
@@ -978,7 +978,7 @@ fn gmp_handle_timer<I, C, SC>(
     I: IpExt,
 {
     let ReportTimerExpiredActions { send_report } =
-        sync_ctx.with_gmp_state_mut(&device, |GmpState { enabled: _, groups }| {
+        core_ctx.with_gmp_state_mut(&device, |GmpState { enabled: _, groups }| {
             groups
                 .get_mut(&group_addr)
                 .expect("get state for group with expired report timer")
@@ -986,7 +986,7 @@ fn gmp_handle_timer<I, C, SC>(
                 .report_timer_expired()
         });
 
-    sync_ctx.send_message(ctx, &device, group_addr, GmpMessageType::Report(send_report));
+    core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report(send_report));
 }
 
 trait GmpMessage<I: Ip> {
@@ -994,8 +994,8 @@ trait GmpMessage<I: Ip> {
 }
 
 fn handle_report_message<I, C, SC>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
 ) -> Result<(), SC::Err>
@@ -1005,7 +1005,7 @@ where
     I: IpExt,
 {
     let ReportReceivedActions { stop_timer } =
-        sync_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
+        core_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
             groups
                 .get_mut(&group_addr)
                 .ok_or(SC::not_a_member_err(*group_addr))
@@ -1014,7 +1014,8 @@ where
 
     if stop_timer {
         assert_matches!(
-            ctx.cancel_timer(GmpDelayedReportTimerId { device: device.clone(), group_addr }),
+            bindings_ctx
+                .cancel_timer(GmpDelayedReportTimerId { device: device.clone(), group_addr }),
             Some(_)
         );
     }
@@ -1029,8 +1030,8 @@ enum QueryTarget<A> {
 }
 
 fn handle_query_message<I, C, SC>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     target: QueryTarget<I::Addr>,
     max_response_time: Duration,
@@ -1041,9 +1042,9 @@ where
     I: IpExt,
 {
     let addr_and_actions =
-        sync_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
-            let now = ctx.now();
-            let mut rng = ctx.rng();
+        core_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
+            let now = bindings_ctx.now();
+            let mut rng = bindings_ctx.rng();
 
             Ok(match target {
                 QueryTarget::Unspecified => either::Either::Left(
@@ -1075,43 +1076,49 @@ where
     {
         if let Some(generic_actions) = generic_actions {
             let _: Option<C::Instant> = match generic_actions {
-                QueryReceivedGenericAction::ScheduleTimer(delay) => ctx.schedule_timer(
+                QueryReceivedGenericAction::ScheduleTimer(delay) => bindings_ctx.schedule_timer(
                     delay,
                     GmpDelayedReportTimerId { device: device.clone(), group_addr },
                 ),
                 QueryReceivedGenericAction::StopTimerAndSendReport(protocol_specific) => {
-                    sync_ctx.send_message(
-                        ctx,
+                    core_ctx.send_message(
+                        bindings_ctx,
                         device,
                         group_addr,
                         GmpMessageType::Report(protocol_specific),
                     );
-                    ctx.cancel_timer(GmpDelayedReportTimerId { device: device.clone(), group_addr })
+                    bindings_ctx.cancel_timer(GmpDelayedReportTimerId {
+                        device: device.clone(),
+                        group_addr,
+                    })
                 }
             };
         }
 
         if let Some(ps_actions) = ps_actions {
-            sync_ctx.run_actions(ctx, device, ps_actions);
+            core_ctx.run_actions(bindings_ctx, device, ps_actions);
         }
     }
 
     Ok(())
 }
 
-fn gmp_handle_maybe_enabled<C, SC, I>(sync_ctx: &mut SC, ctx: &mut C, device: &SC::DeviceId)
-where
+fn gmp_handle_maybe_enabled<C, SC, I>(
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
+    device: &SC::DeviceId,
+) where
     C: GmpNonSyncContext<I, SC::DeviceId>,
     SC: GmpContext<I, C>,
     I: IpExt,
 {
-    let actions = sync_ctx.with_gmp_state_mut(device, |GmpState { enabled, groups }| {
+    let actions = core_ctx.with_gmp_state_mut(device, |GmpState { enabled, groups }| {
         if !enabled {
             return Vec::new();
         }
 
-        let now = ctx.now();
-        let mut rng = ctx.rng();
+        let now = bindings_ctx.now();
+        let mut rng = bindings_ctx.rng();
 
         groups
             .iter_mut()
@@ -1125,15 +1132,15 @@ where
 
     for (group_addr, JoinGroupActions { send_report_and_schedule_timer }) in actions {
         if let Some((protocol_specific, delay)) = send_report_and_schedule_timer {
-            sync_ctx.send_message(
-                ctx,
+            core_ctx.send_message(
+                bindings_ctx,
                 device,
                 group_addr,
                 GmpMessageType::Report(protocol_specific),
             );
 
             assert_matches!(
-                ctx.schedule_timer(
+                bindings_ctx.schedule_timer(
                     delay,
                     GmpDelayedReportTimerId { device: device.clone(), group_addr }
                 ),
@@ -1143,13 +1150,13 @@ where
     }
 }
 
-fn gmp_handle_disabled<C, SC, I>(sync_ctx: &mut SC, ctx: &mut C, device: &SC::DeviceId)
+fn gmp_handle_disabled<C, SC, I>(core_ctx: &mut SC, bindings_ctx: &mut C, device: &SC::DeviceId)
 where
     C: GmpNonSyncContext<I, SC::DeviceId>,
     SC: GmpContext<I, C>,
     I: IpExt,
 {
-    let actions = sync_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
+    let actions = core_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
         groups
             .groups()
             .cloned()
@@ -1165,20 +1172,21 @@ where
     for (group_addr, LeaveGroupActions { send_leave, stop_timer }) in actions {
         if stop_timer {
             assert_matches!(
-                ctx.cancel_timer(GmpDelayedReportTimerId { device: device.clone(), group_addr }),
+                bindings_ctx
+                    .cancel_timer(GmpDelayedReportTimerId { device: device.clone(), group_addr }),
                 Some(_)
             );
         }
 
         if send_leave {
-            sync_ctx.send_message(ctx, device, group_addr, GmpMessageType::Leave);
+            core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
         }
     }
 }
 
 fn gmp_join_group<C, SC, I>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
 ) -> GroupJoinResult
@@ -1187,10 +1195,10 @@ where
     SC: GmpContext<I, C>,
     I: IpExt,
 {
-    sync_ctx
+    core_ctx
         .with_gmp_state_mut(device, |GmpState { enabled, groups }| {
-            let now = ctx.now();
-            let mut rng = ctx.rng();
+            let now = bindings_ctx.now();
+            let mut rng = bindings_ctx.rng();
 
             groups.join_group_gmp(
                 !enabled || !I::should_perform_gmp(group_addr),
@@ -1201,15 +1209,15 @@ where
         })
         .map(|JoinGroupActions { send_report_and_schedule_timer }| {
             if let Some((protocol_specific, delay)) = send_report_and_schedule_timer {
-                sync_ctx.send_message(
-                    ctx,
+                core_ctx.send_message(
+                    bindings_ctx,
                     device,
                     group_addr,
                     GmpMessageType::Report(protocol_specific),
                 );
 
                 assert_matches!(
-                    ctx.schedule_timer(
+                    bindings_ctx.schedule_timer(
                         delay,
                         GmpDelayedReportTimerId { device: device.clone(), group_addr }
                     ),
@@ -1220,8 +1228,8 @@ where
 }
 
 fn gmp_leave_group<C, SC, I>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
 ) -> GroupLeaveResult
@@ -1230,14 +1238,14 @@ where
     SC: GmpContext<I, C>,
     I: IpExt,
 {
-    sync_ctx
+    core_ctx
         .with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
             groups.leave_group_gmp(group_addr)
         })
         .map(|LeaveGroupActions { send_leave, stop_timer }| {
             if stop_timer {
                 assert_matches!(
-                    ctx.cancel_timer(GmpDelayedReportTimerId {
+                    bindings_ctx.cancel_timer(GmpDelayedReportTimerId {
                         device: device.clone(),
                         group_addr
                     }),
@@ -1246,7 +1254,7 @@ where
             }
 
             if send_leave {
-                sync_ctx.send_message(ctx, device, group_addr, GmpMessageType::Leave);
+                core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
             }
         })
 }
@@ -1280,19 +1288,20 @@ mod testutil {
             C: RngContext + InstantContext<Instant = FakeInstant>,
         >(
             &mut self,
-            ctx: &mut C,
+            bindings_ctx: &mut C,
             addr: MulticastAddr<A>,
         ) {
             fn new_state_machine<C: RngContext + InstantContext, P: Default + ProtocolSpecific>(
-                ctx: &mut C,
+                bindings_ctx: &mut C,
             ) -> GmpStateMachine<C::Instant, P> {
-                let now = ctx.now();
-                let (machine, _actions) = GmpStateMachine::join_group(&mut ctx.rng(), now, false);
+                let now = bindings_ctx.now();
+                let (machine, _actions) =
+                    GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, false);
                 machine
             }
 
             <A::Version as Ip>::map_ip(
-                (GroupWrapper(self), addr, IpInvariant(ctx)),
+                (GroupWrapper(self), addr, IpInvariant(bindings_ctx)),
                 |(GroupWrapper(MulticastGroupSet { inner }), addr, IpInvariant(ctx))| {
                     let _: InsertResult<_> =
                         inner.insert_with(addr, || (new_state_machine(ctx).into(), ()));

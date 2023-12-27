@@ -123,28 +123,28 @@ impl_timer_context!(
 
 /// Handles a generic timer event.
 pub fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     id: TimerId<NonSyncCtx>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
 
     match id {
         TimerId(TimerIdInner::DeviceLayer(x)) => {
-            device::handle_timer(&mut sync_ctx, ctx, x);
+            device::handle_timer(&mut sync_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut sync_ctx, ctx, x);
+            transport::handle_timer(&mut sync_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::IpLayer(x)) => {
-            ip::handle_timer(&mut sync_ctx, ctx, x);
+            ip::handle_timer(&mut sync_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::Ipv4Device(x)) => {
-            ip::device::handle_ipv4_timer(&mut sync_ctx, ctx, x);
+            ip::device::handle_ipv4_timer(&mut sync_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::Ipv6Device(x)) => {
-            ip::device::handle_ipv6_timer(&mut sync_ctx, ctx, x);
+            ip::device::handle_ipv6_timer(&mut sync_ctx, bindings_ctx, x);
         }
         #[cfg(test)]
         TimerId(TimerIdInner::Nop(_)) => {

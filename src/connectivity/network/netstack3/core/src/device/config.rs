@@ -91,7 +91,7 @@ where
     ///
     /// Note that even if the previous value matched the requested value, it is
     /// still populated in the returned `DeviceConfigurationUpdate`.
-    pub fn apply(self, sync_ctx: &SyncCtx<C>) -> DeviceConfigurationUpdate {
+    pub fn apply(self, core_ctx: &SyncCtx<C>) -> DeviceConfigurationUpdate {
         let Self(DeviceConfigurationUpdate { arp, ndp }, device_id) = self;
         let eth = match device_id {
             DeviceId::Loopback(_) => {
@@ -105,7 +105,7 @@ where
             DeviceId::Ethernet(eth) => eth,
         };
         crate::device::integration::with_ethernet_state(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             eth,
             |mut state| {
                 let arp = arp.map(|ArpConfigurationUpdate { nud }| {
@@ -149,13 +149,13 @@ pub fn new_device_configuration_update<C: NonSyncContext>(
 
 /// Returns a snapshot of the given device's configuration.
 pub fn get_device_configuration<C: NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
+    core_ctx: &SyncCtx<C>,
     device_id: &DeviceId<C>,
 ) -> DeviceConfiguration {
     match device_id {
         DeviceId::Loopback(_) => DeviceConfiguration { arp: None, ndp: None },
         DeviceId::Ethernet(eth) => crate::device::integration::with_ethernet_state(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             eth,
             |mut state| {
                 let arp = Some(ArpConfiguration {

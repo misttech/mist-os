@@ -268,7 +268,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
     fn send_neighbor_solicitation(
         &mut self,
-        ctx: &mut NonSyncCtx,
+        bindings_ctx: &mut NonSyncCtx,
         device_id: &EthernetDeviceId<NonSyncCtx>,
         lookup_addr: SpecifiedAddr<Ipv6Addr>,
         remote_link_addr: Option<Mac>,
@@ -301,7 +301,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         // can't happen statically.
         let _: Result<(), _> = crate::ip::icmp::send_ndp_packet(
             self,
-            ctx,
+            bindings_ctx,
             &device_id.clone().into(),
             Some(src_ip),
             dst_ip,
@@ -342,8 +342,8 @@ impl<
 }
 
 fn send_as_ethernet_frame_to_dst<S, C, SC>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     dst_mac: Mac,
     body: S,
@@ -365,19 +365,20 @@ where
     /// by the implementation.
     const MIN_BODY_LEN: usize = 0;
 
-    let local_mac = get_mac(sync_ctx, device_id);
+    let local_mac = get_mac(core_ctx, device_id);
     let frame = body.encapsulate(EthernetFrameBuilder::new(
         local_mac.get(),
         dst_mac,
         ether_type,
         MIN_BODY_LEN,
     ));
-    send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|frame| frame.into_inner())
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame)
+        .map_err(|frame| frame.into_inner())
 }
 
 fn send_ethernet_frame<S, C, SC>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     frame: S,
 ) -> Result<(), S>
@@ -389,37 +390,37 @@ where
         + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
         + CounterContext<DeviceCounters>,
 {
-    sync_ctx.with_counters(|counters| {
+    core_ctx.with_counters(|counters| {
         counters.ethernet.common.send_total_frames.increment();
     });
     match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
-        sync_ctx,
-        ctx,
+        core_ctx,
+        bindings_ctx,
         device_id,
         (),
         frame,
     ) {
         Ok(()) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.send_frame.increment();
             });
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.send_no_queue.increment();
             });
             tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.send_queue_full.increment();
             });
             Err(s)
         }
         Err(TransmitQueueFrameError::SerializeError(s)) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.send_serialize_error.increment();
             });
             Err(s)
@@ -433,7 +434,7 @@ impl<'a, NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDevi
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        ctx: &mut NonSyncCtx,
+        bindings_ctx: &mut NonSyncCtx,
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S>
@@ -442,7 +443,14 @@ impl<'a, NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDevi
         S::Buffer: BufferMut,
     {
         let Self { device_id, sync_ctx } = self;
-        send_as_ethernet_frame_to_dst(*sync_ctx, ctx, device_id, dst_mac, body, EtherType::Ipv6)
+        send_as_ethernet_frame_to_dst(
+            *sync_ctx,
+            bindings_ctx,
+            device_id,
+            dst_mac,
+            body,
+            EtherType::Ipv6,
+        )
     }
 }
 
@@ -748,12 +756,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 
     fn send_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-        DeviceLayerEventDispatcher::send_frame(ctx, device_id, buf).map_err(
+        DeviceLayerEventDispatcher::send_frame(bindings_ctx, device_id, buf).map_err(
             |DeviceSendFrameError::DeviceNotReady(buf)| {
                 DeviceSendFrameError::DeviceNotReady((meta, buf))
             },
@@ -838,13 +846,13 @@ pub(super) fn handle_timer<
         + TimerHandler<C, NudTimerId<Ipv6, EthernetLinkDevice, SC::DeviceId>>
         + TimerHandler<C, ArpTimerId<EthernetLinkDevice, SC::DeviceId>>,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     id: EthernetTimerId<SC::DeviceId>,
 ) {
     match id {
-        EthernetTimerId::Arp(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
-        EthernetTimerId::Nudv6(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
+        EthernetTimerId::Arp(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
+        EthernetTimerId::Nudv6(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
     }
 }
 
@@ -873,8 +881,8 @@ impl_timer_context!(
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
 pub(super) fn send_ip_frame<C, SC, A, S>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     local_addr: SpecifiedAddr<A>,
     body: S,
@@ -892,18 +900,18 @@ where
     S::Buffer: BufferMut,
     A::Version: EthernetIpExt,
 {
-    sync_ctx.with_counters(|counters| {
+    core_ctx.with_counters(|counters| {
         counters.ethernet.send_ip_frame.increment();
     });
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
 
-    let body = body.with_size_limit(get_mtu(sync_ctx, device_id).get() as usize);
+    let body = body.with_size_limit(get_mtu(core_ctx, device_id).get() as usize);
 
     if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
         send_as_ethernet_frame_to_dst(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device_id,
             Mac::from(&multicast),
             body,
@@ -911,7 +919,11 @@ where
         )
     } else {
         NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
-            sync_ctx, ctx, device_id, local_addr, body,
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            local_addr,
+            body,
         )
     }
     .map_err(Nested::into_inner)
@@ -928,12 +940,12 @@ pub(super) fn receive_frame<
         + DeviceSocketHandler<EthernetLinkDevice, C>
         + CounterContext<DeviceCounters>,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     mut buffer: B,
 ) {
-    sync_ctx.with_counters(|counters| {
+    core_ctx.with_counters(|counters| {
         counters.ethernet.common.recv_frame.increment();
     });
     trace!("ethernet::receive_frame: device_id = {:?}", device_id);
@@ -950,7 +962,7 @@ pub(super) fn receive_frame<
     {
         frame
     } else {
-        sync_ctx.with_counters(|counters| {
+        core_ctx.with_counters(|counters| {
             counters.ethernet.common.recv_parse_error.increment();
         });
         trace!("ethernet::receive_frame: failed to parse ethernet frame");
@@ -960,13 +972,13 @@ pub(super) fn receive_frame<
 
     let dst = ethernet.dst_mac();
 
-    let frame_dest = sync_ctx.with_ethernet_state(device_id, |static_state, dynamic_state| {
+    let frame_dest = core_ctx.with_ethernet_state(device_id, |static_state, dynamic_state| {
         deliver_as(static_state, dynamic_state, &dst)
     });
 
     let frame_dst = match frame_dest {
         None => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.recv_other_dest.increment();
             });
             trace!(
@@ -980,8 +992,8 @@ pub(super) fn receive_frame<
     };
     let ethertype = ethernet.ethertype();
 
-    sync_ctx.handle_frame(
-        ctx,
+    core_ctx.handle_frame(
+        bindings_ctx,
         device_id,
         ReceivedFrame::from_ethernet(ethernet, frame_dst).into(),
         whole_frame,
@@ -997,12 +1009,12 @@ pub(super) fn receive_frame<
             };
             match types {
                 (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
-                    sync_ctx.with_counters(|counters| {
+                    core_ctx.with_counters(|counters| {
                         counters.ethernet.recv_arp_delivered.increment();
                     });
                     ArpPacketHandler::handle_packet(
-                        sync_ctx,
-                        ctx,
+                        core_ctx,
+                        bindings_ctx,
                         device_id.clone(),
                         frame_dst,
                         buffer,
@@ -1011,27 +1023,27 @@ pub(super) fn receive_frame<
             }
         }
         Some(EtherType::Ipv4) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.recv_ip_delivered.increment();
             });
-            sync_ctx.receive_frame(
-                ctx,
+            core_ctx.receive_frame(
+                bindings_ctx,
                 RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), frame_dst),
                 buffer,
             )
         }
         Some(EtherType::Ipv6) => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.recv_ip_delivered.increment();
             });
-            sync_ctx.receive_frame(
-                ctx,
+            core_ctx.receive_frame(
+                bindings_ctx,
                 RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), frame_dst),
                 buffer,
             )
         }
         Some(EtherType::Other(_)) | None => {
-            sync_ctx.with_counters(|counters| {
+            core_ctx.with_counters(|counters| {
                 counters.ethernet.common.recv_unsupported_ethertype.increment();
             });
         } // TODO(joshlf)
@@ -1043,12 +1055,12 @@ pub(super) fn set_promiscuous_mode<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
+    core_ctx: &mut SC,
+    _bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     enabled: bool,
 ) {
-    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
+    core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         dynamic_state.promiscuous_mode = enabled
     })
 }
@@ -1072,12 +1084,12 @@ pub(super) fn join_link_multicast<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
+    core_ctx: &mut SC,
+    _bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
-    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
+    core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         let groups = &mut dynamic_state.link_multicast_groups;
 
         match groups.insert(multicast_addr) {
@@ -1119,12 +1131,12 @@ pub(super) fn leave_link_multicast<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
+    core_ctx: &mut SC,
+    _bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
-    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
+    core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         let groups = &mut dynamic_state.link_multicast_groups;
 
         match groups.remove(multicast_addr) {
@@ -1150,10 +1162,10 @@ pub(super) fn leave_link_multicast<
 
 /// Get the routing metric associated with this device.
 pub(super) fn get_routing_metric<SC: EthernetIpLinkDeviceStaticStateContext>(
-    sync_ctx: &mut SC,
+    core_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> RawMetric {
-    sync_ctx.with_static_ethernet_device_state(device_id, |static_state| static_state.metric)
+    core_ctx.with_static_ethernet_device_state(device_id, |static_state| static_state.metric)
 }
 
 /// Get the MTU associated with this device.
@@ -1161,10 +1173,10 @@ pub(super) fn get_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &mut SC,
+    core_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Mtu {
-    sync_ctx.with_ethernet_state(device_id, |_static_state, dynamic_state| {
+    core_ctx.with_ethernet_state(device_id, |_static_state, dynamic_state| {
         dynamic_state.max_frame_size.as_mtu()
     })
 }
@@ -1177,15 +1189,19 @@ pub(super) fn insert_static_arp_table_entry<
     C: LinkResolutionContext<EthernetLinkDevice>,
     SC: NudHandler<Ipv4, EthernetLinkDevice, C>,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: SpecifiedAddr<Ipv4Addr>,
     mac: UnicastAddr<Mac>,
 ) {
     NudHandler::<Ipv4, EthernetLinkDevice, _>::set_static_neighbor(
-        sync_ctx, ctx, device_id, addr, *mac,
+        core_ctx,
+        bindings_ctx,
+        device_id,
+        addr,
+        *mac,
     )
 }
 
@@ -1197,16 +1213,16 @@ pub(super) fn insert_static_ndp_table_entry<
     C: LinkResolutionContext<EthernetLinkDevice>,
     SC: NudHandler<Ipv6, EthernetLinkDevice, C>,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: UnicastAddr<Ipv6Addr>,
     mac: UnicastAddr<Mac>,
 ) {
     NudHandler::<Ipv6, EthernetLinkDevice, _>::set_static_neighbor(
-        sync_ctx,
-        ctx,
+        core_ctx,
+        bindings_ctx,
         device_id,
         addr.into_specified(),
         *mac,
@@ -1222,7 +1238,7 @@ impl<
 {
     fn send_frame<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         ArpFrameMetadata { device_id, dst_addr }: ArpFrameMetadata<
             EthernetLinkDevice,
             SC::DeviceId,
@@ -1233,7 +1249,14 @@ impl<
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        send_as_ethernet_frame_to_dst(self, ctx, &device_id, dst_addr, body, EtherType::Arp)
+        send_as_ethernet_frame_to_dst(
+            self,
+            bindings_ctx,
+            &device_id,
+            dst_addr,
+            body,
+            EtherType::Arp,
+        )
     }
 }
 
@@ -1273,7 +1296,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 
     fn get_protocol_addr(
         &mut self,
-        _ctx: &mut C,
+        _bindings_ctx: &mut C,
         device_id: &EthernetDeviceId<C>,
     ) -> Option<Ipv4Addr> {
         device::integration::with_ethernet_state(self, device_id, |mut state| {
@@ -1286,7 +1309,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 
     fn get_hardware_addr(
         &mut self,
-        _ctx: &mut C,
+        _bindings_ctx: &mut C,
         device_id: &EthernetDeviceId<C>,
     ) -> UnicastAddr<Mac> {
         get_mac(self, device_id)
@@ -1335,7 +1358,7 @@ impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S>
@@ -1344,7 +1367,14 @@ impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets
         S::Buffer: BufferMut,
     {
         let Self { device_id, sync_ctx } = self;
-        send_as_ethernet_frame_to_dst(*sync_ctx, ctx, device_id, dst_mac, body, EtherType::Ipv4)
+        send_as_ethernet_frame_to_dst(
+            *sync_ctx,
+            bindings_ctx,
+            device_id,
+            dst_mac,
+            body,
+            EtherType::Ipv4,
+        )
     }
 }
 impl<
@@ -1356,7 +1386,7 @@ impl<
 {
     fn send_frame<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         metadata: DeviceSocketMetadata<SC::DeviceId>,
         body: S,
     ) -> Result<(), S>
@@ -1366,10 +1396,15 @@ impl<
     {
         let DeviceSocketMetadata { device_id, header } = metadata;
         match header {
-            Some(DatagramHeader { dest_addr, protocol }) => {
-                send_as_ethernet_frame_to_dst(self, ctx, &device_id, dest_addr, body, protocol)
-            }
-            None => send_ethernet_frame(self, ctx, &device_id, body),
+            Some(DatagramHeader { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
+                self,
+                bindings_ctx,
+                &device_id,
+                dest_addr,
+                body,
+                protocol,
+            ),
+            None => send_ethernet_frame(self, bindings_ctx, &device_id, body),
         }
     }
 }
@@ -1379,21 +1414,21 @@ pub(super) fn get_mac<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &'a mut SC,
+    core_ctx: &'a mut SC,
     device_id: &SC::DeviceId,
 ) -> UnicastAddr<Mac> {
-    sync_ctx.with_static_ethernet_device_state(device_id, |state| state.mac)
+    core_ctx.with_static_ethernet_device_state(device_id, |state| state.mac)
 }
 
 pub(super) fn set_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
-    sync_ctx: &mut SC,
+    core_ctx: &mut SC,
     device_id: &SC::DeviceId,
     mtu: Mtu,
 ) {
-    sync_ctx.with_ethernet_state_mut(device_id, |static_state, dynamic_state| {
+    core_ctx.with_ethernet_state_mut(device_id, |static_state, dynamic_state| {
         if let Some(mut frame_size ) = MaxEthernetFrameSize::from_mtu(mtu) {
             // If `frame_size` is greater than what the device supports, set it
             // to maximum frame size the device supports.
@@ -1434,8 +1469,8 @@ impl DeviceStateSpec for EthernetLinkDevice {
 /// available, or an observer that can be used to wait for link address
 /// resolution to complete.
 pub fn resolve_ethernet_link_addr<I: Ip, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &EthernetDeviceId<NonSyncCtx>,
     dst: &SpecifiedAddr<I::Addr>,
 ) -> LinkResolutionResult<
@@ -1444,9 +1479,9 @@ pub fn resolve_ethernet_link_addr<I: Ip, NonSyncCtx: NonSyncContext>(
         EthernetLinkDevice,
     >>::Observer,
 >{
-    let sync_ctx = Locked::new(sync_ctx);
+    let sync_ctx = Locked::new(core_ctx);
     let IpInvariant(result) = I::map_ip(
-        (IpInvariant((sync_ctx, ctx, device)), dst),
+        (IpInvariant((sync_ctx, bindings_ctx, device)), dst),
         |(IpInvariant((mut sync_ctx, ctx, device)), dst)| {
             IpInvariant(NudHandler::<Ipv4, EthernetLinkDevice, _>::resolve_link_addr(
                 &mut sync_ctx,
@@ -1557,12 +1592,12 @@ mod tests {
     impl DeviceSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
         fn handle_frame(
             &mut self,
-            ctx: &mut FakeNonSyncCtx,
+            bindings_ctx: &mut FakeNonSyncCtx,
             device: &Self::DeviceId,
             frame: Frame<&[u8]>,
             whole_frame: &[u8],
         ) {
-            self.inner.handle_frame(ctx, device, frame, whole_frame)
+            self.inner.handle_frame(bindings_ctx, device, frame, whole_frame)
         }
     }
 
@@ -1581,7 +1616,7 @@ mod tests {
     impl DeviceSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
         fn handle_frame(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device: &Self::DeviceId,
             _frame: Frame<&[u8]>,
             _whole_frame: &[u8],
@@ -1663,7 +1698,7 @@ mod tests {
     impl NudHandler<Ipv6, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
         fn handle_neighbor_update(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _link_addr: Mac,
@@ -1674,7 +1709,7 @@ mod tests {
 
         fn set_static_neighbor(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _link_addr: Mac,
@@ -1684,20 +1719,20 @@ mod tests {
 
         fn delete_neighbor(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
         ) -> Result<(), NotFoundError> {
             unimplemented!()
         }
 
-        fn flush(&mut self, _ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
+        fn flush(&mut self, _bindings_ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
             unimplemented!()
         }
 
         fn resolve_link_addr(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
             _dst: &SpecifiedAddr<Ipv6Addr>,
         ) -> LinkResolutionResult<
@@ -1710,7 +1745,7 @@ mod tests {
 
         fn send_ip_packet_to_neighbor<S>(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _body: S,
@@ -1751,7 +1786,7 @@ mod tests {
 
         fn get_protocol_addr(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
         ) -> Option<Ipv4Addr> {
             unimplemented!()
@@ -1759,7 +1794,7 @@ mod tests {
 
         fn get_hardware_addr(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
         ) -> UnicastAddr<Mac> {
             self.inner.get_ref().static_state.mac
@@ -1796,7 +1831,7 @@ mod tests {
     {
         fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
-            ctx: &mut FakeNonSyncCtx,
+            bindings_ctx: &mut FakeNonSyncCtx,
             link_addr: Mac,
             body: S,
         ) -> Result<(), S>
@@ -1807,7 +1842,7 @@ mod tests {
             let Self { sync_ctx, device_id } = self;
             send_as_ethernet_frame_to_dst(
                 *sync_ctx,
-                ctx,
+                bindings_ctx,
                 device_id,
                 link_addr,
                 body,
@@ -1856,12 +1891,12 @@ mod tests {
 
         fn send_frame(
             &mut self,
-            ctx: &mut FakeNonSyncCtx,
+            bindings_ctx: &mut FakeNonSyncCtx,
             device_id: &Self::DeviceId,
             (): Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-            TransmitQueueContext::send_frame(&mut self.inner, ctx, device_id, (), buf)
+            TransmitQueueContext::send_frame(&mut self.inner, bindings_ctx, device_id, (), buf)
         }
     }
 
@@ -1879,7 +1914,7 @@ mod tests {
 
         fn send_frame(
             &mut self,
-            _ctx: &mut FakeNonSyncCtx,
+            _bindings_ctx: &mut FakeNonSyncCtx,
             device_id: &Self::DeviceId,
             (): Self::Meta,
             buf: Self::Buffer,
@@ -1926,21 +1961,21 @@ mod tests {
     }
 
     fn contains_addr<A: IpAddress>(
-        sync_ctx: &crate::testutil::FakeSyncCtx,
+        core_ctx: &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: SpecifiedAddr<A>,
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
-                    &mut Locked::new(sync_ctx),
+                    &mut Locked::new(core_ctx),
                     device,
                     |mut addrs, _sync_ctx| addrs.any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                    &mut Locked::new(sync_ctx),
+                    &mut Locked::new(core_ctx),
                     device,
                     |mut addrs, _sync_ctx| addrs.any(|a| a.addr() == addr),
                 )
@@ -2044,15 +2079,15 @@ mod tests {
     }
 
     fn is_forwarding_enabled<I: Ip>(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> bool {
         match I::VERSION {
             IpVersion::V4 => {
-                crate::device::testutil::is_forwarding_enabled::<_, Ipv4>(sync_ctx, device)
+                crate::device::testutil::is_forwarding_enabled::<_, Ipv4>(core_ctx, device)
             }
             IpVersion::V6 => {
-                crate::device::testutil::is_forwarding_enabled::<_, Ipv6>(sync_ctx, device)
+                crate::device::testutil::is_forwarding_enabled::<_, Ipv6>(core_ctx, device)
             }
         }
     }
@@ -2060,13 +2095,13 @@ mod tests {
     #[ip_test]
     fn test_set_ip_routing<I: Ip + TestIpExt>() {
         fn check_other_is_forwarding_enabled<I: Ip>(
-            sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+            core_ctx: &mut &crate::testutil::FakeSyncCtx,
             device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             expected: bool,
         ) {
             let enabled = match I::VERSION {
-                IpVersion::V4 => is_forwarding_enabled::<Ipv6>(sync_ctx, device),
-                IpVersion::V6 => is_forwarding_enabled::<Ipv4>(sync_ctx, device),
+                IpVersion::V4 => is_forwarding_enabled::<Ipv6>(core_ctx, device),
+                IpVersion::V6 => is_forwarding_enabled::<Ipv4>(core_ctx, device),
             };
 
             assert_eq!(enabled, expected);
@@ -2368,8 +2403,8 @@ mod tests {
     }
 
     fn receive_simple_ip_packet_test<A: IpAddress>(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         src_ip: A,
         dst_ip: A,
@@ -2390,14 +2425,14 @@ mod tests {
             .into_inner();
 
         receive_ip_packet::<_, _, A::Version>(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             device,
             FrameDestination::Individual { local: true },
             buf,
         );
         assert_eq!(
-            sync_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
+            core_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
             expected
         );
     }
@@ -2524,21 +2559,21 @@ mod tests {
     }
 
     fn join_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 device,
                 multicast_addr,
             ),
@@ -2546,21 +2581,21 @@ mod tests {
     }
 
     fn leave_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 device,
                 multicast_addr,
             ),

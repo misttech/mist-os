@@ -58,10 +58,10 @@ impl From<crate::error::ExistsError> for AddRouteError {
 /// This can be used to construct an `Entry` from an `AddableEntry` the same
 /// way that the core routing table does.
 pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     gateway: SpecifiedAddr<IpAddr>,
 ) -> Option<DeviceId<NonSyncCtx>> {
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     match gateway.into() {
         IpAddr::V4(gateway) => {
             select_device_for_gateway_inner::<Ipv4, _, _>(&mut sync_ctx, gateway)
@@ -77,10 +77,10 @@ fn select_device_for_gateway_inner<
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
     SC: IpStateContext<I, C>,
 >(
-    sync_ctx: &mut SC,
+    core_ctx: &mut SC,
     gateway: SpecifiedAddr<I::Addr>,
 ) -> Option<SC::DeviceId> {
-    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+    core_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
         table.lookup(sync_ctx, None, *gateway).and_then(
             |Destination { next_hop: found_next_hop, device: found_device }| match found_next_hop {
                 NextHop::RemoteAsNeighbor => Some(found_device),
@@ -97,8 +97,8 @@ fn select_device_for_gateway_inner<
 /// table modifications to allow for evolution of the routing table in the
 /// future.
 pub fn set_routes<I: Ip, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     entries: Vec<EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
 ) {
     #[derive(GenericOverIp)]
@@ -107,19 +107,20 @@ pub fn set_routes<I: Ip, NonSyncCtx: NonSyncContext>(
         Vec<EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
     );
 
-    let () = net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), Wrap(entries)), |(
-        IpInvariant((sync_ctx, _ctx)),
-        Wrap(mut entries),
-    )| {
-        let mut sync_ctx = Locked::new(sync_ctx);
-        // Make sure to sort the entries _before_ taking the routing table lock.
-        entries.sort_unstable_by(|a, b| {
-            OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
-        });
-        IpStateContext::<I, _>::with_ip_routing_table_mut(&mut sync_ctx, |_sync_ctx, table| {
-            table.table = entries;
-        });
-    },);
+    let () = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((core_ctx, bindings_ctx)), Wrap(entries)),
+        |(IpInvariant((sync_ctx, _ctx)), Wrap(mut entries))| {
+            let mut sync_ctx = Locked::new(sync_ctx);
+            // Make sure to sort the entries _before_ taking the routing table lock.
+            entries.sort_unstable_by(|a, b| {
+                OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
+            });
+            IpStateContext::<I, _>::with_ip_routing_table_mut(&mut sync_ctx, |_sync_ctx, table| {
+                table.table = entries;
+            });
+        },
+    );
 }
 
 /// Requests that a route be added to the forwarding table.
@@ -128,10 +129,10 @@ pub(crate) fn request_context_add_route<
     DeviceId,
     C: IpLayerNonSyncContext<I, DeviceId>,
 >(
-    ctx: &mut C,
+    bindings_ctx: &mut C,
     entry: AddableEntry<I::Addr, DeviceId>,
 ) {
-    ctx.on_event(IpLayerEvent::AddRoute(entry))
+    bindings_ctx.on_event(IpLayerEvent::AddRoute(entry))
 }
 
 /// Requests that routes matching these specifiers be removed from the
@@ -141,12 +142,12 @@ pub(crate) fn request_context_del_routes<
     DeviceId,
     C: IpLayerNonSyncContext<I, DeviceId>,
 >(
-    ctx: &mut C,
+    bindings_ctx: &mut C,
     del_subnet: Subnet<I::Addr>,
     del_device: DeviceId,
     del_gateway: Option<SpecifiedAddr<I::Addr>>,
 ) {
-    ctx.on_event(IpLayerEvent::RemoveRoutes {
+    bindings_ctx.on_event(IpLayerEvent::RemoveRoutes {
         subnet: del_subnet,
         device: del_device,
         gateway: del_gateway,
@@ -168,13 +169,13 @@ pub trait RoutesVisitor<'a, C: DeviceLayerTypes + 'a> {
 }
 
 /// Provides access to the state of the route table via a visitor.
-pub fn with_routes<'a, I, C, V>(sync_ctx: &SyncCtx<C>, cb: &mut V) -> V::VisitResult
+pub fn with_routes<'a, I, C, V>(core_ctx: &SyncCtx<C>, cb: &mut V) -> V::VisitResult
 where
     I: IpExt,
     C: NonSyncContext + 'a,
     V: RoutesVisitor<'a, C>,
 {
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(r) = I::map_ip(
         IpInvariant((&mut sync_ctx, cb)),
         |IpInvariant((sync_ctx, cb))| {
@@ -281,11 +282,11 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     /// See [`ForwardingTable`] for more details of how entries are sorted.
     pub(crate) fn lookup<SC: IpForwardingDeviceContext<I, DeviceId = D>>(
         &self,
-        sync_ctx: &mut SC,
+        core_ctx: &mut SC,
         local_device: Option<&D>,
         address: I::Addr,
     ) -> Option<Destination<I::Addr, D>> {
-        self.lookup_filter_map(sync_ctx, local_device, address, |_: &mut SC, _: &D| Some(()))
+        self.lookup_filter_map(core_ctx, local_device, address, |_: &mut SC, _: &D| Some(()))
             .map(|(Destination { device, next_hop }, ())| Destination {
                 device: device.clone(),
                 next_hop,
@@ -295,7 +296,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
 
     pub(crate) fn lookup_filter_map<'a, SC: IpForwardingDeviceContext<I, DeviceId = D>, R>(
         &'a self,
-        sync_ctx: &'a mut SC,
+        core_ctx: &'a mut SC,
         local_device: Option<&'a D>,
         address: I::Addr,
         mut f: impl FnMut(&mut SC, &D) -> Option<R> + 'a,
@@ -314,11 +315,11 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 return None;
             }
 
-            if !sync_ctx.is_ip_device_enabled(device) {
+            if !core_ctx.is_ip_device_enabled(device) {
                 return None;
             }
 
-            f(sync_ctx, device).map(|r| {
+            f(core_ctx, device).map(|r| {
                 let next_hop = gateway.map_or(NextHop::RemoteAsNeighbor, NextHop::Gateway);
                 (Destination { next_hop, device }, r)
             })
@@ -348,14 +349,14 @@ pub(crate) mod testutil {
     // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
     // observing the device's metric, if applicable.
     fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
-        sync_ctx: &mut SC,
+        core_ctx: &mut SC,
         device: &SC::DeviceId,
         metric: AddableMetric,
     ) -> Metric {
         match metric {
             AddableMetric::ExplicitMetric(value) => Metric::ExplicitMetric(value),
             AddableMetric::MetricTracksInterface => {
-                Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
+                Metric::MetricTracksInterface(core_ctx.get_routing_metric(device))
             }
         }
     }
@@ -367,15 +368,15 @@ pub(crate) mod testutil {
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
         SC: IpStateContext<I, C>,
     >(
-        sync_ctx: &mut SC,
-        _ctx: &mut C,
+        core_ctx: &mut SC,
+        _bindings_ctx: &mut C,
         entry: crate::ip::types::AddableEntry<I::Addr, SC::DeviceId>,
     ) -> Result<(), AddRouteError>
     where
         SC::DeviceId: PartialOrd,
     {
         let crate::ip::types::AddableEntry { subnet, device, gateway, metric } = entry;
-        sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+        core_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
             let metric = observe_metric(sync_ctx, &device, metric);
             let _entry = table.add_entry(EntryAndGeneration {
                 entry: Entry { subnet, device, gateway, metric },
@@ -398,11 +399,11 @@ pub(crate) mod testutil {
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
         SC: IpStateContext<I, C>,
     >(
-        sync_ctx: &mut SC,
-        _ctx: &mut C,
+        core_ctx: &mut SC,
+        _bindings_ctx: &mut C,
         del_subnet: Subnet<I::Addr>,
     ) -> Result<(), crate::error::NotFoundError> {
-        sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+        core_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
             let removed =
                 table.del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
                     subnet == &del_subnet
@@ -420,13 +421,13 @@ pub(crate) mod testutil {
         SC: IpStateContext<I, C>,
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
     >(
-        sync_ctx: &mut SC,
-        _ctx: &mut C,
+        core_ctx: &mut SC,
+        _bindings_ctx: &mut C,
         del_device: &SC::DeviceId,
     ) {
         debug!("deleting routes on device: {del_device:?}");
 
-        let _: Vec<_> = sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+        let _: Vec<_> = core_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
             table.del_entries(|Entry { subnet: _, device, gateway: _, metric: _ }| {
                 device == del_device
             })
@@ -967,11 +968,11 @@ mod tests {
         fn lookup_with_devices<I: Ip>(
             table: &ForwardingTable<I, MultipleDevicesId>,
             next_hop: SpecifiedAddr<I::Addr>,
-            sync_ctx: &mut FakeCtx,
+            core_ctx: &mut FakeCtx,
             devices: &[MultipleDevicesId],
         ) -> Vec<Destination<I::Addr, MultipleDevicesId>> {
             table
-                .lookup_filter_map(sync_ctx, None, *next_hop, |_, d| {
+                .lookup_filter_map(core_ctx, None, *next_hop, |_, d| {
                     devices.iter().contains(d).then_some(())
                 })
                 .map(|(Destination { next_hop, device }, ())| Destination {

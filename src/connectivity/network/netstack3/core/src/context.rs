@@ -159,9 +159,9 @@ impl<I: Instant + 'static> InstantContext for CachedInstantCtx<I> {
 /// cannot overlap. Until we figure out an approach to deal with that problem,
 /// this exists as a workaround.
 pub(crate) fn new_cached_instant_context<I: InstantContext + ?Sized>(
-    ctx: &I,
+    bindings_ctx: &I,
 ) -> CachedInstantCtx<I::Instant> {
-    CachedInstantCtx(ctx.now())
+    CachedInstantCtx(bindings_ctx.now())
 }
 
 /// A context that supports scheduling timers.
@@ -215,7 +215,7 @@ pub trait TimerContext<Id>: InstantContext {
 /// A `TimerHandler` is a type capable of handling the event of a timer firing.
 pub(crate) trait TimerHandler<C, Id> {
     /// Handle a timer firing.
-    fn handle_timer(&mut self, ctx: &mut C, id: Id);
+    fn handle_timer(&mut self, bindings_ctx: &mut C, id: Id);
 }
 
 // NOTE:
@@ -248,7 +248,7 @@ pub trait RecvFrameContext<C, Meta> {
     /// Receive a frame.
     ///
     /// `receive_frame` receives a frame with the given metadata.
-    fn receive_frame<B: BufferMut>(&mut self, ctx: &mut C, metadata: Meta, frame: B);
+    fn receive_frame<B: BufferMut>(&mut self, bindings_ctx: &mut C, metadata: Meta, frame: B);
 }
 
 /// A context for sending frames.
@@ -264,7 +264,7 @@ pub trait SendFrameContext<C, Meta> {
     /// unmodified `Serializer` is returned.
     ///
     /// [`Serializer`]: packet::Serializer
-    fn send_frame<S>(&mut self, ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
+    fn send_frame<S>(&mut self, bindings_ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -418,8 +418,8 @@ pub struct SyncCtx<BT: BindingsTypes> {
 
 impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
     /// Create a new `SyncCtx`.
-    pub fn new(non_sync_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
-        SyncCtx { state: StackStateBuilder::default().build_with_ctx(non_sync_ctx) }
+    pub fn new(bindings_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
+        SyncCtx { state: StackStateBuilder::default().build_with_ctx(bindings_ctx) }
     }
 }
 
@@ -1096,18 +1096,18 @@ pub(crate) mod testutil {
         C,
         F: FnMut(&mut SC, &mut C, Id) + 'a,
     >(
-        sync_ctx: &'a mut SC,
+        core_ctx: &'a mut SC,
         mut f: F,
     ) -> impl FnMut(&mut C, Id) + 'a {
-        move |non_sync_ctx, id| f(sync_ctx, non_sync_ctx, id)
+        move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
     }
 
     #[cfg(test)]
     pub(crate) fn handle_timer_helper_with_sc_ref<'a, Id, SC, C, F: FnMut(&SC, &mut C, Id) + 'a>(
-        sync_ctx: &'a SC,
+        core_ctx: &'a SC,
         mut f: F,
     ) -> impl FnMut(&mut C, Id) + 'a {
-        move |non_sync_ctx, id| f(sync_ctx, non_sync_ctx, id)
+        move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
     }
 
     /// A fake [`FrameContext`].
@@ -1149,7 +1149,12 @@ pub(crate) mod testutil {
     }
 
     impl<C, Meta> SendFrameContext<C, Meta> for FakeFrameCtx<Meta> {
-        fn send_frame<S>(&mut self, _ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
+        fn send_frame<S>(
+            &mut self,
+            _bindings_ctx: &mut C,
+            metadata: Meta,
+            frame: S,
+        ) -> Result<(), S>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -1656,7 +1661,7 @@ pub(crate) mod testutil {
     {
         fn send_frame<SS>(
             &mut self,
-            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             metadata: Meta,
             frame: SS,
         ) -> Result<(), SS>
@@ -1664,7 +1669,7 @@ pub(crate) mod testutil {
             SS: Serializer,
             SS::Buffer: BufferMut,
         {
-            self.frames.send_frame(ctx, metadata, frame)
+            self.frames.send_frame(bindings_ctx, metadata, frame)
         }
     }
 
@@ -2161,8 +2166,12 @@ pub(crate) mod testutil {
             impl<M, E: Debug, D, S> TimerHandler<FakeNonSyncCtx<usize, E, S>, usize>
                 for FakeSyncCtx<Vec<(usize, FakeInstant)>, M, D>
             {
-                fn handle_timer(&mut self, ctx: &mut FakeNonSyncCtx<usize, E, S>, id: usize) {
-                    let now = ctx.now();
+                fn handle_timer(
+                    &mut self,
+                    bindings_ctx: &mut FakeNonSyncCtx<usize, E, S>,
+                    id: usize,
+                ) {
+                    let now = bindings_ctx.now();
                     self.get_mut().push((id, now));
                 }
             }

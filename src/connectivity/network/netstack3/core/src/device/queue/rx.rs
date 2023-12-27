@@ -85,7 +85,7 @@ pub(crate) trait ReceiveDequeFrameContext<D: Device, C>: ReceiveQueueTypes<D, C>
     /// Handle a received frame.
     fn handle_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
@@ -127,7 +127,7 @@ pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Returns an error with the metadata and body if the queue is full.
     fn queue_rx_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         body: Self::Buffer,
@@ -145,11 +145,11 @@ where
 {
     /// Handle any queued RX frames.
     pub(crate) fn handle_queued_rx_frames(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
     ) -> WorkQueueReport {
-        sync_ctx.with_dequed_frames_and_rx_queue_ctx(
+        core_ctx.with_dequed_frames_and_rx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames }, rx_queue_ctx| {
                 assert_eq!(
@@ -166,7 +166,7 @@ where
                 );
 
                 while let Some((meta, p)) = dequeued_frames.pop_front() {
-                    rx_queue_ctx.handle_frame(ctx, device_id, meta, p);
+                    rx_queue_ctx.handle_frame(bindings_ctx, device_id, meta, p);
                 }
 
                 ret.into()
@@ -180,14 +180,14 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueue
 {
     fn queue_rx_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         meta: SC::Meta,
         body: SC::Buffer,
     ) -> Result<(), ReceiveQueueFullError<(Self::Meta, SC::Buffer)>> {
         self.with_receive_queue_mut(device_id, |ReceiveQueueState { queue }| {
             queue.queue_rx_frame(meta, body).map(|res| match res {
-                EnqueueResult::QueueWasPreviouslyEmpty => ctx.wake_rx_task(device_id),
+                EnqueueResult::QueueWasPreviouslyEmpty => bindings_ctx.wake_rx_task(device_id),
                 EnqueueResult::QueuePreviouslyWasOccupied => {
                     // We have already woken up the RX task when the queue was
                     // previously empty so there is no need to do it again.
@@ -251,7 +251,7 @@ mod tests {
     impl ReceiveDequeFrameContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn handle_frame(
             &mut self,
-            _ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeNonSyncCtxImpl,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             (): (),
             buf: Buf<Vec<u8>>,

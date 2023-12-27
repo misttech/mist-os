@@ -50,7 +50,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// `Some(Default::default())`.
     fn new_ip_socket<O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -72,7 +72,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// If the socket is currently unroutable, an error is returned.
     fn send_ip_packet<S, O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         socket: &IpSock<I, Self::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
@@ -110,7 +110,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// an error, it will be returned as well.
     fn send_oneshot_ip_packet_with_fallible_serializer<S, E, F, O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -127,23 +127,25 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     {
         // We use a `match` instead of `map_err` because `map_err` would require passing a closure
         // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
-        match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
+        match self.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options) {
             Err((err, options)) => {
                 Err(SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options })
             }
             Ok(tmp) => {
                 let packet = get_body_from_src_ip(*tmp.local_ip())
                     .map_err(SendOneShotIpPacketError::SerializeError)?;
-                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(_body, err)| match err {
-                    IpSockSendError::Mtu => {
-                        let IpSock { options, definition: _ } = tmp;
-                        SendOneShotIpPacketError::CreateAndSendError {
-                            err: IpSockCreateAndSendError::Mtu,
-                            options,
+                self.send_ip_packet(bindings_ctx, &tmp, packet, mtu).map_err(|(_body, err)| {
+                    match err {
+                        IpSockSendError::Mtu => {
+                            let IpSock { options, definition: _ } = tmp;
+                            SendOneShotIpPacketError::CreateAndSendError {
+                                err: IpSockCreateAndSendError::Mtu,
+                                options,
+                            }
                         }
-                    }
-                    IpSockSendError::Unroutable(_) => {
-                        unreachable!("socket which was just created should still be routable")
+                        IpSockSendError::Unroutable(_) => {
+                            unreachable!("socket which was just created should still be routable")
+                        }
                     }
                 })
             }
@@ -153,7 +155,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// Sends a one-shot IP packet but with a non-fallible serializer.
     fn send_oneshot_ip_packet<S, F, O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -169,7 +171,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         O: SendOptions<I>,
     {
         self.send_oneshot_ip_packet_with_fallible_serializer(
-            ctx,
+            bindings_ctx,
             device,
             local_ip,
             remote_ip,
@@ -300,7 +302,7 @@ where
     /// https://www.rfc-editor.org/rfc/rfc1122#section-3.4
     fn get_mms<O: SendOptions<I>>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError>;
 }
@@ -407,7 +409,7 @@ where
     /// egress over the device.
     fn lookup_route(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: Option<&Self::DeviceId>,
         src_ip: Option<SpecifiedAddr<I::Addr>>,
         dst_ip: SpecifiedAddr<I::Addr>,
@@ -416,7 +418,7 @@ where
     /// Send an IP packet to the next-hop node.
     fn send_ip_packet<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
     ) -> Result<(), S>
@@ -433,7 +435,7 @@ impl<
 {
     fn new_ip_socket<O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: Option<EitherDeviceId<&SC::DeviceId, &SC::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -456,11 +458,15 @@ impl<
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
-            match self.lookup_route(ctx, device, local_ip.map(|a| a.into()), remote_ip.into()) {
-                Ok(r) => r,
-                Err(e) => return Err((e.into(), options)),
-            };
+        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } = match self.lookup_route(
+            bindings_ctx,
+            device,
+            local_ip.map(|a| a.into()),
+            remote_ip.into(),
+        ) {
+            Ok(r) => r,
+            Err(e) => return Err((e.into(), options)),
+        };
         // TODO(https://fxbug.dev/132092): Remove this panic opportunity once
         // `lookup_route` returns a `NonMappedAddr`.
         let src_addr = SocketIpAddr::new_from_specified_or_panic(src_addr);
@@ -481,7 +487,7 @@ impl<
 
     fn send_ip_packet<S, O>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         ip_sock: &IpSock<I, SC::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
@@ -496,7 +502,7 @@ impl<
             counters.send_ip_packet.increment();
         });
 
-        send_ip_packet(self, ctx, ip_sock, body, mtu)
+        send_ip_packet(self, bindings_ctx, ip_sock, body, mtu)
     }
 }
 
@@ -533,8 +539,8 @@ impl<I: Ip, S: SendOptions<I>> SendOptions<I> for &'_ S {
 }
 
 fn send_ip_packet<I, S, C, SC, O>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     socket: &IpSock<I, SC::WeakDeviceId, O>,
     body: S,
     mtu: Option<u32>,
@@ -547,7 +553,7 @@ where
     SC: IpSocketContext<I, C>,
     O: SendOptions<I>,
 {
-    trace_duration!(ctx, "ip::send_packet");
+    trace_duration!(bindings_ctx, "ip::send_packet");
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;
@@ -555,7 +561,7 @@ where
     let local_ip: SpecifiedAddr<_> = (*local_ip).into();
 
     let device = if let Some(device) = device {
-        let Some(device) = sync_ctx.upgrade_weak_device_id(device) else {
+        let Some(device) = core_ctx.upgrade_weak_device_id(device) else {
             return Err((body, ResolveRouteError::Unreachable.into()));
         };
         Some(device)
@@ -564,7 +570,7 @@ where
     };
 
     let ResolvedRoute { src_addr: got_local_ip, device, next_hop } =
-        match sync_ctx.lookup_route(ctx, device.as_ref(), Some(local_ip), remote_ip) {
+        match core_ctx.lookup_route(bindings_ctx, device.as_ref(), Some(local_ip), remote_ip) {
             Ok(o) => o,
             Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
         };
@@ -577,8 +583,8 @@ where
     };
 
     IpSocketContext::send_ip_packet(
-        sync_ctx,
-        ctx,
+        core_ctx,
+        bindings_ctx,
         SendIpPacketMeta {
             device: &device,
             src_ip: local_ip,
@@ -601,7 +607,7 @@ impl<
 {
     fn get_mms<O: SendOptions<I>>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError> {
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
@@ -611,7 +617,12 @@ impl<
             .transpose()?;
 
         let ResolvedRoute { src_addr: _, device, next_hop: _ } = self
-            .lookup_route(ctx, device.as_ref(), Some((*local_ip).into()), (*remote_ip).into())
+            .lookup_route(
+                bindings_ctx,
+                device.as_ref(),
+                Some((*local_ip).into()),
+                (*remote_ip).into(),
+            )
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
         // TODO(https://fxbug.dev/121911): Calculate the options size when they
@@ -1038,7 +1049,7 @@ pub(crate) mod testutil {
 
         fn confirm_reachable_with_destination(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             _dst: SpecifiedAddr<<I>::Addr>,
             _device: Option<&Self::DeviceId>,
         ) {
@@ -1111,7 +1122,7 @@ pub(crate) mod testutil {
     {
         fn lookup_route(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1122,7 +1133,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<S>(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
@@ -1150,17 +1161,17 @@ pub(crate) mod testutil {
     {
         fn lookup_route(
             &mut self,
-            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
-            self.get_mut().as_mut().lookup_route(ctx, device, local_ip, addr)
+            self.get_mut().as_mut().lookup_route(bindings_ctx, device, local_ip, addr)
         }
 
         fn send_ip_packet<SS>(
             &mut self,
-            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -1177,7 +1188,7 @@ pub(crate) mod testutil {
                 ttl,
                 mtu,
             };
-            self.send_frame(ctx, meta, body)
+            self.send_frame(bindings_ctx, meta, body)
         }
     }
 
@@ -1272,19 +1283,19 @@ pub(crate) mod testutil {
     {
         fn join_multicast_group(
             &mut self,
-            ctx: &mut C,
+            bindings_ctx: &mut C,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
             let Self { device_state, table: _, ip_forwarding_ctx: _, counters: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
-            state.multicast_groups.write().join_multicast_group(ctx, addr)
+            state.multicast_groups.write().join_multicast_group(bindings_ctx, addr)
         }
 
         fn leave_multicast_group(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1321,13 +1332,13 @@ pub(crate) mod testutil {
 
         fn confirm_reachable_with_destination(
             &mut self,
-            ctx: &mut C,
+            bindings_ctx: &mut C,
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
             TransportIpContext::<I, C>::confirm_reachable_with_destination(
                 self.get_mut(),
-                ctx,
+                bindings_ctx,
                 dst,
                 device,
             )
@@ -1552,7 +1563,7 @@ pub(crate) mod testutil {
     {
         fn lookup_route(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1582,7 +1593,7 @@ pub(crate) mod testutil {
         /// Send an IP packet to the next-hop node.
         fn send_ip_packet<S>(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
@@ -1607,17 +1618,17 @@ pub(crate) mod testutil {
     {
         fn lookup_route(
             &mut self,
-            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
-            self.get_mut().lookup_route(ctx, device, local_ip, addr)
+            self.get_mut().lookup_route(bindings_ctx, device, local_ip, addr)
         }
 
         fn send_ip_packet<SS>(
             &mut self,
-            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -1634,7 +1645,7 @@ pub(crate) mod testutil {
                 ttl,
                 mtu,
             };
-            self.send_frame(ctx, meta, body)
+            self.send_frame(bindings_ctx, meta, body)
         }
     }
 
@@ -1646,7 +1657,7 @@ pub(crate) mod testutil {
     {
         fn join_multicast_group(
             &mut self,
-            ctx: &mut C,
+            bindings_ctx: &mut C,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1666,12 +1677,12 @@ pub(crate) mod testutil {
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             let state: &IpDeviceState<_, I> = state.as_ref();
             let mut groups = state.multicast_groups.write();
-            groups.join_multicast_group(ctx, addr)
+            groups.join_multicast_group(bindings_ctx, addr)
         }
 
         fn leave_multicast_group(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1720,7 +1731,7 @@ pub(crate) mod testutil {
 
         fn confirm_reachable_with_destination(
             &mut self,
-            _ctx: &mut C,
+            _bindings_ctx: &mut C,
             _dst: SpecifiedAddr<<I>::Addr>,
             _device: Option<&Self::DeviceId>,
         ) {
@@ -1846,8 +1857,8 @@ mod tests {
     }
 
     fn remove_all_local_addrs<I: Ip + IpLayerIpExt + IpDeviceIpExt>(
-        sync_ctx: &FakeSyncCtx,
-        ctx: &mut FakeNonSyncCtx,
+        core_ctx: &FakeSyncCtx,
+        bindings_ctx: &mut FakeNonSyncCtx,
     ) where
         for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
             DeviceIpDeviceConfigurationContext<
@@ -1858,7 +1869,7 @@ mod tests {
         FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
         let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             |devices, _ctx| devices.collect::<Vec<_>>(),
         );
         for device in devices {
@@ -1867,7 +1878,7 @@ mod tests {
             struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
             let WrapVecAddrSubnet(subnets) = I::map_ip(
-                IpInvariant((&mut Locked::new(sync_ctx), &device)),
+                IpInvariant((&mut Locked::new(core_ctx), &device)),
                 |IpInvariant((sync_ctx, device))| {
                     crate::ip::device::with_assigned_ipv4_addr_subnets(sync_ctx, device, |addrs| {
                         WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
@@ -1883,7 +1894,7 @@ mod tests {
             );
 
             for subnet in subnets {
-                crate::device::del_ip_addr(sync_ctx, ctx, &device, subnet.addr())
+                crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, subnet.addr())
                     .expect("failed to remove addr from device");
             }
         }

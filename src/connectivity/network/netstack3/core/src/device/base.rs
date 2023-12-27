@@ -158,10 +158,10 @@ where
 
 /// Gets the routing metric for the device.
 pub fn get_routing_metric<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     device_id: &DeviceId<NonSyncCtx>,
 ) -> RawMetric {
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     match device_id {
         DeviceId::Ethernet(id) => ethernet::get_routing_metric(&mut sync_ctx, id),
         DeviceId::Loopback(id) => loopback::get_routing_metric(&mut sync_ctx, id),
@@ -189,10 +189,10 @@ pub trait NeighborVisitor<C: NonSyncContext, T: Instant> {
 /// The argument `filter_map` defines a filtering function, so that unneeded
 /// devices are not copied and returned in the snapshot.
 pub(crate) fn snapshot_device_ids<T, C: NonSyncContext, F: FnMut(DeviceId<C>) -> Option<T>>(
-    sync_ctx: &SyncCtx<C>,
+    core_ctx: &SyncCtx<C>,
     filter_map: F,
 ) -> impl IntoIterator<Item = T> {
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     let devices = sync_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
     let Devices { ethernet, loopback } = &*devices;
     DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
@@ -201,17 +201,17 @@ pub(crate) fn snapshot_device_ids<T, C: NonSyncContext, F: FnMut(DeviceId<C>) ->
 }
 
 /// Provides access to NUD state via a `visitor`.
-pub fn inspect_neighbors<C, V>(sync_ctx: &SyncCtx<C>, visitor: &V)
+pub fn inspect_neighbors<C, V>(core_ctx: &SyncCtx<C>, visitor: &V)
 where
     C: NonSyncContext,
     V: NeighborVisitor<C, <C as InstantBindingsTypes>::Instant>,
 {
-    let device_ids = snapshot_device_ids(sync_ctx, |device| match device {
+    let device_ids = snapshot_device_ids(core_ctx, |device| match device {
         DeviceId::Ethernet(d) => Some(d),
         // Loopback devices do not have neighbors.
         DeviceId::Loopback(_) => None,
     });
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     for device in device_ids {
         let id = device.clone();
         integration::with_ethernet_state(&mut sync_ctx, &id, |mut device_state| {
@@ -243,10 +243,10 @@ pub struct InspectDeviceState<C: NonSyncContext> {
 
 /// Provides access to Device state via a `visitor`.
 pub fn inspect_devices<C: NonSyncContext, V: DevicesVisitor<C>>(
-    sync_ctx: &SyncCtx<C>,
+    core_ctx: &SyncCtx<C>,
     visitor: &V,
 ) {
-    let devices = snapshot_device_ids(sync_ctx, Some).into_iter().map(|device| {
+    let devices = snapshot_device_ids(core_ctx, Some).into_iter().map(|device| {
         let device_id = device.clone();
         let ip = match &device {
             DeviceId::Ethernet(d) => &d.device_state().ip,
@@ -320,12 +320,12 @@ impl_timer_context!(
 
 /// Handle a timer event firing in the device layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
+    bindings_ctx: &mut NonSyncCtx,
     DeviceLayerTimerId(id): DeviceLayerTimerId<NonSyncCtx>,
 ) {
     match id {
-        DeviceLayerTimerIdInner::Ethernet(id) => ethernet::handle_timer(sync_ctx, ctx, id),
+        DeviceLayerTimerIdInner::Ethernet(id) => ethernet::handle_timer(core_ctx, bindings_ctx, id),
     }
 }
 
@@ -668,36 +668,48 @@ pub enum DeviceSendFrameError<T> {
 
 /// Sets the TX queue configuration for a device.
 pub fn set_tx_queue_configuration<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     config: TransmitQueueConfiguration,
 ) {
-    let sync_ctx = &mut Locked::new(sync_ctx);
+    let sync_ctx = &mut Locked::new(core_ctx);
     match device {
         DeviceId::Ethernet(id) => TransmitQueueApi::<_, _, EthernetLinkDevice>::set_configuration(
-            sync_ctx, ctx, id, config,
+            sync_ctx,
+            bindings_ctx,
+            id,
+            config,
         ),
-        DeviceId::Loopback(id) => {
-            TransmitQueueApi::<_, _, LoopbackDevice>::set_configuration(sync_ctx, ctx, id, config)
-        }
+        DeviceId::Loopback(id) => TransmitQueueApi::<_, _, LoopbackDevice>::set_configuration(
+            sync_ctx,
+            bindings_ctx,
+            id,
+            config,
+        ),
     }
 }
 
 /// Does the work of transmitting frames for a device.
 pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
-    let sync_ctx = &mut Locked::new(sync_ctx);
+    let sync_ctx = &mut Locked::new(core_ctx);
     match device {
         DeviceId::Ethernet(id) => {
-            TransmitQueueApi::<_, _, EthernetLinkDevice>::transmit_queued_frames(sync_ctx, ctx, id)
+            TransmitQueueApi::<_, _, EthernetLinkDevice>::transmit_queued_frames(
+                sync_ctx,
+                bindings_ctx,
+                id,
+            )
         }
-        DeviceId::Loopback(id) => {
-            TransmitQueueApi::<_, _, LoopbackDevice>::transmit_queued_frames(sync_ctx, ctx, id)
-        }
+        DeviceId::Loopback(id) => TransmitQueueApi::<_, _, LoopbackDevice>::transmit_queued_frames(
+            sync_ctx,
+            bindings_ctx,
+            id,
+        ),
     }
 }
 
@@ -708,13 +720,13 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
 /// RX packets may be handled. See [`DeviceLayerEventDispatcher::wake_rx_task`]
 /// for more details.
 pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &LoopbackDeviceId<NonSyncCtx>,
 ) -> WorkQueueReport {
     ReceiveQueueApi::<_, _, LoopbackDevice>::handle_queued_rx_frames(
-        &mut Locked::new(sync_ctx),
-        ctx,
+        &mut Locked::new(core_ctx),
+        bindings_ctx,
         device,
     )
 }
@@ -747,8 +759,8 @@ pub type RemoveDeviceResultWithContext<S, C> =
     RemoveDeviceResult<S, <C as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
 fn remove_device<T: DeviceStateSpec, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: BaseDeviceId<T, NonSyncCtx>,
     remove: impl FnOnce(
         &mut Devices<NonSyncCtx>,
@@ -762,18 +774,18 @@ where
     // for the device that would otherwise hold references to defunct device
     // state.
     let debug_references = {
-        let mut sync_ctx = Locked::new(sync_ctx);
+        let mut sync_ctx = Locked::new(core_ctx);
 
         let device = device.clone().into();
 
-        crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, ctx, &device);
-        crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
+        crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, bindings_ctx, &device);
+        crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, bindings_ctx, &device);
         device.downgrade().debug_references()
     };
 
     tracing::debug!("removing {device:?}");
     let (primary, strong) = {
-        let mut devices = sync_ctx.state.device.devices.write();
+        let mut devices = core_ctx.state.device.devices.write();
         remove(&mut *devices, device)
     };
     assert_eq!(strong, primary);
@@ -797,11 +809,11 @@ where
 ///
 /// Panics if the caller holds strong device IDs for `device`.
 pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: EthernetDeviceId<NonSyncCtx>,
 ) -> RemoveDeviceResultWithContext<NonSyncCtx::EthernetDeviceState, NonSyncCtx> {
-    remove_device(sync_ctx, ctx, device, |devices, id| {
+    remove_device(core_ctx, bindings_ctx, device, |devices, id| {
         let removed = devices
             .ethernet
             .remove(&id)
@@ -817,11 +829,11 @@ pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
 ///
 /// Panics if the caller holds strong device IDs for `device`.
 pub fn remove_loopback_device<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: LoopbackDeviceId<NonSyncCtx>,
 ) -> RemoveDeviceResultWithContext<NonSyncCtx::LoopbackDeviceState, NonSyncCtx> {
-    remove_device(sync_ctx, ctx, device, |devices, id| {
+    remove_device(core_ctx, bindings_ctx, device, |devices, id| {
         let removed = devices.loopback.take().expect("loopback device not installed");
         (removed, id)
     })
@@ -832,19 +844,19 @@ pub fn add_ethernet_device_with_state<
     NonSyncCtx: NonSyncContext,
     F: FnOnce() -> (NonSyncCtx::EthernetDeviceState, NonSyncCtx::DeviceIdentifier),
 >(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxEthernetFrameSize,
     metric: RawMetric,
     bindings_state: F,
 ) -> EthernetDeviceId<NonSyncCtx> {
-    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, bindings_state)
+    core_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, bindings_state)
 }
 
 /// Adds a new Ethernet device to the stack.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxEthernetFrameSize,
     metric: RawMetric,
@@ -853,7 +865,7 @@ where
     NonSyncCtx::EthernetDeviceState: Default,
     NonSyncCtx::DeviceIdentifier: Default,
 {
-    add_ethernet_device_with_state(sync_ctx, mac, max_frame_size, metric, Default::default)
+    add_ethernet_device_with_state(core_ctx, mac, max_frame_size, metric, Default::default)
 }
 
 /// Adds a new loopback device to the stack.
@@ -865,12 +877,12 @@ pub fn add_loopback_device_with_state<
     NonSyncCtx: NonSyncContext,
     F: FnOnce() -> (NonSyncCtx::LoopbackDeviceState, NonSyncCtx::DeviceIdentifier),
 >(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
     metric: RawMetric,
     bindings_state: F,
 ) -> Result<LoopbackDeviceId<NonSyncCtx>, crate::error::ExistsError> {
-    sync_ctx.state.device.add_loopback_device(mtu, metric, bindings_state)
+    core_ctx.state.device.add_loopback_device(mtu, metric, bindings_state)
 }
 
 /// Adds a new loopback device to the stack.
@@ -880,7 +892,7 @@ pub fn add_loopback_device_with_state<
 /// returned.
 #[cfg(test)]
 pub(crate) fn add_loopback_device<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
     metric: RawMetric,
 ) -> Result<LoopbackDeviceId<NonSyncCtx>, crate::error::ExistsError>
@@ -888,44 +900,47 @@ where
     NonSyncCtx::LoopbackDeviceState: Default,
     NonSyncCtx::DeviceIdentifier: Default,
 {
-    add_loopback_device_with_state(sync_ctx, mtu, metric, Default::default)
+    add_loopback_device_with_state(core_ctx, mtu, metric, Default::default)
 }
 
 /// Receive a device layer frame from the network.
 pub fn receive_frame<B: BufferMut, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &EthernetDeviceId<NonSyncCtx>,
     buffer: B,
 ) {
-    trace_duration!(ctx, "device::receive_frame");
-    sync_ctx.state.device_counters().ethernet.common.recv_frame.increment();
-    self::ethernet::receive_frame(&mut Locked::new(sync_ctx), ctx, device, buffer)
+    trace_duration!(bindings_ctx, "device::receive_frame");
+    core_ctx.state.device_counters().ethernet.common.recv_frame.increment();
+    self::ethernet::receive_frame(&mut Locked::new(core_ctx), bindings_ctx, device, buffer)
 }
 
 /// Set the promiscuous mode flag on `device`.
 // TODO(rheacock): remove `allow(dead_code)` when this is used.
 #[allow(dead_code)]
 pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     enabled: bool,
 ) -> Result<(), NotSupportedError> {
     match device {
-        DeviceId::Ethernet(id) => {
-            Ok(self::ethernet::set_promiscuous_mode(&mut Locked::new(sync_ctx), ctx, id, enabled))
-        }
+        DeviceId::Ethernet(id) => Ok(self::ethernet::set_promiscuous_mode(
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
+            id,
+            enabled,
+        )),
         DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
 }
 
 /// Get all IPv4 and IPv6 address/subnet pairs configured on a device
 pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Vec<AddrSubnetEither> {
-    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut Locked::new(sync_ctx), device)
+    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut Locked::new(core_ctx), device)
 }
 
 /// Adds an IP address and associated subnet to this device.
@@ -933,8 +948,8 @@ pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
 /// For IPv6, this function also joins the solicited-node multicast group and
 /// begins performing Duplicate Address Detection (DAD).
 pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr_sub_and_config: impl Into<AddrSubnetAndManualConfigEither<NonSyncCtx::Instant>>,
 ) -> Result<(), ExistsError> {
@@ -944,22 +959,34 @@ pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
         addr_sub_and_config,
         device
     );
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
 
     match addr_sub_and_config {
         AddrSubnetAndManualConfigEither::V4(addr_sub, config) => {
-            crate::ip::device::add_ipv4_addr_subnet(&mut sync_ctx, ctx, device, addr_sub, config)
+            crate::ip::device::add_ipv4_addr_subnet(
+                &mut sync_ctx,
+                bindings_ctx,
+                device,
+                addr_sub,
+                config,
+            )
         }
         AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
-            crate::ip::device::add_ipv6_addr_subnet(&mut sync_ctx, ctx, device, addr_sub, config)
+            crate::ip::device::add_ipv6_addr_subnet(
+                &mut sync_ctx,
+                bindings_ctx,
+                device,
+                addr_sub,
+                config,
+            )
         }
     }
 }
 
 /// Sets properties on an IP address.
 pub fn set_ip_addr_properties<NonSyncCtx: NonSyncContext, A: IpAddress>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     address: SpecifiedAddr<A>,
     next_valid_until: Lifetime<NonSyncCtx::Instant>,
@@ -969,19 +996,19 @@ pub fn set_ip_addr_properties<NonSyncCtx: NonSyncContext, A: IpAddress>(
         next_valid_until,
         address
     );
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
 
     match address.into() {
         IpAddr::V4(address) => crate::ip::device::set_ipv4_addr_properties(
             &mut sync_ctx,
-            ctx,
+            bindings_ctx,
             device,
             address,
             next_valid_until,
         ),
         IpAddr::V6(address) => crate::ip::device::set_ipv6_addr_properties(
             &mut sync_ctx,
-            ctx,
+            bindings_ctx,
             device,
             address,
             next_valid_until,
@@ -991,19 +1018,21 @@ pub fn set_ip_addr_properties<NonSyncCtx: NonSyncContext, A: IpAddress>(
 
 /// Delete an IP address on a device.
 pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr: impl Into<SpecifiedAddr<IpAddr>>,
 ) -> Result<(), error::NotFoundError> {
-    let mut sync_ctx = Locked::new(sync_ctx);
+    let mut sync_ctx = Locked::new(core_ctx);
     let addr = addr.into();
     trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
     match addr.into() {
-        IpAddr::V4(addr) => crate::ip::device::del_ipv4_addr(&mut sync_ctx, ctx, &device, &addr),
+        IpAddr::V4(addr) => {
+            crate::ip::device::del_ipv4_addr(&mut sync_ctx, bindings_ctx, &device, &addr)
+        }
         IpAddr::V6(addr) => crate::ip::device::del_ipv6_addr_with_reason(
             &mut sync_ctx,
-            ctx,
+            bindings_ctx,
             &device,
             DelIpv6Addr::SpecifiedAddr(addr),
             crate::ip::device::state::DelIpv6AddrReason::ManualAction,
@@ -1029,15 +1058,15 @@ fn validate_ipv6_neighbor_addr(addr: Ipv6Addr) -> Option<UnicastAddr<Ipv6Addr>> 
 
 /// Inserts a static neighbor entry for a neighbor.
 pub fn insert_static_neighbor_entry<I: Ip, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr: I::Addr,
     mac: Mac,
 ) -> Result<(), StaticNeighborInsertionError> {
     let mac = UnicastAddr::new(mac).ok_or(StaticNeighborInsertionError::MacAddressNotUnicast)?;
     let IpInvariant(result) = I::map_ip(
-        (IpInvariant((sync_ctx, ctx, device, mac)), addr),
+        (IpInvariant((core_ctx, bindings_ctx, device, mac)), addr),
         |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
             IpInvariant(
                 validate_ipv4_neighbor_addr(addr)
@@ -1067,8 +1096,8 @@ pub fn insert_static_neighbor_entry<I: Ip, NonSyncCtx: NonSyncContext>(
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
 pub(crate) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: SpecifiedAddr<Ipv4Addr>,
@@ -1076,8 +1105,8 @@ pub(crate) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 ) -> Result<(), NotSupportedError> {
     match device {
         DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_arp_table_entry(
-            &mut Locked::new(sync_ctx),
-            ctx,
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
             id,
             addr,
             mac,
@@ -1091,8 +1120,8 @@ pub(crate) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 /// This will cause any conflicting dynamic entry to be removed, and NDP
 /// messages about `addr` to be ignored.
 pub(crate) fn insert_static_ndp_table_entry<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: UnicastAddr<Ipv6Addr>,
@@ -1100,8 +1129,8 @@ pub(crate) fn insert_static_ndp_table_entry<NonSyncCtx: NonSyncContext>(
 ) -> Result<(), NotSupportedError> {
     match device {
         DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_ndp_table_entry(
-            &mut Locked::new(sync_ctx),
-            ctx,
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
             id,
             addr,
             mac,
@@ -1112,8 +1141,8 @@ pub(crate) fn insert_static_ndp_table_entry<NonSyncCtx: NonSyncContext>(
 
 /// Remove a static or dynamic neighbor table entry.
 pub fn remove_neighbor_table_entry<I: Ip, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr: I::Addr,
 ) -> Result<(), NeighborRemovalError> {
@@ -1122,7 +1151,7 @@ pub fn remove_neighbor_table_entry<I: Ip, NonSyncCtx: NonSyncContext>(
         DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError.into()),
     };
     let IpInvariant(result) = I::map_ip(
-        (IpInvariant((sync_ctx, ctx, device)), addr),
+        (IpInvariant((core_ctx, bindings_ctx, device)), addr),
         |(IpInvariant((sync_ctx, ctx, device)), addr)| {
             IpInvariant(
                 validate_ipv4_neighbor_addr(addr)
@@ -1160,8 +1189,8 @@ pub fn remove_neighbor_table_entry<I: Ip, NonSyncCtx: NonSyncContext>(
 
 /// Flush neighbor table entries.
 pub fn flush_neighbor_table<I: Ip, NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), NotSupportedError> {
     let device = match device {
@@ -1169,7 +1198,7 @@ pub fn flush_neighbor_table<I: Ip, NonSyncCtx: NonSyncContext>(
         DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError),
     };
     let IpInvariant(()) = I::map_ip(
-        IpInvariant((sync_ctx, ctx)),
+        IpInvariant((core_ctx, bindings_ctx)),
         |IpInvariant((sync_ctx, ctx))| {
             NudHandler::<Ipv4, EthernetLinkDevice, _>::flush(
                 &mut Locked::new(sync_ctx),
@@ -1192,18 +1221,18 @@ pub fn flush_neighbor_table<I: Ip, NonSyncCtx: NonSyncContext>(
 
 /// Gets the IPv4 configuration and flags for a `device`.
 pub fn get_ipv4_configuration_and_flags<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Ipv4DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv4_configuration_and_flags(&mut Locked::new(sync_ctx), device)
+    crate::ip::device::get_ipv4_configuration_and_flags(&mut Locked::new(core_ctx), device)
 }
 
 /// Gets the IPv6 configuration and flags for a `device`.
 pub fn get_ipv6_configuration_and_flags<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    core_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Ipv6DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv6_configuration_and_flags(&mut Locked::new(sync_ctx), device)
+    crate::ip::device::get_ipv6_configuration_and_flags(&mut Locked::new(core_ctx), device)
 }
 
 /// Updates the IPv4 configuration for a device.
@@ -1316,22 +1345,22 @@ pub(crate) mod testutil {
     }
 
     pub fn enable_device<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
     ) {
         let ip_config =
             Some(IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() });
         let _: Ipv4DeviceConfigurationUpdate = crate::device::testutil::update_ipv4_configuration(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device,
             Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
         )
         .unwrap();
         let _: Ipv6DeviceConfigurationUpdate = crate::device::testutil::update_ipv6_configuration(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device,
             Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
         )
@@ -1341,8 +1370,8 @@ pub(crate) mod testutil {
     /// Enables or disables IP packet routing on `device`.
     #[cfg(test)]
     pub(crate) fn set_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         enabled: bool,
     ) -> Result<(), NotSupportedError> {
@@ -1354,8 +1383,8 @@ pub(crate) mod testutil {
             IpVersion::V4 => {
                 let _: Ipv4DeviceConfigurationUpdate =
                     crate::device::testutil::update_ipv4_configuration(
-                        sync_ctx,
-                        ctx,
+                        core_ctx,
+                        bindings_ctx,
                         device,
                         Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
                     )
@@ -1364,8 +1393,8 @@ pub(crate) mod testutil {
             IpVersion::V6 => {
                 let _: Ipv6DeviceConfigurationUpdate =
                     crate::device::testutil::update_ipv6_configuration(
-                        sync_ctx,
-                        ctx,
+                        core_ctx,
+                        bindings_ctx,
                         device,
                         Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
                     )
@@ -1379,10 +1408,10 @@ pub(crate) mod testutil {
     /// Returns whether IP packet routing is enabled on `device`.
     #[cfg(test)]
     pub(crate) fn is_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
+        core_ctx: &SyncCtx<NonSyncCtx>,
         device: &DeviceId<NonSyncCtx>,
     ) -> bool {
-        let mut sync_ctx = Locked::new(sync_ctx);
+        let mut sync_ctx = Locked::new(core_ctx);
         match I::VERSION {
             IpVersion::V4 => {
                 crate::ip::device::is_ip_forwarding_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
@@ -1424,24 +1453,24 @@ pub(crate) mod testutil {
 
     /// A shortcut to update IPv4 configuration in a single call.
     pub fn update_ipv4_configuration<NonSyncCtx: crate::NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         config: Ipv4DeviceConfigurationUpdate,
     ) -> Result<Ipv4DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
         let pending = crate::device::new_ipv4_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut lock_order::Locked::new(sync_ctx), ctx))
+        Ok(pending.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx))
     }
 
     /// A shortcut to update IPv6 configuration in a single call.
     pub fn update_ipv6_configuration<NonSyncCtx: crate::NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
+        core_ctx: &SyncCtx<NonSyncCtx>,
+        bindings_ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         config: Ipv6DeviceConfigurationUpdate,
     ) -> Result<Ipv6DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
         let pending = crate::device::new_ipv6_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut lock_order::Locked::new(sync_ctx), ctx))
+        Ok(pending.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx))
     }
 }
 
@@ -1578,11 +1607,11 @@ mod tests {
     }
 
     fn add_ethernet(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        _non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
+        _bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
     ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
         crate::device::add_ethernet_device(
-            sync_ctx,
+            core_ctx,
             Ipv6::FAKE_CONFIG.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
@@ -1591,19 +1620,19 @@ mod tests {
     }
 
     fn add_loopback(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
     ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
         let device = crate::device::add_loopback_device(
-            sync_ctx,
+            core_ctx,
             Ipv6::MINIMUM_LINK_MTU,
             DEFAULT_INTERFACE_METRIC,
         )
         .unwrap()
         .into();
         crate::device::add_ip_addr_subnet(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
                 .unwrap(),
@@ -1613,21 +1642,21 @@ mod tests {
     }
 
     fn check_transmitted_ethernet(
-        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
         _device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
-        assert_eq!(non_sync_ctx.frames_sent().len(), count);
+        assert_eq!(bindings_ctx.frames_sent().len(), count);
     }
 
     fn check_transmitted_loopback(
-        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
         device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
         // Loopback frames leave the stack; outgoing frames land in
         // its RX queue.
-        let rx_available = core::mem::take(&mut non_sync_ctx.state_mut().rx_available);
+        let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
         if count == 0 {
             assert_eq!(rx_available, <[LoopbackDeviceId::<_>; 0]>::default());
         } else {

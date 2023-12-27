@@ -75,7 +75,7 @@ impl<I: crate::Instant> TokenBucket<I> {
     /// `try_take` attempts to take a token from the bucket. If the bucket is
     /// currently empty, then no token is available to be taken, and `try_take`
     /// return false.
-    pub(crate) fn try_take<C: InstantContext<Instant = I>>(&mut self, ctx: &C) -> bool {
+    pub(crate) fn try_take<C: InstantContext<Instant = I>>(&mut self, bindings_ctx: &C) -> bool {
         if self.token_fractions >= TOKEN_MULTIPLIER {
             self.token_fractions -= TOKEN_MULTIPLIER;
             return true;
@@ -116,7 +116,7 @@ impl<I: crate::Instant> TokenBucket<I> {
         // this isn't an issue in practice, but it's worth calling out in case
         // it becomes an issue in the future.
 
-        let now = ctx.now();
+        let now = bindings_ctx.now();
         // The duration since the last refill, or 1 second, whichever is
         // shorter. If this is the first fill, pretend that a full second has
         // elapsed since the previous refill. In reality, there was no previous
@@ -184,9 +184,9 @@ pub(crate) mod tests {
 
     impl<I: crate::Instant> TokenBucket<I> {
         /// Call `try_take` `n` times, and assert that it succeeds every time.
-        fn assert_take_n<C: InstantContext<Instant = I>>(&mut self, ctx: &C, n: usize) {
+        fn assert_take_n<C: InstantContext<Instant = I>>(&mut self, bindings_ctx: &C, n: usize) {
             for _ in 0..n {
-                assert!(self.try_take(ctx));
+                assert!(self.try_take(bindings_ctx));
             }
         }
     }

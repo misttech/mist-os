@@ -44,7 +44,7 @@ pub(crate) enum Ipv6PacketAction {
 /// hop-by-hop extension header (which MUST be the first extension header if
 /// present) as per RFC 8200 section 4.
 pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    ctx: &mut C,
+    core_ctx: &mut C,
     device: &C::DeviceId,
     frame_dst: FrameDestination,
     packet: &Ipv6Packet<B>,
@@ -69,7 +69,7 @@ pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSli
             match ext_hdr.data() {
                 Ipv6ExtensionHeaderData::HopByHopOptions { options } => {
                     action = handle_hop_by_hop_options_ext_hdr(
-                        ctx,
+                        core_ctx,
                         device,
                         frame_dst,
                         packet,
@@ -77,11 +77,12 @@ pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSli
                     );
                 }
                 Ipv6ExtensionHeaderData::Fragment { fragment_data } => {
-                    action = handle_fragment_ext_hdr(ctx, device, frame_dst, packet, fragment_data);
+                    action =
+                        handle_fragment_ext_hdr(core_ctx, device, frame_dst, packet, fragment_data);
                 }
                 Ipv6ExtensionHeaderData::DestinationOptions { options } => {
                     action = handle_destination_options_ext_hdr(
-                        ctx,
+                        core_ctx,
                         device,
                         frame_dst,
                         packet,
@@ -97,7 +98,7 @@ pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSli
         if let Some(ext_hdr) = iter.next() {
             if let Ipv6ExtensionHeaderData::HopByHopOptions { options } = ext_hdr.data() {
                 action = handle_hop_by_hop_options_ext_hdr(
-                    ctx,
+                    core_ctx,
                     device,
                     frame_dst,
                     packet,
@@ -121,7 +122,7 @@ fn handle_hop_by_hop_options_ext_hdr<
     B: ByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<HopByHopOptionData<'a>>>,
 >(
-    _ctx: &mut C,
+    _bindings_ctx: &mut C,
     _device: &C::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
@@ -145,7 +146,7 @@ fn handle_hop_by_hop_options_ext_hdr<
 /// Handles a routing extension header for a `packet`.
 // TODO(rheacock): Remove `_` prefix when this is used.
 fn _handle_routing_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    _ctx: &mut C,
+    _bindings_ctx: &mut C,
     _device: &C::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
@@ -159,7 +160,7 @@ fn _handle_routing_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
 
 /// Handles a fragment extension header for a `packet`.
 fn handle_fragment_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    _ctx: &mut C,
+    _bindings_ctx: &mut C,
     _device: &C::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
@@ -179,7 +180,7 @@ fn handle_destination_options_ext_hdr<
     B: ByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<DestinationOptionData<'a>>>,
 >(
-    _ctx: &mut C,
+    _bindings_ctx: &mut C,
     _device: &C::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,

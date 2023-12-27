@@ -81,7 +81,7 @@ pub(crate) trait TransmitQueueContext<D: Device, C>: TransmitQueueCommon<D, C> {
     /// error must be returned.
     fn send_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
@@ -121,7 +121,7 @@ pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
     /// Queues a frame for transmission.
     fn queue_tx_frame<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         body: S,
@@ -142,11 +142,11 @@ impl<
 {
     /// Transmits any queued frames.
     pub(crate) fn transmit_queued_frames(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
     ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
-        sync_ctx.with_dequed_packets_and_tx_queue_ctx(
+        core_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
@@ -166,9 +166,9 @@ impl<
                 let Some(ret) = ret else { return Ok(WorkQueueReport::AllDone) };
 
                 while let Some((meta, p)) = dequed_packets.pop_front() {
-                    deliver_to_device_sockets(tx_queue_ctx, ctx, device_id, &p);
+                    deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
 
-                    match tx_queue_ctx.send_frame(ctx, device_id, meta, p) {
+                    match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                         Ok(()) => {}
                         Err(DeviceSendFrameError::DeviceNotReady(x)) => {
                             // We failed to send the frame so requeue it and try
@@ -192,14 +192,14 @@ impl<
 
     /// Sets the queue configuration for the device.
     pub(crate) fn set_configuration(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         config: TransmitQueueConfiguration,
     ) {
         // We take the dequeue lock as well to make sure we finish any current
         // dequeuing before changing the configuration.
-        sync_ctx.with_dequed_packets_and_tx_queue_ctx(
+        core_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
@@ -231,8 +231,8 @@ impl<
                     let ret = prev_queue.dequeue_into(dequed_packets, MAX_BATCH_SIZE);
 
                     while let Some((meta, p)) = dequed_packets.pop_front() {
-                        deliver_to_device_sockets(tx_queue_ctx, ctx, device_id, &p);
-                        match tx_queue_ctx.send_frame(ctx, device_id, meta, p) {
+                        deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
+                        match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                             Ok(()) => {}
                             Err(DeviceSendFrameError::DeviceNotReady(x)) => {
                                 // We swapped to no-queue and device cannot send
@@ -257,16 +257,20 @@ fn deliver_to_device_sockets<
     C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
     SC: TransmitQueueCommon<D, C> + DeviceSocketHandler<D, C>,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     buffer: &SC::Buffer,
 ) {
     let bytes = buffer.as_ref();
     match SC::parse_outgoing_frame(bytes) {
-        Ok(sent_frame) => {
-            DeviceSocketHandler::handle_frame(sync_ctx, ctx, device_id, sent_frame.into(), bytes)
-        }
+        Ok(sent_frame) => DeviceSocketHandler::handle_frame(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            sent_frame.into(),
+            bytes,
+        ),
         Err(ParseSentFrameError) => {
             tracing::trace!(
                 "failed to parse outgoing frame on {:?} ({} bytes)",
@@ -288,7 +292,7 @@ where
 {
     fn queue_tx_frame<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         meta: SC::Meta,
         body: S,
@@ -315,7 +319,7 @@ where
                     Some(queue) => queue.queue_tx_frame(meta, body, get_buffer).map(|res| {
                         match res {
                             EnqueueResult::QueueWasPreviouslyEmpty => {
-                                ctx.wake_tx_task(device_id);
+                                bindings_ctx.wake_tx_task(device_id);
                             }
                             EnqueueResult::QueuePreviouslyWasOccupied => {}
                         }
@@ -329,11 +333,11 @@ where
             EnqueueStatus::NotAttempted((body, meta)) => {
                 // TODO(https://fxbug.dev/127022): Deliver the frame to packet
                 // sockets and to the device atomically.
-                deliver_to_device_sockets(self, ctx, device_id, &body);
+                deliver_to_device_sockets(self, bindings_ctx, device_id, &body);
 
                 // Send the frame while not holding the TX queue exclusively to
                 // not block concurrent senders from making progress.
-                self.send_frame(ctx, device_id, meta, body).map_err(|_| {
+                self.send_frame(bindings_ctx, device_id, meta, body).map_err(|_| {
                     TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))
                 })
             }
@@ -433,7 +437,7 @@ mod tests {
 
         fn send_frame(
             &mut self,
-            _ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeNonSyncCtxImpl,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             meta: (),
             buf: Buf<Vec<u8>>,
@@ -469,12 +473,12 @@ mod tests {
     impl DeviceSocketHandler<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn handle_frame(
             &mut self,
-            ctx: &mut FakeNonSyncCtxImpl,
+            bindings_ctx: &mut FakeNonSyncCtxImpl,
             _device: &Self::DeviceId,
             frame: Frame<&[u8]>,
             _whole_frame: &[u8],
         ) {
-            ctx.state_mut().delivered_to_sockets.push(frame.cloned())
+            bindings_ctx.state_mut().delivered_to_sockets.push(frame.cloned())
         }
     }
 

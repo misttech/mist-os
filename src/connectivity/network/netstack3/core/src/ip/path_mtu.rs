@@ -61,14 +61,29 @@ pub(crate) trait PmtuHandler<I: Ip, C> {
     /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than
     /// the current PMTU and does not violate the minimum MTU size requirements
     /// for an IP.
-    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: Mtu);
+    fn update_pmtu_if_less(
+        &mut self,
+        bindings_ctx: &mut C,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        new_mtu: Mtu,
+    );
 
     /// Updates the PMTU between `src_ip` and `dst_ip` to the next lower
     /// estimate from `from`.
-    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: Mtu);
+    fn update_pmtu_next_lower(
+        &mut self,
+        bindings_ctx: &mut C,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        from: Mtu,
+    );
 }
 
-fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(ctx: &mut C, cache_is_empty: bool) {
+fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(
+    bindings_ctx: &mut C,
+    cache_is_empty: bool,
+) {
     // Only attempt to create the next maintenance task if we still have
     // PMTU entries in the cache. If we don't, it would be a waste to
     // schedule the timer. We will let the next creation of a PMTU entry
@@ -78,44 +93,56 @@ fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(ctx: &mut C, cache_is_e
     }
 
     let timer_id = PmtuTimerId::default();
-    match ctx.scheduled_instant(timer_id) {
+    match bindings_ctx.scheduled_instant(timer_id) {
         Some(scheduled_at) => {
             let _: C::Instant = scheduled_at;
             // Timer already set, nothing to do.
         }
         None => {
             // We only enter this match arm if a timer was not already set.
-            assert_eq!(ctx.schedule_timer(MAINTENANCE_PERIOD, timer_id), None)
+            assert_eq!(bindings_ctx.schedule_timer(MAINTENANCE_PERIOD, timer_id), None)
         }
     }
 }
 
 fn handle_update_result<I: Ip, C: PmtuNonSyncContext<I>>(
-    ctx: &mut C,
+    bindings_ctx: &mut C,
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
 ) {
     // TODO(https://fxbug.dev/92599): Do something with this `Result`.
     let _: Result<_, _> = result.map(|ret| {
-        maybe_schedule_timer(ctx, cache_is_empty);
+        maybe_schedule_timer(bindings_ctx, cache_is_empty);
         ret
     });
 }
 
 impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> for SC {
-    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: Mtu) {
+    fn update_pmtu_if_less(
+        &mut self,
+        bindings_ctx: &mut C,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        new_mtu: Mtu,
+    ) {
         self.with_state_mut(|cache| {
-            let now = ctx.now();
+            let now = bindings_ctx.now();
             let res = cache.update_pmtu_if_less(src_ip, dst_ip, new_mtu, now);
-            handle_update_result(ctx, res, cache.is_empty());
+            handle_update_result(bindings_ctx, res, cache.is_empty());
         })
     }
 
-    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: Mtu) {
+    fn update_pmtu_next_lower(
+        &mut self,
+        bindings_ctx: &mut C,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        from: Mtu,
+    ) {
         self.with_state_mut(|cache| {
-            let now = ctx.now();
+            let now = bindings_ctx.now();
             let res = cache.update_pmtu_next_lower(src_ip, dst_ip, from, now);
-            handle_update_result(ctx, res, cache.is_empty());
+            handle_update_result(bindings_ctx, res, cache.is_empty());
         })
     }
 }
@@ -123,11 +150,11 @@ impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> f
 impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> TimerHandler<C, PmtuTimerId<I>>
     for SC
 {
-    fn handle_timer(&mut self, ctx: &mut C, _timer: PmtuTimerId<I>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut C, _timer: PmtuTimerId<I>) {
         self.with_state_mut(|cache| {
-            let now = ctx.now();
+            let now = bindings_ctx.now();
             cache.handle_timer(now);
-            maybe_schedule_timer(ctx, cache.is_empty());
+            maybe_schedule_timer(bindings_ctx, cache.is_empty());
         })
     }
 }
@@ -488,16 +515,20 @@ mod tests {
         next_lower_pmtu_plateau(start)
     }
 
-    fn get_pmtu<I: Ip>(ctx: &FakeSyncCtxImpl<I>, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Mtu> {
-        ctx.get_ref().cache.get_pmtu(src_ip, dst_ip)
+    fn get_pmtu<I: Ip>(
+        core_ctx: &FakeSyncCtxImpl<I>,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+    ) -> Option<Mtu> {
+        core_ctx.get_ref().cache.get_pmtu(src_ip, dst_ip)
     }
 
     fn get_last_updated<I: Ip>(
-        ctx: &FakeSyncCtxImpl<I>,
+        core_ctx: &FakeSyncCtxImpl<I>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<FakeInstant> {
-        ctx.get_ref().cache.get_last_updated(src_ip, dst_ip)
+        core_ctx.get_ref().cache.get_last_updated(src_ip, dst_ip)
     }
 
     #[ip_test]

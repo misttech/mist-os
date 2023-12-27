@@ -193,7 +193,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 {
     fn send_frame<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         metadata: DeviceSocketMetadata<LoopbackDeviceId<C>>,
         body: S,
     ) -> Result<(), S>
@@ -203,17 +203,22 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     {
         let DeviceSocketMetadata { device_id, header } = metadata;
         match header {
-            Some(DatagramHeader { dest_addr, protocol }) => {
-                send_as_ethernet_frame_to_dst(self, ctx, &device_id, body, protocol, dest_addr)
-            }
-            None => send_ethernet_frame(self, ctx, &device_id, body),
+            Some(DatagramHeader { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
+                self,
+                bindings_ctx,
+                &device_id,
+                body,
+                protocol,
+                dest_addr,
+            ),
+            None => send_ethernet_frame(self, bindings_ctx, &device_id, body),
         }
     }
 }
 
 pub(super) fn send_ip_frame<NonSyncCtx, A, S, L>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    bindings_ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
     _local_addr: SpecifiedAddr<A>,
     packet: S,
@@ -227,8 +232,8 @@ where
     A::Version: EthernetIpExt,
 {
     send_as_ethernet_frame_to_dst(
-        sync_ctx,
-        ctx,
+        core_ctx,
+        bindings_ctx,
         device_id,
         packet,
         <A::Version as EthernetIpExt>::ETHER_TYPE,
@@ -237,8 +242,8 @@ where
 }
 
 fn send_as_ethernet_frame_to_dst<NonSyncCtx, S, L>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    bindings_ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
     packet: S,
     protocol: EtherType,
@@ -264,12 +269,12 @@ where
         MIN_BODY_LEN,
     ));
 
-    send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|s| s.into_inner())
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame).map_err(|s| s.into_inner())
 }
 
 fn send_ethernet_frame<L, S, NonSyncCtx>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    bindings_ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
     frame: S,
 ) -> Result<(), S>
@@ -279,18 +284,18 @@ where
     S::Buffer: BufferMut,
     NonSyncCtx: NonSyncContext,
 {
-    sync_ctx.with_counters(|counters: &DeviceCounters| {
+    core_ctx.with_counters(|counters: &DeviceCounters| {
         counters.loopback.common.send_total_frames.increment();
     });
     match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
-        sync_ctx,
-        ctx,
+        core_ctx,
+        bindings_ctx,
         device_id,
         (),
         frame,
     ) {
         Ok(()) => {
-            sync_ctx.with_counters(|counters: &DeviceCounters| {
+            core_ctx.with_counters(|counters: &DeviceCounters| {
                 counters.loopback.common.send_frame.increment();
             });
             Ok(())
@@ -299,13 +304,13 @@ where
             unreachable!("loopback never fails to send a frame")
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
-            sync_ctx.with_counters(|counters: &DeviceCounters| {
+            core_ctx.with_counters(|counters: &DeviceCounters| {
                 counters.loopback.common.send_queue_full.increment();
             });
             Err(s)
         }
         Err(TransmitQueueFrameError::SerializeError(s)) => {
-            sync_ctx.with_counters(|counters: &DeviceCounters| {
+            core_ctx.with_counters(|counters: &DeviceCounters| {
                 counters.loopback.common.send_serialize_error.increment();
             });
             Err(s)
@@ -315,20 +320,20 @@ where
 
 /// Get the routing metric associated with this device.
 pub(super) fn get_routing_metric<NonSyncCtx: NonSyncContext, L>(
-    ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
 ) -> RawMetric {
-    device::integration::with_loopback_state(ctx, device_id, |mut state| {
+    device::integration::with_loopback_state(core_ctx, device_id, |mut state| {
         state.cast_with(|s| &s.link.metric).copied()
     })
 }
 
 /// Gets the MTU associated with this device.
 pub(super) fn get_mtu<NonSyncCtx: NonSyncContext, L>(
-    ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
 ) -> Mtu {
-    device::integration::with_loopback_state(ctx, device_id, |mut state| {
+    device::integration::with_loopback_state(core_ctx, device_id, |mut state| {
         state.cast_with(|s| &s.link.mtu).copied()
     })
 }
@@ -369,7 +374,7 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
 {
     fn handle_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &LoopbackDeviceId<C>,
         (): Self::Meta,
         mut buf: Buf<Vec<u8>>,
@@ -394,7 +399,7 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
 
         DeviceSocketHandler::<LoopbackDevice, _>::handle_frame(
             self,
-            ctx,
+            bindings_ctx,
             device_id,
             ReceivedFrame::from_ethernet(frame, frame_dest).into(),
             whole_body,
@@ -418,7 +423,7 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
                 });
                 crate::ip::receive_ipv4_packet(
                     self,
-                    ctx,
+                    bindings_ctx,
                     &device_id.clone().into(),
                     frame_dest,
                     buf,
@@ -430,7 +435,7 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
                 });
                 crate::ip::receive_ipv6_packet(
                     self,
-                    ctx,
+                    bindings_ctx,
                     &device_id.clone().into(),
                     frame_dest,
                     buf,
@@ -508,7 +513,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 
     fn send_frame(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
@@ -521,7 +526,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         // which may need to be delivered to the sending socket itself. Without
         // this decoupling of RX/TX paths, sending a packet while holding onto
         // the socket lock will result in a deadlock.
-        match ReceiveQueueHandler::queue_rx_frame(self, ctx, device_id, meta, buf) {
+        match ReceiveQueueHandler::queue_rx_frame(self, bindings_ctx, device_id, meta, buf) {
             Ok(()) => {}
             Err(ReceiveQueueFullError(((), _frame))) => {
                 // RX queue is full - there is nothing further we can do here.

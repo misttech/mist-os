@@ -118,7 +118,7 @@ pub(crate) trait FragmentHandler<I: IpExt, C> {
     /// Panics if the packet has no fragment data.
     fn process_fragment<B: ByteSlice>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         packet: I::Packet<B>,
     ) -> FragmentProcessingState<I, B>
     where
@@ -143,7 +143,7 @@ pub(crate) trait FragmentHandler<I: IpExt, C> {
     /// to cancel the reassembly timer.
     fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
     ) -> Result<I::Packet<B>, FragmentReassemblyError>;
@@ -154,7 +154,7 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
 {
     fn process_fragment<B: ByteSlice>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         packet: I::Packet<B>,
     ) -> FragmentProcessingState<I, B>
     where
@@ -166,10 +166,10 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
             if let Some(timer_id) = timer_id {
                 match timer_id {
                     CacheTimerAction::CreateNewTimer(timer_id) => {
-                        assert_eq!(ctx.schedule_timer(REASSEMBLY_TIMEOUT, timer_id), None)
+                        assert_eq!(bindings_ctx.schedule_timer(REASSEMBLY_TIMEOUT, timer_id), None)
                     }
                     CacheTimerAction::CancelExistingTimer(timer_id) => {
-                        assert_ne!(ctx.cancel_timer(timer_id), None)
+                        assert_ne!(bindings_ctx.cancel_timer(timer_id), None)
                     }
                 }
             }
@@ -180,7 +180,7 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
 
     fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
     ) -> Result<I::Packet<B>, FragmentReassemblyError> {
@@ -192,7 +192,7 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
                     // Cancel the reassembly timer as we attempt reassembly which
                     // means we had all the fragments for the final packet, even
                     // if parsing the reassembled packet failed.
-                    assert_matches!(ctx.cancel_timer(*key), Some(_));
+                    assert_matches!(bindings_ctx.cancel_timer(*key), Some(_));
                 }
                 Err(FragmentReassemblyError::InvalidKey)
                 | Err(FragmentReassemblyError::MissingFragments) => {}
@@ -208,7 +208,7 @@ impl<A: IpAddress, C: FragmentNonSyncContext<A::Version>, SC: FragmentContext<A:
 where
     A::Version: IpExt,
 {
-    fn handle_timer(&mut self, _ctx: &mut C, key: FragmentCacheKey<A>) {
+    fn handle_timer(&mut self, _bindings_ctx: &mut C, key: FragmentCacheKey<A>) {
         // If a timer fired, the `key` must still exist in our fragment cache.
         assert_matches!(self.with_state_mut(|cache| cache.remove_data(&key)), Some(_));
     }
@@ -925,22 +925,29 @@ mod tests {
         SC: FragmentContext<I, C>,
         C: FragmentNonSyncContext<I>,
     >(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
         expected_result: ExpectedResult,
     ) {
-        I::process_ip_fragment(sync_ctx, ctx, fragment_id, fragment_offset, m_flag, expected_result)
+        I::process_ip_fragment(
+            core_ctx,
+            bindings_ctx,
+            fragment_id,
+            fragment_offset,
+            m_flag,
+            expected_result,
+        )
     }
 
     /// Generates and processes an IPv4 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
     fn process_ipv4_fragment<SC: FragmentContext<Ipv4, C>, C: FragmentNonSyncContext<Ipv4>>(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
@@ -959,7 +966,7 @@ mod tests {
         match expected_result {
             ExpectedResult::Ready { total_body_len } => {
                 let _: (FragmentCacheKey<_>, usize) = assert_frag_proc_state_ready!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FAKE_CONFIG_V4.remote_ip.get(),
                     FAKE_CONFIG_V4.local_ip.get(),
                     fragment_id,
@@ -968,19 +975,19 @@ mod tests {
             }
             ExpectedResult::NeedMore => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::NeedMoreFragments
                 );
             }
             ExpectedResult::Invalid => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::InvalidFragment
                 );
             }
             ExpectedResult::OutOfMemory => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::OutOfMemory
                 );
             }
@@ -991,8 +998,8 @@ mod tests {
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
     fn process_ipv6_fragment<SC: FragmentContext<Ipv6, C>, C: FragmentNonSyncContext<Ipv6>>(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
@@ -1020,7 +1027,7 @@ mod tests {
         match expected_result {
             ExpectedResult::Ready { total_body_len } => {
                 let _: (FragmentCacheKey<_>, usize) = assert_frag_proc_state_ready!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FAKE_CONFIG_V6.remote_ip.get(),
                     FAKE_CONFIG_V6.local_ip.get(),
                     fragment_id,
@@ -1029,19 +1036,19 @@ mod tests {
             }
             ExpectedResult::NeedMore => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::NeedMoreFragments
                 );
             }
             ExpectedResult::Invalid => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::InvalidFragment
                 );
             }
             ExpectedResult::OutOfMemory => {
                 assert_matches!(
-                    FragmentHandler::process_fragment::<&[u8]>(sync_ctx, ctx, packet),
+                    FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
                     FragmentProcessingState::OutOfMemory
                 );
             }
@@ -1052,8 +1059,8 @@ mod tests {
         const HEADER_LENGTH: usize;
 
         fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            sync_ctx: &mut SC,
-            ctx: &mut C,
+            core_ctx: &mut SC,
+            bindings_ctx: &mut C,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
@@ -1065,16 +1072,16 @@ mod tests {
         const HEADER_LENGTH: usize = packet_formats::ipv4::HDR_PREFIX_LEN;
 
         fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            sync_ctx: &mut SC,
-            ctx: &mut C,
+            core_ctx: &mut SC,
+            bindings_ctx: &mut C,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
             expected_result: ExpectedResult,
         ) {
             process_ipv4_fragment(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 fragment_id,
                 fragment_offset,
                 m_flag,
@@ -1086,16 +1093,16 @@ mod tests {
         const HEADER_LENGTH: usize = packet_formats::ipv6::IPV6_FIXED_HDR_LEN;
 
         fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            sync_ctx: &mut SC,
-            ctx: &mut C,
+            core_ctx: &mut SC,
+            bindings_ctx: &mut C,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
             expected_result: ExpectedResult,
         ) {
             process_ipv6_fragment(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 fragment_id,
                 fragment_offset,
                 m_flag,
@@ -1110,8 +1117,8 @@ mod tests {
         SC: FragmentContext<I, C>,
         C: FragmentNonSyncContext<I>,
     >(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         fragment_id: u16,
         total_body_len: usize,
     ) {
@@ -1122,7 +1129,8 @@ mod tests {
             I::FAKE_CONFIG.local_ip.get(),
             fragment_id.into(),
         );
-        let packet = FragmentHandler::reassemble_packet(sync_ctx, ctx, &key, &mut buffer).unwrap();
+        let packet =
+            FragmentHandler::reassemble_packet(core_ctx, bindings_ctx, &key, &mut buffer).unwrap();
         let expected_body = generate_body_fragment(fragment_id, 0, total_body_len);
         assert_eq!(packet.body(), &expected_body[..]);
     }

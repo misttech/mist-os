@@ -77,21 +77,21 @@ pub trait CounterVisitor {
 }
 
 /// Provides access to stack counters via a visitor.
-pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx<C>, visitor: &V) {
+pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(core_ctx: &SyncCtx<C>, visitor: &V) {
     let counters = StackCounters {
-        ipv4_common: sync_ctx.state.ip_counters::<Ipv4>(),
-        ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
-        ipv4: sync_ctx.state.ipv4().counters(),
-        ipv6: sync_ctx.state.ipv6().counters(),
-        arp: sync_ctx.state.arp_counters(),
-        udpv4: sync_ctx.state.udp_counters::<Ipv4>(),
-        udpv6: sync_ctx.state.udp_counters::<Ipv6>(),
-        icmpv4_rx: sync_ctx.state.icmp_rx_counters::<Ipv4>(),
-        icmpv4_tx: sync_ctx.state.icmp_tx_counters::<Ipv4>(),
-        icmpv6_rx: sync_ctx.state.icmp_rx_counters::<Ipv6>(),
-        icmpv6_tx: sync_ctx.state.icmp_tx_counters::<Ipv6>(),
-        ndp: sync_ctx.state.ndp_counters(),
-        devices: sync_ctx.state.device_counters(),
+        ipv4_common: core_ctx.state.ip_counters::<Ipv4>(),
+        ipv6_common: core_ctx.state.ip_counters::<Ipv6>(),
+        ipv4: core_ctx.state.ipv4().counters(),
+        ipv6: core_ctx.state.ipv6().counters(),
+        arp: core_ctx.state.arp_counters(),
+        udpv4: core_ctx.state.udp_counters::<Ipv4>(),
+        udpv6: core_ctx.state.udp_counters::<Ipv6>(),
+        icmpv4_rx: core_ctx.state.icmp_rx_counters::<Ipv4>(),
+        icmpv4_tx: core_ctx.state.icmp_tx_counters::<Ipv4>(),
+        icmpv6_rx: core_ctx.state.icmp_rx_counters::<Ipv6>(),
+        icmpv6_tx: core_ctx.state.icmp_tx_counters::<Ipv6>(),
+        ndp: core_ctx.state.ndp_counters(),
+        devices: core_ctx.state.device_counters(),
     };
     visitor.visit_counters(counters);
 }

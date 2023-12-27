@@ -113,7 +113,7 @@ pub(crate) trait MldPacketHandler<C, DeviceId> {
     /// Receive an MLD packet.
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -126,7 +126,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> MldPacketHandler<C, 
 {
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &SC::DeviceId,
         _src_ip: Ipv6SourceAddr,
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -143,7 +143,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> MldPacketHandler<C, 
                     .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
                         handle_query_message(
                             self,
-                            ctx,
+                            bindings_ctx,
                             device,
                             group_addr,
                             body.max_response_delay(),
@@ -154,7 +154,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> MldPacketHandler<C, 
                 let addr = msg.body().group_addr();
                 MulticastAddr::new(msg.body().group_addr())
                     .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        handle_report_message(self, ctx, device, group_addr)
+                        handle_report_message(self, bindings_ctx, device, group_addr)
                     })
             }
             MldPacket::MulticastListenerDone(_) => {
@@ -230,7 +230,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
 
     fn send_message(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv6Addr>,
         msg_type: GmpMessageType<MldProtocolSpecific>,
@@ -238,7 +238,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
         let result = match msg_type {
             GmpMessageType::Report(MldProtocolSpecific) => send_mld_packet::<_, _, _>(
                 self,
-                ctx,
+                bindings_ctx,
                 device,
                 group_addr,
                 MulticastListenerReport,
@@ -247,7 +247,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
             ),
             GmpMessageType::Leave => send_mld_packet::<_, _, _>(
                 self,
-                ctx,
+                bindings_ctx,
                 device,
                 Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
                 MulticastListenerDone,
@@ -265,7 +265,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
         }
     }
 
-    fn run_actions(&mut self, _ctx: &mut C, device: &SC::DeviceId, actions: Never) {
+    fn run_actions(&mut self, _bindings_ctx: &mut C, device: &SC::DeviceId, actions: Never) {
         unreachable!("actions ({actions:?} should not be constructable; device = {device:?}")
     }
 
@@ -393,9 +393,9 @@ impl_timer_context!(
 impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>>
     TimerHandler<C, MldDelayedReportTimerId<SC::DeviceId>> for SC
 {
-    fn handle_timer(&mut self, ctx: &mut C, timer: MldDelayedReportTimerId<SC::DeviceId>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut C, timer: MldDelayedReportTimerId<SC::DeviceId>) {
         let MldDelayedReportTimerId(id) = timer;
-        gmp_handle_timer(self, ctx, id);
+        gmp_handle_timer(self, bindings_ctx, id);
     }
 }
 
@@ -408,8 +408,8 @@ fn send_mld_packet<
     SC: MldContext<C>,
     M: IcmpMldv1MessageType,
 >(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     dst_ip: MulticastAddr<Ipv6Addr>,
     msg: M,
@@ -424,7 +424,7 @@ fn send_mld_packet<
     // TODO(https://fxbug.dev/98534): Handle an IPv6 link-local address being
     // assigned when reports were sent with the unspecified source address.
     let src_ip =
-        sync_ctx.get_ipv6_link_local_addr(device).map_or(Ipv6::UNSPECIFIED_ADDRESS, |x| x.get());
+        core_ctx.get_ipv6_link_local_addr(device).map_or(Ipv6::UNSPECIFIED_ADDRESS, |x| x.get());
 
     let body = Mldv1MessageBuilder::<M>::new_with_max_resp_delay(group_addr, max_resp_delay)
         .into_serializer()
@@ -440,8 +440,8 @@ fn send_mld_packet<
             )
             .unwrap(),
         );
-    sync_ctx
-        .send_frame(ctx, MldFrameMetadata::new(device.clone(), dst_ip), body)
+    core_ctx
+        .send_frame(bindings_ctx, MldFrameMetadata::new(device.clone(), dst_ip), body)
         .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
@@ -611,8 +611,8 @@ mod tests {
         });
 
     fn receive_mld_query(
-        sync_ctx: &mut FakeSyncCtxImpl,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl,
+        core_ctx: &mut FakeSyncCtxImpl,
+        bindings_ctx: &mut FakeNonSyncCtxImpl,
         resp_time: Duration,
         group_addr: MulticastAddr<Ipv6Addr>,
     ) {
@@ -634,8 +634,8 @@ mod tests {
             .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
             .unwrap()
         {
-            Icmpv6Packet::Mld(packet) => sync_ctx.receive_mld_packet(
-                non_sync_ctx,
+            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
+                bindings_ctx,
                 &FakeDeviceId,
                 router_addr.try_into().unwrap(),
                 MY_IP,
@@ -646,8 +646,8 @@ mod tests {
     }
 
     fn receive_mld_report(
-        sync_ctx: &mut FakeSyncCtxImpl,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl,
+        core_ctx: &mut FakeSyncCtxImpl,
+        bindings_ctx: &mut FakeNonSyncCtxImpl,
         group_addr: MulticastAddr<Ipv6Addr>,
     ) {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
@@ -666,8 +666,8 @@ mod tests {
             .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
             .unwrap()
         {
-            Icmpv6Packet::Mld(packet) => sync_ctx.receive_mld_packet(
-                non_sync_ctx,
+            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
+                bindings_ctx,
                 &FakeDeviceId,
                 router_addr.try_into().unwrap(),
                 MY_IP,

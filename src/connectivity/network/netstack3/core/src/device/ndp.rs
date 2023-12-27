@@ -199,11 +199,11 @@ mod tests {
     }
 
     fn get_global_ipv6_addrs<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
+        core_ctx: &SyncCtx<C>,
         device_id: &DeviceId<C>,
     ) -> Vec<GlobalIpv6Addr<C::Instant>> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             device_id,
             |addrs, sync_ctx| {
                 addrs
@@ -806,12 +806,12 @@ mod tests {
     }
 
     fn get_address_assigned(
-        sync_ctx: &crate::testutil::FakeSyncCtx,
+        core_ctx: &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<bool> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             device,
             |mut addrs, sync_ctx| {
                 addrs.find_map(|addr_id| {
@@ -1153,8 +1153,8 @@ mod tests {
         // Sets the hop limit with a router advertisement and sends a packet to
         // make sure the packet uses the new hop limit.
         fn inner_test(
-            sync_ctx: &crate::testutil::FakeSyncCtx,
-            ctx: &mut crate::testutil::FakeNonSyncCtx,
+            core_ctx: &crate::testutil::FakeSyncCtx,
+            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
             device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             hop_limit: u8,
             frame_offset: usize,
@@ -1180,16 +1180,16 @@ mod tests {
                 .unwrap()
                 .unwrap_b();
             receive_ip_packet::<_, _, Ipv6>(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 device_id,
                 FrameDestination::Multicast,
                 icmpv6_packet_buf,
             );
-            assert_eq!(get_ipv6_hop_limit(&mut Locked::new(sync_ctx), device_id).get(), hop_limit);
+            assert_eq!(get_ipv6_hop_limit(&mut Locked::new(core_ctx), device_id).get(), hop_limit);
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 SendIpPacketMeta {
                     device: device_id,
                     src_ip: Some(config.local_ip),
@@ -1202,7 +1202,7 @@ mod tests {
                 Buf::new(vec![0; 10], ..),
             )
             .unwrap();
-            let frames = ctx.frames_sent();
+            let frames = bindings_ctx.frames_sent();
             let (buf, _, _, _) = parse_ethernet_frame(
                 &frames[frame_offset].1[..],
                 EthernetFrameLengthCheck::NoCheck,
@@ -1867,14 +1867,22 @@ mod tests {
     impl TestSlaacPrefix {
         fn send_prefix_update(
             &self,
-            sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-            ctx: &mut crate::testutil::FakeNonSyncCtx,
+            core_ctx: &mut &crate::testutil::FakeSyncCtx,
+            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
             device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             src_ip: Ipv6Addr,
         ) {
             let Self { prefix, valid_for, preferred_for } = *self;
 
-            receive_prefix_update(sync_ctx, ctx, device, src_ip, prefix, preferred_for, valid_for);
+            receive_prefix_update(
+                core_ctx,
+                bindings_ctx,
+                device,
+                src_ip,
+                prefix,
+                preferred_for,
+                valid_for,
+            );
         }
 
         fn valid_until<I: Instant>(&self, now: I) -> I {
@@ -2423,8 +2431,8 @@ mod tests {
     }
 
     fn receive_prefix_update(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        ctx: &mut crate::testutil::FakeNonSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         src_ip: Ipv6Addr,
         subnet: Subnet<Ipv6Addr>,
@@ -2445,8 +2453,8 @@ mod tests {
             preferred_lifetime,
         );
         receive_ip_packet::<_, _, Ipv6>(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             FrameDestination::Multicast,
             icmpv6_packet_buf,
@@ -2454,30 +2462,30 @@ mod tests {
     }
 
     fn get_matching_slaac_address_entries<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         filter: F,
     ) -> impl Iterator<Item = GlobalIpv6Addr<FakeInstant>> {
-        get_global_ipv6_addrs(sync_ctx, device).into_iter().filter(filter)
+        get_global_ipv6_addrs(core_ctx, device).into_iter().filter(filter)
     }
 
     fn get_matching_slaac_address_entry<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         filter: F,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
-        let mut matching_addrs = get_matching_slaac_address_entries(sync_ctx, device, filter);
+        let mut matching_addrs = get_matching_slaac_address_entries(core_ctx, device, filter);
         let entry = matching_addrs.next();
         assert_eq!(matching_addrs.next(), None);
         entry
     }
 
     fn get_slaac_address_entry(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
-        let mut matching_addrs = get_global_ipv6_addrs(sync_ctx, device)
+        let mut matching_addrs = get_global_ipv6_addrs(core_ctx, device)
             .into_iter()
             .filter(|entry| *entry.addr_sub() == addr_sub);
         let entry = matching_addrs.next();
@@ -2486,7 +2494,7 @@ mod tests {
     }
 
     fn assert_slaac_lifetimes_enforced(
-        non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
+        bindings_ctx: &crate::testutil::FakeNonSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         entry: GlobalIpv6Addr<FakeInstant>,
         valid_until: FakeInstant,
@@ -2505,7 +2513,7 @@ mod tests {
             Ipv6AddrConfig::Manual(_manual_config) => unreachable!(),
         };
         assert_eq!(entry_valid_until, Lifetime::Finite(valid_until));
-        non_sync_ctx.timer_ctx().assert_some_timers_installed([
+        bindings_ctx.timer_ctx().assert_some_timers_installed([
             (
                 SlaacTimerId::new_deprecate_slaac_address(device.clone(), entry.addr_sub().addr())
                     .into(),
@@ -2527,8 +2535,8 @@ mod tests {
 
         set_logger_for_test();
         fn inner_test(
-            sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-            ctx: &mut crate::testutil::FakeNonSyncCtx,
+            core_ctx: &mut &crate::testutil::FakeSyncCtx,
+            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
             device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             src_ip: Ipv6Addr,
             subnet: Subnet<Ipv6Addr>,
@@ -2538,22 +2546,28 @@ mod tests {
             expected_valid_lifetime: u32,
         ) {
             receive_prefix_update(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 device,
                 src_ip,
                 subnet,
                 preferred_lifetime,
                 valid_lifetime,
             );
-            let entry = get_slaac_address_entry(sync_ctx, &device, addr_sub).unwrap();
-            let now = ctx.now();
+            let entry = get_slaac_address_entry(core_ctx, &device, addr_sub).unwrap();
+            let now = bindings_ctx.now();
             let valid_until =
                 now.checked_add(Duration::from_secs(expected_valid_lifetime.into())).unwrap();
             let preferred_until =
                 now.checked_add(Duration::from_secs(preferred_lifetime.into())).unwrap();
 
-            assert_slaac_lifetimes_enforced(ctx, &device, entry, valid_until, preferred_until);
+            assert_slaac_lifetimes_enforced(
+                bindings_ctx,
+                &device,
+                entry,
+                valid_until,
+                preferred_until,
+            );
         }
 
         let config = Ipv6::FAKE_CONFIG;
@@ -2894,8 +2908,8 @@ mod tests {
     }
 
     fn receive_neighbor_advertisement_for_duplicate_address(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        ctx: &mut crate::testutil::FakeNonSyncCtx,
+        core_ctx: &mut &crate::testutil::FakeSyncCtx,
+        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         source_ip: UnicastAddr<Ipv6Addr>,
     ) {
@@ -2907,8 +2921,8 @@ mod tests {
 
         let src_ip = source_ip.get();
         receive_ip_packet::<_, _, Ipv6>(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             FrameDestination::Multicast,
             testutil::neighbor_advertisement_ip_packet(

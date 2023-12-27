@@ -63,19 +63,19 @@ where
 {
     fn join_multicast_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     ) {
-        crate::ip::device::join_ip_multicast::<I, _, _>(self, ctx, device, addr)
+        crate::ip::device::join_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
     }
 
     fn leave_multicast_group(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     ) {
-        crate::ip::device::leave_ip_multicast::<I, _, _>(self, ctx, device, addr)
+        crate::ip::device::leave_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
     }
 }

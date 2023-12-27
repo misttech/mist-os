@@ -108,7 +108,7 @@ pub(crate) trait IgmpPacketHandler<C, DeviceId> {
     /// Receive an IGMP message in an IP packet.
     fn receive_igmp_packet<B: BufferMut>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &DeviceId,
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -121,7 +121,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> IgmpPacketHandler<
 {
     fn receive_igmp_packet<B: BufferMut>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &SC::DeviceId,
         _src_ip: Ipv4Addr,
         _dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -145,7 +145,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> IgmpPacketHandler<
                     .map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                         handle_query_message(
                             self,
-                            ctx,
+                            bindings_ctx,
                             device,
                             group_addr,
                             msg.max_response_time().into(),
@@ -155,13 +155,13 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> IgmpPacketHandler<
             IgmpPacket::MembershipReportV1(msg) => {
                 let addr = msg.group_addr();
                 MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
-                    handle_report_message(self, ctx, device, group_addr)
+                    handle_report_message(self, bindings_ctx, device, group_addr)
                 })
             }
             IgmpPacket::MembershipReportV2(msg) => {
                 let addr = msg.group_addr();
                 MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
-                    handle_report_message(self, ctx, device, group_addr)
+                    handle_report_message(self, bindings_ctx, device, group_addr)
                 })
             }
             IgmpPacket::LeaveGroup(_) => {
@@ -225,7 +225,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
 
     fn send_message(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv4Addr>,
         msg_type: GmpMessageType<Igmpv2ProtocolSpecific>,
@@ -235,7 +235,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
                 if v1_router_present {
                     send_igmp_message::<_, _, IgmpMembershipReportV1>(
                         self,
-                        ctx,
+                        bindings_ctx,
                         device,
                         group_addr,
                         group_addr,
@@ -244,7 +244,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
                 } else {
                     send_igmp_message::<_, _, IgmpMembershipReportV2>(
                         self,
-                        ctx,
+                        bindings_ctx,
                         device,
                         group_addr,
                         group_addr,
@@ -254,7 +254,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
             }
             GmpMessageType::Leave => send_igmp_message::<_, _, IgmpLeaveGroup>(
                 self,
-                ctx,
+                bindings_ctx,
                 device,
                 group_addr,
                 Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
@@ -271,10 +271,15 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
         }
     }
 
-    fn run_actions(&mut self, ctx: &mut C, device: &Self::DeviceId, actions: Igmpv2Actions) {
+    fn run_actions(
+        &mut self,
+        bindings_ctx: &mut C,
+        device: &Self::DeviceId,
+        actions: Igmpv2Actions,
+    ) {
         match actions {
             Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
-                let _: Option<C::Instant> = ctx
+                let _: Option<C::Instant> = bindings_ctx
                     .schedule_timer(duration, IgmpTimerId::new_v1_router_present(device.clone()));
             }
         }
@@ -340,9 +345,9 @@ impl<DeviceId> IgmpTimerId<DeviceId> {
 impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>>
     TimerHandler<C, IgmpTimerId<SC::DeviceId>> for SC
 {
-    fn handle_timer(&mut self, ctx: &mut C, timer: IgmpTimerId<SC::DeviceId>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut C, timer: IgmpTimerId<SC::DeviceId>) {
         match timer {
-            IgmpTimerId::Gmp(id) => gmp_handle_timer(self, ctx, id),
+            IgmpTimerId::Gmp(id) => gmp_handle_timer(self, bindings_ctx, id),
             IgmpTimerId::V1RouterPresent { device } => IgmpContext::with_igmp_state_mut(
                 self,
                 &device,
@@ -357,8 +362,8 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>>
 }
 
 fn send_igmp_message<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>, M>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device: &SC::DeviceId,
     group_addr: MulticastAddr<Ipv4Addr>,
     dst_ip: MulticastAddr<Ipv4Addr>,
@@ -379,7 +384,7 @@ where
     // multicast packets to us before an address is available. See RFC 4541 for
     // some details regarding considerations for IGMP/MLD snooping switches.
     let src_ip =
-        sync_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
+        core_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
 
     let body =
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
@@ -392,8 +397,8 @@ where
     };
     let body = body.into_serializer().encapsulate(builder);
 
-    sync_ctx
-        .send_frame(ctx, IgmpPacketMetadata::new(device.clone(), dst_ip), body)
+    core_ctx
+        .send_frame(bindings_ctx, IgmpPacketMetadata::new(device.clone(), dst_ip), body)
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
@@ -746,8 +751,8 @@ mod tests {
         IgmpTimerId::V1RouterPresent { device: FakeDeviceId };
 
     fn receive_igmp_query(
-        sync_ctx: &mut FakeSyncCtx,
-        ctx: &mut FakeNonSyncCtx,
+        core_ctx: &mut FakeSyncCtx,
+        bindings_ctx: &mut FakeNonSyncCtx,
         resp_time: Duration,
     ) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
@@ -755,12 +760,12 @@ mod tests {
             resp_time.try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        sync_ctx.receive_igmp_packet(ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
     }
 
     fn receive_igmp_general_query(
-        sync_ctx: &mut FakeSyncCtx,
-        ctx: &mut FakeNonSyncCtx,
+        core_ctx: &mut FakeSyncCtx,
+        bindings_ctx: &mut FakeNonSyncCtx,
         resp_time: Duration,
     ) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
@@ -768,13 +773,13 @@ mod tests {
             resp_time.try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        sync_ctx.receive_igmp_packet(ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
     }
 
-    fn receive_igmp_report(sync_ctx: &mut FakeSyncCtx, ctx: &mut FakeNonSyncCtx) {
+    fn receive_igmp_report(core_ctx: &mut FakeSyncCtx, bindings_ctx: &mut FakeNonSyncCtx) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipReportV2>::new(GROUP_ADDR.get());
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        sync_ctx.receive_igmp_packet(ctx, &FakeDeviceId, OTHER_HOST_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, OTHER_HOST_ADDR, MY_ADDR, buff);
     }
 
     fn setup_simple_test_environment_with_addr_subnet(
@@ -794,8 +799,8 @@ mod tests {
         )
     }
 
-    fn ensure_ttl_ihl_rtr(sync_ctx: &FakeSyncCtx) {
-        for (_, frame) in sync_ctx.frames() {
+    fn ensure_ttl_ihl_rtr(core_ctx: &FakeSyncCtx) {
+        for (_, frame) in core_ctx.frames() {
             assert_eq!(frame[8], 1); // TTL,
             assert_eq!(&frame[20..24], &[148, 4, 0, 0]); // RTR
             assert_eq!(frame[0], 0x46); // IHL

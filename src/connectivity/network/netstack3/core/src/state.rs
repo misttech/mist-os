@@ -40,9 +40,9 @@ impl StackStateBuilder {
     }
 
     /// Consume this builder and produce a `StackState`.
-    pub(crate) fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> StackState<C> {
+    pub(crate) fn build_with_ctx<C: NonSyncContext>(self, bindings_ctx: &mut C) -> StackState<C> {
         StackState {
-            transport: self.transport.build_with_ctx(ctx),
+            transport: self.transport.build_with_ctx(bindings_ctx),
             ipv4: self.ipv4.build(),
             ipv6: self.ipv6.build(),
             device: DeviceLayerState::new(),

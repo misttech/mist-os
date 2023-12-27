@@ -294,8 +294,8 @@ impl<L: LinkUnicastAddress, DeviceId: Clone, I: Ip, Instant> Event<L, DeviceId, 
 }
 
 fn schedule_timer_if_should_retransmit<I, D, DeviceId, SC, C>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &DeviceId,
     neighbor: SpecifiedAddr<I::Addr>,
     event: NudEvent,
@@ -311,9 +311,9 @@ where
     match counter {
         Some(c) => {
             *counter = NonZeroU16::new(c.get() - 1);
-            let retransmit_timeout = sync_ctx.retransmit_timeout();
+            let retransmit_timeout = core_ctx.retransmit_timeout();
             assert_eq!(
-                ctx.schedule_timer(
+                bindings_ctx.schedule_timer(
                     retransmit_timeout.get(),
                     NudTimerId::neighbor(device_id.clone(), neighbor, event)
                 ),
@@ -362,8 +362,8 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Drop for Incomplete<D, N> {
 
 impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     fn new_with_pending_frame<I, SC, C, DeviceId>(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         frame: Buf<Vec<u8>>,
@@ -376,7 +376,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         DeviceId: StrongId,
     {
         let mut this = Incomplete {
-            transmit_counter: Some(sync_ctx.max_multicast_solicit()),
+            transmit_counter: Some(core_ctx.max_multicast_solicit()),
             pending_frames: [frame].into(),
             notifiers: Vec::new(),
             _marker: PhantomData,
@@ -384,14 +384,19 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         // NB: transmission of a neighbor probe on entering INCOMPLETE (and subsequent
         // retransmissions) is done by `handle_timer`, as it need not be done with the
         // neighbor table lock held.
-        assert!(this.schedule_timer_if_should_retransmit(sync_ctx, ctx, device_id, neighbor));
+        assert!(this.schedule_timer_if_should_retransmit(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            neighbor
+        ));
 
         this
     }
 
     fn new_with_notifier<I, SC, C, DeviceId>(
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         notifier: C::Notifier,
@@ -404,7 +409,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         DeviceId: StrongId,
     {
         let mut this = Incomplete {
-            transmit_counter: Some(sync_ctx.max_multicast_solicit()),
+            transmit_counter: Some(core_ctx.max_multicast_solicit()),
             pending_frames: VecDeque::new(),
             notifiers: [notifier].into(),
             _marker: PhantomData,
@@ -412,15 +417,20 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         // NB: transmission of a neighbor probe on entering INCOMPLETE (and subsequent
         // retransmissions) is done by `handle_timer`, as it need not be done with the
         // neighbor table lock held.
-        assert!(this.schedule_timer_if_should_retransmit(sync_ctx, ctx, device_id, neighbor));
+        assert!(this.schedule_timer_if_should_retransmit(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            neighbor
+        ));
 
         this
     }
 
     fn schedule_timer_if_should_retransmit<I, DeviceId, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> bool
@@ -433,8 +443,8 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     {
         let Self { transmit_counter, pending_frames: _, notifiers: _, _marker } = self;
         schedule_timer_if_should_retransmit(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device_id,
             neighbor,
             NudEvent::RetransmitMulticastProbe,
@@ -470,8 +480,8 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     /// that link address resolution is complete.
     fn complete_resolution<I, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         link_address: D::Address,
     ) where
         I: Ip,
@@ -492,11 +502,11 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
             // Ignore any errors on sending the IP packet, because a failure at this point
             // is not actionable for the caller: failing to send a previously-queued packet
             // doesn't mean that updating the neighbor entry should fail.
-            sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, link_address, body).unwrap_or_else(
-                |_: Buf<Vec<u8>>| {
+            core_ctx
+                .send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)
+                .unwrap_or_else(|_: Buf<Vec<u8>>| {
                     tracing::error!("failed to send pending IP packet to neighbor {link_address:?}")
-                },
-            )
+                })
         }
         for notifier in notifiers.drain(..) {
             notifier.notify(Ok(link_address));
@@ -520,7 +530,7 @@ pub(crate) struct Stale<D: LinkDevice> {
 impl<D: LinkDevice> Stale<D> {
     fn enter_delay<I, C, DeviceId: Clone>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> Delay<D>
@@ -533,7 +543,7 @@ impl<D: LinkDevice> Stale<D> {
         // Start a timer to transition into PROBE after DELAY_FIRST_PROBE seconds if no
         // packets are sent to this neighbor.
         assert_eq!(
-            ctx.schedule_timer(
+            bindings_ctx.schedule_timer(
                 DELAY_FIRST_PROBE_TIME.get(),
                 NudTimerId::neighbor(device_id.clone(), neighbor, NudEvent::DelayFirstProbe),
             ),
@@ -553,8 +563,8 @@ pub(crate) struct Delay<D: LinkDevice> {
 impl<D: LinkDevice> Delay<D> {
     fn enter_probe<I, DeviceId, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> Probe<D>
@@ -569,9 +579,9 @@ impl<D: LinkDevice> Delay<D> {
         // NB: transmission of a neighbor probe on entering PROBE (and subsequent
         // retransmissions) is done by `handle_timer`, as it need not be done with the
         // neighbor table lock held.
-        let retransmit_timeout = sync_ctx.retransmit_timeout();
+        let retransmit_timeout = core_ctx.retransmit_timeout();
         assert_eq!(
-            ctx.schedule_timer(
+            bindings_ctx.schedule_timer(
                 retransmit_timeout.get(),
                 NudTimerId::neighbor(device_id.clone(), neighbor, NudEvent::RetransmitUnicastProbe)
             ),
@@ -580,7 +590,7 @@ impl<D: LinkDevice> Delay<D> {
 
         Probe {
             link_address,
-            transmit_counter: NonZeroU16::new(sync_ctx.max_unicast_solicit().get() - 1),
+            transmit_counter: NonZeroU16::new(core_ctx.max_unicast_solicit().get() - 1),
         }
     }
 }
@@ -595,8 +605,8 @@ pub(crate) struct Probe<D: LinkDevice> {
 impl<D: LinkDevice> Probe<D> {
     fn schedule_timer_if_should_retransmit<I, DeviceId, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> bool
@@ -608,8 +618,8 @@ impl<D: LinkDevice> Probe<D> {
     {
         let Self { link_address: _, transmit_counter } = self;
         schedule_timer_if_should_retransmit(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device_id,
             neighbor,
             NudEvent::RetransmitUnicastProbe,
@@ -619,7 +629,7 @@ impl<D: LinkDevice> Probe<D> {
 
     fn enter_unreachable<I, C, DeviceId>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         num_entries: usize,
         last_gc: &mut Option<C::Instant>,
@@ -632,7 +642,7 @@ impl<D: LinkDevice> Probe<D> {
         // This entry is deemed discardable now that it is not in active use; schedule
         // garbage collection for the neighbor table if we are currently over the
         // maximum amount of entries.
-        maybe_schedule_gc(ctx, device_id, num_entries, last_gc);
+        maybe_schedule_gc(bindings_ctx, device_id, num_entries, last_gc);
 
         let Self { link_address, transmit_counter: _ } = self;
         Unreachable { link_address: *link_address, mode: UnreachableMode::WaitingForPacketSend }
@@ -670,7 +680,7 @@ impl UnreachableMode {
     /// so far, as defined in [RFC 7048 section 4].
     ///
     /// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
-    fn next_backoff_retransmit_timeout<I, SC>(&self, sync_ctx: &mut SC) -> NonZeroDuration
+    fn next_backoff_retransmit_timeout<I, SC>(&self, core_ctx: &mut SC) -> NonZeroDuration
     where
         I: Ip,
         SC: NudConfigContext<I>,
@@ -684,7 +694,7 @@ impl UnreachableMode {
         // TODO(https://fxbug.dev/133437): vary this retransmit timeout by some random
         // "jitter factor" to avoid synchronization of transmissions from different
         // hosts.
-        (sync_ctx.retransmit_timeout() * BACKOFF_MULTIPLE.saturating_pow(probes_sent.get()))
+        (core_ctx.retransmit_timeout() * BACKOFF_MULTIPLE.saturating_pow(probes_sent.get()))
             .min(MAX_RETRANS_TIMER)
     }
 }
@@ -692,8 +702,8 @@ impl UnreachableMode {
 impl<D: LinkDevice> Unreachable<D> {
     fn handle_timer<I, DeviceId, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> Option<TransmitProbe<D::Address>>
@@ -722,9 +732,9 @@ impl<D: LinkDevice> Unreachable<D> {
                     *probes_sent = probes_sent.saturating_add(1);
                     *packet_sent = false;
 
-                    let duration = mode.next_backoff_retransmit_timeout(sync_ctx);
+                    let duration = mode.next_backoff_retransmit_timeout(core_ctx);
                     assert_eq!(
-                        ctx.schedule_timer(
+                        bindings_ctx.schedule_timer(
                             duration.into(),
                             NudTimerId::neighbor(
                                 device_id.clone(),
@@ -751,8 +761,8 @@ impl<D: LinkDevice> Unreachable<D> {
     /// Returns whether a multicast neighbor probe should be sent as a result.
     fn handle_packet_queued_to_send<I, DeviceId, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> bool
@@ -782,9 +792,9 @@ impl<D: LinkDevice> Unreachable<D> {
                 let probes_sent = NonZeroU32::new(1).unwrap();
                 *mode = UnreachableMode::Backoff { probes_sent, packet_sent: false };
 
-                let duration = mode.next_backoff_retransmit_timeout(sync_ctx);
+                let duration = mode.next_backoff_retransmit_timeout(core_ctx);
                 assert_eq!(
-                    ctx.schedule_timer(
+                    bindings_ctx.schedule_timer(
                         duration.into(),
                         NudTimerId::neighbor(
                             device_id.clone(),
@@ -824,7 +834,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> NeighborState<D
 impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighborState<D, Time, N> {
     fn cancel_timer<I, C, DeviceId>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) where
@@ -840,7 +850,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                 _marker,
             }) => {
                 assert_ne!(
-                    ctx.cancel_timer(NudTimerId::neighbor(
+                    bindings_ctx.cancel_timer(NudTimerId::neighbor(
                         device_id.clone(),
                         neighbor,
                         NudEvent::RetransmitMulticastProbe,
@@ -854,7 +864,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                 last_confirmed_at: _,
             }) => {
                 assert_ne!(
-                    ctx.cancel_timer(NudTimerId::neighbor(
+                    bindings_ctx.cancel_timer(NudTimerId::neighbor(
                         device_id.clone(),
                         neighbor,
                         NudEvent::ReachableTime,
@@ -866,7 +876,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
             DynamicNeighborState::Stale(Stale { link_address: _ }) => {}
             DynamicNeighborState::Delay(Delay { link_address: _ }) => {
                 assert_ne!(
-                    ctx.cancel_timer(NudTimerId::neighbor(
+                    bindings_ctx.cancel_timer(NudTimerId::neighbor(
                         device_id.clone(),
                         neighbor,
                         NudEvent::DelayFirstProbe,
@@ -877,7 +887,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
             }
             DynamicNeighborState::Probe(Probe { link_address: _, transmit_counter: _ }) => {
                 assert_ne!(
-                    ctx.cancel_timer(NudTimerId::neighbor(
+                    bindings_ctx.cancel_timer(NudTimerId::neighbor(
                         device_id.clone(),
                         neighbor,
                         NudEvent::RetransmitUnicastProbe,
@@ -893,7 +903,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                     UnreachableMode::WaitingForPacketSend => {}
                     UnreachableMode::Backoff { probes_sent: _, packet_sent: _ } => {
                         assert_ne!(
-                            ctx.cancel_timer(NudTimerId::neighbor(
+                            bindings_ctx.cancel_timer(NudTimerId::neighbor(
                                 device_id.clone(),
                                 neighbor,
                                 NudEvent::RetransmitMulticastProbe,
@@ -909,8 +919,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
 
     fn cancel_timer_and_complete_resolution<I, SC, C>(
         mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -919,11 +929,11 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         C: NonSyncContext<I, D, SC::DeviceId>,
         SC: NudSenderContext<I, D, C>,
     {
-        self.cancel_timer(ctx, device_id, neighbor);
+        self.cancel_timer(bindings_ctx, device_id, neighbor);
 
         match self {
             DynamicNeighborState::Incomplete(mut incomplete) => {
-                incomplete.complete_resolution(sync_ctx, ctx, link_address);
+                incomplete.complete_resolution(core_ctx, bindings_ctx, link_address);
             }
             DynamicNeighborState::Reachable(_)
             | DynamicNeighborState::Stale(_)
@@ -953,8 +963,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     // Enters reachable state.
     fn enter_reachable<I, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -965,7 +975,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     {
         // TODO(https://fxbug.dev/124960): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
-        let now = ctx.now();
+        let now = bindings_ctx.now();
         match self {
             // If this neighbor entry is already in REACHABLE, rather than proactively
             // rescheduling the timer (which can be a relatively expensive operation
@@ -992,16 +1002,16 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         let event_dynamic_state = self.to_event_dynamic_state();
         debug_assert_ne!(previous.to_event_dynamic_state(), event_dynamic_state);
         let event_state = EventState::Dynamic(event_dynamic_state);
-        ctx.on_event(Event::changed(device_id, event_state, neighbor, ctx.now()));
+        bindings_ctx.on_event(Event::changed(device_id, event_state, neighbor, bindings_ctx.now()));
         previous.cancel_timer_and_complete_resolution(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device_id,
             neighbor,
             link_address,
         );
         assert_eq!(
-            ctx.schedule_timer(
+            bindings_ctx.schedule_timer(
                 REACHABLE_TIME.get(),
                 NudTimerId::neighbor(device_id.clone(), neighbor, NudEvent::ReachableTime),
             ),
@@ -1018,8 +1028,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     // actually changes.
     fn enter_stale<I, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -1037,10 +1047,10 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         let event_dynamic_state = self.to_event_dynamic_state();
         debug_assert_ne!(previous.to_event_dynamic_state(), event_dynamic_state);
         let event_state = EventState::Dynamic(event_dynamic_state);
-        ctx.on_event(Event::changed(device_id, event_state, neighbor, ctx.now()));
+        bindings_ctx.on_event(Event::changed(device_id, event_state, neighbor, bindings_ctx.now()));
         previous.cancel_timer_and_complete_resolution(
-            sync_ctx,
-            ctx,
+            core_ctx,
+            bindings_ctx,
             device_id,
             neighbor,
             link_address,
@@ -1049,7 +1059,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         // This entry is deemed discardable now that it is not in active use; schedule
         // garbage collection for the neighbor table if we are currently over the
         // maximum amount of entries.
-        maybe_schedule_gc(ctx, device_id, num_entries, last_gc);
+        maybe_schedule_gc(bindings_ctx, device_id, num_entries, last_gc);
 
         // Stale entries don't do anything until an outgoing packet is queued for
         // transmission.
@@ -1062,8 +1072,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     /// Also returns whether a multicast neighbor probe should be sent as a result.
     fn resolve_link_addr<I, DeviceId, C, SC>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> (
@@ -1100,10 +1110,16 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                 // sending neighbor probes to confirm reachability is likely to be useful given
                 // a client is attempting to resolve this neighbor. Additionally, this maintains
                 // consistency with Netstack2's behavior.
-                let delay @ Delay { link_address } = entry.enter_delay(ctx, device_id, neighbor);
+                let delay @ Delay { link_address } =
+                    entry.enter_delay(bindings_ctx, device_id, neighbor);
                 *self = DynamicNeighborState::Delay(delay);
                 let event_state = EventState::Dynamic(self.to_event_dynamic_state());
-                ctx.on_event(Event::changed(device_id, event_state, neighbor, ctx.now()));
+                bindings_ctx.on_event(Event::changed(
+                    device_id,
+                    event_state,
+                    neighbor,
+                    bindings_ctx.now(),
+                ));
 
                 (LinkResolutionResult::Resolved(link_address), false)
             }
@@ -1117,8 +1133,12 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                 let link_address = *link_address;
 
                 // Advance the state machine as if a packet had been sent to this neighbor.
-                let do_multicast_solicit =
-                    unreachable.handle_packet_queued_to_send(sync_ctx, ctx, device_id, neighbor);
+                let do_multicast_solicit = unreachable.handle_packet_queued_to_send(
+                    core_ctx,
+                    bindings_ctx,
+                    device_id,
+                    neighbor,
+                );
                 (LinkResolutionResult::Resolved(link_address), do_multicast_solicit)
             }
         }
@@ -1131,8 +1151,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     /// Returns whether a multicast neighbor probe should be sent as a result.
     fn handle_packet_queued_to_send<I, C, SC, S>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
@@ -1164,28 +1184,38 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
                 //   expire in DELAY_FIRST_PROBE_TIME seconds.
                 //
                 // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
-                let delay @ Delay { link_address } = entry.enter_delay(ctx, device_id, neighbor);
+                let delay @ Delay { link_address } =
+                    entry.enter_delay(bindings_ctx, device_id, neighbor);
                 *self = DynamicNeighborState::Delay(delay);
                 let event_state = EventState::Dynamic(self.to_event_dynamic_state());
-                ctx.on_event(Event::changed(device_id, event_state, neighbor, ctx.now()));
+                bindings_ctx.on_event(Event::changed(
+                    device_id,
+                    event_state,
+                    neighbor,
+                    bindings_ctx.now(),
+                ));
 
-                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)?;
 
                 Ok(false)
             }
             DynamicNeighborState::Reachable(Reachable { link_address, last_confirmed_at: _ })
             | DynamicNeighborState::Delay(Delay { link_address })
             | DynamicNeighborState::Probe(Probe { link_address, transmit_counter: _ }) => {
-                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, *link_address, body)?;
 
                 Ok(false)
             }
             DynamicNeighborState::Unreachable(unreachable) => {
                 let Unreachable { link_address, mode: _ } = unreachable;
-                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, *link_address, body)?;
 
-                let do_multicast_solicit =
-                    unreachable.handle_packet_queued_to_send(sync_ctx, ctx, device_id, neighbor);
+                let do_multicast_solicit = unreachable.handle_packet_queued_to_send(
+                    core_ctx,
+                    bindings_ctx,
+                    device_id,
+                    neighbor,
+                );
                 Ok(do_multicast_solicit)
             }
         }
@@ -1193,8 +1223,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
 
     fn handle_probe<I, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -1228,8 +1258,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         };
         if transition_to_stale {
             self.enter_stale(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 device_id,
                 neighbor,
                 link_address,
@@ -1241,8 +1271,8 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
 
     fn handle_confirmation<I, SC, C>(
         &mut self,
-        sync_ctx: &mut SC,
-        ctx: &mut C,
+        core_ctx: &mut SC,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -1338,11 +1368,11 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         };
         match new_state {
             Some(NewState::Reachable { link_address }) => {
-                self.enter_reachable(sync_ctx, ctx, device_id, neighbor, link_address)
+                self.enter_reachable(core_ctx, bindings_ctx, device_id, neighbor, link_address)
             }
             Some(NewState::Stale { link_address }) => self.enter_stale(
-                sync_ctx,
-                ctx,
+                core_ctx,
+                bindings_ctx,
                 device_id,
                 neighbor,
                 link_address,
@@ -1364,12 +1394,12 @@ pub(crate) mod testutil {
         C: NonSyncContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     >(
-        sync_ctx: &mut SC,
+        core_ctx: &mut SC,
         device_id: SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         expected_link_addr: D::Address,
     ) {
-        sync_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
+        core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
             assert_matches!(
                 neighbors.get(&neighbor),
                 Some(NeighborState::Dynamic(
@@ -1383,7 +1413,7 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn assert_dynamic_neighbor_state<I, D, C, SC>(
-        sync_ctx: &mut SC,
+        core_ctx: &mut SC,
         device_id: SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         expected_state: DynamicNeighborState<D, C::Instant, C::Notifier>,
@@ -1393,7 +1423,7 @@ pub(crate) mod testutil {
         C: NonSyncContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     {
-        sync_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
+        core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
             assert_matches!(
                 neighbors.get(&neighbor),
                 Some(NeighborState::Dynamic(state)) => {
@@ -1409,11 +1439,11 @@ pub(crate) mod testutil {
         C: NonSyncContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     >(
-        sync_ctx: &mut SC,
+        core_ctx: &mut SC,
         device_id: SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) {
-        sync_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
+        core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc: _ }, _config| {
             assert_matches!(neighbors.get(&neighbor), None)
         })
     }
@@ -1589,7 +1619,7 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, Self::
     /// address; if it is `None`, the message will be multicast.
     fn send_neighbor_solicitation(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         lookup_addr: SpecifiedAddr<I::Addr>,
         remote_link_addr: Option<D::Address>,
@@ -1685,7 +1715,7 @@ pub(crate) trait NudSenderContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, 
     /// Send an IP frame to the neighbor with the specified link address.
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         neighbor_link_addr: D::Address,
         body: S,
     ) -> Result<(), S>
@@ -1702,7 +1732,7 @@ pub(crate) trait NudIpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Advertisement message.
     fn handle_neighbor_probe(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
@@ -1713,7 +1743,7 @@ pub(crate) trait NudIpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// For IPv6, this can be an NDP Neighbor Advertisement.
     fn handle_neighbor_confirmation(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
@@ -1721,7 +1751,7 @@ pub(crate) trait NudIpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     );
 
     /// Clears the neighbor table.
-    fn flush_neighbor_table(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+    fn flush_neighbor_table(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
 }
 
 /// Specifies the link-layer address of a neighbor.
@@ -1741,7 +1771,7 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     /// response to the source packet.
     fn handle_neighbor_update(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
         // disallow the address with all host bits equal to 0, and the
@@ -1762,7 +1792,7 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     /// Dynamic updates for the neighbor will be ignored for static entries.
     fn set_static_neighbor(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
         // disallow the address with all host bits equal to 0, and the
@@ -1776,7 +1806,7 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     /// Deletes a static or dynamic neighbor entry.
     fn delete_neighbor(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
         // disallow subnet and subnet broadcast addresses.
@@ -1785,12 +1815,12 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     ) -> Result<(), NotFoundError>;
 
     /// Clears the neighbor table.
-    fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+    fn flush(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
 
     /// Resolve the link-address of a device's neighbor.
     fn resolve_link_addr(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &Self::DeviceId,
         // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
         // disallow subnet and subnet broadcast addresses.
@@ -1807,7 +1837,7 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     /// is performed.
     fn send_ip_packet_to_neighbor<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
@@ -1827,21 +1857,21 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 {
     fn handle_timer(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         NudTimerId(device_id, timer): NudTimerId<I, D, SC::DeviceId>,
     ) {
         match timer {
-            NudTimerInner::GarbageCollection => collect_garbage(self, ctx, &device_id),
+            NudTimerInner::GarbageCollection => collect_garbage(self, bindings_ctx, &device_id),
             NudTimerInner::Neighbor { lookup_addr, event, _marker } => {
-                handle_neighbor_timer(self, ctx, &device_id, lookup_addr, event)
+                handle_neighbor_timer(self, bindings_ctx, &device_id, lookup_addr, event)
             }
         }
     }
 }
 
 fn handle_neighbor_timer<I, D, SC, C>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     lookup_addr: SpecifiedAddr<I::Addr>,
     event: NudEvent,
@@ -1852,7 +1882,7 @@ fn handle_neighbor_timer<I, D, SC, C>(
     SC: NudContext<I, D, C>,
 {
     let action =
-        sync_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc }, sync_ctx| {
+        core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc }, sync_ctx| {
             let num_entries = neighbors.len();
             let mut entry = match neighbors.entry(lookup_addr) {
                 Entry::Occupied(entry) => entry,
@@ -1865,7 +1895,7 @@ fn handle_neighbor_timer<I, D, SC, C>(
 
                     if incomplete.schedule_timer_if_should_retransmit(
                         sync_ctx,
-                        ctx,
+                        bindings_ctx,
                         &device_id,
                         lookup_addr,
                     ) {
@@ -1882,7 +1912,11 @@ fn handle_neighbor_timer<I, D, SC, C>(
                             "neighbor resolution failed for {lookup_addr}; removing entry"
                         );
                         let _: NeighborState<_, _, _> = entry.remove();
-                        ctx.on_event(Event::removed(device_id, lookup_addr, ctx.now()));
+                        bindings_ctx.on_event(Event::removed(
+                            device_id,
+                            lookup_addr,
+                            bindings_ctx.now(),
+                        ));
                         None
                     }
                 }
@@ -1893,25 +1927,26 @@ fn handle_neighbor_timer<I, D, SC, C>(
                     let link_address = *link_address;
                     if probe.schedule_timer_if_should_retransmit(
                         sync_ctx,
-                        ctx,
+                        bindings_ctx,
                         &device_id,
                         lookup_addr,
                     ) {
                         Some(TransmitProbe::Unicast(link_address))
                     } else {
                         let unreachable =
-                            probe.enter_unreachable(ctx, &device_id, num_entries, last_gc);
+                            probe.enter_unreachable(bindings_ctx, &device_id, num_entries, last_gc);
                         *entry.get_mut() =
                             NeighborState::Dynamic(DynamicNeighborState::Unreachable(unreachable));
                         let event_state = entry.get_mut().to_event_state();
-                        let event = Event::changed(device_id, event_state, lookup_addr, ctx.now());
-                        ctx.on_event(event);
+                        let event =
+                            Event::changed(device_id, event_state, lookup_addr, bindings_ctx.now());
+                        bindings_ctx.on_event(event);
                         None
                     }
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Unreachable(unreachable)) => {
                     assert_eq!(event, NudEvent::RetransmitMulticastProbe);
-                    unreachable.handle_timer(sync_ctx, ctx, &device_id, lookup_addr)
+                    unreachable.handle_timer(sync_ctx, bindings_ctx, &device_id, lookup_addr)
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address,
@@ -1921,9 +1956,9 @@ fn handle_neighbor_timer<I, D, SC, C>(
                     let link_address = *link_address;
 
                     let expiration = last_confirmed_at.add(REACHABLE_TIME.get());
-                    if expiration > ctx.now() {
+                    if expiration > bindings_ctx.now() {
                         assert_eq!(
-                            ctx.schedule_timer_instant(
+                            bindings_ctx.schedule_timer_instant(
                                 expiration,
                                 NudTimerId::neighbor(
                                     device_id.clone(),
@@ -1946,13 +1981,14 @@ fn handle_neighbor_timer<I, D, SC, C>(
                                 link_address,
                             }));
                         let event_state = entry.get_mut().to_event_state();
-                        let event = Event::changed(device_id, event_state, lookup_addr, ctx.now());
-                        ctx.on_event(event);
+                        let event =
+                            Event::changed(device_id, event_state, lookup_addr, bindings_ctx.now());
+                        bindings_ctx.on_event(event);
 
                         // This entry is deemed discardable now that it is not in active use;
                         // schedule garbage collection for the neighbor table if we are currently
                         // over the maximum amount of entries.
-                        maybe_schedule_gc(ctx, device_id, num_entries, last_gc);
+                        maybe_schedule_gc(bindings_ctx, device_id, num_entries, last_gc);
                     }
 
                     None
@@ -1967,10 +2003,15 @@ fn handle_neighbor_timer<I, D, SC, C>(
                     //
                     // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
                     let probe @ Probe { link_address, transmit_counter: _ } =
-                        delay.enter_probe(sync_ctx, ctx, &device_id, lookup_addr);
+                        delay.enter_probe(sync_ctx, bindings_ctx, &device_id, lookup_addr);
                     *entry.get_mut() = NeighborState::Dynamic(DynamicNeighborState::Probe(probe));
                     let event_state = entry.get_mut().to_event_state();
-                    ctx.on_event(Event::changed(device_id, event_state, lookup_addr, ctx.now()));
+                    bindings_ctx.on_event(Event::changed(
+                        device_id,
+                        event_state,
+                        lookup_addr,
+                        bindings_ctx.now(),
+                    ));
 
                     Some(TransmitProbe::Unicast(link_address))
                 }
@@ -1983,10 +2024,15 @@ fn handle_neighbor_timer<I, D, SC, C>(
 
     match action {
         Some(TransmitProbe::Multicast) => {
-            sync_ctx.send_neighbor_solicitation(ctx, &device_id, lookup_addr, None);
+            core_ctx.send_neighbor_solicitation(bindings_ctx, &device_id, lookup_addr, None);
         }
         Some(TransmitProbe::Unicast(link_addr)) => {
-            sync_ctx.send_neighbor_solicitation(ctx, &device_id, lookup_addr, Some(link_addr));
+            core_ctx.send_neighbor_solicitation(
+                bindings_ctx,
+                &device_id,
+                lookup_addr,
+                Some(link_addr),
+            );
         }
         None => {}
     }
@@ -1997,7 +2043,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 {
     fn handle_neighbor_update(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -2025,13 +2071,13 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                                 device_id,
                                 state.to_event_state(),
                                 neighbor,
-                                ctx.now(),
+                                bindings_ctx.now(),
                             );
-                            ctx.on_event(event);
+                            bindings_ctx.on_event(event);
 
                             // This entry is not currently in active use; if we are currently over
                             // the maximum amount of entries, schedule garbage collection.
-                            maybe_schedule_gc(ctx, device_id, neighbors.len(), last_gc);
+                            maybe_schedule_gc(bindings_ctx, device_id, neighbors.len(), last_gc);
                         }
                         // Per [RFC 4861 section 7.2.5] ("Receipt of Neighbor Advertisements"):
                         //
@@ -2047,7 +2093,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                         NeighborState::Dynamic(e) => match source {
                             DynamicNeighborUpdateSource::Probe => e.handle_probe(
                                 sync_ctx,
-                                ctx,
+                                bindings_ctx,
                                 device_id,
                                 neighbor,
                                 link_address,
@@ -2057,7 +2103,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                             DynamicNeighborUpdateSource::Confirmation(flags) => e
                                 .handle_confirmation(
                                     sync_ctx,
-                                    ctx,
+                                    bindings_ctx,
                                     device_id,
                                     neighbor,
                                     link_address,
@@ -2075,7 +2121,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 
     fn set_static_neighbor(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
@@ -2088,13 +2134,18 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                         core::mem::replace(occupied.get_mut(), NeighborState::Static(link_address));
                     let event_state = occupied.get().to_event_state();
                     if event_state != previous.to_event_state() {
-                        ctx.on_event(Event::changed(device_id, event_state, neighbor, ctx.now()));
+                        bindings_ctx.on_event(Event::changed(
+                            device_id,
+                            event_state,
+                            neighbor,
+                            bindings_ctx.now(),
+                        ));
                     }
                     match previous {
                         NeighborState::Dynamic(entry) => {
                             entry.cancel_timer_and_complete_resolution(
                                 sync_ctx,
-                                ctx,
+                                bindings_ctx,
                                 device_id,
                                 neighbor,
                                 link_address,
@@ -2105,9 +2156,13 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                 }
                 Entry::Vacant(vacant) => {
                     let state = vacant.insert(NeighborState::Static(link_address));
-                    let event =
-                        Event::added(device_id, state.to_event_state(), neighbor, ctx.now());
-                    ctx.on_event(event);
+                    let event = Event::added(
+                        device_id,
+                        state.to_event_state(),
+                        neighbor,
+                        bindings_ctx.now(),
+                    );
+                    bindings_ctx.on_event(event);
                 }
             },
         );
@@ -2115,39 +2170,39 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 
     fn delete_neighbor(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     ) -> Result<(), NotFoundError> {
         self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
             match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
                 NeighborState::Dynamic(mut entry) => {
-                    entry.cancel_timer(ctx, device_id, neighbor);
+                    entry.cancel_timer(bindings_ctx, device_id, neighbor);
                 }
                 NeighborState::Static(_) => {}
             }
-            ctx.on_event(Event::removed(device_id, neighbor, ctx.now()));
+            bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
             Ok(())
         })
     }
 
-    fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
+    fn flush(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId) {
         self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
             neighbors.drain().for_each(|(neighbor, state)| {
                 match state {
                     NeighborState::Dynamic(mut entry) => {
-                        entry.cancel_timer(ctx, device_id, neighbor);
+                        entry.cancel_timer(bindings_ctx, device_id, neighbor);
                     }
                     NeighborState::Static(_) => {}
                 }
-                ctx.on_event(Event::removed(device_id, neighbor, ctx.now()));
+                bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
             });
         });
     }
 
     fn resolve_link_addr(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device: &SC::DeviceId,
         dst: &SpecifiedAddr<I::Addr>,
     ) -> LinkResolutionResult<D::Address, <C::Notifier as LinkResolutionNotifier<D>>::Observer>
@@ -2160,10 +2215,19 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                         let (notifier, observer) = C::Notifier::new();
                         let state = entry.insert(NeighborState::Dynamic(
                             DynamicNeighborState::Incomplete(Incomplete::new_with_notifier(
-                                sync_ctx, ctx, device, *dst, notifier,
+                                sync_ctx,
+                                bindings_ctx,
+                                device,
+                                *dst,
+                                notifier,
                             )),
                         ));
-                        ctx.on_event(Event::added(device, state.to_event_state(), *dst, ctx.now()));
+                        bindings_ctx.on_event(Event::added(
+                            device,
+                            state.to_event_state(),
+                            *dst,
+                            bindings_ctx.now(),
+                        ));
                         (LinkResolutionResult::Pending(observer), true)
                     }
                     Entry::Occupied(e) => match e.into_mut() {
@@ -2171,14 +2235,14 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                             (LinkResolutionResult::Resolved(*link_address), false)
                         }
                         NeighborState::Dynamic(e) => {
-                            e.resolve_link_addr(sync_ctx, ctx, device, *dst)
+                            e.resolve_link_addr(sync_ctx, bindings_ctx, device, *dst)
                         }
                     },
                 }
             });
 
         if do_multicast_solicit {
-            self.send_neighbor_solicitation(ctx, &device, *dst, /* multicast */ None);
+            self.send_neighbor_solicitation(bindings_ctx, &device, *dst, /* multicast */ None);
         }
 
         result
@@ -2186,7 +2250,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 
     fn send_ip_packet_to_neighbor<S>(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         lookup_addr: SpecifiedAddr<I::Addr>,
         body: S,
@@ -2203,7 +2267,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                         let state = e.insert(NeighborState::Dynamic(
                             DynamicNeighborState::Incomplete(Incomplete::new_with_pending_frame(
                                 sync_ctx,
-                                ctx,
+                                bindings_ctx,
                                 device_id,
                                 lookup_addr,
                                 body.serialize_vec_outer()
@@ -2212,9 +2276,13 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                                     .into_inner(),
                             )),
                         ));
-                        let event =
-                            Event::added(device_id, state.to_event_state(), lookup_addr, ctx.now());
-                        ctx.on_event(event);
+                        let event = Event::added(
+                            device_id,
+                            state.to_event_state(),
+                            lookup_addr,
+                            bindings_ctx.now(),
+                        );
+                        bindings_ctx.on_event(event);
 
                         Ok(true)
                     }
@@ -2229,7 +2297,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                                 // packet is sent out, resulting in out-of-order transmission to the
                                 // device.
                                 sync_ctx.send_ip_packet_to_neighbor_link_addr(
-                                    ctx,
+                                    bindings_ctx,
                                     *link_address,
                                     body,
                                 )?;
@@ -2239,7 +2307,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
                             NeighborState::Dynamic(e) => {
                                 let do_multicast_solicit = e.handle_packet_queued_to_send(
                                     sync_ctx,
-                                    ctx,
+                                    bindings_ctx,
                                     device_id,
                                     lookup_addr,
                                     body,
@@ -2255,7 +2323,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 
         if do_multicast_solicit {
             self.send_neighbor_solicitation(
-                ctx,
+                bindings_ctx,
                 &device_id,
                 lookup_addr,
                 /* multicast */ None,
@@ -2269,8 +2337,8 @@ impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext
 /// Confirm upper-layer forward reachability to the specified neighbor through
 /// the specified device.
 pub(crate) fn confirm_reachable<I, D, SC, C>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
     neighbor: SpecifiedAddr<I::Addr>,
 ) where
@@ -2279,7 +2347,7 @@ pub(crate) fn confirm_reachable<I, D, SC, C>(
     C: NonSyncContext<I, D, SC::DeviceId>,
     SC: NudContext<I, D, C>,
 {
-    sync_ctx.with_nud_state_mut_and_sender_ctx(
+    core_ctx.with_nud_state_mut_and_sender_ctx(
         device_id,
         |NudState { neighbors, last_gc: _ }, sync_ctx| {
             match neighbors.entry(neighbor) {
@@ -2318,7 +2386,13 @@ pub(crate) fn confirm_reachable<I, D, SC, C>(
                                 mode: _,
                             }) => *link_address,
                         };
-                        e.enter_reachable(sync_ctx, ctx, device_id, neighbor, link_address);
+                        e.enter_reachable(
+                            sync_ctx,
+                            bindings_ctx,
+                            device_id,
+                            neighbor,
+                            link_address,
+                        );
                     }
                 },
             }
@@ -2327,7 +2401,7 @@ pub(crate) fn confirm_reachable<I, D, SC, C>(
 }
 
 fn maybe_schedule_gc<I, D, C, DeviceId: Clone>(
-    ctx: &mut C,
+    bindings_ctx: &mut C,
     device_id: &DeviceId,
     num_entries: usize,
     last_gc: &mut Option<C::Instant>,
@@ -2337,11 +2411,13 @@ fn maybe_schedule_gc<I, D, C, DeviceId: Clone>(
     C: NonSyncContext<I, D, DeviceId>,
 {
     if num_entries > MAX_ENTRIES
-        && ctx.scheduled_instant(NudTimerId::garbage_collection(device_id.clone())).is_none()
+        && bindings_ctx
+            .scheduled_instant(NudTimerId::garbage_collection(device_id.clone()))
+            .is_none()
     {
         let delay = if let Some(last_gc) = last_gc {
             let next_gc = last_gc.add(MIN_GARBAGE_COLLECTION_INTERVAL.get());
-            next_gc.saturating_duration_since(ctx.now())
+            next_gc.saturating_duration_since(bindings_ctx.now())
         } else {
             core::time::Duration::ZERO
         };
@@ -2354,7 +2430,7 @@ fn maybe_schedule_gc<I, D, C, DeviceId: Clone>(
         //  (1) checking if the GC timer is scheduled
         //  (2) scheduling a timer if it is not
         assert_eq!(
-            ctx.schedule_timer(delay, NudTimerId::garbage_collection(device_id.clone())),
+            bindings_ctx.schedule_timer(delay, NudTimerId::garbage_collection(device_id.clone())),
             None
         );
     }
@@ -2370,20 +2446,20 @@ fn maybe_schedule_gc<I, D, C, DeviceId: Clone>(
 /// other states represent entries to which we have either recently sent packets
 /// (REACHABLE, DELAY, PROBE), or which we are actively trying to resolve and
 /// for which we have recently queued outgoing packets (INCOMPLETE).
-fn collect_garbage<I, D, SC, C>(sync_ctx: &mut SC, ctx: &mut C, device_id: &SC::DeviceId)
+fn collect_garbage<I, D, SC, C>(core_ctx: &mut SC, bindings_ctx: &mut C, device_id: &SC::DeviceId)
 where
     I: Ip,
     D: LinkDevice,
     C: NonSyncContext<I, D, SC::DeviceId>,
     SC: NudContext<I, D, C>,
 {
-    sync_ctx.with_nud_state_mut(device_id, |NudState { neighbors, last_gc }, _| {
+    core_ctx.with_nud_state_mut(device_id, |NudState { neighbors, last_gc }, _| {
         let max_to_remove = neighbors.len().saturating_sub(MAX_ENTRIES);
         if max_to_remove == 0 {
             return;
         }
 
-        *last_gc = Some(ctx.now());
+        *last_gc = Some(bindings_ctx.now());
 
         // Define an ordering by priority for garbage collection, such that lower
         // numbers correspond to higher usefulness and therefore lower likelihood of
@@ -2493,14 +2569,14 @@ where
         let entries_to_remove = entries_to_remove
             .into_iter()
             .map(|SortEntry { key: neighbor, state }| {
-                state.cancel_timer(ctx, device_id, *neighbor);
+                state.cancel_timer(bindings_ctx, device_id, *neighbor);
                 *neighbor
             })
             .collect::<Vec<_>>();
 
         for neighbor in entries_to_remove {
             assert_matches!(neighbors.remove(&neighbor), Some(_));
-            ctx.on_event(Event::removed(device_id, neighbor, ctx.now()));
+            bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
         }
     });
 }
@@ -2685,14 +2761,14 @@ mod tests {
 
         fn send_neighbor_solicitation(
             &mut self,
-            ctx: &mut FakeNonSyncCtxImpl<I>,
+            bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             lookup_addr: SpecifiedAddr<I::Addr>,
             remote_link_addr: Option<FakeLinkAddress>,
         ) {
             self.inner
                 .send_frame(
-                    ctx,
+                    bindings_ctx,
                     FakeNudMessageMeta::NeighborSolicitation { lookup_addr, remote_link_addr },
                     Buf::new(Vec::new(), ..),
                 )
@@ -2713,7 +2789,7 @@ mod tests {
     impl<I: Ip> NudSenderContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeInnerCtxImpl<I> {
         fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
-            ctx: &mut FakeNonSyncCtxImpl<I>,
+            bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
             dst_link_address: FakeLinkAddress,
             body: S,
         ) -> Result<(), S>
@@ -2721,7 +2797,7 @@ mod tests {
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            self.send_frame(ctx, FakeNudMessageMeta::IpFrame { dst_link_address }, body)
+            self.send_frame(bindings_ctx, FakeNudMessageMeta::IpFrame { dst_link_address }, body)
         }
     }
 
@@ -2740,13 +2816,13 @@ mod tests {
 
     #[track_caller]
     fn check_lookup_has<I: Ip>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         lookup_addr: SpecifiedAddr<I::Addr>,
         expected_link_addr: FakeLinkAddress,
     ) {
         let entry = assert_matches!(
-            sync_ctx.outer.nud.neighbors.get(&lookup_addr),
+            core_ctx.outer.nud.neighbors.get(&lookup_addr),
             Some(entry @ (
                 NeighborState::Dynamic(
                     DynamicNeighborState::Reachable (Reachable { link_address, last_confirmed_at: _ })
@@ -2766,25 +2842,25 @@ mod tests {
                 unreachable!("entry must be static, REACHABLE, or STALE")
             }
             NeighborState::Dynamic(DynamicNeighborState::Reachable { .. }) => {
-                ctx.timer_ctx().assert_timers_installed([(
+                bindings_ctx.timer_ctx().assert_timers_installed([(
                     NudTimerId::neighbor(FakeLinkDeviceId, lookup_addr, NudEvent::ReachableTime),
-                    ctx.now() + REACHABLE_TIME.get(),
+                    bindings_ctx.now() + REACHABLE_TIME.get(),
                 )])
             }
             NeighborState::Dynamic(DynamicNeighborState::Delay { .. }) => {
-                ctx.timer_ctx().assert_timers_installed([(
+                bindings_ctx.timer_ctx().assert_timers_installed([(
                     NudTimerId::neighbor(FakeLinkDeviceId, lookup_addr, NudEvent::DelayFirstProbe),
-                    ctx.now() + DELAY_FIRST_PROBE_TIME.get(),
+                    bindings_ctx.now() + DELAY_FIRST_PROBE_TIME.get(),
                 )])
             }
             NeighborState::Dynamic(DynamicNeighborState::Probe { .. }) => {
-                ctx.timer_ctx().assert_timers_installed([(
+                bindings_ctx.timer_ctx().assert_timers_installed([(
                     NudTimerId::neighbor(
                         FakeLinkDeviceId,
                         lookup_addr,
                         NudEvent::RetransmitUnicastProbe,
                     ),
-                    ctx.now() + sync_ctx.inner.get_ref().retrans_timer.get(),
+                    bindings_ctx.now() + core_ctx.inner.get_ref().retrans_timer.get(),
                 )])
             }
             NeighborState::Dynamic(DynamicNeighborState::Unreachable(Unreachable {
@@ -2795,12 +2871,12 @@ mod tests {
                     UnreachableMode::WaitingForPacketSend => None,
                     mode @ UnreachableMode::Backoff { .. } => {
                         let duration =
-                            mode.next_backoff_retransmit_timeout::<I, _>(sync_ctx.inner.get_mut());
-                        Some(ctx.now() + duration.get())
+                            mode.next_backoff_retransmit_timeout::<I, _>(core_ctx.inner.get_mut());
+                        Some(bindings_ctx.now() + duration.get())
                     }
                 };
                 if let Some(instant) = instant {
-                    ctx.timer_ctx().assert_timers_installed([(
+                    bindings_ctx.timer_ctx().assert_timers_installed([(
                         NudTimerId::neighbor(
                             FakeLinkDeviceId,
                             lookup_addr,
@@ -2811,7 +2887,7 @@ mod tests {
                 }
             }
             NeighborState::Dynamic(DynamicNeighborState::Stale { .. })
-            | NeighborState::Static(_) => ctx.timer_ctx().assert_no_timers_installed(),
+            | NeighborState::Static(_) => bindings_ctx.timer_ctx().assert_no_timers_installed(),
         }
     }
 
@@ -2846,8 +2922,8 @@ mod tests {
     const LINK_ADDR3: FakeLinkAddress = FakeLinkAddress([3]);
 
     fn queue_ip_packet_to_unresolved_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
         pending_frames: &mut VecDeque<Buf<Vec<u8>>>,
         body: u8,
@@ -2856,8 +2932,8 @@ mod tests {
         let body = [body];
         assert_eq!(
             NudHandler::send_ip_packet_to_neighbor(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &FakeLinkDeviceId,
                 neighbor,
                 Buf::new(body, ..),
@@ -2865,13 +2941,13 @@ mod tests {
             Ok(())
         );
 
-        let max_multicast_solicit = sync_ctx.inner.max_multicast_solicit().get();
+        let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
 
         pending_frames.push_back(Buf::new(body.to_vec(), ..));
 
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             neighbor,
             DynamicNeighborState::Incomplete(Incomplete {
                 transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
@@ -2881,58 +2957,58 @@ mod tests {
             }),
             expect_event.then_some(ExpectedEvent::Added),
         );
-        non_sync_ctx.timer_ctx().assert_some_timers_installed([(
+        bindings_ctx.timer_ctx().assert_some_timers_installed([(
             NudTimerId::neighbor(FakeLinkDeviceId, neighbor, NudEvent::RetransmitMulticastProbe),
-            non_sync_ctx.now() + ONE_SECOND.get(),
+            bindings_ctx.now() + ONE_SECOND.get(),
         )]);
     }
 
     fn init_incomplete_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         take_probe: bool,
     ) -> VecDeque<Buf<Vec<u8>>> {
         let mut pending_frames = VecDeque::new();
         queue_ip_packet_to_unresolved_neighbor(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             &mut pending_frames,
             1,
             true, /* expect_event */
         );
         if take_probe {
-            assert_neighbor_probe_sent_for_ip(sync_ctx, ip_address, None);
+            assert_neighbor_probe_sent_for_ip(core_ctx, ip_address, None);
         }
         pending_frames
     }
 
     fn init_incomplete_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         take_probe: bool,
     ) -> VecDeque<Buf<Vec<u8>>> {
-        init_incomplete_neighbor_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, take_probe)
+        init_incomplete_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, take_probe)
     }
 
     fn init_stale_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
         NudHandler::handle_neighbor_update(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &FakeLinkDeviceId,
             ip_address,
             link_address,
             DynamicNeighborUpdateSource::Probe,
         );
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             DynamicNeighborState::Stale(Stale { link_address }),
             Some(ExpectedEvent::Added),
@@ -2940,24 +3016,24 @@ mod tests {
     }
 
     fn init_stale_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
-        init_stale_neighbor_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, link_address);
+        init_stale_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_reachable_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
         let queued_frame =
-            init_incomplete_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, true);
+            init_incomplete_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, true);
         NudHandler::handle_neighbor_update(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &FakeLinkDeviceId,
             ip_address,
             link_address,
@@ -2967,37 +3043,37 @@ mod tests {
             }),
         );
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             DynamicNeighborState::Reachable(Reachable {
                 link_address,
-                last_confirmed_at: non_sync_ctx.now(),
+                last_confirmed_at: bindings_ctx.now(),
             }),
             Some(ExpectedEvent::Changed),
         );
-        assert_pending_frame_sent(sync_ctx, queued_frame, link_address);
+        assert_pending_frame_sent(core_ctx, queued_frame, link_address);
     }
 
     fn init_reachable_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
-        init_reachable_neighbor_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, link_address);
+        init_reachable_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_delay_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
-        init_stale_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address);
+        init_stale_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, link_address);
         assert_eq!(
             NudHandler::send_ip_packet_to_neighbor(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &FakeLinkDeviceId,
                 ip_address,
                 Buf::new([1], ..),
@@ -3005,45 +3081,45 @@ mod tests {
             Ok(())
         );
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             DynamicNeighborState::Delay(Delay { link_address }),
             Some(ExpectedEvent::Changed),
         );
         assert_eq!(
-            sync_ctx.inner.take_frames(),
+            core_ctx.inner.take_frames(),
             vec![(FakeNudMessageMeta::IpFrame { dst_link_address: LINK_ADDR1 }, vec![1])],
         );
     }
 
     fn init_delay_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
-        init_delay_neighbor_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, link_address);
+        init_delay_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_probe_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
         take_probe: bool,
     ) {
-        init_delay_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address);
-        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
+        init_delay_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, link_address);
+        let max_unicast_solicit = core_ctx.inner.max_unicast_solicit().get();
         assert_eq!(
-            non_sync_ctx.trigger_timers_for(
+            bindings_ctx.trigger_timers_for(
                 DELAY_FIRST_PROBE_TIME.into(),
-                handle_timer_helper_with_sc_ref_mut(sync_ctx, TimerHandler::handle_timer),
+                handle_timer_helper_with_sc_ref_mut(core_ctx, TimerHandler::handle_timer),
             ),
             [NudTimerId::neighbor(FakeLinkDeviceId, ip_address, NudEvent::DelayFirstProbe)]
         );
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             DynamicNeighborState::Probe(Probe {
                 link_address,
@@ -3052,19 +3128,19 @@ mod tests {
             Some(ExpectedEvent::Changed),
         );
         if take_probe {
-            assert_neighbor_probe_sent_for_ip(sync_ctx, ip_address, Some(LINK_ADDR1));
+            assert_neighbor_probe_sent_for_ip(core_ctx, ip_address, Some(LINK_ADDR1));
         }
     }
 
     fn init_probe_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
         take_probe: bool,
     ) {
         init_probe_neighbor_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             I::LOOKUP_ADDR1,
             link_address,
             take_probe,
@@ -3072,20 +3148,20 @@ mod tests {
     }
 
     fn init_unreachable_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
-        init_probe_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address, false);
-        let retransmit_timeout = sync_ctx.inner.retransmit_timeout();
-        let max_unicast_solicit = sync_ctx.inner.max_unicast_solicit().get();
+        init_probe_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, link_address, false);
+        let retransmit_timeout = core_ctx.inner.retransmit_timeout();
+        let max_unicast_solicit = core_ctx.inner.max_unicast_solicit().get();
         for _ in 0..max_unicast_solicit {
-            assert_neighbor_probe_sent_for_ip(sync_ctx, ip_address, Some(LINK_ADDR1));
+            assert_neighbor_probe_sent_for_ip(core_ctx, ip_address, Some(LINK_ADDR1));
             assert_eq!(
-                non_sync_ctx.trigger_timers_for(
+                bindings_ctx.trigger_timers_for(
                     retransmit_timeout.into(),
-                    handle_timer_helper_with_sc_ref_mut(sync_ctx, TimerHandler::handle_timer),
+                    handle_timer_helper_with_sc_ref_mut(core_ctx, TimerHandler::handle_timer),
                 ),
                 [NudTimerId::neighbor(
                     FakeLinkDeviceId,
@@ -3095,8 +3171,8 @@ mod tests {
             );
         }
         assert_neighbor_state_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             ip_address,
             DynamicNeighborState::Unreachable(Unreachable {
                 link_address,
@@ -3107,11 +3183,11 @@ mod tests {
     }
 
     fn init_unreachable_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
-        init_unreachable_neighbor_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, link_address);
+        init_unreachable_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -3125,54 +3201,54 @@ mod tests {
     }
 
     fn init_neighbor_in_state<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         state: InitialState,
     ) -> DynamicNeighborState<FakeLinkDevice, FakeInstant, FakeLinkResolutionNotifier<FakeLinkDevice>>
     {
         match state {
             InitialState::Incomplete => {
                 let _: VecDeque<Buf<Vec<u8>>> =
-                    init_incomplete_neighbor(sync_ctx, non_sync_ctx, true);
+                    init_incomplete_neighbor(core_ctx, bindings_ctx, true);
             }
             InitialState::Reachable => {
-                init_reachable_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1);
+                init_reachable_neighbor(core_ctx, bindings_ctx, LINK_ADDR1);
             }
             InitialState::Stale => {
-                init_stale_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1);
+                init_stale_neighbor(core_ctx, bindings_ctx, LINK_ADDR1);
             }
             InitialState::Delay => {
-                init_delay_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1);
+                init_delay_neighbor(core_ctx, bindings_ctx, LINK_ADDR1);
             }
             InitialState::Probe => {
-                init_probe_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1, true);
+                init_probe_neighbor(core_ctx, bindings_ctx, LINK_ADDR1, true);
             }
             InitialState::Unreachable => {
-                init_unreachable_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1);
+                init_unreachable_neighbor(core_ctx, bindings_ctx, LINK_ADDR1);
             }
         }
-        assert_matches!(sync_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
+        assert_matches!(core_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
             Some(NeighborState::Dynamic(state)) => state.clone()
         )
     }
 
     #[track_caller]
     fn init_static_neighbor_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
         expected_event: ExpectedEvent,
     ) {
         NudHandler::set_static_neighbor(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &FakeLinkDeviceId,
             ip_address,
             link_address,
         );
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [Event {
                 device: FakeLinkDeviceId,
                 addr: ip_address,
@@ -3180,21 +3256,21 @@ mod tests {
                     ExpectedEvent::Added => EventKind::Added(EventState::Static(link_address)),
                     ExpectedEvent::Changed => EventKind::Changed(EventState::Static(link_address)),
                 },
-                at: non_sync_ctx.now(),
+                at: bindings_ctx.now(),
             }],
         );
     }
 
     #[track_caller]
     fn init_static_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         link_address: FakeLinkAddress,
         expected_event: ExpectedEvent,
     ) {
         init_static_neighbor_with_ip(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             I::LOOKUP_ADDR1,
             link_address,
             expected_event,
@@ -3203,21 +3279,21 @@ mod tests {
 
     #[track_caller]
     fn delete_neighbor<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
     ) {
-        NudHandler::delete_neighbor(sync_ctx, non_sync_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1)
+        NudHandler::delete_neighbor(core_ctx, bindings_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1)
             .expect("neighbor entry should exist");
         assert_eq!(
-            non_sync_ctx.take_events(),
-            [Event::removed(&FakeLinkDeviceId, I::LOOKUP_ADDR1, non_sync_ctx.now())],
+            bindings_ctx.take_events(),
+            [Event::removed(&FakeLinkDeviceId, I::LOOKUP_ADDR1, bindings_ctx.now())],
         );
     }
 
     #[track_caller]
     fn assert_neighbor_state<I: Ip + TestIpExt>(
-        sync_ctx: &FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         state: DynamicNeighborState<
             FakeLinkDevice,
             FakeInstant,
@@ -3225,7 +3301,7 @@ mod tests {
         >,
         event_kind: Option<ExpectedEvent>,
     ) {
-        assert_neighbor_state_with_ip(sync_ctx, non_sync_ctx, I::LOOKUP_ADDR1, state, event_kind);
+        assert_neighbor_state_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, state, event_kind);
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -3236,8 +3312,8 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_state_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
         state: DynamicNeighborState<
             FakeLinkDevice,
@@ -3249,7 +3325,7 @@ mod tests {
         if let Some(expected_event) = expected_event {
             let event_state = EventState::Dynamic(state.to_event_dynamic_state());
             assert_eq!(
-                non_sync_ctx.take_events(),
+                bindings_ctx.take_events(),
                 [Event {
                     device: FakeLinkDeviceId,
                     addr: neighbor,
@@ -3257,23 +3333,23 @@ mod tests {
                         ExpectedEvent::Added => EventKind::Added(event_state),
                         ExpectedEvent::Changed => EventKind::Changed(event_state),
                     },
-                    at: non_sync_ctx.now(),
+                    at: bindings_ctx.now(),
                 }],
             );
         }
 
-        let FakeNudContext { nud } = &sync_ctx.outer;
+        let FakeNudContext { nud } = &core_ctx.outer;
         assert_eq!(nud.neighbors.get(&neighbor), Some(&NeighborState::Dynamic(state)));
     }
 
     #[track_caller]
     fn assert_pending_frame_sent<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
         pending_frames: VecDeque<Buf<Vec<u8>>>,
         link_address: FakeLinkAddress,
     ) {
         assert_eq!(
-            sync_ctx.inner.take_frames(),
+            core_ctx.inner.take_frames(),
             pending_frames
                 .into_iter()
                 .map(|f| (
@@ -3286,12 +3362,12 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_probe_sent_for_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: Option<FakeLinkAddress>,
     ) {
         assert_eq!(
-            sync_ctx.inner.take_frames(),
+            core_ctx.inner.take_frames(),
             [(
                 FakeNudMessageMeta::NeighborSolicitation {
                     lookup_addr: ip_address,
@@ -3304,22 +3380,22 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_probe_sent<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
         link_address: Option<FakeLinkAddress>,
     ) {
-        assert_neighbor_probe_sent_for_ip(sync_ctx, I::LOOKUP_ADDR1, link_address);
+        assert_neighbor_probe_sent_for_ip(core_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     #[track_caller]
     fn assert_neighbor_removed_with_ip<I: Ip + TestIpExt>(
-        sync_ctx: &mut FakeCtxImpl<I>,
-        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCtxImpl<I>,
+        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
     ) {
-        super::testutil::assert_neighbor_unknown(sync_ctx, FakeLinkDeviceId, neighbor);
+        super::testutil::assert_neighbor_unknown(core_ctx, FakeLinkDeviceId, neighbor);
         assert_eq!(
-            non_sync_ctx.take_events(),
-            [Event::removed(&FakeLinkDeviceId, neighbor, non_sync_ctx.now())],
+            bindings_ctx.take_events(),
+            [Event::removed(&FakeLinkDeviceId, neighbor, bindings_ctx.now())],
         );
     }
 
@@ -4433,7 +4509,7 @@ mod tests {
         I: Ip,
         C: crate::NonSyncContext + NonSyncContext<I, EthernetLinkDevice, EthernetDeviceId<C>>,
     >(
-        sync_ctx: &'a SyncCtx<C>,
+        core_ctx: &'a SyncCtx<C>,
         device_id: &EthernetDeviceId<C>,
         expected: HashMap<
             SpecifiedAddr<I::Addr>,
@@ -4445,7 +4521,7 @@ mod tests {
         <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier: PartialEq,
     {
         NudContext::<I, EthernetLinkDevice, _>::with_nud_state_mut(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             device_id,
             |NudState { neighbors, last_gc: _ }, _config| assert_eq!(*neighbors, expected),
         )

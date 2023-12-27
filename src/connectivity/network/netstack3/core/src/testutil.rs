@@ -118,11 +118,11 @@ pub struct ContextPair<SC, C> {
 
 impl<SC, C> ContextPair<SC, C> {
     #[cfg(test)]
-    pub(crate) fn with_sync_ctx(sync_ctx: SC) -> Self
+    pub(crate) fn with_sync_ctx(core_ctx: SC) -> Self
     where
         C: Default,
     {
-        Self { sync_ctx, non_sync_ctx: C::default() }
+        Self { sync_ctx: core_ctx, non_sync_ctx: C::default() }
     }
 }
 
@@ -1226,16 +1226,16 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
 }
 
 #[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNonSyncCtx) {
+pub(crate) fn handle_queued_rx_packets(core_ctx: &FakeSyncCtx, bindings_ctx: &mut FakeNonSyncCtx) {
     loop {
-        let rx_available = core::mem::take(&mut ctx.state_mut().rx_available);
+        let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
         if rx_available.len() == 0 {
             break;
         }
 
         for id in rx_available.into_iter() {
             loop {
-                match crate::device::handle_queued_rx_packets(sync_ctx, ctx, &id) {
+                match crate::device::handle_queued_rx_packets(core_ctx, bindings_ctx, &id) {
                     crate::work_queue::WorkQueueReport::AllDone => break,
                     crate::work_queue::WorkQueueReport::Pending => (),
                 }
@@ -1365,7 +1365,7 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstan
 #[cfg(test)]
 pub(crate) fn handle_timer(
     FakeCtx { sync_ctx, non_sync_ctx }: &mut FakeCtx,
-    _ctx: &mut (),
+    _bindings_ctx: &mut (),
     id: TimerId<FakeNonSyncCtx>,
 ) {
     crate::time::handle_timer(sync_ctx, non_sync_ctx, id)
@@ -1377,17 +1377,25 @@ pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
 /// Add a route directly to the forwarding table.
 #[cfg(any(test, feature = "testutils"))]
 pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
-    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &crate::SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<NonSyncCtx>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
-    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
+    let mut sync_ctx = lock_order::Locked::new(core_ctx);
     match entry {
         crate::ip::types::AddableEntryEither::V4(entry) => {
-            crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, entry)
+            crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
+                &mut sync_ctx,
+                bindings_ctx,
+                entry,
+            )
         }
         crate::ip::types::AddableEntryEither::V6(entry) => {
-            crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(&mut sync_ctx, ctx, entry)
+            crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
+                &mut sync_ctx,
+                bindings_ctx,
+                entry,
+            )
         }
     }
 }
@@ -1396,50 +1404,58 @@ pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
 /// found to be deleted.
 #[cfg(any(test, feature = "testutils"))]
 pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
-    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &crate::SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
-    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
+    let mut sync_ctx = lock_order::Locked::new(core_ctx);
 
     match subnet {
         SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
             Ipv4,
             _,
             _,
-        >(&mut sync_ctx, ctx, subnet),
+        >(&mut sync_ctx, bindings_ctx, subnet),
         SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
             Ipv6,
             _,
             _,
-        >(&mut sync_ctx, ctx, subnet),
+        >(&mut sync_ctx, bindings_ctx, subnet),
     }
     .map_err(From::from)
 }
 
 pub(crate) fn del_device_routes<NonSyncCtx: crate::NonSyncContext>(
-    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &crate::SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) {
-    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
-    crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, device);
-    crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, device);
+    let mut sync_ctx = lock_order::Locked::new(core_ctx);
+    crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
+        &mut sync_ctx,
+        bindings_ctx,
+        device,
+    );
+    crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
+        &mut sync_ctx,
+        bindings_ctx,
+        device,
+    );
 }
 
 /// Removes all of the routes through the device, then removes the device.
 pub fn clear_routes_and_remove_ethernet_device<NonSyncCtx: crate::NonSyncContext>(
-    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &crate::SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     ethernet_device: crate::device::EthernetDeviceId<NonSyncCtx>,
 ) {
     let device_id = crate::device::DeviceId::Ethernet(ethernet_device);
-    del_device_routes(sync_ctx, ctx, &device_id);
+    del_device_routes(core_ctx, bindings_ctx, &device_id);
     let ethernet_device = match device_id {
         crate::device::DeviceId::Ethernet(ethernet_device) => ethernet_device,
         crate::device::DeviceId::Loopback(_) => unreachable!(),
     };
-    match crate::device::remove_ethernet_device(sync_ctx, ctx, ethernet_device) {
+    match crate::device::remove_ethernet_device(core_ctx, bindings_ctx, ethernet_device) {
         crate::device::RemoveDeviceResult::Removed(_external_state) => {}
         crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
             panic!("failed to remove ethernet device")
@@ -1785,8 +1801,8 @@ mod tests {
     }
 
     fn send_packet<'a, A: IpAddress>(
-        sync_ctx: &'a FakeSyncCtx,
-        ctx: &mut FakeNonSyncCtx,
+        core_ctx: &'a FakeSyncCtx,
+        bindings_ctx: &mut FakeNonSyncCtx,
         src_ip: SpecifiedAddr<A>,
         dst_ip: SpecifiedAddr<A>,
         device: &DeviceId<FakeNonSyncCtx>,
@@ -1805,8 +1821,8 @@ mod tests {
             mtu: None,
         };
         IpLayerHandler::<A::Version, _>::send_ip_packet_from_device(
-            &mut Locked::new(sync_ctx),
-            ctx,
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
             meta,
             Buf::new(vec![1, 2, 3, 4], ..),
         )

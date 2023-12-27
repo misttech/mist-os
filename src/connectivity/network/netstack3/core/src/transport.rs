@@ -91,9 +91,12 @@ impl TransportStateBuilder {
         &mut self.udp
     }
 
-    pub(crate) fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> TransportLayerState<C> {
-        let now = ctx.now();
-        let mut rng = ctx.rng();
+    pub(crate) fn build_with_ctx<C: NonSyncContext>(
+        self,
+        bindings_ctx: &mut C,
+    ) -> TransportLayerState<C> {
+        let now = bindings_ctx.now();
+        let mut rng = bindings_ctx.rng();
         TransportLayerState {
             udpv4: self.udp.clone().build(),
             udpv6: self.udp.build(),
@@ -188,12 +191,12 @@ pub(crate) enum TransportLayerTimerId<C: crate::NonSyncContext> {
 
 /// Handle a timer event firing in the transport layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
-    ctx: &mut NonSyncCtx,
+    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
+    bindings_ctx: &mut NonSyncCtx,
     id: TransportLayerTimerId<NonSyncCtx>,
 ) {
     match id {
-        TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(sync_ctx, ctx, id),
+        TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(core_ctx, bindings_ctx, id),
     }
 }
 

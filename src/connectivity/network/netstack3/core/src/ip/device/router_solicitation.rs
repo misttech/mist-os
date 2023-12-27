@@ -94,7 +94,7 @@ pub(super) trait RsContext<C>: DeviceIdContext<AnyDevice> {
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,
-        ctx: &mut C,
+        bindings_ctx: &mut C,
         device_id: &Self::DeviceId,
         message: RouterSolicitation,
         body: F,
@@ -113,16 +113,16 @@ pub(crate) trait RsHandler<C>:
     DeviceIdContext<AnyDevice> + TimerHandler<C, RsTimerId<Self::DeviceId>>
 {
     /// Starts router solicitation.
-    fn start_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+    fn start_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
 
     /// Stops router solicitation.
     ///
     /// Does nothing if router solicitaiton is not being performed
-    fn stop_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+    fn stop_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
 }
 
 impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
-    fn start_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
+    fn start_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId) {
         let remaining = self.with_rs_remaining_mut_and_max(device_id, |remaining, max| {
             *remaining = max;
             max
@@ -135,40 +135,46 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
                 // random amount of time between 0 and `MAX_RTR_SOLICITATION_DELAY` to
                 // alleviate congestion when many hosts start up on a link at the same
                 // time.
-                let delay = ctx.rng().gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
+                let delay =
+                    bindings_ctx.rng().gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
                 assert_eq!(
-                    ctx.schedule_timer(delay, RsTimerId { device_id: device_id.clone() },),
+                    bindings_ctx.schedule_timer(delay, RsTimerId { device_id: device_id.clone() },),
                     None
                 );
             }
         }
     }
 
-    fn stop_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
-        let _: Option<C::Instant> = ctx.cancel_timer(RsTimerId { device_id: device_id.clone() });
+    fn stop_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId) {
+        let _: Option<C::Instant> =
+            bindings_ctx.cancel_timer(RsTimerId { device_id: device_id.clone() });
     }
 }
 
 impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> TimerHandler<C, RsTimerId<SC::DeviceId>>
     for SC
 {
-    fn handle_timer(&mut self, ctx: &mut C, RsTimerId { device_id }: RsTimerId<SC::DeviceId>) {
-        do_router_solicitation(self, ctx, &device_id)
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut C,
+        RsTimerId { device_id }: RsTimerId<SC::DeviceId>,
+    ) {
+        do_router_solicitation(self, bindings_ctx, &device_id)
     }
 }
 
 /// Solicit routers once and schedule next message.
 fn do_router_solicitation<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
+    core_ctx: &mut SC,
+    bindings_ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let src_ll = sync_ctx.get_link_layer_addr_bytes(device_id);
+    let src_ll = core_ctx.get_link_layer_addr_bytes(device_id);
 
     // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
     // can't happen statically.
     let _: Result<(), _> =
-        sync_ctx.send_rs_packet(ctx, device_id, RouterSolicitation::default(), |src_ip| {
+        core_ctx.send_rs_packet(bindings_ctx, device_id, RouterSolicitation::default(), |src_ip| {
             // As per RFC 4861 section 4.1,
             //
             //   Valid Options:
@@ -192,7 +198,7 @@ fn do_router_solicitation<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>>(
             })
         });
 
-    sync_ctx.with_rs_remaining_mut(device_id, |remaining| {
+    core_ctx.with_rs_remaining_mut(device_id, |remaining| {
         *remaining = NonZeroU8::new(
             remaining
                 .expect("should only send a router solicitations when at least one is remaining")
@@ -204,7 +210,7 @@ fn do_router_solicitation<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>>(
             None => {}
             Some(NonZeroU8 { .. }) => {
                 assert_eq!(
-                    ctx.schedule_timer(
+                    bindings_ctx.schedule_timer(
                         RTR_SOLICITATION_INTERVAL,
                         RsTimerId { device_id: device_id.clone() },
                     ),
@@ -292,7 +298,7 @@ mod tests {
             F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
         >(
             &mut self,
-            ctx: &mut FakeNonSyncCtxImpl,
+            bindings_ctx: &mut FakeNonSyncCtxImpl,
             &FakeDeviceId: &FakeDeviceId,
             message: RouterSolicitation,
             body: F,
@@ -304,7 +310,7 @@ mod tests {
                 link_layer_bytes: _,
                 ip_device_id_ctx: _,
             } = self.get_ref();
-            self.send_frame(ctx, RsMessageMeta { message }, body(*source_address))
+            self.send_frame(bindings_ctx, RsMessageMeta { message }, body(*source_address))
         }
     }
 
