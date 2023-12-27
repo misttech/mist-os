@@ -263,7 +263,6 @@
                 "fuchsia.media.UsageReporter",
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.memory.debug.MemoryPressure",
-                "fuchsia.memory.Debugger",
                 "fuchsia.memory.inspection.Collector",
                 "fuchsia.memory.Monitor",
                 "fuchsia.memory.sampler.Sampler",

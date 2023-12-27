@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.memory;
 
-using fuchsia.memorypressure;
 using zx;
 
 /// Interface used to register for memory notifications.
@@ -65,18 +64,5 @@ type Stats = struct {
 closed protocol Watcher {
     strict OnChange(struct {
         stats Stats;
-    });
-};
-
-/// Interface used to debug the singleton memory_monitor instance.
-@discoverable
-closed protocol Debugger {
-    /// Signals registered watchers of the fuchsia.memorypressure service with
-    /// the specified memory pressure level. Intended for debugging only. Does
-    /// not affect the real memory pressure level on the system, or trigger any
-    /// kernel memory reclamation tasks.
-    @deprecated("Use fuchsia.memory.debug.Signaler")
-    strict SignalMemoryPressure(struct {
-        level fuchsia.memorypressure.Level;
     });
 };

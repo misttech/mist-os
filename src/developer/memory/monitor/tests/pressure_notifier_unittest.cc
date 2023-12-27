@@ -5,7 +5,7 @@
 #include "src/developer/memory/monitor/pressure_notifier.h"
 
 #include <fuchsia/feedback/cpp/fidl_test_base.h>
-#include <fuchsia/memory/cpp/fidl.h>
+#include <fuchsia/memory/debug/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
@@ -48,7 +48,8 @@ class CrashReporterForTest : public fuchsia::feedback::testing::CrashReporter_Te
   size_t num_crash_reports_ = 0;
 };
 
-class PressureNotifierUnitTest : public fuchsia::memory::Debugger, public gtest::TestLoopFixture {
+class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
+                                 public gtest::TestLoopFixture {
  public:
   void SetUp() override {
     context_provider_ =
@@ -95,9 +96,9 @@ class PressureNotifierUnitTest : public fuchsia::memory::Debugger, public gtest:
   }
 
   void TestSimulatedPressure(fmp::Level level) {
-    fuchsia::memory::DebuggerPtr memdebug;
+    fuchsia::memory::debug::MemoryPressurePtr memdebug;
     context_provider_->ConnectToPublicService(memdebug.NewRequest());
-    memdebug->SignalMemoryPressure(level);
+    memdebug->Signal(level);
   }
 
   void SetCrashReportInterval(uint32_t mins) {
@@ -113,11 +114,11 @@ class PressureNotifierUnitTest : public fuchsia::memory::Debugger, public gtest:
   Level last_level() const { return last_level_; }
 
  private:
-  void SignalMemoryPressure(fmp::Level level) override { notifier_->DebugNotify(level); }
+  void Signal(fmp::Level level) override { notifier_->DebugNotify(level); }
 
   std::unique_ptr<sys::testing::ComponentContextProvider> context_provider_;
   std::unique_ptr<PressureNotifier> notifier_;
-  fidl::BindingSet<fuchsia::memory::Debugger> memdebug_bindings_;
+  fidl::BindingSet<fuchsia::memory::debug::MemoryPressure> memdebug_bindings_;
   CrashReporterForTest crash_reporter_;
   Level last_level_;
 };
@@ -610,10 +611,10 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
     ASSERT_EQ(watcher1.NumChanges(), 1);
     ASSERT_EQ(watcher2.NumChanges(), 1);
 
-    // Start the fuchsia.memory.Debugger service.
+    // Start the fuchsia.memory.debug.MemoryPressure service.
     SetupMemDebugService();
 
-    // Simulate pressure via the fuchsia.memory.Debugger service.
+    // Simulate pressure via the fuchsia.memory.debug.MemoryPressure service.
     TestSimulatedPressure(fmp::Level::CRITICAL);
     RunLoopUntilIdle();
     // Verify that watchers saw the change.

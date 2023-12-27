@@ -14,18 +14,15 @@
 
 namespace monitor {
 
-class MemoryDebugger : public fuchsia::memory::Debugger,
-                       public fuchsia::memory::debug::MemoryPressure {
+class MemoryDebugger : public fuchsia::memory::debug::MemoryPressure {
  public:
   MemoryDebugger(sys::ComponentContext *context, PressureNotifier *notifier);
-  // Deprecated. Use `Signal`.
-  void SignalMemoryPressure(fuchsia::memorypressure::Level level) final;
+
   // Signals registered watchers of the fuchsia.memorypressure service with the
   // specified memory pressure `level`.
   void Signal(fuchsia::memorypressure::Level level) final;
 
  private:
-  fidl::BindingSet<fuchsia::memory::Debugger> deprecated_bindings_;
   fidl::BindingSet<fuchsia::memory::debug::MemoryPressure> bindings_;
   PressureNotifier *const notifier_;
 };
