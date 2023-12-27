@@ -2891,6 +2891,7 @@ impl MemoryManager {
             zx::Status::NO_RESOURCES => errno!(ENOMEM),
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             zx::Status::ALREADY_EXISTS => errno!(EEXIST),
+            zx::Status::BAD_STATE => errno!(EINVAL),
             _ => impossible_error(status),
         }
     }
