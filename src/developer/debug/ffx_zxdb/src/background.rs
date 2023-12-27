@@ -37,6 +37,7 @@ pub async fn forward_to_agent(socket: DebugAgentSocket) -> Result<()> {
 
     let _forward_task = fuchsia_async::Task::local(async move {
         loop {
+            // Here we always want to spawn a new DebugAgent
             let _ = socket.forward_one_connection().await.map_err(|e| {
                 eprintln!("Connection to debug_agent broken: {}", e);
             });

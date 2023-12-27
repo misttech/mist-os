@@ -4,25 +4,30 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use errors::ffx_bail;
+use errors::{ffx_bail, ffx_error};
 use ffx_debug_connect_args::ConnectCommand;
-use ffx_zxdb::{forward_to_agent, Debugger};
+use ffx_zxdb::{
+    forward_to_agent,
+    util::{self, Agent},
+    Debugger,
+};
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger as fdebugger;
 use signal_hook::consts::signal::SIGINT;
 use std::{
+    io::{BufRead, Write},
     process::Command,
     sync::{atomic::AtomicBool, Arc},
 };
 
-pub use ffx_zxdb::debug_agent::DebugAgentSocket;
+pub use ffx_zxdb::debug_agent::{DebugAgentSocket, DebuggerProxy};
 
 #[derive(FfxTool)]
 pub struct ConnectTool {
     #[command]
     cmd: ConnectCommand,
     #[with(moniker("/core/debugger"))]
-    debugger_proxy: fdebugger::LauncherProxy,
+    launcher_proxy: fdebugger::LauncherProxy,
 }
 
 fho::embedded_plugin!(ConnectTool);
@@ -32,16 +37,64 @@ impl FfxMain for ConnectTool {
     type Writer = SimpleWriter;
 
     async fn main(self, mut _writer: Self::Writer) -> fho::Result<()> {
-        connect_tool_impl(self.cmd, self.debugger_proxy).await?;
+        connect_tool_impl(self.cmd, self.launcher_proxy).await?;
         Ok(())
     }
 }
 
+async fn choose_debug_agent(launcher_proxy: &fdebugger::LauncherProxy) -> Result<Option<Agent>> {
+    // Get the list of all currently running DebugAgents from the launcher.
+    let mut agent_vec = util::get_all_debug_agents(&launcher_proxy).await?;
+
+    if !agent_vec.is_empty() {
+        println!("[0] Launch new DebugAgent");
+
+        util::print_debug_agents(&agent_vec);
+
+        println!(
+            "Select a number from above to debug the attached process(es), \
+             or 0 to start a new debugging session (ctrl-c to cancel)"
+        );
+
+        std::io::stdout().flush().unwrap();
+
+        let input = std::io::stdin()
+            .lock()
+            .lines()
+            .next()
+            .map(|r| r.ok())
+            .flatten()
+            .map(|s| s.parse::<usize>().ok())
+            .ok_or(ffx_error!("Failed to parse input!"))?
+            .filter(|i| *i <= agent_vec.len())
+            .ok_or(ffx_error!("Invalid input!"))?;
+
+        return Ok(match input {
+            0 => None,
+            index => Some(agent_vec.remove(index - 1)),
+        });
+    }
+
+    Ok(None)
+}
+
 async fn connect_tool_impl(
     cmd: ConnectCommand,
-    debugger_proxy: fdebugger::LauncherProxy,
+    launcher_proxy: fdebugger::LauncherProxy,
 ) -> Result<()> {
-    let socket = DebugAgentSocket::create(debugger_proxy)?;
+    let socket = choose_debug_agent(&launcher_proxy).await?.map_or_else(
+        || {
+            if !&cmd.agent_only {
+                // zxdb_e2e_tests depend on the socket path output below.
+                println!("Launching new DebugAgent");
+            }
+            DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy))
+        },
+        |agent| {
+            println!("Connecting to {}", agent.name);
+            DebugAgentSocket::create(DebuggerProxy::DebugAgentProxy(agent.debug_agent_proxy))
+        },
+    )?;
 
     if cmd.agent_only {
         println!("{}", socket.unix_socket_path().display());

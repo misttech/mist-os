@@ -9,7 +9,10 @@ use fuchsia_async::{unblock, Task};
 use signal_hook::{consts::signal::SIGUSR1, iterator::Signals};
 use std::{path::PathBuf, process::Command};
 
-use crate::{debug_agent::DebugAgentSocket, spawn_forward_task, CommandBuilder};
+use crate::{
+    debug_agent::{DebugAgentSocket, DebuggerProxy},
+    spawn_forward_task, CommandBuilder,
+};
 
 pub struct Debugger {
     socket: DebugAgentSocket,
@@ -18,9 +21,8 @@ pub struct Debugger {
 }
 
 impl Debugger {
-    /// Create a debugger that uses the given debug agent.
-    pub async fn new(debugger_proxy: fdebugger::LauncherProxy) -> Result<Self> {
-        let socket = DebugAgentSocket::create(debugger_proxy)?;
+    pub async fn launch(debugger_proxy: fdebugger::LauncherProxy) -> Result<Self> {
+        let socket = DebugAgentSocket::create(DebuggerProxy::LauncherProxy(debugger_proxy))?;
         Debugger::from_socket(socket).await
     }
 

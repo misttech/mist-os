@@ -471,12 +471,12 @@ void ConsoleContext::HandleNotification(NotificationType type, const std::string
 
 void ConsoleContext::HandlePreviousConnectedProcesses(
     const std::vector<debug_ipc::ProcessRecord>& processes) {
-  OutputBuffer out(OutputBuffer{Syntax::kHeading, "Previously connected processes:\n"});
+  OutputBuffer out(
+      OutputBuffer{Syntax::kHeading, "Attaching to previously connected processes:\n"});
   for (auto& process : processes) {
     out.Append(
         fxl::StringPrintf("%" PRIu64 ": %s\n", process.process_koid, process.process_name.c_str()));
   }
-  out.Append(OutputBuffer{Syntax::kComment, "Type \"attach <pid>\" to reconnect.\n"});
 
   Console::get()->Output(std::move(out));
 }

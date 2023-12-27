@@ -50,7 +50,7 @@ impl FfxMain for DebugTool {
             get_runtime(&instance.moniker, &realm_query).await.unwrap_or(Runtime::Unknown);
         let job_koid = get_job_koid(&runtime).await?;
 
-        let mut debugger = Debugger::new(self.debugger_proxy).await?;
+        let mut debugger = Debugger::launch(self.debugger_proxy).await?;
         debugger.command.attach_job_koid(job_koid);
         debugger.run().await?;
         Ok(())

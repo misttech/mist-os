@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod debug_agent;
+pub mod util;
 
 mod background;
 mod command_builder;

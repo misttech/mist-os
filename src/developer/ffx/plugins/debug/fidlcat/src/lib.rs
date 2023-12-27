@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use errors::ffx_error;
-use ffx_debug_connect::DebugAgentSocket;
+use ffx_debug_connect::{DebugAgentSocket, DebuggerProxy};
 use fho::{deferred, moniker, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::LauncherProxy;
 use fuchsia_async::unblock;
@@ -75,8 +75,9 @@ impl FfxMain for FidlTool {
         if cmd.from.is_some() && cmd.from.as_ref().unwrap() != "device" {
             arguments.add_value("--from", &cmd.from.unwrap());
         } else {
-            let debugger_proxy = launcher_proxy.await?;
-            debug_agent_socket = Some(DebugAgentSocket::create(debugger_proxy)?);
+            debug_agent_socket = Some(DebugAgentSocket::create(DebuggerProxy::LauncherProxy(
+                launcher_proxy.await?,
+            ))?);
         }
 
         arguments.add_option("--to", &cmd.to);

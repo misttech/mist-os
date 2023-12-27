@@ -99,6 +99,11 @@ class Target : public ClientObject {
   // Notification from the agent that a process has exited.
   virtual void OnProcessExiting(int return_code, uint64_t timestamp) = 0;
 
+  // Use |record| to create a client-side process entry for an already attached process from
+  // DebugAgent. This method assumes |record| is up to date, and therefore performs no IPC calls
+  // until fetching modules for the created target and process(es).
+  virtual void AssignPreviousConnectedProcess(const debug_ipc::ProcessRecord& record) = 0;
+
   // Provides the setting schema for this object.
   static fxl::RefPtr<SettingSchema> GetSchema();
 

@@ -45,7 +45,7 @@ async fn start_tool_impl(tool: StartTool) -> Result<()> {
     // If the user wants to debug the component, we need to start the debugger with a breakpoint
     // on `_start`, which will give the user a chance to set any further breakpoints they want.
     let maybe_session = if tool.cmd.debug {
-        let mut debugger = Debugger::new(tool.debugger_proxy).await?;
+        let mut debugger = Debugger::launch(tool.debugger_proxy).await?;
         debugger.command.attach(&format!("{}", moniker));
         debugger.command.break_at("_start");
         let session = debugger.start().await?;

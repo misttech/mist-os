@@ -58,6 +58,7 @@ class TargetImpl : public Target {
   void Attach(uint64_t koid, CallbackWithTimestamp callback) override;
   void Detach(Callback callback) override;
   void OnProcessExiting(int return_code, uint64_t timestamp) override;
+  void AssignPreviousConnectedProcess(const debug_ipc::ProcessRecord& record) override;
 
  private:
   // Most logic between attaching and starting is shared so these functions handle both cases. The

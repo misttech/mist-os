@@ -28,6 +28,7 @@
 #include "src/developer/debug/shared/stream_buffer.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/developer/debug/zxdb/client/arch_info.h"
+#include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/breakpoint_action.h"
 #include "src/developer/debug/zxdb/client/breakpoint_impl.h"
 #include "src/developer/debug/zxdb/client/filter.h"
@@ -493,7 +494,7 @@ void Session::OpenMinidump(const std::string& path, fit::callback<void(const Err
 
 Err Session::Disconnect() {
   if (!stream_ && !is_minidump_) {
-    if (pending_connection_.get()) {
+    if (pending_connection_) {
       // Cancel pending connection.
       pending_connection_ = nullptr;
       return Err();
@@ -820,6 +821,15 @@ void Session::SyncAgentStatus() {
           return;
         }
 
+        if (!reply.filters.empty()) {
+          for (auto& remote_filter : reply.filters) {
+            Filter* client_filter = system().CreateNewFilter();
+            client_filter->SetType(remote_filter.type);
+            client_filter->SetPattern(remote_filter.pattern);
+            client_filter->SetJobKoid(remote_filter.job_koid);
+          }
+        }
+
         // Notify about previously connected processes.
         if (!reply.processes.empty()) {
           for (auto& observer : observers_) {
@@ -839,6 +849,29 @@ void Session::SyncAgentStatus() {
             }
           } else {
             LOGS(Info) << "Not auto connecting to all processes in Limbo due to user override.";
+          }
+        }
+
+        if (!reply.breakpoints.empty()) {
+          for (auto& bp : reply.breakpoints) {
+            Breakpoint* client_bp = system().CreateNewBreakpoint();
+
+            BreakpointSettings settings = client_bp->GetSettings();
+            settings.name = bp.name;
+            settings.type = bp.type;
+            settings.one_shot = bp.one_shot;
+            settings.instructions = bp.instructions;
+            settings.scope = ExecutionScope();
+
+            // TODO(http://b/317387036): There is some information that will be lost about the
+            // breakpoint if it had been installed by zxdb before (breakpoint conditions, file/line
+            // information, etc) which the target never knows about. The best we can do is use the
+            // address that DebugAgent knows about when the breakpoint is installed.
+            for (const auto& location : bp.locations) {
+              settings.locations.emplace_back(location.address);
+            }
+
+            client_bp->SetSettings(settings);
           }
         }
       });

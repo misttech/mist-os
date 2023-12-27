@@ -32,6 +32,7 @@ class MockTarget : public Target {
   void Attach(uint64_t koid, CallbackWithTimestamp callback) override;
   void Detach(Callback callback) override;
   void OnProcessExiting(int return_code, uint64_t timestamp) override;
+  void AssignPreviousConnectedProcess(const debug_ipc::ProcessRecord& record) override {}
 
  private:
   State state_ = kNone;

@@ -284,4 +284,19 @@ void TargetImpl::OnKillOrDetachReply(ProcessObserver::DestroyReason reason, cons
   callback(GetWeakPtr(), issue_err);
 }
 
+void TargetImpl::AssignPreviousConnectedProcess(const debug_ipc::ProcessRecord& record) {
+  process_ = ProcessImpl::FromPreviousProcess(this, record);
+
+  state_ = State::kRunning;
+  for (auto& observer : session()->process_observers()) {
+    observer.DidCreateProcess(process_.get(), 0);
+  }
+
+  // We won't get a modules notification, since DebugAgent is already attached to this process, so
+  // we must request them explicitly. We don't need to do anything in the callback, failure modes
+  // will be output separately (like failed downloads) and observer notifications will be sent from
+  // the symbol handlers.
+  process_->GetModules(false, [](const Err& err, std::vector<debug_ipc::Module> modules) {});
+}
+
 }  // namespace zxdb

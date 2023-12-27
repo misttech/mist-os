@@ -46,6 +46,17 @@ ProcessImpl::~ProcessImpl() {
   }
 }
 
+// static.
+std::unique_ptr<ProcessImpl> ProcessImpl::FromPreviousProcess(
+    TargetImpl* target, const debug_ipc::ProcessRecord& record) {
+  auto process = std::make_unique<ProcessImpl>(target, record.process_koid, record.process_name,
+                                               StartType::kAttach, record.components);
+
+  process->UpdateThreads(record.threads);
+
+  return process;
+}
+
 ThreadImpl* ProcessImpl::GetThreadImplFromKoid(uint64_t koid) {
   auto found = threads_.find(koid);
   if (found == threads_.end())

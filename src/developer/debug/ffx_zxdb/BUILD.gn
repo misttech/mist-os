@@ -32,5 +32,6 @@ rustc_library("ffx_zxdb") {
     "src/debug_agent.rs",
     "src/debugger.rs",
     "src/lib.rs",
+    "src/util.rs",
   ]
 }

@@ -204,6 +204,16 @@ void DebugAgent::OnStatus(const debug_ipc::StatusRequest& request, debug_ipc::St
     reply->processes.emplace_back(std::move(process_record));
   }
 
+  reply->breakpoints.reserve(breakpoints_.size());
+  for (auto& [_, bp] : breakpoints_) {
+    reply->breakpoints.push_back(bp.settings());
+  }
+
+  reply->filters.reserve(filters_.size());
+  for (auto& filter : filters_) {
+    reply->filters.push_back(filter.filter());
+  }
+
   // Get the limbo processes.
   if (system_interface_->GetLimboProvider().Valid()) {
     for (const auto& [process_koid, record] :

@@ -29,6 +29,9 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
               const std::vector<debug_ipc::ComponentInfo>& component_info);
   ~ProcessImpl() override;
 
+  static std::unique_ptr<ProcessImpl> FromPreviousProcess(TargetImpl* target,
+                                                          const debug_ipc::ProcessRecord& record);
+
   ThreadImpl* GetThreadImplFromKoid(uint64_t koid);
 
   TargetImpl* target() const { return target_; }

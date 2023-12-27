@@ -36,7 +36,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 58;
+constexpr uint32_t kCurrentProtocolVersion = 59;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -243,6 +243,7 @@ struct HelloReply {
 struct StatusRequest {
   void Serialize(Serializer& ser, uint32_t ver) {}
 };
+
 struct StatusReply {
   // All the processes that the debug agent is currently attached.
   std::vector<ProcessRecord> processes;
@@ -252,7 +253,18 @@ struct StatusReply {
   // wait for a debugger, it is said that those processes are in "limbo".
   std::vector<ProcessRecord> limbo;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | processes | limbo; }
+  // All the breakpoints (pending or active, hardware or software) registered with the Agent.
+  std::vector<BreakpointSettings> breakpoints;
+
+  // All the installed filters.
+  std::vector<Filter> filters;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | processes | limbo;
+    if (ver >= 59) {
+      ser | breakpoints | filters;
+    }
+  }
 };
 
 struct KillRequest {

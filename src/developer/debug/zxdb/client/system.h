@@ -13,6 +13,7 @@
 #include "src/developer/debug/zxdb/client/client_object.h"
 #include "src/developer/debug/zxdb/client/download_manager.h"
 #include "src/developer/debug/zxdb/client/map_setting_store.h"
+#include "src/developer/debug/zxdb/client/session_observer.h"
 #include "src/developer/debug/zxdb/client/setting_store_observer.h"
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
@@ -34,7 +35,7 @@ class TargetImpl;
 
 // Represents the client's view of the system-wide state on the debugged
 // computer.
-class System : public ClientObject, public SettingStoreObserver {
+class System : public ClientObject, public SessionObserver, public SettingStoreObserver {
  public:
   enum class Where {
     kNone,    // No connection.
@@ -177,6 +178,13 @@ class System : public ClientObject, public SettingStoreObserver {
  private:
   void AddNewTarget(std::unique_ptr<TargetImpl> target);
   void AddSymbolServer(std::unique_ptr<SymbolServer> server);
+
+  // Returns an unused Target or allocates a new one, if there are none available.
+  Target* GetNextTarget();
+
+  // SessionObserver implementation.
+  void HandlePreviousConnectedProcesses(
+      const std::vector<debug_ipc::ProcessRecord>& procs) override;
 
   Where where_ = Where::kNone;
 

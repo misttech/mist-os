@@ -15,19 +15,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub enum DebuggerProxy {
+    LauncherProxy(fdebugger::LauncherProxy),
+    DebugAgentProxy(fdebugger::DebugAgentProxy),
+}
+
 /// Represents a connectable socket to the remote debug_agent. It's essentially a FIDL socket and a
-/// UNIX socket proxied by us.
+/// UNIX socket proxied by us. If |proxy| is a fucshia.debugger.Launcher proxy, a new DebugAgent
+/// will be launched to connect this socket, otherwise, the existing DebugAgent on the other end of
+/// the fuchsia.debugger.DebugAgent proxy will be connected.
 pub struct DebugAgentSocket {
-    launcher_proxy: fdebugger::LauncherProxy,
+    proxy: DebuggerProxy,
     unix_socket_path: PathBuf,
     unix_socket: UnixListener,
 }
 
 impl DebugAgentSocket {
     /// Create a UNIX socket on the host side for zxdb/fidlcat to connect.
-    pub fn create(launcher_proxy: fdebugger::LauncherProxy) -> Result<DebugAgentSocket> {
+    pub fn create(proxy: DebuggerProxy) -> Result<DebugAgentSocket> {
         let (unix_socket_path, unix_socket) = make_temp_unix_socket()?;
-        return Ok(DebugAgentSocket { launcher_proxy, unix_socket_path, unix_socket });
+        return Ok(DebugAgentSocket { proxy, unix_socket_path, unix_socket });
     }
 
     /// The path to the UNIX socket.
@@ -45,20 +52,23 @@ impl DebugAgentSocket {
         // Create a FIDL socket to the debug_agent on the device.
         let (fidl_left, fidl_right) = fidl::Socket::create_stream();
 
-        let (client_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>()?;
-
-        // TODO(jruthe): give callers options to connect to already existing
-        // DebugAgents or to launch a new one rather than unconditionally
-        // starting a new one every time.
-        self.launcher_proxy.launch(server_end).await?.map_err(Status::from_raw)?;
-
-        client_proxy.connect(fidl_right).await?.map_err(Status::from_raw)?;
-
         let fidl_conn = fidl::AsyncSocket::from_socket(fidl_left)?;
 
         let (mut unix_rx, mut unix_tx) = unix_conn.split();
         let (mut fidl_rx, mut fidl_tx) = fidl_conn.split();
+
+        let agent = match &self.proxy {
+            DebuggerProxy::DebugAgentProxy(agent) => agent.clone(),
+            DebuggerProxy::LauncherProxy(launcher) => {
+                // No choice given, launch a new DebugAgent.
+                let (client_proxy, server_end) =
+                    fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>()?;
+                launcher.launch(server_end).await?.map_err(Status::from_raw)?;
+                client_proxy
+            }
+        };
+
+        agent.connect(fidl_right).await?.map_err(Status::from_raw)?;
 
         // Forward from UNIX socket to FIDL socket.
         let unix_to_fidl = async {
