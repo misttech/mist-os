@@ -37,7 +37,7 @@ class GcManager {
 
   F2fs *fs_ = nullptr;
   SuperblockInfo &superblock_info_;
-  uint32_t cur_victim_sec_;  // current victim section num
+  uint32_t cur_victim_sec_ = kNullSecNo;  // current victim section num
   std::binary_semaphore run_{1};
   SegmentManager &segment_manager_;
 

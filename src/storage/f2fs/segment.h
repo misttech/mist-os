@@ -189,7 +189,7 @@ class SegmentManager {
 
   bool CompareValidBlocks(uint32_t blocks, uint32_t segno, bool section)
       __TA_EXCLUDES(sentry_lock_);
-  uint32_t GetValidBlocks(uint32_t segno, bool section) __TA_REQUIRES_SHARED(sentry_lock_);
+  uint32_t GetValidBlocks(uint32_t segno, bool section) const __TA_REQUIRES_SHARED(sentry_lock_);
   bool HasNotEnoughFreeSecs(uint32_t freed = 0);
   uint32_t Utilization();
   uint32_t CursegSegno(int type);
@@ -200,10 +200,10 @@ class SegmentManager {
   pgoff_t CurrentSitAddr(uint32_t start) __TA_REQUIRES_SHARED(sentry_lock_);
   pgoff_t NextSitAddr(pgoff_t block_addr) __TA_REQUIRES_SHARED(sentry_lock_);
   void SetToNextSit(uint32_t start) __TA_REQUIRES(sentry_lock_);
-  uint64_t GetMtime();
-  block_t StartSumBlock();
-  block_t SumBlkAddr(int base, int type);
-  bool SecUsageCheck(uint32_t secno) __TA_REQUIRES_SHARED(seglist_lock_);
+  uint64_t GetMtime() const;
+  block_t StartSumBlock() const;
+  block_t SumBlkAddr(int base, int type) const;
+  bool SecUsageCheck(uint32_t secno) const __TA_REQUIRES_SHARED(seglist_lock_);
   bool IsValidBlock(uint32_t segno, uint64_t offset) __TA_EXCLUDES(sentry_lock_);
 
   block_t PrefreeSegments() __TA_EXCLUDES(seglist_lock_);
@@ -272,16 +272,19 @@ class SegmentManager {
 
   block_t GetMainAreaStartBlock() const { return main_blkaddr_; }
   CursegInfo *CURSEG_I(CursegType type) { return &curseg_array_[static_cast<int>(type)]; }
+  const CursegInfo *CURSEG_I(CursegType type) const {
+    return &curseg_array_[static_cast<int>(type)];
+  }
 
-  block_t StartBlock(uint32_t segno) {
+  block_t StartBlock(uint32_t segno) const {
     return (seg0_blkaddr_ + (GetR2LSegNo(segno) << superblock_info_.GetLogBlocksPerSeg()));
   }
-  block_t NextFreeBlkAddr(CursegType type) {
-    CursegInfo *curseg = CURSEG_I(type);
+  block_t NextFreeBlkAddr(CursegType type) const {
+    const CursegInfo *curseg = CURSEG_I(type);
     return (StartBlock(curseg->segno) + curseg->next_blkoff);
   }
   block_t GetSegOffFromSeg0(block_t blk_addr) const { return blk_addr - seg0_blkaddr_; }
-  uint32_t GetSegNoFromSeg0(block_t blk_addr) {
+  uint32_t GetSegNoFromSeg0(block_t blk_addr) const {
     return GetSegOffFromSeg0(blk_addr) >> superblock_info_.GetLogBlocksPerSeg();
   }
   uint32_t GetSegmentNumber(block_t blk_addr) {
@@ -289,8 +292,8 @@ class SegmentManager {
                ? kNullSegNo
                : GetL2RSegNo(GetSegNoFromSeg0(blk_addr));
   }
-  uint32_t GetSecNo(uint32_t segno) { return segno / superblock_info_.GetSegsPerSec(); }
-  uint32_t GetZoneNoFromSegNo(uint32_t segno) {
+  uint32_t GetSecNo(uint32_t segno) const { return segno / superblock_info_.GetSegsPerSec(); }
+  uint32_t GetZoneNoFromSegNo(uint32_t segno) const {
     return segno / superblock_info_.GetSegsPerSec() / superblock_info_.GetSecsPerZone();
   }
   block_t GetSumBlock(uint32_t segno) const { return ssa_blkaddr_ + segno; }
@@ -323,17 +326,19 @@ class SegmentManager {
 
   // This function calculates the maximum cost for a victim in each GcType
   // Any segment with a less cost value becomes a victim candidate.
-  size_t GetMaxCost(const VictimSelPolicy &policy);
+  size_t GetMaxCost(const VictimSelPolicy &policy) const;
 
   // This method determines GcMode for GetVictimByDefault
-  VictimSelPolicy GetVictimSelPolicy(GcType gc_type, CursegType type, AllocMode alloc_mode)
+  VictimSelPolicy GetVictimSelPolicy(GcType gc_type, CursegType type, AllocMode alloc_mode) const
       __TA_REQUIRES(seglist_lock_);
 
+  uint32_t GetBackgroundVictim() const __TA_REQUIRES_SHARED(seglist_lock_);
+
   // This method calculates the gc cost for each dirty segment
-  uint32_t GetGcCost(uint32_t segno, const VictimSelPolicy &policy)
+  size_t GetGcCost(uint32_t segno, const VictimSelPolicy &policy) const
       __TA_REQUIRES_SHARED(sentry_lock_);
 
-  uint32_t GetGreedyCost(uint32_t segno) __TA_REQUIRES_SHARED(sentry_lock_);
+  size_t GetCostBenefitRatio(uint32_t segno) const __TA_REQUIRES_SHARED(sentry_lock_);
 
   // for tests and fsck
   void SetCurVictimSec(uint32_t secno) TA_NO_THREAD_SAFETY_ANALYSIS { cur_victim_sec_ = secno; }
@@ -384,7 +389,7 @@ class SegmentManager {
            (segno == CURSEG_I(CursegType::kCursegColdNode)->segno);
   }
 
-  bool IsCurSec(uint32_t secno) {
+  bool IsCurSec(uint32_t secno) const {
     return (secno ==
             CURSEG_I(CursegType::kCursegHotData)->segno / superblock_info_.GetSegsPerSec()) ||
            (secno ==
@@ -400,8 +405,8 @@ class SegmentManager {
   }
 
   // L: Logical segment number in volume, R: Relative segment number in main area
-  uint32_t GetL2RSegNo(uint32_t segno) { return (segno - start_segno_); }
-  uint32_t GetR2LSegNo(uint32_t segno) { return (segno + start_segno_); }
+  uint32_t GetL2RSegNo(uint32_t segno) const { return (segno - start_segno_); }
+  uint32_t GetR2LSegNo(uint32_t segno) const { return (segno + start_segno_); }
   zx::result<LockedPage> GetCurrentSitPage(uint32_t segno) __TA_REQUIRES(sentry_lock_);
   zx::result<LockedPage> GetNextSitPage(uint32_t start) __TA_REQUIRES(sentry_lock_);
 

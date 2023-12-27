@@ -5,30 +5,47 @@
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
-uint32_t SegmentManager::GetGcCost(uint32_t segno, const VictimSelPolicy &policy) {
-  if (policy.alloc_mode == AllocMode::kSSR)
+size_t SegmentManager::GetGcCost(uint32_t segno, const VictimSelPolicy &policy) const {
+  if (policy.alloc_mode == AllocMode::kSSR) {
     return sit_info_->sentries[segno].ckpt_valid_blocks;
+  }
 
   if (policy.gc_mode == GcMode::kGcGreedy) {
-    return GetGreedyCost(segno);
-  } else {
-    // TODO: Add GetCbCost() for GcMode::kGcCb when Background GC is implemented.
-    return kUint32Max;
+    return GetValidBlocks(segno, true);
   }
+  return GetCostBenefitRatio(segno);
 }
 
-uint32_t SegmentManager::GetGreedyCost(uint32_t segno) {
-  uint32_t valid_blocks = GetValidBlocks(segno, true);
-
-  if (IsDataSeg(static_cast<CursegType>(sit_info_->sentries[segno].type))) {
-    return 2 * valid_blocks;
-  } else {
-    return valid_blocks;
+size_t SegmentManager::GetCostBenefitRatio(uint32_t segno) const {
+  size_t start = GetSecNo(segno) * superblock_info_.GetSegsPerSec();
+  uint64_t mtime = 0;
+  for (size_t i = 0; i < superblock_info_.GetSegsPerSec(); i++) {
+    mtime += sit_info_->sentries[start + i].mtime;
   }
+  mtime = mtime / superblock_info_.GetSegsPerSec();
+  size_t valid_blocks_ratio = 100 * GetValidBlocks(segno, true) / superblock_info_.GetSegsPerSec() /
+                              superblock_info_.GetBlocksPerSeg();
+
+  // Handle if the system time is changed by user
+  if (mtime < sit_info_->min_mtime) {
+    sit_info_->min_mtime = mtime ? mtime - 1 : 0;
+  }
+  if (mtime > sit_info_->max_mtime) {
+    sit_info_->max_mtime = std::max(GetMtime(), mtime + 1);
+  }
+
+  // A higher value means that it's been longer since it was last modified.
+  size_t age = 0;
+  if (sit_info_->max_mtime != sit_info_->min_mtime) {
+    age = 100 -
+          (100 * (mtime - sit_info_->min_mtime) / (sit_info_->max_mtime - sit_info_->min_mtime));
+  }
+
+  return kUint32Max - (100 * (100 - valid_blocks_ratio) * age / (100 + valid_blocks_ratio));
 }
 
 VictimSelPolicy SegmentManager::GetVictimSelPolicy(GcType gc_type, CursegType type,
-                                                   AllocMode alloc_mode) {
+                                                   AllocMode alloc_mode) const {
   VictimSelPolicy policy;
   policy.alloc_mode = alloc_mode;
   if (policy.alloc_mode == AllocMode::kSSR) {
@@ -51,7 +68,7 @@ VictimSelPolicy SegmentManager::GetVictimSelPolicy(GcType gc_type, CursegType ty
   return policy;
 }
 
-size_t SegmentManager::GetMaxCost(const VictimSelPolicy &policy) {
+size_t SegmentManager::GetMaxCost(const VictimSelPolicy &policy) const {
   if (policy.alloc_mode == AllocMode::kSSR)
     return 1 << superblock_info_.GetLogBlocksPerSeg();
   if (policy.gc_mode == GcMode::kGcGreedy)
@@ -59,6 +76,22 @@ size_t SegmentManager::GetMaxCost(const VictimSelPolicy &policy) {
   else if (policy.gc_mode == GcMode::kGcCb)
     return kUint32Max;
   return 0;
+}
+
+uint32_t SegmentManager::GetBackgroundVictim() const {
+  const size_t last = superblock_info_.GetTotalSections();
+  // If the gc_type is GcType::kFgGc, we can select victim segments
+  // selected by background GC before.
+  // Those segments might have smaller valid blocks to be migrated.
+  size_t secno = 0;
+  while (!dirty_info_->victim_secmap.Scan(secno, last, false, &secno)) {
+    if (SecUsageCheck(static_cast<uint32_t>(secno))) {
+      ++secno;
+      continue;
+    }
+    return safemath::checked_cast<uint32_t>(secno);
+  }
+  return kNullSegNo;
 }
 
 zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegType type,
@@ -75,11 +108,13 @@ zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegTy
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
 
-#if 0  // porting needed
-  //  if (p.alloc_mode == AllocMode::kLFS && gc_type == GcType::kFgGc) {
-  //    p.min_segno = CheckBgVictims();
-  //  }
-#endif
+  if (policy.alloc_mode == AllocMode::kLFS && gc_type == GcType::kFgGc) {
+    uint32_t secno = GetBackgroundVictim();
+    if (secno != kNullSegNo) {
+      dirty_info_->victim_secmap.ClearOne(secno);
+      policy.min_segno = safemath::checked_cast<uint32_t>(secno * superblock_info_.GetSegsPerSec());
+    }
+  }
 
   auto &last_victim = last_victim_[static_cast<int>(policy.gc_mode)];
   auto gc_mode = static_cast<int>(policy.gc_mode);
@@ -111,12 +146,11 @@ zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegTy
       if (SecUsageCheck(secno)) {
         continue;
       }
-
       if (gc_type == GcType::kBgGc && dirty_info_->victim_secmap.GetOne(secno)) {
         continue;
       }
 
-      uint32_t cost = GetGcCost(segno, policy);
+      size_t cost = GetGcCost(segno, policy);
 
       if (policy.min_cost > cost) {
         policy.min_segno = segno;
@@ -165,7 +199,6 @@ bool SegmentManager::IsValidBlock(uint32_t segno, uint64_t offset) {
 GcManager::GcManager(F2fs *fs)
     : fs_(fs),
       superblock_info_(fs->GetSuperblockInfo()),
-      cur_victim_sec_(kNullSecNo),
       segment_manager_(fs->GetSegmentManager()) {}
 
 zx::result<uint32_t> GcManager::Run() {
@@ -184,8 +217,7 @@ zx::result<uint32_t> GcManager::Run() {
   auto release = fit::defer([&] { run_.release(); });
   std::lock_guard gc_lock(f2fs::GetGlobalLock());
 
-  // TODO: Default gc_type should be kBgGc when background gc is implemented.
-  GcType gc_type = GcType::kFgGc;
+  GcType gc_type = GcType::kBgGc;
   uint32_t sec_freed = 0;
 
   // FG_GC must run when there is no space (e.g., HasNotEnoughFreeSecs() == true).
@@ -218,15 +250,11 @@ zx::result<uint32_t> GcManager::Run() {
       gc_type = GcType::kFgGc;
     }
 
-    uint32_t segno;
-    if (auto ret = segment_manager_.GetGcVictim(gc_type, CursegType::kNoCheckType);
-        ret.is_error()) {
+    auto segno_or = segment_manager_.GetGcVictim(gc_type, CursegType::kNoCheckType);
+    if (segno_or.is_error()) {
       break;
-    } else {
-      segno = ret.value();
     }
-
-    if (auto err = DoGarbageCollect(segno, gc_type); err != ZX_OK) {
+    if (auto err = DoGarbageCollect(*segno_or, gc_type); err != ZX_OK) {
       return zx::error(err);
     }
 

@@ -130,7 +130,7 @@ bool SegmentManager::CompareValidBlocks(uint32_t blocks, uint32_t segno, bool se
   return GetValidBlocks(segno, section) == blocks;
 }
 
-uint32_t SegmentManager::GetValidBlocks(uint32_t segno, bool section) {
+uint32_t SegmentManager::GetValidBlocks(uint32_t segno, bool section) const {
   // In order to get # of valid blocks in a section instantly from many
   // segments, f2fs manages two counting structures separately.
   if (section && superblock_info_.GetSegsPerSec() > 1) {
@@ -357,22 +357,22 @@ void SegmentManager::SetToNextSit(uint32_t start) {
   }
 }
 
-uint64_t SegmentManager::GetMtime() {
+uint64_t SegmentManager::GetMtime() const {
   auto cur_time = time(nullptr);
   return sit_info_->elapsed_time + cur_time - sit_info_->mounted_time;
 }
 
-block_t SegmentManager::StartSumBlock() {
+block_t SegmentManager::StartSumBlock() const {
   return superblock_info_.StartCpAddr() +
          LeToCpu(superblock_info_.GetCheckpoint().cp_pack_start_sum);
 }
 
-block_t SegmentManager::SumBlkAddr(int base, int type) {
+block_t SegmentManager::SumBlkAddr(int base, int type) const {
   return superblock_info_.StartCpAddr() +
          LeToCpu(superblock_info_.GetCheckpoint().cp_pack_total_block_count) - (base + 1) + type;
 }
 
-bool SegmentManager::SecUsageCheck(unsigned int secno) {
+bool SegmentManager::SecUsageCheck(unsigned int secno) const {
   return IsCurSec(secno) || cur_victim_sec_ == secno;
 }
 

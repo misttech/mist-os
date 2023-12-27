@@ -14,8 +14,36 @@
 namespace f2fs {
 namespace {
 
-using SegmentManagerTest = F2fsFakeDevTestFixture;
 using Runner = ComponentRunner;
+
+class SegmentManagerTest : public F2fsFakeDevTestFixture {
+ public:
+  SegmentManagerTest() {}
+
+ protected:
+  void MakeDirtySegments(size_t invalidate_ratio, int num_files) {
+    fs_->GetGcManager().DisableFgGc();
+    for (int file_no = 0; file_no < num_files; ++file_no) {
+      fbl::RefPtr<fs::Vnode> test_file;
+      EXPECT_EQ(root_dir_->Create(std::to_string(file_num++), S_IFREG, &test_file), ZX_OK);
+      auto vnode = fbl::RefPtr<File>::Downcast(std::move(test_file));
+      std::array<char, kPageSize> buf;
+      std::memset(buf.data(), file_no, buf.size());
+      for (size_t i = 0; i < fs_->GetSuperblockInfo().GetBlocksPerSeg(); ++i) {
+        FileTester::AppendToFile(vnode.get(), buf.data(), buf.size());
+      }
+      vnode->SyncFile(0, vnode->GetSize(), 0);
+      size_t truncate_size = vnode->GetSize() * (100 - invalidate_ratio) / 100;
+      EXPECT_EQ(vnode->Truncate(truncate_size), ZX_OK);
+      vnode->Close();
+    }
+    fs_->SyncFs();
+    fs_->GetGcManager().EnableFgGc();
+  }
+
+ private:
+  int file_num = 0;
+};
 
 TEST_F(SegmentManagerTest, BlkChaining) {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
@@ -262,6 +290,67 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) TA_NO_THREAD_SAFETY_ANALYSIS {
   victim_or = fs_->GetSegmentManager().GetVictimByDefault(GcType::kBgGc, CursegType::kCursegHotNode,
                                                           AllocMode::kLFS);
   ASSERT_TRUE(victim_or.is_error());
+}
+
+TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
+  DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
+  auto &bitmap = dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)];
+
+  size_t invalid_ratio = 2;
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  // Make a dirty segment with 98% of valid blocks
+  MakeDirtySegments(invalid_ratio, 1);
+  ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 1U);
+
+  // Make a dirty segment with 97% of valid blocks after 1 sec
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  MakeDirtySegments(invalid_ratio + 1, 1);
+  ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 2U);
+
+  // Make a dirty segment with 99% of valid blocks after 1 sec
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  MakeDirtySegments(invalid_ratio - 1, 1);
+  ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 3U);
+
+  size_t valid_blocks_98 = CheckedDivRoundUp<size_t>(
+      fs_->GetSuperblockInfo().GetBlocksPerSeg() * (100 - invalid_ratio), 100);
+  size_t valid_blocks_97 = CheckedDivRoundUp<size_t>(
+      fs_->GetSuperblockInfo().GetBlocksPerSeg() * (100 - invalid_ratio - 1), 100);
+
+  // GcType::kFgGc should select a victim according to valid blocks
+  auto victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
+      GcType::kFgGc, CursegType::kNoCheckType, AllocMode::kLFS);
+  ASSERT_TRUE(victim_seg_or.is_ok());
+  ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_97);
+  fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
+
+  // GcType::kBgGc should select a victim according to the segment age and valid blocks
+  victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
+      GcType::kBgGc, CursegType::kNoCheckType, AllocMode::kLFS);
+  ASSERT_TRUE(victim_seg_or.is_ok());
+  ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_98);
+
+  // When a victim that GcType::kBgGc chooses is not handled yet, GcType::kFgGc should select the
+  // victim
+  victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
+      GcType::kFgGc, CursegType::kNoCheckType, AllocMode::kLFS);
+  ASSERT_TRUE(victim_seg_or.is_ok());
+  ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_98);
+  fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
+
+  // Even after system time is modified, it can select a victim correctly.
+  fs_->GetSegmentManager().GetSitInfo().min_mtime = time(nullptr);
+  victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
+      GcType::kBgGc, CursegType::kNoCheckType, AllocMode::kLFS);
+  ASSERT_TRUE(victim_seg_or.is_ok());
+  ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_98);
+
+  fs_->GetSegmentManager().GetSitInfo().max_mtime = 0;
+  dirty_info->victim_secmap.ClearOne(*victim_seg_or / fs_->GetSuperblockInfo().GetSegsPerSec());
+  victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
+      GcType::kBgGc, CursegType::kNoCheckType, AllocMode::kLFS);
+  ASSERT_TRUE(victim_seg_or.is_ok());
+  ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_98);
 }
 
 TEST_F(SegmentManagerTest, AllocateNewSegments) TA_NO_THREAD_SAFETY_ANALYSIS {
