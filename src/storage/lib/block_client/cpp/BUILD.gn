@@ -15,9 +15,24 @@ config("migration") {
   include_dirs = [ "include" ]
 }
 
+source_set("interface") {
+  sources = [ "block_device.h" ]
+  public_deps = [
+    # For storage/buffer/vmoid_registry.h
+    "//zircon/system/ulib/storage/buffer",
+
+    # For fidl/fuchsia.../wire.h
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+
+    # For lib/zx/...
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 static_library("cpp") {
   public = [
-    "block_device.h",
     "block_group_registry.h",
     "client.h",
     "reader.h",
@@ -36,6 +51,8 @@ static_library("cpp") {
   public_configs = [ ":migration" ]
 
   public_deps = [
+    ":interface",
+
     # fake_block_device.h has #include <range/range.h>.
     "//zircon/system/ulib/range",
 
@@ -46,14 +63,6 @@ static_library("cpp") {
     "//zircon/system/ulib/storage/buffer",
 
     # client.h has #include <lib/zx/fifo.h>.
-    "//zircon/system/ulib/zx",
-
-    # block_device.h has #include <.../wire.h>
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
-
-    # block_device.h has #include <lib/zx/result.h>
     "//zircon/system/ulib/zx",
 
     # reader.h has #include <lib/fzl/owned-vmo-mapper.h>

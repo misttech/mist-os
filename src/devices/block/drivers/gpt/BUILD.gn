@@ -45,7 +45,7 @@ fuchsia_driver("gpt-driver") {
     "//src/lib/ddk",
     "//src/lib/fidl/cpp",
     "//src/storage/gpt",
-    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/block_client/cpp:interface",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/third_party/ulib/cksum",
