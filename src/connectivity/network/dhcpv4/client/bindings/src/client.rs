@@ -5,7 +5,6 @@
 use std::{cell::RefCell, num::NonZeroU64};
 
 use anyhow::Context as _;
-use async_trait::async_trait;
 use fidl::endpoints::{self, Proxy as _};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp::{
@@ -120,7 +119,6 @@ pub(crate) async fn serve_client(
 
 struct Clock;
 
-#[async_trait(?Send)]
 impl dhcp_client_core::deps::Clock for Clock {
     type Instant = fasync::Time;
 

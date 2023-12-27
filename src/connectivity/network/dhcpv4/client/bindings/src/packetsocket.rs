@@ -4,7 +4,6 @@
 
 use std::num::NonZeroU64;
 
-use async_trait::async_trait;
 use dhcp_client_core::deps::PacketSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
@@ -192,7 +191,6 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
 // TODO(https://fxbug.dev/124913): expose this from `libc` crate on fuchsia.
 const ARPHRD_ETHER: libc::c_ushort = 1;
 
-#[async_trait(?Send)]
 impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {
     async fn send_to(
         &self,
@@ -284,7 +282,6 @@ impl PacketSocketProviderImpl {
     }
 }
 
-#[async_trait(?Send)]
 impl PacketSocketProvider for PacketSocketProviderImpl {
     type Sock = PacketSocket;
 

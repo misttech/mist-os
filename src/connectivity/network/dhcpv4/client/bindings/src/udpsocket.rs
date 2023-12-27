@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
 use dhcp_client_core::deps::UdpSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fuchsia_async as fasync;
@@ -175,7 +174,6 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
     }
 }
 
-#[async_trait(?Send)]
 impl dhcp_client_core::deps::Socket<std::net::SocketAddr> for UdpSocket {
     async fn send_to(
         &self,
@@ -205,7 +203,6 @@ impl dhcp_client_core::deps::Socket<std::net::SocketAddr> for UdpSocket {
 
 pub(crate) struct LibcUdpSocketProvider;
 
-#[async_trait(?Send)]
 impl UdpSocketProvider for LibcUdpSocketProvider {
     type Sock = UdpSocket;
 
@@ -235,7 +232,6 @@ mod testutil {
         }
     }
 
-    #[async_trait(?Send)]
     impl UdpSocketProvider for TestUdpSocketProviderImpl {
         type Sock = UdpSocket;
 

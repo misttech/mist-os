@@ -6,7 +6,6 @@
 //! core, and provides fake implementations of these dependencies for testing
 //! purposes.
 
-use async_trait::async_trait;
 use fuchsia_async as fasync;
 use rand::Rng;
 
@@ -59,14 +58,12 @@ pub enum SocketError {
     Other(std::io::Error),
 }
 
-// While #[async_trait] causes the Futures returned by the trait functions to be
-// heap-allocated, we accept this because the DHCP client sends messages
-// infrequently (once every few seconds), and because we expect
-// async_fn_in_trait to be stabilized in the relatively near future.
-// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
-// instead.
-#[async_trait(?Send)]
 /// Abstracts sending and receiving datagrams on a socket.
+// `async_fn_in_trait` is stabilized, but currently emits a lint warning when
+// used in pub traits due to the inability to specify Send or Sync bounds on
+// the Future returned by the async fn. We suppress this lint as the DHCP client
+// uses only a local executor and thus doesn't require Send + Sync.
+#[allow(async_fn_in_trait)]
 pub trait Socket<T> {
     /// Sends a datagram containing the contents of `buf` to `addr`.
     async fn send_to(&self, buf: &[u8], addr: T) -> Result<(), SocketError>;
@@ -76,14 +73,12 @@ pub trait Socket<T> {
     async fn recv_from(&self, buf: &mut [u8]) -> Result<DatagramInfo<T>, SocketError>;
 }
 
-// While #[async_trait] causes the Futures returned by the trait functions to be
-// heap-allocated, we accept this because we expect creating a socket to be an
-// infrequent operation, and because we expect async_fn_in_trait to be
-// stabilized in the relatively near future.
-// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
-// instead.
-#[async_trait(?Send)]
 /// Provides access to AF_PACKET sockets.
+// `async_fn_in_trait` is stabilized, but currently emits a lint warning when
+// used in pub traits due to the inability to specify Send or Sync bounds on
+// the Future returned by the async fn. We suppress this lint as the DHCP client
+// uses only a local executor and thus doesn't require Send + Sync.
+#[allow(async_fn_in_trait)]
 pub trait PacketSocketProvider {
     /// The type of sockets provided by this `PacketSocketProvider`.
     type Sock: Socket<net_types::ethernet::Mac>;
@@ -94,14 +89,12 @@ pub trait PacketSocketProvider {
     async fn get_packet_socket(&self) -> Result<Self::Sock, SocketError>;
 }
 
-// While #[async_trait] causes the Futures returned by the trait functions to be
-// heap-allocated, we accept this because we expect creating a socket to be an
-// infrequent operation, and because we expect async_fn_in_trait to be
-// stabilized in the relatively near future.
-// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
-// instead.
-#[async_trait(?Send)]
 /// Provides access to UDP sockets.
+// `async_fn_in_trait` is stabilized, but currently emits a lint warning when
+// used in pub traits due to the inability to specify Send or Sync bounds on
+// the Future returned by the async fn. We suppress this lint as the DHCP client
+// uses only a local executor and thus doesn't require Send + Sync.
+#[allow(async_fn_in_trait)]
 pub trait UdpSocketProvider {
     /// The type of sockets provided by this `UdpSocketProvider`.
     type Sock: Socket<std::net::SocketAddr>;
@@ -141,14 +134,12 @@ impl Instant for fasync::Time {
     }
 }
 
-// While #[async_trait] causes the Futures returned by the trait functions to be
-// heap-allocated, we accept this because waiting until a given time is expected
-// to be time-consuming (by definition), and because we expect async_fn_in_trait
-// to be stabilized in the relatively near future.
-// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
-// instead.
-#[async_trait(?Send)]
 /// Provides access to system-time-related operations.
+// `async_fn_in_trait` is stabilized, but currently emits a lint warning when
+// used in pub traits due to the inability to specify Send or Sync bounds on
+// the Future returned by the async fn. We suppress this lint as the DHCP client
+// uses only a local executor and thus doesn't require Send + Sync.
+#[allow(async_fn_in_trait)]
 pub trait Clock {
     /// The type representing monotonic system time.
     type Instant: Instant;
@@ -217,7 +208,6 @@ pub(crate) mod testutil {
         }
     }
 
-    #[async_trait(?Send)]
     impl<T: Send> Socket<T> for FakeSocket<T> {
         async fn send_to(&self, buf: &[u8], addr: T) -> Result<(), SocketError> {
             let FakeSocket { sender, receiver: _ } = self;
@@ -237,7 +227,6 @@ pub(crate) mod testutil {
         }
     }
 
-    #[async_trait(?Send)]
     impl<T, U> Socket<U> for T
     where
         T: AsRef<FakeSocket<U>>,
@@ -278,7 +267,6 @@ pub(crate) mod testutil {
         }
     }
 
-    #[async_trait(?Send)]
     impl PacketSocketProvider for FakeSocketProvider<net_types::ethernet::Mac, ()> {
         type Sock = Rc<FakeSocket<net_types::ethernet::Mac>>;
         async fn get_packet_socket(&self) -> Result<Self::Sock, SocketError> {
@@ -290,7 +278,6 @@ pub(crate) mod testutil {
         }
     }
 
-    #[async_trait(?Send)]
     impl UdpSocketProvider for FakeSocketProvider<std::net::SocketAddr, std::net::SocketAddr> {
         type Sock = Rc<FakeSocket<std::net::SocketAddr>>;
         async fn bind_new_udp_socket(
@@ -399,7 +386,6 @@ pub(crate) mod testutil {
         executor.run_until_stalled(main_future)
     }
 
-    #[async_trait(?Send)]
     impl Clock for Rc<RefCell<FakeTimeController>> {
         type Instant = std::time::Duration;
 
