@@ -1056,6 +1056,11 @@ impl FilesystemLauncher {
             connect_to_protocol_at_path::<VolumeManagerMarker>(&fvm_topo_path)
                 .context("Failed to connect to the fvm VolumeManagerProxy")?;
 
+        // **NOTE**: We must call VolumeManager::GetInfo() to ensure all partitions are visible when
+        // we enumerate them below. See https://fxbug.dev/126961 for more information.
+        zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
+            .context("get_info failed")?;
+
         let dir_entries = fuchsia_fs::directory::readdir(&fvm_directory_proxy).await?;
         for entry in dir_entries {
             // Destroy all fvm partitions aside from blobfs
