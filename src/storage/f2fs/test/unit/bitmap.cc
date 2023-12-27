@@ -123,33 +123,33 @@ TEST_F(BitmapTest, CloneBits) {
   size_t num_bits = GetBitSize(kPageSize * 2);
   RawBitmap bits1;
   RawBitmap bits2;
-  uint8_t raw_bits[num_bytes];
-  memset(raw_bits, 0xAA, num_bytes);
+  auto raw_bits = std::make_unique<uint8_t[]>(num_bytes);
+  memset(raw_bits.get(), 0xAA, num_bytes);
   bits1.Reset(num_bits);
   bits2.Reset(num_bits);
 
   // Byte-aligned copy
-  ASSERT_EQ(CloneBits(bits1, raw_bits, num_bits, num_bits), ZX_ERR_INVALID_ARGS);
-  ASSERT_EQ(CloneBits(bits1, raw_bits, 0, num_bits), ZX_OK);
+  ASSERT_EQ(CloneBits(bits1, raw_bits.get(), num_bits, num_bits), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(bits1, raw_bits.get(), 0, num_bits), ZX_OK);
 
-  ASSERT_EQ(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+  ASSERT_EQ(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits.get(), num_bytes), 0);
 
   size_t offset = GetBitSize(kPageSize);
   ASSERT_EQ(CloneBits(bits2, bits1, num_bits, num_bits), ZX_ERR_INVALID_ARGS);
   ASSERT_EQ(CloneBits(bits2, bits1, offset, num_bits - offset), ZX_OK);
 
-  ASSERT_NE(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+  ASSERT_NE(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits.get(), num_bytes), 0);
   ASSERT_EQ(memcmp(static_cast<uint8_t *>(bits2.StorageUnsafe()->GetData()) + GetByteSize(offset),
-                   raw_bits, GetByteSize(num_bits - offset)),
+                   raw_bits.get(), GetByteSize(num_bits - offset)),
             0);
 
-  ASSERT_EQ(CloneBits(raw_bits, bits2, 0, num_bits * 2), ZX_ERR_INVALID_ARGS);
-  ASSERT_EQ(CloneBits(raw_bits, bits2, 0, num_bits), ZX_OK);
-  ASSERT_EQ(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
-  ASSERT_NE(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+  ASSERT_EQ(CloneBits(raw_bits.get(), bits2, 0, num_bits * 2), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(raw_bits.get(), bits2, 0, num_bits), ZX_OK);
+  ASSERT_EQ(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits.get(), num_bytes), 0);
+  ASSERT_NE(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits.get(), num_bytes), 0);
 
   // Byte-unaligned copy
-  ASSERT_EQ(CloneBits(bits1, raw_bits, 1, num_bits), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(bits1, raw_bits.get(), 1, num_bits), ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

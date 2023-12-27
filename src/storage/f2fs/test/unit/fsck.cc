@@ -859,11 +859,11 @@ TEST(FsckTest, WrongDataExistFlag) {
     FileTester::AppendToInline(child_file_ptr, data_string.data(), data_string.size());
     ASSERT_EQ(child_file_ptr->GetSize(), data_string.size());
 
-    char r_buf[data_string.size()];
+    auto r_buf = std::make_unique<char[]>(data_string.size());
     size_t out;
-    ASSERT_EQ(FileTester::Read(child_file_ptr, r_buf, data_string.size(), 0, &out), ZX_OK);
+    ASSERT_EQ(FileTester::Read(child_file_ptr, r_buf.get(), data_string.size(), 0, &out), ZX_OK);
     ASSERT_EQ(out, data_string.size());
-    ASSERT_EQ(memcmp(r_buf, data_string.data(), data_string.size()), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), data_string.data(), data_string.size()), 0);
     // read() migrated inline data to a file block.
     FileTester::CheckNonInlineFile(child_file_ptr);
 

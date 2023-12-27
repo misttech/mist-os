@@ -406,10 +406,8 @@ zx::result<TraverseResult> FsckWorker::TraverseInodeBlock(const Node &node_block
 
     if (node_block.i.i_inline & kInlineData) {
       if (!(node_block.i.i_inline & kDataExist)) {
-        char zeroes[MaxInlineData(node_block.i)];
-        memset(zeroes, 0, MaxInlineData(node_block.i));
-
-        if (memcmp(zeroes, InlineDataPtr(node_block.i), MaxInlineData(node_block.i))) {
+        auto zeroes = std::make_unique<char[]>(MaxInlineData(node_block.i));
+        if (memcmp(zeroes.get(), InlineDataPtr(node_block.i), MaxInlineData(node_block.i))) {
           FX_LOGS(WARNING) << "\tinode[" << nid << "] has junk inline data";
           fsck_.data_exist_flag_set.insert(nid);
         }

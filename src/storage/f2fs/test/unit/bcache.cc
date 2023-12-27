@@ -409,15 +409,15 @@ TEST_P(F2fsMountedBcacheMapperTest, ReadWrite) {
   for (auto i : num_pages) {
     total_pages += i;
   }
-  size_t data_size = kPageSize * total_pages;
-  char w_buf[data_size];
+  const size_t data_size = kPageSize * total_pages;
+  auto w_buf = std::make_unique<char[]>(data_size);
 
   for (size_t i = 0; i < data_size; ++i) {
     w_buf[i] = static_cast<char>(rand() % 128);
   }
 
   // Write data for various sizes
-  char *w_buf_iter = w_buf;
+  char *w_buf_iter = w_buf.get();
   for (auto i : num_pages) {
     size_t cur_size = i * kPageSize;
     FileTester::AppendToFile(test_file_ptr, w_buf_iter, cur_size);
@@ -432,7 +432,7 @@ TEST_P(F2fsMountedBcacheMapperTest, ReadWrite) {
     test_file_ptr->Writeback(op);
     test_file_ptr->ResetFileCache();
   }
-  w_buf_iter = w_buf;
+  w_buf_iter = w_buf.get();
   for (size_t i = 0; i < total_pages; ++i) {
     FileTester::ReadFromFile(test_file_ptr, r_buf, kPageSize, i * kPageSize);
     ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);

@@ -176,28 +176,28 @@ TEST_F(FileTest, FileReadExceedFileSize) {
   uint32_t data_size = kPageSize * 7 / 4;
   uint32_t read_location = kPageSize * 5 / 4;
 
-  char w_buf[data_size];
-  char r_buf[read_location + kPageSize];
+  auto w_buf = std::make_unique<char[]>(data_size);
+  auto r_buf = std::make_unique<char[]>(read_location + kPageSize);
 
   for (size_t i = 0; i < data_size; ++i) {
     w_buf[i] = static_cast<char>(rand() % 128);
   }
 
   // Write data
-  FileTester::AppendToFile(test_file_ptr, w_buf, data_size);
+  FileTester::AppendToFile(test_file_ptr, w_buf.get(), data_size);
   ASSERT_EQ(test_file_ptr->GetSize(), data_size);
 
   size_t out;
   // Read first part of file
-  ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, read_location, 0, &out), ZX_OK);
+  ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf.get(), read_location, 0, &out), ZX_OK);
   ASSERT_EQ(out, read_location);
   // Read excess file size, then check if actual read size does not exceed the end of file
   ASSERT_EQ(
-      FileTester::Read(test_file_ptr, &(r_buf[read_location]), kPageSize, read_location, &out),
+      FileTester::Read(test_file_ptr, r_buf.get() + read_location, kPageSize, read_location, &out),
       ZX_OK);
   ASSERT_EQ(out, data_size - read_location);
 
-  ASSERT_EQ(memcmp(r_buf, w_buf, data_size), 0);
+  ASSERT_EQ(memcmp(r_buf.get(), w_buf.get(), data_size), 0);
 
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);
   test_file_vn = nullptr;
@@ -292,14 +292,14 @@ TEST_F(FileTest, MixedSizeWrite) {
     total_pages += i;
   }
   size_t data_size = kPageSize * total_pages;
-  char w_buf[data_size];
+  auto w_buf = std::make_unique<char[]>(data_size);
 
   for (size_t i = 0; i < data_size; ++i) {
     w_buf[i] = static_cast<char>(rand() % 128);
   }
 
   // Write data for various sizes
-  char *w_buf_iter = w_buf;
+  char *w_buf_iter = w_buf.get();
   for (auto i : num_pages) {
     size_t cur_size = i * kPageSize;
     FileTester::AppendToFile(test_file_ptr, w_buf_iter, cur_size);
@@ -308,13 +308,13 @@ TEST_F(FileTest, MixedSizeWrite) {
   ASSERT_EQ(test_file_ptr->GetSize(), data_size);
 
   // Read verify for each page
-  char r_buf[kPageSize];
-  w_buf_iter = w_buf;
+  auto r_buf = std::make_unique<char[]>(kPageSize);
+  w_buf_iter = w_buf.get();
   for (size_t i = 0; i < total_pages; ++i) {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, i * kPageSize, &out), ZX_OK);
+    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, i * kPageSize, &out), ZX_OK);
     ASSERT_EQ(out, kPageSize);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, kPageSize), 0);
     w_buf_iter += kPageSize;
   }
 
@@ -324,12 +324,12 @@ TEST_F(FileTest, MixedSizeWrite) {
     test_file_ptr->Writeback(op);
     test_file_ptr->ResetFileCache();
   }
-  w_buf_iter = w_buf;
+  w_buf_iter = w_buf.get();
   for (size_t i = 0; i < total_pages; ++i) {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, i * kPageSize, &out), ZX_OK);
+    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, i * kPageSize, &out), ZX_OK);
     ASSERT_EQ(out, kPageSize);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, kPageSize), 0);
     w_buf_iter += kPageSize;
   }
 
@@ -386,18 +386,18 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   }
   size_t unalign = 1000;
   size_t data_size = kPageSize * total_pages + unalign;
-  char w_buf[data_size];
+  auto w_buf = std::make_unique<char[]>(data_size);
 
   for (size_t i = 0; i < data_size; ++i) {
     w_buf[i] = static_cast<char>(rand() % 128);
   }
 
   // Write some data for unalignment
-  FileTester::AppendToFile(test_file_ptr, w_buf, unalign);
+  FileTester::AppendToFile(test_file_ptr, w_buf.get(), unalign);
   ASSERT_EQ(test_file_ptr->GetSize(), unalign);
 
   // Write data for various sizes
-  char *w_buf_iter = w_buf + unalign;
+  char *w_buf_iter = w_buf.get() + unalign;
   for (auto i : num_pages) {
     size_t cur_size = i * kPageSize;
     FileTester::AppendToFile(test_file_ptr, w_buf_iter, cur_size);
@@ -406,23 +406,24 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   ASSERT_EQ(test_file_ptr->GetSize(), data_size);
 
   // Read verify for each page
-  char r_buf[kPageSize];
-  w_buf_iter = w_buf;
+  auto r_buf = std::make_unique<char[]>(kPageSize);
+  w_buf_iter = w_buf.get();
   for (size_t i = 0; i < total_pages; ++i) {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, i * kPageSize, &out), ZX_OK);
+    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, i * kPageSize, &out), ZX_OK);
     ASSERT_EQ(out, kPageSize);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, kPageSize), 0);
     w_buf_iter += kPageSize;
   }
 
   // Read verify for last unaligned data
   {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, total_pages * kPageSize, &out),
-              ZX_OK);
+    ASSERT_EQ(
+        FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, total_pages * kPageSize, &out),
+        ZX_OK);
     ASSERT_EQ(out, unalign);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, unalign), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, unalign), 0);
   }
 
   // Read verify again after clearing file cache
@@ -431,20 +432,21 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
     test_file_ptr->Writeback(op);
     test_file_vn->ResetFileCache();
   }
-  w_buf_iter = w_buf;
+  w_buf_iter = w_buf.get();
   for (size_t i = 0; i < total_pages; ++i) {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, i * kPageSize, &out), ZX_OK);
+    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, i * kPageSize, &out), ZX_OK);
     ASSERT_EQ(out, kPageSize);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, kPageSize), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, kPageSize), 0);
     w_buf_iter += kPageSize;
   }
   {
     size_t out;
-    ASSERT_EQ(FileTester::Read(test_file_ptr, r_buf, kPageSize, total_pages * kPageSize, &out),
-              ZX_OK);
+    ASSERT_EQ(
+        FileTester::Read(test_file_ptr, r_buf.get(), kPageSize, total_pages * kPageSize, &out),
+        ZX_OK);
     ASSERT_EQ(out, unalign);
-    ASSERT_EQ(memcmp(r_buf, w_buf_iter, unalign), 0);
+    ASSERT_EQ(memcmp(r_buf.get(), w_buf_iter, unalign), 0);
   }
 
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);

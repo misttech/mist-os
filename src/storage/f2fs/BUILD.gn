@@ -77,9 +77,6 @@ static_library("f2fs") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
-
   if (is_fuchsia) {
     sources += [
       "component_runner.cc",

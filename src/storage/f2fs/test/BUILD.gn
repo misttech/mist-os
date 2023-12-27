@@ -64,9 +64,6 @@ test("f2fs_unit") {
   ]
   public = [ "unit/unit_lib.h" ]
   deps = test_deps
-
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_component("f2fs-unittest") {
