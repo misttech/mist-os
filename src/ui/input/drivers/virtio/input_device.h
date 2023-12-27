@@ -4,31 +4,56 @@
 #ifndef SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_DEVICE_H_
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_DEVICE_H_
 
+#include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/input_report_reader/reader.h>
+#include <lib/zx/clock.h>
 #include <zircon/types.h>
 
 #include <virtio/input.h>
 
 namespace virtio {
 
-// Each HidDevice is responsible for taking virtio events and translating them
-// into HID events. This class should be inherited once for each type of input
-// device that should be supported (e.g: mice, keyboards, touchscreens).
-class HidDevice {
+class HidDeviceBase {
  public:
-  virtual ~HidDevice() = default;
+  virtual ~HidDeviceBase() = default;
 
   // Gets the HID Report Descriptor for this device. The memory for the descriptor
   // is dynamically allocated and placed in |data| with length |len|.
-  virtual zx_status_t GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                                    size_t* out_data_actual) = 0;
+  virtual fuchsia_input_report::wire::DeviceDescriptor GetDescriptor(fidl::AnyArena& allocator) = 0;
 
   // Process a virtio event for this device and update the private HID
   // report accordingly.
   virtual void ReceiveEvent(virtio_input_event_t* event) = 0;
 
-  // Return a constant pointer to the private HID report that represents
-  // this device.
-  virtual const uint8_t* GetReport(size_t* size) = 0;
+  virtual void GetInputReportsReader(
+      async_dispatcher_t* dispatcher,
+      fidl::ServerEnd<fuchsia_input_report::InputReportsReader> reader) = 0;
+  virtual zx::time SendReportToAllReaders() = 0;
+};
+
+// Each HidDevice is responsible for taking virtio events and translating them
+// into HID events. This class should be inherited once for each type of input
+// device that should be supported (e.g: mice, keyboards, touchscreens).
+template <typename ReportType>
+class HidDevice : public HidDeviceBase {
+ public:
+  void GetInputReportsReader(
+      async_dispatcher_t* dispatcher,
+      fidl::ServerEnd<fuchsia_input_report::InputReportsReader> reader) override {
+    readers_.CreateReader(dispatcher, std::move(reader));
+  }
+
+  zx::time SendReportToAllReaders() override {
+    report_.event_time = zx::clock::get_monotonic();
+    readers_.SendReportToAllReaders(report_);
+    return report_.event_time;
+  }
+
+ protected:
+  ReportType report_;
+
+ private:
+  input_report_reader::InputReportReaderManager<ReportType> readers_;
 };
 
 }  // namespace virtio

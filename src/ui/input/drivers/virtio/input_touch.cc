@@ -4,81 +4,113 @@
 
 #include "input_touch.h"
 
-#include <fuchsia/hardware/hidbus/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include <fbl/algorithm.h>
 
-#include "src/devices/bus/lib/virtio/trace.h"
-
-#define LOCAL_TRACE 0
-
 namespace virtio {
 
-zx_status_t HidTouch::GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                                    size_t* out_data_actual) {
-  if (out_data_buffer == nullptr || out_data_actual == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+namespace {
+
+constexpr fuchsia_input_report::wire::Axis CreateNonNegativeAxis(int64_t max_micrometer) {
+  return {
+      .range = {.min = 0, .max = max_micrometer},
+      .unit =
+          {
+              .type = fuchsia_input_report::wire::UnitType::kMeters,
+              .exponent = -6,
+          },
+  };
+}
+
+}  // namespace
+
+void TouchReport::ToFidlInputReport(
+    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+    fidl::AnyArena& allocator) {
+  size_t count = 0;
+  fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
+                                                                               kMaxTouchPoints);
+  for (uint32_t i = 0; i < kMaxTouchPoints; i++) {
+    if (!contacts[i].exists) {
+      continue;
+    }
+    contact_rpt[count++] = fuchsia_input_report::wire::ContactInputReport::Builder(allocator)
+                               .contact_id(i)
+                               .position_x(contacts[i].x)
+                               .position_y(contacts[i].y)
+                               .Build();
+  }
+  contact_rpt.set_count(count);
+
+  input_report.event_time(event_time.get())
+      .touch(fuchsia_input_report::wire::TouchInputReport::Builder(allocator)
+                 .contacts(contact_rpt)
+                 .Build());
+}
+
+fuchsia_input_report::wire::DeviceDescriptor HidTouch::GetDescriptor(fidl::AnyArena& allocator) {
+  fuchsia_input_report::wire::DeviceInfo device_info;
+  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  device_info.product_id =
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioTouchscreen);
+
+  fidl::VectorView<fuchsia_input_report::wire::ContactInputDescriptor> contacts(allocator,
+                                                                                kMaxTouchPoints);
+  for (auto& c : contacts) {
+    c = fuchsia_input_report::wire::ContactInputDescriptor::Builder(allocator)
+            .position_x(CreateNonNegativeAxis(kXPhysicalMaxMicrometer))
+            .position_y(CreateNonNegativeAxis(kYPhysicalMaxMicrometer))
+            .Build();
   }
 
-  if (desc_type != HID_DESCRIPTION_TYPE_REPORT) {
-    return ZX_ERR_NOT_FOUND;
-  }
+  const auto input = fuchsia_input_report::wire::TouchInputDescriptor::Builder(allocator)
+                         .touch_type(fuchsia_input_report::wire::TouchType::kTouchscreen)
+                         .max_contacts(kMaxTouchPoints)
+                         .contacts(contacts)
+                         .Build();
 
-  size_t buflen = 0;
-  const uint8_t* buf = get_paradise_touch_report_desc(&buflen);
+  const auto touch =
+      fuchsia_input_report::wire::TouchDescriptor::Builder(allocator).input(input).Build();
 
-  if (data_size < buflen) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-  memcpy(out_data_buffer, buf, buflen);
-  *out_data_actual = buflen;
-  return ZX_OK;
+  return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
+      .device_info(device_info)
+      .touch(touch)
+      .Build();
 }
 
 void HidTouch::ReceiveEvent(virtio_input_event_t* event) {
   if (event->type == VIRTIO_INPUT_EV_ABS) {
     if (event->code == VIRTIO_INPUT_EV_MT_SLOT) {
-      if (event->value >= MAX_TOUCH_POINTS) {
-        LTRACEF("ERROR: Slot is too large for touchscreen\n");
-        mt_slot_ = -1;
+      if (event->value >= kMaxTouchPoints) {
+        zxlogf(ERROR,
+               "Touch input finger ID (%" PRIu32 ") exceeds the maximum finger ID supported %d",
+               event->value, kMaxTouchPoints - 1);
+        active_finger_index_ = -1;
         return;
       }
-      mt_slot_ = event->value;
+      active_finger_index_ = event->value;
     }
 
-    if (mt_slot_ < 0 || mt_slot_ >= MAX_TOUCH_POINTS) {
+    if (active_finger_index_ < 0 || active_finger_index_ >= kMaxTouchPoints) {
       return;
     }
 
     if (event->code == VIRTIO_INPUT_EV_MT_TRACKING_ID) {
-      paradise_finger_t& finger = report_.fingers[mt_slot_];
       // If tracking id is -1 we have to remove the finger from being tracked.
-      if (static_cast<int>(event->value) == -1) {
-        if (finger.flags & PARADISE_FINGER_FLAGS_TSWITCH_MASK) {
-          finger.flags &= static_cast<uint8_t>(~PARADISE_FINGER_FLAGS_TSWITCH_MASK);
-          report_.contact_count--;
-        }
-      } else {
-        if (!(finger.flags & PARADISE_FINGER_FLAGS_TSWITCH_MASK)) {
-          finger.flags |= static_cast<uint8_t>(PARADISE_FINGER_FLAGS_TSWITCH_MASK);
-          report_.contact_count++;
-        }
-      }
-      finger.finger_id = static_cast<uint16_t>(event->value);
+      report_.contacts[active_finger_index_].exists = static_cast<int32_t>(event->value) != -1;
     } else if (event->code == VIRTIO_INPUT_EV_MT_POSITION_X) {
-      report_.fingers[mt_slot_].x =
-          static_cast<uint16_t>(event->value * PARADISE_X_MAX / x_info_.max);
+      // By guaranteeing `event->value` <= max, the product will be <= kLogicalMax, where both
+      // kLogicalMax and the product are int64_t, so we are guaranteed to not overflow.
+      ZX_DEBUG_ASSERT(event->value <= x_info_.max);
+      report_.contacts[active_finger_index_].x = event->value * kXLogicalMax / x_info_.max;
     } else if (event->code == VIRTIO_INPUT_EV_MT_POSITION_Y) {
-      report_.fingers[mt_slot_].y =
-          static_cast<uint16_t>(event->value * PARADISE_Y_MAX / y_info_.max);
+      // By guaranteeing `event->value` <= max, the product will be <= kLogicalMax, where both
+      // kLogicalMax and the product are int64_t, so we are guaranteed to not overflow.
+      ZX_DEBUG_ASSERT(event->value <= y_info_.max);
+      report_.contacts[active_finger_index_].y = event->value * kYLogicalMax / y_info_.max;
     }
   }
-}
-
-const uint8_t* HidTouch::GetReport(size_t* size) {
-  *size = sizeof(report_);
-  return reinterpret_cast<const uint8_t*>(&report_);
 }
 
 }  // namespace virtio

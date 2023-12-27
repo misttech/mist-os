@@ -19,6 +19,9 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/bus/lib/virtio/trace.h"
+#include "src/ui/input/drivers/virtio/input_kbd.h"
+#include "src/ui/input/drivers/virtio/input_mouse.h"
+#include "src/ui/input/drivers/virtio/input_touch.h"
 
 #define LOCAL_TRACE 0
 
@@ -33,28 +36,14 @@ static bool IsQemuTouchscreen(const virtio_input_config_t& config) {
   return false;
 }
 
-zx_status_t InputDevice::HidbusGetReport(hid_report_type_t rpt_type, uint8_t rpt_id, uint8_t* data,
-                                         size_t len, size_t* out_len) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t InputDevice::HidbusSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                         const uint8_t* data, size_t len) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t InputDevice::HidbusGetIdle(uint8_t rpt_type, uint8_t* duration) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t InputDevice::HidbusSetIdle(uint8_t rpt_type, uint8_t duration) { return ZX_OK; }
-
-zx_status_t InputDevice::HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t InputDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
-
 InputDevice::InputDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(std::move(bti), std::move(backend)), ddk::Device<InputDevice>(bus_device) {}
+    : virtio::Device(std::move(bti), std::move(backend)),
+      ddk::Device<InputDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin>(
+          bus_device) {
+  metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
+  total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
+  last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
+}
 
 InputDevice::~InputDevice() {}
 
@@ -99,11 +88,9 @@ zx_status_t InputDevice::Init() {
     hid_device_ = std::make_unique<HidTouch>(x_info, y_info);
   } else if (cfg_rel_size > 0 || cfg_abs_size > 0) {
     // Mouse
-    dev_class_ = HID_DEVICE_CLASS_POINTER;
     hid_device_ = std::make_unique<HidMouse>();
   } else if (cfg_key_size > 0) {
     // Keyboard
-    dev_class_ = HID_DEVICE_CLASS_KBD;
     hid_device_ = std::make_unique<HidKeyboard>();
   } else {
     return ZX_ERR_NOT_SUPPORTED;
@@ -164,9 +151,7 @@ zx_status_t InputDevice::Init() {
   StartIrqThread();
   DriverStatusOk();
 
-  hidbus_ifc_.ops = nullptr;
-
-  status = DdkAdd("virtio-input");
+  status = DdkAdd(ddk::DeviceAddArgs("virtio-input").set_inspect_vmo(inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to add device: %s", tag(), zx_status_get_string(status));
     return status;
@@ -177,40 +162,13 @@ zx_status_t InputDevice::Init() {
   return ZX_OK;
 }
 
-zx_status_t InputDevice::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
-  fbl::AutoLock lock(&lock_);
-  if (hidbus_ifc_.ops != nullptr) {
-    return ZX_ERR_ALREADY_BOUND;
-  }
-  hidbus_ifc_ = *ifc;
-  return ZX_OK;
-}
-
-void InputDevice::HidbusStop() {
-  fbl::AutoLock lock(&lock_);
-  hidbus_ifc_.ops = nullptr;
-}
-
 void InputDevice::DdkRelease() {
   fbl::AutoLock lock(&lock_);
-  hidbus_ifc_.ops = nullptr;
   for (size_t i = 0; i < kEventCount; ++i) {
     if (io_buffer_is_valid(&buffers_[i])) {
       io_buffer_release(&buffers_[i]);
     }
   }
-}
-
-zx_status_t InputDevice::HidbusQuery(uint32_t options, hid_info_t* info) {
-  info->dev_num = dev_class_;  // Use type for dev_num for now.
-  info->device_class = dev_class_;
-  info->boot_device = true;
-  return ZX_OK;
-}
-
-zx_status_t InputDevice::HidbusGetDescriptor(uint8_t desc_type, uint8_t* out_data_buffer,
-                                             size_t data_size, size_t* out_data_actual) {
-  return hid_device_->GetDescriptor(desc_type, out_data_buffer, data_size, out_data_actual);
 }
 
 void InputDevice::ReceiveEvent(virtio_input_event_t* event) {
@@ -220,11 +178,8 @@ void InputDevice::ReceiveEvent(virtio_input_event_t* event) {
     // TODO(fxbug.dev/64889): Currently we assume all input events are SYN_REPORT.
     // We need to handle other event codes like SYN_DROPPED as well.
     fbl::AutoLock lock(&lock_);
-    if (hidbus_ifc_.ops) {
-      size_t size;
-      const uint8_t* report = hid_device_->GetReport(&size);
-      hidbus_ifc_io_queue(&hidbus_ifc_, report, size, zx_clock_get_monotonic());
-    }
+    total_report_count_.Add(1);
+    last_event_timestamp_.Set(hid_device_->SendReportToAllReaders().get());
   }
 }
 

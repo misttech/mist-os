@@ -2,19 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/ui/input/drivers/virtio/input_mouse.h"
+
 #include <lib/ddk/debug.h>
 #include <zircon/status.h>
 
-#include <cstdint>
-#include <iterator>
-
 #include <fbl/algorithm.h>
 #include <virtio/input.h>
-
-#include "src/devices/bus/lib/virtio/trace.h"
-#include "src/ui/input/drivers/virtio/input.h"
-
-#define LOCAL_TRACE 0
 
 namespace virtio {
 
@@ -24,31 +18,63 @@ constexpr uint16_t kKeyCodeBtnLeft = 0x110;    // BTN_LEFT
 constexpr uint16_t kKeyCodeBtnRight = 0x111;   // BTN_RIGHT
 constexpr uint16_t kKeyCodeBtnMiddle = 0x112;  // BTN_MIDDLE
 
-constexpr uint8_t kButtonIndexLeft = 1;
-constexpr uint8_t kButtonIndexRight = 2;
-constexpr uint8_t kButtonIndexMid = 3;
+constexpr int64_t kRangeMin = -32767;
+constexpr int64_t kRangeMax = 32767;
+constexpr fuchsia_input_report::wire::Axis kMouseRange = {
+    .range = {.min = kRangeMin, .max = kRangeMax},
+    .unit =
+        {
+            .type = fuchsia_input_report::wire::UnitType::kNone,
+            .exponent = 0,
+        },
+};
 
 }  // namespace
 
-zx_status_t HidMouse::GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                                    size_t* out_data_actual) {
-  if (out_data_buffer == nullptr || out_data_actual == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+void MouseReport::ToFidlInputReport(
+    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+    fidl::AnyArena& allocator) {
+  fidl::VectorView<uint8_t> pressed_buttons(allocator, kMaxButtonCount);
+  size_t idx = 0;
+  for (uint8_t i = 0; i < kMaxButtonCount; i++) {
+    if (buttons[i]) {
+      pressed_buttons[idx++] = i + 1;
+    }
   }
+  pressed_buttons.set_count(idx);
 
-  if (desc_type != HID_DESCRIPTION_TYPE_REPORT) {
-    return ZX_ERR_NOT_FOUND;
-  }
+  auto mouse_rpt = fuchsia_input_report::wire::MouseInputReport::Builder(allocator);
+  mouse_rpt.pressed_buttons(pressed_buttons);
+  mouse_rpt.movement_x(rel_x);
+  mouse_rpt.movement_y(rel_y);
+  mouse_rpt.scroll_v(rel_wheel);
 
-  size_t report_size = 0u;
-  const uint8_t* report_descriptor = get_virtio_scroll_mouse_report_desc(&report_size);
+  input_report.event_time(event_time.get()).mouse(mouse_rpt.Build());
+}
 
-  if (data_size < report_size) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-  memcpy(out_data_buffer, report_descriptor, report_size);
-  *out_data_actual = report_size;
-  return ZX_OK;
+fuchsia_input_report::wire::DeviceDescriptor HidMouse::GetDescriptor(fidl::AnyArena& allocator) {
+  fuchsia_input_report::wire::DeviceInfo device_info;
+  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  device_info.product_id =
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioMouse);
+
+  const auto input =
+      fuchsia_input_report::wire::MouseInputDescriptor::Builder(allocator)
+          .buttons({allocator,
+                    {MouseReport::ButtonIndex::kLeft, MouseReport::ButtonIndex::kRight,
+                     MouseReport::ButtonIndex::kMid}})
+          .movement_x(kMouseRange)
+          .movement_y(kMouseRange)
+          .scroll_v(kMouseRange)
+          .Build();
+
+  const auto mouse =
+      fuchsia_input_report::wire::MouseDescriptor::Builder(allocator).input(input).Build();
+
+  return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
+      .device_info(device_info)
+      .mouse(mouse)
+      .Build();
 }
 
 void HidMouse::ReceiveKeyEvent(virtio_input_event_t* event) {
@@ -59,24 +85,20 @@ void HidMouse::ReceiveKeyEvent(virtio_input_event_t* event) {
   uint8_t button_idx = 0;
   switch (key_code) {
     case kKeyCodeBtnLeft:
-      button_idx = kButtonIndexLeft;
+      button_idx = MouseReport::ButtonIndex::kLeft;
       break;
     case kKeyCodeBtnRight:
-      button_idx = kButtonIndexRight;
+      button_idx = MouseReport::ButtonIndex::kRight;
       break;
     case kKeyCodeBtnMiddle:
-      button_idx = kButtonIndexMid;
+      button_idx = MouseReport::ButtonIndex::kMid;
       break;
     default:
       zxlogf(ERROR, "%s: key code %u not supported!", __func__, key_code);
       return;
   }
 
-  if (status == VIRTIO_INPUT_EV_KEY_PRESSED) {
-    report_.button |= 1 << (button_idx - 1);
-  } else {
-    report_.button &= ~(1 << (button_idx - 1));
-  }
+  report_.buttons[button_idx - 1] = status == VIRTIO_INPUT_EV_KEY_PRESSED;
 }
 
 void HidMouse::ReceiveRelEvent(virtio_input_event_t* event) {
@@ -116,11 +138,6 @@ void HidMouse::ReceiveEvent(virtio_input_event_t* event) {
       zxlogf(ERROR, "%s: unsupported event type %u!", __func__, event->type);
       break;
   }
-}
-
-const uint8_t* HidMouse::GetReport(size_t* size) {
-  *size = sizeof(report_);
-  return reinterpret_cast<const uint8_t*>(&report_);
 }
 
 }  // namespace virtio

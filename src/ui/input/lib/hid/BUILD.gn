@@ -22,7 +22,6 @@ library_headers("headers") {
     "lib/hid/samsung.h",
     "lib/hid/usages.h",
     "lib/hid/mouse.h",
-    "lib/hid/virtio-mouse.h",
   ]
 }
 
@@ -44,7 +43,6 @@ source_set("hid") {
     "multi-sensor.c",
     "paradise.c",
     "samsung.c",
-    "virtio-mouse.c",
   ]
   deps = [
     "//src/lib/ddk:ddk-metadata-headers",

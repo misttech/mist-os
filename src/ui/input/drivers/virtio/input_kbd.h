@@ -8,22 +8,24 @@
 
 namespace virtio {
 
-class HidKeyboard : public HidDevice {
+static constexpr int kMaxKeys = 6;
+struct KeyboardReport {
+  zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+  std::array<std::optional<fuchsia_input::wire::Key>, kMaxKeys> usage;
+
+  void ToFidlInputReport(
+      fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+      fidl::AnyArena& allocator);
+};
+
+class HidKeyboard : public HidDevice<KeyboardReport> {
  public:
-  zx_status_t GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                            size_t* out_data_actual) override;
+  fuchsia_input_report::wire::DeviceDescriptor GetDescriptor(fidl::AnyArena& allocator) override;
   void ReceiveEvent(virtio_input_event_t* event) override;
-  const uint8_t* GetReport(size_t* size) override;
 
  private:
-  struct KeyboardReport {
-    uint8_t usage[6];
-  } __attribute__((packed));
-
   void AddKeypressToReport(uint16_t event_code);
   void RemoveKeypressFromReport(uint16_t event_code);
-
-  KeyboardReport report_ = {};
 };
 
 }  // namespace virtio

@@ -4,35 +4,51 @@
 #ifndef SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_TOUCH_H_
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_TOUCH_H_
 
-#include <lib/hid/paradise.h>
-
 #include "input_device.h"
 
 namespace virtio {
 
-// The HidTouch class translates virtio touchscreen events into HID touchscreen
-// events. It does this by making the virtio touchscreen appear exactly like
-// a paradise touchscreen. There is no good reason to use the paradise
-// touchscreen, other than it is a valid, tested report descriptor and it
-// was easier to reuse it than building a new report descriptor from scratch.
-class HidTouch : public HidDevice {
+static constexpr int kMaxTouchPoints = 5;
+struct TouchReport {
+  zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+  struct Contact {
+    bool exists = false;
+    int64_t x = 0;
+    int64_t y = 0;
+  };
+  std::array<Contact, kMaxTouchPoints> contacts = {};
+
+  void ToFidlInputReport(
+      fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+      fidl::AnyArena& allocator);
+};
+
+// The HidTouch class translates virtio touchscreen events into HID touchscreen events. It does this
+// by making the virtio touchscreen appear exactly like a Google Pixelbook (Eve) touchscreen. There
+// is no good reason to use the Google Pixelbook (Eve) touchscreen, other than it is a valid, tested
+// report descriptor and it was easier to reuse it than building a new report descriptor from
+// scratch.
+class HidTouch : public HidDevice<TouchReport> {
  public:
   HidTouch(virtio_input_absinfo_t x_info, virtio_input_absinfo_t y_info)
-      : x_info_(x_info), y_info_(y_info) {
-    report_.rpt_id = PARADISE_RPT_ID_TOUCH;
-  }
+      : x_info_(x_info), y_info_(y_info) {}
 
-  zx_status_t GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                            size_t* out_data_actual) override;
+  fuchsia_input_report::wire::DeviceDescriptor GetDescriptor(fidl::AnyArena& allocator) override;
   void ReceiveEvent(virtio_input_event_t* event) override;
-  const uint8_t* GetReport(size_t* size) override;
+
+  // These numbers are used by the touch descriptor of the Google Pixelbook (Eve) touchscreen. We
+  // use these physical/logical sizes to emulate a real touch device on the emulator.
+  static constexpr int64_t kXPhysicalMaxMicrometer = 259200;
+  static constexpr int64_t kYPhysicalMaxMicrometer = 172800;
+  static constexpr int64_t kXLogicalMax = 10368;
+  static constexpr int64_t kYLogicalMax = 6912;
 
  private:
-  static constexpr int MAX_TOUCH_POINTS = 5;
   virtio_input_absinfo_t x_info_;
   virtio_input_absinfo_t y_info_;
-  int mt_slot_ = -1;
-  paradise_touch_t report_ = {};
+  // The index of the current finger that the driver is processing.
+  // Must be [0..kMaxTouchPoints - 1] for a valid finger or -1 when no finger is being processed.
+  int active_finger_index_ = -1;
 };
 
 }  // namespace virtio

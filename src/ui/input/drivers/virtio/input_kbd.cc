@@ -2,187 +2,234 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/ui/input/drivers/virtio/input_kbd.h"
+
 #include <lib/ddk/debug.h>
 #include <zircon/status.h>
 
-#include <iterator>
-
 #include <fbl/algorithm.h>
 
-#include "input.h"
 #include "src/devices/bus/lib/virtio/trace.h"
 
 #define LOCAL_TRACE 0
 
 namespace virtio {
 
-// clang-format off
+namespace {
 
 // These are Linux input event codes:
 // https://github.com/torvalds/linux/blob/HEAD/include/uapi/linux/input-event-codes.h
-const uint8_t kEventCodeMap[] = {
-    0,                                  // KEY_RESERVED (0)
-    41,                                 // KEY_ESC (1)
-    30,                                 // KEY_1 (2)
-    31,                                 // KEY_2 (3)
-    32,                                 // KEY_3 (4)
-    33,                                 // KEY_4 (5)
-    34,                                 // KEY_5 (6)
-    35,                                 // KEY_6 (7)
-    36,                                 // KEY_7 (8)
-    37,                                 // KEY_8 (9)
-    38,                                 // KEY_9 (10)
-    39,                                 // KEY_0 (11)
-    45,                                 // KEY_MINUS (12)
-    46,                                 // KEY_EQUAL (13)
-    42,                                 // KEY_BACKSPACE (14)
-    43,                                 // KEY_TAB (15)
-    20,                                 // KEY_Q (16)
-    26,                                 // KEY_W (17)
-    8,                                  // KEY_E (18)
-    21,                                 // KEY_R (19)
-    23,                                 // KEY_T (20)
-    28,                                 // KEY_Y (21)
-    24,                                 // KEY_U (22)
-    12,                                 // KEY_I (23)
-    18,                                 // KEY_O (24)
-    19,                                 // KEY_P (25)
-    47,                                 // KEY_LEFTBRACE (26)
-    48,                                 // KEY_RIGHTBRACE (27)
-    40,                                 // KEY_ENTER (28)
-    224,                                // KEY_LEFTCTRL (29)
-    4,                                  // KEY_A (30)
-    22,                                 // KEY_S (31)
-    7,                                  // KEY_D (32)
-    9,                                  // KEY_F (33)
-    10,                                 // KEY_G (34)
-    11,                                 // KEY_H (35)
-    13,                                 // KEY_J (36)
-    14,                                 // KEY_K (37)
-    15,                                 // KEY_L (38)
-    51,                                 // KEY_SEMICOLON (39)
-    52,                                 // KEY_APOSTROPHE (40)
-    53,                                 // KEY_GRAVE (41)
-    225,                                // KEY_LEFTSHIFT (42)
-    49,                                 // KEY_BACKSLASH (43)
-    29,                                 // KEY_Z (44)
-    27,                                 // KEY_X (45)
-    6,                                  // KEY_C (46)
-    25,                                 // KEY_V (47)
-    5,                                  // KEY_B (48)
-    17,                                 // KEY_N (49)
-    16,                                 // KEY_M (50)
-    54,                                 // KEY_COMMA (51)
-    55,                                 // KEY_DOT (52)
-    56,                                 // KEY_SLASH (53)
-    229,                                // KEY_RIGHTSHIFT (54)
-    85,                                 // KEY_KPASTERISK (55)
-    226,                                // KEY_LEFTALT (56)
-    44,                                 // KEY_SPACE (57)
-    57,                                 // KEY_CAPSLOCK (58)
-    58,                                 // KEY_F1 (59)
-    59,                                 // KEY_F2 (60)
-    60,                                 // KEY_F3 (61)
-    61,                                 // KEY_F4 (62)
-    62,                                 // KEY_F5 (63)
-    63,                                 // KEY_F6 (64)
-    64,                                 // KEY_F7 (65)
-    65,                                 // KEY_F8 (66)
-    66,                                 // KEY_F9 (67)
-    67,                                 // KEY_F10 (68)
-    83,                                 // KEY_NUMLOCK (69)
-    71,                                 // KEY_SCROLLLOCK (70)
-    95,                                 // KEY_KP7 (71)
-    96,                                 // KEY_KP8 (72)
-    97,                                 // KEY_KP9 (73)
-    86,                                 // KEY_KPMINUS (74)
-    92,                                 // KEY_KP4 (75)
-    93,                                 // KEY_KP5 (76)
-    94,                                 // KEY_KP6 (77)
-    87,                                 // KEY_KPPLUS (78)
-    89,                                 // KEY_KP1 (79)
-    90,                                 // KEY_KP2 (80)
-    91,                                 // KEY_KP3 (81)
-    98,                                 // KEY_KP0 (82)
-    99,                                 // KEY_KPDOT (83)
-    0, 0, 0, 0, 0, 0,                   // Unsupported
-    0, 0, 0, 0, 0, 0, 0,                // Unsupported
-    228,                                // KEY_RIGHTCTRL (97)
-    0, 0,                               // Unsupported
-    230,                                // KEY_RIGHTALT (100)
-    0, 0,                               // Unsupported
-    82,                                 // KEY_UP (103)
-    0,                                  // Unsupported
-    80,                                 // KEY_LEFT (105)
-    79,                                 // KEY_RIGHT (106)
-    0,                                  // Unsupported
-    81,                                 // KEY_DOWN (108)
-    78,                                 // KEY_PAGEDOWN (109)
-    73,                                 // KEY_INSERT (110)
-    76,                                 // KEY_DELETE (111)
-    0, 0, 0, 0, 0, 0, 0,                // Unsupported
-    72,                                 // KEY_PAUSE (119)
-    0, 0, 0, 0, 0,                      // Unsupported
-    227,                                // KEY_LEFTMETA (125)
-    231,                                // KEY_RIGHTMETA (126)
+constexpr std::optional<fuchsia_input::wire::Key> kEventCodeMap[] = {
+    /* 0x00 */ std::nullopt,
+    /* 0x01 */ fuchsia_input::wire::Key::kEscape,
+    /* 0x02 */ fuchsia_input::wire::Key::kKey1,
+    /* 0x03 */ fuchsia_input::wire::Key::kKey2,
+    /* 0x04 */ fuchsia_input::wire::Key::kKey3,
+    /* 0x05 */ fuchsia_input::wire::Key::kKey4,
+    /* 0x06 */ fuchsia_input::wire::Key::kKey5,
+    /* 0x07 */ fuchsia_input::wire::Key::kKey6,
+    /* 0x08 */ fuchsia_input::wire::Key::kKey7,
+    /* 0x09 */ fuchsia_input::wire::Key::kKey8,
+    /* 0x0a */ fuchsia_input::wire::Key::kKey9,
+    /* 0x0b */ fuchsia_input::wire::Key::kKey0,
+    /* 0x0c */ fuchsia_input::wire::Key::kMinus,
+    /* 0x0d */ fuchsia_input::wire::Key::kEquals,
+    /* 0x0e */ fuchsia_input::wire::Key::kBackspace,
+    /* 0x0f */ fuchsia_input::wire::Key::kTab,
+    /* 0x10 */ fuchsia_input::wire::Key::kQ,
+    /* 0x11 */ fuchsia_input::wire::Key::kW,
+    /* 0x12 */ fuchsia_input::wire::Key::kE,
+    /* 0x13 */ fuchsia_input::wire::Key::kR,
+    /* 0x14 */ fuchsia_input::wire::Key::kT,
+    /* 0x15 */ fuchsia_input::wire::Key::kY,
+    /* 0x16 */ fuchsia_input::wire::Key::kU,
+    /* 0x17 */ fuchsia_input::wire::Key::kI,
+    /* 0x18 */ fuchsia_input::wire::Key::kO,
+    /* 0x19 */ fuchsia_input::wire::Key::kP,
+    /* 0x1a */ fuchsia_input::wire::Key::kLeftBrace,
+    /* 0x1b */ fuchsia_input::wire::Key::kRightBrace,
+    /* 0x1c */ fuchsia_input::wire::Key::kEnter,
+    /* 0x1d */ fuchsia_input::wire::Key::kLeftCtrl,
+    /* 0x1e */ fuchsia_input::wire::Key::kA,
+    /* 0x1f */ fuchsia_input::wire::Key::kS,
+    /* 0x20 */ fuchsia_input::wire::Key::kD,
+    /* 0x21 */ fuchsia_input::wire::Key::kF,
+    /* 0x22 */ fuchsia_input::wire::Key::kG,
+    /* 0x23 */ fuchsia_input::wire::Key::kH,
+    /* 0x24 */ fuchsia_input::wire::Key::kJ,
+    /* 0x25 */ fuchsia_input::wire::Key::kK,
+    /* 0x26 */ fuchsia_input::wire::Key::kL,
+    /* 0x27 */ fuchsia_input::wire::Key::kSemicolon,
+    /* 0x28 */ fuchsia_input::wire::Key::kApostrophe,
+    /* 0x29 */ fuchsia_input::wire::Key::kGraveAccent,
+    /* 0x2a */ fuchsia_input::wire::Key::kLeftShift,
+    /* 0x2b */ fuchsia_input::wire::Key::kBackslash,
+    /* 0x2c */ fuchsia_input::wire::Key::kZ,
+    /* 0x2d */ fuchsia_input::wire::Key::kX,
+    /* 0x2e */ fuchsia_input::wire::Key::kC,
+    /* 0x2f */ fuchsia_input::wire::Key::kV,
+    /* 0x30 */ fuchsia_input::wire::Key::kB,
+    /* 0x31 */ fuchsia_input::wire::Key::kN,
+    /* 0x32 */ fuchsia_input::wire::Key::kM,
+    /* 0x33 */ fuchsia_input::wire::Key::kComma,
+    /* 0x34 */ fuchsia_input::wire::Key::kDot,
+    /* 0x35 */ fuchsia_input::wire::Key::kSlash,
+    /* 0x36 */ fuchsia_input::wire::Key::kRightShift,
+    /* 0x37 */ fuchsia_input::wire::Key::kKeypadAsterisk,
+    /* 0x38 */ fuchsia_input::wire::Key::kLeftAlt,
+    /* 0x39 */ fuchsia_input::wire::Key::kSpace,
+    /* 0x3a */ fuchsia_input::wire::Key::kCapsLock,
+    /* 0x3b */ fuchsia_input::wire::Key::kF1,
+    /* 0x3c */ fuchsia_input::wire::Key::kF2,
+    /* 0x3d */ fuchsia_input::wire::Key::kF3,
+    /* 0x3e */ fuchsia_input::wire::Key::kF4,
+    /* 0x3f */ fuchsia_input::wire::Key::kF5,
+    /* 0x40 */ fuchsia_input::wire::Key::kF6,
+    /* 0x41 */ fuchsia_input::wire::Key::kF7,
+    /* 0x42 */ fuchsia_input::wire::Key::kF8,
+    /* 0x43 */ fuchsia_input::wire::Key::kF9,
+    /* 0x44 */ fuchsia_input::wire::Key::kF10,
+    /* 0x45 */ fuchsia_input::wire::Key::kNumLock,
+    /* 0x46 */ fuchsia_input::wire::Key::kScrollLock,
+    /* 0x47 */ fuchsia_input::wire::Key::kKeypad7,
+    /* 0x48 */ fuchsia_input::wire::Key::kKeypad8,
+    /* 0x49 */ fuchsia_input::wire::Key::kKeypad9,
+    /* 0x4a */ fuchsia_input::wire::Key::kKeypadMinus,
+    /* 0x4b */ fuchsia_input::wire::Key::kKeypad4,
+    /* 0x4c */ fuchsia_input::wire::Key::kKeypad5,
+    /* 0x4d */ fuchsia_input::wire::Key::kKeypad6,
+    /* 0x4e */ fuchsia_input::wire::Key::kKeypadPlus,
+    /* 0x4f */ fuchsia_input::wire::Key::kKeypad1,
+    /* 0x50 */ fuchsia_input::wire::Key::kKeypad2,
+    /* 0x51 */ fuchsia_input::wire::Key::kKeypad3,
+    /* 0x52 */ fuchsia_input::wire::Key::kKeypad0,
+    /* 0x53 */ fuchsia_input::wire::Key::kKeypadDot,
+    /* 0x54 */ std::nullopt,
+    /* 0x55 */ std::nullopt,
+    /* 0x56 */ std::nullopt,
+    /* 0x57 */ std::nullopt,
+    /* 0x58 */ std::nullopt,
+    /* 0x59 */ std::nullopt,
+    /* 0x5a */ std::nullopt,
+    /* 0x5b */ std::nullopt,
+    /* 0x5c */ std::nullopt,
+    /* 0x5d */ std::nullopt,
+    /* 0x5e */ std::nullopt,
+    /* 0x5f */ std::nullopt,
+    /* 0x60 */ std::nullopt,
+    /* 0x61 */ fuchsia_input::wire::Key::kRightCtrl,
+    /* 0x62 */ std::nullopt,
+    /* 0x63 */ std::nullopt,
+    /* 0x64 */ fuchsia_input::wire::Key::kRightAlt,
+    /* 0x65 */ std::nullopt,
+    /* 0x66 */ std::nullopt,
+    /* 0x67 */ fuchsia_input::wire::Key::kUp,
+    /* 0x68 */ std::nullopt,
+    /* 0x69 */ fuchsia_input::wire::Key::kLeft,
+    /* 0x6a */ fuchsia_input::wire::Key::kRight,
+    /* 0x6b */ std::nullopt,
+    /* 0x6c */ fuchsia_input::wire::Key::kDown,
+    /* 0x6d */ fuchsia_input::wire::Key::kPageDown,
+    /* 0x6e */ fuchsia_input::wire::Key::kInsert,
+    /* 0x6f */ fuchsia_input::wire::Key::kDelete,
+    /* 0x70 */ std::nullopt,
+    /* 0x71 */ std::nullopt,
+    /* 0x72 */ std::nullopt,
+    /* 0x73 */ std::nullopt,
+    /* 0x74 */ std::nullopt,
+    /* 0x75 */ std::nullopt,
+    /* 0x76 */ std::nullopt,
+    /* 0x77 */ fuchsia_input::wire::Key::kPause,
+    /* 0x78 */ std::nullopt,
+    /* 0x79 */ std::nullopt,
+    /* 0x7a */ std::nullopt,
+    /* 0x7b */ std::nullopt,
+    /* 0x7c */ std::nullopt,
+    /* 0x7d */ fuchsia_input::wire::Key::kLeftMeta,
+    /* 0x7e */ fuchsia_input::wire::Key::kRightMeta,
 };
 
-static const uint8_t kbd_hid_report_desc[] = {
-    0x05, 0x01, // Usage Page (Generic Desktop Ctrls)
-    0x09, 0x06, // Usage (Keyboard)
-    0xA1, 0x01, // Collection (Application)
-    0x05, 0x07, //   Usage Page (Kbrd/Keypad)
-    0x95, 0x05, //   Report Count (5)
-    0x75, 0x01, //   Report Size (1)
-    0x05, 0x08, //   Usage Page (LEDs)
-    0x19, 0x01, //   Usage Minimum (Num Lock)
-    0x29, 0x05, //   Usage Maximum (Kana)
-    0x91, 0x02, //   Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,
-                //   Non-volatile)
-    0x95, 0x01, //   Report Count (1)
-    0x75, 0x03, //   Report Size (3)
-    0x91, 0x01, //   Output (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,
-                //   Non-volatile)
-    0x95, 0x06, //   Report Count (6)
-    0x75, 0x08, //   Report Size (8)
-    0x15, 0x00, //   Logical Minimum (0)
-    0x26, 0xFF, 0x00,  //   Logical Maximum (255)
-    0x05, 0x07, //   Usage Page (Kbrd/Keypad)
-    0x19, 0x00, //   Usage Minimum (0x00)
-    0x2A, 0xFF, 0x00,  //   Usage Maximum (0xFF)
-    0x81, 0x00, //   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-    0xC0,       // End Collection
-};
-
-// clang-format on
-
-zx_status_t HidKeyboard::GetDescriptor(uint8_t desc_type, void* out_data_buffer, size_t data_size,
-                                       size_t* out_data_actual) {
-  if (out_data_buffer == nullptr || out_data_actual == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+constexpr size_t kKeyCount = []() {
+  size_t count = 0;
+  for (const auto& k : kEventCodeMap) {
+    if (k.has_value()) {
+      count++;
+    }
   }
+  return count;
+}();
 
-  if (desc_type != HID_DESCRIPTION_TYPE_REPORT) {
-    return ZX_ERR_NOT_FOUND;
+constexpr std::array<fuchsia_input::wire::Key, kKeyCount> kKeys = []() {
+  std::array<fuchsia_input::wire::Key, kKeyCount> keys;
+  size_t i = 0;
+  for (const auto& k : kEventCodeMap) {
+    if (k.has_value()) {
+      keys[i++] = k.value();
+    }
   }
+  return keys;
+}();
 
-  if (data_size < sizeof(kbd_hid_report_desc)) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
+}  // namespace
+
+void KeyboardReport::ToFidlInputReport(
+    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+    fidl::AnyArena& allocator) {
+  fidl::VectorView<fuchsia_input::wire::Key> keys3(allocator, kMaxKeys);
+  size_t idx = 0;
+  for (const auto& key : usage) {
+    if (!key.has_value()) {
+      break;
+    }
+    keys3[idx++] = *key;
   }
-  memcpy(out_data_buffer, kbd_hid_report_desc, sizeof(kbd_hid_report_desc));
-  *out_data_actual = sizeof(kbd_hid_report_desc);
-  return ZX_OK;
+  keys3.set_count(idx);
+
+  auto keyboard_report =
+      fuchsia_input_report::wire::KeyboardInputReport::Builder(allocator).pressed_keys3(keys3);
+  input_report.event_time(event_time.get()).keyboard(keyboard_report.Build());
+}
+
+fuchsia_input_report::wire::DeviceDescriptor HidKeyboard::GetDescriptor(fidl::AnyArena& allocator) {
+  fuchsia_input_report::wire::DeviceInfo device_info;
+  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  device_info.product_id =
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioKeyboard);
+
+  const auto input =
+      fuchsia_input_report::wire::KeyboardInputDescriptor::Builder(allocator).keys3(kKeys).Build();
+
+  const auto output =
+      fuchsia_input_report::wire::KeyboardOutputDescriptor::Builder(allocator)
+          .leds({allocator,
+                 {fuchsia_input_report::LedType::kNumLock, fuchsia_input_report::LedType::kCapsLock,
+                  fuchsia_input_report::LedType::kScrollLock,
+                  fuchsia_input_report::LedType::kCompose, fuchsia_input_report::LedType::kKana}})
+          .Build();
+
+  const auto keyboard = fuchsia_input_report::wire::KeyboardDescriptor::Builder(allocator)
+                            .input(input)
+                            .output(output)
+                            .Build();
+
+  return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
+      .device_info(device_info)
+      .keyboard(keyboard)
+      .Build();
 }
 
 void HidKeyboard::AddKeypressToReport(uint16_t event_code) {
-  uint8_t hid_code = kEventCodeMap[event_code];
-  for (size_t i = 0; i != 6; ++i) {
-    if (report_.usage[i] == hid_code) {
-      // The key already exists in the report so we ignore it.
+  auto hid_code = kEventCodeMap[event_code];
+  if (!hid_code.has_value()) {
+    return;
+  }
+  for (auto& usage : report_.usage) {
+    if (!usage.has_value()) {
+      usage = hid_code;
       return;
     }
-    if (report_.usage[i] == 0) {
-      report_.usage[i] = hid_code;
+    if (*usage == *hid_code) {
+      // The key already exists in the report so we ignore it.
       return;
     }
   }
@@ -192,10 +239,13 @@ void HidKeyboard::AddKeypressToReport(uint16_t event_code) {
 }
 
 void HidKeyboard::RemoveKeypressFromReport(uint16_t event_code) {
-  uint8_t hid_code = kEventCodeMap[event_code];
+  auto hid_code = kEventCodeMap[event_code];
+  if (!hid_code.has_value()) {
+    return;
+  }
   int id = -1;
-  for (int i = 0; i != 6; ++i) {
-    if (report_.usage[i] == hid_code) {
+  for (int i = 0; i != kMaxKeys; ++i) {
+    if (report_.usage[i].has_value() && *report_.usage[i] == *hid_code) {
       id = i;
       break;
     }
@@ -206,21 +256,19 @@ void HidKeyboard::RemoveKeypressFromReport(uint16_t event_code) {
     return;
   }
 
-  for (size_t i = id; i != 5; ++i) {
+  for (size_t i = id; i != kMaxKeys - 1; ++i) {
     report_.usage[i] = report_.usage[i + 1];
   }
-  report_.usage[5] = 0;
+  report_.usage[kMaxKeys - 1] = std::nullopt;
 }
 
 void HidKeyboard::ReceiveEvent(virtio_input_event_t* event) {
   if (event->type != VIRTIO_INPUT_EV_KEY) {
+    zxlogf(TRACE, "Unsupported event type %d\n", event->type);
     return;
   }
-  if (event->code == 0) {
-    return;
-  }
-  if (event->code >= std::size(kEventCodeMap)) {
-    LTRACEF("unknown key\n");
+  if (event->code == 0 || event->code >= std::size(kEventCodeMap)) {
+    zxlogf(TRACE, "Unknown key %d\n", event->code);
     return;
   }
   if (event->value == VIRTIO_INPUT_EV_KEY_PRESSED) {
@@ -228,11 +276,6 @@ void HidKeyboard::ReceiveEvent(virtio_input_event_t* event) {
   } else if (event->value == VIRTIO_INPUT_EV_KEY_RELEASED) {
     RemoveKeypressFromReport(event->code);
   }
-}
-
-const uint8_t* HidKeyboard::GetReport(size_t* size) {
-  *size = sizeof(report_);
-  return reinterpret_cast<const uint8_t*>(&report_);
 }
 
 }  // namespace virtio

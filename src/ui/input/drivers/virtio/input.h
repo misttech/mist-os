@@ -4,28 +4,24 @@
 #ifndef SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_H_
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_H_
 
-#include <fuchsia/hardware/hidbus/c/banjo.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/hid/boot.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
-#include <stdlib.h>
-
-#include <memory>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <virtio/input.h>
 
-#include "src/ui/input/drivers/virtio/input_kbd.h"
-#include "src/ui/input/drivers/virtio/input_mouse.h"
-#include "src/ui/input/drivers/virtio/input_touch.h"
+#include "src/ui/input/drivers/virtio/input_device.h"
 
 namespace virtio {
 
-class InputDevice : public Device,
-                    public ddk::Device<InputDevice>,
-                    public ddk::HidbusProtocol<InputDevice, ddk::base_protocol> {
+class InputDevice
+    : public Device,
+      public ddk::Device<InputDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin>,
+      public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
   InputDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend);
   virtual ~InputDevice();
@@ -38,22 +34,36 @@ class InputDevice : public Device,
 
   // DDK driver hooks
   void DdkRelease();
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc);
-  void HidbusStop();
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info);
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  // Unsupported calls:
-  zx_status_t HidbusGetReport(hid_report_type_t rpt_type, uint8_t rpt_id, uint8_t* out_data_buffer,
-                              size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                              const uint8_t* data_buffer, size_t data_size);
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* out_duration);
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration);
-  zx_status_t HidbusGetProtocol(hid_protocol_t* out_protocol);
-  zx_status_t HidbusSetProtocol(hid_protocol_t protocol);
+
+  // fuchsia_input_report::InputDevice required methods
+  void GetInputReportsReader(GetInputReportsReaderRequestView request,
+                             GetInputReportsReaderCompleter::Sync& completer) override {
+    hid_device_->GetInputReportsReader(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                       std::move(request->reader));
+  }
+  void GetDescriptor(GetDescriptorCompleter::Sync& completer) override {
+    fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
+    completer.Reply(hid_device_->GetDescriptor(allocator));
+  }
+  void SendOutputReport(SendOutputReportRequestView request,
+                        SendOutputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetFeatureReport(GetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFeatureReport(SetFeatureReportRequestView request,
+                        SetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetInputReport(GetInputReportRequestView request,
+                      GetInputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
  private:
+  static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
+
   void ReceiveEvent(virtio_input_event_t* event);
 
   void SelectConfig(uint8_t select, uint8_t subsel);
@@ -65,11 +75,13 @@ class InputDevice : public Device,
 
   fbl::Mutex lock_;
 
-  uint8_t dev_class_;
-  hidbus_ifc_protocol_t hidbus_ifc_;
-
-  std::unique_ptr<HidDevice> hid_device_;
+  std::unique_ptr<HidDeviceBase> hid_device_;
   Ring vring_ = {this};
+
+  inspect::Inspector inspector_;
+  inspect::Node metrics_root_;
+  inspect::UintProperty total_report_count_;
+  inspect::UintProperty last_event_timestamp_;
 };
 
 }  // namespace virtio
