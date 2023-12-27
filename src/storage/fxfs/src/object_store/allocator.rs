@@ -1308,68 +1308,18 @@ impl Allocator {
         &self,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
-        mut dealloc_range: Range<u64>,
+        dealloc_range: Range<u64>,
     ) -> Result<u64, Error> {
         debug!(device_range = ?dealloc_range, "deallocate");
 
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
-
-        // NB: It is intentional that we don't call SimpleAllocator::layer_set here, because we
-        // don't want to look at temporary allocations (we should not deallocate them).
-        let layer_set = self.tree.layer_set();
-        let mut merger = layer_set.merger();
-        // The precise search key that we choose here is important.  We need to perform a full merge
-        // across all layers because we want the precise value of delta, so we must ensure that we
-        // query all layers, which is done by setting the lower bound to zero (the merger consults
-        // iterators until it encounters a key whose lower-bound is not greater than the search
-        // key).  The upper bound is used to search each individual layer, and we want to start with
-        // an extent that covers the first byte of the range we're deallocating.
-        let mut iter = self
-            .filter(
-                merger
-                    .seek(Bound::Included(&AllocatorKey {
-                        device_range: 0..dealloc_range.start + 1,
-                    }))
-                    .await?,
-            )
-            .await?;
-        let mut deallocated = 0;
-        let mut mutation = None;
-        while let Some(ItemRef { key: AllocatorKey { device_range, .. }, value, .. }) = iter.get() {
-            ensure!(device_range.is_aligned(self.block_size), FxfsError::Inconsistent);
-            if device_range.start > dealloc_range.start {
-                // We expect the entire range to be allocated.
-                bail!(anyhow!(FxfsError::Inconsistent)
-                    .context("Attempt to deallocate unallocated range"));
-            }
-            let end = std::cmp::min(device_range.end, dealloc_range.end);
-            if let AllocatorValue::Abs { count: 1, owner_object_id: store_object_id } = value {
-                debug_assert_eq!(owner_object_id, *store_object_id);
-                match &mut mutation {
-                    None => {
-                        mutation = Some(AllocatorMutation::Deallocate {
-                            device_range: (dealloc_range.start..end).into(),
-                            owner_object_id,
-                        });
-                    }
-                    Some(AllocatorMutation::Deallocate { device_range, .. }) => {
-                        device_range.end = end;
-                    }
-                    _ => unreachable!(),
-                }
-                deallocated += end - dealloc_range.start;
-            } else {
-                panic!("Unexpected AllocatorValue variant: {:?}", value);
-            }
-            if end == dealloc_range.end {
-                break;
-            }
-            dealloc_range.start = end;
-            iter.advance().await?;
-        }
-        if let Some(mutation) = mutation {
-            transaction.add(self.object_id(), Mutation::Allocator(mutation));
-        }
+        // We don't currently support sharing of allocations (value.count always equals 1), so as
+        // long as we can assume the deallocated range is actually allocated, we can avoid device
+        // access.
+        let deallocated = dealloc_range.end - dealloc_range.start;
+        let mutation =
+            AllocatorMutation::Deallocate { device_range: dealloc_range.into(), owner_object_id };
+        transaction.add(self.object_id(), Mutation::Allocator(mutation));
         Ok(deallocated)
     }
 
