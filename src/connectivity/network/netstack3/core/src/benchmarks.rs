@@ -49,15 +49,15 @@ use crate::{
 // IPv4 packet frame which we expect will be parsed and forwarded without
 // requiring any new buffers to be allocated.
 fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
-    let (Ctx { sync_ctx, mut non_sync_ctx }, idx_to_device_id) =
+    let (Ctx { core_ctx, mut bindings_ctx }, idx_to_device_id) =
         FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
             .build_with(StackStateBuilder::default());
-    let sync_ctx = &sync_ctx;
+    let core_ctx = &core_ctx;
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
     crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
-        &sync_ctx,
-        &mut non_sync_ctx,
+        &core_ctx,
+        &mut bindings_ctx,
         &device,
         true,
     )
@@ -106,15 +106,15 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             iters += 1;
         }
         black_box(receive_frame(
-            black_box(&sync_ctx),
-            black_box(&mut non_sync_ctx),
+            black_box(&core_ctx),
+            black_box(&mut bindings_ctx),
             black_box(&eth_device),
             black_box(Buf::new(&mut buf[..], range.clone())),
         ));
 
         #[cfg(debug_assertions)]
         {
-            assert_eq!(non_sync_ctx.frames_sent().len(), iters);
+            assert_eq!(bindings_ctx.frames_sent().len(), iters);
         }
 
         // Since we modified the buffer in-place, it now has the wrong source

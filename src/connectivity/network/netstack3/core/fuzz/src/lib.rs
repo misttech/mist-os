@@ -401,19 +401,19 @@ fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
 }
 
 fn dispatch(
-    Ctx { sync_ctx, non_sync_ctx }: &mut FakeCtx,
+    Ctx { core_ctx, bindings_ctx }: &mut FakeCtx,
     device_id: &EthernetDeviceId<FakeNonSyncCtx>,
     action: FuzzAction,
 ) {
     use FuzzAction::*;
     match action {
         ReceiveFrame(ArbitraryFrame { frame_type: _, buf, description: _ }) => {
-            netstack3_core::device::receive_frame(sync_ctx, non_sync_ctx, device_id, buf)
+            netstack3_core::device::receive_frame(core_ctx, bindings_ctx, device_id, buf)
         }
         AdvanceTime(SmallDuration(duration)) => {
-            let _: Vec<TimerId<_>> = non_sync_ctx
+            let _: Vec<TimerId<_>> = bindings_ctx
                 .trigger_timers_for(duration, |non_sync_ctx, id| {
-                    netstack3_core::handle_timer(sync_ctx, non_sync_ctx, id)
+                    netstack3_core::handle_timer(core_ctx, non_sync_ctx, id)
                 });
         }
     }

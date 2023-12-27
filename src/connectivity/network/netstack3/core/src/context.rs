@@ -1054,7 +1054,7 @@ pub(crate) mod testutil {
         core_ctx: &'a mut CC,
         mut f: F,
     ) -> impl FnMut(&mut BC, Id) + 'a {
-        move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
+        move |bindings_ctx, id| f(core_ctx, bindings_ctx, id)
     }
 
     #[cfg(test)]
@@ -1068,7 +1068,7 @@ pub(crate) mod testutil {
         core_ctx: &'a CC,
         mut f: F,
     ) -> impl FnMut(&mut BC, Id) + 'a {
-        move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
+        move |bindings_ctx, id| f(core_ctx, bindings_ctx, id)
     }
 
     /// A fake [`FrameContext`].
@@ -1384,16 +1384,16 @@ pub(crate) mod testutil {
         for FakeCtxWithSyncCtx<CC, TimerId, Event, State>
     {
         fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
-            let Self { sync_ctx: _, non_sync_ctx } = self;
-            f(&non_sync_ctx.timers)
+            let Self { core_ctx: _, bindings_ctx } = self;
+            f(&bindings_ctx.timers)
         }
 
         fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
             &mut self,
             f: F,
         ) -> O {
-            let Self { sync_ctx: _, non_sync_ctx } = self;
-            f(&mut non_sync_ctx.timers)
+            let Self { core_ctx: _, bindings_ctx } = self;
+            f(&mut bindings_ctx.timers)
         }
     }
 
@@ -1434,7 +1434,7 @@ pub(crate) mod testutil {
         for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_ref(&self) -> &FakeInstantCtx {
-            self.non_sync_ctx.timers.as_ref()
+            self.bindings_ctx.timers.as_ref()
         }
     }
 
@@ -1443,7 +1443,7 @@ pub(crate) mod testutil {
         for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_ref(&self) -> &FakeTimerCtx<Id> {
-            &self.non_sync_ctx.timers
+            &self.bindings_ctx.timers
         }
     }
 
@@ -1452,7 +1452,7 @@ pub(crate) mod testutil {
         for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
-            &mut self.non_sync_ctx.timers
+            &mut self.bindings_ctx.timers
         }
     }
 
@@ -1461,7 +1461,7 @@ pub(crate) mod testutil {
         for FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
     {
         fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
-            &mut self.sync_ctx.frames
+            &mut self.core_ctx.frames
         }
     }
 
@@ -1473,7 +1473,7 @@ pub(crate) mod testutil {
             &mut self,
             f: F,
         ) -> O {
-            f(&mut self.sync_ctx.frames)
+            f(&mut self.core_ctx.frames)
         }
     }
 
@@ -2028,14 +2028,14 @@ pub(crate) mod testutil {
 
         /// Retrieves a `FakeSyncCtx` named `context`.
         pub(crate) fn sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut CC {
-            let crate::testutil::ContextPair { sync_ctx, non_sync_ctx: _ } = self.context(context);
-            sync_ctx
+            let crate::testutil::ContextPair { core_ctx, bindings_ctx: _ } = self.context(context);
+            core_ctx
         }
 
         /// Retrieves a `FakeNonSyncCtx` named `context`.
         pub(crate) fn non_sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut BC {
-            let crate::testutil::ContextPair { sync_ctx: _, non_sync_ctx } = self.context(context);
-            non_sync_ctx
+            let crate::testutil::ContextPair { core_ctx: _, bindings_ctx } = self.context(context);
+            bindings_ctx
         }
     }
 
@@ -2140,100 +2140,100 @@ pub(crate) mod testutil {
             let new_ctx =
                 || FakeCtx::<Vec<(usize, FakeInstant)>, usize, (), (), FakeDeviceId, ()>::default();
 
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = new_ctx();
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
 
             // When no timers are installed, `trigger_next_timer` should return
             // `false`.
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 None
             );
-            assert_eq!(sync_ctx.get_ref().as_slice(), []);
+            assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // When one timer is installed, it should be triggered.
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = new_ctx();
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
 
             // No timer with id `0` exists yet.
-            assert_eq!(non_sync_ctx.scheduled_instant(0), None);
+            assert_eq!(bindings_ctx.scheduled_instant(0), None);
 
-            assert_eq!(non_sync_ctx.schedule_timer(ONE_SEC, 0), None);
+            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
 
             // Timer with id `0` scheduled to execute at `ONE_SEC_INSTANT`.
-            assert_eq!(non_sync_ctx.scheduled_instant(0).unwrap(), ONE_SEC_INSTANT);
+            assert_eq!(bindings_ctx.scheduled_instant(0).unwrap(), ONE_SEC_INSTANT);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(0)
             );
-            assert_eq!(sync_ctx.get_ref().as_slice(), [(0, ONE_SEC_INSTANT)]);
+            assert_eq!(core_ctx.get_ref().as_slice(), [(0, ONE_SEC_INSTANT)]);
 
             // After the timer fires, it should not still be scheduled at some
             // instant.
-            assert_eq!(non_sync_ctx.scheduled_instant(0), None);
+            assert_eq!(bindings_ctx.scheduled_instant(0), None);
 
             // The time should have been advanced.
-            assert_eq!(non_sync_ctx.now(), ONE_SEC_INSTANT);
+            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
 
             // Once it's been triggered, it should be canceled and not
             // triggerable again.
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = new_ctx();
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 None
             );
-            assert_eq!(sync_ctx.get_ref().as_slice(), []);
+            assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // If we schedule a timer but then cancel it, it shouldn't fire.
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = new_ctx();
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
 
-            assert_eq!(non_sync_ctx.schedule_timer(ONE_SEC, 0), None);
-            assert_eq!(non_sync_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
+            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
+            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 None
             );
-            assert_eq!(sync_ctx.get_ref().as_slice(), []);
+            assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // If we schedule a timer but then schedule the same ID again, the
             // second timer should overwrite the first one.
-            let FakeCtx { sync_ctx: _, mut non_sync_ctx } = new_ctx();
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(0), 0), None);
+            let FakeCtx { core_ctx: _, mut bindings_ctx } = new_ctx();
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
             assert_eq!(
-                non_sync_ctx.schedule_timer(ONE_SEC, 0),
+                bindings_ctx.schedule_timer(ONE_SEC, 0),
                 Some(Duration::from_secs(0).into())
             );
-            assert_eq!(non_sync_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
+            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
 
             // If we schedule three timers and then run `trigger_timers_until`
             // with the appropriate value, only two of them should fire.
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = new_ctx();
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(0), 0), None,);
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(1), 1), None,);
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(2), 2), None,);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None,);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), 1), None,);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 2), None,);
             assert_eq!(
-                non_sync_ctx.trigger_timers_until_instant(
+                bindings_ctx.trigger_timers_until_instant(
                     ONE_SEC_INSTANT,
-                    handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer)
+                    handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer)
                 ),
                 vec![0, 1],
             );
 
             // The first two timers should have fired.
             assert_eq!(
-                sync_ctx.get_ref().as_slice(),
+                core_ctx.get_ref().as_slice(),
                 [(0, FakeInstant::from(Duration::from_secs(0))), (1, ONE_SEC_INSTANT)]
             );
 
             // They should be canceled now.
-            assert_eq!(non_sync_ctx.cancel_timer(0), None);
-            assert_eq!(non_sync_ctx.cancel_timer(1), None);
+            assert_eq!(bindings_ctx.cancel_timer(0), None);
+            assert_eq!(bindings_ctx.cancel_timer(1), None);
 
             // The clock should have been updated.
-            assert_eq!(non_sync_ctx.now(), ONE_SEC_INSTANT);
+            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
 
             // The last timer should not have fired.
             assert_eq!(
-                non_sync_ctx.cancel_timer(2),
+                bindings_ctx.cancel_timer(2),
                 Some(FakeInstant::from(Duration::from_secs(2)))
             );
         }
@@ -2242,16 +2242,16 @@ pub(crate) mod testutil {
         fn test_trigger_timers_until_and_expect_unordered() {
             // If the requested instant does not coincide with a timer trigger
             // point, the time should still be advanced.
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtx { mut core_ctx, mut bindings_ctx } =
                 FakeCtx::<Vec<(usize, FakeInstant)>, usize, (), (), FakeDeviceId, ()>::default();
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(0), 0), None);
-            assert_eq!(non_sync_ctx.schedule_timer(Duration::from_secs(2), 1), None);
-            non_sync_ctx.trigger_timers_until_and_expect_unordered(
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 1), None);
+            bindings_ctx.trigger_timers_until_and_expect_unordered(
                 ONE_SEC_INSTANT,
                 vec![0],
-                |non_sync_ctx, id| TimerHandler::handle_timer(&mut sync_ctx, non_sync_ctx, id),
+                |bindings_ctx, id| TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id),
             );
-            assert_eq!(non_sync_ctx.now(), ONE_SEC_INSTANT);
+            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
         }
     }
 }

@@ -128,27 +128,27 @@ pub fn handle_timer<BC: BindingsContext>(
     id: TimerId<BC>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
-    let mut sync_ctx = Locked::new(core_ctx);
+    let mut core_ctx = Locked::new(core_ctx);
 
     match id {
         TimerId(TimerIdInner::DeviceLayer(x)) => {
-            device::handle_timer(&mut sync_ctx, bindings_ctx, x);
+            device::handle_timer(&mut core_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut sync_ctx, bindings_ctx, x);
+            transport::handle_timer(&mut core_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::IpLayer(x)) => {
-            ip::handle_timer(&mut sync_ctx, bindings_ctx, x);
+            ip::handle_timer(&mut core_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::Ipv4Device(x)) => {
-            ip::device::handle_ipv4_timer(&mut sync_ctx, bindings_ctx, x);
+            ip::device::handle_ipv4_timer(&mut core_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::Ipv6Device(x)) => {
-            ip::device::handle_ipv6_timer(&mut sync_ctx, bindings_ctx, x);
+            ip::device::handle_ipv6_timer(&mut core_ctx, bindings_ctx, x);
         }
         #[cfg(test)]
         TimerId(TimerIdInner::Nop(_)) => {
-            crate::context::CounterContext::with_counters(&sync_ctx, |counters: &TimerCounters| {
+            crate::context::CounterContext::with_counters(&core_ctx, |counters: &TimerCounters| {
                 counters.nop.increment()
             })
         }

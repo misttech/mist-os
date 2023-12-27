@@ -465,9 +465,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>
         device::integration::with_loopback_state_and_sync_ctx(
             self,
             device_id,
-            |mut state, sync_ctx| {
+            |mut state, core_ctx| {
                 let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
-                let mut locked = sync_ctx.cast_locked();
+                let mut locked = core_ctx.cast_locked();
                 cb(&mut x, &mut locked)
             },
         )
@@ -554,9 +554,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         device::integration::with_loopback_state_and_sync_ctx(
             self,
             device_id,
-            |mut state, sync_ctx| {
+            |mut state, core_ctx| {
                 let mut x = state.lock::<crate::lock_ordering::LoopbackTxDequeue>();
-                let mut locked = sync_ctx.cast_locked();
+                let mut locked = core_ctx.cast_locked();
                 cb(&mut x, &mut locked)
             },
         )
@@ -589,19 +589,19 @@ mod tests {
 
     #[test]
     fn loopback_mtu() {
-        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let sync_ctx = &sync_ctx;
-        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
+        let core_ctx = &core_ctx;
+        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
             .expect("error adding loopback device")
             .into();
-        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
+        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
 
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(core_ctx), &device),
             MTU
         );
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(core_ctx), &device),
             MTU
         );
     }
@@ -612,18 +612,18 @@ mod tests {
         for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, Unlocked>:
             IpDeviceStateContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
-        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let sync_ctx = &sync_ctx;
-        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
+        let core_ctx = &core_ctx;
+        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
             .expect("error adding loopback device")
             .into();
-        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
+        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
 
         let get_addrs = || {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
-                &mut Locked::new(sync_ctx),
+                &mut Locked::new(core_ctx),
                 &device,
-                |addrs, _sync_ctx| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
+                |addrs, _core_ctx| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
             )
         };
 
@@ -641,8 +641,8 @@ mod tests {
 
         assert_eq!(
             crate::device::add_ip_addr_subnet(
-                sync_ctx,
-                &mut non_sync_ctx,
+                core_ctx,
+                &mut bindings_ctx,
                 &device,
                 AddrSubnetEither::from(addr)
             ),
@@ -651,24 +651,24 @@ mod tests {
         let addr = addr.addr();
         assert_eq!(&get_addrs()[..], [addr]);
 
-        assert_eq!(crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, addr), Ok(()));
+        assert_eq!(crate::device::del_ip_addr(core_ctx, &mut bindings_ctx, &device, addr), Ok(()));
         assert_eq!(get_addrs(), []);
 
         assert_eq!(
-            crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, addr),
+            crate::device::del_ip_addr(core_ctx, &mut bindings_ctx, &device, addr),
             Err(NotFoundError)
         );
     }
 
     #[ip_test]
     fn loopback_sends_ethernet<I: Ip + TestIpExt>() {
-        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let sync_ctx = &sync_ctx;
-        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
+        let core_ctx = &core_ctx;
+        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
             .expect("error adding loopback device");
         crate::device::testutil::enable_device(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device.clone().into(),
         );
 
@@ -676,13 +676,13 @@ mod tests {
         const BODY: &[u8] = b"IP body".as_slice();
 
         let body = Buf::new(Vec::from(BODY), ..);
-        send_ip_frame(&mut Locked::new(sync_ctx), &mut non_sync_ctx, &device, local_addr, body)
+        send_ip_frame(&mut Locked::new(core_ctx), &mut bindings_ctx, &device, local_addr, body)
             .expect("can send");
 
         // There is no transmit queue so the frames will immediately go into the
         // receive queue.
         let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
-            &mut Locked::new(sync_ctx),
+            &mut Locked::new(core_ctx),
             &device,
             |queue_state| queue_state.take_frames().map(|((), frame)| frame).collect::<Vec<_>>(),
         );

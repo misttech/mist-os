@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn stop_router_solicitation() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(1),
                 router_soliciations_remaining: None,
@@ -329,17 +329,17 @@ mod tests {
                 link_layer_bytes: None,
                 ip_device_id_ctx: Default::default(),
             }));
-        RsHandler::start_router_solicitation(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
+        RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
 
-        let now = non_sync_ctx.now();
-        non_sync_ctx
+        let now = bindings_ctx.now();
+        bindings_ctx
             .timer_ctx()
             .assert_timers_installed([(RS_TIMER_ID, now..=now + MAX_RTR_SOLICITATION_DELAY)]);
 
-        RsHandler::stop_router_solicitation(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        RsHandler::stop_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
-        assert_eq!(sync_ctx.frames(), &[][..]);
+        assert_eq!(core_ctx.frames(), &[][..]);
     }
 
     const SOURCE_ADDRESS: UnicastAddr<Ipv6Addr> =
@@ -381,7 +381,7 @@ mod tests {
         link_layer_bytes: Option<Vec<u8>>,
         expected_sll_bytes: Option<&[u8]>,
     ) {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(max_router_solicitations),
                 router_soliciations_remaining: None,
@@ -389,24 +389,24 @@ mod tests {
                 link_layer_bytes,
                 ip_device_id_ctx: Default::default(),
             }));
-        RsHandler::start_router_solicitation(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
+        RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
 
-        assert_eq!(sync_ctx.frames(), &[][..]);
+        assert_eq!(core_ctx.frames(), &[][..]);
 
         let mut duration = MAX_RTR_SOLICITATION_DELAY;
         for i in 0..max_router_solicitations {
             assert_eq!(
-                sync_ctx.get_ref().router_soliciations_remaining,
+                core_ctx.get_ref().router_soliciations_remaining,
                 NonZeroU8::new(max_router_solicitations - i)
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(RS_TIMER_ID, now..=now + duration)]);
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(RS_TIMER_ID, now..=now + duration)]);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(RS_TIMER_ID)
             );
-            let frames = sync_ctx.frames();
+            let frames = core_ctx.frames();
             assert_eq!(frames.len(), usize::from(i + 1), "frames = {:?}", frames);
             let (RsMessageMeta { message }, frame) =
                 frames.last().expect("should have transmitted a frame");
@@ -421,9 +421,9 @@ mod tests {
             duration = RTR_SOLICITATION_INTERVAL;
         }
 
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_eq!(sync_ctx.get_ref().router_soliciations_remaining, None);
-        let frames = sync_ctx.frames();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(core_ctx.get_ref().router_soliciations_remaining, None);
+        let frames = core_ctx.frames();
         assert_eq!(frames.len(), usize::from(max_router_solicitations), "frames = {:?}", frames);
     }
 }

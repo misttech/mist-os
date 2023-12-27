@@ -135,12 +135,12 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscovery
     ) {
         self.with_discovered_routes_mut(
             device_id,
-            |Ipv6RouteDiscoveryState { routes }, sync_ctx| {
+            |Ipv6RouteDiscoveryState { routes }, core_ctx| {
                 match lifetime {
                     Some(lifetime) => {
                         let newly_added = routes.insert(route.clone());
                         if newly_added {
-                            match sync_ctx.add_discovered_ipv6_route(bindings_ctx, device_id, route)
+                            match core_ctx.add_discovered_ipv6_route(bindings_ctx, device_id, route)
                             {
                                 Ok(()) => (),
                                 Err(crate::error::ExistsError) => {
@@ -180,7 +180,7 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscovery
                     }
                     None => {
                         if routes.remove(&route) {
-                            invalidate_route(sync_ctx, bindings_ctx, device_id, route);
+                            invalidate_route(core_ctx, bindings_ctx, device_id, route);
                         }
                     }
                 }
@@ -191,9 +191,9 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscovery
     fn invalidate_routes(&mut self, bindings_ctx: &mut BC, device_id: &CC::DeviceId) {
         self.with_discovered_routes_mut(
             device_id,
-            |Ipv6RouteDiscoveryState { routes }, sync_ctx| {
+            |Ipv6RouteDiscoveryState { routes }, core_ctx| {
                 for route in core::mem::take(routes).into_iter() {
-                    invalidate_route(sync_ctx, bindings_ctx, device_id, route);
+                    invalidate_route(core_ctx, bindings_ctx, device_id, route);
                 }
             },
         )
@@ -210,9 +210,9 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscovery
     ) {
         self.with_discovered_routes_mut(
             &device_id,
-            |Ipv6RouteDiscoveryState { routes }, sync_ctx| {
+            |Ipv6RouteDiscoveryState { routes }, core_ctx| {
                 assert!(routes.remove(&route), "invalidated route should be discovered");
-                del_discovered_ipv6_route(sync_ctx, bindings_ctx, &device_id, route);
+                del_discovered_ipv6_route(core_ctx, bindings_ctx, &device_id, route);
             },
         )
     }
@@ -403,17 +403,17 @@ mod tests {
 
     #[test]
     fn new_route_no_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         RouteDiscoveryHandler::update_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             ROUTE1,
             None,
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     fn discover_new_route(
@@ -474,72 +474,72 @@ mod tests {
 
     #[test]
     fn new_route_already_exists() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         // Fake the route already being present in the routing table.
-        assert!(sync_ctx.get_mut().route_table.route_table.insert(ROUTE1));
+        assert!(core_ctx.get_mut().route_table.route_table.insert(ROUTE1));
 
         // Clear events so we can assert on route-added events later.
-        let _: Vec<crate::testutil::DispatchedEvent> = non_sync_ctx.take_events();
+        let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
 
         RouteDiscoveryHandler::update_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             ROUTE1,
             Some(NonZeroNdpLifetime::Finite(ONE_SECOND)),
         );
 
         // There should not be any add-route events dispatched.
-        assert_eq!(non_sync_ctx.take_events(), []);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(bindings_ctx.take_events(), []);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     #[test]
     fn invalidated_route_not_found() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
-        discover_new_route(&mut sync_ctx, &mut non_sync_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
+        discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
 
         // Fake the route already being removed from underneath the route
         // discovery table.
-        assert!(sync_ctx.get_mut().route_table.route_table.remove(&ROUTE1));
+        assert!(core_ctx.get_mut().route_table.route_table.remove(&ROUTE1));
         // Invalidating the route should ignore the fact that the route is not
         // in the route table.
-        update_to_invalidate_check_invalidation(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
 
     #[test]
     fn new_route_with_infinite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
-        discover_new_route(&mut sync_ctx, &mut non_sync_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     #[test]
     fn update_route_from_infinite_to_finite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
-        discover_new_route(&mut sync_ctx, &mut non_sync_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         RouteDiscoveryHandler::update_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             ROUTE1,
             Some(NonZeroNdpLifetime::Finite(ONE_SECOND)),
         );
-        non_sync_ctx.timer_ctx().assert_some_timers_installed([(
+        bindings_ctx.timer_ctx().assert_some_timers_installed([(
             Ipv6DiscoveredRouteTimerId { device_id: FakeDeviceId, route: ROUTE1 },
             FakeInstant::from(ONE_SECOND.get()),
         )]);
-        assert_single_invalidation_timer(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        assert_single_invalidation_timer(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
 
     fn update_to_invalidate_check_invalidation(
@@ -553,112 +553,112 @@ mod tests {
 
     #[test]
     fn invalidate_route_with_infinite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
-        discover_new_route(&mut sync_ctx, &mut non_sync_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
-        update_to_invalidate_check_invalidation(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
     #[test]
     fn new_route_with_finite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE1,
             NonZeroNdpLifetime::Finite(ONE_SECOND),
         );
-        assert_single_invalidation_timer(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        assert_single_invalidation_timer(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
 
     #[test]
     fn update_route_from_finite_to_infinite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE1,
             NonZeroNdpLifetime::Finite(ONE_SECOND),
         );
 
         RouteDiscoveryHandler::update_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             ROUTE1,
             Some(NonZeroNdpLifetime::Infinite),
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     #[test]
     fn update_route_from_finite_to_finite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE1,
             NonZeroNdpLifetime::Finite(ONE_SECOND),
         );
 
         RouteDiscoveryHandler::update_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             ROUTE1,
             Some(NonZeroNdpLifetime::Finite(TWO_SECONDS)),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             Ipv6DiscoveredRouteTimerId { device_id: FakeDeviceId, route: ROUTE1 },
             FakeInstant::from(TWO_SECONDS.get()),
         )]);
 
-        assert_single_invalidation_timer(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        assert_single_invalidation_timer(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
 
     #[test]
     fn invalidate_route_with_finite_lifetime() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE1,
             NonZeroNdpLifetime::Finite(ONE_SECOND),
         );
 
-        update_to_invalidate_check_invalidation(&mut sync_ctx, &mut non_sync_ctx, ROUTE1);
+        update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
 
     #[test]
     fn invalidate_all_routes() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE1,
             NonZeroNdpLifetime::Finite(ONE_SECOND),
         );
         discover_new_route(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ROUTE2,
             NonZeroNdpLifetime::Finite(TWO_SECONDS),
         );
 
-        RouteDiscoveryHandler::invalidate_routes(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        let route_table = &sync_ctx.get_ref().route_table.route_table;
+        RouteDiscoveryHandler::invalidate_routes(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let route_table = &core_ctx.get_ref().route_table.route_table;
         assert!(route_table.is_empty(), "route_table={route_table:?}");
     }
 
@@ -729,17 +729,17 @@ mod tests {
         } = Ipv6::FAKE_CONFIG;
 
         let mut ctx = crate::testutil::FakeCtx::default();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let device_id = crate::device::add_ethernet_device(
-            sync_ctx,
+            core_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 ip_config: Some(IpDeviceConfigurationUpdate {
@@ -751,7 +751,7 @@ mod tests {
         )
         .unwrap();
 
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         (ctx, device_id, Ipv6::FAKE_CONFIG)
     }
@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn discovery_integration() {
         let (
-            Ctx { sync_ctx, mut non_sync_ctx },
+            Ctx { core_ctx, mut bindings_ctx },
             device_id,
             FakeEventDispatcherConfig {
                 local_mac: _,
@@ -813,9 +813,9 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
 
-        add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
+        add_link_local_route(core_ctx, &mut bindings_ctx, &device_id);
 
         let src_ip = remote_mac.to_ipv6_link_local().addr();
 
@@ -836,38 +836,38 @@ mod tests {
         let timer_id = |route| timer_id(route, device_id.clone());
 
         // Clear events so we can assert on route-added events later.
-        let _: Vec<crate::testutil::DispatchedEvent> = non_sync_ctx.take_events();
+        let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
 
         // Do nothing as router with no valid lifetime has not been discovered
         // yet and prefix does not make on-link determination.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(0, false, as_secs(ONE_SECOND).into(), 0),
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Discover a default router only as on-link prefix has no valid
         // lifetime.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(as_secs(ONE_SECOND), true, 0, 0),
         );
         let gateway_route =
             Ipv6DiscoveredRoute { subnet: IPV6_DEFAULT_SUBNET, gateway: Some(src_ip) };
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             timer_id(gateway_route),
             FakeInstant::from(ONE_SECOND.get()),
         )]);
 
         let gateway_route_entry = discovered_route_to_entry(&device_id, gateway_route);
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                 gateway_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
             ))]
@@ -876,21 +876,21 @@ mod tests {
         // Discover an on-link prefix and update valid lifetime for default
         // router.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), 0),
         );
         let on_link_route = Ipv6DiscoveredRoute { subnet, gateway: None };
         let on_link_route_entry = discovered_route_to_entry(&device_id, on_link_route);
-        non_sync_ctx.timer_ctx().assert_timers_installed([
+        bindings_ctx.timer_ctx().assert_timers_installed([
             (timer_id(gateway_route), FakeInstant::from(TWO_SECONDS.get())),
             (timer_id(on_link_route), FakeInstant::from(ONE_SECOND.get())),
         ]);
 
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                 on_link_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
             ))]
@@ -898,8 +898,8 @@ mod tests {
 
         // Discover more-specific route.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(
@@ -911,14 +911,14 @@ mod tests {
         );
         let more_specific_route = Ipv6DiscoveredRoute { subnet, gateway: Some(src_ip) };
         let more_specific_route_entry = discovered_route_to_entry(&device_id, more_specific_route);
-        non_sync_ctx.timer_ctx().assert_timers_installed([
+        bindings_ctx.timer_ctx().assert_timers_installed([
             (timer_id(gateway_route), FakeInstant::from(TWO_SECONDS.get())),
             (timer_id(on_link_route), FakeInstant::from(ONE_SECOND.get())),
             (timer_id(more_specific_route), FakeInstant::from(THREE_SECONDS.get())),
         ]);
 
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                 more_specific_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
             ))]
@@ -927,13 +927,13 @@ mod tests {
         // Invalidate default router and more specific route, and update valid
         // lifetime for on-link prefix.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(0, true, as_secs(TWO_SECONDS).into(), 0),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             timer_id(on_link_route),
             FakeInstant::from(TWO_SECONDS.get()),
         )]);
@@ -944,7 +944,7 @@ mod tests {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
                 more_specific_route_entry;
             let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
-            let events = non_sync_ctx.take_events();
+            let events = bindings_ctx.take_events();
             assert_eq!(events.len(), 2);
             assert!(events.contains(&crate::testutil::DispatchedEvent::IpLayerIpv6(event1)));
             assert!(events.contains(&crate::testutil::DispatchedEvent::IpLayerIpv6(event2)));
@@ -953,32 +953,32 @@ mod tests {
         // Do nothing as prefix does not make on-link determination and router
         // with valid lifetime is not discovered.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(0, false, 0, 0),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             timer_id(on_link_route),
             FakeInstant::from(TWO_SECONDS.get()),
         )]);
-        assert_eq!(non_sync_ctx.take_events(), []);
+        assert_eq!(bindings_ctx.take_events(), []);
 
         // Invalidate on-link prefix.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(0, true, 0, 0),
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
         {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
                 on_link_route_entry;
             assert_eq!(
-                non_sync_ctx.take_events(),
+                bindings_ctx.take_events(),
                 [crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::RemoveRoutes {
                     subnet,
                     device: device.downgrade(),
@@ -991,7 +991,7 @@ mod tests {
     #[test]
     fn discovery_integration_infinite_to_finite_to_infinite_lifetime() {
         let (
-            Ctx { sync_ctx, mut non_sync_ctx },
+            Ctx { core_ctx, mut bindings_ctx },
             device_id,
             FakeEventDispatcherConfig {
                 local_mac: _,
@@ -1001,9 +1001,9 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
 
-        add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
+        add_link_local_route(core_ctx, &mut bindings_ctx, &device_id);
 
         let src_ip = remote_mac.to_ipv6_link_local().addr();
 
@@ -1027,25 +1027,25 @@ mod tests {
         let on_link_route_entry = discovered_route_to_entry(&device_id, on_link_route);
 
         // Clear events so we can assert on route-added events later.
-        let _: Vec<crate::testutil::DispatchedEvent> = non_sync_ctx.take_events();
+        let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
 
         // Router with finite lifetime and on-link prefix with infinite
         // lifetime.
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             timer_id(gateway_route),
             FakeInstant::from(Duration::from_secs(router_lifetime_secs.into())),
         )]);
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [
                 crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                     gateway_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
@@ -1060,13 +1060,13 @@ mod tests {
         let router_lifetime_secs = u16::MAX - 1;
         let prefix_lifetime_secs = u32::MAX - 1;
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([
+        bindings_ctx.timer_ctx().assert_timers_installed([
             (
                 timer_id(gateway_route),
                 FakeInstant::from(Duration::from_secs(router_lifetime_secs.into())),
@@ -1076,36 +1076,36 @@ mod tests {
                 FakeInstant::from(Duration::from_secs(prefix_lifetime_secs.into())),
             ),
         ]);
-        assert_eq!(non_sync_ctx.take_events(), []);
+        assert_eq!(bindings_ctx.take_events(), []);
 
         // Router with finite lifetime and on-link prefix with infinite
         // lifetime.
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             timer_id(gateway_route),
             FakeInstant::from(Duration::from_secs(router_lifetime_secs.into())),
         )]);
-        assert_eq!(non_sync_ctx.take_events(), []);
+        assert_eq!(bindings_ctx.take_events(), []);
 
         // Router and prefix invalidated.
         let router_lifetime_secs = 0;
         let prefix_lifetime_secs = 0;
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
@@ -1115,7 +1115,7 @@ mod tests {
                 on_link_route_entry;
             let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
             assert_eq!(
-                non_sync_ctx.take_events(),
+                bindings_ctx.take_events(),
                 [
                     crate::testutil::DispatchedEvent::IpLayerIpv6(event1),
                     crate::testutil::DispatchedEvent::IpLayerIpv6(event2)
@@ -1127,7 +1127,7 @@ mod tests {
     #[test]
     fn flush_routes_on_interface_disabled_integration() {
         let (
-            Ctx { sync_ctx, mut non_sync_ctx },
+            Ctx { core_ctx, mut bindings_ctx },
             device_id,
             FakeEventDispatcherConfig {
                 local_mac: _,
@@ -1137,9 +1137,9 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
 
-        add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
+        add_link_local_route(core_ctx, &mut bindings_ctx, &device_id);
 
         let src_ip = remote_mac.to_ipv6_link_local().addr();
         let gateway_route =
@@ -1149,14 +1149,14 @@ mod tests {
         let on_link_route_entry = discovered_route_to_entry(&device_id, on_link_route);
 
         // Clear events so we can assert on route-added events later.
-        let _: Vec<crate::testutil::DispatchedEvent> = non_sync_ctx.take_events();
+        let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
 
         let timer_id = |route| timer_id(route, device_id.clone());
 
         // Discover both an on-link prefix and default router.
         receive_ip_packet::<_, _, Ipv6>(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             router_advertisement_buf(
@@ -1168,12 +1168,12 @@ mod tests {
                 None,
             ),
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([
+        bindings_ctx.timer_ctx().assert_timers_installed([
             (timer_id(gateway_route), FakeInstant::from(TWO_SECONDS.get())),
             (timer_id(on_link_route), FakeInstant::from(ONE_SECOND.get())),
         ]);
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             [
                 crate::testutil::DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                     gateway_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
@@ -1186,8 +1186,8 @@ mod tests {
 
         // Disable the interface.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            sync_ctx,
-            &mut non_sync_ctx,
+            core_ctx,
+            &mut bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 ip_config: Some(IpDeviceConfigurationUpdate {
@@ -1198,7 +1198,7 @@ mod tests {
             },
         )
         .unwrap();
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
@@ -1207,7 +1207,7 @@ mod tests {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
                 on_link_route_entry;
             let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
-            let events = non_sync_ctx.take_events();
+            let events = bindings_ctx.take_events();
             let (a, b, c) = assert_matches!(&events[..], [a, b, c] => (a, b, c));
             assert!([a, b].contains(&&crate::testutil::DispatchedEvent::IpLayerIpv6(event1)));
             assert!([a, b].contains(&&crate::testutil::DispatchedEvent::IpLayerIpv6(event2)));

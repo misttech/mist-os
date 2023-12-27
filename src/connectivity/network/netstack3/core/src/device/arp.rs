@@ -248,8 +248,8 @@ impl<
         device_id: &CC::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, sync_ctx| {
-            cb(nud, sync_ctx)
+        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, core_ctx| {
+            cb(nud, core_ctx)
         })
     }
 
@@ -261,7 +261,7 @@ impl<
         device_id: &CC::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut(device_id, |ArpState { nud }, sync_ctx| cb(nud, sync_ctx))
+        self.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| cb(nud, core_ctx))
     }
 
     fn send_neighbor_solicitation(
@@ -901,11 +901,11 @@ mod tests {
         // Test that, when we receive a gratuitous ARP request, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
         send_arp_packet(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ArpOp::Request,
             TEST_REMOTE_IPV4,
             TEST_REMOTE_IPV4,
@@ -916,13 +916,13 @@ mod tests {
 
         // We should have cached the sender's address information.
         assert_dynamic_neighbor_with_addr(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             TEST_REMOTE_MAC,
         );
         // Gratuitous ARPs should not prompt a response.
-        assert_empty(sync_ctx.frames().iter());
+        assert_empty(core_ctx.frames().iter());
     }
 
     #[test]
@@ -930,11 +930,11 @@ mod tests {
         // Test that, when we receive a gratuitous ARP response, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
         send_arp_packet(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ArpOp::Response,
             TEST_REMOTE_IPV4,
             TEST_REMOTE_IPV4,
@@ -945,13 +945,13 @@ mod tests {
 
         // We should have cached the sender's address information.
         assert_dynamic_neighbor_with_addr(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             TEST_REMOTE_MAC,
         );
         // Gratuitous ARPs should not send a response.
-        assert_empty(sync_ctx.frames().iter());
+        assert_empty(core_ctx.frames().iter());
     }
 
     #[test]
@@ -960,19 +960,19 @@ mod tests {
         // a gratuitous ARP for the same host, we cancel the timer and notify
         // the device layer.
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
         );
         assert_eq!(
             NudHandler::send_ip_packet_to_neighbor(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
@@ -981,8 +981,8 @@ mod tests {
         );
 
         send_arp_packet(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ArpOp::Response,
             TEST_REMOTE_IPV4,
             TEST_REMOTE_IPV4,
@@ -993,7 +993,7 @@ mod tests {
 
         // The response should now be in our cache.
         assert_dynamic_neighbor_with_addr(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             TEST_REMOTE_MAC,
@@ -1001,7 +1001,7 @@ mod tests {
 
         // Gratuitous ARPs should not send a response (the 1 frame is for the
         // original request).
-        assert_eq!(sync_ctx.frames().len(), 1);
+        assert_eq!(core_ctx.frames().len(), 1);
     }
 
     #[test]
@@ -1009,12 +1009,12 @@ mod tests {
         // Test that, when we receive an ARP request, we cache the sender's
         // address information and send an ARP response.
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         send_arp_packet(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ArpOp::Request,
             TEST_REMOTE_IPV4,
             TEST_LOCAL_IPV4,
@@ -1025,7 +1025,7 @@ mod tests {
 
         // Make sure we cached the sender's address information.
         assert_dynamic_neighbor_with_addr(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             TEST_REMOTE_MAC,
@@ -1033,7 +1033,7 @@ mod tests {
 
         // We should have sent an ARP response.
         validate_last_arp_packet(
-            &sync_ctx,
+            &core_ctx,
             1,
             TEST_REMOTE_MAC,
             ArpOp::Response,
@@ -1097,9 +1097,9 @@ mod tests {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
                     let mut ctx = FakeCtx::with_sync_ctx(FakeCtxImpl::default());
-                    let FakeCtx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-                    sync_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
-                    sync_ctx.get_mut().proto_addr = Some(*proto_addr);
+                    let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
+                    core_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
+                    core_ctx.get_mut().proto_addr = Some(*proto_addr);
                     (*name, ctx)
                 })
             },
@@ -1131,16 +1131,16 @@ mod tests {
         } = requested_remote_cfg;
 
         // Trigger link resolution.
-        network.with_context(local_name, |FakeCtx { sync_ctx, non_sync_ctx }| {
+        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx }| {
             assert_neighbor_unknown(
-                sync_ctx,
+                core_ctx,
                 FakeLinkDeviceId,
                 SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
             );
             assert_eq!(
                 NudHandler::send_ip_packet_to_neighbor(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &FakeLinkDeviceId,
                     SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
                     Buf::new([1], ..),
@@ -1150,7 +1150,7 @@ mod tests {
 
             // We should have sent an ARP request.
             validate_last_arp_packet(
-                sync_ctx,
+                core_ctx,
                 1,
                 Mac::BROADCAST,
                 ArpOp::Request,
@@ -1162,11 +1162,11 @@ mod tests {
         });
         // Step once to deliver the ARP request to the remotes.
         let res = network.step(
-            |FakeCtx { sync_ctx, non_sync_ctx }, device_id, buf| {
-                handle_packet(sync_ctx, non_sync_ctx, device_id, FrameDestination::Broadcast, buf)
+            |FakeCtx { core_ctx, bindings_ctx }, device_id, buf| {
+                handle_packet(core_ctx, bindings_ctx, device_id, FrameDestination::Broadcast, buf)
             },
-            |FakeCtx { sync_ctx, non_sync_ctx }, _ctx, id| {
-                TimerHandler::handle_timer(sync_ctx, non_sync_ctx, id)
+            |FakeCtx { core_ctx, bindings_ctx }, _ctx, id| {
+                TimerHandler::handle_timer(core_ctx, bindings_ctx, id)
             },
         );
         assert_eq!(res.timers_fired, 0);
@@ -1180,9 +1180,9 @@ mod tests {
 
         // The requested remote should have populated its ARP cache with the local's
         // information.
-        network.with_context(requested_remote_name, |FakeCtx { sync_ctx, non_sync_ctx: _ }| {
+        network.with_context(requested_remote_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
-                sync_ctx,
+                core_ctx,
                 FakeLinkDeviceId,
                 SpecifiedAddr::new(local_proto_addr).unwrap(),
                 LOCAL_HOST_CFG.hw_addr,
@@ -1190,7 +1190,7 @@ mod tests {
 
             // The requested remote should have sent an ARP response.
             validate_last_arp_packet(
-                sync_ctx,
+                core_ctx,
                 1,
                 local_hw_addr,
                 ArpOp::Response,
@@ -1203,17 +1203,17 @@ mod tests {
 
         // Step once to deliver the ARP response to the local.
         let res = network.step(
-            |FakeCtx { sync_ctx, non_sync_ctx }, device_id, buf| {
+            |FakeCtx { core_ctx, bindings_ctx }, device_id, buf| {
                 handle_packet(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     device_id,
                     FrameDestination::Individual { local: true },
                     buf,
                 )
             },
-            |FakeCtx { sync_ctx, non_sync_ctx }, _ctx, id| {
-                TimerHandler::handle_timer(sync_ctx, non_sync_ctx, id)
+            |FakeCtx { core_ctx, bindings_ctx }, _ctx, id| {
+                TimerHandler::handle_timer(core_ctx, bindings_ctx, id)
             },
         );
         assert_eq!(res.timers_fired, 0);
@@ -1221,9 +1221,9 @@ mod tests {
 
         // The local should have populated its cache with the remote's
         // information.
-        network.with_context(local_name, |FakeCtx { sync_ctx, non_sync_ctx: _ }| {
+        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
-                sync_ctx,
+                core_ctx,
                 FakeLinkDeviceId,
                 SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
                 requested_remote_hw_addr,
@@ -1235,12 +1235,12 @@ mod tests {
                 // The non-requested_remote should not have populated its ARP cache.
                 network.with_context(
                     *unrequested_remote_name,
-                    |FakeCtx { sync_ctx, non_sync_ctx: _ }| {
+                    |FakeCtx { core_ctx, bindings_ctx: _ }| {
                         // The non-requested_remote should not have sent an ARP response.
-                        assert_empty(sync_ctx.frames().iter());
+                        assert_empty(core_ctx.frames().iter());
 
                         assert_neighbor_unknown(
-                            sync_ctx,
+                            core_ctx,
                             FakeLinkDeviceId,
                             SpecifiedAddr::new(local_proto_addr).unwrap(),
                         );
@@ -1262,19 +1262,19 @@ mod tests {
         frame_dst: FrameDestination,
         expect_solicited: bool,
     ) {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
         );
         assert_eq!(
             NudHandler::send_ip_packet_to_neighbor(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
@@ -1284,8 +1284,8 @@ mod tests {
 
         // Now send a confirmation with the specified frame destination.
         send_arp_packet(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             ArpOp::Response,
             TEST_REMOTE_IPV4,
             TEST_LOCAL_IPV4,
@@ -1299,13 +1299,13 @@ mod tests {
         let expected_state = if expect_solicited {
             DynamicNeighborState::Reachable(Reachable {
                 link_address: TEST_REMOTE_MAC,
-                last_confirmed_at: non_sync_ctx.now(),
+                last_confirmed_at: bindings_ctx.now(),
             })
         } else {
             DynamicNeighborState::Stale(Stale { link_address: TEST_REMOTE_MAC })
         };
         assert_dynamic_neighbor_state(
-            &mut sync_ctx,
+            &mut core_ctx,
             FakeLinkDeviceId,
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             expected_state,

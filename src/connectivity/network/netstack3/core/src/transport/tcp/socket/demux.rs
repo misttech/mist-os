@@ -211,8 +211,8 @@ fn handle_incoming_packet<I, B, BC, CC>(
                     EitherStack::ThisStack(conn_id) => {
                         match core_ctx.with_socket_mut_transport_demux(
                             &conn_id,
-                            |sync_ctx, socket_state| {
-                                let (sync_ctx, converter) = sync_ctx.into_single_stack();
+                            |core_ctx, socket_state| {
+                                let (core_ctx, converter) = core_ctx.into_single_stack();
                                 let (conn, _addr) = assert_matches!(
                                     socket_state,
                                     TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
@@ -225,7 +225,7 @@ fn handle_incoming_packet<I, B, BC, CC>(
                                     "invalid socket ID"
                                 );
                                 try_handle_incoming_for_connection::<I, I, CC, BC, B, _>(
-                                    sync_ctx,
+                                    core_ctx,
                                     bindings_ctx,
                                     conn_addr.clone(),
                                     &conn_id,
@@ -250,8 +250,8 @@ fn handle_incoming_packet<I, B, BC, CC>(
                     EitherStack::OtherStack(conn_id) => {
                         match core_ctx.with_socket_mut_transport_demux(
                             &conn_id,
-                            |sync_ctx, socket_state| {
-                                let (sync_ctx, converter) = match sync_ctx {
+                            |core_ctx, socket_state| {
+                                let (core_ctx, converter) = match core_ctx {
                                     MaybeDualStack::DualStack(ds) => ds,
                                     // TODO(https://issues.fuchsia.dev/316408184):
                                     // Improve type safety to avoid unreachable.
@@ -263,7 +263,7 @@ fn handle_incoming_packet<I, B, BC, CC>(
                                     "invalid socket ID"
                                 );
                                 try_handle_incoming_for_connection::<I::OtherVersion, I, CC, BC, B, _>(
-                                    sync_ctx,
+                                    core_ctx,
                                     bindings_ctx,
                                     conn_addr.clone(),
                                     &conn_id,
@@ -292,10 +292,10 @@ fn handle_incoming_packet<I, B, BC, CC>(
             Some(SocketLookupResult::Listener((id, _listener_addr))) => {
                 match core_ctx.with_socket_mut_isn_transport_demux(
                     &id,
-                    |sync_ctx, socket_state, isn| {
-                        let (sync_ctx, converter) = sync_ctx.into_single_stack();
+                    |core_ctx, socket_state, isn| {
+                        let (core_ctx, converter) = core_ctx.into_single_stack();
                         try_handle_incoming_for_listener::<I, CC, BC, B>(
-                            sync_ctx,
+                            core_ctx,
                             converter,
                             bindings_ctx,
                             isn,

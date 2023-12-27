@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn queue_and_dequeue() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         for _ in 0..2 {
@@ -291,8 +291,8 @@ mod tests {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
                     ReceiveQueueHandler::queue_rx_frame(
-                        &mut sync_ctx,
-                        &mut non_sync_ctx,
+                        &mut core_ctx,
+                        &mut bindings_ctx,
                         &FakeLinkDeviceId,
                         (),
                         body
@@ -301,14 +301,14 @@ mod tests {
                 );
                 // We should only ever be woken up once when the first frame
                 // was enqueued.
-                assert_eq!(non_sync_ctx.state().woken_rx_tasks, [FakeLinkDeviceId]);
+                assert_eq!(bindings_ctx.state().woken_rx_tasks, [FakeLinkDeviceId]);
             }
 
             let body = Buf::new(vec![131], ..);
             assert_eq!(
                 ReceiveQueueHandler::queue_rx_frame(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
+                    &mut core_ctx,
+                    &mut bindings_ctx,
                     &FakeLinkDeviceId,
                     (),
                     body.clone(),
@@ -318,7 +318,7 @@ mod tests {
             // We should only ever be woken up once when the first frame
             // was enqueued.
             assert_eq!(
-                core::mem::take(&mut non_sync_ctx.state_mut().woken_rx_tasks),
+                core::mem::take(&mut bindings_ctx.state_mut().woken_rx_tasks),
                 [FakeLinkDeviceId]
             );
 
@@ -326,14 +326,14 @@ mod tests {
             for i in (0..(MAX_RX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
                     ReceiveQueueApi::handle_queued_rx_frames(
-                        &mut sync_ctx,
-                        &mut non_sync_ctx,
+                        &mut core_ctx,
+                        &mut bindings_ctx,
                         &FakeLinkDeviceId,
                     ),
                     WorkQueueReport::Pending
                 );
                 assert_eq!(
-                    core::mem::take(&mut sync_ctx.get_mut().handled_frames),
+                    core::mem::take(&mut core_ctx.get_mut().handled_frames),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -342,21 +342,21 @@ mod tests {
 
             assert_eq!(
                 ReceiveQueueApi::handle_queued_rx_frames(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
+                    &mut core_ctx,
+                    &mut bindings_ctx,
                     &FakeLinkDeviceId,
                 ),
                 WorkQueueReport::AllDone
             );
             assert_eq!(
-                core::mem::take(&mut sync_ctx.get_mut().handled_frames),
+                core::mem::take(&mut core_ctx.get_mut().handled_frames),
                 (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
             );
             // Should not have woken up the RX task since the queue should be
             // empty.
-            assert_eq!(core::mem::take(&mut non_sync_ctx.state_mut().woken_rx_tasks), []);
+            assert_eq!(core::mem::take(&mut bindings_ctx.state_mut().woken_rx_tasks), []);
 
             // The queue should now be empty so the next iteration of queueing
             // `MAX_RX_QUEUED_LEN` frames should succeed.

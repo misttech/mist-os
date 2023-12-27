@@ -103,7 +103,7 @@ pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 #[derive(Default)]
 pub struct ContextPair<CC, BT> {
     /// The synchronized context.
-    pub sync_ctx: CC,
+    pub core_ctx: CC,
     /// The non-synchronized context.
     // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
     // dropped before `non-sync_ctx` so that the existence of strongly-referenced
@@ -113,7 +113,7 @@ pub struct ContextPair<CC, BT> {
     // Note that if strongly-referenced (device) IDs exist when dropping the
     // primary reference, the primary reference's drop impl will panic. See
     // `crate::sync::PrimaryRc::drop` for details.
-    pub non_sync_ctx: BT,
+    pub bindings_ctx: BT,
 }
 
 impl<CC, BC> ContextPair<CC, BC> {
@@ -122,7 +122,7 @@ impl<CC, BC> ContextPair<CC, BC> {
     where
         BC: Default,
     {
-        Self { sync_ctx: core_ctx, non_sync_ctx: BC::default() }
+        Self { core_ctx, bindings_ctx: BC::default() }
     }
 }
 
@@ -137,9 +137,9 @@ impl<BC: crate::BindingsContext + Default> Default for Ctx<BC> {
 
 impl<BC: crate::BindingsContext + Default> Ctx<BC> {
     pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
-        let mut non_sync_ctx = Default::default();
-        let state = builder.build_with_ctx(&mut non_sync_ctx);
-        Self { sync_ctx: SyncCtx { state }, non_sync_ctx }
+        let mut bindings_ctx = Default::default();
+        let state = builder.build_with_ctx(&mut bindings_ctx);
+        Self { core_ctx: SyncCtx { state }, bindings_ctx }
     }
 }
 
@@ -386,16 +386,16 @@ impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeCtx {
         &self,
         f: F,
     ) -> O {
-        let Self { sync_ctx: _, non_sync_ctx } = self;
-        non_sync_ctx.with_inner(|ctx| f(&ctx.timers))
+        let Self { core_ctx: _, bindings_ctx } = self;
+        bindings_ctx.with_inner(|ctx| f(&ctx.timers))
     }
 
     fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
         &mut self,
         f: F,
     ) -> O {
-        let Self { sync_ctx: _, non_sync_ctx } = self;
-        non_sync_ctx.with_inner_mut(|ctx| f(&mut ctx.timers))
+        let Self { core_ctx: _, bindings_ctx } = self;
+        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.timers))
     }
 }
 
@@ -407,8 +407,8 @@ impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>
         &mut self,
         f: F,
     ) -> O {
-        let Self { sync_ctx: _, non_sync_ctx } = self;
-        non_sync_ctx.with_inner_mut(|ctx| f(&mut ctx.frames))
+        let Self { core_ctx: _, bindings_ctx } = self;
+        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.frames))
     }
 }
 
@@ -1022,7 +1022,7 @@ impl FakeEventDispatcherBuilder {
         state_builder: StackStateBuilder,
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let FakeEventDispatcherBuilder {
             devices,
@@ -1034,7 +1034,7 @@ impl FakeEventDispatcherBuilder {
             .into_iter()
             .map(|DeviceConfig { mac, addr_subnet: ip_and_subnet, ipv4_config, ipv6_config }| {
                 let eth_id = crate::device::add_ethernet_device(
-                    sync_ctx,
+                    core_ctx,
                     mac,
                     IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                     DEFAULT_INTERFACE_METRIC,
@@ -1042,8 +1042,8 @@ impl FakeEventDispatcherBuilder {
                 let id = eth_id.clone().into();
                 if let Some(ipv4_config) = ipv4_config {
                     let _previous = crate::device::testutil::update_ipv4_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
+                        core_ctx,
+                        bindings_ctx,
                         &id,
                         ipv4_config,
                     )
@@ -1051,21 +1051,21 @@ impl FakeEventDispatcherBuilder {
                 }
                 if let Some(ipv6_config) = ipv6_config {
                     let _previous = crate::device::testutil::update_ipv6_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
+                        core_ctx,
+                        bindings_ctx,
                         &id,
                         ipv6_config,
                     )
                     .unwrap();
                 }
-                crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);
+                crate::device::testutil::enable_device(core_ctx, bindings_ctx, &id);
                 match ip_and_subnet {
                     Some(AddrSubnetEither::V4(addr_sub)) => {
-                        crate::device::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &id, addr_sub)
+                        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &id, addr_sub)
                             .unwrap();
                     }
                     Some(AddrSubnetEither::V6(addr_sub)) => {
-                        crate::device::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &id, addr_sub)
+                        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &id, addr_sub)
                             .unwrap();
                     }
                     None => {}
@@ -1076,8 +1076,8 @@ impl FakeEventDispatcherBuilder {
         for (idx, ip, mac) in arp_table_entries {
             let device = &idx_to_device_id[idx];
             crate::device::insert_static_arp_table_entry(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device.clone().into(),
                 ip,
                 mac,
@@ -1087,8 +1087,8 @@ impl FakeEventDispatcherBuilder {
         for (idx, ip, mac) in ndp_table_entries {
             let device = &idx_to_device_id[idx];
             crate::device::insert_static_ndp_table_entry(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device.clone().into(),
                 ip,
                 mac,
@@ -1099,8 +1099,8 @@ impl FakeEventDispatcherBuilder {
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
             crate::testutil::add_route(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 crate::ip::types::AddableEntryEither::without_gateway(
                     subnet,
                     device.clone().into(),
@@ -1364,11 +1364,11 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstan
 
 #[cfg(test)]
 pub(crate) fn handle_timer(
-    FakeCtx { sync_ctx, non_sync_ctx }: &mut FakeCtx,
+    FakeCtx { core_ctx, bindings_ctx }: &mut FakeCtx,
     _bindings_ctx: &mut (),
     id: TimerId<FakeNonSyncCtx>,
 ) {
-    crate::time::handle_timer(sync_ctx, non_sync_ctx, id)
+    crate::time::handle_timer(core_ctx, bindings_ctx, id)
 }
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
@@ -1381,18 +1381,18 @@ pub fn add_route<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
-    let mut sync_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = lock_order::Locked::new(core_ctx);
     match entry {
         crate::ip::types::AddableEntryEither::V4(entry) => {
             crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
-                &mut sync_ctx,
+                &mut core_ctx,
                 bindings_ctx,
                 entry,
             )
         }
         crate::ip::types::AddableEntryEither::V6(entry) => {
             crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
-                &mut sync_ctx,
+                &mut core_ctx,
                 bindings_ctx,
                 entry,
             )
@@ -1408,19 +1408,19 @@ pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
-    let mut sync_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = lock_order::Locked::new(core_ctx);
 
     match subnet {
         SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
             Ipv4,
             _,
             _,
-        >(&mut sync_ctx, bindings_ctx, subnet),
+        >(&mut core_ctx, bindings_ctx, subnet),
         SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
             Ipv6,
             _,
             _,
-        >(&mut sync_ctx, bindings_ctx, subnet),
+        >(&mut core_ctx, bindings_ctx, subnet),
     }
     .map_err(From::from)
 }
@@ -1430,14 +1430,14 @@ pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
 ) {
-    let mut sync_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = lock_order::Locked::new(core_ctx);
     crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
-        &mut sync_ctx,
+        &mut core_ctx,
         bindings_ctx,
         device,
     );
     crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
-        &mut sync_ctx,
+        &mut core_ctx,
         bindings_ctx,
         device,
     );
@@ -1537,10 +1537,10 @@ mod tests {
 
         // Alice sends Bob a ping.
 
-        net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
+        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut Locked::new(&*sync_ctx),
-                non_sync_ctx,
+                &mut Locked::new(&*core_ctx),
+                bindings_ctx,
                 None, // device
                 None, // local_ip
                 SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
@@ -1584,32 +1584,32 @@ mod tests {
         );
         core::mem::drop((device_ids_1, device_ids_2));
 
-        net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
+                bindings_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
                 None
             );
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(4), TimerId(TimerIdInner::Nop(4))),
+                bindings_ctx.schedule_timer(Duration::from_secs(4), TimerId(TimerIdInner::Nop(4))),
                 None
             );
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(5))),
+                bindings_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(5))),
                 None
             );
         });
 
-        net.with_context(2, |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
+                bindings_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
                 None
             );
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
+                bindings_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
                 None
             );
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(6))),
+                bindings_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(6))),
                 None
             );
         });
@@ -1640,8 +1640,8 @@ mod tests {
 
         assert!(net.step(receive_frame, handle_timer).is_idle());
         // Check that current time on contexts tick together.
-        let t1 = net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| non_sync_ctx.now());
-        let t2 = net.with_context(2, |Ctx { sync_ctx: _, non_sync_ctx }| non_sync_ctx.now());
+        let t1 = net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
+        let t2 = net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
         assert_eq!(t1, t2);
     }
 
@@ -1660,19 +1660,19 @@ mod tests {
         );
         core::mem::drop((device_ids_1, device_ids_2));
 
-        net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
+                bindings_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
                 None
             );
         });
-        net.with_context(2, |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
+                bindings_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
                 None
             );
             assert_eq!(
-                non_sync_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
+                bindings_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
                 None
             );
         });
@@ -1708,10 +1708,10 @@ mod tests {
         );
 
         // Alice sends Bob a ping.
-        net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
+        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut Locked::new(&*sync_ctx),
-                non_sync_ctx,
+                &mut Locked::new(&*core_ctx),
+                bindings_ctx,
                 None, // device
                 None, // local_ip
                 SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
@@ -1732,21 +1732,21 @@ mod tests {
             .unwrap();
         });
 
-        net.with_context("alice", |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context("alice", |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx
+                bindings_ctx
                     .schedule_timer(Duration::from_millis(3), TimerId(TimerIdInner::Nop(1))),
                 None
             );
         });
-        net.with_context("bob", |Ctx { sync_ctx: _, non_sync_ctx }| {
+        net.with_context("bob", |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(
-                non_sync_ctx
+                bindings_ctx
                     .schedule_timer(Duration::from_millis(7), TimerId(TimerIdInner::Nop(2))),
                 None
             );
             assert_eq!(
-                non_sync_ctx
+                bindings_ctx
                     .schedule_timer(Duration::from_millis(10), TimerId(TimerIdInner::Nop(1))),
                 None
             );
@@ -1889,8 +1889,8 @@ mod tests {
 
         // Bob and Calvin should get any packet sent by Alice.
 
-        net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_a, ip_b, &alice_device_id.clone().into());
+        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
+            send_packet(core_ctx, bindings_ctx, ip_a, ip_b, &alice_device_id.clone().into());
         });
         assert_eq!(net.non_sync_ctx("alice").frames_sent().len(), 1);
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
@@ -1912,8 +1912,8 @@ mod tests {
         // Only Alice should get packets sent by Bob.
 
         net.drop_pending_frames();
-        net.with_context("bob", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_b, ip_a, &bob_device_id.clone().into());
+        net.with_context("bob", |Ctx { core_ctx, bindings_ctx }| {
+            send_packet(core_ctx, bindings_ctx, ip_b, ip_a, &bob_device_id.clone().into());
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_eq!(net.non_sync_ctx("bob").frames_sent().len(), 1);
@@ -1931,8 +1931,8 @@ mod tests {
         // No one gets packets sent by Calvin.
 
         net.drop_pending_frames();
-        net.with_context("calvin", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
+        net.with_context("calvin", |Ctx { core_ctx, bindings_ctx }| {
+            send_packet(core_ctx, bindings_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());

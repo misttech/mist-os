@@ -792,8 +792,8 @@ mod tests {
         a: Option<AddrSubnet<Ipv4Addr>>,
     ) -> FakeCtx {
         let mut ctx = FakeCtx::with_sync_ctx(FakeSyncCtx::default());
-        ctx.non_sync_ctx.seed_rng(seed);
-        ctx.sync_ctx.get_mut().addr_subnet = a;
+        ctx.bindings_ctx.seed_rng(seed);
+        ctx.core_ctx.get_mut().addr_subnet = a;
         ctx
     }
 
@@ -815,10 +815,10 @@ mod tests {
     #[test_case(Some(MY_ADDR); "specified_src")]
     #[test_case(None; "unspecified_src")]
     fn test_igmp_simple_integration(src_ip: Option<SpecifiedAddr<Ipv4Addr>>) {
-        let check_report = |sync_ctx: &mut FakeSyncCtx| {
+        let check_report = |core_ctx: &mut FakeSyncCtx| {
             let expected_src_ip = src_ip.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get());
 
-            let frames = sync_ctx.take_frames();
+            let frames = core_ctx.take_frames();
             let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) = assert_matches!(
                 &frames[..], [x] => x);
             assert_eq!(dst_ip, &GROUP_ADDR);
@@ -838,83 +838,83 @@ mod tests {
 
         let addr_subnet = src_ip.map(|a| AddrSubnet::new(a.get(), 16).unwrap());
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtx { mut core_ctx, mut bindings_ctx } =
                 setup_simple_test_environment_with_addr_subnet(seed, addr_subnet);
 
             // Joining a group should send a report.
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            check_report(&mut sync_ctx);
+            check_report(&mut core_ctx);
 
             // Should send a report after a query.
-            receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(10));
+            receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
-            check_report(&mut sync_ctx);
+            check_report(&mut core_ctx);
         });
     }
 
     #[test]
     fn test_igmp_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(10));
+            receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let IgmpGroupState(group_state) = sync_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 3);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            assert_eq!(core_ctx.frames().len(), 3);
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
     #[test]
     fn test_igmp_integration_igmpv1_router_present() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
-            let instant1 = non_sync_ctx.timer_ctx().timers()[0].0.clone();
+            let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
 
-            receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(0));
-            assert_eq!(sync_ctx.frames().len(), 1);
+            receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0));
+            assert_eq!(core_ctx.frames().len(), 1);
 
             // Since we have heard from the v1 router, we should have set our
             // flag.
-            let IgmpGroupState(group_state) = sync_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(state) => {
                     assert!(state.get_protocol_specific().v1_router_present)
@@ -922,35 +922,35 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             // Two timers: one for the delayed report, one for the v1 router
             // timer.
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([
                 (REPORT_DELAY_TIMER_ID, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
                 (V1_ROUTER_PRESENT_TIMER_ID, now..=(now + DEFAULT_V1_ROUTER_PRESENT_TIMEOUT)),
             ]);
-            let instant2 = non_sync_ctx.timer_ctx().timers()[1].0.clone();
+            let instant2 = bindings_ctx.timer_ctx().timers()[1].0.clone();
             assert_eq!(instant1, instant2);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
             // After the first timer, we send out our V1 report.
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
             // The last frame being sent should be a V1 report.
-            let (_, frame) = sync_ctx.frames().last().unwrap();
+            let (_, frame) = core_ctx.frames().last().unwrap();
             // 34 and 0x12 are hacky but they can quickly tell it is a V1
             // report.
             assert_eq!(frame[24], 0x12);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(V1_ROUTER_PRESENT_TIMER_ID)
             );
             // After the second timer, we should reset our flag for v1 routers.
-            let IgmpGroupState(group_state) = sync_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Idle(state) => {
                     assert!(!state.get_protocol_specific().v1_router_present)
@@ -958,84 +958,84 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(10));
+            receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 3);
+            assert_eq!(core_ctx.frames().len(), 3);
             // Now we should get V2 report
-            assert_eq!(sync_ctx.frames().last().unwrap().1[24], 0x16);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
     #[test]
     fn test_igmp_integration_delay_reset_timer() {
         // This seed value was chosen to later produce a timer duration > 100ms.
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(123456);
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(123456);
         assert_eq!(
-            sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
             GroupJoinResult::Joined(())
         );
-        let now = non_sync_ctx.now();
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        let now = bindings_ctx.now();
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             REPORT_DELAY_TIMER_ID,
             now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
         )]);
-        let instant1 = non_sync_ctx.timer_ctx().timers()[0].0.clone();
-        let start = non_sync_ctx.now();
+        let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let start = bindings_ctx.now();
         let duration = Duration::from_micros(((instant1 - start).as_micros() / 2) as u64);
         assert!(duration.as_millis() > 100);
-        receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, duration);
-        assert_eq!(sync_ctx.frames().len(), 1);
-        let now = non_sync_ctx.now();
-        non_sync_ctx
+        receive_igmp_query(&mut core_ctx, &mut bindings_ctx, duration);
+        assert_eq!(core_ctx.frames().len(), 1);
+        let now = bindings_ctx.now();
+        bindings_ctx
             .timer_ctx()
             .assert_timers_installed([(REPORT_DELAY_TIMER_ID, now..=(now + duration))]);
-        let instant2 = non_sync_ctx.timer_ctx().timers()[0].0.clone();
+        let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // Because of the message, our timer should be reset to a nearer future.
         assert!(instant2 <= instant1);
         assert_eq!(
-            non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
             Some(REPORT_DELAY_TIMER_ID)
         );
-        assert!(non_sync_ctx.now() - start <= duration);
-        assert_eq!(sync_ctx.frames().len(), 2);
+        assert!(bindings_ctx.now() - start <= duration);
+        assert_eq!(core_ctx.frames().len(), 2);
         // Make sure it is a V2 report.
-        assert_eq!(sync_ctx.frames().last().unwrap().1[24], 0x16);
-        ensure_ttl_ihl_rtr(&sync_ctx);
+        assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
+        ensure_ttl_ihl_rtr(&core_ctx);
     }
 
     #[test]
     fn test_igmp_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             // The initial unsolicited report.
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(REPORT_DELAY_TIMER_ID)
             );
             // The report after the delay.
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
             // Our leave message.
-            assert_eq!(sync_ctx.frames().len(), 3);
+            assert_eq!(core_ctx.frames().len(), 3);
 
-            let leave_frame = &sync_ctx.frames().last().unwrap().1;
+            let leave_frame = &core_ctx.frames().last().unwrap().1;
 
             // Make sure it is a leave message.
             assert_eq!(leave_frame[24], 0x17);
@@ -1044,80 +1044,80 @@ mod tests {
             assert_eq!(leave_frame[17], 0);
             assert_eq!(leave_frame[18], 0);
             assert_eq!(leave_frame[19], 2);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
     #[test]
     fn test_igmp_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            receive_igmp_report(&mut sync_ctx, &mut non_sync_ctx);
-            non_sync_ctx.timer_ctx().assert_no_timers_installed();
+            assert_eq!(core_ctx.frames().len(), 1);
+            receive_igmp_report(&mut core_ctx, &mut bindings_ctx);
+            bindings_ctx.timer_ctx().assert_no_timers_installed();
             // The report should be discarded because we have received from
             // someone else.
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
             // A leave message is not sent.
-            assert_eq!(sync_ctx.frames().len(), 1);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            assert_eq!(core_ctx.frames().len(), 1);
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
     #[test]
     fn test_receive_general_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR_2),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR_2),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
+            let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            non_sync_ctx.timer_ctx().assert_timers_installed([
+            bindings_ctx.timer_ctx().assert_timers_installed([
                 (REPORT_DELAY_TIMER_ID, range.clone()),
                 (REPORT_DELAY_TIMER_ID_2, range),
             ]);
             // The initial unsolicited report.
-            assert_eq!(sync_ctx.frames().len(), 2);
-            non_sync_ctx.trigger_timers_and_expect_unordered(
+            assert_eq!(core_ctx.frames().len(), 2);
+            bindings_ctx.trigger_timers_and_expect_unordered(
                 [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
             );
-            assert_eq!(sync_ctx.frames().len(), 4);
+            assert_eq!(core_ctx.frames().len(), 4);
             const RESP_TIME: Duration = Duration::from_secs(10);
-            receive_igmp_general_query(&mut sync_ctx, &mut non_sync_ctx, RESP_TIME);
+            receive_igmp_general_query(&mut core_ctx, &mut bindings_ctx, RESP_TIME);
             // Two new timers should be there.
-            let now = non_sync_ctx.now();
+            let now = bindings_ctx.now();
             let range = now..=(now + RESP_TIME);
-            non_sync_ctx.timer_ctx().assert_timers_installed([
+            bindings_ctx.timer_ctx().assert_timers_installed([
                 (REPORT_DELAY_TIMER_ID, range.clone()),
                 (REPORT_DELAY_TIMER_ID_2, range),
             ]);
-            non_sync_ctx.trigger_timers_and_expect_unordered(
+            bindings_ctx.trigger_timers_and_expect_unordered(
                 [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
             );
             // Two new reports should be sent.
-            assert_eq!(sync_ctx.frames().len(), 6);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            assert_eq!(core_ctx.frames().len(), 6);
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
@@ -1126,43 +1126,43 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Test that we do not perform IGMP when IGMP is disabled.
 
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtx { mut core_ctx, mut bindings_ctx } =
                 FakeCtx::with_sync_ctx(FakeSyncCtx::default());
-            non_sync_ctx.seed_rng(seed);
-            sync_ctx.get_mut().igmp_enabled = false;
+            bindings_ctx.seed_rng(seed);
+            core_ctx.get_mut().igmp_enabled = false;
 
             // Assert that no observable effects have taken place.
-            let assert_no_effect = |sync_ctx: &FakeSyncCtx, non_sync_ctx: &FakeNonSyncCtx| {
-                non_sync_ctx.timer_ctx().assert_no_timers_installed();
-                assert_empty(sync_ctx.frames());
+            let assert_no_effect = |core_ctx: &FakeSyncCtx, bindings_ctx: &FakeNonSyncCtx| {
+                bindings_ctx.timer_ctx().assert_no_timers_installed();
+                assert_empty(core_ctx.frames());
             };
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
             // We should join the group but left in the GMP's non-member
             // state.
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_no_effect(&sync_ctx, &non_sync_ctx);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
+            assert_no_effect(&core_ctx, &bindings_ctx);
 
-            receive_igmp_report(&mut sync_ctx, &mut non_sync_ctx);
+            receive_igmp_report(&mut core_ctx, &mut bindings_ctx);
             // We should have done no state transitions/work.
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_no_effect(&sync_ctx, &non_sync_ctx);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
+            assert_no_effect(&core_ctx, &bindings_ctx);
 
-            receive_igmp_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(10));
+            receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
             // We should have done no state transitions/work.
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_no_effect(&sync_ctx, &non_sync_ctx);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
+            assert_no_effect(&core_ctx, &bindings_ctx);
 
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
             // We should have left the group but not executed any `Actions`.
-            assert!(sync_ctx.get_ref().groups.get(&GROUP_ADDR).is_none());
-            assert_no_effect(&sync_ctx, &non_sync_ctx);
+            assert!(core_ctx.get_ref().groups.get(&GROUP_ADDR).is_none());
+            assert_no_effect(&core_ctx, &bindings_ctx);
         });
     }
 
@@ -1172,62 +1172,62 @@ mod tests {
             // Simple IGMP integration test to check that when we call top-level
             // multicast join and leave functions, IGMP is performed.
 
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            let now = non_sync_ctx.now();
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            non_sync_ctx
+            bindings_ctx
                 .timer_ctx()
                 .assert_timers_installed([(REPORT_DELAY_TIMER_ID, range.clone())]);
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            ensure_ttl_ihl_rtr(&core_ctx);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::AlreadyMember
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            non_sync_ctx
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            bindings_ctx
                 .timer_ctx()
                 .assert_timers_installed([(REPORT_DELAY_TIMER_ID, range.clone())]);
 
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::StillMember
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            non_sync_ctx.timer_ctx().assert_timers_installed([(REPORT_DELAY_TIMER_ID, range)]);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            bindings_ctx.timer_ctx().assert_timers_installed([(REPORT_DELAY_TIMER_ID, range)]);
 
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
-            assert_eq!(sync_ctx.frames().len(), 2);
-            non_sync_ctx.timer_ctx().assert_no_timers_installed();
-            ensure_ttl_ihl_rtr(&sync_ctx);
+            assert_eq!(core_ctx.frames().len(), 2);
+            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            ensure_ttl_ihl_rtr(&core_ctx);
         });
     }
 
     #[test]
     fn test_igmp_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut sync_ctx, mut non_sync_ctx } = setup_simple_test_environment(seed);
-            assert_eq!(sync_ctx.take_frames(), []);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            assert_eq!(core_ctx.take_frames(), []);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             {
-                let frames = sync_ctx.take_frames();
+                let frames = core_ctx.take_frames();
                 let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
                     assert_matches!(&frames[..], [x] => x);
                 assert_eq!(dst_ip, &GROUP_ADDR);
@@ -1246,15 +1246,15 @@ mod tests {
             }
 
             // Should do nothing.
-            sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.take_frames(), []);
+            core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.take_frames(), []);
 
             // Should send done message.
-            sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
+            core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
             {
-                let frames = sync_ctx.take_frames();
+                let frames = core_ctx.take_frames();
                 let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
                     assert_matches!(&frames[..], [x] => x);
                 assert_eq!(dst_ip, &Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS);
@@ -1273,15 +1273,15 @@ mod tests {
             }
 
             // Should do nothing.
-            sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_eq!(sync_ctx.take_frames(), []);
+            core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
+            assert_eq!(core_ctx.take_frames(), []);
 
             // Should send report message.
-            sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
+            core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             {
-                let frames = sync_ctx.take_frames();
+                let frames = core_ctx.take_frames();
                 let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
                     assert_matches!(&frames[..], [x] => x);
                 assert_eq!(dst_ip, &GROUP_ADDR);
@@ -1311,26 +1311,26 @@ mod tests {
             subnet: _,
         } = Ipv4::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
+        let crate::testutil::FakeCtx { core_ctx, mut bindings_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
-        let mut sync_ctx = &sync_ctx;
+        let mut core_ctx = &core_ctx;
         let eth_device_id = crate::device::add_ethernet_device(
-            sync_ctx,
+            core_ctx,
             local_mac,
             MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
         crate::device::add_ip_addr_subnet(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             AddrSubnet::new(MY_ADDR.get(), 24).unwrap(),
         )
         .unwrap();
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
 
-        let now = non_sync_ctx.now();
+        let now = bindings_ctx.now();
         let timer_id = TimerId(TimerIdInner::Ipv4Device(
             IgmpTimerId::Gmp(GmpDelayedReportTimerId {
                 device: device_id.clone(),
@@ -1344,13 +1344,13 @@ mod tests {
             gmp_enabled: bool,
         }
 
-        let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-                          non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let set_config = |core_ctx: &mut &crate::testutil::FakeSyncCtx,
+                          bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
             let _: Ipv4DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv4_configuration(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &device_id,
                     Ipv4DeviceConfigurationUpdate {
                         ip_config: Some(IpDeviceConfigurationUpdate {
@@ -1363,8 +1363,8 @@ mod tests {
                 )
                 .unwrap();
         };
-        let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx| {
-            let frames = non_sync_ctx.take_frames();
+        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx| {
+            let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
@@ -1384,8 +1384,8 @@ mod tests {
                 }
             );
         };
-        let check_sent_leave = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx| {
-            let frames = non_sync_ctx.take_frames();
+        let check_sent_leave = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx| {
+            let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
 
             assert_eq!(egress_device, &eth_device_id);
@@ -1412,69 +1412,69 @@ mod tests {
         // Should send report for the all-systems multicast group that all
         // interfaces join.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
-        check_sent_report(&mut non_sync_ctx);
+        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        check_sent_report(&mut bindings_ctx);
 
         // Disable IGMP.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(&mut non_sync_ctx);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_leave(&mut bindings_ctx);
 
         // Enable IGMP but disable IPv4.
         //
         // Should do nothing.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(&bindings_ctx.take_frames()[..], []);
 
         // Disable IGMP but enable IPv4.
         //
         // Should do nothing.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(&bindings_ctx.take_frames()[..], []);
 
         // Enable IGMP.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
-        check_sent_report(&mut non_sync_ctx);
+        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        check_sent_report(&mut bindings_ctx);
 
         // Disable IPv4.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(&mut non_sync_ctx);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_leave(&mut bindings_ctx);
 
         // Enable IPv4.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
-        check_sent_report(&mut non_sync_ctx);
+        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
+        check_sent_report(&mut bindings_ctx);
     }
 }

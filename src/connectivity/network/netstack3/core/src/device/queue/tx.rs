@@ -484,14 +484,14 @@ mod tests {
 
     #[test]
     fn noqueue() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -499,36 +499,36 @@ mod tests {
             Ok(())
         );
         let FakeTxQueueNonSyncCtxState { woken_tx_tasks, delivered_to_sockets } =
-            non_sync_ctx.state();
+            bindings_ctx.state();
         assert_eq!(woken_tx_tasks, &[]);
         assert_eq!(
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
-        assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), [body]);
+        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
 
         // Should not have any frames waiting to be transmitted since we have no
         // queue.
         assert_eq!(
             TransmitQueueApi::transmit_queued_frames(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
             ),
             Ok(WorkQueueReport::AllDone),
         );
-        assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
-        assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), []);
+        assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
+        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), []);
     }
 
     #[test]
     fn fifo_queue_and_dequeue() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeLinkDeviceId,
             TransmitQueueConfiguration::Fifo,
         );
@@ -538,8 +538,8 @@ mod tests {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
                     TransmitQueueHandler::queue_tx_frame(
-                        &mut sync_ctx,
-                        &mut non_sync_ctx,
+                        &mut core_ctx,
+                        &mut bindings_ctx,
                         &FakeLinkDeviceId,
                         (),
                         body
@@ -548,14 +548,14 @@ mod tests {
                 );
                 // We should only ever be woken up once when the first packet
                 // was enqueued.
-                assert_eq!(non_sync_ctx.state().woken_tx_tasks, [FakeLinkDeviceId]);
+                assert_eq!(bindings_ctx.state().woken_tx_tasks, [FakeLinkDeviceId]);
             }
 
             let body = Buf::new(vec![131], ..);
             assert_eq!(
                 TransmitQueueHandler::queue_tx_frame(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
+                    &mut core_ctx,
+                    &mut bindings_ctx,
                     &FakeLinkDeviceId,
                     (),
                     body.clone(),
@@ -564,7 +564,7 @@ mod tests {
             );
 
             let FakeTxQueueNonSyncCtxState { woken_tx_tasks, delivered_to_sockets } =
-                non_sync_ctx.state_mut();
+                bindings_ctx.state_mut();
             // We should only ever be woken up once when the first packet
             // was enqueued.
             assert_eq!(core::mem::take(woken_tx_tasks), [FakeLinkDeviceId]);
@@ -575,14 +575,14 @@ mod tests {
             for i in (0..(MAX_TX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
                     TransmitQueueApi::transmit_queued_frames(
-                        &mut sync_ctx,
-                        &mut non_sync_ctx,
+                        &mut core_ctx,
+                        &mut bindings_ctx,
                         &FakeLinkDeviceId,
                     ),
                     Ok(WorkQueueReport::Pending),
                 );
                 assert_eq!(
-                    core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
+                    core::mem::take(&mut core_ctx.get_mut().transmitted_packets),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -591,14 +591,14 @@ mod tests {
 
             assert_eq!(
                 TransmitQueueApi::transmit_queued_frames(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
+                    &mut core_ctx,
+                    &mut bindings_ctx,
                     &FakeLinkDeviceId,
                 ),
                 Ok(WorkQueueReport::AllDone),
             );
             assert_eq!(
-                core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
+                core::mem::take(&mut core_ctx.get_mut().transmitted_packets),
                 (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
@@ -606,7 +606,7 @@ mod tests {
             // Should not have woken up the TX task since the queue should be
             // empty.
             let FakeTxQueueNonSyncCtxState { woken_tx_tasks, delivered_to_sockets } =
-                non_sync_ctx.state_mut();
+                bindings_ctx.state_mut();
             assert_eq!(core::mem::take(woken_tx_tasks), []);
 
             // The queue should now be empty so the next iteration of queueing
@@ -622,12 +622,12 @@ mod tests {
 
     #[test]
     fn device_not_ready() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeLinkDeviceId,
             TransmitQueueConfiguration::Fifo,
         );
@@ -635,8 +635,8 @@ mod tests {
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -644,23 +644,23 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            core::mem::take(&mut non_sync_ctx.state_mut().woken_tx_tasks),
+            core::mem::take(&mut bindings_ctx.state_mut().woken_tx_tasks),
             [FakeLinkDeviceId]
         );
-        assert_eq!(sync_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
 
-        sync_ctx.get_mut().device_not_ready = true;
+        core_ctx.get_mut().device_not_ready = true;
         assert_eq!(
             TransmitQueueApi::transmit_queued_frames(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
             ),
             Err(DeviceSendFrameError::DeviceNotReady(())),
         );
-        assert_eq!(sync_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
         let FakeTxQueueNonSyncCtxState { woken_tx_tasks, delivered_to_sockets } =
-            non_sync_ctx.state();
+            bindings_ctx.state();
         assert_eq!(woken_tx_tasks, &[]);
         // Frames were delivered to packet sockets before the device was found
         // to not be ready.
@@ -669,28 +669,28 @@ mod tests {
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
 
-        sync_ctx.get_mut().device_not_ready = false;
+        core_ctx.get_mut().device_not_ready = false;
         assert_eq!(
             TransmitQueueApi::transmit_queued_frames(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
             ),
             Ok(WorkQueueReport::AllDone),
         );
-        assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
-        assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), [body]);
+        assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
+        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
     }
 
     #[test_case(true; "device not ready")]
     #[test_case(false; "device ready")]
     fn drain_before_noqueue(device_not_ready: bool) {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeLinkDeviceId,
             TransmitQueueConfiguration::Fifo,
         );
@@ -698,8 +698,8 @@ mod tests {
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -707,29 +707,29 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            core::mem::take(&mut non_sync_ctx.state_mut().woken_tx_tasks),
+            core::mem::take(&mut bindings_ctx.state_mut().woken_tx_tasks),
             [FakeLinkDeviceId]
         );
-        assert_eq!(sync_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
 
-        sync_ctx.get_mut().device_not_ready = device_not_ready;
+        core_ctx.get_mut().device_not_ready = device_not_ready;
         TransmitQueueApi::set_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeLinkDeviceId,
             TransmitQueueConfiguration::None,
         );
         let FakeTxQueueNonSyncCtxState { woken_tx_tasks, delivered_to_sockets } =
-            non_sync_ctx.state();
+            bindings_ctx.state();
         assert_eq!(woken_tx_tasks, &[]);
         assert_eq!(
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
         if device_not_ready {
-            assert_eq!(sync_ctx.get_mut().transmitted_packets, []);
+            assert_eq!(core_ctx.get_mut().transmitted_packets, []);
         } else {
-            assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), [body]);
+            assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
         }
     }
 }

@@ -413,21 +413,21 @@ fn update_device_and_protocol<
     new_device: TargetDevice<&CC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
-    core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
+    core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
         // Even if we're never moving the socket from/to the any-device
         // state, we acquire the lock to make the move between devices
         // atomic from the perspective of frame delivery. Otherwise there
         // would be a brief period during which arriving frames wouldn't be
         // delivered to the socket from either device.
-        let old_device = sync_ctx.with_socket_state_mut(
+        let old_device = core_ctx.with_socket_state_mut(
             socket,
-            |_: &BC::SocketState, Target { protocol, device }, sync_ctx| {
+            |_: &BC::SocketState, Target { protocol, device }, core_ctx| {
                 match protocol_update {
                     MaybeUpdate::NewValue(p) => *protocol = Some(p),
                     MaybeUpdate::NoChange => (),
                 };
                 let old_device = match &device {
-                    TargetDevice::SpecificDevice(device) => sync_ctx.upgrade_weak_device_id(device),
+                    TargetDevice::SpecificDevice(device) => core_ctx.upgrade_weak_device_id(device),
                     TargetDevice::AnyDevice => {
                         assert!(any_device_sockets.remove(socket));
                         None
@@ -436,7 +436,7 @@ fn update_device_and_protocol<
                 *device = match &new_device {
                     TargetDevice::AnyDevice => TargetDevice::AnyDevice,
                     TargetDevice::SpecificDevice(d) => {
-                        TargetDevice::SpecificDevice(sync_ctx.downgrade_device_id(d))
+                        TargetDevice::SpecificDevice(core_ctx.downgrade_device_id(d))
                     }
                 };
                 old_device
@@ -451,9 +451,9 @@ fn update_device_and_protocol<
         if let Some(device) = old_device {
             // Remove the reference to the socket from the old device if
             // there is one, and it hasn't been removed.
-            sync_ctx.with_device_sockets_mut(
+            core_ctx.with_device_sockets_mut(
                 &device,
-                |DeviceSockets(device_sockets), _sync_ctx| {
+                |DeviceSockets(device_sockets), _core_ctx| {
                     assert!(device_sockets.remove(socket), "socket not found in device state");
                 },
             );
@@ -461,9 +461,9 @@ fn update_device_and_protocol<
 
         // Add the reference to the new device, if there is one.
         match &new_device {
-            TargetDevice::SpecificDevice(new_device) => sync_ctx.with_device_sockets_mut(
+            TargetDevice::SpecificDevice(new_device) => core_ctx.with_device_sockets_mut(
                 new_device,
-                |DeviceSockets(device_sockets), _sync_ctx| {
+                |DeviceSockets(device_sockets), _core_ctx| {
                     assert!(device_sockets.insert(socket.clone()));
                 },
             ),
@@ -481,7 +481,7 @@ where
 {
     fn create(&mut self, external_state: BC::SocketState) -> Self::SocketId {
         let strong = self.create_socket(external_state);
-        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), _sync_ctx| {
+        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), _core_ctx| {
             // On creation, sockets do not target any device or protocol.
             // Inserting them into the `any_device_sockets` table lets us treat
             // newly-created sockets uniformly with sockets whose target device
@@ -507,19 +507,19 @@ where
     }
 
     fn get_info(&mut self, id: &Self::SocketId) -> SocketInfo<Self::WeakDeviceId> {
-        self.with_socket_state(id, |_external_state, Target { device, protocol }, _sync_ctx| {
+        self.with_socket_state(id, |_external_state, Target { device, protocol }, _core_ctx| {
             SocketInfo { device: device.clone(), protocol: *protocol }
         })
     }
 
     fn remove(&mut self, id: Self::SocketId) {
-        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
+        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
             let old_device =
-                sync_ctx.with_socket_state_mut(&id, |_: &BC::SocketState, target, sync_ctx| {
+                core_ctx.with_socket_state_mut(&id, |_: &BC::SocketState, target, core_ctx| {
                     let Target { device, protocol: _ } = target;
                     match &device {
                         TargetDevice::SpecificDevice(device) => {
-                            sync_ctx.upgrade_weak_device_id(device)
+                            core_ctx.upgrade_weak_device_id(device)
                         }
                         TargetDevice::AnyDevice => {
                             assert!(any_device_sockets.remove(&id));
@@ -528,9 +528,9 @@ where
                     }
                 });
             if let Some(device) = old_device {
-                sync_ctx.with_device_sockets_mut(
+                core_ctx.with_device_sockets_mut(
                     &device,
-                    |DeviceSockets(device_sockets), _sync_ctx| {
+                    |DeviceSockets(device_sockets), _core_ctx| {
                         assert!(device_sockets.remove(&id), "device doesn't have socket");
                     },
                 )
@@ -551,8 +551,8 @@ where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let metadata = match self.with_socket_state(id, |_: &BC::SocketState, target, sync_ctx| {
-            make_send_metadata(sync_ctx, target, params, None)
+        let metadata = match self.with_socket_state(id, |_: &BC::SocketState, target, core_ctx| {
+            make_send_metadata(core_ctx, target, params, None)
         }) {
             Ok(metadata) => metadata,
             Err(e) => return Err((body, e)),
@@ -573,7 +573,7 @@ where
     {
         let metadata = match self.with_socket_state(
             id,
-            |_: &BC::SocketState, target @ Target { device: _, protocol }, sync_ctx| {
+            |_: &BC::SocketState, target @ Target { device: _, protocol }, core_ctx| {
                 let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
                 let protocol = match target_protocol.or_else(|| {
                     protocol.and_then(|p| match p {
@@ -586,7 +586,7 @@ where
                 };
 
                 make_send_metadata(
-                    sync_ctx,
+                    core_ctx,
                     target,
                     frame,
                     Some(DatagramHeader { dest_addr, protocol: EtherType::from(protocol.get()) }),
@@ -657,8 +657,8 @@ pub fn create<BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     external_state: BC::SocketState,
 ) -> SocketId<BC> {
-    let mut sync_ctx = Locked::new(core_ctx);
-    SocketId(DeviceSocketApi::create(&mut sync_ctx, external_state))
+    let mut core_ctx = Locked::new(core_ctx);
+    SocketId(DeviceSocketApi::create(&mut core_ctx, external_state))
 }
 
 /// Sets the device for which a packet socket will receive packets.
@@ -667,8 +667,8 @@ pub fn set_device<BC: crate::BindingsContext>(
     SocketId(id): &SocketId<BC>,
     device: TargetDevice<&DeviceId<BC>>,
 ) {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::set_device(&mut sync_ctx, id, device)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::set_device(&mut core_ctx, id, device)
 }
 
 /// Sets the device and protocol for which a socket will receive packets.
@@ -678,8 +678,8 @@ pub fn set_device_and_protocol<BC: crate::BindingsContext>(
     device: TargetDevice<&DeviceId<BC>>,
     protocol: Protocol,
 ) {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::set_device_and_protocol(&mut sync_ctx, id, device, protocol)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::set_device_and_protocol(&mut core_ctx, id, device, protocol)
 }
 
 /// Gets the bound info for a socket.
@@ -687,8 +687,8 @@ pub fn get_info<BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     SocketId(id): &SocketId<BC>,
 ) -> SocketInfo<WeakDeviceId<BC>> {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::get_info(&mut sync_ctx, id)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::get_info(&mut core_ctx, id)
 }
 
 /// Removes a bound socket.
@@ -698,8 +698,8 @@ pub fn get_info<BC: crate::BindingsContext>(
 /// If the provided [`SocketId`] is not the last instance for a socket, this
 /// method will panic.
 pub fn remove<BC: crate::BindingsContext>(core_ctx: &SyncCtx<BC>, SocketId(id): SocketId<BC>) {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::remove(&mut sync_ctx, id)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::remove(&mut core_ctx, id)
 }
 
 /// Sends a frame for the specified socket without any additional framing.
@@ -710,8 +710,8 @@ pub fn send_frame<BC: crate::BindingsContext, B: BufferMut>(
     params: SendFrameParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendFrameError)> {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::send_frame(&mut sync_ctx, bindings_ctx, id, params, body)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::send_frame(&mut core_ctx, bindings_ctx, id, params, body)
 }
 
 /// Sends a datagram with system-determined framing.
@@ -722,8 +722,8 @@ pub fn send_datagram<BC: crate::BindingsContext, B: BufferMut>(
     params: SendDatagramParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendDatagramError)> {
-    let mut sync_ctx = Locked::new(core_ctx);
-    DeviceSocketApi::send_datagram(&mut sync_ctx, bindings_ctx, id, params, body)
+    let mut core_ctx = Locked::new(core_ctx);
+    DeviceSocketApi::send_datagram(&mut core_ctx, bindings_ctx, id, params, body)
 }
 
 /// Allows the rest of the stack to dispatch packets to listening sockets.
@@ -869,7 +869,7 @@ where
         // TODO(https://fxbug.dev/125732): Invert the order of acquisition
         // for the lock on the sockets held in the device and the any-device
         // sockets lock.
-        self.with_any_device_sockets(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
+        self.with_any_device_sockets(|AnyDeviceSockets(any_device_sockets), core_ctx| {
             // Iterate through the device's sockets while also holding the
             // any-device sockets lock. This prevents double delivery to the
             // same socket. If the two tables were locked independently,
@@ -884,11 +884,11 @@ where
             //   B) unlock D's sockets and any device sockets
             //   A) lock D's sockets
             //   A) deliver to socket X in D's table (!)
-            sync_ctx.with_device_sockets(&device, |DeviceSockets(device_sockets), sync_ctx| {
+            core_ctx.with_device_sockets(&device, |DeviceSockets(device_sockets), core_ctx| {
                 for socket in any_device_sockets.iter().chain(device_sockets) {
-                    sync_ctx.with_socket_state(
+                    core_ctx.with_socket_state(
                         socket,
-                        |external_state, Target { protocol, device: _ }, _sync_ctx| {
+                        |external_state, Target { protocol, device: _ }, _core_ctx| {
                             let should_deliver = match protocol {
                                 None => false,
                                 Some(p) => match p {
@@ -1575,31 +1575,31 @@ mod tests {
 
     #[test]
     fn create_remove() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let bound = DeviceSocketApi::create(&mut sync_ctx, Default::default());
+        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
         assert_eq!(
-            DeviceSocketApi::get_info(&mut sync_ctx, &bound),
+            DeviceSocketApi::get_info(&mut core_ctx, &bound),
             SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
         );
 
-        DeviceSocketApi::remove(&mut sync_ctx, bound);
+        DeviceSocketApi::remove(&mut core_ctx, bound);
     }
 
     #[test_case(TargetDevice::AnyDevice)]
     #[test_case(TargetDevice::SpecificDevice(&MultipleDevicesId::A))]
     fn test_set_device(device: TargetDevice<&MultipleDevicesId>) {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let bound = DeviceSocketApi::create(&mut sync_ctx, Default::default());
-        DeviceSocketApi::set_device(&mut sync_ctx, &bound, device.clone());
+        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
+        DeviceSocketApi::set_device(&mut core_ctx, &bound, device.clone());
         assert_eq!(
-            DeviceSocketApi::get_info(&mut sync_ctx, &bound),
+            DeviceSocketApi::get_info(&mut core_ctx, &bound),
             SocketInfo { device: device.with_weak_id(), protocol: None }
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         if let TargetDevice::SpecificDevice(d) = device {
             let DeviceSockets(socket_ids) = device_sockets.get(&d).expect("device state exists");
             assert_eq!(socket_ids, &HashSet::from([bound]));
@@ -1608,12 +1608,12 @@ mod tests {
 
     #[test]
     fn update_device() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let bound = DeviceSocketApi::create(&mut sync_ctx, Default::default());
+        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
 
         DeviceSocketApi::set_device(
-            &mut sync_ctx,
+            &mut core_ctx,
             &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::A),
         );
@@ -1621,12 +1621,12 @@ mod tests {
         // Now update the device and make sure the socket only appears in the
         // one device's list.
         DeviceSocketApi::set_device(
-            &mut sync_ctx,
+            &mut core_ctx,
             &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::B),
         );
         assert_eq!(
-            DeviceSocketApi::get_info(&mut sync_ctx, &bound),
+            DeviceSocketApi::get_info(&mut core_ctx, &bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None
@@ -1634,7 +1634,7 @@ mod tests {
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         let device_socket_lists = device_sockets
             .iter()
             .map(|(d, DeviceSockets(indexes))| (d, indexes.iter().collect()))
@@ -1661,56 +1661,56 @@ mod tests {
         protocol: Protocol,
         device: TargetDevice<&MultipleDevicesId>,
     ) {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
         let mut sockets =
-            [(); 3].map(|()| DeviceSocketApi::create(&mut sync_ctx, Default::default()));
+            [(); 3].map(|()| DeviceSocketApi::create(&mut core_ctx, Default::default()));
         for socket in &mut sockets {
             DeviceSocketApi::set_device_and_protocol(
-                &mut sync_ctx,
+                &mut core_ctx,
                 socket,
                 device.clone(),
                 protocol,
             );
             assert_eq!(
-                DeviceSocketApi::get_info(&mut sync_ctx, socket),
+                DeviceSocketApi::get_info(&mut core_ctx, socket),
                 SocketInfo { device: device.with_weak_id(), protocol: Some(protocol) }
             );
         }
 
         for socket in sockets {
-            DeviceSocketApi::remove(&mut sync_ctx, socket)
+            DeviceSocketApi::remove(&mut core_ctx, socket)
         }
     }
 
     #[test]
     fn change_device_after_removal() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let bound = DeviceSocketApi::create(&mut sync_ctx, Default::default());
+        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
         // Set the device for the socket before removing the device state
         // entirely.
         const DEVICE_TO_REMOVE: MultipleDevicesId = MultipleDevicesId::A;
         DeviceSocketApi::set_device(
-            &mut sync_ctx,
+            &mut core_ctx,
             &bound,
             TargetDevice::SpecificDevice(&DEVICE_TO_REMOVE),
         );
 
         // Now remove the device; this should cause future attempts to upgrade
         // the device ID to fail.
-        let removed = sync_ctx.get_mut().remove_device(&DEVICE_TO_REMOVE);
+        let removed = core_ctx.get_mut().remove_device(&DEVICE_TO_REMOVE);
         assert_eq!(removed, DeviceSockets(HashSet::from([bound.clone()])));
 
         // Changing the device should gracefully handle the fact that the
         // earlier-bound device is now gone.
         DeviceSocketApi::set_device(
-            &mut sync_ctx,
+            &mut core_ctx,
             &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::B),
         );
         assert_eq!(
-            DeviceSocketApi::get_info(&mut sync_ctx, &bound),
+            DeviceSocketApi::get_info(&mut core_ctx, &bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None,
@@ -1718,7 +1718,7 @@ mod tests {
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         let DeviceSockets(weak_sockets) =
             device_sockets.get(&MultipleDevicesId::B).expect("device state exists");
         assert_eq!(weak_sockets, &HashSet::from([bound]));
@@ -1808,19 +1808,19 @@ mod tests {
 
     #[test]
     fn receive_frame_deliver_to_multiple() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let non_sync_ctx = FakeNonSyncCtx::default();
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let bindings_ctx = FakeNonSyncCtx::default();
 
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            DeviceSocketApi::create(&mut sync_ctx, state)
+            DeviceSocketApi::create(&mut core_ctx, state)
         };
 
         let mut make_bound = |device, protocol| {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            make_bound(&mut sync_ctx, device, protocol, state)
+            make_bound(&mut core_ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
@@ -1845,8 +1845,8 @@ mod tests {
                 FrameDestination::Individual { local: true },
             )
             .into(),
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
         );
 
         let _ = (
@@ -1870,19 +1870,19 @@ mod tests {
 
     #[test]
     fn sent_frame_deliver_to_multiple() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let non_sync_ctx = FakeNonSyncCtx::default();
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let bindings_ctx = FakeNonSyncCtx::default();
 
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            DeviceSocketApi::create(&mut sync_ctx, state)
+            DeviceSocketApi::create(&mut core_ctx, state)
         };
 
         let mut make_bound = |device, protocol| {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            make_bound(&mut sync_ctx, device, protocol, state)
+            make_bound(&mut core_ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
@@ -1903,8 +1903,8 @@ mod tests {
 
         let mut sockets_with_received_frames = deliver_one_frame(
             SentFrame::Ethernet(TestData::frame().into()).into(),
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
         );
 
         let _ = (
@@ -1929,10 +1929,10 @@ mod tests {
 
     #[test]
     fn deliver_multiple_frames() {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut bindings_ctx = FakeNonSyncCtx::default();
         let socket = make_bound(
-            &mut sync_ctx,
+            &mut core_ctx,
             TargetDevice::AnyDevice,
             Some(Protocol::All),
             ExternalSocketState::default(),
@@ -1941,8 +1941,8 @@ mod tests {
         const RECEIVE_COUNT: usize = 10;
         for _ in 0..RECEIVE_COUNT {
             DeviceSocketHandler::handle_frame(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &MultipleDevicesId::A,
                 super::ReceivedFrame::from_ethernet(
                     TestData::frame(),
@@ -1954,7 +1954,7 @@ mod tests {
         }
 
         let FakeSockets { mut all_sockets, any_device_sockets: _, device_sockets: _ } =
-            sync_ctx.into_state();
+            core_ctx.into_state();
         let FakeStrongId(index) = socket;
         let (ExternalSocketState(received), _): (_, Target<_>) = all_sockets.remove(index).unwrap();
         assert_eq!(
@@ -1991,13 +1991,13 @@ mod tests {
         send_device: Option<MultipleDevicesId>,
         expected_device: Result<MultipleDevicesId, SendFrameError>,
     ) {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut bindings_ctx = FakeNonSyncCtx::default();
 
-        let id = DeviceSocketApi::create(&mut sync_ctx, Default::default());
+        let id = DeviceSocketApi::create(&mut core_ctx, Default::default());
         if let Some(bind_device) = bind_device {
             DeviceSocketApi::set_device(
-                &mut sync_ctx,
+                &mut core_ctx,
                 &id,
                 TargetDevice::SpecificDevice(&bind_device),
             );
@@ -2007,8 +2007,8 @@ mod tests {
         let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
         assert_eq!(
             DeviceSocketApi::send_frame(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &id,
                 destination,
                 Buf::new(Vec::from(TestData::BODY), ..),
@@ -2018,7 +2018,7 @@ mod tests {
         );
 
         if let Ok(expected_device) = expected_device {
-            let FakeNonSyncCtx { sent } = non_sync_ctx;
+            let FakeNonSyncCtx { sent } = bindings_ctx;
             assert_eq!(
                 sent,
                 [(
@@ -2091,11 +2091,11 @@ mod tests {
         destination: SendDatagramParams<MultipleDevicesId>,
         expected_device: Result<MultipleDevicesId, SendDatagramError>,
     ) {
-        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let mut core_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut bindings_ctx = FakeNonSyncCtx::default();
 
         let id = make_bound(
-            &mut sync_ctx,
+            &mut core_ctx,
             bind_device.map_or(TargetDevice::AnyDevice, TargetDevice::SpecificDevice),
             bind_protocol,
             Default::default(),
@@ -2104,8 +2104,8 @@ mod tests {
         let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
         assert_eq!(
             DeviceSocketApi::send_datagram(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 &id,
                 destination,
                 Buf::new(Vec::from(TestData::BODY), ..),
@@ -2115,7 +2115,7 @@ mod tests {
         );
 
         if let Ok(expected_device) = expected_device {
-            let FakeNonSyncCtx { sent } = non_sync_ctx;
+            let FakeNonSyncCtx { sent } = bindings_ctx;
             let expected_sent = (
                 DeviceSocketMetadata {
                     device_id: expected_device,
@@ -2137,18 +2137,18 @@ mod tests {
         use crate::testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V4};
         let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4).build();
 
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        let Ctx { core_ctx, bindings_ctx: _ } = &mut ctx;
 
-        let never_bound = create(sync_ctx, Mutex::default());
+        let never_bound = create(core_ctx, Mutex::default());
         let bound_any_device = {
-            let id = create(sync_ctx, Mutex::default());
-            set_device(sync_ctx, &id, TargetDevice::AnyDevice);
+            let id = create(core_ctx, Mutex::default());
+            set_device(core_ctx, &id, TargetDevice::AnyDevice);
             id
         };
         let bound_specific_device = {
-            let id = create(sync_ctx, Mutex::default());
+            let id = create(core_ctx, Mutex::default());
             set_device(
-                sync_ctx,
+                core_ctx,
                 &id,
                 TargetDevice::SpecificDevice(&DeviceId::Ethernet(device_ids[0].clone())),
             );

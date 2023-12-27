@@ -1360,7 +1360,7 @@ fn receive_ip_transport_icmp_error<
     };
 
     let id = echo_request.message().id();
-    core_ctx.with_icmp_ctx_and_sockets_mut(|sync_ctx, sockets| {
+    core_ctx.with_icmp_ctx_and_sockets_mut(|core_ctx, sockets| {
             if let Some(conn) = sockets.socket_map.conns().get_by_addr(&ConnAddr {
                 ip: ConnIpAddr {
                     local: (original_src_ip, NonZeroU16::new(id).unwrap()),
@@ -1368,7 +1368,7 @@ fn receive_ip_transport_icmp_error<
                 },
                 device: None,
             }) {
-                sync_ctx.with_counters(|counters: &IcmpRxCounters<I>| {
+                core_ctx.with_counters(|counters: &IcmpRxCounters<I>| {
                     counters.error_at_socket.increment();
                 });
                 // NB: At the moment bindings has no need to consume ICMP
@@ -3582,7 +3582,7 @@ impl<
         _bindings_ctx: &mut BC,
         id: &SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
-        self.with_sockets_state(|_sync_ctx, state| {
+        self.with_sockets_state(|_core_ctx, state| {
             match state.get(id.get_key_index()).expect("invalid socket ID") {
                 datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
                 datagram::SocketState::Bound(
@@ -4416,24 +4416,24 @@ mod tests {
         modify_packet_builder(&mut pb);
         let buffer = Buf::new(body, ..).encapsulate(pb).serialize_vec_outer().unwrap();
 
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             I::FAKE_CONFIG.into_builder().build_with_modifications(modify_stack_state_builder);
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, I>(&sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, I>(&core_ctx, &mut bindings_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
             IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(
-                &sync_ctx,
-                &mut non_sync_ctx,
+                &core_ctx,
+                &mut bindings_ctx,
                 &device,
                 FrameDestination::Individual { local: true },
                 buffer,
             ),
             IpVersion::V6 => receive_ip_packet::<_, _, Ipv6>(
-                &sync_ctx,
-                &mut non_sync_ctx,
+                &core_ctx,
+                &mut bindings_ctx,
                 &device,
                 FrameDestination::Individual { local: true },
                 buffer,
@@ -4444,34 +4444,34 @@ mod tests {
             // TODO(http://fxbug.dev/134635): Redesign iterating through
             // assert_counters once CounterContext is removed.
             let count = match *counter {
-                "send_ipv4_packet" => sync_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
-                "send_ipv6_packet" => sync_ctx.state.ipv6.inner.counters().send_ip_packet.get(),
-                "echo_request" => sync_ctx.state.icmp_rx_counters::<I>().echo_request.get(),
+                "send_ipv4_packet" => core_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
+                "send_ipv6_packet" => core_ctx.state.ipv6.inner.counters().send_ip_packet.get(),
+                "echo_request" => core_ctx.state.icmp_rx_counters::<I>().echo_request.get(),
                 "timestamp_request" => {
-                    sync_ctx.state.icmp_rx_counters::<I>().timestamp_request.get()
+                    core_ctx.state.icmp_rx_counters::<I>().timestamp_request.get()
                 }
                 "protocol_unreachable" => {
-                    sync_ctx.state.icmp_tx_counters::<I>().protocol_unreachable.get()
+                    core_ctx.state.icmp_tx_counters::<I>().protocol_unreachable.get()
                 }
-                "port_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().port_unreachable.get(),
-                "net_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().net_unreachable.get(),
-                "ttl_expired" => sync_ctx.state.icmp_tx_counters::<I>().ttl_expired.get(),
-                "packet_too_big" => sync_ctx.state.icmp_tx_counters::<I>().packet_too_big.get(),
+                "port_unreachable" => core_ctx.state.icmp_tx_counters::<I>().port_unreachable.get(),
+                "net_unreachable" => core_ctx.state.icmp_tx_counters::<I>().net_unreachable.get(),
+                "ttl_expired" => core_ctx.state.icmp_tx_counters::<I>().ttl_expired.get(),
+                "packet_too_big" => core_ctx.state.icmp_tx_counters::<I>().packet_too_big.get(),
                 "parameter_problem" => {
-                    sync_ctx.state.icmp_tx_counters::<I>().parameter_problem.get()
+                    core_ctx.state.icmp_tx_counters::<I>().parameter_problem.get()
                 }
-                "dest_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().dest_unreachable.get(),
-                "error" => sync_ctx.state.icmp_tx_counters::<I>().error.get(),
+                "dest_unreachable" => core_ctx.state.icmp_tx_counters::<I>().dest_unreachable.get(),
+                "error" => core_ctx.state.icmp_tx_counters::<I>().error.get(),
                 c => panic!("unrecognized counter: {c}"),
             };
             assert!(count > 0, "counter at zero: {counter}");
         }
 
         if let Some((expect_message, expect_code)) = expect_message_code {
-            assert_eq!(non_sync_ctx.frames_sent().len(), 1);
+            assert_eq!(bindings_ctx.frames_sent().len(), 1);
             let (src_mac, dst_mac, src_ip, dst_ip, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<I, _, M, _>(
-                    &non_sync_ctx.frames_sent()[0].1,
+                    &bindings_ctx.frames_sent()[0].1,
                     EthernetFrameLengthCheck::NoCheck,
                     f,
                 )
@@ -4484,7 +4484,7 @@ mod tests {
             assert_eq!(message, expect_message);
             assert_eq!(code, expect_code);
         } else {
-            assert_empty(non_sync_ctx.frames_sent().iter());
+            assert_empty(bindings_ctx.frames_sent().iter());
         }
     }
 
@@ -5033,9 +5033,9 @@ mod tests {
         };
 
         let loopback_device_id =
-            net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx: _ }| {
+            net.with_context(LOCAL_CTX_NAME, |Ctx { core_ctx, bindings_ctx: _ }| {
                 crate::device::add_loopback_device(
-                    &&*sync_ctx,
+                    &&*core_ctx,
                     Mtu::new(u16::MAX as u32),
                     DEFAULT_INTERFACE_METRIC,
                 )
@@ -5054,33 +5054,33 @@ mod tests {
             .serialize_vec_outer()
             .unwrap()
             .into_inner();
-        let conn = net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::testutil::enable_device(&&*sync_ctx, non_sync_ctx, &loopback_device_id);
+        let conn = net.with_context(LOCAL_CTX_NAME, |Ctx { core_ctx, bindings_ctx }| {
+            crate::device::testutil::enable_device(&&*core_ctx, bindings_ctx, &loopback_device_id);
 
-            let conn = new_socket::<I, _>(sync_ctx);
+            let conn = new_socket::<I, _>(core_ctx);
             if bind_to_device {
                 let device = local_device_ids[0].clone().into();
-                set_device(sync_ctx, non_sync_ctx, &conn, Some(&device))
+                set_device(core_ctx, bindings_ctx, &conn, Some(&device))
                     .expect("failed to set SO_BINDTODEVICE");
             }
             core::mem::drop((local_device_ids, remote_device_ids));
-            bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(icmp_id)).unwrap();
+            bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(icmp_id)).unwrap();
             match send_type {
                 IcmpSendType::Send => {
                     connect(
-                        sync_ctx,
-                        non_sync_ctx,
+                        core_ctx,
+                        bindings_ctx,
                         &conn,
                         Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         REMOTE_ID,
                     )
                     .unwrap();
-                    send(sync_ctx, non_sync_ctx, &conn, buf).unwrap();
+                    send(core_ctx, bindings_ctx, &conn, buf).unwrap();
                 }
                 IcmpSendType::SendTo => {
                     send_to(
-                        sync_ctx,
-                        non_sync_ctx,
+                        core_ctx,
+                        bindings_ctx,
                         &conn,
                         Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         buf,
@@ -5088,16 +5088,16 @@ mod tests {
                     .unwrap();
                 }
             }
-            handle_queued_rx_packets(sync_ctx, non_sync_ctx);
+            handle_queued_rx_packets(core_ctx, bindings_ctx);
 
             conn
         });
 
         net.run_until_idle(
             crate::device::testutil::receive_frame,
-            |Ctx { sync_ctx, non_sync_ctx }, _, id| {
-                crate::handle_timer(&&*sync_ctx, non_sync_ctx, id);
-                handle_queued_rx_packets(sync_ctx, non_sync_ctx);
+            |Ctx { core_ctx, bindings_ctx }, _, id| {
+                crate::handle_timer(&&*core_ctx, bindings_ctx, id);
+                handle_queued_rx_packets(core_ctx, bindings_ctx);
             },
         );
 
@@ -5383,20 +5383,20 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx: FakeIcmpCtx<Ipv4> = FakeIcmpCtx::default();
-            let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
 
-            let conn = SocketHandler::<Ipv4, _>::create(sync_ctx);
+            let conn = SocketHandler::<Ipv4, _>::create(core_ctx);
             // NOTE: This assertion is not a correctness requirement. It's just
             // that the rest of this test assumes that the new connection has ID
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
+            SocketHandler::bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
                 .unwrap();
             SocketHandler::connect(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
                 REMOTE_ID,
@@ -5404,8 +5404,8 @@ mod tests {
             .unwrap();
 
             <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FAKE_CONFIG_V4.remote_ip.get(),
                 FAKE_CONFIG_V4.local_ip,
@@ -5424,9 +5424,9 @@ mod tests {
             for (ctr, expected) in assert_counters {
                 let actual = match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => {
-                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error.get()
+                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error.get()
                     }
-                    "IcmpIpTransportContext::receive_icmp_error" => sync_ctx
+                    "IcmpIpTransportContext::receive_icmp_error" => core_ctx
                         .inner
                         .inner
                         .state
@@ -5434,7 +5434,7 @@ mod tests {
                         .error_at_transport_layer
                         .get(),
                     "IcmpEchoBindingsContext::receive_icmp_error" => {
-                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error_at_socket.get()
+                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error_at_socket.get()
                     }
                     c => panic!("unrecognized counter: {c}"),
                 };
@@ -5479,11 +5479,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5496,9 +5496,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5511,11 +5511,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5545,11 +5545,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5562,9 +5562,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5577,11 +5577,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5609,11 +5609,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5626,9 +5626,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5641,11 +5641,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
     }
@@ -5685,19 +5685,19 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-            let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
-            let conn = SocketHandler::<Ipv6, _>::create(sync_ctx);
+            let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
             // NOTE: This assertion is not a correctness requirement. It's just
             // that the rest of this test assumes that the new connection has ID
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
+            SocketHandler::bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
                 .unwrap();
             SocketHandler::connect(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
                 REMOTE_ID,
@@ -5705,8 +5705,8 @@ mod tests {
             .unwrap();
 
             <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FAKE_CONFIG_V6.remote_ip.get().try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip,
@@ -5725,12 +5725,12 @@ mod tests {
             for (ctr, count) in assert_counters {
                 match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => assert_eq!(
-                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error.get(),
+                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpIpTransportContext::receive_icmp_error" => assert_eq!(
-                        sync_ctx
+                        core_ctx
                             .inner
                             .inner
                             .state
@@ -5741,7 +5741,7 @@ mod tests {
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpEchoBindingsContext::receive_icmp_error" => assert_eq!(
-                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error_at_socket.get(),
+                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error_at_socket.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
@@ -5787,9 +5787,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5802,9 +5802,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5817,11 +5817,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5851,9 +5851,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5866,9 +5866,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5881,11 +5881,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5913,9 +5913,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5928,9 +5928,9 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
 
@@ -5943,11 +5943,11 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ }| {
+            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
-                assert_eq!(sync_ctx.inner.outer.receive_icmp_error, [err]);
+                assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
         );
     }
@@ -5958,11 +5958,11 @@ mod tests {
 
         /// Call `send_icmpv4_ttl_expired` with fake values.
         fn send_icmpv4_ttl_expired_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_ttl_expired(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
@@ -5976,11 +5976,11 @@ mod tests {
 
         /// Call `send_icmpv4_parameter_problem` with fake values.
         fn send_icmpv4_parameter_problem_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_parameter_problem(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
@@ -5995,11 +5995,11 @@ mod tests {
 
         /// Call `send_icmpv4_dest_unreachable` with fake values.
         fn send_icmpv4_dest_unreachable_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_dest_unreachable(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
@@ -6013,11 +6013,11 @@ mod tests {
 
         /// Call `send_icmpv6_ttl_expired` with fake values.
         fn send_icmpv6_ttl_expired_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_ttl_expired(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
@@ -6030,11 +6030,11 @@ mod tests {
 
         /// Call `send_icmpv6_packet_too_big` with fake values.
         fn send_icmpv6_packet_too_big_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_packet_too_big(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
@@ -6048,11 +6048,11 @@ mod tests {
 
         /// Call `send_icmpv6_parameter_problem` with fake values.
         fn send_icmpv6_parameter_problem_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_parameter_problem(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 UnicastAddr::new(*FAKE_CONFIG_V6.remote_ip).expect("unicast source address"),
@@ -6066,11 +6066,11 @@ mod tests {
 
         /// Call `send_icmpv6_dest_unreachable` with fake values.
         fn send_icmpv6_dest_unreachable_helper(
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_dest_unreachable(
-                &mut sync_ctx.inner,
-                non_sync_ctx,
+                &mut core_ctx.inner,
+                bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
@@ -6111,18 +6111,18 @@ mod tests {
             for i in 0..ERRORS_PER_SECOND {
                 send(&mut ctx);
                 assert_eq!(
-                    ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
+                    ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                     i + 1
                 );
             }
 
             assert_eq!(
-                ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
+                ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                 ERRORS_PER_SECOND
             );
             send(&mut ctx);
             assert_eq!(
-                ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
+                ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                 ERRORS_PER_SECOND
             );
 
@@ -6131,13 +6131,13 @@ mod tests {
 
             let mut ctx = with_errors_per_second(0);
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
-            ctx.non_sync_ctx.sleep_skip_timers(Duration::from_secs(1));
+            assert_eq!(ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
-            ctx.non_sync_ctx.sleep_skip_timers(Duration::from_secs(1));
+            assert_eq!(ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.core_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {
@@ -6174,12 +6174,12 @@ mod tests {
         // Verify that connecting to an ipv4-mapped-ipv6 address fails, as ICMP
         // sockets do not support dual-stack operations.
         let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let conn = SocketHandler::<Ipv6, _>::create(sync_ctx);
+        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
         assert_eq!(
             SocketHandler::<Ipv6, _>::connect(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
@@ -6193,11 +6193,11 @@ mod tests {
     #[ip_test]
     fn send_invalid_icmp_echo<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let conn = SocketHandler::<I, _>::create(sync_ctx);
+        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let conn = SocketHandler::<I, _>::create(core_ctx);
         SocketHandler::<I, _>::connect(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &conn,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
@@ -6215,7 +6215,7 @@ mod tests {
             .unwrap()
             .into_inner();
         assert_matches!(
-            SocketHandler::<I, _>::send(sync_ctx, non_sync_ctx, &conn, buf,),
+            SocketHandler::<I, _>::send(core_ctx, bindings_ctx, &conn, buf,),
             Err(datagram::SendError::SerializeError(
                 packet_formats::error::ParseError::NotExpected
             ))
@@ -6225,31 +6225,31 @@ mod tests {
     #[ip_test]
     fn get_info<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
         const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
 
-        let id = SocketHandler::<I, _>::create(sync_ctx);
+        let id = SocketHandler::<I, _>::create(core_ctx);
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
+            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
             SocketInfo::Unbound
         );
 
-        SocketHandler::<I, _>::bind(sync_ctx, non_sync_ctx, &id, None, Some(ICMP_ID)).unwrap();
+        SocketHandler::<I, _>::bind(core_ctx, bindings_ctx, &id, None, Some(ICMP_ID)).unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
+            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
             SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
         );
 
         SocketHandler::<I, _>::connect(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &id,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
         .unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
+            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
             SocketInfo::Connected {
                 local_ip: I::FAKE_CONFIG.local_ip,
                 remote_ip: I::FAKE_CONFIG.remote_ip,

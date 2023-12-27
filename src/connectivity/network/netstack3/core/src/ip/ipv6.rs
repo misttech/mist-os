@@ -222,7 +222,7 @@ mod tests {
     fn test_no_extension_headers() {
         // Test that if we have no extension headers, we continue
 
-        let (Ctx { sync_ctx, non_sync_ctx: _ }, device_ids) =
+        let (Ctx { core_ctx, bindings_ctx: _ }, device_ids) =
             FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
         let builder = Ipv6PacketBuilder::new(
             FAKE_CONFIG_V6.remote_ip,
@@ -238,7 +238,7 @@ mod tests {
 
         assert_eq!(
             handle_extension_headers(
-                &mut Locked::new(&sync_ctx),
+                &mut Locked::new(&core_ctx),
                 &device_id,
                 frame_dst,
                 &packet,

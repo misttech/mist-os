@@ -727,32 +727,32 @@ mod tests {
     #[test]
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
 
             receive_mld_query(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
 
             // We should get two MLD reports - one for the unsolicited one for
             // the host to turn into Delay Member state and the other one for
             // the timer being fired.
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
             // The frames are all reports.
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             }
@@ -762,26 +762,26 @@ mod tests {
     #[test]
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
 
-            receive_mld_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
             // The query says that it wants to hear from us immediately.
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
             // There should be no timers set.
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 None
             );
             // The frames are all reports.
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             }
@@ -791,44 +791,44 @@ mod tests {
     #[test]
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
 
             receive_mld_query(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
+                &mut core_ctx,
+                &mut bindings_ctx,
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let MldGroupState(group_state) = sync_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let MldGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 3);
+            assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             }
@@ -838,27 +838,27 @@ mod tests {
     #[test]
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_mld_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
-            let MldGroupState(group_state) = sync_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let MldGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),
@@ -866,12 +866,12 @@ mod tests {
 
             // No timers!
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 None
             );
-            assert_eq!(sync_ctx.frames().len(), 3);
+            assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             }
@@ -880,40 +880,40 @@ mod tests {
 
     #[test]
     fn test_mld_integration_delay_reset_timer() {
-        let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
             FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
         // This seed was carefully chosen to produce a substantial duration
         // value below.
-        non_sync_ctx.seed_rng(123456);
+        bindings_ctx.seed_rng(123456);
         assert_eq!(
-            sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
             GroupJoinResult::Joined(())
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             TIMER_ID,
             FakeInstant::from(Duration::from_micros(590_354)),
         )]);
-        let instant1 = non_sync_ctx.timer_ctx().timers()[0].0.clone();
-        let start = non_sync_ctx.now();
+        let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let start = bindings_ctx.now();
         let duration = instant1 - start;
 
-        receive_mld_query(&mut sync_ctx, &mut non_sync_ctx, duration, GROUP_ADDR);
-        assert_eq!(sync_ctx.frames().len(), 1);
-        non_sync_ctx.timer_ctx().assert_timers_installed([(
+        receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
+        assert_eq!(core_ctx.frames().len(), 1);
+        bindings_ctx.timer_ctx().assert_timers_installed([(
             TIMER_ID,
             FakeInstant::from(Duration::from_micros(34_751)),
         )]);
-        let instant2 = non_sync_ctx.timer_ctx().timers()[0].0.clone();
+        let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // This new timer should be sooner.
         assert!(instant2 <= instant1);
         assert_eq!(
-            non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
             Some(TIMER_ID)
         );
-        assert!(non_sync_ctx.now() - start <= duration);
-        assert_eq!(sync_ctx.frames().len(), 2);
+        assert!(bindings_ctx.now() - start <= duration);
+        assert_eq!(core_ctx.frames().len(), 2);
         // The frames are all reports.
-        for (_, frame) in sync_ctx.frames() {
+        for (_, frame) in core_ctx.frames() {
             ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         }
@@ -922,80 +922,80 @@ mod tests {
     #[test]
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(
                 TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             // The initial unsolicited report.
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
             // The report after the delay.
-            assert_eq!(sync_ctx.frames().len(), 2);
+            assert_eq!(core_ctx.frames().len(), 2);
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
             // Our leave message.
-            assert_eq!(sync_ctx.frames().len(), 3);
+            assert_eq!(core_ctx.frames().len(), 3);
             // The first two messages should be reports.
-            ensure_frame(&sync_ctx.frames()[0].1, 131, GROUP_ADDR, GROUP_ADDR);
-            ensure_slice_addr(&sync_ctx.frames()[0].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
-            ensure_frame(&sync_ctx.frames()[1].1, 131, GROUP_ADDR, GROUP_ADDR);
-            ensure_slice_addr(&sync_ctx.frames()[1].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
+            ensure_frame(&core_ctx.frames()[0].1, 131, GROUP_ADDR, GROUP_ADDR);
+            ensure_slice_addr(&core_ctx.frames()[0].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
+            ensure_frame(&core_ctx.frames()[1].1, 131, GROUP_ADDR, GROUP_ADDR);
+            ensure_slice_addr(&core_ctx.frames()[1].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             // The last one should be the done message whose destination is all
             // routers.
             ensure_frame(
-                &sync_ctx.frames()[2].1,
+                &core_ctx.frames()[2].1,
                 132,
                 Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
                 GROUP_ADDR,
             );
-            ensure_slice_addr(&sync_ctx.frames()[2].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
+            ensure_slice_addr(&core_ctx.frames()[2].1, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         });
     }
 
     #[test]
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            let now = non_sync_ctx.now();
-            non_sync_ctx.timer_ctx().assert_timers_installed([(
+            let now = bindings_ctx.now();
+            bindings_ctx.timer_ctx().assert_timers_installed([(
                 TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            receive_mld_report(&mut sync_ctx, &mut non_sync_ctx, GROUP_ADDR);
-            non_sync_ctx.timer_ctx().assert_no_timers_installed();
+            assert_eq!(core_ctx.frames().len(), 1);
+            receive_mld_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
+            bindings_ctx.timer_ctx().assert_no_timers_installed();
             // The report should be discarded because we have received from someone
             // else.
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
             // A leave message is not sent.
-            assert_eq!(sync_ctx.frames().len(), 1);
+            assert_eq!(core_ctx.frames().len(), 1);
             // The frames are all reports.
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
             }
@@ -1005,20 +1005,20 @@ mod tests {
     #[test]
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
-            sync_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
+            core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(TIMER_ID)
             );
-            for (_, frame) in sync_ctx.frames() {
+            for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, MY_MAC.to_ipv6_link_local().addr().get());
             }
@@ -1030,47 +1030,47 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Test that we do not perform MLD for addresses that we're supposed
             // to skip or when MLD is disabled.
-            let test = |FakeCtxImpl { mut sync_ctx, mut non_sync_ctx }, group| {
-                sync_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
+            let test = |FakeCtxImpl { mut core_ctx, mut bindings_ctx }, group| {
+                core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
 
                 // Assert that no observable effects have taken place.
                 let assert_no_effect =
-                    |sync_ctx: &FakeSyncCtxImpl, non_sync_ctx: &FakeNonSyncCtxImpl| {
-                        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-                        assert_empty(sync_ctx.frames());
+                    |core_ctx: &FakeSyncCtxImpl, bindings_ctx: &FakeNonSyncCtxImpl| {
+                        bindings_ctx.timer_ctx().assert_no_timers_installed();
+                        assert_empty(core_ctx.frames());
                     };
 
                 assert_eq!(
-                    sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, group),
+                    core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, group),
                     GroupJoinResult::Joined(())
                 );
                 // We should join the group but left in the GMP's non-member
                 // state.
-                assert_gmp_state!(sync_ctx, &group, NonMember);
-                assert_no_effect(&sync_ctx, &non_sync_ctx);
+                assert_gmp_state!(core_ctx, &group, NonMember);
+                assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_report(&mut sync_ctx, &mut non_sync_ctx, group);
+                receive_mld_report(&mut core_ctx, &mut bindings_ctx, group);
                 // We should have done no state transitions/work.
-                assert_gmp_state!(sync_ctx, &group, NonMember);
-                assert_no_effect(&sync_ctx, &non_sync_ctx);
+                assert_gmp_state!(core_ctx, &group, NonMember);
+                assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_query(&mut sync_ctx, &mut non_sync_ctx, Duration::from_secs(10), group);
+                receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10), group);
                 // We should have done no state transitions/work.
-                assert_gmp_state!(sync_ctx, &group, NonMember);
-                assert_no_effect(&sync_ctx, &non_sync_ctx);
+                assert_gmp_state!(core_ctx, &group, NonMember);
+                assert_no_effect(&core_ctx, &bindings_ctx);
 
                 assert_eq!(
-                    sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, group),
+                    core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, group),
                     GroupLeaveResult::Left(())
                 );
                 // We should have left the group but not executed any `Actions`.
-                assert!(sync_ctx.get_ref().groups.get(&group).is_none());
-                assert_no_effect(&sync_ctx, &non_sync_ctx);
+                assert!(core_ctx.get_ref().groups.get(&group).is_none());
+                assert_no_effect(&core_ctx, &bindings_ctx);
             };
 
             let new_ctx = || {
                 let mut ctx = FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-                ctx.non_sync_ctx.seed_rng(seed);
+                ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
 
@@ -1090,7 +1090,7 @@ mod tests {
             // Test that we skip executing `Actions` when MLD is disabled on the
             // device.
             let mut ctx = new_ctx();
-            ctx.sync_ctx.get_mut().mld_enabled = false;
+            ctx.core_ctx.get_mut().mld_enabled = false;
             test(ctx, GROUP_ADDR);
         });
     }
@@ -1100,46 +1100,46 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
+            bindings_ctx.seed_rng(seed);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            let now = non_sync_ctx.now();
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            non_sync_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
-            let frame = &sync_ctx.frames().last().unwrap().1;
+            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
+            let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
 
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::AlreadyMember
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            non_sync_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
 
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::StillMember
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.frames().len(), 1);
-            non_sync_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range)]);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.frames().len(), 1);
+            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range)]);
 
             assert_eq!(
-                sync_ctx.gmp_leave_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupLeaveResult::Left(())
             );
-            assert_eq!(sync_ctx.frames().len(), 2);
-            non_sync_ctx.timer_ctx().assert_no_timers_installed();
-            let frame = &sync_ctx.frames().last().unwrap().1;
+            assert_eq!(core_ctx.frames().len(), 2);
+            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 132, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         });
@@ -1148,10 +1148,10 @@ mod tests {
     #[test]
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut sync_ctx, mut non_sync_ctx } =
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
                 FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
-            non_sync_ctx.seed_rng(seed);
-            assert_eq!(sync_ctx.take_frames(), []);
+            bindings_ctx.seed_rng(seed);
+            assert_eq!(core_ctx.take_frames(), []);
 
             // Should not perform MLD for the all-nodes address.
             //
@@ -1161,21 +1161,21 @@ mod tests {
             //   all-nodes multicast address, nor any multicast address of scope
             //   0 (reserved) or 1 (node-local).
             assert_eq!(
-                sync_ctx.gmp_join_group(
-                    &mut non_sync_ctx,
+                core_ctx.gmp_join_group(
+                    &mut bindings_ctx,
                     &FakeDeviceId,
                     Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS
                 ),
                 GroupJoinResult::Joined(())
             );
-            assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
+            assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_eq!(
-                sync_ctx.gmp_join_group(&mut non_sync_ctx, &FakeDeviceId, GROUP_ADDR),
+                core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             {
-                let frames = sync_ctx.take_frames();
+                let frames = core_ctx.take_frames();
                 let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
                     assert_matches!(&frames[..], [x] => x);
                 assert_eq!(dst_ip, &GROUP_ADDR);
@@ -1189,17 +1189,17 @@ mod tests {
             }
 
             // Should do nothing.
-            sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_eq!(sync_ctx.take_frames(), []);
+            core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            assert_eq!(core_ctx.take_frames(), []);
 
             // Should send done message.
-            sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
+            core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
             {
-                let frames = sync_ctx.take_frames();
+                let frames = core_ctx.take_frames();
                 let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
                     assert_matches!(&frames[..], [x] => x);
                 assert_eq!(dst_ip, &Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS);
@@ -1213,16 +1213,16 @@ mod tests {
             }
 
             // Should do nothing.
-            sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_eq!(sync_ctx.take_frames(), []);
+            core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
+            assert_eq!(core_ctx.take_frames(), []);
 
             // Should send report message.
-            sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
-            assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
-            assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            let frames = sync_ctx.take_frames();
+            core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
+            assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
+            assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
+            let frames = core_ctx.take_frames();
             let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
                 assert_matches!(&frames[..], [x] => x);
             assert_eq!(dst_ip, &GROUP_ADDR);
@@ -1246,18 +1246,18 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
+        let crate::testutil::FakeCtx { core_ctx, mut bindings_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
-        let mut sync_ctx = &sync_ctx;
+        let mut core_ctx = &core_ctx;
         let eth_device_id = crate::device::add_ethernet_device(
-            sync_ctx,
+            core_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
 
-        let now = non_sync_ctx.now();
+        let now = bindings_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
         let snmc_timer_id =
@@ -1269,13 +1269,13 @@ mod tests {
             ip_enabled: bool,
             gmp_enabled: bool,
         }
-        let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-                          non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let set_config = |core_ctx: &mut &crate::testutil::FakeSyncCtx,
+                          bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
             let _: Ipv6DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv6_configuration(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &device_id,
                     Ipv6DeviceConfigurationUpdate {
                         // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
@@ -1298,9 +1298,9 @@ mod tests {
                 )
                 .unwrap();
         };
-        let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                  specified_source: bool| {
-            let frames = non_sync_ctx.take_frames();
+            let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
@@ -1326,9 +1326,9 @@ mod tests {
             assert_eq!(ttl, 1);
             assert_eq!(code, IcmpUnusedCode);
         };
-        let check_sent_done = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let check_sent_done = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                specified_source: bool| {
-            let frames = non_sync_ctx.take_frames();
+            let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
@@ -1356,69 +1356,69 @@ mod tests {
         // MLD should be performed for the auto-generated link-local address's
         // solicited-node multicast address.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut non_sync_ctx, false);
+        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+        check_sent_report(&mut bindings_ctx, false);
 
         // Disable MLD.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut non_sync_ctx, true);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_done(&mut bindings_ctx, true);
 
         // Enable MLD but disable IPv6.
         //
         // Should do nothing.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(&bindings_ctx.take_frames()[..], []);
 
         // Disable MLD but enable IPv6.
         //
         // Should do nothing.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(&bindings_ctx.take_frames()[..], []);
 
         // Enable MLD.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut non_sync_ctx, true);
+        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+        check_sent_report(&mut bindings_ctx, true);
 
         // Disable IPv6.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut non_sync_ctx, false);
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_done(&mut bindings_ctx, false);
 
         // Enable IPv6.
         set_config(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
-        check_sent_report(&mut non_sync_ctx, false);
+        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
+        check_sent_report(&mut bindings_ctx, false);
     }
 }

@@ -1491,24 +1491,24 @@ pub(crate) mod testutil {
         pub(crate) fn get_common_counters<I: Ip>(&self) -> &IpCounters<I> {
             I::map_ip(
                 IpInvariant(self),
-                |IpInvariant(sync_ctx)| &sync_ctx.v4_common_counters,
-                |IpInvariant(sync_ctx)| &sync_ctx.v6_common_counters,
+                |IpInvariant(core_ctx)| &core_ctx.v4_common_counters,
+                |IpInvariant(core_ctx)| &core_ctx.v6_common_counters,
             )
         }
 
         pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
             I::map_ip(
                 IpInvariant(self),
-                |IpInvariant(sync_ctx)| &sync_ctx.tx_icmpv4_counters,
-                |IpInvariant(sync_ctx)| &sync_ctx.tx_icmpv6_counters,
+                |IpInvariant(core_ctx)| &core_ctx.tx_icmpv4_counters,
+                |IpInvariant(core_ctx)| &core_ctx.tx_icmpv6_counters,
             )
         }
 
         pub(crate) fn icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
             I::map_ip(
                 IpInvariant(self),
-                |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv4_counters,
-                |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv6_counters,
+                |IpInvariant(core_ctx)| &core_ctx.rx_icmpv4_counters,
+                |IpInvariant(core_ctx)| &core_ctx.rx_icmpv6_counters,
             )
         }
     }
@@ -1880,14 +1880,14 @@ mod tests {
 
             let WrapVecAddrSubnet(subnets) = I::map_ip(
                 IpInvariant((&mut Locked::new(core_ctx), &device)),
-                |IpInvariant((sync_ctx, device))| {
-                    crate::ip::device::with_assigned_ipv4_addr_subnets(sync_ctx, device, |addrs| {
+                |IpInvariant((core_ctx, device))| {
+                    crate::ip::device::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                         WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                     })
                 },
-                |IpInvariant((sync_ctx, device))| {
+                |IpInvariant((core_ctx, device))| {
                     crate::ip::device::testutil::with_assigned_ipv6_addr_subnets(
-                        sync_ctx,
+                        core_ctx,
                         device,
                         |addrs| WrapVecAddrSubnet(addrs.collect::<Vec<_>>()),
                     )
@@ -1986,17 +1986,17 @@ mod tests {
 
         let FakeEventDispatcherConfig { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } =
             cfg;
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
         let loopback_device_id = crate::device::add_loopback_device(
-            &sync_ctx,
+            &core_ctx,
             Mtu::new(u16::MAX as u32),
             DEFAULT_INTERFACE_METRIC,
         )
         .expect("create the loopback interface")
         .into();
-        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &loopback_device_id);
+        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &loopback_device_id);
 
         let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
             test_case;
@@ -2012,12 +2012,12 @@ mod tests {
             AddressType::Remote => (remote_ip, Some(remote_ip)),
             AddressType::Unspecified { can_select } => {
                 if !can_select {
-                    remove_all_local_addrs::<I>(&sync_ctx, &mut non_sync_ctx);
+                    remove_all_local_addrs::<I>(&core_ctx, &mut bindings_ctx);
                 }
                 (local_ip, None)
             }
             AddressType::Unroutable => {
-                remove_all_local_addrs::<I>(&sync_ctx, &mut non_sync_ctx);
+                remove_all_local_addrs::<I>(&core_ctx, &mut bindings_ctx);
                 (local_ip, Some(local_ip))
             }
         };
@@ -2029,7 +2029,7 @@ mod tests {
                 panic!("remote_ip_type cannot be unspecified")
             }
             AddressType::Unroutable => {
-                crate::testutil::del_routes_to_subnet(&sync_ctx, &mut non_sync_ctx, subnet.into())
+                crate::testutil::del_routes_to_subnet(&core_ctx, &mut bindings_ctx, subnet.into())
                     .unwrap();
                 remote_ip
             }
@@ -2038,7 +2038,7 @@ mod tests {
         let get_expected_result = |template| expected_result.map(|()| template);
         let weak_local_device = local_device
             .as_ref()
-            .map(|d| DeviceIdContext::downgrade_device_id(&Locked::new(sync_ctx), d));
+            .map(|d| DeviceIdContext::downgrade_device_id(&Locked::new(core_ctx), d));
         let template = IpSock {
             definition: IpSockDefinition {
                 remote_ip: SocketIpAddr::new_from_specified_or_panic(to_ip),
@@ -2050,8 +2050,8 @@ mod tests {
         };
 
         let res = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             weak_local_device.as_ref().map(EitherDeviceId::Weak),
             from_ip.map(SocketIpAddr::new_from_specified_or_panic),
             SocketIpAddr::new_from_specified_or_panic(to_ip),
@@ -2065,8 +2065,8 @@ mod tests {
         const SPECIFIED_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(1));
         assert_eq!(
             IpSocketHandler::new_ip_socket(
-                &mut Locked::new(sync_ctx),
-                &mut non_sync_ctx,
+                &mut Locked::new(core_ctx),
+                &mut bindings_ctx,
                 weak_local_device.as_ref().map(EitherDeviceId::Weak),
                 from_ip.map(SocketIpAddr::new_from_specified_or_panic),
                 SocketIpAddr::new_from_specified_or_panic(to_ip),
@@ -2110,26 +2110,26 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
         crate::device::add_ip_addr_subnet(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::device::add_ip_addr_subnet(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             AddrSubnet::new(remote_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::testutil::add_route(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             AddableEntryEither::without_gateway(
                 subnet.into(),
                 device_id.clone(),
@@ -2139,13 +2139,13 @@ mod tests {
         .unwrap();
 
         let loopback_device_id = crate::device::add_loopback_device(
-            &sync_ctx,
+            &core_ctx,
             Mtu::new(u16::MAX as u32),
             DEFAULT_INTERFACE_METRIC,
         )
         .expect("create the loopback interface")
         .into();
-        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &loopback_device_id);
+        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &loopback_device_id);
 
         let (expected_from_ip, from_ip) = match from_addr_type {
             AddressType::LocallyOwned => (local_ip, Some(local_ip)),
@@ -2164,8 +2164,8 @@ mod tests {
         };
 
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             None,
             from_ip.map(SocketIpAddr::new_from_specified_or_panic),
             SocketIpAddr::new_from_specified_or_panic(to_ip),
@@ -2189,19 +2189,19 @@ mod tests {
         // Send an echo packet on the socket and validate that the packet is
         // delivered locally.
         IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             buffer.into_inner().buffer_view().as_ref().into_serializer(),
             None,
         )
         .unwrap();
 
-        handle_queued_rx_packets(sync_ctx, &mut non_sync_ctx);
+        handle_queued_rx_packets(core_ctx, &mut bindings_ctx);
 
-        assert_eq!(non_sync_ctx.frames_sent().len(), 0);
+        assert_eq!(bindings_ctx.frames_sent().len(), 0);
 
-        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -2222,13 +2222,13 @@ mod tests {
         let FakeEventDispatcherConfig::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } =
             cfg;
 
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             None,
             None,
             SocketIpAddr::new_from_specified_or_panic(remote_ip),
@@ -2237,7 +2237,7 @@ mod tests {
         )
         .unwrap();
 
-        let curr_id = crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut Locked::new(sync_ctx));
+        let curr_id = crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut Locked::new(core_ctx));
 
         let check_frame =
             move |frame: &[u8], packet_count| match [local_ip.get(), remote_ip.get()].into() {
@@ -2272,58 +2272,58 @@ mod tests {
                 }
             };
         let mut packet_count = 0;
-        assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
+        assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
 
         // Send a packet on the socket and make sure that the right contents
         // are sent.
         IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             (&[0u8][..]).into_serializer(),
             None,
         )
         .unwrap();
-        let mut check_sent_frame = |non_sync_ctx: &crate::testutil::FakeNonSyncCtx| {
+        let mut check_sent_frame = |bindings_ctx: &crate::testutil::FakeNonSyncCtx| {
             packet_count += 1;
-            assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
-            let (dev, frame) = &non_sync_ctx.frames_sent()[packet_count - 1];
+            assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
+            let (dev, frame) = &bindings_ctx.frames_sent()[packet_count - 1];
             assert_eq!(dev, &device_ids[0]);
             check_frame(&frame, packet_count);
         };
-        check_sent_frame(&non_sync_ctx);
+        check_sent_frame(&bindings_ctx);
 
         // Send a packet while imposing an MTU that is large enough to fit the
         // packet.
         let small_body = [0; 1];
         let small_body_serializer = (&small_body).into_serializer();
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             small_body_serializer,
             Some(Ipv6::MINIMUM_LINK_MTU.into()),
         );
         assert_matches!(res, Ok(()));
-        check_sent_frame(&non_sync_ctx);
+        check_sent_frame(&bindings_ctx);
 
         // Send a packet on the socket while imposing an MTU which will not
         // allow a packet to be sent.
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             small_body_serializer,
             Some(1), // mtu
         );
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
-        assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
+        assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
         // Try sending a packet which will be larger than the device's MTU,
         // and make sure it fails.
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
             None,
@@ -2332,14 +2332,14 @@ mod tests {
 
         // Make sure that sending on an unroutable socket fails.
         crate::ip::forwarding::testutil::del_routes_to_subnet::<I, _, _>(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             subnet,
         )
         .unwrap();
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             &sock,
             small_body_serializer,
             None,
@@ -2378,12 +2378,12 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
         crate::device::add_ip_addr_subnet(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
@@ -2392,8 +2392,8 @@ mod tests {
         // Use multicast remote addresses since unicast addresses would trigger
         // ARP/NDP requests.
         crate::testutil::add_route(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
                 device_id.clone(),
@@ -2407,8 +2407,8 @@ mod tests {
 
         let mut send_to = |destination_ip| {
             let sock = IpSocketHandler::<I, _>::new_ip_socket(
-                &mut Locked::new(sync_ctx),
-                &mut non_sync_ctx,
+                &mut Locked::new(core_ctx),
+                &mut bindings_ctx,
                 None,
                 None,
                 destination_ip,
@@ -2418,8 +2418,8 @@ mod tests {
             .unwrap();
 
             IpSocketHandler::<I, _>::send_ip_packet(
-                &mut Locked::new(sync_ctx),
-                &mut non_sync_ctx,
+                &mut Locked::new(core_ctx),
+                &mut bindings_ctx,
                 &sock,
                 (&[0u8][..]).into_serializer(),
                 None,
@@ -2432,7 +2432,7 @@ mod tests {
         send_to(SocketIpAddr::new_from_specified_or_panic(remote_ip));
         send_to(SocketIpAddr::new_from_specified_or_panic(other_remote_ip));
 
-        let frames = non_sync_ctx.frames_sent();
+        let frames = bindings_ctx.frames_sent();
         let [df_remote, df_other_remote] = assert_matches!(&frames[..], [df1, df2] => [df1, df2]);
         {
             let (_dev, frame) = df_remote;
@@ -2500,21 +2500,21 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
+        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
         let eth_device_id = device_ids[device_idx].clone();
         core::mem::drop(device_ids);
         let device_id: DeviceId<_> = eth_device_id.clone().into();
-        let sync_ctx = &sync_ctx;
+        let core_ctx = &core_ctx;
         crate::device::add_ip_addr_subnet(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::testutil::add_route(
-            &sync_ctx,
-            &mut non_sync_ctx,
+            &core_ctx,
+            &mut bindings_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
                 device_id.clone(),
@@ -2524,8 +2524,8 @@ mod tests {
         .unwrap();
 
         let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
+            &mut Locked::new(core_ctx),
+            &mut bindings_ctx,
             None,
             None,
             SocketIpAddr::new_from_specified_or_panic(I::multicast_addr(1)),
@@ -2536,23 +2536,23 @@ mod tests {
 
         let expected = if remove_device {
             // Clear routes on the device before removing it.
-            crate::testutil::del_device_routes(&sync_ctx, &mut non_sync_ctx, &device_id);
+            crate::testutil::del_device_routes(&core_ctx, &mut bindings_ctx, &device_id);
 
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
-            crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, eth_device_id)
+            crate::device::remove_ethernet_device(&core_ctx, &mut bindings_ctx, eth_device_id)
                 .into_removed();
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(
-                IpDeviceContext::<I, _>::get_mtu(&mut Locked::new(sync_ctx), &device_id),
+                IpDeviceContext::<I, _>::get_mtu(&mut Locked::new(core_ctx), &device_id),
                 0, /* no ip options/ext hdrs used */
             )
             .unwrap())
         };
 
         assert_eq!(
-            DeviceIpSocketHandler::get_mms(&mut Locked::new(sync_ctx), &mut non_sync_ctx, &ip_sock),
+            DeviceIpSocketHandler::get_mms(&mut Locked::new(core_ctx), &mut bindings_ctx, &ip_sock),
             expected,
         );
     }

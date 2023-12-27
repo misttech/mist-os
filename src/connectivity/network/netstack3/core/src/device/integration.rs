@@ -186,13 +186,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>();
             cb(
                 &state,
                 SyncCtxWithIpDeviceConfiguration {
                     config: &state,
-                    sync_ctx: sync_ctx
+                    core_ctx: core_ctx
                         .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>(),
                 },
             )
@@ -207,11 +207,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>();
             cb(SyncCtxWithIpDeviceConfiguration {
                 config: &mut state,
-                sync_ctx: sync_ctx
+                core_ctx: core_ctx
                     .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>(),
             })
         })
@@ -345,7 +345,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             cb(
                 Box::new(
                     state
@@ -353,7 +353,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                         .iter()
                         .map(PrimaryRc::clone_strong),
                 ),
-                &mut sync_ctx.cast_locked::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>(),
+                &mut core_ctx.cast_locked::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>(),
             )
         })
     }
@@ -469,13 +469,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
             cb(
                 &state,
                 SyncCtxWithIpDeviceConfiguration {
                     config: &state,
-                    sync_ctx: sync_ctx
+                    core_ctx: core_ctx
                         .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>(),
                 },
             )
@@ -490,11 +490,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
             cb(SyncCtxWithIpDeviceConfiguration {
                 config: &mut state,
-                sync_ctx: sync_ctx
+                core_ctx: core_ctx
                     .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>(),
             })
         })
@@ -628,7 +628,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+        with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             cb(
                 Box::new(
                     state
@@ -636,7 +636,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                         .iter()
                         .map(PrimaryRc::clone_strong),
                 ),
-                &mut sync_ctx.cast_locked::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>(),
+                &mut core_ctx.cast_locked::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>(),
             )
         })
     }
@@ -783,16 +783,16 @@ impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters
     type DeviceId = CC::DeviceId;
     type WeakDeviceId = CC::WeakDeviceId;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        let Self { sync_ctx, device_id: _ } = self;
-        CC::downgrade_device_id(sync_ctx, device_id)
+        let Self { core_ctx, device_id: _ } = self;
+        CC::downgrade_device_id(core_ctx, device_id)
     }
 
     fn upgrade_weak_device_id(
         &self,
         weak_device_id: &Self::WeakDeviceId,
     ) -> Option<Self::DeviceId> {
-        let Self { sync_ctx, device_id: _ } = self;
-        CC::upgrade_weak_device_id(sync_ctx, weak_device_id)
+        let Self { core_ctx, device_id: _ } = self;
+        CC::upgrade_weak_device_id(core_ctx, weak_device_id)
     }
 }
 
@@ -965,7 +965,7 @@ pub(crate) fn with_ethernet_state<
     device_id: &EthernetDeviceId<BC>,
     cb: F,
 ) -> O {
-    with_ethernet_state_and_sync_ctx(core_ctx, device_id, |ip_device_state, _sync_ctx| {
+    with_ethernet_state_and_sync_ctx(core_ctx, device_id, |ip_device_state, _core_ctx| {
         cb(ip_device_state)
     })
 }
@@ -980,7 +980,7 @@ pub(crate) fn with_loopback_state<
     device_id: &LoopbackDeviceId<BC>,
     cb: F,
 ) -> O {
-    with_loopback_state_and_sync_ctx(core_ctx, device_id, |ip_device_state, _sync_ctx| {
+    with_loopback_state_and_sync_ctx(core_ctx, device_id, |ip_device_state, _core_ctx| {
         cb(ip_device_state)
     })
 }

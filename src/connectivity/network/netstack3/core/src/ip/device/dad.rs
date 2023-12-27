@@ -39,7 +39,7 @@ pub(super) struct DadAddressStateRef<'a, CC> {
     /// `None` if the address is not recognized.
     pub(super) dad_state: &'a mut Ipv6DadState,
     /// The execution context available with the address's DAD state.
-    pub(super) sync_ctx: &'a mut CC,
+    pub(super) core_ctx: &'a mut CC,
 }
 
 /// Holds references to state associated with duplicate address detection.
@@ -182,7 +182,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
         device_id,
         addr,
         |DadStateRef { state, retrans_timer, max_dad_transmits }| {
-            let DadAddressStateRef { dad_state, sync_ctx } =
+            let DadAddressStateRef { dad_state, core_ctx } =
                 state.unwrap_or_else(|| panic!("expected address to exist; addr: {addr:?}"));
 
             match variation {
@@ -192,7 +192,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     // for any outgoing MLD message.
                     *dad_state =
                         Ipv6DadState::Tentative { dad_transmits_remaining: *max_dad_transmits };
-                    sync_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
+                    core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
 
                     // As per RFC 4861 section 5.6.2,
                     //
@@ -202,7 +202,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     //
                     // Note that we join the all-nodes multicast address on interface
                     // enable.
-                    sync_ctx.join_multicast_group(
+                    core_ctx.join_multicast_group(
                         bindings_ctx,
                         device_id,
                         addr.addr().to_solicited_node_address(),
@@ -221,7 +221,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
             match remaining {
                 None => {
                     *dad_state = Ipv6DadState::Assigned;
-                    sync_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
+                    core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
                     bindings_ctx.on_event(DadEvent::AddressAssigned {
                         device: device_id.clone(),
                         addr: addr.addr_sub().addr(),
@@ -318,7 +318,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> fo
             device_id,
             addr,
             |DadStateRef { state, retrans_timer: _, max_dad_transmits: _ }| {
-                let DadAddressStateRef { dad_state, sync_ctx } =
+                let DadAddressStateRef { dad_state, core_ctx } =
                     state.unwrap_or_else(|| panic!("expected address to exist; addr: {addr:?}"));
 
                 let leave_group = match dad_state {
@@ -344,9 +344,9 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> fo
                 // that the address is not used as the source for any outgoing
                 // MLD message.
                 *dad_state = Ipv6DadState::Uninitialized;
-                sync_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
+                core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
                 if leave_group {
-                    sync_ctx.leave_multicast_group(
+                    core_ctx.leave_multicast_group(
                         bindings_ctx,
                         device_id,
                         addr.addr().to_solicited_node_address(),
@@ -513,7 +513,7 @@ mod tests {
                 self.get_mut();
             cb(DadStateRef {
                 state: (address_ctx.get_ref().addr == request_addr.addr())
-                    .then(|| DadAddressStateRef { dad_state: state, sync_ctx: address_ctx }),
+                    .then(|| DadAddressStateRef { dad_state: state, core_ctx: address_ctx }),
                 retrans_timer,
                 max_dad_transmits,
             })
@@ -541,7 +541,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_start() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
@@ -554,8 +554,8 @@ mod tests {
                 }),
             }));
         DadHandler::start_duplicate_address_detection(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             &get_address_id(OTHER_ADDRESS.get()),
         );
@@ -564,7 +564,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_handle_timer() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
@@ -577,8 +577,8 @@ mod tests {
                 }),
             }));
         TimerHandler::handle_timer(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             DadTimerId { device_id: FakeDeviceId, addr: OTHER_ADDRESS },
         );
     }
@@ -586,7 +586,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "expected address to be tentative")]
     fn panic_non_tentative_address_handle_timer() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Assigned,
                 retrans_timer: RETRANS_TIMER,
@@ -599,15 +599,15 @@ mod tests {
                 }),
             }));
         TimerHandler::handle_timer(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             DadTimerId { device_id: FakeDeviceId, addr: DAD_ADDRESS },
         );
     }
 
     #[test]
     fn dad_disabled() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
@@ -620,20 +620,20 @@ mod tests {
                 }),
             }));
         DadHandler::start_duplicate_address_detection(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         assert_eq!(*state, Ipv6DadState::Assigned);
         let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
             address_ctx.get_ref();
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: DAD_ADDRESS }][..]
         );
     }
@@ -676,7 +676,7 @@ mod tests {
         const RETRANS_TIMER: NonZeroDuration =
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
@@ -691,34 +691,34 @@ mod tests {
                 }),
             }));
         DadHandler::start_duplicate_address_detection(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
             check_dad(
-                &sync_ctx,
-                &non_sync_ctx,
+                &core_ctx,
+                &bindings_ctx,
                 usize::from(count + 1),
                 NonZeroU8::new(DAD_TRANSMITS_REQUIRED - count - 1),
                 RETRANS_TIMER,
             );
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
                 Some(DAD_TIMER_ID)
             );
         }
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         assert_eq!(*state, Ipv6DadState::Assigned);
         let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
             address_ctx.get_ref();
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
         assert_eq!(
-            non_sync_ctx.take_events(),
+            bindings_ctx.take_events(),
             &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: DAD_ADDRESS }][..]
         );
     }
@@ -729,7 +729,7 @@ mod tests {
         const RETRANS_TIMER: NonZeroDuration =
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(2)) };
 
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
@@ -744,28 +744,28 @@ mod tests {
                 }),
             }));
         DadHandler::start_duplicate_address_detection(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
         check_dad(
-            &sync_ctx,
-            &non_sync_ctx,
+            &core_ctx,
+            &bindings_ctx,
             1,
             NonZeroU8::new(DAD_TRANSMITS_REQUIRED - 1),
             RETRANS_TIMER,
         );
 
         DadHandler::stop_duplicate_address_detection(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
+            &mut core_ctx,
+            &mut bindings_ctx,
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
-        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timer_ctx().assert_no_timers_installed();
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            sync_ctx.get_ref();
+            core_ctx.get_ref();
         assert_eq!(*state, Ipv6DadState::Uninitialized);
         let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
             address_ctx.get_ref();
