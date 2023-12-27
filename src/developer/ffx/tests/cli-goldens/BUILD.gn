@@ -129,7 +129,7 @@ if (is_host && has_board) {
   }
 }
 
-group("e2e_tests") {
+group("tests") {
   testonly = true
 
   # TODO(http://fxbug.dev/124461): Support product bundle for testing on mac
