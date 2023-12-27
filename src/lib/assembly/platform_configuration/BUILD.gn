@@ -54,6 +54,7 @@ rustc_library("platform_configuration") {
     "//src/diagnostics/lib/sampler-config",
     "//src/lib/assembly/component_id_index",
     "//src/lib/assembly/component_manager_config",
+    "//src/lib/assembly/config_capabilities",
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/named_file_map",

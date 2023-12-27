@@ -128,6 +128,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_domain_config(package, config)?;
     }
 
+    // Add the configuration capabilities.
+    builder.add_configuration_capabilities(configuration.configuration_capabilities)?;
+
     // Add the board's Board Input Bundles, if it has them.
     for (bundle_path, bundle) in board_input_bundles {
         builder

@@ -161,6 +161,12 @@
         },
     ],
     offer: [
+        {
+            from: "parent",
+            to: "#driver_index",
+            config: [ "fuchsia.driver.DriverLoadFuzzerMaxDelayMs" ],
+        },
+
         // Disable the required offer for Archivist
         {
             protocol: [

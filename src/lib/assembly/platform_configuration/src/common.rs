@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use assembly_config_capabilities::CapabilityNamedMap;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeSet};
@@ -155,6 +156,13 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Add a core shard.
     fn core_shard(&mut self, path: &Utf8PathBuf);
+
+    /// Sets a configuration capability.
+    fn set_config_capability(
+        &mut self,
+        name: &str,
+        config: assembly_config_capabilities::Config,
+    ) -> Result<()>;
 }
 
 /// The interface for specifying the configuration to provide for bootfs.
@@ -250,6 +258,9 @@ pub(crate) struct ConfigurationBuilderImpl {
 
     /// The core shards to add.
     core_shards: Vec<Utf8PathBuf>,
+
+    /// The configuration capabilities to add.
+    configuration_capabilities: CapabilityNamedMap,
 }
 
 #[cfg(test)]
@@ -271,15 +282,30 @@ impl ConfigurationBuilderImpl {
             domain_configs: DomainConfigs::new("domain configs"),
             icu_config,
             core_shards: Vec::new(),
+            configuration_capabilities: CapabilityNamedMap::new("config capabilties"),
         }
     }
 
     /// Convert the builder into the completed configuration that can be used
     /// to create the configured platform itself.
     pub fn build(self) -> CompletedConfiguration {
-        let Self { bundles, bootfs, package_configs, domain_configs, icu_config: _, core_shards } =
-            self;
-        CompletedConfiguration { bundles, bootfs, package_configs, domain_configs, core_shards }
+        let Self {
+            bundles,
+            bootfs,
+            package_configs,
+            domain_configs,
+            icu_config: _,
+            core_shards,
+            configuration_capabilities,
+        } = self;
+        CompletedConfiguration {
+            bundles,
+            bootfs,
+            package_configs,
+            domain_configs,
+            core_shards,
+            configuration_capabilities,
+        }
     }
 }
 
@@ -305,6 +331,9 @@ pub struct CompletedConfiguration {
 
     // The list of core shards to add.
     pub core_shards: Vec<Utf8PathBuf>,
+
+    // The configuration capabilities to add.
+    pub configuration_capabilities: CapabilityNamedMap,
 }
 
 /// A map from package names to the configuration to apply to them.
@@ -449,6 +478,14 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
 
     fn core_shard(&mut self, path: &Utf8PathBuf) {
         self.core_shards.push(path.clone());
+    }
+
+    fn set_config_capability(
+        &mut self,
+        name: &str,
+        config: assembly_config_capabilities::Config,
+    ) -> Result<()> {
+        self.configuration_capabilities.try_insert_unique(name.to_string(), config)
     }
 }
 

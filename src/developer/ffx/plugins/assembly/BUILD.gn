@@ -64,6 +64,7 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/assembly/base_package",
     "//src/lib/assembly/blobfs",
     "//src/lib/assembly/components",
+    "//src/lib/assembly/config_capabilities",
     "//src/lib/assembly/config_data",
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/domain_config",

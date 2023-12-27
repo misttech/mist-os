@@ -2137,6 +2137,24 @@ pub enum ConfigType {
     Vector,
 }
 
+impl From<&cm_rust::ConfigValueType> for ConfigType {
+    fn from(value: &cm_rust::ConfigValueType) -> Self {
+        match value {
+            cm_rust::ConfigValueType::Bool => ConfigType::Bool,
+            cm_rust::ConfigValueType::Uint8 => ConfigType::Uint8,
+            cm_rust::ConfigValueType::Int8 => ConfigType::Int8,
+            cm_rust::ConfigValueType::Uint16 => ConfigType::Uint16,
+            cm_rust::ConfigValueType::Int16 => ConfigType::Int16,
+            cm_rust::ConfigValueType::Uint32 => ConfigType::Uint32,
+            cm_rust::ConfigValueType::Int32 => ConfigType::Int32,
+            cm_rust::ConfigValueType::Uint64 => ConfigType::Uint64,
+            cm_rust::ConfigValueType::Int64 => ConfigType::Int64,
+            cm_rust::ConfigValueType::String { .. } => ConfigType::String,
+            cm_rust::ConfigValueType::Vector { .. } => ConfigType::Vector,
+        }
+    }
+}
+
 #[derive(Clone, Hash, Debug, PartialEq, PartialOrd, Eq, Ord, Serialize)]
 pub struct ConfigKey(String);
 
@@ -2333,6 +2351,26 @@ impl ConfigNestedValueType {
     }
 }
 
+impl TryFrom<&cm_rust::ConfigNestedValueType> for ConfigNestedValueType {
+    type Error = ();
+    fn try_from(nested: &cm_rust::ConfigNestedValueType) -> Result<Self, ()> {
+        Ok(match nested {
+            cm_rust::ConfigNestedValueType::Bool => ConfigNestedValueType::Bool {},
+            cm_rust::ConfigNestedValueType::Uint8 => ConfigNestedValueType::Uint8 {},
+            cm_rust::ConfigNestedValueType::Int8 => ConfigNestedValueType::Int8 {},
+            cm_rust::ConfigNestedValueType::Uint16 => ConfigNestedValueType::Uint16 {},
+            cm_rust::ConfigNestedValueType::Int16 => ConfigNestedValueType::Int16 {},
+            cm_rust::ConfigNestedValueType::Uint32 => ConfigNestedValueType::Uint32 {},
+            cm_rust::ConfigNestedValueType::Int32 => ConfigNestedValueType::Int32 {},
+            cm_rust::ConfigNestedValueType::Uint64 => ConfigNestedValueType::Uint64 {},
+            cm_rust::ConfigNestedValueType::Int64 => ConfigNestedValueType::Int64 {},
+            cm_rust::ConfigNestedValueType::String { max_size } => {
+                ConfigNestedValueType::String { max_size: NonZeroU32::new(*max_size).ok_or(())? }
+            }
+        })
+    }
+}
+
 #[derive(Deserialize, Debug, PartialEq, ReferenceDoc, Serialize)]
 #[serde(deny_unknown_fields)]
 #[reference_doc(fields_as = "list")]
@@ -2373,7 +2411,7 @@ pub struct ResolverRegistration {
     pub scheme: cm_types::UrlScheme,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Clone, ReferenceDoc, Serialize)]
+#[derive(Deserialize, Debug, PartialEq, Clone, ReferenceDoc, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 #[reference_doc(fields_as = "list")]
 pub struct Capability {

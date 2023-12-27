@@ -92,6 +92,8 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// Data passed to the board's Board Driver, if provided.
     board_driver_arguments: Option<BoardDriverArguments>,
+
+    configuration_capabilities: Option<assembly_config_capabilities::CapabilityNamedMap>,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -117,6 +119,7 @@ impl ImageAssemblyConfigBuilder {
             package_urls: BTreeSet::default(),
             packages_to_compile: BTreeMap::default(),
             board_driver_arguments: None,
+            configuration_capabilities: None,
         }
     }
 
@@ -583,6 +586,17 @@ impl ImageAssemblyConfigBuilder {
         }
     }
 
+    pub fn add_configuration_capabilities(
+        &mut self,
+        config: assembly_config_capabilities::CapabilityNamedMap,
+    ) -> Result<()> {
+        if self.configuration_capabilities.is_some() {
+            return Err(anyhow::format_err!("duplicate configuration capabilities"));
+        }
+        self.configuration_capabilities = Some(config);
+        Ok(())
+    }
+
     pub fn add_compiled_package(
         &mut self,
         compiled_package_def: &CompiledPackageDefinition,
@@ -638,6 +652,7 @@ impl ImageAssemblyConfigBuilder {
             package_urls: _,
             packages_to_compile,
             board_driver_arguments,
+            configuration_capabilities,
         } = self;
 
         let cmc_tool = tools.get_tool("cmc")?;
@@ -728,6 +743,23 @@ impl ImageAssemblyConfigBuilder {
                 .with_context(|| format!("building domain config package {package_name}"))?;
             base.add_package_ignore_duplicates(PackageEntry { path, manifest })
                 .with_context(|| format!("Adding domain config package: {}", package_name))?;
+        }
+
+        // Construct the config capability package.
+        if let Some(config) = configuration_capabilities {
+            let package_name = "config";
+            let outdir = outdir.join(package_name);
+            std::fs::create_dir_all(&outdir)
+                .with_context(|| format!("creating directory {outdir}"))?;
+
+            let (path, manifest) =
+                assembly_config_capabilities::build_config_capability_package(config, &outdir)
+                    .with_context(|| {
+                        format!("building config capabilties package {package_name}")
+                    })?;
+            bootfs_packages
+                .add_package(PackageEntry { path, manifest })
+                .with_context(|| format!("Adding config capabilities package: {}", package_name))?;
         }
 
         {

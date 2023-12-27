@@ -25,8 +25,17 @@
             name: "elf_runner",
             url: "fuchsia-builtin://#elf_runner.cm",
         },
+        {
+            name: "config",
+            url: "fuchsia-boot:///config#meta/config.cm",
+        },
     ],
     offer: [
+        {
+            from: "#config",
+            to: "#bootstrap",
+            config: [ "fuchsia.driver.DriverLoadFuzzerMaxDelayMs" ],
+        },
         {
             protocol: "fuchsia.component.Binder",
             from: "#core",
@@ -59,7 +68,10 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "void",
-            to: "#bootstrap",
+            to: [
+                "#bootstrap",
+                "#config",
+            ],
             availability: "optional",
         },
 

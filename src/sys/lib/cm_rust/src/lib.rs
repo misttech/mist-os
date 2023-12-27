@@ -1175,6 +1175,56 @@ pub enum ConfigValueType {
     Vector { nested_type: ConfigNestedValueType, max_count: u32 },
 }
 
+impl ConfigValueType {
+    pub fn get_max_size(&self) -> Option<u32> {
+        match self {
+            ConfigValueType::String { max_size } => Some(*max_size),
+            ConfigValueType::Bool
+            | ConfigValueType::Uint8
+            | ConfigValueType::Int8
+            | ConfigValueType::Uint16
+            | ConfigValueType::Int16
+            | ConfigValueType::Uint32
+            | ConfigValueType::Int32
+            | ConfigValueType::Uint64
+            | ConfigValueType::Int64
+            | ConfigValueType::Vector { .. } => None,
+        }
+    }
+
+    pub fn get_nested_type(&self) -> Option<ConfigNestedValueType> {
+        match self {
+            ConfigValueType::Vector { nested_type, .. } => Some(nested_type.clone()),
+            ConfigValueType::Bool
+            | ConfigValueType::Uint8
+            | ConfigValueType::Int8
+            | ConfigValueType::Uint16
+            | ConfigValueType::Int16
+            | ConfigValueType::Uint32
+            | ConfigValueType::Int32
+            | ConfigValueType::Uint64
+            | ConfigValueType::Int64
+            | ConfigValueType::String { .. } => None,
+        }
+    }
+
+    pub fn get_max_count(&self) -> Option<u32> {
+        match self {
+            ConfigValueType::Vector { max_count, .. } => Some(*max_count),
+            ConfigValueType::Bool
+            | ConfigValueType::Uint8
+            | ConfigValueType::Int8
+            | ConfigValueType::Uint16
+            | ConfigValueType::Int16
+            | ConfigValueType::Uint32
+            | ConfigValueType::Int32
+            | ConfigValueType::Uint64
+            | ConfigValueType::Int64
+            | ConfigValueType::String { .. } => None,
+        }
+    }
+}
+
 impl FidlIntoNative<ConfigNestedValueType> for fdecl::ConfigType {
     fn fidl_into_native(mut self) -> ConfigNestedValueType {
         match self.layout {

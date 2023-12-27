@@ -12,6 +12,7 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/component_id_index:component_id_index_test",
     "//src/lib/assembly/component_manager_config:component_manager_config_test",
     "//src/lib/assembly/components:components_test",
+    "//src/lib/assembly/config_capabilities:config_capabilities_test",
     "//src/lib/assembly/config_data:config_data_test",
     "//src/lib/assembly/config_schema:config_schema_test",
     "//src/lib/assembly/domain_config:domain_config_test",

@@ -54,7 +54,19 @@
             allow_long_names: true,
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            type: "int64",
+            value: 0,
+        },
+    ],
     offer: [
+        {
+            from: "self",
+            to: "#driver-index",
+            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+        },
         {
             protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
             from: "#driver_manager",

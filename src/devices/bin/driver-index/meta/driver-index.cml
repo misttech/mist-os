@@ -20,6 +20,10 @@
     ],
     use: [
         {
+            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            config_key: "driver_load_fuzzer_max_delay_ms",
+        },
+        {
             directory: "boot",
             rights: [ "r*" ],
             path: "/boot",

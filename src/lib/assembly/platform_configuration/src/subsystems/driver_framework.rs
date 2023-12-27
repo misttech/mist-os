@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::driver_framework_config::{
     DriverFrameworkConfig, DriverHostCrashPolicy, TestFuzzingConfig,
 };
@@ -38,6 +39,11 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("enable_driver_load_fuzzer", test_fuzzing_config.enable_load_fuzzer)?
             .field("driver_load_fuzzer_max_delay_ms", test_fuzzing_config.max_load_delay_ms)?
             .field("disabled_drivers", disabled_drivers)?;
+
+        builder.set_config_capability(
+            "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            Config::new(ConfigValueType::Int64, test_fuzzing_config.max_load_delay_ms.into()),
+        )?;
 
         let driver_host_crash_policy = driver_framework_config
             .driver_host_crash_policy
