@@ -99,18 +99,18 @@ fuchsia::feedback::CrashReport CreateCrashReport(const feedback::RebootLog& rebo
       std::make_shared<::fpromise::completer<void, Error>>(std::move(bridge.completer));
 
   delayed_crash_reporting_.Reset([this, report = std::move(report), completer]() mutable {
-    crash_reporter_->File(std::move(report),
-                          [completer](::fpromise::result<void, zx_status_t> result) {
-                            if (!*completer) {
-                              return;
-                            }
+    crash_reporter_->FileReport(
+        std::move(report), [completer](fuchsia::feedback::CrashReporter_FileReport_Result result) {
+          if (!*completer) {
+            return;
+          }
 
-                            if (result.is_error()) {
-                              completer->complete_error(Error::kBadValue);
-                            } else {
-                              completer->complete_ok();
-                            }
-                          });
+          if (result.is_err()) {
+            completer->complete_error(Error::kBadValue);
+          } else {
+            completer->complete_ok();
+          }
+        });
   });
 
   if (const zx_status_t status = async::PostDelayedTask(

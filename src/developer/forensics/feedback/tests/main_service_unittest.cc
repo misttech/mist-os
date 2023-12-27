@@ -120,9 +120,9 @@ TEST_F(MainServiceTest, CrashReports) {
   services()->Connect(crash_reporting_product_register_ptr_.NewRequest(dispatcher()));
 
   bool crash_reporter_called = false;
-  crash_reporter_ptr_->File(
+  crash_reporter_ptr_->FileReport(
       std::move(fuchsia::feedback::CrashReport().set_program_name("program_name")),
-      [&](::fpromise::result<void, zx_status_t>) { crash_reporter_called = true; });
+      [&](fuchsia::feedback::CrashReporter_FileReport_Result) { crash_reporter_called = true; });
 
   bool crash_reporting_product_register_called = false;
   crash_reporting_product_register_ptr_->UpsertWithAck(
