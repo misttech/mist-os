@@ -620,16 +620,16 @@ mod tests {
         (),
     >;
 
-    type FakeSyncCtx = crate::context::testutil::FakeSyncCtx<
+    type FakeCoreCtx = crate::context::testutil::FakeCoreCtx<
         FakeIgmpCtx,
         IgmpPacketMetadata<FakeDeviceId>,
         FakeDeviceId,
     >;
 
-    type FakeNonSyncCtx =
-        crate::context::testutil::FakeNonSyncCtx<IgmpTimerId<FakeDeviceId>, (), ()>;
+    type FakeBindingsCtx =
+        crate::context::testutil::FakeBindingsCtx<IgmpTimerId<FakeDeviceId>, (), ()>;
 
-    impl IgmpStateContext<FakeNonSyncCtx> for FakeSyncCtx {
+    impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
             O,
             F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>) -> O,
@@ -644,7 +644,7 @@ mod tests {
         }
     }
 
-    impl IgmpContext<FakeNonSyncCtx> for FakeSyncCtx {
+    impl IgmpContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state_mut<
             O,
             F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<FakeInstant>>) -> O,
@@ -756,8 +756,8 @@ mod tests {
         IgmpTimerId::V1RouterPresent { device: FakeDeviceId };
 
     fn receive_igmp_query(
-        core_ctx: &mut FakeSyncCtx,
-        bindings_ctx: &mut FakeNonSyncCtx,
+        core_ctx: &mut FakeCoreCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
         resp_time: Duration,
     ) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
@@ -769,8 +769,8 @@ mod tests {
     }
 
     fn receive_igmp_general_query(
-        core_ctx: &mut FakeSyncCtx,
-        bindings_ctx: &mut FakeNonSyncCtx,
+        core_ctx: &mut FakeCoreCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
         resp_time: Duration,
     ) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
@@ -781,7 +781,7 @@ mod tests {
         core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
     }
 
-    fn receive_igmp_report(core_ctx: &mut FakeSyncCtx, bindings_ctx: &mut FakeNonSyncCtx) {
+    fn receive_igmp_report(core_ctx: &mut FakeCoreCtx, bindings_ctx: &mut FakeBindingsCtx) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipReportV2>::new(GROUP_ADDR.get());
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
         core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, OTHER_HOST_ADDR, MY_ADDR, buff);
@@ -791,7 +791,7 @@ mod tests {
         seed: u128,
         a: Option<AddrSubnet<Ipv4Addr>>,
     ) -> FakeCtx {
-        let mut ctx = FakeCtx::with_sync_ctx(FakeSyncCtx::default());
+        let mut ctx = FakeCtx::with_sync_ctx(FakeCoreCtx::default());
         ctx.bindings_ctx.seed_rng(seed);
         ctx.core_ctx.get_mut().addr_subnet = a;
         ctx
@@ -804,7 +804,7 @@ mod tests {
         )
     }
 
-    fn ensure_ttl_ihl_rtr(core_ctx: &FakeSyncCtx) {
+    fn ensure_ttl_ihl_rtr(core_ctx: &FakeCoreCtx) {
         for (_, frame) in core_ctx.frames() {
             assert_eq!(frame[8], 1); // TTL,
             assert_eq!(&frame[20..24], &[148, 4, 0, 0]); // RTR
@@ -815,7 +815,7 @@ mod tests {
     #[test_case(Some(MY_ADDR); "specified_src")]
     #[test_case(None; "unspecified_src")]
     fn test_igmp_simple_integration(src_ip: Option<SpecifiedAddr<Ipv4Addr>>) {
-        let check_report = |core_ctx: &mut FakeSyncCtx| {
+        let check_report = |core_ctx: &mut FakeCoreCtx| {
             let expected_src_ip = src_ip.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get());
 
             let frames = core_ctx.take_frames();
@@ -1127,12 +1127,12 @@ mod tests {
             // Test that we do not perform IGMP when IGMP is disabled.
 
             let FakeCtx { mut core_ctx, mut bindings_ctx } =
-                FakeCtx::with_sync_ctx(FakeSyncCtx::default());
+                FakeCtx::with_sync_ctx(FakeCoreCtx::default());
             bindings_ctx.seed_rng(seed);
             core_ctx.get_mut().igmp_enabled = false;
 
             // Assert that no observable effects have taken place.
-            let assert_no_effect = |core_ctx: &FakeSyncCtx, bindings_ctx: &FakeNonSyncCtx| {
+            let assert_no_effect = |core_ctx: &FakeCoreCtx, bindings_ctx: &FakeBindingsCtx| {
                 bindings_ctx.timer_ctx().assert_no_timers_installed();
                 assert_empty(core_ctx.frames());
             };
@@ -1344,8 +1344,8 @@ mod tests {
             gmp_enabled: bool,
         }
 
-        let set_config = |core_ctx: &mut &crate::testutil::FakeSyncCtx,
-                          bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let set_config = |core_ctx: &mut &crate::testutil::FakeCoreCtx,
+                          bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
             let _: Ipv4DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv4_configuration(
@@ -1363,7 +1363,7 @@ mod tests {
                 )
                 .unwrap();
         };
-        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx| {
+        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
             let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
@@ -1384,7 +1384,7 @@ mod tests {
                 }
             );
         };
-        let check_sent_leave = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx| {
+        let check_sent_leave = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
             let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
 

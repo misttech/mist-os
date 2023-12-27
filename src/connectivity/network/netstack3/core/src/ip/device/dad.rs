@@ -388,7 +388,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
             InstantContext as _, SendFrameContext as _,
         },
         device::testutil::FakeDeviceId,
@@ -402,7 +402,7 @@ mod tests {
         ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
-    type FakeAddressCtxImpl = FakeSyncCtx<FakeDadAddressContext, (), FakeDeviceId>;
+    type FakeAddressCtxImpl = FakeCoreCtx<FakeDadAddressContext, (), FakeDeviceId>;
 
     impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadAddressContext {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
@@ -414,7 +414,7 @@ mod tests {
         type AddressId = AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>;
     }
 
-    impl DadAddressContext<FakeNonSyncCtxImpl> for FakeAddressCtxImpl {
+    impl DadAddressContext<FakeBindingsCtxImpl> for FakeAddressCtxImpl {
         fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
             &mut self,
             &FakeDeviceId: &Self::DeviceId,
@@ -429,7 +429,7 @@ mod tests {
 
         fn join_multicast_group(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeDeviceId: &Self::DeviceId,
             multicast_addr: MulticastAddr<Ipv6Addr>,
         ) {
@@ -440,7 +440,7 @@ mod tests {
 
         fn leave_multicast_group(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeDeviceId: &Self::DeviceId,
             multicast_addr: MulticastAddr<Ipv6Addr>,
         ) {
@@ -480,19 +480,20 @@ mod tests {
         }
     }
 
-    type FakeNonSyncCtxImpl = FakeNonSyncCtx<DadTimerId<FakeDeviceId>, DadEvent<FakeDeviceId>, ()>;
+    type FakeBindingsCtxImpl =
+        FakeBindingsCtx<DadTimerId<FakeDeviceId>, DadEvent<FakeDeviceId>, ()>;
 
-    type FakeCtxImpl = FakeSyncCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
+    type FakeCoreCtxImpl = FakeCoreCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 
     fn get_address_id(addr: Ipv6Addr) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
         AddrSubnet::new(addr, Ipv6Addr::BYTES * 8).unwrap()
     }
 
-    impl IpDeviceAddressIdContext<Ipv6> for FakeCtxImpl {
+    impl IpDeviceAddressIdContext<Ipv6> for FakeCoreCtxImpl {
         type AddressId = AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>;
     }
 
-    impl DadContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl DadContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type DadAddressCtx<'a> = FakeAddressCtxImpl;
 
         fn get_address_id(
@@ -521,7 +522,7 @@ mod tests {
 
         fn send_dad_packet(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeDeviceId: &FakeDeviceId,
             dst_ip: MulticastAddr<Ipv6Addr>,
             message: NeighborSolicitation,
@@ -542,7 +543,7 @@ mod tests {
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_start() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -565,7 +566,7 @@ mod tests {
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_handle_timer() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -587,7 +588,7 @@ mod tests {
     #[should_panic(expected = "expected address to be tentative")]
     fn panic_non_tentative_address_handle_timer() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Assigned,
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -608,7 +609,7 @@ mod tests {
     #[test]
     fn dad_disabled() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -642,8 +643,8 @@ mod tests {
         DadTimerId { addr: DAD_ADDRESS, device_id: FakeDeviceId };
 
     fn check_dad(
-        core_ctx: &FakeCtxImpl,
-        bindings_ctx: &FakeNonSyncCtxImpl,
+        core_ctx: &FakeCoreCtxImpl,
+        bindings_ctx: &FakeBindingsCtxImpl,
         frames_len: usize,
         dad_transmits_remaining: Option<NonZeroU8>,
         retrans_timer: NonZeroDuration,
@@ -677,7 +678,7 @@ mod tests {
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
@@ -730,7 +731,7 @@ mod tests {
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(2)) };
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },

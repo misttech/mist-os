@@ -578,7 +578,7 @@ mod tests {
         error::NotFoundError,
         ip::device::{IpAddressId as _, IpDeviceIpExt, IpDeviceStateContext},
         testutil::{
-            Ctx, FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            Ctx, FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
         SyncCtx,
     };
@@ -609,8 +609,8 @@ mod tests {
     #[ip_test]
     fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpDeviceIpExt>()
     where
-        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, Unlocked>:
-            IpDeviceStateContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, Unlocked>:
+            IpDeviceStateContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
         let core_ctx = &core_ctx;

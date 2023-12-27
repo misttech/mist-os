@@ -1607,9 +1607,9 @@ mod tests {
     }
 
     fn add_ethernet(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        _bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        _bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+    ) -> DeviceId<crate::testutil::FakeBindingsCtx> {
         crate::device::add_ethernet_device(
             core_ctx,
             Ipv6::FAKE_CONFIG.local_mac,
@@ -1620,9 +1620,9 @@ mod tests {
     }
 
     fn add_loopback(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+    ) -> DeviceId<crate::testutil::FakeBindingsCtx> {
         let device = crate::device::add_loopback_device(
             core_ctx,
             Ipv6::MINIMUM_LINK_MTU,
@@ -1642,16 +1642,16 @@ mod tests {
     }
 
     fn check_transmitted_ethernet(
-        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-        _device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        _device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
         count: usize,
     ) {
         assert_eq!(bindings_ctx.frames_sent().len(), count);
     }
 
     fn check_transmitted_loopback(
-        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-        device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
         count: usize,
     ) {
         // Loopback frames leave the stack; outgoing frames land in
@@ -1673,12 +1673,12 @@ mod tests {
     #[test_case(add_loopback, check_transmitted_loopback, false; "loopback without queue")]
     fn tx_queue(
         add_device: fn(
-            &mut &crate::testutil::FakeSyncCtx,
-            &mut crate::testutil::FakeNonSyncCtx,
-        ) -> DeviceId<crate::testutil::FakeNonSyncCtx>,
+            &mut &crate::testutil::FakeCoreCtx,
+            &mut crate::testutil::FakeBindingsCtx,
+        ) -> DeviceId<crate::testutil::FakeBindingsCtx>,
         check_transmitted: fn(
-            &mut crate::testutil::FakeNonSyncCtx,
-            &DeviceId<crate::testutil::FakeNonSyncCtx>,
+            &mut crate::testutil::FakeBindingsCtx,
+            &DeviceId<crate::testutil::FakeBindingsCtx>,
             usize,
         ),
         with_tx_queue: bool,

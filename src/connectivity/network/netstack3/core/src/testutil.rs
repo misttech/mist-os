@@ -209,16 +209,16 @@ pub(crate) mod benchmarks {
 
 #[derive(Default)]
 /// Non-sync context state held by [`FakeNonSyncCtx`].
-pub struct FakeNonSyncCtxState {
+pub struct FakeBindingsCtxState {
     icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<Vec<u8>>>,
     icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<Vec<u8>>>,
     udpv4_received: HashMap<crate::transport::udp::SocketId<Ipv4>, Vec<Vec<u8>>>,
     udpv6_received: HashMap<crate::transport::udp::SocketId<Ipv6>, Vec<Vec<u8>>>,
-    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
-    pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
+    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
+    pub(crate) tx_available: Vec<DeviceId<FakeBindingsCtx>>,
 }
 
-impl FakeNonSyncCtxState {
+impl FakeBindingsCtxState {
     pub(crate) fn udp_state_mut<I: Ip>(
         &mut self,
     ) -> &mut HashMap<crate::transport::udp::SocketId<I>, Vec<Vec<u8>>> {
@@ -237,19 +237,19 @@ impl FakeNonSyncCtxState {
 }
 
 /// Shorthand for [`Ctx`] with a [`FakeNonSyncCtx`].
-pub type FakeCtx = Ctx<FakeNonSyncCtx>;
+pub type FakeCtx = Ctx<FakeBindingsCtx>;
 /// Shorthand for [`SyncCtx`] that uses a [`FakeNonSyncCtx`].
-pub type FakeSyncCtx = SyncCtx<FakeNonSyncCtx>;
+pub type FakeCoreCtx = SyncCtx<FakeBindingsCtx>;
 
 /// Test-only implementation of [`crate::NonSyncContext`].
 #[derive(Default, Clone)]
-pub struct FakeNonSyncCtx(
+pub struct FakeBindingsCtx(
     Arc<
         Mutex<
-            crate::context::testutil::FakeNonSyncCtx<
+            crate::context::testutil::FakeBindingsCtx<
                 TimerId<Self>,
                 DispatchedEvent,
-                FakeNonSyncCtxState,
+                FakeBindingsCtxState,
             >,
         >,
     >,
@@ -290,13 +290,13 @@ impl<
     }
 }
 
-impl FakeNonSyncCtx {
+impl FakeBindingsCtx {
     fn with_inner<
         F: FnOnce(
-            &crate::context::testutil::FakeNonSyncCtx<
+            &crate::context::testutil::FakeBindingsCtx<
                 TimerId<Self>,
                 DispatchedEvent,
-                FakeNonSyncCtxState,
+                FakeBindingsCtxState,
             >,
         ) -> O,
         O,
@@ -311,10 +311,10 @@ impl FakeNonSyncCtx {
 
     fn with_inner_mut<
         F: FnOnce(
-            &mut crate::context::testutil::FakeNonSyncCtx<
+            &mut crate::context::testutil::FakeBindingsCtx<
                 TimerId<Self>,
                 DispatchedEvent,
-                FakeNonSyncCtxState,
+                FakeBindingsCtxState,
             >,
         ) -> O,
         O,
@@ -329,26 +329,26 @@ impl FakeNonSyncCtx {
 
     #[cfg(test)]
     pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
-        Wrapper(self.0.lock(), crate::context::testutil::FakeNonSyncCtx::timer_ctx, ())
+        Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::timer_ctx, ())
     }
 
     #[cfg(test)]
     pub(crate) fn frames_sent(
         &self,
-    ) -> impl Deref<Target = [(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)]> + '_ {
-        Wrapper(self.0.lock(), crate::context::testutil::FakeNonSyncCtx::frames, ())
+    ) -> impl Deref<Target = [(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)]> + '_ {
+        Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::frames, ())
     }
 
-    pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeNonSyncCtxState> + '_ {
+    pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
         Wrapper(
             self.0.lock(),
-            crate::context::testutil::FakeNonSyncCtx::state,
-            crate::context::testutil::FakeNonSyncCtx::state_mut,
+            crate::context::testutil::FakeBindingsCtx::state,
+            crate::context::testutil::FakeBindingsCtx::state_mut,
         )
     }
 
     /// Take all frames sent so far.
-    pub fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
+    pub fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| ctx.frame_ctx_mut().take_frames())
     }
 
@@ -381,8 +381,8 @@ impl FakeNonSyncCtx {
     }
 }
 
-impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeCtx {
-    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &self,
         f: F,
     ) -> O {
@@ -390,7 +390,7 @@ impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeCtx {
         bindings_ctx.with_inner(|ctx| f(&ctx.timers))
     }
 
-    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &mut self,
         f: F,
     ) -> O {
@@ -399,10 +399,10 @@ impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeCtx {
     }
 }
 
-impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>> for FakeCtx {
+impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>> for FakeCtx {
     fn with_fake_frame_ctx_mut<
         O,
-        F: FnOnce(&mut FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>) -> O,
+        F: FnOnce(&mut FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>>) -> O,
     >(
         &mut self,
         f: F,
@@ -412,15 +412,15 @@ impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>
     }
 }
 
-impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
-    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &self,
         f: F,
     ) -> O {
         self.with_inner(|ctx| f(&ctx.timers))
     }
 
-    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &mut self,
         f: F,
     ) -> O {
@@ -428,39 +428,39 @@ impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
     }
 }
 
-impl InstantBindingsTypes for FakeNonSyncCtx {
+impl InstantBindingsTypes for FakeBindingsCtx {
     type Instant = FakeInstant;
 }
 
-impl InstantContext for FakeNonSyncCtx {
+impl InstantContext for FakeBindingsCtx {
     fn now(&self) -> FakeInstant {
         self.with_inner(|ctx| ctx.now())
     }
 }
 
-impl TimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
+impl TimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
     fn schedule_timer_instant(
         &mut self,
         time: FakeInstant,
-        id: TimerId<FakeNonSyncCtx>,
+        id: TimerId<FakeBindingsCtx>,
     ) -> Option<FakeInstant> {
         self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, id))
     }
 
-    fn cancel_timer(&mut self, id: TimerId<FakeNonSyncCtx>) -> Option<FakeInstant> {
+    fn cancel_timer(&mut self, id: TimerId<FakeBindingsCtx>) -> Option<FakeInstant> {
         self.with_inner_mut(|ctx| ctx.cancel_timer(id))
     }
 
-    fn cancel_timers_with<F: FnMut(&TimerId<FakeNonSyncCtx>) -> bool>(&mut self, f: F) {
+    fn cancel_timers_with<F: FnMut(&TimerId<FakeBindingsCtx>) -> bool>(&mut self, f: F) {
         self.with_inner_mut(|ctx| ctx.cancel_timers_with(f))
     }
 
-    fn scheduled_instant(&self, id: TimerId<FakeNonSyncCtx>) -> Option<FakeInstant> {
+    fn scheduled_instant(&self, id: TimerId<FakeBindingsCtx>) -> Option<FakeInstant> {
         self.with_inner_mut(|ctx| ctx.scheduled_instant(id))
     }
 }
 
-impl RngContext for FakeNonSyncCtx {
+impl RngContext for FakeBindingsCtx {
     type Rng<'a> = FakeCryptoRng<XorShiftRng>;
 
     fn rng(&mut self) -> Self::Rng<'_> {
@@ -469,19 +469,19 @@ impl RngContext for FakeNonSyncCtx {
     }
 }
 
-impl<T: Into<DispatchedEvent>> EventContext<T> for FakeNonSyncCtx {
+impl<T: Into<DispatchedEvent>> EventContext<T> for FakeBindingsCtx {
     fn on_event(&mut self, event: T) {
         self.with_inner_mut(|ctx| ctx.events.on_event(event.into()))
     }
 }
 
-impl TracingContext for FakeNonSyncCtx {
+impl TracingContext for FakeBindingsCtx {
     type DurationScope = ();
 
     fn duration(&self, _: &'static CStr) {}
 }
 
-impl TcpBindingsTypes for FakeNonSyncCtx {
+impl TcpBindingsTypes for FakeBindingsCtx {
     type ReceiveBuffer = Arc<Mutex<RingBuffer>>;
 
     type SendBuffer = TestSendBuffer;
@@ -507,7 +507,7 @@ impl TcpBindingsTypes for FakeNonSyncCtx {
     }
 }
 
-impl crate::ReferenceNotifiers for FakeNonSyncCtx {
+impl crate::ReferenceNotifiers for FakeBindingsCtx {
     type ReferenceReceiver<T: 'static> = Never;
 
     type ReferenceNotifier<T: Send + 'static> = Never;
@@ -526,7 +526,7 @@ impl crate::ReferenceNotifiers for FakeNonSyncCtx {
     }
 }
 
-impl<D: LinkDevice> LinkResolutionContext<D> for FakeNonSyncCtx {
+impl<D: LinkDevice> LinkResolutionContext<D> for FakeBindingsCtx {
     type Notifier = ();
 }
 
@@ -997,7 +997,7 @@ impl FakeEventDispatcherBuilder {
 
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
+    pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         self.build_with_modifications(|_| {})
     }
 
@@ -1008,7 +1008,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
-    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         let mut stack_builder = StackStateBuilder::default();
         f(&mut stack_builder);
         self.build_with(stack_builder)
@@ -1020,7 +1020,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
-    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
@@ -1133,11 +1133,11 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
 }
 
 impl FakeNetworkContext for FakeCtx {
-    type TimerId = TimerId<FakeNonSyncCtx>;
-    type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
+    type TimerId = TimerId<FakeBindingsCtx>;
+    type SendMeta = EthernetWeakDeviceId<FakeBindingsCtx>;
 }
 
-impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
+impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
@@ -1152,7 +1152,7 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv4>,
@@ -1168,7 +1168,7 @@ impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv6>,
@@ -1184,11 +1184,11 @@ impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl crate::device::socket::DeviceSocketTypes for FakeNonSyncCtx {
-    type SocketState = Mutex<Vec<(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)>>;
+impl crate::device::socket::DeviceSocketTypes for FakeBindingsCtx {
+    type SocketState = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
 }
 
-impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeNonSyncCtx {
+impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
     fn receive_frame(
         &self,
         state: &Self::SocketState,
@@ -1200,24 +1200,24 @@ impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for Fake
     }
 }
 
-impl DeviceLayerStateTypes for FakeNonSyncCtx {
+impl DeviceLayerStateTypes for FakeBindingsCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
     type DeviceIdentifier = MonotonicIdentifier;
 }
 
-impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
-    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeNonSyncCtx>) {
+impl DeviceLayerEventDispatcher for FakeBindingsCtx {
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeBindingsCtx>) {
         self.state_mut().rx_available.push(device.clone());
     }
 
-    fn wake_tx_task(&mut self, device: &DeviceId<FakeNonSyncCtx>) {
+    fn wake_tx_task(&mut self, device: &DeviceId<FakeBindingsCtx>) {
         self.state_mut().tx_available.push(device.clone());
     }
 
     fn send_frame(
         &mut self,
-        device: &EthernetDeviceId<FakeNonSyncCtx>,
+        device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(device.downgrade(), frame.into_inner()));
@@ -1226,7 +1226,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
 }
 
 #[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(core_ctx: &FakeSyncCtx, bindings_ctx: &mut FakeNonSyncCtx) {
+pub(crate) fn handle_queued_rx_packets(core_ctx: &FakeCoreCtx, bindings_ctx: &mut FakeBindingsCtx) {
     loop {
         let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
         if rx_available.len() == 0 {
@@ -1249,20 +1249,20 @@ pub(crate) fn handle_queued_rx_packets(core_ctx: &FakeSyncCtx, bindings_ctx: &mu
 #[generic_over_ip()]
 #[allow(missing_docs)]
 pub enum DispatchedEvent {
-    IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>),
-    IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>),
-    IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
-    IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
-    NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>),
-    NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>),
+    IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>),
+    IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
+    IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, Ipv4>),
+    IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, Ipv6>),
+    NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>),
+    NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
 }
 
-impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>
-    for IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I, FakeInstant>
+impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
+    for IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
 {
     fn from(
-        e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>,
-    ) -> IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I, FakeInstant> {
+        e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>,
+    ) -> IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant> {
         match e {
             IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
                 IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state, valid_until }
@@ -1287,24 +1287,24 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>
     }
 }
 
-impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>) -> DispatchedEvent {
+impl From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>> for DispatchedEvent {
+    fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>) -> DispatchedEvent {
         DispatchedEvent::IpDeviceIpv4(e.into())
     }
 }
 
-impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>) -> DispatchedEvent {
+impl From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>> for DispatchedEvent {
+    fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>) -> DispatchedEvent {
         DispatchedEvent::IpDeviceIpv6(e.into())
     }
 }
 
-impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
-    for IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I>
+impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>
+    for IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I>
 {
     fn from(
-        e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>,
-    ) -> IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
+        e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>,
+    ) -> IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I> {
         match e {
             IpLayerEvent::AddRoute(AddableEntry { subnet, device, gateway, metric }) => {
                 IpLayerEvent::AddRoute(AddableEntry {
@@ -1321,25 +1321,25 @@ impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
     }
 }
 
-impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for DispatchedEvent {
-    fn from(e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) -> DispatchedEvent {
+impl From<IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv4>> for DispatchedEvent {
+    fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv4>) -> DispatchedEvent {
         DispatchedEvent::IpLayerIpv4(e.into())
     }
 }
 
-impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
-    fn from(e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) -> DispatchedEvent {
+impl From<IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv6>> for DispatchedEvent {
+    fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv6>) -> DispatchedEvent {
         DispatchedEvent::IpLayerIpv6(e.into())
     }
 }
 
-impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>>
-    for nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, I, FakeInstant>
+impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>>
+    for nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
 {
     fn from(
         nud::Event { device, kind, addr, at }: nud::Event<
             Mac,
-            EthernetDeviceId<FakeNonSyncCtx>,
+            EthernetDeviceId<FakeBindingsCtx>,
             I,
             FakeInstant,
         >,
@@ -1348,11 +1348,11 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstan
     }
 }
 
-impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>>
+impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>>
     for DispatchedEvent
 {
     fn from(
-        e: nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>,
+        e: nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>,
     ) -> DispatchedEvent {
         I::map_ip(
             e,
@@ -1366,7 +1366,7 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstan
 pub(crate) fn handle_timer(
     FakeCtx { core_ctx, bindings_ctx }: &mut FakeCtx,
     _bindings_ctx: &mut (),
-    id: TimerId<FakeNonSyncCtx>,
+    id: TimerId<FakeBindingsCtx>,
 ) {
     crate::time::handle_timer(core_ctx, bindings_ctx, id)
 }
@@ -1698,7 +1698,7 @@ mod tests {
         core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeNonSyncCtx>| {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeBindingsCtx>| {
                 if net == "alice" {
                     vec![("bob", bob_device_id.clone(), Some(latency))]
                 } else {
@@ -1761,12 +1761,12 @@ mod tests {
         fn assert_full_state<
             'a,
             L: FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeNonSyncCtx>,
-                EthernetDeviceId<FakeNonSyncCtx>,
+                EthernetWeakDeviceId<FakeBindingsCtx>,
+                EthernetDeviceId<FakeBindingsCtx>,
                 &'a str,
             >,
         >(
-            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeNonSyncCtx>, FakeCtx, L>,
+            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeBindingsCtx>, FakeCtx, L>,
             alice_nop: u64,
             bob_nop: u64,
             bob_echo_request: u64,
@@ -1801,15 +1801,15 @@ mod tests {
     }
 
     fn send_packet<'a, A: IpAddress>(
-        core_ctx: &'a FakeSyncCtx,
-        bindings_ctx: &mut FakeNonSyncCtx,
+        core_ctx: &'a FakeCoreCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
         src_ip: SpecifiedAddr<A>,
         dst_ip: SpecifiedAddr<A>,
-        device: &DeviceId<FakeNonSyncCtx>,
+        device: &DeviceId<FakeBindingsCtx>,
     ) where
         A::Version: TestIpExt,
-        Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
-            IpLayerHandler<A::Version, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
+            IpLayerHandler<A::Version, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let meta = SendIpPacketMeta {
             device,
@@ -1832,11 +1832,11 @@ mod tests {
     #[ip_test]
     fn test_send_to_many<I: Ip + TestIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpLayerHandler<
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpLayerHandler<
             I,
-            FakeNonSyncCtx,
-            DeviceId = DeviceId<FakeNonSyncCtx>,
-            WeakDeviceId = WeakDeviceId<FakeNonSyncCtx>,
+            FakeBindingsCtx,
+            DeviceId = DeviceId<FakeBindingsCtx>,
+            WeakDeviceId = WeakDeviceId<FakeBindingsCtx>,
         >,
     {
         let mac_a = UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap();
@@ -1866,7 +1866,7 @@ mod tests {
         let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeNonSyncCtx>| match net {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeBindingsCtx>| match net {
                 "alice" => vec![
                     ("bob", bob_device_id.clone(), None),
                     ("calvin", calvin_device_id.clone(), None),

@@ -4155,7 +4155,7 @@ mod tests {
             testutil::{
                 FakeFrameCtx, FakeInstant, FakeInstantCtx, FakeLinkResolutionNotifier, FakeNetwork,
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
-                WithFakeFrameContext, WithFakeTimerContext, WrappedFakeSyncCtx,
+                WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
             InstantContext as _, SendFrameContext,
         },
@@ -4207,9 +4207,14 @@ mod tests {
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
         type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpNonSyncCtx<FakeDeviceId>>,
+            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
             (
-                Connection<Self, Self, FakeWeakDeviceId<FakeDeviceId>, TcpNonSyncCtx<FakeDeviceId>>,
+                Connection<
+                    Self,
+                    Self,
+                    FakeWeakDeviceId<FakeDeviceId>,
+                    TcpBindingsCtx<FakeDeviceId>,
+                >,
                 ConnAddr<
                     ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
                     FakeWeakDeviceId<FakeDeviceId>,
@@ -4218,14 +4223,14 @@ mod tests {
         >;
 
         type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpNonSyncCtx<FakeDeviceId>>,
+            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
             EitherStack<
                 (
                     Connection<
                         Self,
                         Self,
                         FakeWeakDeviceId<FakeDeviceId>,
-                        TcpNonSyncCtx<FakeDeviceId>,
+                        TcpBindingsCtx<FakeDeviceId>,
                     >,
                     ConnAddr<
                         ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
@@ -4237,7 +4242,7 @@ mod tests {
                         Self,
                         Self::OtherVersion,
                         FakeWeakDeviceId<FakeDeviceId>,
-                        TcpNonSyncCtx<FakeDeviceId>,
+                        TcpBindingsCtx<FakeDeviceId>,
                     >,
                     ConnAddr<
                         ConnIpAddr<<Self::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
@@ -4299,14 +4304,14 @@ mod tests {
         }
     }
 
-    type TcpSyncCtx<D, BT> = WrappedFakeSyncCtx<
+    type TcpCoreCtx<D, BT> = WrappedFakeCoreCtx<
         FakeDualStackTcpState<D, BT>,
         FakeDualStackIpSocketCtx<D>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;
 
-    type TcpCtx<D> = ContextPair<TcpSyncCtx<D, TcpNonSyncCtx<D>>, TcpNonSyncCtx<D>>;
+    type TcpCtx<D> = ContextPair<TcpCoreCtx<D, TcpBindingsCtx<D>>, TcpBindingsCtx<D>>;
 
     /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> WithFakeFrameContext<DualStackSendIpPacketMeta<D>> for TcpCtx<D> {
@@ -4322,14 +4327,16 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<D> {
-        type TimerId = TimerId<D::Weak, TcpNonSyncCtx<D>>;
+        type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
     }
 
-    impl<D: FakeStrongDeviceId> WithFakeTimerContext<TimerId<D::Weak, TcpNonSyncCtx<D>>> for TcpCtx<D> {
+    impl<D: FakeStrongDeviceId> WithFakeTimerContext<TimerId<D::Weak, TcpBindingsCtx<D>>>
+        for TcpCtx<D>
+    {
         fn with_fake_timer_ctx<
             O,
-            F: FnOnce(&FakeTimerCtx<TimerId<D::Weak, TcpNonSyncCtx<D>>>) -> O,
+            F: FnOnce(&FakeTimerCtx<TimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
         >(
             &self,
             f: F,
@@ -4340,7 +4347,7 @@ mod tests {
 
         fn with_fake_timer_ctx_mut<
             O,
-            F: FnOnce(&mut FakeTimerCtx<TimerId<D::Weak, TcpNonSyncCtx<D>>>) -> O,
+            F: FnOnce(&mut FakeTimerCtx<TimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
         >(
             &mut self,
             f: F,
@@ -4352,17 +4359,17 @@ mod tests {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct TcpNonSyncCtx<D: FakeStrongDeviceId> {
+    struct TcpBindingsCtx<D: FakeStrongDeviceId> {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId<D::Weak, Self>>,
     }
 
-    impl<D: LinkDevice + FakeStrongDeviceId> LinkResolutionContext<D> for TcpNonSyncCtx<D> {
+    impl<D: LinkDevice + FakeStrongDeviceId> LinkResolutionContext<D> for TcpBindingsCtx<D> {
         type Notifier = FakeLinkResolutionNotifier<D>;
     }
 
     /// Delegate implementation to internal thing.
-    impl<D: FakeStrongDeviceId> TimerContext<TimerId<D::Weak, Self>> for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> TimerContext<TimerId<D::Weak, Self>> for TcpBindingsCtx<D> {
         fn schedule_timer_instant(
             &mut self,
             time: FakeInstant,
@@ -4384,35 +4391,35 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<FakeInstantCtx> for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> AsRef<FakeInstantCtx> for TcpBindingsCtx<D> {
         fn as_ref(&self) -> &FakeInstantCtx {
             &self.timers.instant
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<FakeCryptoRng<XorShiftRng>> for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> AsRef<FakeCryptoRng<XorShiftRng>> for TcpBindingsCtx<D> {
         fn as_ref(&self) -> &FakeCryptoRng<XorShiftRng> {
             &self.rng
         }
     }
 
-    impl<D: FakeStrongDeviceId> DeviceSocketTypes for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> DeviceSocketTypes for TcpBindingsCtx<D> {
         type SocketState = ();
     }
 
-    impl<D: FakeStrongDeviceId> DeviceLayerStateTypes for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> DeviceLayerStateTypes for TcpBindingsCtx<D> {
         type LoopbackDeviceState = ();
         type EthernetDeviceState = ();
         type DeviceIdentifier = MonotonicIdentifier;
     }
 
-    impl<D: FakeStrongDeviceId> TracingContext for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> TracingContext for TcpBindingsCtx<D> {
         type DurationScope = ();
 
         fn duration(&self, _: &'static CStr) {}
     }
 
-    impl<D: FakeStrongDeviceId> TcpBindingsTypes for TcpNonSyncCtx<D> {
+    impl<D: FakeStrongDeviceId> TcpBindingsTypes for TcpBindingsCtx<D> {
         type ReceiveBuffer = Arc<Mutex<RingBuffer>>;
         type SendBuffer = TestSendBuffer;
         type ReturnedBuffers = ClientBuffers;
@@ -4434,7 +4441,7 @@ mod tests {
         }
     }
 
-    impl<I, D, BC> DeviceIpSocketHandler<I, BC> for TcpSyncCtx<D, BC>
+    impl<I, D, BC> DeviceIpSocketHandler<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
@@ -4450,7 +4457,7 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<I, D, BC> TransportIpContext<I, BC> for TcpSyncCtx<D, BC>
+    impl<I, D, BC> TransportIpContext<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
@@ -4491,7 +4498,7 @@ mod tests {
             I: TcpTestIpExt,
             D: FakeStrongDeviceId,
             BC: TcpBindingsTypes + IpSocketBindingsContext,
-        > IpSocketContext<I, BC> for TcpSyncCtx<D, BC>
+        > IpSocketContext<I, BC> for TcpCoreCtx<D, BC>
     {
         fn lookup_route(
             &mut self,
@@ -4527,7 +4534,7 @@ mod tests {
         }
     }
 
-    impl<D, BC> TcpDemuxContext<Ipv4, D::Weak, BC> for TcpSyncCtx<D, BC>
+    impl<D, BC> TcpDemuxContext<Ipv4, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
         D: FakeStrongDeviceId,
         BC: TcpBindingsTypes + IpSocketBindingsContext,
@@ -4544,7 +4551,7 @@ mod tests {
         }
     }
 
-    impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpSyncCtx<D, BC>
+    impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
         D: FakeStrongDeviceId,
         BC: TcpBindingsTypes + IpSocketBindingsContext,
@@ -4562,7 +4569,7 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketBindingsContext> TcpContext<Ipv6, BC>
-        for TcpSyncCtx<D, BC>
+        for TcpCoreCtx<D, BC>
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = crate::convert::UninstantiableConverter;
@@ -4639,7 +4646,7 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketBindingsContext> TcpContext<Ipv4, BC>
-        for TcpSyncCtx<D, BC>
+        for TcpCoreCtx<D, BC>
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = ();
@@ -4716,7 +4723,7 @@ mod tests {
         }
     }
 
-    impl TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>> {
+    impl TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>> {
         fn new<I: TcpTestIpExt>(
             addr: SpecifiedAddr<I::Addr>,
             peer: SpecifiedAddr<I::Addr>,
@@ -4733,7 +4740,7 @@ mod tests {
         }
     }
 
-    impl TcpSyncCtx<MultipleDevicesId, TcpNonSyncCtx<MultipleDevicesId>> {
+    impl TcpCoreCtx<MultipleDevicesId, TcpBindingsCtx<MultipleDevicesId>> {
         fn new_multiple_devices() -> Self {
             Self::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(core::iter::empty::<
@@ -4830,23 +4837,23 @@ mod tests {
                 (
                     LOCAL,
                     TcpCtx {
-                        core_ctx: TcpSyncCtx::new::<I>(
+                        core_ctx: TcpCoreCtx::new::<I>(
                             I::FAKE_CONFIG.local_ip,
                             I::FAKE_CONFIG.remote_ip,
                             I::FAKE_CONFIG.subnet.prefix(),
                         ),
-                        bindings_ctx: TcpNonSyncCtx::default(),
+                        bindings_ctx: TcpBindingsCtx::default(),
                     },
                 ),
                 (
                     REMOTE,
                     TcpCtx {
-                        core_ctx: TcpSyncCtx::new::<I>(
+                        core_ctx: TcpCoreCtx::new::<I>(
                             I::FAKE_CONFIG.remote_ip,
                             I::FAKE_CONFIG.local_ip,
                             I::FAKE_CONFIG.subnet.prefix(),
                         ),
-                        bindings_ctx: TcpNonSyncCtx::default(),
+                        bindings_ctx: TcpBindingsCtx::default(),
                     },
                 ),
             ],
@@ -4907,7 +4914,7 @@ mod tests {
     fn handle_timer<D: FakeStrongDeviceId>(
         TcpCtx { core_ctx, bindings_ctx }: &mut TcpCtx<D>,
         _: &mut (),
-        timer_id: TimerId<D::Weak, TcpNonSyncCtx<D>>,
+        timer_id: TimerId<D::Weak, TcpBindingsCtx<D>>,
     ) {
         match timer_id {
             TimerId::V4(id) => SocketHandler::<Ipv4, _>::handle_timer(core_ctx, bindings_ctx, id),
@@ -4968,14 +4975,14 @@ mod tests {
         drop_rate: f64,
     ) -> (
         TcpTestNetwork,
-        TcpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
         Arc<Mutex<Vec<u8>>>,
-        TcpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
     )
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -5096,7 +5103,7 @@ mod tests {
             conn_id.get().deref(),
             TcpSocketState::Bound(BoundSocketState::Connected((
                 conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -5228,9 +5235,9 @@ mod tests {
         bind_config: BindConfig,
         listen_addr: I::Addr,
     ) where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -5245,12 +5252,12 @@ mod tests {
     #[test_case(I::UNSPECIFIED_ADDRESS; "any addr")]
     fn bind_conflict<I: Ip + TcpTestIpExt>(conflict_addr: I::Addr)
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         set_logger_for_test();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5302,11 +5309,11 @@ mod tests {
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5349,11 +5356,11 @@ mod tests {
     #[ip_test]
     fn bind_to_non_existent_address<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5382,7 +5389,7 @@ mod tests {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
                 Ipv6::FAKE_CONFIG.local_ip,
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
@@ -5413,7 +5420,7 @@ mod tests {
         let ll_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
                 Ipv6::FAKE_CONFIG.local_ip,
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
@@ -5446,8 +5453,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeNetwork::new(
             [
-                (LOCAL, TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(client_ip, server_ip, 0))),
-                (REMOTE, TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (LOCAL, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (REMOTE, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -5534,8 +5541,8 @@ mod tests {
         let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeNetwork::new(
             [
-                (LOCAL, TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(server_ip, client_ip, 0))),
-                (REMOTE, TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (LOCAL, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (REMOTE, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -5627,9 +5634,9 @@ mod tests {
     #[ip_test]
     fn connect_reset<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -5696,7 +5703,7 @@ mod tests {
         client.get().deref(),
         TcpSocketState::Bound(BoundSocketState::Connected((
             conn, _sharing))) => {
-                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                 assert_matches!(
                     conn,
                     Connection {
@@ -5729,9 +5736,9 @@ mod tests {
     #[ip_test]
     fn retransmission<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -5752,12 +5759,12 @@ mod tests {
     #[ip_test]
     fn listener_with_bound_device_conflict<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<MultipleDevicesId, TcpNonSyncCtx<MultipleDevicesId>>:
-            TcpContext<I, TcpNonSyncCtx<MultipleDevicesId>>,
+        TcpCoreCtx<MultipleDevicesId, TcpBindingsCtx<MultipleDevicesId>>:
+            TcpContext<I, TcpBindingsCtx<MultipleDevicesId>>,
     {
         set_logger_for_test();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new_multiple_devices());
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new_multiple_devices());
 
         let sock_a = SocketHandler::<I, _>::create_socket(
             &mut core_ctx,
@@ -5812,7 +5819,7 @@ mod tests {
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::with_inner_and_outer_state(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                     FakeDeviceConfig {
                         device,
@@ -5855,7 +5862,7 @@ mod tests {
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::with_inner_and_outer_state(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                     FakeDeviceConfig {
                         device,
@@ -5898,11 +5905,11 @@ mod tests {
     #[test_case(I::UNSPECIFIED_ADDRESS, false; "unspecified listener")]
     fn bound_socket_info<I: Ip + TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5940,11 +5947,11 @@ mod tests {
     #[ip_test]
     fn connection_info<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5997,7 +6004,7 @@ mod tests {
             [
                 (
                     LOCAL,
-                    TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(
+                    TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
                         server_ip,
                         client_ip,
                         Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6005,7 +6012,7 @@ mod tests {
                 ),
                 (
                     REMOTE,
-                    TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(
+                    TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
                         client_ip,
                         server_ip,
                         Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6087,7 +6094,7 @@ mod tests {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<Ipv6>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
                 local_ip,
                 remote_ip,
                 Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6156,9 +6163,9 @@ mod tests {
         peer_calls_close: bool,
         expected_time_to_close: Duration,
     ) where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -6186,7 +6193,7 @@ mod tests {
                     state.deref(),
                     TcpSocketState::Bound(BoundSocketState::Connected((
                         conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -6222,9 +6229,9 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -6255,7 +6262,7 @@ mod tests {
                 state.deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
                 conn, _sharing))) => {
-                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                 assert_matches!(
                     conn,
                     Connection {
@@ -6280,9 +6287,9 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -6309,7 +6316,7 @@ mod tests {
                 assert_matches!(
                     id.get().deref(),
                     TcpSocketState::Bound(BoundSocketState::Connected((conn, _addr))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -6335,7 +6342,7 @@ mod tests {
                 assert_matches!(
                     id.get().deref(),
                     TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -6354,11 +6361,11 @@ mod tests {
     #[ip_test]
     fn remove_unbound<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6376,11 +6383,11 @@ mod tests {
     #[ip_test]
     fn remove_bound<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6406,9 +6413,9 @@ mod tests {
     #[ip_test]
     fn shutdown_listener<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -6519,7 +6526,7 @@ mod tests {
                 remote_connection.get().deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
                     conn, _sharing))) => {
-                        let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                        let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                         assert_matches!(
                             conn,
                             Connection {
@@ -6576,7 +6583,7 @@ mod tests {
                 new_remote_connection.get().deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
                     conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -6601,8 +6608,8 @@ mod tests {
     #[ip_test]
     fn set_buffer_size<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
@@ -6768,11 +6775,11 @@ mod tests {
     #[ip_test]
     fn set_reuseaddr_unbound<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6818,11 +6825,11 @@ mod tests {
         set_reuseaddr: [bool; 2],
         expected: Result<(), LocalAddressError>,
     ) where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6852,12 +6859,12 @@ mod tests {
     #[ip_test]
     fn toggle_reuseaddr_bound_different_addrs<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::with_inner_and_outer_state(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::<_>::with_devices_state(core::iter::once::<(
                     _,
                     _,
@@ -6909,11 +6916,11 @@ mod tests {
     #[ip_test]
     fn unset_reuseaddr_bound_unspecified_specified<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6956,8 +6963,8 @@ mod tests {
     #[ip_test]
     fn reuseaddr_allows_binding_under_connection<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
@@ -7045,11 +7052,11 @@ mod tests {
     #[test_case([false, false]; "any any")]
     fn set_reuseaddr_bound_allows_other_bound<I: Ip + TcpTestIpExt>(bind_specified: [bool; 2])
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7115,11 +7122,11 @@ mod tests {
     #[ip_test]
     fn clear_reuseaddr_listener<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7238,11 +7245,11 @@ mod tests {
         icmp_error: I::ErrorCode,
     ) -> ConnectionError
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>
-            + TcpContext<I::OtherVersion, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
+            + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::new::<I>(
+            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7327,12 +7334,12 @@ mod tests {
         icmp_error: I::ErrorCode,
     ) -> ConnectionError
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
                 I,
-                TcpNonSyncCtx<FakeDeviceId>,
+                TcpBindingsCtx<FakeDeviceId>,
                 SingleStackConverter = I::SingleStackConverter,
                 DualStackConverter = I::DualStackConverter,
-            > + TcpContext<I::OtherVersion, TcpNonSyncCtx<FakeDeviceId>>,
+            > + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
         let (mut net, local, local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
@@ -7373,7 +7380,7 @@ mod tests {
                 local.get().deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
                     conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -7390,8 +7397,8 @@ mod tests {
     #[ip_test]
     fn icmp_destination_unreachable_listener<I: Ip + TcpTestIpExt + IcmpIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>
-            + TcpContext<I::OtherVersion, TcpNonSyncCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
+            + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut net = new_test_net::<I>();
 
@@ -7475,9 +7482,9 @@ mod tests {
     #[ip_test]
     fn time_wait_reuse<I: Ip + TcpTestIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,
@@ -7560,7 +7567,7 @@ mod tests {
                 weak_local.upgrade().unwrap().get().deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
                     conn, _sharing))) => {
-                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                    let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                     assert_matches!(
                         conn,
                         Connection {
@@ -7599,7 +7606,7 @@ mod tests {
         conn.get().deref(),
         TcpSocketState::Bound(BoundSocketState::Connected((
             conn, _sharing))) => {
-                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpSyncCtx<_, _>>(conn, &I::converter());
+                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(conn, &I::converter());
                 assert_matches!(
                     conn,
                 Connection {
@@ -7683,11 +7690,11 @@ mod tests {
     #[ip_test]
     fn conn_addr_not_available<I: Ip + TcpTestIpExt + IcmpIpExt>()
     where
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>:
-            TcpContext<I, TcpNonSyncCtx<FakeDeviceId>>,
-        TcpSyncCtx<FakeDeviceId, TcpNonSyncCtx<FakeDeviceId>>: TcpContext<
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
-            TcpNonSyncCtx<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
             SingleStackConverter = I::SingleStackConverter,
             DualStackConverter = I::DualStackConverter,
         >,

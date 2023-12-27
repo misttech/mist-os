@@ -529,15 +529,15 @@ mod tests {
         FakeDeviceId,
         (),
     >;
-    type FakeSyncCtxImpl = crate::context::testutil::FakeSyncCtx<
+    type FakeCoreCtxImpl = crate::context::testutil::FakeCoreCtx<
         FakeMldCtx,
         MldFrameMetadata<FakeDeviceId>,
         FakeDeviceId,
     >;
-    type FakeNonSyncCtxImpl =
-        crate::context::testutil::FakeNonSyncCtx<MldDelayedReportTimerId<FakeDeviceId>, (), ()>;
+    type FakeBindingsCtxImpl =
+        crate::context::testutil::FakeBindingsCtx<MldDelayedReportTimerId<FakeDeviceId>, (), ()>;
 
-    impl MldStateContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
             F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
@@ -552,7 +552,7 @@ mod tests {
         }
     }
 
-    impl MldContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl MldContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state_mut<
             O,
             F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
@@ -617,8 +617,8 @@ mod tests {
         });
 
     fn receive_mld_query(
-        core_ctx: &mut FakeSyncCtxImpl,
-        bindings_ctx: &mut FakeNonSyncCtxImpl,
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
         resp_time: Duration,
         group_addr: MulticastAddr<Ipv6Addr>,
     ) {
@@ -652,8 +652,8 @@ mod tests {
     }
 
     fn receive_mld_report(
-        core_ctx: &mut FakeSyncCtxImpl,
-        bindings_ctx: &mut FakeNonSyncCtxImpl,
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
         group_addr: MulticastAddr<Ipv6Addr>,
     ) {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
@@ -728,7 +728,7 @@ mod tests {
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -763,7 +763,7 @@ mod tests {
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -792,7 +792,7 @@ mod tests {
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -839,7 +839,7 @@ mod tests {
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -881,7 +881,7 @@ mod tests {
     #[test]
     fn test_mld_integration_delay_reset_timer() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+            FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
         // This seed was carefully chosen to produce a substantial duration
         // value below.
         bindings_ctx.seed_rng(123456);
@@ -923,7 +923,7 @@ mod tests {
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -970,7 +970,7 @@ mod tests {
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1006,7 +1006,7 @@ mod tests {
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
@@ -1035,7 +1035,7 @@ mod tests {
 
                 // Assert that no observable effects have taken place.
                 let assert_no_effect =
-                    |core_ctx: &FakeSyncCtxImpl, bindings_ctx: &FakeNonSyncCtxImpl| {
+                    |core_ctx: &FakeCoreCtxImpl, bindings_ctx: &FakeBindingsCtxImpl| {
                         bindings_ctx.timer_ctx().assert_no_timers_installed();
                         assert_empty(core_ctx.frames());
                     };
@@ -1069,7 +1069,7 @@ mod tests {
             };
 
             let new_ctx = || {
-                let mut ctx = FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                let mut ctx = FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
                 ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
@@ -1101,7 +1101,7 @@ mod tests {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1149,7 +1149,7 @@ mod tests {
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeSyncCtxImpl::default());
+                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
             assert_eq!(core_ctx.take_frames(), []);
 
@@ -1269,8 +1269,8 @@ mod tests {
             ip_enabled: bool,
             gmp_enabled: bool,
         }
-        let set_config = |core_ctx: &mut &crate::testutil::FakeSyncCtx,
-                          bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let set_config = |core_ctx: &mut &crate::testutil::FakeCoreCtx,
+                          bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
             let _: Ipv6DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv6_configuration(
@@ -1298,7 +1298,7 @@ mod tests {
                 )
                 .unwrap();
         };
-        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                                  specified_source: bool| {
             let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
@@ -1326,7 +1326,7 @@ mod tests {
             assert_eq!(ttl, 1);
             assert_eq!(code, IcmpUnusedCode);
         };
-        let check_sent_done = |bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let check_sent_done = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                                specified_source: bool| {
             let frames = bindings_ctx.take_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);

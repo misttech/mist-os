@@ -3249,11 +3249,11 @@ pub(crate) mod testutil {
     use crate::{
         context::{testutil::FakeInstant, RngContext},
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        testutil::{FakeNonSyncCtx, FakeSyncCtx},
+        testutil::{FakeBindingsCtx, FakeCoreCtx},
     };
 
     impl<S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
-        for crate::context::testutil::FakeSyncCtx<S, Meta, D>
+        for crate::context::testutil::FakeCoreCtx<S, Meta, D>
     where
         FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,
     {
@@ -3311,16 +3311,20 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<I: packet_formats::ip::IpExt, S, Id, Event: Debug, DeviceId, NonSyncCtxState>
+    impl<I: packet_formats::ip::IpExt, S, Id, Event: Debug, DeviceId, BindingsCtxState>
         crate::context::SendFrameContext<
-            crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            crate::context::testutil::FakeBindingsCtx<Id, Event, BindingsCtxState>,
             SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
         >
-        for crate::context::testutil::FakeSyncCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
+        for crate::context::testutil::FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
     {
         fn send_frame<SS>(
             &mut self,
-            bindings_ctx: &mut crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut crate::context::testutil::FakeBindingsCtx<
+                Id,
+                Event,
+                BindingsCtxState,
+            >,
             metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
             frame: SS,
         ) -> Result<(), SS>
@@ -3399,8 +3403,8 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn is_in_ip_multicast<A: IpAddress>(
-        core_ctx: &FakeSyncCtx,
-        device: &DeviceId<FakeNonSyncCtx>,
+        core_ctx: &FakeCoreCtx,
+        device: &DeviceId<FakeBindingsCtx>,
         addr: MulticastAddr<A>,
     ) -> bool {
         let mut core_ctx = Locked::new(core_ctx);
@@ -3444,7 +3448,7 @@ pub(crate) mod testutil {
             State: MulticastMembershipHandler<I, BC, DeviceId = D>,
             Meta,
         > MulticastMembershipHandler<I, BC>
-        for crate::context::testutil::FakeSyncCtx<State, Meta, D>
+        for crate::context::testutil::FakeCoreCtx<State, Meta, D>
     where
         Self: DeviceIdContext<AnyDevice, DeviceId = D>,
     {
@@ -3517,8 +3521,8 @@ mod tests {
         },
         state::StackState,
         testutil::{
-            assert_empty, handle_timer, new_rng, set_logger_for_test, Ctx, FakeCtx,
-            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            assert_empty, handle_timer, new_rng, set_logger_for_test, Ctx, FakeBindingsCtx,
+            FakeCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
@@ -3532,7 +3536,7 @@ mod tests {
     /// frame in `net` is an ICMP packet with code set to `code`, and pointer
     /// set to `pointer`.
     fn verify_icmp_for_unrecognized_ext_hdr_option(
-        bindings_ctx: &mut FakeNonSyncCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
         code: Icmpv6ParameterProblemCode,
         pointer: u32,
         offset: usize,
@@ -5259,7 +5263,8 @@ mod tests {
         I::get_other_ip_address(27)
     }
 
-    fn make_test_ctx<I: Ip + TestIpExt>() -> (Ctx<FakeNonSyncCtx>, Vec<DeviceId<FakeNonSyncCtx>>) {
+    fn make_test_ctx<I: Ip + TestIpExt>() -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>)
+    {
         let mut builder = FakeEventDispatcherBuilder::default();
         for device in [Device::First, Device::Second] {
             let ip: SpecifiedAddr<I::Addr> = device.ip_address();
@@ -5295,16 +5300,16 @@ mod tests {
     }
 
     fn do_route_lookup<I: Ip + TestIpExt + IpDeviceStateIpExt>(
-        core_ctx: &SyncCtx<FakeNonSyncCtx>,
-        bindings_ctx: &mut FakeNonSyncCtx,
-        device_ids: Vec<DeviceId<FakeNonSyncCtx>>,
+        core_ctx: &SyncCtx<FakeBindingsCtx>,
+        bindings_ctx: &mut FakeBindingsCtx,
+        device_ids: Vec<DeviceId<FakeBindingsCtx>>,
         egress_device: Option<Device>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         dest_ip: SpecifiedAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, Device>, ResolveRouteError>
     where
-        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
-            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+            IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let egress_device = egress_device.map(|d| &device_ids[d.index()]);
 
@@ -5393,8 +5398,8 @@ mod tests {
         dest_ip: SpecifiedAddr<I::Addr>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
-        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
-            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+            IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();
 
@@ -5449,8 +5454,8 @@ mod tests {
         egress_device: Option<Device>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
-        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
-            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+            IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();
 

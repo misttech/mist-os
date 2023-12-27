@@ -957,7 +957,7 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant},
             RngContext, SendFrameContext, TracingContext,
         },
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
@@ -1150,18 +1150,18 @@ pub(crate) mod testutil {
             Meta,
             Event: Debug,
             DeviceId: FakeStrongDeviceId,
-            NonSyncCtxState,
-        > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
-        for FakeSyncCtx<S, Meta, DeviceId>
+            BindingsCtxState,
+        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState>>
+        for FakeCoreCtx<S, Meta, DeviceId>
     where
-        FakeSyncCtx<S, Meta, DeviceId>: SendFrameContext<
-            FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+        FakeCoreCtx<S, Meta, DeviceId>: SendFrameContext<
+            FakeBindingsCtx<Id, Event, BindingsCtxState>,
             SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
         >,
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1171,7 +1171,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<SS>(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -1312,7 +1312,7 @@ pub(crate) mod testutil {
             D: FakeStrongDeviceId,
             State: TransportIpContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
             Meta,
-        > TransportIpContext<I, BC> for FakeSyncCtx<State, Meta, D>
+        > TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
         Self: IpSocketContext<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
@@ -1607,18 +1607,18 @@ pub(crate) mod testutil {
             Meta,
             Event: Debug,
             DeviceId: FakeStrongDeviceId,
-            NonSyncCtxState,
-        > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
-        for FakeSyncCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
+            BindingsCtxState,
+        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState>>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
     where
-        FakeSyncCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>: SendFrameContext<
-            FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+        FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>: SendFrameContext<
+            FakeBindingsCtx<Id, Event, BindingsCtxState>,
             SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
         >,
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1628,7 +1628,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<SS>(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -1858,16 +1858,17 @@ mod tests {
     }
 
     fn remove_all_local_addrs<I: Ip + IpLayerIpExt + IpDeviceIpExt>(
-        core_ctx: &FakeSyncCtx,
-        bindings_ctx: &mut FakeNonSyncCtx,
+        core_ctx: &FakeCoreCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
     ) where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
             DeviceIpDeviceConfigurationContext<
                 I,
-                FakeNonSyncCtx,
-                DeviceId = DeviceId<FakeNonSyncCtx>,
+                FakeBindingsCtx,
+                DeviceId = DeviceId<FakeBindingsCtx>,
             >,
-        FakeNonSyncCtx: IpDeviceBindingsContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
+        FakeBindingsCtx:
+            IpDeviceBindingsContext<I, DeviceId<FakeBindingsCtx>, Instant = FakeInstant>,
     {
         let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
             &mut Locked::new(core_ctx),
@@ -1970,16 +1971,16 @@ mod tests {
         }; "new remote to local")]
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
-            IpSocketHandler<I, FakeNonSyncCtx>
-                + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
+            IpSocketHandler<I, FakeBindingsCtx>
+                + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>
                 + DeviceIpDeviceConfigurationContext<
                     I,
-                    FakeNonSyncCtx,
-                    DeviceId = DeviceId<FakeNonSyncCtx>,
+                    FakeBindingsCtx,
+                    DeviceId = DeviceId<FakeBindingsCtx>,
                 >,
-        FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
-            + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>,
+        FakeBindingsCtx: TimerContext<I::Timer<DeviceId<FakeBindingsCtx>>>
+            + EventContext<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>,
     {
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;
@@ -2093,8 +2094,8 @@ mod tests {
         from_addr_type: AddressType,
         to_addr_type: AddressType,
     ) where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();
 
@@ -2207,10 +2208,10 @@ mod tests {
     #[ip_test]
     fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, FakeNonSyncCtx>,
-        FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+            + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
+            + IpStateContext<I, FakeBindingsCtx>,
+        FakeBindingsCtx: EventContext<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>,
     {
         // Test various edge cases of the
         // IpSocketContext::send_ip_packet` method.
@@ -2284,7 +2285,7 @@ mod tests {
             None,
         )
         .unwrap();
-        let mut check_sent_frame = |bindings_ctx: &crate::testutil::FakeNonSyncCtx| {
+        let mut check_sent_frame = |bindings_ctx: &crate::testutil::FakeBindingsCtx| {
             packet_count += 1;
             assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
             let (dev, frame) = &bindings_ctx.frames_sent()[packet_count - 1];
@@ -2350,9 +2351,9 @@ mod tests {
     #[ip_test]
     fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, FakeNonSyncCtx>,
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+            + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
+            + IpStateContext<I, FakeBindingsCtx>,
     {
         set_logger_for_test();
 
@@ -2483,10 +2484,10 @@ mod tests {
     #[test_case(false; "dont remove device")]
     fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, FakeNonSyncCtx>
-            + DeviceIpSocketHandler<I, FakeNonSyncCtx>,
+        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+            + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
+            + IpStateContext<I, FakeBindingsCtx>
+            + DeviceIpSocketHandler<I, FakeBindingsCtx>,
     {
         set_logger_for_test();
 

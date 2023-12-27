@@ -209,7 +209,7 @@ mod tests {
     use packet::Buf;
 
     use crate::{
-        context::testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx},
+        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx},
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
             queue::MAX_RX_QUEUED_LEN,
@@ -223,25 +223,25 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeRxQueueNonSyncCtxState {
+    struct FakeRxQueueBindingsCtxState {
         woken_rx_tasks: Vec<FakeLinkDeviceId>,
     }
 
-    type FakeSyncCtxImpl = FakeSyncCtx<FakeRxQueueState, (), FakeLinkDeviceId>;
-    type FakeNonSyncCtxImpl = FakeNonSyncCtx<(), (), FakeRxQueueNonSyncCtxState>;
+    type FakeCoreCtxImpl = FakeCoreCtx<FakeRxQueueState, (), FakeLinkDeviceId>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), FakeRxQueueBindingsCtxState>;
 
-    impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
+    impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state_mut().woken_rx_tasks.push(device_id.clone())
         }
     }
 
-    impl ReceiveQueueTypes<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl ReceiveQueueTypes<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type Meta = ();
         type Buffer = Buf<Vec<u8>>;
     }
 
-    impl ReceiveQueueContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl ReceiveQueueContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_receive_queue_mut<O, F: FnOnce(&mut ReceiveQueueState<(), Buf<Vec<u8>>>) -> O>(
             &mut self,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -251,10 +251,10 @@ mod tests {
         }
     }
 
-    impl ReceiveDequeFrameContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl ReceiveDequeFrameContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn handle_frame(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             (): (),
             buf: Buf<Vec<u8>>,
@@ -263,7 +263,7 @@ mod tests {
         }
     }
 
-    impl ReceiveDequeContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl ReceiveDequeContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type ReceiveQueueCtx<'a> = Self;
 
         fn with_dequed_frames_and_rx_queue_ctx<
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn queue_and_dequeue() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
 
         for _ in 0..2 {
             for i in 0..MAX_RX_QUEUED_LEN {

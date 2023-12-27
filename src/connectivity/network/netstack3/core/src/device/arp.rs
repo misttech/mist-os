@@ -648,8 +648,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork, FakeNonSyncCtx,
-                FakeSyncCtx,
+                FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeLinkResolutionNotifier,
+                FakeNetwork,
             },
             InstantContext as _, TimerHandler,
         },
@@ -709,19 +709,19 @@ mod tests {
         }
     }
 
-    type FakeNonSyncCtxImpl = FakeNonSyncCtx<
+    type FakeBindingsCtxImpl = FakeBindingsCtx<
         ArpTimerId<EthernetLinkDevice, FakeLinkDeviceId>,
         nud::Event<Mac, FakeLinkDeviceId, Ipv4, FakeInstant>,
         (),
     >;
 
-    type FakeCtxImpl = FakeSyncCtx<
+    type FakeCoreCtxImpl = FakeCoreCtx<
         FakeArpCtx,
         ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>,
         FakeDeviceId,
     >;
 
-    impl DeviceIdContext<EthernetLinkDevice> for FakeCtxImpl {
+    impl DeviceIdContext<EthernetLinkDevice> for FakeCoreCtxImpl {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -750,7 +750,7 @@ mod tests {
         }
     }
 
-    impl ArpContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl ArpContext<EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type ConfigCtx<'a> = FakeArpConfigCtx;
 
         type ArpSenderCtx<'a> = FakeArpInnerCtx;
@@ -776,7 +776,7 @@ mod tests {
 
         fn get_protocol_addr(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> Option<Ipv4Addr> {
             self.get_ref().proto_addr
@@ -784,7 +784,7 @@ mod tests {
 
         fn get_hardware_addr(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> UnicastAddr<Mac> {
             self.get_ref().hw_addr
@@ -822,10 +822,10 @@ mod tests {
         }
     }
 
-    impl ArpSenderContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeArpInnerCtx {
+    impl ArpSenderContext<EthernetLinkDevice, FakeBindingsCtxImpl> for FakeArpInnerCtx {
         fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             _dst_link_address: Mac,
             _body: S,
         ) -> Result<(), S> {
@@ -833,15 +833,15 @@ mod tests {
         }
     }
 
-    impl CounterContext<ArpCounters> for FakeCtxImpl {
+    impl CounterContext<ArpCounters> for FakeCoreCtxImpl {
         fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
             cb(&self.get_ref().counters)
         }
     }
 
     fn send_arp_packet(
-        core_ctx: &mut FakeCtxImpl,
-        bindings_ctx: &mut FakeNonSyncCtxImpl,
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
         op: ArpOp,
         sender_ipv4: Ipv4Addr,
         target_ipv4: Ipv4Addr,
@@ -881,7 +881,7 @@ mod tests {
     // Validate that we've sent `total_frames` frames in total, and that the
     // most recent one was sent to `dst` with the given ARP packet contents.
     fn validate_last_arp_packet(
-        core_ctx: &FakeCtxImpl,
+        core_ctx: &FakeCoreCtxImpl,
         total_frames: usize,
         dst: Mac,
         op: ArpOp,
@@ -902,7 +902,7 @@ mod tests {
         // sender's address information, and we do not send a response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -931,7 +931,7 @@ mod tests {
         // sender's address information, and we do not send a response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -961,7 +961,7 @@ mod tests {
         // the device layer.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(
@@ -1010,7 +1010,7 @@ mod tests {
         // address information and send an ARP response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
 
         send_arp_packet(
             &mut core_ctx,
@@ -1096,7 +1096,7 @@ mod tests {
             {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
-                    let mut ctx = FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+                    let mut ctx = FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
                     let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
                     core_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
                     core_ctx.get_mut().proto_addr = Some(*proto_addr);
@@ -1263,7 +1263,7 @@ mod tests {
         expect_solicited: bool,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(

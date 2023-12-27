@@ -2625,9 +2625,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeCtxWithSyncCtx, FakeInstant,
-                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkLinks, FakeNonSyncCtx,
-                FakeSyncCtx, FakeTimerCtxExt as _, WrappedFakeSyncCtx,
+                handle_timer_helper_with_sc_ref_mut, FakeBindingsCtx, FakeCoreCtx,
+                FakeCtxWithCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
+                FakeNetworkLinks, FakeTimerCtxExt as _, WrappedFakeCoreCtx,
             },
             InstantContext, SendFrameContext as _,
         },
@@ -2664,7 +2664,7 @@ mod tests {
         nud_config: NudUserConfig,
     }
 
-    type FakeCtxImpl<I> = WrappedFakeSyncCtx<
+    type FakeCoreCtxImpl<I> = WrappedFakeCoreCtx<
         FakeNudContext<I, FakeLinkDevice>,
         FakeConfigContext,
         FakeNudMessageMeta<I>,
@@ -2672,7 +2672,7 @@ mod tests {
     >;
 
     type FakeInnerCtxImpl<I> =
-        FakeSyncCtx<FakeConfigContext, FakeNudMessageMeta<I>, FakeLinkDeviceId>;
+        FakeCoreCtx<FakeConfigContext, FakeNudMessageMeta<I>, FakeLinkDeviceId>;
 
     #[derive(Debug, PartialEq, Eq)]
     enum FakeNudMessageMeta<I: Ip> {
@@ -2685,13 +2685,13 @@ mod tests {
         },
     }
 
-    type FakeNonSyncCtxImpl<I> = FakeNonSyncCtx<
+    type FakeBindingsCtxImpl<I> = FakeBindingsCtx<
         NudTimerId<I, FakeLinkDevice, FakeLinkDeviceId>,
         Event<FakeLinkAddress, FakeLinkDeviceId, I, FakeInstant>,
         (),
     >;
 
-    impl<I: Ip> FakeCtxImpl<I> {
+    impl<I: Ip> FakeCoreCtxImpl<I> {
         fn new() -> Self {
             Self::with_inner_and_outer_state(
                 FakeConfigContext {
@@ -2709,7 +2709,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip> DeviceIdContext<FakeLinkDevice> for FakeCtxImpl<I> {
+    impl<I: Ip> DeviceIdContext<FakeLinkDevice> for FakeCoreCtxImpl<I> {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
 
@@ -2726,7 +2726,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip> NudContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeCtxImpl<I> {
+    impl<I: Ip> NudContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
         type ConfigCtx<'a> = FakeConfigContext;
 
         type SenderCtx<'a> = FakeInnerCtxImpl<I>;
@@ -2772,7 +2772,7 @@ mod tests {
 
         fn send_neighbor_solicitation(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+            bindings_ctx: &mut FakeBindingsCtxImpl<I>,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             lookup_addr: SpecifiedAddr<I::Addr>,
             remote_link_addr: Option<FakeLinkAddress>,
@@ -2797,10 +2797,10 @@ mod tests {
         }
     }
 
-    impl<I: Ip> NudSenderContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeInnerCtxImpl<I> {
+    impl<I: Ip> NudSenderContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>> for FakeInnerCtxImpl<I> {
         fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+            bindings_ctx: &mut FakeBindingsCtxImpl<I>,
             dst_link_address: FakeLinkAddress,
             body: S,
         ) -> Result<(), S>
@@ -2827,8 +2827,8 @@ mod tests {
 
     #[track_caller]
     fn check_lookup_has<I: Ip>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         lookup_addr: SpecifiedAddr<I::Addr>,
         expected_link_addr: FakeLinkAddress,
     ) {
@@ -2933,8 +2933,8 @@ mod tests {
     const LINK_ADDR3: FakeLinkAddress = FakeLinkAddress([3]);
 
     fn queue_ip_packet_to_unresolved_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
         pending_frames: &mut VecDeque<Buf<Vec<u8>>>,
         body: u8,
@@ -2975,8 +2975,8 @@ mod tests {
     }
 
     fn init_incomplete_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         take_probe: bool,
     ) -> VecDeque<Buf<Vec<u8>>> {
@@ -2996,16 +2996,16 @@ mod tests {
     }
 
     fn init_incomplete_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         take_probe: bool,
     ) -> VecDeque<Buf<Vec<u8>>> {
         init_incomplete_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, take_probe)
     }
 
     fn init_stale_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
@@ -3027,16 +3027,16 @@ mod tests {
     }
 
     fn init_stale_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
         init_stale_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_reachable_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
@@ -3067,16 +3067,16 @@ mod tests {
     }
 
     fn init_reachable_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
         init_reachable_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_delay_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
@@ -3105,16 +3105,16 @@ mod tests {
     }
 
     fn init_delay_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
         init_delay_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
     fn init_probe_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
         take_probe: bool,
@@ -3144,8 +3144,8 @@ mod tests {
     }
 
     fn init_probe_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
         take_probe: bool,
     ) {
@@ -3159,8 +3159,8 @@ mod tests {
     }
 
     fn init_unreachable_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
     ) {
@@ -3194,8 +3194,8 @@ mod tests {
     }
 
     fn init_unreachable_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
     ) {
         init_unreachable_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
@@ -3212,8 +3212,8 @@ mod tests {
     }
 
     fn init_neighbor_in_state<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         state: InitialState,
     ) -> DynamicNeighborState<FakeLinkDevice, FakeInstant, FakeLinkResolutionNotifier<FakeLinkDevice>>
     {
@@ -3245,8 +3245,8 @@ mod tests {
 
     #[track_caller]
     fn init_static_neighbor_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: FakeLinkAddress,
         expected_event: ExpectedEvent,
@@ -3274,8 +3274,8 @@ mod tests {
 
     #[track_caller]
     fn init_static_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
         expected_event: ExpectedEvent,
     ) {
@@ -3290,8 +3290,8 @@ mod tests {
 
     #[track_caller]
     fn delete_neighbor<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
     ) {
         NudHandler::delete_neighbor(core_ctx, bindings_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1)
             .expect("neighbor entry should exist");
@@ -3303,8 +3303,8 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_state<I: Ip + TestIpExt>(
-        core_ctx: &FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         state: DynamicNeighborState<
             FakeLinkDevice,
             FakeInstant,
@@ -3323,8 +3323,8 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_state_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
         state: DynamicNeighborState<
             FakeLinkDevice,
@@ -3355,7 +3355,7 @@ mod tests {
 
     #[track_caller]
     fn assert_pending_frame_sent<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
         pending_frames: VecDeque<Buf<Vec<u8>>>,
         link_address: FakeLinkAddress,
     ) {
@@ -3373,7 +3373,7 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_probe_sent_for_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: Option<FakeLinkAddress>,
     ) {
@@ -3391,7 +3391,7 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_probe_sent<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
         link_address: Option<FakeLinkAddress>,
     ) {
         assert_neighbor_probe_sent_for_ip(core_ctx, I::LOOKUP_ADDR1, link_address);
@@ -3399,8 +3399,8 @@ mod tests {
 
     #[track_caller]
     fn assert_neighbor_removed_with_ip<I: Ip + TestIpExt>(
-        core_ctx: &mut FakeCtxImpl<I>,
-        bindings_ctx: &mut FakeNonSyncCtxImpl<I>,
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
     ) {
         super::testutil::assert_neighbor_unknown(core_ctx, FakeLinkDeviceId, neighbor);
@@ -3412,8 +3412,8 @@ mod tests {
 
     #[ip_test]
     fn incomplete_to_stale_on_probe<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in INCOMPLETE.
         let queued_frame = init_incomplete_neighbor(&mut core_ctx, &mut bindings_ctx, true);
@@ -3444,8 +3444,8 @@ mod tests {
     #[test_case(false, true; "unsolicited override")]
     #[test_case(false, false; "unsolicited non-override")]
     fn incomplete_on_confirmation<I: Ip + TestIpExt>(solicited_flag: bool, override_flag: bool) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in INCOMPLETE.
         let queued_frame = init_incomplete_neighbor(&mut core_ctx, &mut bindings_ctx, true);
@@ -3482,8 +3482,8 @@ mod tests {
 
     #[ip_test]
     fn reachable_to_stale_on_timeout<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3519,8 +3519,8 @@ mod tests {
         initial_state: InitialState,
         update_link_address: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let initial_state = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3568,8 +3568,8 @@ mod tests {
         initial_state: InitialState,
         override_flag: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3611,8 +3611,8 @@ mod tests {
     >(
         initial_state: InitialState,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3654,8 +3654,8 @@ mod tests {
         initial_state: InitialState,
         override_flag: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let expected_state =
@@ -3689,8 +3689,8 @@ mod tests {
     >(
         initial_state: InitialState,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3723,8 +3723,8 @@ mod tests {
 
     #[ip_test]
     fn reachable_to_reachable_on_probe_with_same_address<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3758,8 +3758,8 @@ mod tests {
     fn reachable_to_stale_on_non_override_confirmation_with_different_address<I: Ip + TestIpExt>(
         solicited_flag: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3800,8 +3800,8 @@ mod tests {
         initial_state: InitialState,
         solicited_flag: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let initial_state = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3826,8 +3826,8 @@ mod tests {
 
     #[ip_test]
     fn stale_to_delay_on_packet_sent<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor in STALE.
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3874,8 +3874,8 @@ mod tests {
         initial_state: InitialState,
         expected_initial_event: NudEvent,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3922,8 +3922,8 @@ mod tests {
 
     #[ip_test]
     fn unreachable_probes_with_exponential_backoff_while_packets_sent<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         init_unreachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
 
@@ -3970,7 +3970,7 @@ mod tests {
             ]
         );
 
-        let next_backoff_timer = |core_ctx: &mut FakeCtxImpl<I>, probes_sent| {
+        let next_backoff_timer = |core_ctx: &mut FakeCoreCtxImpl<I>, probes_sent| {
             UnreachableMode::Backoff {
                 probes_sent: NonZeroU32::new(probes_sent).unwrap(),
                 packet_sent: /* unused */ false,
@@ -4066,8 +4066,8 @@ mod tests {
     #[test_case(true; "solicited confirmation")]
     #[test_case(false; "unsolicited confirmation")]
     fn confirmation_should_not_create_entry<I: Ip + TestIpExt>(solicited_flag: bool) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         let link_addr = FakeLinkAddress([1]);
         NudHandler::handle_neighbor_update(
@@ -4088,8 +4088,8 @@ mod tests {
     #[test_case(true; "set_with_dynamic")]
     #[test_case(false; "set_with_static")]
     fn pending_frames<I: Ip + TestIpExt>(dynamic: bool) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         // Send up to the maximum number of pending frames to some neighbor
@@ -4200,8 +4200,8 @@ mod tests {
 
     #[ip_test]
     fn static_neighbor<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         init_static_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, ExpectedEvent::Added);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -4227,8 +4227,8 @@ mod tests {
 
     #[ip_test]
     fn dynamic_neighbor<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -4267,8 +4267,8 @@ mod tests {
 
     #[ip_test]
     fn send_solicitation_on_lookup<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4332,8 +4332,8 @@ mod tests {
 
     #[ip_test]
     fn solicitation_failure_in_incomplete<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4383,8 +4383,8 @@ mod tests {
 
     #[ip_test]
     fn solicitation_failure_in_probe<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4437,8 +4437,8 @@ mod tests {
 
     #[ip_test]
     fn flush_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4499,8 +4499,8 @@ mod tests {
 
     #[ip_test]
     fn delete_dynamic_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4545,8 +4545,8 @@ mod tests {
     #[test_case(InitialState::Probe; "probe neighbor")]
     #[test_case(InitialState::Unreachable; "unreachable neighbor")]
     fn resolve_cached_linked_addr<I: Ip + TestIpExt>(initial_state: InitialState) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4584,8 +4584,8 @@ mod tests {
     #[test_case(ResolutionSuccess::Confirmation; "incomplete entry timed out")]
     #[test_case(ResolutionSuccess::StaticEntryAdded; "incomplete entry removed from table")]
     fn dynamic_neighbor_resolution_success<I: Ip + TestIpExt>(reason: ResolutionSuccess) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         let observers = (0..10)
             .map(|_| {
@@ -4675,8 +4675,8 @@ mod tests {
     #[test_case(ResolutionFailure::Timeout; "incomplete entry timed out")]
     #[test_case(ResolutionFailure::Removed; "incomplete entry removed from table")]
     fn dynamic_neighbor_resolution_failure<I: Ip + TestIpExt>(reason: ResolutionFailure) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         let observers = (0..10)
             .map(|_| {
@@ -4758,8 +4758,8 @@ mod tests {
         initial_state: InitialState,
         should_transition_to_reachable: bool,
     ) {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         let initial = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
 
@@ -4866,8 +4866,8 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_retains_static_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Add `MAX_ENTRIES` STALE dynamic neighbors and `MAX_ENTRIES` static
         // neighbors to the neighbor table, interleaved to avoid accidental
@@ -4914,8 +4914,8 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_retains_in_use_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Add enough static entries that the NUD table is near maximum capacity.
         for i in 0..MAX_ENTRIES - 1 {
@@ -4956,8 +4956,8 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_triggered_on_new_stale_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.outer.nud.last_gc = Some(bindings_ctx.now());
 
@@ -5004,8 +5004,8 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_triggered_on_transition_to_unreachable<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.outer.nud.last_gc = Some(bindings_ctx.now());
 
@@ -5052,8 +5052,8 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_not_triggered_on_new_incomplete_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithSyncCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtxWithCoreCtx::with_sync_ctx(FakeCoreCtxImpl::<I>::new());
 
         // Fill the neighbor table to maximum capacity with static entries.
         for i in 0..MAX_ENTRIES {
@@ -5465,21 +5465,21 @@ mod tests {
 
     type FakeNudNetwork<L> = FakeNetwork<
         &'static str,
-        EthernetDeviceId<testutil::FakeNonSyncCtx>,
-        testutil::Ctx<testutil::FakeNonSyncCtx>,
+        EthernetDeviceId<testutil::FakeBindingsCtx>,
+        testutil::Ctx<testutil::FakeBindingsCtx>,
         L,
     >;
 
     fn new_test_net<I: Ip + testutil::TestIpExt>() -> (
         FakeNudNetwork<
             impl FakeNetworkLinks<
-                EthernetWeakDeviceId<testutil::FakeNonSyncCtx>,
-                EthernetDeviceId<testutil::FakeNonSyncCtx>,
+                EthernetWeakDeviceId<testutil::FakeBindingsCtx>,
+                EthernetDeviceId<testutil::FakeBindingsCtx>,
                 &'static str,
             >,
         >,
-        EthernetDeviceId<testutil::FakeNonSyncCtx>,
-        EthernetDeviceId<testutil::FakeNonSyncCtx>,
+        EthernetDeviceId<testutil::FakeBindingsCtx>,
+        EthernetDeviceId<testutil::FakeBindingsCtx>,
     ) {
         let build_ctx = |config: FakeEventDispatcherConfig<I::Addr>| {
             let mut builder = testutil::FakeEventDispatcherBuilder::default();
@@ -5505,15 +5505,18 @@ mod tests {
     fn bind_and_connect_sockets<
         I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
         L: FakeNetworkLinks<
-            EthernetWeakDeviceId<testutil::FakeNonSyncCtx>,
-            EthernetDeviceId<testutil::FakeNonSyncCtx>,
+            EthernetWeakDeviceId<testutil::FakeBindingsCtx>,
+            EthernetDeviceId<testutil::FakeBindingsCtx>,
             &'static str,
         >,
     >(
         net: &mut FakeNudNetwork<L>,
         local_buffers: tcp::buffer::testutil::ProvidedBuffers,
-    ) -> tcp::socket::TcpSocketId<I, WeakDeviceId<testutil::FakeNonSyncCtx>, testutil::FakeNonSyncCtx>
-    {
+    ) -> tcp::socket::TcpSocketId<
+        I,
+        WeakDeviceId<testutil::FakeBindingsCtx>,
+        testutil::FakeBindingsCtx,
+    > {
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
         net.with_context("remote", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
@@ -5552,13 +5555,13 @@ mod tests {
         I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
     >()
     where
-        for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
+        for<'a> Locked<&'a SyncCtx<testutil::FakeBindingsCtx>, lock_order::Unlocked>:
             DeviceIdContext<
                     EthernetLinkDevice,
-                    DeviceId = EthernetDeviceId<testutil::FakeNonSyncCtx>,
-                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
-        testutil::FakeNonSyncCtx: TimerContext<
-            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeNonSyncCtx>>,
+                    DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
+                > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+        testutil::FakeBindingsCtx: TimerContext<
+            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
@@ -5635,13 +5638,13 @@ mod tests {
     #[ip_test]
     fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt>()
     where
-        for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
+        for<'a> Locked<&'a SyncCtx<testutil::FakeBindingsCtx>, lock_order::Unlocked>:
             DeviceIdContext<
                     EthernetLinkDevice,
-                    DeviceId = EthernetDeviceId<testutil::FakeNonSyncCtx>,
-                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
-        testutil::FakeNonSyncCtx: TimerContext<
-            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeNonSyncCtx>>,
+                    DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
+                > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+        testutil::FakeBindingsCtx: TimerContext<
+            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();

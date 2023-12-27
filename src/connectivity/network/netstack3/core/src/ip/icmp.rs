@@ -4095,7 +4095,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{
-            FakeCtxWithSyncCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
+            FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, Wrapped,
         },
         context::CounterContext,
         device::{
@@ -4128,7 +4128,7 @@ mod tests {
 
     /// The FakeSyncCtx held as the inner state of the [`WrappedFakeSyncCtx`] that
     /// is [`FakeSyncCtx`].
-    type FakeBufferSyncCtx = FakeSyncCtx<
+    type FakeBufferCoreCtx = FakeCoreCtx<
         FakeDualStackIpSocketCtx<FakeDeviceId>,
         DualStackSendIpPacketMeta<FakeDeviceId>,
         FakeDeviceId,
@@ -4137,7 +4137,7 @@ mod tests {
     impl<Inner, I: Ip, D> CounterContext<IpCounters<I>>
         for Wrapped<
             Inner,
-            FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4146,7 +4146,7 @@ mod tests {
     }
 
     impl<I: Ip, D> CounterContext<IcmpTxCounters<I>>
-        for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_ref().icmp_tx_counters::<I>())
@@ -4156,7 +4156,7 @@ mod tests {
     impl<Inner, I: Ip, D> CounterContext<IcmpTxCounters<I>>
         for Wrapped<
             Inner,
-            FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4165,7 +4165,7 @@ mod tests {
     }
 
     impl<I: Ip, D> CounterContext<IcmpRxCounters<I>>
-        for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_ref().icmp_rx_counters::<I>())
@@ -4175,7 +4175,7 @@ mod tests {
     impl<Inner, I: Ip, D> CounterContext<IcmpRxCounters<I>>
         for Wrapped<
             Inner,
-            FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4184,7 +4184,7 @@ mod tests {
     }
 
     impl<D> CounterContext<NdpCounters>
-        for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
             cb(&self.get_ref().ndp_counters)
@@ -4194,7 +4194,7 @@ mod tests {
     impl<Inner, D> CounterContext<NdpCounters>
         for Wrapped<
             Inner,
-            FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
@@ -4203,26 +4203,26 @@ mod tests {
     }
 
     /// `FakeSyncCtx` specialized for ICMP.
-    type FakeIcmpSyncCtx<I> =
-        Wrapped<SocketsState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerSyncCtx<I>>;
+    type FakeIcmpCoreCtx<I> =
+        Wrapped<SocketsState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerCoreCtx<I>>;
 
-    type FakeIcmpInnerSyncCtx<I> =
-        Wrapped<FakeIcmpInnerSyncCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferSyncCtx>;
+    type FakeIcmpInnerCoreCtx<I> =
+        Wrapped<FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
 
     /// `FakeNonSyncCtx` specialized for ICMP.
-    type FakeIcmpNonSyncCtx<I> = FakeNonSyncCtx<(), (), FakeIcmpNonSyncCtxState<I>>;
+    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>>;
 
     type FakeIcmpCtx<I> =
-        FakeCtxWithSyncCtx<FakeIcmpSyncCtx<I>, (), (), FakeIcmpNonSyncCtxState<I>>;
+        FakeCtxWithCoreCtx<FakeIcmpCoreCtx<I>, (), (), FakeIcmpBindingsCtxState<I>>;
 
-    struct FakeIcmpInnerSyncCtxState<I: IpExt, W: WeakId> {
+    struct FakeIcmpInnerCoreCtxState<I: IpExt, W: WeakId> {
         bound_socket_map_and_allocator: BoundSockets<I, W>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
         pmtu_state: FakePmtuState<I::Addr>,
     }
 
-    impl<I: IpExt, W: WeakId> FakeIcmpInnerSyncCtxState<I, W> {
+    impl<I: IpExt, W: WeakId> FakeIcmpInnerCoreCtxState<I, W> {
         fn with_errors_per_second(errors_per_second: u64) -> Self {
             Self {
                 bound_socket_map_and_allocator: Default::default(),
@@ -4233,7 +4233,7 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt> Default for FakeIcmpInnerSyncCtx<I> {
+    impl<I: TestIpExt> Default for FakeIcmpInnerCoreCtx<I> {
         fn default() -> Self {
             Wrapped::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
@@ -4241,24 +4241,24 @@ mod tests {
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![I::FAKE_CONFIG.remote_ip],
                 })),
-                FakeIcmpInnerSyncCtxState::with_errors_per_second(DEFAULT_ERRORS_PER_SECOND),
+                FakeIcmpInnerCoreCtxState::with_errors_per_second(DEFAULT_ERRORS_PER_SECOND),
             )
         }
     }
 
-    impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpInnerSyncCtx<I> {}
-    impl IcmpStateContext for FakeBufferSyncCtx {}
-    impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpSyncCtx<I> {}
-    impl IcmpStateContext for SyncCtx<crate::testutil::FakeNonSyncCtx> {}
+    impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpInnerCoreCtx<I> {}
+    impl IcmpStateContext for FakeBufferCoreCtx {}
+    impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpCoreCtx<I> {}
+    impl IcmpStateContext for SyncCtx<crate::testutil::FakeBindingsCtx> {}
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpNonSyncCtx<I>>
-        for FakeIcmpInnerSyncCtx<I>
+    impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>>
+        for FakeIcmpInnerCoreCtx<I>
     {
         type DualStackContext = datagram::UninstantiableContext<I, Icmp, Self>;
-        type IpSocketsCtx<'a> = FakeBufferSyncCtx;
+        type IpSocketsCtx<'a> = FakeBufferCoreCtx;
         fn receive_icmp_error(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<I>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             _device: &Self::DeviceId,
             original_src_ip: Option<SpecifiedAddr<I::Addr>>,
             original_dst_ip: SpecifiedAddr<I::Addr>,
@@ -4310,10 +4310,10 @@ mod tests {
         }
     }
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt> StateContext<I, FakeIcmpNonSyncCtx<I>>
-        for FakeIcmpSyncCtx<I>
+    impl<I: datagram::IpExt + IpDeviceStateIpExt> StateContext<I, FakeIcmpBindingsCtx<I>>
+        for FakeIcmpCoreCtx<I>
     {
-        type SocketStateCtx<'a> = FakeIcmpInnerSyncCtx<I>;
+        type SocketStateCtx<'a> = FakeIcmpInnerCoreCtx<I>;
 
         fn with_sockets_state<
             O,
@@ -4345,7 +4345,7 @@ mod tests {
         }
     }
 
-    impl<I: IcmpIpExt, D> IcmpEchoBindingsContext<I, D> for FakeIcmpNonSyncCtx<I> {
+    impl<I: IcmpIpExt, D> IcmpEchoBindingsContext<I, D> for FakeIcmpBindingsCtx<I> {
         fn receive_icmp_echo_reply<B: BufferMut>(
             &mut self,
             conn: SocketId<I>,
@@ -5156,29 +5156,29 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeIcmpNonSyncCtxState<I: IcmpIpExt> {
+    struct FakeIcmpBindingsCtxState<I: IcmpIpExt> {
         receive_icmp_echo_reply: Vec<ReceiveIcmpEchoReply<I>>,
     }
 
-    impl InnerIcmpv4Context<FakeIcmpNonSyncCtx<Ipv4>> for FakeIcmpInnerSyncCtx<Ipv4> {
+    impl InnerIcmpv4Context<FakeIcmpBindingsCtx<Ipv4>> for FakeIcmpInnerCoreCtx<Ipv4> {
         fn should_send_timestamp_reply(&self) -> bool {
             false
         }
     }
-    impl<I: datagram::IpExt> AsMut<FakePmtuState<I::Addr>> for FakeIcmpInnerSyncCtx<I> {
+    impl<I: datagram::IpExt> AsMut<FakePmtuState<I::Addr>> for FakeIcmpInnerCoreCtx<I> {
         fn as_mut(&mut self) -> &mut FakePmtuState<I::Addr> {
             &mut self.outer.pmtu_state
         }
     }
-    impl_pmtu_handler!(FakeIcmpInnerSyncCtx<Ipv4>, FakeIcmpNonSyncCtx<Ipv4>, Ipv4);
-    impl_pmtu_handler!(FakeIcmpInnerSyncCtx<Ipv6>, FakeIcmpNonSyncCtx<Ipv6>, Ipv6);
+    impl_pmtu_handler!(FakeIcmpInnerCoreCtx<Ipv4>, FakeIcmpBindingsCtx<Ipv4>, Ipv4);
+    impl_pmtu_handler!(FakeIcmpInnerCoreCtx<Ipv6>, FakeIcmpBindingsCtx<Ipv6>, Ipv6);
 
     impl<I: datagram::IpExt + IpDeviceStateIpExt>
-        crate::ip::socket::IpSocketContext<I, FakeIcmpNonSyncCtx<I>> for FakeIcmpInnerSyncCtx<I>
+        crate::ip::socket::IpSocketContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpInnerCoreCtx<I>
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut FakeIcmpNonSyncCtx<I>,
+            bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             device: Option<&FakeDeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -5189,7 +5189,7 @@ mod tests {
 
         fn send_ip_packet<S>(
             &mut self,
-            bindings_ctx: &mut FakeIcmpNonSyncCtx<I>,
+            bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             meta: SendIpPacketMeta<I, &FakeDeviceId, SpecifiedAddr<I::Addr>>,
             body: S,
         ) -> Result<(), S>
@@ -5206,7 +5206,7 @@ mod tests {
         }
     }
 
-    impl IpDeviceHandler<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+    impl IpDeviceHandler<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
         fn is_router_device(&mut self, _device_id: &Self::DeviceId) -> bool {
             unimplemented!()
         }
@@ -5216,7 +5216,7 @@ mod tests {
         }
     }
 
-    impl IpDeviceStateContext<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+    impl IpDeviceStateContext<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
         fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
             cb(&())
         }
@@ -5242,7 +5242,7 @@ mod tests {
         }
     }
 
-    impl Ipv6DeviceHandler<FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+    impl Ipv6DeviceHandler<FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
         type LinkLayerAddr = [u8; 0];
 
         fn get_link_layer_addr_bytes(&mut self, _device_id: &Self::DeviceId) -> Option<[u8; 0]> {
@@ -5251,7 +5251,7 @@ mod tests {
 
         fn set_discovered_retrans_timer(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _retrans_timer: NonZeroDuration,
         ) {
@@ -5260,7 +5260,7 @@ mod tests {
 
         fn remove_duplicate_tentative_address(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _addr: UnicastAddr<Ipv6Addr>,
         ) -> IpAddressState {
@@ -5273,7 +5273,7 @@ mod tests {
 
         fn update_discovered_ipv6_route(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _route: Ipv6DiscoveredRoute,
             _lifetime: Option<NonZeroNdpLifetime>,
@@ -5283,7 +5283,7 @@ mod tests {
 
         fn apply_slaac_update(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _subnet: Subnet<Ipv6Addr>,
             _preferred_lifetime: Option<NonZeroNdpLifetime>,
@@ -5294,7 +5294,7 @@ mod tests {
 
         fn receive_mld_packet<B: ByteSlice>(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device: &FakeDeviceId,
             _src_ip: Ipv6SourceAddr,
             _dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -5304,10 +5304,10 @@ mod tests {
         }
     }
 
-    impl IpLayerHandler<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+    impl IpLayerHandler<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
         fn send_ip_packet_from_device<S>(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _meta: SendIpPacketMeta<Ipv6, &Self::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
             _body: S,
         ) -> Result<(), S> {
@@ -5315,10 +5315,10 @@ mod tests {
         }
     }
 
-    impl NudIpHandler<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+    impl NudIpHandler<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
         fn handle_neighbor_probe(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _link_addr: &[u8],
@@ -5328,7 +5328,7 @@ mod tests {
 
         fn handle_neighbor_confirmation(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _link_addr: &[u8],
@@ -5339,7 +5339,7 @@ mod tests {
 
         fn flush_neighbor_table(
             &mut self,
-            _bindings_ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
         ) {
             unimplemented!()
@@ -5383,7 +5383,7 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx: FakeIcmpCtx<Ipv4> = FakeIcmpCtx::default();
-            let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
 
             let conn = SocketHandler::<Ipv4, _>::create(core_ctx);
             // NOTE: This assertion is not a correctness requirement. It's just
@@ -5479,7 +5479,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -5496,7 +5496,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5511,7 +5511,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -5545,7 +5545,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -5562,7 +5562,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5577,7 +5577,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -5609,7 +5609,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -5626,7 +5626,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5641,7 +5641,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -5685,7 +5685,7 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-            let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
             let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
             // NOTE: This assertion is not a correctness requirement. It's just
             // that the rest of this test assumes that the new connection has ID
@@ -5787,7 +5787,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5802,7 +5802,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5817,7 +5817,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -5851,7 +5851,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5866,7 +5866,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5881,7 +5881,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -5913,7 +5913,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5928,7 +5928,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.inner.outer.receive_icmp_error, [err]);
             },
@@ -5943,7 +5943,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithSyncCtx { core_ctx, bindings_ctx: _ }| {
+            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -5958,7 +5958,7 @@ mod tests {
 
         /// Call `send_icmpv4_ttl_expired` with fake values.
         fn send_icmpv4_ttl_expired_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_ttl_expired(
                 &mut core_ctx.inner,
@@ -5976,7 +5976,7 @@ mod tests {
 
         /// Call `send_icmpv4_parameter_problem` with fake values.
         fn send_icmpv4_parameter_problem_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_parameter_problem(
                 &mut core_ctx.inner,
@@ -5995,7 +5995,7 @@ mod tests {
 
         /// Call `send_icmpv4_dest_unreachable` with fake values.
         fn send_icmpv4_dest_unreachable_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_dest_unreachable(
                 &mut core_ctx.inner,
@@ -6013,7 +6013,7 @@ mod tests {
 
         /// Call `send_icmpv6_ttl_expired` with fake values.
         fn send_icmpv6_ttl_expired_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_ttl_expired(
                 &mut core_ctx.inner,
@@ -6030,7 +6030,7 @@ mod tests {
 
         /// Call `send_icmpv6_packet_too_big` with fake values.
         fn send_icmpv6_packet_too_big_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_packet_too_big(
                 &mut core_ctx.inner,
@@ -6048,7 +6048,7 @@ mod tests {
 
         /// Call `send_icmpv6_parameter_problem` with fake values.
         fn send_icmpv6_parameter_problem_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_parameter_problem(
                 &mut core_ctx.inner,
@@ -6066,7 +6066,7 @@ mod tests {
 
         /// Call `send_icmpv6_dest_unreachable` with fake values.
         fn send_icmpv6_dest_unreachable_helper(
-            FakeCtxWithSyncCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_dest_unreachable(
                 &mut core_ctx.inner,
@@ -6141,10 +6141,10 @@ mod tests {
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {
-            FakeCtxWithSyncCtx::with_sync_ctx(Wrapped {
+            FakeCtxWithCoreCtx::with_sync_ctx(Wrapped {
                 outer: Default::default(),
                 inner: Wrapped {
-                    outer: FakeIcmpInnerSyncCtxState::with_errors_per_second(errors_per_second),
+                    outer: FakeIcmpInnerCoreCtxState::with_errors_per_second(errors_per_second),
                     inner: Default::default(),
                 },
             })
@@ -6154,10 +6154,10 @@ mod tests {
         run_test::<Ipv4, _, _>(with_errors_per_second_v4, send_icmpv4_dest_unreachable_helper);
 
         fn with_errors_per_second_v6(errors_per_second: u64) -> FakeIcmpCtx<Ipv6> {
-            FakeCtxWithSyncCtx::with_sync_ctx(Wrapped {
+            FakeCtxWithCoreCtx::with_sync_ctx(Wrapped {
                 outer: Default::default(),
                 inner: Wrapped {
-                    outer: FakeIcmpInnerSyncCtxState::with_errors_per_second(errors_per_second),
+                    outer: FakeIcmpInnerCoreCtxState::with_errors_per_second(errors_per_second),
                     inner: Default::default(),
                 },
             })
@@ -6174,7 +6174,7 @@ mod tests {
         // Verify that connecting to an ipv4-mapped-ipv6 address fails, as ICMP
         // sockets do not support dual-stack operations.
         let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
         let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
         assert_eq!(
             SocketHandler::<Ipv6, _>::connect(
@@ -6193,7 +6193,7 @@ mod tests {
     #[ip_test]
     fn send_invalid_icmp_echo<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
         let conn = SocketHandler::<I, _>::create(core_ctx);
         SocketHandler::<I, _>::connect(
             core_ctx,
@@ -6225,7 +6225,7 @@ mod tests {
     #[ip_test]
     fn get_info<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithSyncCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
         const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
 
         let id = SocketHandler::<I, _>::create(core_ctx);

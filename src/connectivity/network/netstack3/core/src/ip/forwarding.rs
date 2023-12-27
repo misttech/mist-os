@@ -443,7 +443,7 @@ mod testutil_testonly {
     use super::*;
 
     use crate::{
-        context::testutil::FakeSyncCtx,
+        context::testutil::FakeCoreCtx,
         device::StrongId,
         ip::{testutil::FakeIpDeviceIdCtx, types::Metric},
     };
@@ -498,7 +498,7 @@ mod testutil_testonly {
         }
     }
 
-    pub(crate) type FakeIpForwardingCtx<D> = FakeSyncCtx<FakeIpForwardingContext<D>, (), D>;
+    pub(crate) type FakeIpForwardingCtx<D> = FakeCoreCtx<FakeIpForwardingContext<D>, (), D>;
 
     impl<I: Ip, D: StrongId> IpForwardingDeviceContext<I> for FakeIpForwardingCtx<D>
     where

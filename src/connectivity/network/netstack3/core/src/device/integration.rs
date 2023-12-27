@@ -24,7 +24,7 @@ use crate::{
     context::{CounterContext, RecvFrameContext, SendFrameContext},
     device::{
         ethernet::{
-            self, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, SyncCtxWithDeviceId,
+            self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
         loopback::{self, LoopbackDevice, LoopbackDeviceId},
         queue::tx::TransmitQueueHandler,
@@ -37,7 +37,7 @@ use crate::{
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
-        integration::SyncCtxWithIpDeviceConfiguration,
+        integration::CoreCtxWithIpDeviceConfiguration,
         nud::{ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
         state::{
             AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
@@ -163,13 +163,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     IpDeviceConfigurationContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, BC>;
-    type WithIpDeviceConfigurationInnerCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+    type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv4DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
         BC,
     >;
-    type WithIpDeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+    type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv4DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
@@ -190,7 +190,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             let state = state.read_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>();
             cb(
                 &state,
-                SyncCtxWithIpDeviceConfiguration {
+                CoreCtxWithIpDeviceConfiguration {
                     config: &state,
                     core_ctx: core_ctx
                         .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>(),
@@ -209,7 +209,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     ) -> O {
         with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>();
-            cb(SyncCtxWithIpDeviceConfiguration {
+            cb(CoreCtxWithIpDeviceConfiguration {
                 config: &mut state,
                 core_ctx: core_ctx
                     .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>(),
@@ -404,13 +404,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
     Ipv6DeviceConfigurationContext<BC> for Locked<&SyncCtx<BC>, L>
 {
-    type Ipv6DeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+    type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
         BC,
     >;
-    type WithIpv6DeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+    type WithIpv6DeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
@@ -446,13 +446,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     IpDeviceConfigurationContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, BC>;
-    type WithIpDeviceConfigurationInnerCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+    type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
         BC,
     >;
-    type WithIpDeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+    type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
         crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
@@ -473,7 +473,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             let state = state.read_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
             cb(
                 &state,
-                SyncCtxWithIpDeviceConfiguration {
+                CoreCtxWithIpDeviceConfiguration {
                     config: &state,
                     core_ctx: core_ctx
                         .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>(),
@@ -492,7 +492,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     ) -> O {
         with_ip_device_state_and_sync_ctx(self, device_id, |mut state, core_ctx| {
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
-            cb(SyncCtxWithIpDeviceConfiguration {
+            cb(CoreCtxWithIpDeviceConfiguration {
                 config: &mut state,
                 core_ctx: core_ctx
                     .cast_locked::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>(),
@@ -778,7 +778,7 @@ impl<BC: BindingsContext, L> DeviceIdContext<EthernetLinkDevice> for Locked<&Syn
 }
 
 impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>>
-    DeviceIdContext<EthernetLinkDevice> for SyncCtxWithDeviceId<'a, CC>
+    DeviceIdContext<EthernetLinkDevice> for CoreCtxWithDeviceId<'a, CC>
 {
     type DeviceId = CC::DeviceId;
     type WeakDeviceId = CC::WeakDeviceId;

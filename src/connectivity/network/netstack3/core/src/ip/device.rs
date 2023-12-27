@@ -2198,7 +2198,7 @@ pub(crate) mod testutil {
             testutil::{update_ipv4_configuration, update_ipv6_configuration},
             DeviceId,
         },
-        testutil::{FakeNonSyncCtx, FakeSyncCtx},
+        testutil::{FakeBindingsCtx, FakeCoreCtx},
     };
 
     /// Gets the IPv6 address and subnet pairs associated with this device which are
@@ -2246,21 +2246,21 @@ pub(crate) mod testutil {
             + Debug;
 
         fn get_ip_configuration_and_flags(
-            core_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            device: &DeviceId<FakeBindingsCtx>,
         ) -> Self::IpDeviceConfigurationAndFlags;
 
         fn update_ip_configuration(
-            core_ctx: &FakeSyncCtx,
-            bindings_ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device: &DeviceId<FakeBindingsCtx>,
             config: IpDeviceConfigurationUpdate,
         ) -> Result<IpDeviceConfigurationUpdate, UpdateIpConfigurationError>;
 
         fn set_ip_device_enabled(
-            core_ctx: &FakeSyncCtx,
-            bindings_ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device: &DeviceId<FakeBindingsCtx>,
             enabled: bool,
             prev_enabled: bool,
         ) {
@@ -2280,16 +2280,16 @@ pub(crate) mod testutil {
         type IpDeviceConfigurationAndFlags = Ipv4DeviceConfigurationAndFlags;
 
         fn get_ip_configuration_and_flags(
-            core_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            device: &DeviceId<FakeBindingsCtx>,
         ) -> Self::IpDeviceConfigurationAndFlags {
             crate::device::get_ipv4_configuration_and_flags(core_ctx, device)
         }
 
         fn update_ip_configuration(
-            core_ctx: &FakeSyncCtx,
-            bindings_ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device: &DeviceId<FakeBindingsCtx>,
             config: IpDeviceConfigurationUpdate,
         ) -> Result<IpDeviceConfigurationUpdate, UpdateIpConfigurationError> {
             update_ipv4_configuration(
@@ -2306,16 +2306,16 @@ pub(crate) mod testutil {
         type IpDeviceConfigurationAndFlags = Ipv6DeviceConfigurationAndFlags;
 
         fn get_ip_configuration_and_flags(
-            core_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            device: &DeviceId<FakeBindingsCtx>,
         ) -> Self::IpDeviceConfigurationAndFlags {
             crate::device::get_ipv6_configuration_and_flags(core_ctx, device)
         }
 
         fn update_ip_configuration(
-            core_ctx: &FakeSyncCtx,
-            bindings_ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
+            core_ctx: &FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device: &DeviceId<FakeBindingsCtx>,
             config: IpDeviceConfigurationUpdate,
         ) -> Result<IpDeviceConfigurationUpdate, UpdateIpConfigurationError> {
             update_ipv6_configuration(
@@ -2369,7 +2369,7 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, Ctx, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
+            assert_empty, Ctx, DispatchedEvent, FakeBindingsCtx, FakeCoreCtx, FakeCtx,
             TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
@@ -2394,7 +2394,7 @@ mod tests {
         assert_eq!(bindings_ctx.take_events()[..], []);
 
         let set_ipv4_enabled =
-            |ctx: &mut crate::testutil::FakeNonSyncCtx, enabled, expected_prev| {
+            |ctx: &mut crate::testutil::FakeBindingsCtx, enabled, expected_prev| {
                 Ipv4::set_ip_device_enabled(core_ctx, ctx, &device_id, enabled, expected_prev)
             };
 
@@ -2549,9 +2549,9 @@ mod tests {
     }
 
     fn enable_ipv6_device(
-        core_ctx: &mut &FakeSyncCtx,
-        bindings_ctx: &mut FakeNonSyncCtx,
-        device_id: &DeviceId<FakeNonSyncCtx>,
+        core_ctx: &mut &FakeCoreCtx,
+        bindings_ctx: &mut FakeBindingsCtx,
+        device_id: &DeviceId<FakeBindingsCtx>,
         ll_addr: AddrSubnet<Ipv6Addr, LinkLocalAddr<UnicastAddr<Ipv6Addr>>>,
         expected_prev: bool,
     ) {
@@ -2612,8 +2612,8 @@ mod tests {
 
         // Enable the device and observe an auto-generated link-local address,
         // router solicitation and DAD for the auto-generated address.
-        let test_enable_device = |core_ctx: &mut &FakeSyncCtx,
-                                  bindings_ctx: &mut FakeNonSyncCtx,
+        let test_enable_device = |core_ctx: &mut &FakeCoreCtx,
+                                  bindings_ctx: &mut FakeBindingsCtx,
                                   extra_group,
                                   expected_prev| {
             enable_ipv6_device(core_ctx, bindings_ctx, &device_id, ll_addr, expected_prev);
@@ -2714,8 +2714,8 @@ mod tests {
             LinkResolutionResult::Resolved(got) => assert_eq!(got, mac)
         );
 
-        let test_disable_device = |core_ctx: &mut &FakeSyncCtx,
-                                   bindings_ctx: &mut FakeNonSyncCtx,
+        let test_disable_device = |core_ctx: &mut &FakeCoreCtx,
+                                   bindings_ctx: &mut FakeBindingsCtx,
                                    expected_prev| {
             Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, false, expected_prev);
             bindings_ctx.timer_ctx().assert_no_timers_installed();

@@ -1678,7 +1678,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{
-            FakeCtx, FakeInstant, FakeInstantRange as _, FakeNonSyncCtx, FakeSyncCtx,
+            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeInstantRange as _,
             FakeTimerCtxExt as _,
         },
         device::{
@@ -1715,8 +1715,8 @@ mod tests {
         }
     }
 
-    type FakeCtxImpl = FakeSyncCtx<FakeSlaacContext, (), FakeDeviceId>;
-    type FakeNonSyncCtxImpl = FakeNonSyncCtx<SlaacTimerId<FakeDeviceId>, (), ()>;
+    type FakeCoreCtxImpl = FakeCoreCtx<FakeSlaacContext, (), FakeDeviceId>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<SlaacTimerId<FakeDeviceId>, (), ()>;
 
     #[derive(Default)]
     struct FakeSlaacAddrs {
@@ -1731,7 +1731,7 @@ mod tests {
         }
     }
 
-    impl<'a> SlaacAddresses<FakeNonSyncCtxImpl> for &'a mut FakeSlaacAddrs {
+    impl<'a> SlaacAddresses<FakeBindingsCtxImpl> for &'a mut FakeSlaacAddrs {
         fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, FakeInstant>)>(
             &mut self,
             mut cb: F,
@@ -1755,10 +1755,10 @@ mod tests {
 
         fn add_addr_sub_and_then<
             O,
-            F: FnOnce(SlaacAddressEntryMut<'_, FakeInstant>, &mut FakeNonSyncCtxImpl) -> O,
+            F: FnOnce(SlaacAddressEntryMut<'_, FakeInstant>, &mut FakeBindingsCtxImpl) -> O,
         >(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
             add_addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
             config: SlaacConfig<FakeInstant>,
             and_then: F,
@@ -1790,7 +1790,7 @@ mod tests {
 
         fn remove_addr(
             &mut self,
-            _bindings_ctx: &mut FakeNonSyncCtxImpl,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
             addr: &UnicastAddr<Ipv6Addr>,
         ) -> Result<
             (AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<FakeInstant>),
@@ -1811,12 +1811,12 @@ mod tests {
         }
     }
 
-    impl SlaacContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
-        type SlaacAddrs<'a> = &'a mut FakeSlaacAddrs where FakeCtxImpl: 'a;
+    impl SlaacContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        type SlaacAddrs<'a> = &'a mut FakeSlaacAddrs where FakeCoreCtxImpl: 'a;
 
         fn with_slaac_addrs_mut_and_configs<
             O,
-            F: FnOnce(SlaacAddrsMutAndConfig<'_, FakeNonSyncCtxImpl, &'_ mut FakeSlaacAddrs>) -> O,
+            F: FnOnce(SlaacAddrsMutAndConfig<'_, FakeBindingsCtxImpl, &'_ mut FakeSlaacAddrs>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -1874,7 +1874,7 @@ mod tests {
         enable_stable_addresses: bool,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -1908,7 +1908,7 @@ mod tests {
     #[test_case(1; "preferred")]
     fn generate_stable_address(preferred_lifetime_secs: u32) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -1974,7 +1974,7 @@ mod tests {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2010,7 +2010,7 @@ mod tests {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2181,7 +2181,7 @@ mod tests {
         }: RefreshStableAddressTimersTest,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2386,7 +2386,7 @@ mod tests {
         }: DontGenerateTemporaryAddressTest,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration {
                     temporary_address_configuration: enable.then(|| {
                         TemporarySlaacAddressConfiguration {
@@ -2525,7 +2525,7 @@ mod tests {
         let regen_advance = regen_advance(temp_idgen_retries, retrans_timer, dad_transmits);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration {
                     temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
                         temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(
@@ -2801,8 +2801,8 @@ mod tests {
         )
         .unwrap();
 
-        let set_ip_enabled = |core_ctx: &mut &crate::testutil::FakeSyncCtx,
-                              bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
+        let set_ip_enabled = |core_ctx: &mut &crate::testutil::FakeCoreCtx,
+                              bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                               enabled| {
             let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
                 core_ctx,

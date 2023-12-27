@@ -71,7 +71,7 @@ pub(crate) mod testutil {
 
     use super::*;
     use crate::{
-        context::testutil::FakeSyncCtx,
+        context::testutil::FakeCoreCtx,
         device::{testutil::FakeWeakDeviceId, DeviceIdContext, Id, StrongId},
     };
 
@@ -129,7 +129,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<S, M> DeviceIdContext<FakeLinkDevice> for FakeSyncCtx<S, M, FakeLinkDeviceId> {
+    impl<S, M> DeviceIdContext<FakeLinkDevice> for FakeCoreCtx<S, M, FakeLinkDeviceId> {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
 

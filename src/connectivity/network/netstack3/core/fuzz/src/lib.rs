@@ -21,7 +21,7 @@ use net_types::{
 use netstack3_core::{
     device::EthernetDeviceId,
     testutil::context::FakeTimerCtxExt as _,
-    testutil::{Ctx, FakeCtx, FakeNonSyncCtx},
+    testutil::{Ctx, FakeBindingsCtx, FakeCtx},
     TimerId,
 };
 use packet::{
@@ -402,7 +402,7 @@ fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
 
 fn dispatch(
     Ctx { core_ctx, bindings_ctx }: &mut FakeCtx,
-    device_id: &EthernetDeviceId<FakeNonSyncCtx>,
+    device_id: &EthernetDeviceId<FakeBindingsCtx>,
     action: FuzzAction,
 ) {
     use FuzzAction::*;

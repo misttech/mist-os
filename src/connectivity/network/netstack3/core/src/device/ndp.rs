@@ -177,8 +177,8 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, handle_timer, set_logger_for_test, Ctx, FakeEventDispatcherBuilder,
-            FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
+            assert_empty, handle_timer, set_logger_for_test, Ctx, FakeBindingsCtx,
+            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
@@ -252,11 +252,11 @@ mod tests {
         UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap()
     }
 
-    impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeNonSyncCtx> {
-        type Error = DeviceId<crate::testutil::FakeNonSyncCtx>;
+    impl TryFrom<DeviceId<crate::testutil::FakeBindingsCtx>> for EthernetDeviceId<FakeBindingsCtx> {
+        type Error = DeviceId<crate::testutil::FakeBindingsCtx>;
         fn try_from(
-            id: DeviceId<crate::testutil::FakeNonSyncCtx>,
-        ) -> Result<EthernetDeviceId<FakeNonSyncCtx>, DeviceId<crate::testutil::FakeNonSyncCtx>>
+            id: DeviceId<crate::testutil::FakeBindingsCtx>,
+        ) -> Result<EthernetDeviceId<FakeBindingsCtx>, DeviceId<crate::testutil::FakeBindingsCtx>>
         {
             match id {
                 DeviceId::Ethernet(id) => Ok(id),
@@ -268,16 +268,16 @@ mod tests {
     fn setup_net() -> (
         FakeNetwork<
             &'static str,
-            EthernetDeviceId<FakeNonSyncCtx>,
+            EthernetDeviceId<FakeBindingsCtx>,
             crate::testutil::FakeCtx,
             impl FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeNonSyncCtx>,
-                EthernetDeviceId<FakeNonSyncCtx>,
+                EthernetWeakDeviceId<FakeBindingsCtx>,
+                EthernetDeviceId<FakeBindingsCtx>,
                 &'static str,
             >,
         >,
-        EthernetDeviceId<FakeNonSyncCtx>,
-        EthernetDeviceId<FakeNonSyncCtx>,
+        EthernetDeviceId<FakeBindingsCtx>,
+        EthernetDeviceId<FakeBindingsCtx>,
     ) {
         let mut local = FakeEventDispatcherBuilder::default();
         let local_dev_idx = local.add_device_with_config(
@@ -518,17 +518,17 @@ mod tests {
     }
 
     fn dad_timer_id(
-        id: EthernetDeviceId<FakeNonSyncCtx>,
+        id: EthernetDeviceId<FakeBindingsCtx>,
         addr: UnicastAddr<Ipv6Addr>,
-    ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
+    ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(
             crate::ip::device::dad::DadTimerId { device_id: id.into(), addr },
         )))
     }
 
     fn rs_timer_id(
-        id: EthernetDeviceId<FakeNonSyncCtx>,
-    ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
+        id: EthernetDeviceId<FakeBindingsCtx>,
+    ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(
             crate::ip::device::router_solicitation::RsTimerId { device_id: id.into() },
         )))
@@ -806,8 +806,8 @@ mod tests {
     }
 
     fn get_address_assigned(
-        core_ctx: &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &crate::testutil::FakeCoreCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<bool> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
@@ -1153,9 +1153,9 @@ mod tests {
         // Sets the hop limit with a router advertisement and sends a packet to
         // make sure the packet uses the new hop limit.
         fn inner_test(
-            core_ctx: &crate::testutil::FakeSyncCtx,
-            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-            device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+            core_ctx: &crate::testutil::FakeCoreCtx,
+            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
             hop_limit: u8,
             frame_offset: usize,
         ) {
@@ -1848,12 +1848,12 @@ mod tests {
         assert_eq!(bindings_ctx.trigger_next_timer(core_ctx, crate::handle_timer), None);
     }
 
-    impl From<SlaacTimerId<DeviceId<crate::testutil::FakeNonSyncCtx>>>
-        for TimerId<crate::testutil::FakeNonSyncCtx>
+    impl From<SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>>
+        for TimerId<crate::testutil::FakeBindingsCtx>
     {
         fn from(
-            id: SlaacTimerId<DeviceId<crate::testutil::FakeNonSyncCtx>>,
-        ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
+            id: SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>,
+        ) -> TimerId<crate::testutil::FakeBindingsCtx> {
             TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Slaac(id)))
         }
     }
@@ -1867,9 +1867,9 @@ mod tests {
     impl TestSlaacPrefix {
         fn send_prefix_update(
             &self,
-            core_ctx: &mut &crate::testutil::FakeSyncCtx,
-            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-            device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+            core_ctx: &mut &crate::testutil::FakeCoreCtx,
+            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             src_ip: Ipv6Addr,
         ) {
             let Self { prefix, valid_for, preferred_for } = *self;
@@ -1945,7 +1945,7 @@ mod tests {
     }
 
     fn initialize_with_temporary_addresses_enabled(
-    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeNonSyncCtx>, SlaacConfiguration)
+    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeBindingsCtx>, SlaacConfiguration)
     {
         set_logger_for_test();
         let config = Ipv6::FAKE_CONFIG;
@@ -2101,7 +2101,7 @@ mod tests {
     fn test_host_generate_temporary_slaac_address(
         valid_lifetime_in_ra: u32,
         preferred_lifetime_in_ra: u32,
-    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeNonSyncCtx>, UnicastAddr<Ipv6Addr>)
+    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeBindingsCtx>, UnicastAddr<Ipv6Addr>)
     {
         set_logger_for_test();
         let (mut ctx, device, slaac_config) = initialize_with_temporary_addresses_enabled();
@@ -2431,9 +2431,9 @@ mod tests {
     }
 
     fn receive_prefix_update(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         src_ip: Ipv6Addr,
         subnet: Subnet<Ipv6Addr>,
         preferred_lifetime: u32,
@@ -2462,16 +2462,16 @@ mod tests {
     }
 
     fn get_matching_slaac_address_entries<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         filter: F,
     ) -> impl Iterator<Item = GlobalIpv6Addr<FakeInstant>> {
         get_global_ipv6_addrs(core_ctx, device).into_iter().filter(filter)
     }
 
     fn get_matching_slaac_address_entry<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         filter: F,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
         let mut matching_addrs = get_matching_slaac_address_entries(core_ctx, device, filter);
@@ -2481,8 +2481,8 @@ mod tests {
     }
 
     fn get_slaac_address_entry(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
         let mut matching_addrs = get_global_ipv6_addrs(core_ctx, device)
@@ -2494,8 +2494,8 @@ mod tests {
     }
 
     fn assert_slaac_lifetimes_enforced(
-        bindings_ctx: &crate::testutil::FakeNonSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        bindings_ctx: &crate::testutil::FakeBindingsCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         entry: GlobalIpv6Addr<FakeInstant>,
         valid_until: FakeInstant,
         preferred_until: FakeInstant,
@@ -2535,9 +2535,9 @@ mod tests {
 
         set_logger_for_test();
         fn inner_test(
-            core_ctx: &mut &crate::testutil::FakeSyncCtx,
-            bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-            device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+            core_ctx: &mut &crate::testutil::FakeCoreCtx,
+            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             src_ip: Ipv6Addr,
             subnet: Subnet<Ipv6Addr>,
             addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
@@ -2908,9 +2908,9 @@ mod tests {
     }
 
     fn receive_neighbor_advertisement_for_duplicate_address(
-        core_ctx: &mut &crate::testutil::FakeSyncCtx,
-        bindings_ctx: &mut crate::testutil::FakeNonSyncCtx,
-        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         source_ip: UnicastAddr<Ipv6Addr>,
     ) {
         let peer_mac = mac!("00:11:22:33:44:55");

@@ -458,7 +458,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeCtx, FakeInstant, FakeSyncCtx,
+                handle_timer_helper_with_sc_ref_mut, FakeCoreCtx, FakeCtx, FakeInstant,
                 FakeTimerCtxExt,
             },
             InstantContext,
@@ -472,9 +472,9 @@ mod tests {
     }
 
     type FakeCtxImpl<I> = FakeCtx<FakePmtuContext<I>, PmtuTimerId<I>, (), (), (), ()>;
-    type FakeSyncCtxImpl<I> = FakeSyncCtx<FakePmtuContext<I>, (), ()>;
+    type FakeCoreCtxImpl<I> = FakeCoreCtx<FakePmtuContext<I>, (), ()>;
 
-    impl<I: Ip> PmtuStateContext<I, FakeInstant> for FakeSyncCtxImpl<I> {
+    impl<I: Ip> PmtuStateContext<I, FakeInstant> for FakeCoreCtxImpl<I> {
         fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, FakeInstant>) -> O>(
             &mut self,
             cb: F,
@@ -516,7 +516,7 @@ mod tests {
     }
 
     fn get_pmtu<I: Ip>(
-        core_ctx: &FakeSyncCtxImpl<I>,
+        core_ctx: &FakeCoreCtxImpl<I>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<Mtu> {
@@ -524,7 +524,7 @@ mod tests {
     }
 
     fn get_last_updated<I: Ip>(
-        core_ctx: &FakeSyncCtxImpl<I>,
+        core_ctx: &FakeCoreCtxImpl<I>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<FakeInstant> {

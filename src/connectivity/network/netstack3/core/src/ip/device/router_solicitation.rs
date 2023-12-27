@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
             InstantContext as _, SendFrameContext as _,
         },
         device::testutil::FakeDeviceId,
@@ -261,10 +261,10 @@ mod tests {
         message: RouterSolicitation,
     }
 
-    type FakeCtxImpl = FakeSyncCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
-    type FakeNonSyncCtxImpl = FakeNonSyncCtx<RsTimerId<FakeDeviceId>, (), ()>;
+    type FakeCoreCtxImpl = FakeCoreCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<RsTimerId<FakeDeviceId>, (), ()>;
 
-    impl RsContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;
 
         fn with_rs_remaining_mut_and_max<
@@ -301,7 +301,7 @@ mod tests {
             F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
         >(
             &mut self,
-            bindings_ctx: &mut FakeNonSyncCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeDeviceId: &FakeDeviceId,
             message: RouterSolicitation,
             body: F,
@@ -322,7 +322,7 @@ mod tests {
     #[test]
     fn stop_router_solicitation() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeRsContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(1),
                 router_soliciations_remaining: None,
                 source_address: None,
@@ -382,7 +382,7 @@ mod tests {
         expected_sll_bytes: Option<&[u8]>,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeRsContext {
+            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(max_router_solicitations),
                 router_soliciations_remaining: None,
                 source_address,
