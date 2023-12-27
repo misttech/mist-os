@@ -33,18 +33,18 @@ impl<DeviceId> DadTimerId<DeviceId> {
     }
 }
 
-pub(super) struct DadAddressStateRef<'a, SC> {
+pub(super) struct DadAddressStateRef<'a, CC> {
     /// A mutable reference to an address' state.
     ///
     /// `None` if the address is not recognized.
     pub(super) dad_state: &'a mut Ipv6DadState,
     /// The execution context available with the address's DAD state.
-    pub(super) sync_ctx: &'a mut SC,
+    pub(super) sync_ctx: &'a mut CC,
 }
 
 /// Holds references to state associated with duplicate address detection.
-pub(super) struct DadStateRef<'a, SC> {
-    pub(super) state: Option<DadAddressStateRef<'a, SC>>,
+pub(super) struct DadStateRef<'a, CC> {
+    pub(super) state: Option<DadAddressStateRef<'a, CC>>,
     /// The time between DAD message retransmissions.
     pub(super) retrans_timer: &'a NonZeroDuration,
     /// The maximum number of DAD messages to send.
@@ -52,7 +52,7 @@ pub(super) struct DadStateRef<'a, SC> {
 }
 
 /// The execution context while performing DAD.
-pub(super) trait DadAddressContext<C>: IpDeviceAddressIdContext<Ipv6> {
+pub(super) trait DadAddressContext<BC>: IpDeviceAddressIdContext<Ipv6> {
     /// Calls the function with a mutable reference to the address's assigned
     /// flag.
     fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
@@ -65,7 +65,7 @@ pub(super) trait DadAddressContext<C>: IpDeviceAddressIdContext<Ipv6> {
     /// Joins the multicast group on the device.
     fn join_multicast_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         multicast_addr: MulticastAddr<Ipv6Addr>,
     );
@@ -73,18 +73,18 @@ pub(super) trait DadAddressContext<C>: IpDeviceAddressIdContext<Ipv6> {
     /// Leaves the multicast group on the device.
     fn leave_multicast_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         multicast_addr: MulticastAddr<Ipv6Addr>,
     );
 }
 
 /// The execution context for DAD.
-pub(super) trait DadContext<C>:
+pub(super) trait DadContext<BC>:
     IpDeviceAddressIdContext<Ipv6> + DeviceIdContext<AnyDevice>
 {
     type DadAddressCtx<'a>: DadAddressContext<
-        C,
+        BC,
         DeviceId = Self::DeviceId,
         AddressId = Self::AddressId,
     >;
@@ -110,7 +110,7 @@ pub(super) trait DadContext<C>:
     /// address.
     fn send_dad_packet(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
@@ -134,13 +134,13 @@ pub(super) trait DadNonSyncContext<DeviceId>:
     TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>
 {
 }
-impl<DeviceId, C: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>>
-    DadNonSyncContext<DeviceId> for C
+impl<DeviceId, BC: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>>
+    DadNonSyncContext<DeviceId> for BC
 {
 }
 
 /// An implementation for Duplicate Address Detection.
-pub(crate) trait DadHandler<C>:
+pub(crate) trait DadHandler<BC>:
     DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<Ipv6>
 {
     /// Starts duplicate address detection.
@@ -150,7 +150,7 @@ pub(crate) trait DadHandler<C>:
     /// Panics if tentative state for the address is not found.
     fn start_duplicate_address_detection(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
     );
@@ -160,7 +160,7 @@ pub(crate) trait DadHandler<C>:
     /// Does nothing if DAD is not being performed on the address.
     fn stop_duplicate_address_detection(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
     );
@@ -171,11 +171,11 @@ enum DoDadVariation {
     Continue,
 }
 
-fn do_duplicate_address_detection<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
-    addr: &SC::AddressId,
+fn do_duplicate_address_detection<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    addr: &CC::AddressId,
     variation: DoDadVariation,
 ) {
     let send_msg = core_ctx.with_dad_state(
@@ -298,10 +298,10 @@ fn do_duplicate_address_detection<C: DadNonSyncContext<SC::DeviceId>, SC: DadCon
     );
 }
 
-impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC {
+impl<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> for CC {
     fn start_duplicate_address_detection(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
     ) {
@@ -310,7 +310,7 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
 
     fn stop_duplicate_address_detection(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
     ) {
@@ -357,13 +357,13 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
     }
 }
 
-impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>>
-    TimerHandler<C, DadTimerId<SC::DeviceId>> for SC
+impl<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>>
+    TimerHandler<BC, DadTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut C,
-        DadTimerId { device_id, addr }: DadTimerId<SC::DeviceId>,
+        bindings_ctx: &mut BC,
+        DadTimerId { device_id, addr }: DadTimerId<CC::DeviceId>,
     ) {
         let addr_id = self.get_address_id(&device_id, addr);
         do_duplicate_address_detection(

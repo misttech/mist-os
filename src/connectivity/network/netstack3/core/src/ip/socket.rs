@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// An execution context defining a type of IP socket.
-pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Constructs a new [`IpSock`].
     ///
     /// `new_ip_socket` constructs a new `IpSock` to the given remote IP
@@ -50,7 +50,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// `Some(Default::default())`.
     fn new_ip_socket<O>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -72,7 +72,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// If the socket is currently unroutable, an error is returned.
     fn send_ip_packet<S, O>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         socket: &IpSock<I, Self::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
@@ -110,7 +110,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// an error, it will be returned as well.
     fn send_oneshot_ip_packet_with_fallible_serializer<S, E, F, O>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -155,7 +155,7 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// Sends a one-shot IP packet but with a non-fallible serializer.
     fn send_oneshot_ip_packet<S, F, O>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
@@ -291,7 +291,7 @@ pub(crate) enum MmsError {
 }
 
 /// Gets device related information of an IP socket.
-pub(crate) trait DeviceIpSocketHandler<I, C>: DeviceIdContext<AnyDevice>
+pub(crate) trait DeviceIpSocketHandler<I, BC>: DeviceIdContext<AnyDevice>
 where
     I: IpLayerIpExt,
 {
@@ -302,7 +302,7 @@ where
     /// https://www.rfc-editor.org/rfc/rfc1122#section-3.4
     fn get_mms<O: SendOptions<I>>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError>;
 }
@@ -392,13 +392,13 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 
 /// The non-synchronized execution context for IP sockets.
 pub(crate) trait IpSocketNonSyncContext: InstantContext + TracingContext {}
-impl<C: InstantContext + TracingContext> IpSocketNonSyncContext for C {}
+impl<BC: InstantContext + TracingContext> IpSocketNonSyncContext for BC {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub(crate) trait IpSocketContext<I, C: IpSocketNonSyncContext>:
+pub(crate) trait IpSocketContext<I, BC: IpSocketNonSyncContext>:
     DeviceIdContext<AnyDevice>
 where
     I: IpDeviceStateIpExt + IpExt,
@@ -409,7 +409,7 @@ where
     /// egress over the device.
     fn lookup_route(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: Option<&Self::DeviceId>,
         src_ip: Option<SpecifiedAddr<I::Addr>>,
         dst_ip: SpecifiedAddr<I::Addr>,
@@ -418,7 +418,7 @@ where
     /// Send an IP packet to the next-hop node.
     fn send_ip_packet<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
     ) -> Result<(), S>
@@ -429,19 +429,19 @@ where
 
 impl<
         I: Ip + IpExt + IpDeviceStateIpExt,
-        C: IpSocketNonSyncContext,
-        SC: IpSocketContext<I, C> + CounterContext<IpCounters<I>>,
-    > IpSocketHandler<I, C> for SC
+        BC: IpSocketNonSyncContext,
+        CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
+    > IpSocketHandler<I, BC> for CC
 {
     fn new_ip_socket<O>(
         &mut self,
-        bindings_ctx: &mut C,
-        device: Option<EitherDeviceId<&SC::DeviceId, &SC::WeakDeviceId>>,
+        bindings_ctx: &mut BC,
+        device: Option<EitherDeviceId<&CC::DeviceId, &CC::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: O,
-    ) -> Result<IpSock<I, SC::WeakDeviceId, O>, (IpSockCreationError, O)> {
+    ) -> Result<IpSock<I, CC::WeakDeviceId, O>, (IpSockCreationError, O)> {
         let device = if let Some(device) = device.as_ref() {
             if let Some(device) = device.as_strong_ref(self) {
                 Some(device)
@@ -487,8 +487,8 @@ impl<
 
     fn send_ip_packet<S, O>(
         &mut self,
-        bindings_ctx: &mut C,
-        ip_sock: &IpSock<I, SC::WeakDeviceId, O>,
+        bindings_ctx: &mut BC,
+        ip_sock: &IpSock<I, CC::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockSendError)>
@@ -538,10 +538,10 @@ impl<I: Ip, S: SendOptions<I>> SendOptions<I> for &'_ S {
     }
 }
 
-fn send_ip_packet<I, S, C, SC, O>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    socket: &IpSock<I, SC::WeakDeviceId, O>,
+fn send_ip_packet<I, S, BC, CC, O>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    socket: &IpSock<I, CC::WeakDeviceId, O>,
     body: S,
     mtu: Option<u32>,
 ) -> Result<(), (S, IpSockSendError)>
@@ -549,8 +549,8 @@ where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
     S: Serializer,
     S::Buffer: BufferMut,
-    C: IpSocketNonSyncContext,
-    SC: IpSocketContext<I, C>,
+    BC: IpSocketNonSyncContext,
+    CC: IpSocketContext<I, BC>,
     O: SendOptions<I>,
 {
     trace_duration!(bindings_ctx, "ip::send_packet");
@@ -601,13 +601,13 @@ where
 
 impl<
         I: IpLayerIpExt + IpDeviceStateIpExt,
-        C: IpSocketNonSyncContext,
-        SC: IpDeviceContext<I, C> + IpSocketContext<I, C> + NonTestCtxMarker,
-    > DeviceIpSocketHandler<I, C> for SC
+        BC: IpSocketNonSyncContext,
+        CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + NonTestCtxMarker,
+    > DeviceIpSocketHandler<I, BC> for CC
 {
     fn get_mms<O: SendOptions<I>>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError> {
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
@@ -624,7 +624,7 @@ impl<
                 (*remote_ip).into(),
             )
             .map_err(MmsError::NoDevice)?;
-        let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
+        let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
         // TODO(https://fxbug.dev/121911): Calculate the options size when they
         // are supported.
         Mms::from_mtu::<I>(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))
@@ -1027,9 +1027,9 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: InstantContext + TracingContext,
+            BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
-        > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
+        > TransportIpContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
@@ -1049,7 +1049,7 @@ pub(crate) mod testutil {
 
         fn confirm_reachable_with_destination(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             _dst: SpecifiedAddr<<I>::Addr>,
             _device: Option<&Self::DeviceId>,
         ) {
@@ -1116,13 +1116,13 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt + IpExt,
-            C: InstantContext + TracingContext,
+            BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
-        > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
+        > IpSocketContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1133,7 +1133,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<S>(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
@@ -1278,12 +1278,12 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt,
             D: FakeStrongDeviceId,
-            C: RngContext + InstantContext<Instant = FakeInstant>,
-        > MulticastMembershipHandler<I, C> for FakeIpSocketCtx<I, D>
+            BC: RngContext + InstantContext<Instant = FakeInstant>,
+        > MulticastMembershipHandler<I, BC> for FakeIpSocketCtx<I, D>
     {
         fn join_multicast_group(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1295,7 +1295,7 @@ pub(crate) mod testutil {
 
         fn leave_multicast_group(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1308,13 +1308,13 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: InstantContext + TracingContext,
+            BC: InstantContext + TracingContext,
             D: FakeStrongDeviceId,
-            State: TransportIpContext<I, C, DeviceId = D> + CounterContext<IpCounters<I>>,
+            State: TransportIpContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
             Meta,
-        > TransportIpContext<I, C> for FakeSyncCtx<State, Meta, D>
+        > TransportIpContext<I, BC> for FakeSyncCtx<State, Meta, D>
     where
-        Self: IpSocketContext<I, C, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
+        Self: IpSocketContext<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
         type DevicesWithAddrIter<'a> = State::DevicesWithAddrIter<'a>
             where Self: 'a;
@@ -1323,20 +1323,20 @@ pub(crate) mod testutil {
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, C>::get_devices_with_assigned_addr(self.get_mut(), addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.get_mut(), addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, C>::get_default_hop_limits(self.get_mut(), device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(self.get_mut(), device)
         }
 
         fn confirm_reachable_with_destination(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, C>::confirm_reachable_with_destination(
+            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
                 self.get_mut(),
                 bindings_ctx,
                 dst,
@@ -1558,12 +1558,12 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt + IpExt,
             DeviceId: FakeStrongDeviceId,
-            C: IpSocketNonSyncContext,
-        > IpSocketContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
+            BC: IpSocketNonSyncContext,
+        > IpSocketContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn lookup_route(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -1593,7 +1593,7 @@ pub(crate) mod testutil {
         /// Send an IP packet to the next-hop node.
         fn send_ip_packet<S>(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
@@ -1652,12 +1652,12 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt,
             D: FakeStrongDeviceId,
-            C: RngContext + InstantContext<Instant = FakeInstant>,
-        > MulticastMembershipHandler<I, C> for FakeDualStackIpSocketCtx<D>
+            BC: RngContext + InstantContext<Instant = FakeInstant>,
+        > MulticastMembershipHandler<I, BC> for FakeDualStackIpSocketCtx<D>
     {
         fn join_multicast_group(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1682,7 +1682,7 @@ pub(crate) mod testutil {
 
         fn leave_multicast_group(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -1708,9 +1708,9 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: InstantContext + TracingContext,
+            BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
-        > TransportIpContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
+        > TransportIpContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
@@ -1731,7 +1731,7 @@ pub(crate) mod testutil {
 
         fn confirm_reachable_with_destination(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             _dst: SpecifiedAddr<<I>::Addr>,
             _device: Option<&Self::DeviceId>,
         ) {

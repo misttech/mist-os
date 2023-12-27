@@ -24,22 +24,22 @@ use crate::{
     NonSyncContext, SyncCtx,
 };
 
-impl<I, L, C> tcp::socket::DemuxSyncContext<I, WeakDeviceId<C>, C> for Locked<&SyncCtx<C>, L>
+impl<I, L, BC> tcp::socket::DemuxSyncContext<I, WeakDeviceId<BC>, BC> for Locked<&SyncCtx<BC>, L>
 where
     I: crate::ip::IpExt
         + crate::ip::device::IpDeviceIpExt
         + crate::transport::tcp::socket::DualStackIpExt,
-    C: NonSyncContext,
+    BC: NonSyncContext,
     L: LockBefore<crate::lock_ordering::TcpDemux<I>>,
 {
-    fn with_demux<O, F: FnOnce(&tcp::socket::DemuxState<I, WeakDeviceId<C>, C>) -> O>(
+    fn with_demux<O, F: FnOnce(&tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
         cb(&self.read_lock::<crate::lock_ordering::TcpDemux<I>>())
     }
 
-    fn with_demux_mut<O, F: FnOnce(&mut tcp::socket::DemuxState<I, WeakDeviceId<C>, C>) -> O>(
+    fn with_demux_mut<O, F: FnOnce(&mut tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -47,21 +47,21 @@ where
     }
 }
 
-impl<L, C> tcp::socket::SyncContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+impl<L, BC> tcp::socket::SyncContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 where
-    C: NonSyncContext,
+    BC: NonSyncContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>,
 {
     type SingleStackIpTransportAndDemuxCtx<'a> =
-        Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSocketState<Ipv4>>;
+        Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>;
 
     type DualStackIpTransportAndDemuxCtx<'a> =
-        Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSocketState<Ipv4>>;
+        Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>;
 
     type SingleStackConverter = ();
     type DualStackConverter = crate::convert::UninstantiableConverter;
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, C>) -> O>(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -71,14 +71,14 @@ where
 
     fn socket_destruction_deferred(
         &mut self,
-        _socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+        _socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
     ) {
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
     fn for_each_socket<
         F: FnMut(
-            &TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
+            &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ),
     >(
@@ -104,12 +104,12 @@ where
                 (&'a mut Self::DualStackIpTransportAndDemuxCtx<'a>, Self::DualStackConverter),
                 (&'a mut Self::SingleStackIpTransportAndDemuxCtx<'a>, Self::SingleStackConverter),
             >,
-            &mut TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
-            &IsnGenerator<C::Instant>,
+            &mut TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
+            &IsnGenerator<BC::Instant>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let isn = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv4>>();
@@ -126,12 +126,12 @@ where
     fn with_socket_and_converter<
         O,
         F: FnOnce(
-            &TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
+            &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         // Acquire socket lock at the current level.
@@ -144,21 +144,21 @@ where
     }
 }
 
-impl<L, C> tcp::socket::SyncContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+impl<L, BC> tcp::socket::SyncContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 where
-    C: NonSyncContext,
+    BC: NonSyncContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>,
 {
     type SingleStackIpTransportAndDemuxCtx<'a> =
-        Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSocketState<Ipv6>>;
+        Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv6>>;
 
     type DualStackIpTransportAndDemuxCtx<'a> =
-        Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSocketState<Ipv6>>;
+        Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv6>>;
 
     type SingleStackConverter = crate::convert::UninstantiableConverter;
     type DualStackConverter = ();
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv6, Self::WeakDeviceId, C>) -> O>(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv6, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -168,14 +168,14 @@ where
 
     fn socket_destruction_deferred(
         &mut self,
-        _socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+        _socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
     ) {
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
     fn for_each_socket<
         F: FnMut(
-            &TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
+            &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ),
     >(
@@ -201,12 +201,12 @@ where
                 (&'a mut Self::DualStackIpTransportAndDemuxCtx<'a>, Self::DualStackConverter),
                 (&'a mut Self::SingleStackIpTransportAndDemuxCtx<'a>, Self::SingleStackConverter),
             >,
-            &mut TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
-            &IsnGenerator<C::Instant>,
+            &mut TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
+            &IsnGenerator<BC::Instant>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let isn = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv6>>();
@@ -223,12 +223,12 @@ where
     fn with_socket_and_converter<
         O,
         F: FnOnce(
-            &TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
+            &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         // Acquire socket lock at the current level.
@@ -241,10 +241,10 @@ where
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
-    udp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
+    udp::StateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSocketsTable<Ipv4>>;
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpSocketsTable<Ipv4>>;
 
     fn with_sockets_state<
         O,
@@ -285,10 +285,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
-    udp::BoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    udp::BoundStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
     type DualStackContext = UninstantiableContext<Ipv4, udp::Udp, Self>;
     type NonDualStackContext = Self;
 
@@ -330,10 +330,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
-    udp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
+    udp::StateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSocketsTable<Ipv6>>;
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpSocketsTable<Ipv6>>;
 
     fn with_sockets_state<
         O,
@@ -374,10 +374,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
-    udp::BoundStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    udp::BoundStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
     type DualStackContext = Self;
     type NonDualStackContext = UninstantiableContext<Ipv6, udp::Udp, Self>;
 
@@ -419,12 +419,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<L, C: NonSyncContext> udp::UdpStateContext for Locked<&SyncCtx<C>, L> {}
+impl<L, BC: NonSyncContext> udp::UdpStateContext for Locked<&SyncCtx<BC>, L> {}
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
-    udp::DualStackBoundStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    udp::DualStackBoundStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
 
     fn with_both_bound_sockets_mut<
         O,
@@ -464,15 +464,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
-    udp::NonDualStackBoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    udp::NonDualStackBoundStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, C: NonSyncContext>
-    RwLockFor<crate::lock_ordering::TcpAllSocketsSet<I>> for SyncCtx<C>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+    RwLockFor<crate::lock_ordering::TcpAllSocketsSet<I>> for SyncCtx<BC>
 {
-    type Data = tcp::socket::TcpSocketSet<I, WeakDeviceId<C>, C>;
+    type Data = tcp::socket::TcpSocketSet<I, WeakDeviceId<BC>, BC>;
 
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
         where
@@ -490,10 +490,10 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, C: NonSyncContext>
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, C: NonSyncContext>
-    RwLockFor<crate::lock_ordering::TcpDemux<I>> for SyncCtx<C>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+    RwLockFor<crate::lock_ordering::TcpDemux<I>> for SyncCtx<BC>
 {
-    type Data = tcp::socket::DemuxState<I, WeakDeviceId<C>, C>;
+    type Data = tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>;
 
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
         where
@@ -511,11 +511,11 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, C: NonSyncContext>
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, C: NonSyncContext>
-    UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for SyncCtx<C>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+    UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for SyncCtx<BC>
 {
-    type Data = IsnGenerator<C::Instant>;
-    type Guard<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
+    type Data = IsnGenerator<BC::Instant>;
+    type Guard<'l> = &'l IsnGenerator<BC::Instant> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.state.transport.tcp_state::<I>().isn_generator

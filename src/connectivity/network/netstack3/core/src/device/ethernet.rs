@@ -81,8 +81,8 @@ pub(crate) trait EthernetIpLinkDeviceNonSyncContext<DeviceId>:
     RngContext + TimerContext<EthernetTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: RngContext + TimerContext<EthernetTimerId<DeviceId>>>
-    EthernetIpLinkDeviceNonSyncContext<DeviceId> for C
+impl<DeviceId, BC: RngContext + TimerContext<EthernetTimerId<DeviceId>>>
+    EthernetIpLinkDeviceNonSyncContext<DeviceId> for BC
 {
 }
 
@@ -101,7 +101,7 @@ pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
 
 /// Provides access to an ethernet device's dynamic state.
 pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
-    C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>,
+    BC: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>,
 >: EthernetIpLinkDeviceStaticStateContext
 {
     /// Calls the function with the ethernet device's static state and immutable
@@ -127,12 +127,10 @@ pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
     ) -> O;
 }
 
-impl<NonSyncCtx: NonSyncContext, L> EthernetIpLinkDeviceStaticStateContext
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
+impl<BC: NonSyncContext, L> EthernetIpLinkDeviceStaticStateContext for Locked<&SyncCtx<BC>, L> {
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
         &mut self,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state(self, device_id, |state| {
@@ -141,17 +139,15 @@ impl<NonSyncCtx: NonSyncContext, L> EthernetIpLinkDeviceStaticStateContext
     }
 }
 
-impl<
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
-    > EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>>
+    EthernetIpLinkDeviceDynamicStateContext<BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_ethernet_state<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state(self, device_id, |mut state| {
@@ -169,7 +165,7 @@ impl<
         F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state(self, device_id, |mut state| {
@@ -185,34 +181,30 @@ impl<
 
 pub(crate) struct SyncCtxWithDeviceId<
     'a,
-    SC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>,
+    CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>,
 > {
-    pub(crate) sync_ctx: &'a mut SC,
-    pub(crate) device_id: &'a SC::DeviceId,
+    pub(crate) sync_ctx: &'a mut CC,
+    pub(crate) device_id: &'a CC::DeviceId,
 }
 
-impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    NudContext<Ipv6, EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type ConfigCtx<'a> = SyncCtxWithDeviceId<
-        'a,
-        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>,
-    >;
+    type ConfigCtx<'a> =
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv6Nud>>;
 
-    type SenderCtx<'a> = SyncCtxWithDeviceId<
-        'a,
-        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>,
-    >;
+    type SenderCtx<'a> =
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv6Nud>>;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
         F: FnOnce(
-            &mut NudState<Ipv6, EthernetLinkDevice, NonSyncCtx::Instant, NonSyncCtx::Notifier>,
+            &mut NudState<Ipv6, EthernetLinkDevice, BC::Instant, BC::Notifier>,
             &mut Self::SenderCtx<'_>,
         ) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state_and_sync_ctx(
@@ -238,12 +230,12 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     fn with_nud_state_mut<
         O,
         F: FnOnce(
-            &mut NudState<Ipv6, EthernetLinkDevice, NonSyncCtx::Instant, NonSyncCtx::Notifier>,
+            &mut NudState<Ipv6, EthernetLinkDevice, BC::Instant, BC::Notifier>,
             &mut Self::ConfigCtx<'_>,
         ) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state_and_sync_ctx(
@@ -268,8 +260,8 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
     fn send_neighbor_solicitation(
         &mut self,
-        bindings_ctx: &mut NonSyncCtx,
-        device_id: &EthernetDeviceId<NonSyncCtx>,
+        bindings_ctx: &mut BC,
+        device_id: &EthernetDeviceId<BC>,
         lookup_addr: SpecifiedAddr<Ipv6Addr>,
         remote_link_addr: Option<Mac>,
     ) {
@@ -315,11 +307,8 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-impl<
-        'a,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::Ipv6DeviceLearnedParams>,
-    > NudConfigContext<Ipv6> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<NonSyncCtx>, L>>
+impl<'a, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceLearnedParams>>
+    NudConfigContext<Ipv6> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
 {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         let Self { device_id, sync_ctx } = self;
@@ -341,10 +330,10 @@ impl<
     }
 }
 
-fn send_as_ethernet_frame_to_dst<S, C, SC>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+fn send_as_ethernet_frame_to_dst<S, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     dst_mac: Mac,
     body: S,
     ether_type: EtherType,
@@ -352,9 +341,9 @@ fn send_as_ethernet_frame_to_dst<S, C, SC>(
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + CounterContext<DeviceCounters>,
 {
     /// The minimum body length for the Ethernet frame.
@@ -376,18 +365,18 @@ where
         .map_err(|frame| frame.into_inner())
 }
 
-fn send_ethernet_frame<S, C, SC>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+fn send_ethernet_frame<S, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     frame: S,
 ) -> Result<(), S>
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + CounterContext<DeviceCounters>,
 {
     core_ctx.with_counters(|counters| {
@@ -428,13 +417,13 @@ where
     }
 }
 
-impl<'a, NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    NudSenderContext<Ipv6, EthernetLinkDevice, NonSyncCtx>
-    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<NonSyncCtx>, L>>
+impl<'a, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
+    NudSenderContext<Ipv6, EthernetLinkDevice, BC>
+    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        bindings_ctx: &mut NonSyncCtx,
+        bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S>
@@ -604,8 +593,8 @@ impl<II: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> EthernetDeviceS
     }
 }
 
-impl<C: NonSyncContext, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
     type Data = NudUserConfig;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NudUserConfig>
@@ -622,8 +611,8 @@ impl<C: NonSyncContext, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
     }
 }
 
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
     type Data = StaticEthernetDeviceState;
     type Guard<'l> = &'l StaticEthernetDeviceState
@@ -634,8 +623,8 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStati
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
     type Data = DynamicEthernetDeviceState;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
@@ -653,14 +642,14 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicSta
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
-    type Data = HeldDeviceSockets<C>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
+    type Data = HeldDeviceSockets<BC>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<BC>>
         where
             Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<BC>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -671,11 +660,11 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
-    type Data = NudState<Ipv6, EthernetLinkDevice, C::Instant, C::Notifier>;
-    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice, C::Instant, C::Notifier>>
+    type Data = NudState<Ipv6, EthernetLinkDevice, BC::Instant, BC::Notifier>;
+    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice, BC::Instant, BC::Notifier>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -683,11 +672,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
-    type Data = ArpState<EthernetLinkDevice, C::Instant, C::Notifier>;
-    type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice, C::Instant, C::Notifier>>
+    type Data = ArpState<EthernetLinkDevice, BC::Instant, BC::Notifier>;
+    type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice, BC::Instant, BC::Notifier>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -695,8 +684,8 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
     type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
     type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
@@ -707,8 +696,8 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
-    for IpLinkDeviceState<EthernetLinkDevice, C>
+impl<BC: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
+    for IpLinkDeviceState<EthernetLinkDevice, BC>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
@@ -719,14 +708,16 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
     }
 }
 
-impl<C: NonSyncContext> TransmitQueueNonSyncContext<EthernetLinkDevice, EthernetDeviceId<C>> for C {
-    fn wake_tx_task(&mut self, device_id: &EthernetDeviceId<C>) {
+impl<BC: NonSyncContext> TransmitQueueNonSyncContext<EthernetLinkDevice, EthernetDeviceId<BC>>
+    for BC
+{
+    fn wake_tx_task(&mut self, device_id: &EthernetDeviceId<BC>) {
         DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueCommon<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
+    TransmitQueueCommon<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
@@ -737,15 +728,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
+    TransmitQueueContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_transmit_queue_mut<
         O,
         F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<C>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state(self, device_id, |mut state| {
@@ -756,7 +747,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 
     fn send_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
@@ -769,10 +760,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
-    TransmitDequeueContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
+    TransmitDequeueContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetTxDequeue>;
+    type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetTxDequeue>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,
@@ -841,14 +832,14 @@ impl<D> From<NudTimerId<Ipv6, EthernetLinkDevice, D>> for EthernetTimerId<D> {
 
 /// Handle an Ethernet timer firing.
 pub(super) fn handle_timer<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + TimerHandler<C, NudTimerId<Ipv6, EthernetLinkDevice, SC::DeviceId>>
-        + TimerHandler<C, ArpTimerId<EthernetLinkDevice, SC::DeviceId>>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+        + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::DeviceId>>
+        + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::DeviceId>>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    id: EthernetTimerId<SC::DeviceId>,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    id: EthernetTimerId<CC::DeviceId>,
 ) {
     match id {
         EthernetTimerId::Arp(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
@@ -880,20 +871,20 @@ impl_timer_context!(
 /// serializer. It computes the routing information, serializes
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
-pub(super) fn send_ip_frame<C, SC, A, S>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+pub(super) fn send_ip_frame<BC, CC, A, S>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     local_addr: SpecifiedAddr<A>,
     body: S,
 ) -> Result<(), S>
 where
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>
-        + SocketNonSyncContext<SC::DeviceId>
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>
+        + SocketNonSyncContext<CC::DeviceId>
         + LinkResolutionContext<EthernetLinkDevice>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + NudHandler<A::Version, EthernetLinkDevice, C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+        + NudHandler<A::Version, EthernetLinkDevice, BC>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + CounterContext<DeviceCounters>,
     A: IpAddress,
     S: Serializer,
@@ -931,18 +922,18 @@ where
 
 /// Receive an Ethernet frame from the network.
 pub(super) fn receive_frame<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId> + SocketNonSyncContext<CC::DeviceId>,
     B: BufferMut,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
-        + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv6>>
-        + ArpPacketHandler<EthernetLinkDevice, C>
-        + DeviceSocketHandler<EthernetLinkDevice, C>
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
+        + ArpPacketHandler<EthernetLinkDevice, BC>
+        + DeviceSocketHandler<EthernetLinkDevice, BC>
         + CounterContext<DeviceCounters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     mut buffer: B,
 ) {
     core_ctx.with_counters(|counters| {
@@ -1052,12 +1043,12 @@ pub(super) fn receive_frame<
 
 /// Set the promiscuous mode flag on `device_id`.
 pub(super) fn set_promiscuous_mode<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     enabled: bool,
 ) {
     core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
@@ -1081,12 +1072,12 @@ pub(super) fn set_promiscuous_mode<
 /// `join_link_multicast` joins an L2 multicast group, whereas
 /// `join_ip_multicast` joins an L3 multicast group.
 pub(super) fn join_link_multicast<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
     core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
@@ -1128,12 +1119,12 @@ pub(super) fn join_link_multicast<
 ///
 /// If `device_id` is not in the multicast group `multicast_addr`.
 pub(super) fn leave_link_multicast<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
     core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
@@ -1161,20 +1152,20 @@ pub(super) fn leave_link_multicast<
 }
 
 /// Get the routing metric associated with this device.
-pub(super) fn get_routing_metric<SC: EthernetIpLinkDeviceStaticStateContext>(
-    core_ctx: &mut SC,
-    device_id: &SC::DeviceId,
+pub(super) fn get_routing_metric<CC: EthernetIpLinkDeviceStaticStateContext>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
 ) -> RawMetric {
     core_ctx.with_static_ethernet_device_state(device_id, |static_state| static_state.metric)
 }
 
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &mut SC,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
 ) -> Mtu {
     core_ctx.with_ethernet_state(device_id, |_static_state, dynamic_state| {
         dynamic_state.max_frame_size.as_mtu()
@@ -1186,12 +1177,12 @@ pub(super) fn get_mtu<
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
 pub(super) fn insert_static_arp_table_entry<
-    C: LinkResolutionContext<EthernetLinkDevice>,
-    SC: NudHandler<Ipv4, EthernetLinkDevice, C>,
+    BC: LinkResolutionContext<EthernetLinkDevice>,
+    CC: NudHandler<Ipv4, EthernetLinkDevice, BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: SpecifiedAddr<Ipv4Addr>,
     mac: UnicastAddr<Mac>,
@@ -1210,12 +1201,12 @@ pub(super) fn insert_static_arp_table_entry<
 /// This will cause any conflicting dynamic entry to be removed, and NDP
 /// messages about `addr` to be ignored.
 pub(super) fn insert_static_ndp_table_entry<
-    C: LinkResolutionContext<EthernetLinkDevice>,
-    SC: NudHandler<Ipv6, EthernetLinkDevice, C>,
+    BC: LinkResolutionContext<EthernetLinkDevice>,
+    CC: NudHandler<Ipv6, EthernetLinkDevice, BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: UnicastAddr<Ipv6Addr>,
     mac: UnicastAddr<Mac>,
@@ -1230,18 +1221,18 @@ pub(super) fn insert_static_ndp_table_entry<
 }
 
 impl<
-        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
-        SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId> + SocketNonSyncContext<CC::DeviceId>,
+        CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + CounterContext<DeviceCounters>,
-    > SendFrameContext<C, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
+    > SendFrameContext<BC, ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>> for CC
 {
     fn send_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         ArpFrameMetadata { device_id, dst_addr }: ArpFrameMetadata<
             EthernetLinkDevice,
-            SC::DeviceId,
+            CC::DeviceId,
         >,
         body: S,
     ) -> Result<(), S>
@@ -1260,24 +1251,24 @@ impl<
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ArpContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    ArpContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type ConfigCtx<'a> =
-        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv4Arp>>;
 
     type ArpSenderCtx<'a> =
-        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv4Arp>>;
 
     fn with_arp_state_mut_and_sender_ctx<
         O,
         F: FnOnce(
-            &mut ArpState<EthernetLinkDevice, C::Instant, C::Notifier>,
+            &mut ArpState<EthernetLinkDevice, BC::Instant, BC::Notifier>,
             &mut Self::ArpSenderCtx<'_>,
         ) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<C>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state_and_sync_ctx(
@@ -1296,8 +1287,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 
     fn get_protocol_addr(
         &mut self,
-        _bindings_ctx: &mut C,
-        device_id: &EthernetDeviceId<C>,
+        _bindings_ctx: &mut BC,
+        device_id: &EthernetDeviceId<BC>,
     ) -> Option<Ipv4Addr> {
         device::integration::with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
@@ -1309,8 +1300,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 
     fn get_hardware_addr(
         &mut self,
-        _bindings_ctx: &mut C,
-        device_id: &EthernetDeviceId<C>,
+        _bindings_ctx: &mut BC,
+        device_id: &EthernetDeviceId<BC>,
     ) -> UnicastAddr<Mac> {
         get_mac(self, device_id)
     }
@@ -1318,12 +1309,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     fn with_arp_state_mut<
         O,
         F: FnOnce(
-            &mut ArpState<EthernetLinkDevice, C::Instant, C::Notifier>,
+            &mut ArpState<EthernetLinkDevice, BC::Instant, BC::Notifier>,
             &mut Self::ConfigCtx<'_>,
         ) -> O,
     >(
         &mut self,
-        device_id: &EthernetDeviceId<C>,
+        device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
         device::integration::with_ethernet_state_and_sync_ctx(
@@ -1341,8 +1332,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     }
 }
 
-impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>> ArpConfigContext
-    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
+impl<'a, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>> ArpConfigContext
+    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
 {
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
         let Self { device_id, sync_ctx } = self;
@@ -1353,12 +1344,13 @@ impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>
     }
 }
 
-impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    ArpSenderContext<EthernetLinkDevice, C> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
+impl<'a, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
+    ArpSenderContext<EthernetLinkDevice, BC>
+    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S>
@@ -1378,16 +1370,16 @@ impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets
     }
 }
 impl<
-        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-        SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+        CC: EthernetIpLinkDeviceDynamicStateContext<BC>
+            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + CounterContext<DeviceCounters>,
-    > SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>> for SC
+    > SendFrameContext<BC, DeviceSocketMetadata<CC::DeviceId>> for CC
 {
     fn send_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
-        metadata: DeviceSocketMetadata<SC::DeviceId>,
+        bindings_ctx: &mut BC,
+        metadata: DeviceSocketMetadata<CC::DeviceId>,
         body: S,
     ) -> Result<(), S>
     where
@@ -1411,21 +1403,21 @@ impl<
 
 pub(super) fn get_mac<
     'a,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &'a mut SC,
-    device_id: &SC::DeviceId,
+    core_ctx: &'a mut CC,
+    device_id: &CC::DeviceId,
 ) -> UnicastAddr<Mac> {
     core_ctx.with_static_ethernet_device_state(device_id, |state| state.mac)
 }
 
 pub(super) fn set_mtu<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
+    BC: EthernetIpLinkDeviceNonSyncContext<CC::DeviceId>,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
-    core_ctx: &mut SC,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
     mtu: Mtu,
 ) {
     core_ctx.with_ethernet_state_mut(device_id, |static_state, dynamic_state| {
@@ -1453,11 +1445,11 @@ impl LinkDevice for EthernetLinkDevice {
 }
 
 impl DeviceStateSpec for EthernetLinkDevice {
-    type Link<C: DeviceLayerTypes> = EthernetDeviceState<
-        <C as InstantBindingsTypes>::Instant,
-        <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
+    type Link<BT: DeviceLayerTypes> = EthernetDeviceState<
+        <BT as InstantBindingsTypes>::Instant,
+        <BT as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
     >;
-    type External<C: DeviceLayerTypes> = C::EthernetDeviceState;
+    type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "Ethernet";
 }
@@ -1468,17 +1460,17 @@ impl DeviceStateSpec for EthernetLinkDevice {
 /// Ethernet device, returning either the associated link-address if it is
 /// available, or an observer that can be used to wait for link address
 /// resolution to complete.
-pub fn resolve_ethernet_link_addr<I: Ip, NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    device: &EthernetDeviceId<NonSyncCtx>,
+pub fn resolve_ethernet_link_addr<I: Ip, BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    device: &EthernetDeviceId<BC>,
     dst: &SpecifiedAddr<I::Addr>,
 ) -> LinkResolutionResult<
     Mac,
-    <<NonSyncCtx as LinkResolutionContext<EthernetLinkDevice>>::Notifier as LinkResolutionNotifier<
+    <<BC as LinkResolutionContext<EthernetLinkDevice>>::Notifier as LinkResolutionNotifier<
         EthernetLinkDevice,
     >>::Observer,
->{
+> {
     let sync_ctx = Locked::new(core_ctx);
     let IpInvariant(result) = I::map_ip(
         (IpInvariant((sync_ctx, bindings_ctx, device)), dst),
@@ -2558,10 +2550,10 @@ mod tests {
         );
     }
 
-    fn join_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        core_ctx: &SyncCtx<NonSyncCtx>,
-        bindings_ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
+    fn join_ip_multicast<A: IpAddress, BC: NonSyncContext>(
+        core_ctx: &SyncCtx<BC>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
@@ -2580,10 +2572,10 @@ mod tests {
         }
     }
 
-    fn leave_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        core_ctx: &SyncCtx<NonSyncCtx>,
-        bindings_ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
+    fn leave_ip_multicast<A: IpAddress, BC: NonSyncContext>(
+        core_ctx: &SyncCtx<BC>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {

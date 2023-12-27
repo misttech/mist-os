@@ -198,10 +198,10 @@ mod tests {
         }
     }
 
-    fn get_global_ipv6_addrs<C: NonSyncContext>(
-        core_ctx: &SyncCtx<C>,
-        device_id: &DeviceId<C>,
-    ) -> Vec<GlobalIpv6Addr<C::Instant>> {
+    fn get_global_ipv6_addrs<BC: NonSyncContext>(
+        core_ctx: &SyncCtx<BC>,
+        device_id: &DeviceId<BC>,
+    ) -> Vec<GlobalIpv6Addr<BC::Instant>> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             &mut Locked::new(core_ctx),
             device_id,

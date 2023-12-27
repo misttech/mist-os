@@ -41,13 +41,13 @@ pub(super) trait PmtuStateContext<I: Ip, Instant> {
 
 /// The non-synchronized execution context for path MTU discovery.
 trait PmtuNonSyncContext<I: Ip>: TimerContext<PmtuTimerId<I>> {}
-impl<I: Ip, C: TimerContext<PmtuTimerId<I>>> PmtuNonSyncContext<I> for C {}
+impl<I: Ip, BC: TimerContext<PmtuTimerId<I>>> PmtuNonSyncContext<I> for BC {}
 
 /// The execution context for path MTU discovery.
-trait PmtuContext<I: Ip, C: PmtuNonSyncContext<I>>: PmtuStateContext<I, C::Instant> {}
+trait PmtuContext<I: Ip, BC: PmtuNonSyncContext<I>>: PmtuStateContext<I, BC::Instant> {}
 
-impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuStateContext<I, C::Instant>> PmtuContext<I, C>
-    for SC
+impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuStateContext<I, BC::Instant>> PmtuContext<I, BC>
+    for CC
 {
 }
 
@@ -57,13 +57,13 @@ impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuStateContext<I, C::Instant>> PmtuC
 /// layer, which holds the PMTU cache. In production, method calls are delegated
 /// to a real [`PmtuCache`], while in testing, method calls may be delegated to
 /// a fake implementation.
-pub(crate) trait PmtuHandler<I: Ip, C> {
+pub(crate) trait PmtuHandler<I: Ip, BC> {
     /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than
     /// the current PMTU and does not violate the minimum MTU size requirements
     /// for an IP.
     fn update_pmtu_if_less(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
@@ -73,15 +73,15 @@ pub(crate) trait PmtuHandler<I: Ip, C> {
     /// estimate from `from`.
     fn update_pmtu_next_lower(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         from: Mtu,
     );
 }
 
-fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(
-    bindings_ctx: &mut C,
+fn maybe_schedule_timer<I: Ip, BC: PmtuNonSyncContext<I>>(
+    bindings_ctx: &mut BC,
     cache_is_empty: bool,
 ) {
     // Only attempt to create the next maintenance task if we still have
@@ -95,7 +95,7 @@ fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(
     let timer_id = PmtuTimerId::default();
     match bindings_ctx.scheduled_instant(timer_id) {
         Some(scheduled_at) => {
-            let _: C::Instant = scheduled_at;
+            let _: BC::Instant = scheduled_at;
             // Timer already set, nothing to do.
         }
         None => {
@@ -105,8 +105,8 @@ fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(
     }
 }
 
-fn handle_update_result<I: Ip, C: PmtuNonSyncContext<I>>(
-    bindings_ctx: &mut C,
+fn handle_update_result<I: Ip, BC: PmtuNonSyncContext<I>>(
+    bindings_ctx: &mut BC,
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
 ) {
@@ -117,10 +117,10 @@ fn handle_update_result<I: Ip, C: PmtuNonSyncContext<I>>(
     });
 }
 
-impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> for SC {
+impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
     fn update_pmtu_if_less(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
@@ -134,7 +134,7 @@ impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> f
 
     fn update_pmtu_next_lower(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         from: Mtu,
@@ -147,10 +147,10 @@ impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> f
     }
 }
 
-impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> TimerHandler<C, PmtuTimerId<I>>
-    for SC
+impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
+    for CC
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut C, _timer: PmtuTimerId<I>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, _timer: PmtuTimerId<I>) {
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             cache.handle_timer(now);

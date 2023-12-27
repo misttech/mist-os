@@ -60,11 +60,11 @@ impl<DeviceId> Ipv6DiscoveredRouteTimerId<DeviceId> {
 /// route discovery state.
 ///
 /// See [`Ipv6RouteDiscoveryContext::with_discovered_routes_mut`].
-pub(super) trait Ipv6DiscoveredRoutesContext<C>: DeviceIdContext<AnyDevice> {
+pub(super) trait Ipv6DiscoveredRoutesContext<BC>: DeviceIdContext<AnyDevice> {
     /// Adds a newly discovered IPv6 route to the routing table.
     fn add_discovered_ipv6_route(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         route: Ipv6DiscoveredRoute,
     ) -> Result<(), crate::error::ExistsError>;
@@ -73,15 +73,15 @@ pub(super) trait Ipv6DiscoveredRoutesContext<C>: DeviceIdContext<AnyDevice> {
     /// routing table.
     fn del_discovered_ipv6_route(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         route: Ipv6DiscoveredRoute,
     );
 }
 
 /// The execution context for IPv6 route discovery.
-pub(super) trait Ipv6RouteDiscoveryContext<C>: DeviceIdContext<AnyDevice> {
-    type WithDiscoveredRoutesMutCtx<'a>: Ipv6DiscoveredRoutesContext<C, DeviceId = Self::DeviceId>;
+pub(super) trait Ipv6RouteDiscoveryContext<BC>: DeviceIdContext<AnyDevice> {
+    type WithDiscoveredRoutesMutCtx<'a>: Ipv6DiscoveredRoutesContext<BC, DeviceId = Self::DeviceId>;
 
     /// Gets the route discovery state, mutably.
     fn with_discovered_routes_mut<
@@ -98,13 +98,13 @@ trait Ipv6RouteDiscoveryNonSyncContext<DeviceId>:
     TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>>
-    Ipv6RouteDiscoveryNonSyncContext<DeviceId> for C
+impl<DeviceId, BC: TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>>
+    Ipv6RouteDiscoveryNonSyncContext<DeviceId> for BC
 {
 }
 
 /// An implementation of IPv6 route discovery.
-pub(crate) trait RouteDiscoveryHandler<C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait RouteDiscoveryHandler<BC>: DeviceIdContext<AnyDevice> {
     /// Handles an update affecting discovered routes.
     ///
     /// A `None` value for `lifetime` indicates that the route is not valid and
@@ -113,23 +113,23 @@ pub(crate) trait RouteDiscoveryHandler<C>: DeviceIdContext<AnyDevice> {
     /// before being invalidated.
     fn update_route(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         route: Ipv6DiscoveredRoute,
         lifetime: Option<NonZeroNdpLifetime>,
     );
 
     /// Invalidates all discovered routes.
-    fn invalidate_routes(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
+    fn invalidate_routes(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryContext<C>>
-    RouteDiscoveryHandler<C> for SC
+impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
+    RouteDiscoveryHandler<BC> for CC
 {
     fn update_route(
         &mut self,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
         route: Ipv6DiscoveredRoute,
         lifetime: Option<NonZeroNdpLifetime>,
     ) {
@@ -155,7 +155,7 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryCo
 
                         let timer_id =
                             Ipv6DiscoveredRouteTimerId { device_id: device_id.clone(), route };
-                        let prev_timer_fires_at: Option<C::Instant> = match lifetime {
+                        let prev_timer_fires_at: Option<BC::Instant> = match lifetime {
                             NonZeroNdpLifetime::Finite(lifetime) => {
                                 bindings_ctx.schedule_timer(lifetime.get(), timer_id.clone())
                             }
@@ -188,7 +188,7 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryCo
         )
     }
 
-    fn invalidate_routes(&mut self, bindings_ctx: &mut C, device_id: &SC::DeviceId) {
+    fn invalidate_routes(&mut self, bindings_ctx: &mut BC, device_id: &CC::DeviceId) {
         self.with_discovered_routes_mut(
             device_id,
             |Ipv6RouteDiscoveryState { routes }, sync_ctx| {
@@ -200,13 +200,13 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryCo
     }
 }
 
-impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryContext<C>>
-    TimerHandler<C, Ipv6DiscoveredRouteTimerId<SC::DeviceId>> for SC
+impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
+    TimerHandler<BC, Ipv6DiscoveredRouteTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut C,
-        Ipv6DiscoveredRouteTimerId { device_id, route }: Ipv6DiscoveredRouteTimerId<SC::DeviceId>,
+        bindings_ctx: &mut BC,
+        Ipv6DiscoveredRouteTimerId { device_id, route }: Ipv6DiscoveredRouteTimerId<CC::DeviceId>,
     ) {
         self.with_discovered_routes_mut(
             &device_id,
@@ -219,30 +219,30 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryCo
 }
 
 fn del_discovered_ipv6_route<
-    C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>,
-    SC: Ipv6DiscoveredRoutesContext<C>,
+    BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>,
+    CC: Ipv6DiscoveredRoutesContext<BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     route: Ipv6DiscoveredRoute,
 ) {
     core_ctx.del_discovered_ipv6_route(bindings_ctx, device_id, route);
 }
 
 fn invalidate_route<
-    C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>,
-    SC: Ipv6DiscoveredRoutesContext<C>,
+    BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>,
+    CC: Ipv6DiscoveredRoutesContext<BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     route: Ipv6DiscoveredRoute,
 ) {
     // Routes with an infinite lifetime have no timers.
     //
     // TODO(https://fxbug.dev/97751): Hold timers scheduled to fire at infinity.
-    let _: Option<C::Instant> = bindings_ctx
+    let _: Option<BC::Instant> = bindings_ctx
         .cancel_timer(Ipv6DiscoveredRouteTimerId { device_id: device_id.clone(), route });
     del_discovered_ipv6_route(core_ctx, bindings_ctx, device_id, route)
 }

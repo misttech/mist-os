@@ -55,7 +55,7 @@ impl<DeviceId> RsTimerId<DeviceId> {
 }
 
 /// The execution context for router solicitation.
-pub(super) trait RsContext<C>: DeviceIdContext<AnyDevice> {
+pub(super) trait RsContext<BC>: DeviceIdContext<AnyDevice> {
     /// A link-layer address.
     type LinkLayerAddr: AsRef<[u8]>;
 
@@ -94,7 +94,7 @@ pub(super) trait RsContext<C>: DeviceIdContext<AnyDevice> {
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         message: RouterSolicitation,
         body: F,
@@ -106,23 +106,26 @@ pub(super) trait RsNonSyncContext<DeviceId>:
     RngContext + TimerContext<RsTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: RngContext + TimerContext<RsTimerId<DeviceId>>> RsNonSyncContext<DeviceId> for C {}
+impl<DeviceId, BC: RngContext + TimerContext<RsTimerId<DeviceId>>> RsNonSyncContext<DeviceId>
+    for BC
+{
+}
 
 /// An implementation of Router Solicitation.
-pub(crate) trait RsHandler<C>:
-    DeviceIdContext<AnyDevice> + TimerHandler<C, RsTimerId<Self::DeviceId>>
+pub(crate) trait RsHandler<BC>:
+    DeviceIdContext<AnyDevice> + TimerHandler<BC, RsTimerId<Self::DeviceId>>
 {
     /// Starts router solicitation.
-    fn start_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
+    fn start_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 
     /// Stops router solicitation.
     ///
     /// Does nothing if router solicitaiton is not being performed
-    fn stop_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId);
+    fn stop_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
-    fn start_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId) {
+impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>> RsHandler<BC> for CC {
+    fn start_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         let remaining = self.with_rs_remaining_mut_and_max(device_id, |remaining, max| {
             *remaining = max;
             max
@@ -145,29 +148,29 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
         }
     }
 
-    fn stop_router_solicitation(&mut self, bindings_ctx: &mut C, device_id: &Self::DeviceId) {
-        let _: Option<C::Instant> =
+    fn stop_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
+        let _: Option<BC::Instant> =
             bindings_ctx.cancel_timer(RsTimerId { device_id: device_id.clone() });
     }
 }
 
-impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> TimerHandler<C, RsTimerId<SC::DeviceId>>
-    for SC
+impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>>
+    TimerHandler<BC, RsTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut C,
-        RsTimerId { device_id }: RsTimerId<SC::DeviceId>,
+        bindings_ctx: &mut BC,
+        RsTimerId { device_id }: RsTimerId<CC::DeviceId>,
     ) {
         do_router_solicitation(self, bindings_ctx, &device_id)
     }
 }
 
 /// Solicit routers once and schedule next message.
-fn do_router_solicitation<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+fn do_router_solicitation<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
 ) {
     let src_ll = core_ctx.get_link_layer_addr_bytes(device_id);
 

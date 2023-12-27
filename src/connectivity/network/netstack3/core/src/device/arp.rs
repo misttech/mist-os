@@ -98,7 +98,7 @@ pub struct ArpCounters {
     pub tx_responses: Counter,
 }
 
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for SyncCtx<C> {
+impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for SyncCtx<BC> {
     type Data = ArpCounters;
     type Guard<'l> = &'l ArpCounters where Self: 'l;
 
@@ -107,9 +107,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for Sy
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext<ArpCounters>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
+impl<BC: NonSyncContext, L> CounterContext<ArpCounters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
     }
@@ -117,13 +115,13 @@ impl<NonSyncCtx: NonSyncContext, L> CounterContext<ArpCounters>
 
 /// An execution context for the ARP protocol that allows sending IP packets to
 /// specific neighbors.
-pub(crate) trait ArpSenderContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
+pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpNonSyncCtx<D, Self::DeviceId>>:
     ArpConfigContext + DeviceIdContext<D>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         dst_link_address: D::HType,
         body: S,
     ) -> Result<(), S>
@@ -163,29 +161,29 @@ pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
 impl<
         DeviceId,
         D: ArpDevice,
-        C: TimerContext<ArpTimerId<D, DeviceId>>
+        BC: TimerContext<ArpTimerId<D, DeviceId>>
             + TracingContext
             + LinkResolutionContext<D>
             + EventContext<
                 nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,
             >,
-    > ArpNonSyncCtx<D, DeviceId> for C
+    > ArpNonSyncCtx<D, DeviceId> for BC
 {
 }
 
 /// An execution context for the ARP protocol.
-pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
-    DeviceIdContext<D> + SendFrameContext<C, ArpFrameMetadata<D, Self::DeviceId>>
+pub(crate) trait ArpContext<D: ArpDevice, BC: ArpNonSyncCtx<D, Self::DeviceId>>:
+    DeviceIdContext<D> + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
 {
     type ConfigCtx<'a>: ArpConfigContext;
 
-    type ArpSenderCtx<'a>: ArpSenderContext<D, C, DeviceId = Self::DeviceId>;
+    type ArpSenderCtx<'a>: ArpSenderContext<D, BC, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a mutable reference to ARP state and the
     /// synchronized context.
     fn with_arp_state_mut_and_sender_ctx<
         O,
-        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::ArpSenderCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<D, BC::Instant, BC::Notifier>, &mut Self::ArpSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -198,14 +196,14 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
     /// `None`.
     fn get_protocol_addr(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
     ) -> Option<Ipv4Addr>;
 
     /// Get the hardware address of this interface.
     fn get_hardware_addr(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
     ) -> UnicastAddr<D::HType>;
 
@@ -213,7 +211,7 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
     /// configuration context.
     fn with_arp_state_mut<
         O,
-        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<D, BC::Instant, BC::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -234,20 +232,20 @@ pub(crate) trait ArpConfigContext {
 
 impl<
         D: ArpDevice,
-        C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: ArpContext<D, C> + CounterContext<ArpCounters>,
-    > NudContext<Ipv4, D, C> for SC
+        BC: ArpNonSyncCtx<D, CC::DeviceId>,
+        CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
+    > NudContext<Ipv4, D, BC> for CC
 {
-    type ConfigCtx<'a> = <SC as ArpContext<D, C>>::ConfigCtx<'a>;
+    type ConfigCtx<'a> = <CC as ArpContext<D, BC>>::ConfigCtx<'a>;
 
-    type SenderCtx<'a> = <SC as ArpContext<D, C>>::ArpSenderCtx<'a>;
+    type SenderCtx<'a> = <CC as ArpContext<D, BC>>::ArpSenderCtx<'a>;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D, C::Instant, C::Notifier>, &mut Self::SenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv4, D, BC::Instant, BC::Notifier>, &mut Self::SenderCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &SC::DeviceId,
+        device_id: &CC::DeviceId,
         cb: F,
     ) -> O {
         self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, sync_ctx| {
@@ -257,10 +255,10 @@ impl<
 
     fn with_nud_state_mut<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D, C::Instant, C::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv4, D, BC::Instant, BC::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &SC::DeviceId,
+        device_id: &CC::DeviceId,
         cb: F,
     ) -> O {
         self.with_arp_state_mut(device_id, |ArpState { nud }, sync_ctx| cb(nud, sync_ctx))
@@ -268,8 +266,8 @@ impl<
 
     fn send_neighbor_solicitation(
         &mut self,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
         lookup_addr: SpecifiedAddr<Ipv4Addr>,
         remote_link_addr: Option<D::Address>,
     ) {
@@ -277,7 +275,7 @@ impl<
     }
 }
 
-impl<SC: ArpConfigContext> NudConfigContext<Ipv4> for SC {
+impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for CC {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         self.retransmit_timeout()
     }
@@ -287,12 +285,12 @@ impl<SC: ArpConfigContext> NudConfigContext<Ipv4> for SC {
     }
 }
 
-impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>>
-    NudSenderContext<Ipv4, D, C> for SC
+impl<D: ArpDevice, BC: ArpNonSyncCtx<D, CC::DeviceId>, CC: ArpSenderContext<D, BC>>
+    NudSenderContext<Ipv4, D, BC> for CC
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         dst_mac: D::HType,
         body: S,
     ) -> Result<(), S>
@@ -304,10 +302,10 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>
     }
 }
 
-pub(crate) trait ArpPacketHandler<D: ArpDevice, C>: DeviceIdContext<D> {
+pub(crate) trait ArpPacketHandler<D: ArpDevice, BC>: DeviceIdContext<D> {
     fn handle_packet<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: Self::DeviceId,
         frame_dst: FrameDestination,
         buffer: B,
@@ -316,17 +314,17 @@ pub(crate) trait ArpPacketHandler<D: ArpDevice, C>: DeviceIdContext<D> {
 
 impl<
         D: ArpDevice,
-        C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: ArpContext<D, C>
-            + SendFrameContext<C, ArpFrameMetadata<D, Self::DeviceId>>
-            + NudHandler<Ipv4, D, C>
+        BC: ArpNonSyncCtx<D, CC::DeviceId>,
+        CC: ArpContext<D, BC>
+            + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
+            + NudHandler<Ipv4, D, BC>
             + CounterContext<ArpCounters>,
-    > ArpPacketHandler<D, C> for SC
+    > ArpPacketHandler<D, BC> for CC
 {
     /// Handles an inbound ARP packet.
     fn handle_packet<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: Self::DeviceId,
         frame_dst: FrameDestination,
         buffer: B,
@@ -337,16 +335,16 @@ impl<
 
 fn handle_packet<
     D: ArpDevice,
-    C: ArpNonSyncCtx<D, SC::DeviceId>,
+    BC: ArpNonSyncCtx<D, CC::DeviceId>,
     B: BufferMut,
-    SC: ArpContext<D, C>
-        + SendFrameContext<C, ArpFrameMetadata<D, SC::DeviceId>>
-        + NudHandler<Ipv4, D, C>
+    CC: ArpContext<D, BC>
+        + SendFrameContext<BC, ArpFrameMetadata<D, CC::DeviceId>>
+        + NudHandler<Ipv4, D, BC>
         + CounterContext<ArpCounters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: CC::DeviceId,
     frame_dst: FrameDestination,
     mut buffer: B,
 ) {
@@ -574,12 +572,12 @@ const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_T
 
 fn send_arp_request<
     D: ArpDevice,
-    C: ArpNonSyncCtx<D, SC::DeviceId>,
-    SC: ArpContext<D, C> + CounterContext<ArpCounters>,
+    BC: ArpNonSyncCtx<D, CC::DeviceId>,
+    CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
     lookup_addr: Ipv4Addr,
     remote_link_addr: Option<D::Address>,
 ) {

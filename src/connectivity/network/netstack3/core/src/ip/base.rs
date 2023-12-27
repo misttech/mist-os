@@ -160,7 +160,7 @@ impl IpExt for Ipv6 {
 ///
 /// An implementation for `()` is provided which indicates that a particular
 /// transport layer protocol is unsupported.
-pub(crate) trait IpTransportContext<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> {
+pub(crate) trait IpTransportContext<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> {
     /// Receive an ICMP error message.
     ///
     /// All arguments beginning with `original_` are fields from the IP packet
@@ -175,9 +175,9 @@ pub(crate) trait IpTransportContext<I: IpExt, C, SC: DeviceIdContext<AnyDevice> 
     /// hold. It is `receive_icmp_error`'s responsibility to handle any length
     /// of `original_body`, and to perform any necessary validation.
     fn receive_icmp_error(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         original_src_ip: Option<SpecifiedAddr<I::Addr>>,
         original_dst_ip: SpecifiedAddr<I::Addr>,
         original_body: &[u8],
@@ -190,20 +190,20 @@ pub(crate) trait IpTransportContext<I: IpExt, C, SC: DeviceIdContext<AnyDevice> 
     /// buffer in its original state (with the transport packet un-parsed) in
     /// the `Err` variant.
     fn receive_ip_packet<B: BufferMut>(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
-impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, C, SC> for () {
+impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, BC, CC> for () {
     fn receive_icmp_error(
-        _core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
-        _device: &SC::DeviceId,
+        _core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _device: &CC::DeviceId,
         _original_src_ip: Option<SpecifiedAddr<I::Addr>>,
         _original_dst_ip: SpecifiedAddr<I::Addr>,
         _original_body: &[u8],
@@ -213,9 +213,9 @@ impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I,
     }
 
     fn receive_ip_packet<B: BufferMut>(
-        _core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
-        _device: &SC::DeviceId,
+        _core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _device: &CC::DeviceId,
         _src_ip: I::RecvSrcAddr,
         _dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
@@ -228,8 +228,8 @@ impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I,
 }
 
 /// The execution context provided by the IP layer to transport layer protocols.
-pub(crate) trait TransportIpContext<I: IpExt, C>:
-    DeviceIdContext<AnyDevice> + IpSocketHandler<I, C>
+pub(crate) trait TransportIpContext<I: IpExt, BC>:
+    DeviceIdContext<AnyDevice> + IpSocketHandler<I, BC>
 {
     type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
     where
@@ -258,14 +258,14 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
     /// device.
     fn confirm_reachable_with_destination(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     );
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
-pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Requests that the specified device join the given multicast group.
     ///
     /// If this method is called multiple times with the same device and
@@ -274,7 +274,7 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice
     /// the same number of times.
     fn join_multicast_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     );
@@ -288,7 +288,7 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice
     /// `leave_multicast_group`.
     fn leave_multicast_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     );
@@ -304,11 +304,11 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         I: IpExt,
-        C,
-        SC: IpDeviceContext<I, C> + IpSocketHandler<I, C> + IpStateContext<I, C> + NonTestCtxMarker,
-    > TransportIpContext<I, C> for SC
+        BC,
+        CC: IpDeviceContext<I, BC> + IpSocketHandler<I, BC> + IpStateContext<I, BC> + NonTestCtxMarker,
+    > TransportIpContext<I, BC> for CC
 {
-    type DevicesWithAddrIter<'s> = <Vec<SC::DeviceId> as IntoIterator>::IntoIter where SC: 's;
+    type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
 
     fn get_devices_with_assigned_addr(
         &mut self,
@@ -333,7 +333,7 @@ impl<
 
     fn confirm_reachable_with_destination(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         dst: SpecifiedAddr<<I as Ip>::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
@@ -374,11 +374,11 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
 impl<S: Id, W: Id> EitherDeviceId<&'_ S, &'_ W> {
     pub(crate) fn as_strong_ref<
         'a,
-        SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
+        CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
     >(
         &'a self,
-        core_ctx: &SC,
-    ) -> Option<Cow<'a, SC::DeviceId>> {
+        core_ctx: &CC,
+    ) -> Option<Cow<'a, CC::DeviceId>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
             EitherDeviceId::Weak(w) => core_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
@@ -400,20 +400,20 @@ impl<S, W> EitherDeviceId<S, W> {
 }
 
 impl<S: Id, W: Id> EitherDeviceId<S, W> {
-    pub(crate) fn as_strong<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
+    pub(crate) fn as_strong<'a, CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
         &'a self,
-        core_ctx: &SC,
-    ) -> Option<Cow<'a, SC::DeviceId>> {
+        core_ctx: &CC,
+    ) -> Option<Cow<'a, CC::DeviceId>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
             EitherDeviceId::Weak(w) => core_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
         }
     }
 
-    pub(crate) fn as_weak<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
+    pub(crate) fn as_weak<'a, CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
         &'a self,
-        core_ctx: &SC,
-    ) -> Cow<'a, SC::WeakDeviceId> {
+        core_ctx: &CC,
+    ) -> Cow<'a, CC::WeakDeviceId> {
         match self {
             EitherDeviceId::Strong(s) => Cow::Owned(core_ctx.downgrade_device_id(s)),
             EitherDeviceId::Weak(w) => Cow::Borrowed(w),
@@ -490,10 +490,10 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpForwardingDeviceContext<I>
-        + IpDeviceStateContext<I, C>;
+        + IpDeviceStateContext<I, BC>;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
@@ -515,7 +515,7 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> 
 }
 
 /// Provices access to an IP device's state for the IP layer.
-pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, C>:
+pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, BC>:
     DeviceIdContext<AnyDevice>
 {
     /// Calls the callback with the next packet ID.
@@ -544,13 +544,13 @@ pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, C>:
 }
 
 /// The IP device context provided to the IP layer.
-pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C> {
+pub(crate) trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     type DeviceAndAddressStatusIter<'a, 's>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>
     where
-        Self: IpDeviceContext<I, C> + 's;
+        Self: IpDeviceContext<I, BC> + 's;
 
     /// Provides access to the status of an address.
     ///
@@ -573,7 +573,7 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C>
     /// through the specified device.
     fn confirm_reachable(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     );
@@ -603,24 +603,24 @@ pub(crate) trait IpLayerNonSyncContext<I: Ip, DeviceId>:
 impl<
         I: Ip,
         DeviceId,
-        C: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
-    > IpLayerNonSyncContext<I, DeviceId> for C
+        BC: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
+    > IpLayerNonSyncContext<I, DeviceId> for BC
 {
 }
 
 /// The execution context for the IP layer.
 pub(crate) trait IpLayerContext<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
->: IpStateContext<I, C> + IpDeviceContext<I, C>
+    BC: IpLayerNonSyncContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
+>: IpStateContext<I, BC> + IpDeviceContext<I, BC>
 {
 }
 
 impl<
         I: IpLayerIpExt,
-        C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpStateContext<I, C> + IpDeviceContext<I, C>,
-    > IpLayerContext<I, C> for SC
+        BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        CC: IpStateContext<I, BC> + IpDeviceContext<I, BC>,
+    > IpLayerContext<I, BC> for CC
 {
 }
 
@@ -648,11 +648,11 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 
 fn is_local_assigned_address<
     I: Ip + IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceStateContext<I, C>,
+    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpDeviceStateContext<I, BC>,
 >(
-    core_ctx: &mut SC,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    device: &CC::DeviceId,
     local_ip: SpecifiedAddr<I::Addr>,
 ) -> bool {
     match core_ctx.address_status_for_device(local_ip, device) {
@@ -666,12 +666,12 @@ fn is_local_assigned_address<
 // `None`.
 fn get_local_addr<
     I: Ip + IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceStateContext<I, C>,
+    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpDeviceStateContext<I, BC>,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     local_ip: Option<SpecifiedAddr<I::Addr>>,
-    device: &SC::DeviceId,
+    device: &CC::DeviceId,
     remote_addr: Option<SpecifiedAddr<I::Addr>>,
 ) -> Result<SpecifiedAddr<I::Addr>, ResolveRouteError> {
     if let Some(local_ip) = local_ip {
@@ -704,17 +704,17 @@ pub enum ResolveRouteError {
 // over a device with the address assigned.
 fn resolve_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
-    C: IpDeviceNonSyncContext<I, SC::DeviceId> + IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>
-        + device::IpDeviceConfigurationContext<I, C>
-        + IpDeviceStateContext<I, C>
+    BC: IpDeviceNonSyncContext<I, CC::DeviceId> + IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpLayerContext<I, BC>
+        + device::IpDeviceConfigurationContext<I, BC>
+        + IpDeviceStateContext<I, BC>
         + NonTestCtxMarker,
 >(
-    core_ctx: &mut SC,
-    device: Option<&SC::DeviceId>,
+    core_ctx: &mut CC,
+    device: Option<&CC::DeviceId>,
     local_ip: Option<SpecifiedAddr<I::Addr>>,
     addr: Option<SpecifiedAddr<I::Addr>>,
-) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
+) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback(A),
         StrongForDevice(D),
@@ -732,7 +732,7 @@ fn resolve_route_to_destination<
     //
     // TODO(https://fxbug.dev/93870): Encode the delivery of locally-
     // destined packets to loopback in the route table.
-    let local_delivery_instructions: Option<LocalDelivery<SpecifiedAddr<I::Addr>, &SC::DeviceId>> =
+    let local_delivery_instructions: Option<LocalDelivery<SpecifiedAddr<I::Addr>, &CC::DeviceId>> =
         addr.and_then(|addr| {
             match device {
                 Some(device) => match core_ctx.address_status_for_device(addr, device) {
@@ -825,32 +825,32 @@ fn resolve_route_to_destination<
 
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
-        C: IpDeviceNonSyncContext<I, SC::DeviceId>
-            + IpLayerNonSyncContext<I, SC::DeviceId>
+        BC: IpDeviceNonSyncContext<I, CC::DeviceId>
+            + IpLayerNonSyncContext<I, CC::DeviceId>
             + IpSocketNonSyncContext,
-        SC: IpLayerContext<I, C>
-            + device::IpDeviceConfigurationContext<I, C>
-            + IpDeviceStateContext<I, C>
+        CC: IpLayerContext<I, BC>
+            + device::IpDeviceConfigurationContext<I, BC>
+            + IpDeviceStateContext<I, BC>
             + NonTestCtxMarker
-            + IpDeviceSendContext<I, C>,
-    > IpSocketContext<I, C> for SC
+            + IpDeviceSendContext<I, BC>,
+    > IpSocketContext<I, BC> for CC
 {
     fn lookup_route(
         &mut self,
-        _bindings_ctx: &mut C,
-        device: Option<&SC::DeviceId>,
+        _bindings_ctx: &mut BC,
+        device: Option<&CC::DeviceId>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
+    ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
         resolve_route_to_destination(self, device, local_ip, Some(addr))
     }
 
     fn send_ip_packet<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<
             I,
-            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
+            &<CC as DeviceIdContext<AnyDevice>>::DeviceId,
             SpecifiedAddr<I::Addr>,
         >,
         body: S,
@@ -863,45 +863,39 @@ impl<
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext<IpCounters<I>>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
+impl<BC: NonSyncContext, I: Ip, L> CounterContext<IpCounters<I>> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext<Ipv4Counters>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
+impl<BC: NonSyncContext, L> CounterContext<Ipv4Counters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateCounters>())
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext<Ipv6Counters>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
+impl<BC: NonSyncContext, L> CounterContext<Ipv6Counters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv6StateCounters>())
     }
 }
 
-impl<I, C, L> IpStateContext<I, C> for Locked<&SyncCtx<C>, L>
+impl<I, BC, L> IpStateContext<I, BC> for Locked<&SyncCtx<BC>, L>
 where
     I: IpLayerIpExt,
-    C: NonSyncContext,
+    BC: NonSyncContext,
     L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
 
     // These bounds ensure that we can fulfill all the traits for the associated
     // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
     // have implementations that are generic on Ip.
-    for<'a> Locked<&'a SyncCtx<C>, crate::lock_ordering::IpStateRoutingTable<I>>:
+    for<'a> Locked<&'a SyncCtx<BC>, crate::lock_ordering::IpStateRoutingTable<I>>:
         DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
             + IpForwardingDeviceContext<I>
-            + IpDeviceStateContext<I, C>,
+            + IpDeviceStateContext<I, BC>,
 {
-    type IpDeviceIdCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IpStateRoutingTable<I>>;
+    type IpDeviceIdCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IpStateRoutingTable<I>>;
 
     fn with_ip_routing_table<
         O,
@@ -932,13 +926,13 @@ where
 ///
 /// This trait acts like a demux on the transport protocol for ingress IP
 /// packets.
-pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, C>:
+pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
     DeviceIdContext<AnyDevice>
 {
     /// Dispatches a received incoming IP packet to the appropriate protocol.
     fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
@@ -953,36 +947,36 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, C>:
 /// frame.
 pub(crate) trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
-    C: IpLayerNonSyncContext<I, Self::DeviceId>,
+    BC: IpLayerNonSyncContext<I, Self::DeviceId>,
 >:
-    IpTransportDispatchContext<I, C>
-    + IpDeviceStateContext<I, C>
-    + IpDeviceSendContext<I, C>
-    + IcmpErrorHandler<I, C>
-    + IpLayerContext<I, C>
-    + FragmentHandler<I, C>
+    IpTransportDispatchContext<I, BC>
+    + IpDeviceStateContext<I, BC>
+    + IpDeviceSendContext<I, BC>
+    + IcmpErrorHandler<I, BC>
+    + IpLayerContext<I, BC>
+    + FragmentHandler<I, BC>
 {
 }
 
 impl<
         I: IpLayerIpExt + IcmpHandlerIpExt,
-        C: IpLayerNonSyncContext<I, SC::DeviceId>,
-        SC: IpTransportDispatchContext<I, C>
-            + IpDeviceStateContext<I, C>
-            + IpDeviceSendContext<I, C>
-            + IcmpErrorHandler<I, C>
-            + IpLayerContext<I, C>
-            + FragmentHandler<I, C>,
-    > IpLayerIngressContext<I, C> for SC
+        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        CC: IpTransportDispatchContext<I, BC>
+            + IpDeviceStateContext<I, BC>
+            + IpDeviceSendContext<I, BC>
+            + IcmpErrorHandler<I, BC>
+            + IpLayerContext<I, BC>
+            + FragmentHandler<I, BC>,
+    > IpLayerIngressContext<I, BC> for CC
 {
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
-    IpTransportDispatchContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
+    IpTransportDispatchContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -1031,12 +1025,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
-    IpTransportDispatchContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
+    IpTransportDispatchContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -1162,8 +1156,8 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDev
     }
 }
 
-pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, C, SC: IpDeviceStateContext<I, C>>(
-    core_ctx: &mut SC,
+pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, BC>>(
+    core_ctx: &mut CC,
 ) -> I::PacketId {
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
@@ -1205,13 +1199,13 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDev
     }
 }
 
-impl<I, C> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for SyncCtx<C>
+impl<I, BT> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for SyncCtx<BT>
 where
     I: Ip,
-    C: BindingsTypes,
+    BT: BindingsTypes,
 {
-    type Data = IpPacketFragmentCache<I, C::Instant>;
-    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, C::Instant>> where Self: 'l;
+    type Data = IpPacketFragmentCache<I, BT::Instant>;
+    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, BT::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
         #[derive(GenericOverIp)]
@@ -1227,13 +1221,13 @@ where
     }
 }
 
-impl<I, C> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for SyncCtx<C>
+impl<I, BT> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for SyncCtx<BT>
 where
     I: Ip,
-    C: BindingsTypes,
+    BT: BindingsTypes,
 {
-    type Data = PmtuCache<I, C::Instant>;
-    type Guard<'l> = LockGuard<'l, PmtuCache<I, C::Instant>> where Self: 'l;
+    type Data = PmtuCache<I, BT::Instant>;
+    type Guard<'l> = LockGuard<'l, PmtuCache<I, BT::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
         #[derive(GenericOverIp)]
@@ -1249,20 +1243,20 @@ where
     }
 }
 
-impl<I: Ip, C: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
-    for SyncCtx<C>
+impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
+    for SyncCtx<BT>
 {
-    type Data = ForwardingTable<I, DeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<I, DeviceId<C>>>
+    type Data = ForwardingTable<I, DeviceId<BT>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<I, DeviceId<BT>>>
         where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<C>>>
+    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<BT>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, C: DeviceLayerTypes>(
-            RwLockReadGuard<'l, ForwardingTable<I, DeviceId<C>>>,
+        pub(super) struct Wrap<'l, I: Ip, BT: DeviceLayerTypes>(
+            RwLockReadGuard<'l, ForwardingTable<I, DeviceId<BT>>>,
         );
 
         let Wrap(guard) = I::map_ip(
@@ -1276,8 +1270,8 @@ impl<I: Ip, C: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTabl
     fn write_lock(&self) -> Self::WriteGuard<'_> {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, C: DeviceLayerTypes>(
-            RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<C>>>,
+        pub(super) struct Wrap<'l, I: Ip, BT: DeviceLayerTypes>(
+            RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<BT>>>,
         );
 
         let Wrap(guard) = I::map_ip(
@@ -1289,12 +1283,12 @@ impl<I: Ip, C: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTabl
     }
 }
 
-impl<I, C> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for SyncCtx<C>
+impl<I, BT> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for SyncCtx<BT>
 where
     I: IpExt,
-    C: BindingsTypes,
+    BT: BindingsTypes,
 {
-    type Data = icmp::BoundSockets<I, WeakDeviceId<C>>;
+    type Data = icmp::BoundSockets<I, WeakDeviceId<BT>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -1326,12 +1320,12 @@ where
     }
 }
 
-impl<I, C> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for SyncCtx<C>
+impl<I, BT> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for SyncCtx<BT>
 where
     I: crate::socket::datagram::DualStackIpExt,
-    C: BindingsTypes,
+    BT: BindingsTypes,
 {
-    type Data = icmp::SocketsState<I, WeakDeviceId<C>>;
+    type Data = icmp::SocketsState<I, WeakDeviceId<BT>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -1363,13 +1357,13 @@ where
     }
 }
 
-impl<I, C> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for SyncCtx<C>
+impl<I, BT> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for SyncCtx<BT>
 where
     I: Ip,
-    C: BindingsTypes,
+    BT: BindingsTypes,
 {
-    type Data = TokenBucket<C::Instant>;
-    type Guard<'l> = LockGuard<'l, TokenBucket<C::Instant>>
+    type Data = TokenBucket<BT::Instant>;
+    type Guard<'l> = LockGuard<'l, TokenBucket<BT::Instant>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
@@ -1382,7 +1376,9 @@ where
     }
 }
 
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId> for SyncCtx<C> {
+impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
+    for SyncCtx<BC>
+{
     type Data = AtomicU16;
     type Guard<'l> = &'l AtomicU16 where Self: 'l;
 
@@ -1466,8 +1462,8 @@ pub struct Ipv6Counters {
     pub extension_header_discard: Counter,
 }
 
-impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
-    for SyncCtx<C>
+impl<BC: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
+    for SyncCtx<BC>
 {
     type Data = IpCounters<I>;
     type Guard<'l> = &'l IpCounters<I> where Self: 'l;
@@ -1477,7 +1473,7 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCount
     }
 }
 
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<C> {
+impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<BC> {
     type Data = Ipv4Counters;
     type Guard<'l> = &'l Ipv4Counters where Self: 'l;
 
@@ -1486,7 +1482,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> 
     }
 }
 
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<C> {
+impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<BC> {
     type Data = Ipv6Counters;
     type Guard<'l> = &'l Ipv6Counters where Self: 'l;
 
@@ -1563,9 +1559,9 @@ impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv4>, IpLayerTimerId::PmtuTimeo
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeoutv6(id), id);
 
 /// Handle a timer event firing in the IP layer.
-pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
-    bindings_ctx: &mut NonSyncCtx,
+pub(crate) fn handle_timer<BC: NonSyncContext>(
+    core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
+    bindings_ctx: &mut BC,
     id: IpLayerTimerId,
 ) {
     match id {
@@ -1601,13 +1597,13 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 /// coming from a device, i.e., `device` given is `None`,
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
-    C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
+    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
     B: BufferMut,
-    SC: IpLayerIngressContext<Ipv4, C> + CounterContext<IpCounters<Ipv4>>,
+    CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     frame_dst: FrameDestination,
     src_ip: Ipv4Addr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -1694,13 +1690,13 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv6_packet` has the same semantics as
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
-    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
+    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
     B: BufferMut,
-    SC: IpLayerIngressContext<Ipv6, C> + CounterContext<IpCounters<Ipv6>>,
+    CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     frame_dst: FrameDestination,
     src_ip: Ipv6SourceAddr,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -1938,10 +1934,10 @@ macro_rules! try_parse_ip_packet {
 /// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
 /// depending on the type parameter, `I`.
 #[cfg(test)]
-pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: NonSyncContext, I: Ip>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
+pub(crate) fn receive_ip_packet<B: BufferMut, BC: NonSyncContext, I: Ip>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    device: &DeviceId<BC>,
     frame_dst: FrameDestination,
     buffer: B,
 ) {
@@ -1961,15 +1957,15 @@ pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: NonSyncContext, I: Ip>
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
 /// for options.
 pub(crate) fn receive_ipv4_packet<
-    C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
+    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
     B: BufferMut,
-    SC: IpLayerIngressContext<Ipv4, C>
+    CC: IpLayerIngressContext<Ipv4, BC>
         + CounterContext<IpCounters<Ipv4>>
         + CounterContext<Ipv4Counters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     frame_dst: FrameDestination,
     mut buffer: B,
 ) {
@@ -2211,15 +2207,15 @@ pub(crate) fn receive_ipv4_packet<
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
 /// for options.
 pub(crate) fn receive_ipv6_packet<
-    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
+    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
     B: BufferMut,
-    SC: IpLayerIngressContext<Ipv6, C>
+    CC: IpLayerIngressContext<Ipv6, BC>
         + CounterContext<IpCounters<Ipv6>>
         + CounterContext<Ipv6Counters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     frame_dst: FrameDestination,
     mut buffer: B,
 ) {
@@ -2559,14 +2555,14 @@ enum DropReason {
 
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
-    C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpLayerContext<Ipv4, C> + CounterContext<IpCounters<Ipv4>> + CounterContext<Ipv4Counters>,
+    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
+    CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>> + CounterContext<Ipv4Counters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
-) -> ReceivePacketAction<Ipv4Addr, SC::DeviceId> {
+) -> ReceivePacketAction<Ipv4Addr, CC::DeviceId> {
     // If the packet arrived at the loopback interface, check if any local
     // interface has the destination address assigned. This effectively lets
     // the loopback interface operate as a weak host for incoming packets.
@@ -2607,14 +2603,14 @@ fn receive_ipv4_packet_action<
 
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
-    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpLayerContext<Ipv6, C> + CounterContext<IpCounters<Ipv6>> + CounterContext<Ipv6Counters>,
+    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
+    CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>> + CounterContext<Ipv6Counters>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
-) -> ReceivePacketAction<Ipv6Addr, SC::DeviceId> {
+) -> ReceivePacketAction<Ipv6Addr, CC::DeviceId> {
     // If the packet arrived at the loopback interface, check if any local
     // interface has the destination address assigned. This effectively lets
     // the loopback interface operate as a weak host for incoming packets.
@@ -2720,14 +2716,14 @@ fn receive_ipv6_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C> + CounterContext<IpCounters<I>>,
+    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     dst_ip: SpecifiedAddr<I::Addr>,
-    device_id: &SC::DeviceId,
-) -> ReceivePacketAction<I::Addr, SC::DeviceId> {
+    device_id: &CC::DeviceId,
+) -> ReceivePacketAction<I::Addr, CC::DeviceId> {
     // The packet is not destined locally, so we attempt to forward it.
     if !core_ctx.is_device_forwarding_enabled(device_id) {
         // Forwarding is disabled; we are operating only as a host.
@@ -2767,21 +2763,21 @@ fn receive_ip_packet_action_common<
 // Look up the route to a host.
 fn lookup_route_table<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
+    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpLayerContext<I, BC>,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
-    device: Option<&SC::DeviceId>,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
-) -> Option<Destination<I::Addr, SC::DeviceId>> {
+) -> Option<Destination<I::Addr, CC::DeviceId>> {
     core_ctx.with_ip_routing_table(|sync_ctx, table| table.lookup(sync_ctx, device, dst_ip))
 }
 
 /// Get all the routes.
-pub fn get_all_routes<NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-) -> Vec<types::EntryEither<DeviceId<NonSyncCtx>>> {
+pub fn get_all_routes<BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+) -> Vec<types::EntryEither<DeviceId<BC>>> {
     {
         let mut sync_ctx = Locked::new(core_ctx);
         IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut sync_ctx, |sync_ctx, ipv4| {
@@ -2839,10 +2835,10 @@ impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<
     }
 }
 
-pub(crate) trait IpLayerHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     fn send_ip_packet_from_device<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
     ) -> Result<(), S>
@@ -2853,14 +2849,14 @@ pub(crate) trait IpLayerHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
 impl<
         I: IpLayerIpExt,
-        C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<I, C> + IpDeviceSendContext<I, C> + NonTestCtxMarker,
-    > IpLayerHandler<I, C> for SC
+        BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC> + NonTestCtxMarker,
+    > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
         &mut self,
-        bindings_ctx: &mut C,
-        meta: SendIpPacketMeta<I, &SC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
+        bindings_ctx: &mut BC,
+        meta: SendIpPacketMeta<I, &CC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
     ) -> Result<(), S>
     where
@@ -2877,20 +2873,20 @@ impl<
 ///
 /// Panics if either the source or destination address is the loopback address
 /// and the device is a non-loopback device.
-pub(crate) fn send_ip_packet_from_device<I, C, SC, S>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     meta: SendIpPacketMeta<
         I,
-        &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
+        &<CC as DeviceIdContext<AnyDevice>>::DeviceId,
         Option<SpecifiedAddr<I::Addr>>,
     >,
     body: S,
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: IpDeviceStateContext<I, C> + IpDeviceSendContext<I, C>,
+    BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC>,
     S: Serializer,
     S::Buffer: BufferMut,
 {
@@ -2934,18 +2930,18 @@ where
 }
 
 impl<
-        C: NonSyncContext,
+        BC: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+    > InnerIcmpContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
     type DualStackContext = datagram::UninstantiableContext<Ipv4, icmp::Icmp, Self>;
     fn receive_icmp_error(
         &mut self,
-        bindings_ctx: &mut C,
-        device: &DeviceId<C>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         original_src_ip: Option<SpecifiedAddr<Ipv4Addr>>,
         original_dst_ip: SpecifiedAddr<Ipv4Addr>,
         original_proto: Ipv4Proto,
@@ -3024,7 +3020,7 @@ impl<
         cb(&mut sync_ctx, &mut sockets)
     }
 
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(
+    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -3033,18 +3029,18 @@ impl<
 }
 
 impl<
-        C: NonSyncContext,
+        BC: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
-    > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+    > InnerIcmpContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
     type DualStackContext = datagram::UninstantiableContext<Ipv6, icmp::Icmp, Self>;
     fn receive_icmp_error(
         &mut self,
-        bindings_ctx: &mut C,
-        device: &DeviceId<C>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         original_src_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         original_dst_ip: SpecifiedAddr<Ipv6Addr>,
         original_next_header: Ipv6Proto,
@@ -3123,7 +3119,7 @@ impl<
         cb(&mut sync_ctx, &mut sockets)
     }
 
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(
+    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -3131,16 +3127,16 @@ impl<
     }
 }
 
-impl<L, C: NonSyncContext> icmp::IcmpStateContext for Locked<&SyncCtx<C>, L> {}
+impl<L, BC: NonSyncContext> icmp::IcmpStateContext for Locked<&SyncCtx<BC>, L> {}
 
 impl<
-        C: NonSyncContext,
+        BC: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
-    > icmp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+    > icmp::StateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
 
     fn with_sockets_state<
         O,
@@ -3178,13 +3174,13 @@ impl<
 }
 
 impl<
-        C: NonSyncContext,
+        BC: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > icmp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+    > icmp::StateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
 
     fn with_sockets_state<
         O,
@@ -3225,10 +3221,10 @@ impl<
 ///
 /// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
 /// or `None` if the destination is unreachable.
-pub fn resolve_route<I: Ip, NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
+pub fn resolve_route<I: Ip, BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
     destination: I::Addr,
-) -> Result<ResolvedRoute<I, DeviceId<NonSyncCtx>>, ResolveRouteError> {
+) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
     let sync_ctx = Locked::new(core_ctx);
     let destination = SpecifiedAddr::new(destination);
     I::map_ip(
@@ -3443,17 +3439,18 @@ pub(crate) mod testutil {
 
     impl<
             I: Ip,
-            C: RngContext + InstantContext<Instant = FakeInstant>,
+            BC: RngContext + InstantContext<Instant = FakeInstant>,
             D: FakeStrongDeviceId,
-            State: MulticastMembershipHandler<I, C, DeviceId = D>,
+            State: MulticastMembershipHandler<I, BC, DeviceId = D>,
             Meta,
-        > MulticastMembershipHandler<I, C> for crate::context::testutil::FakeSyncCtx<State, Meta, D>
+        > MulticastMembershipHandler<I, BC>
+        for crate::context::testutil::FakeSyncCtx<State, Meta, D>
     where
         Self: DeviceIdContext<AnyDevice, DeviceId = D>,
     {
         fn join_multicast_group(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -3462,7 +3459,7 @@ pub(crate) mod testutil {
 
         fn leave_multicast_group(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
@@ -3624,10 +3621,10 @@ mod tests {
 
     /// Process an IP fragment depending on the `Ip` `process_ip_fragment` is
     /// specialized with.
-    fn process_ip_fragment<I: Ip, NonSyncCtx: NonSyncContext>(
-        core_ctx: &mut &SyncCtx<NonSyncCtx>,
-        bindings_ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
+    fn process_ip_fragment<I: Ip, BC: NonSyncContext>(
+        core_ctx: &mut &SyncCtx<BC>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3657,10 +3654,10 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv4_fragment<NonSyncCtx: NonSyncContext>(
-        core_ctx: &mut &SyncCtx<NonSyncCtx>,
-        bindings_ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
+    fn process_ipv4_fragment<BC: NonSyncContext>(
+        core_ctx: &mut &SyncCtx<BC>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3691,10 +3688,10 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv6_fragment<NonSyncCtx: NonSyncContext>(
-        core_ctx: &mut &SyncCtx<NonSyncCtx>,
-        bindings_ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
+    fn process_ipv6_fragment<BC: NonSyncContext>(
+        core_ctx: &mut &SyncCtx<BC>,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -4338,16 +4335,16 @@ mod tests {
     }
 
     trait GetPmtuIpExt: Ip {
-        fn get_pmtu<C: NonSyncContext>(
-            state: &StackState<C>,
+        fn get_pmtu<BC: NonSyncContext>(
+            state: &StackState<BC>,
             local_ip: Self::Addr,
             remote_ip: Self::Addr,
         ) -> Option<Mtu>;
     }
 
     impl GetPmtuIpExt for Ipv4 {
-        fn get_pmtu<C: NonSyncContext>(
-            state: &StackState<C>,
+        fn get_pmtu<BC: NonSyncContext>(
+            state: &StackState<BC>,
             local_ip: Ipv4Addr,
             remote_ip: Ipv4Addr,
         ) -> Option<Mtu> {
@@ -4356,8 +4353,8 @@ mod tests {
     }
 
     impl GetPmtuIpExt for Ipv6 {
-        fn get_pmtu<C: NonSyncContext>(
-            state: &StackState<C>,
+        fn get_pmtu<BC: NonSyncContext>(
+            state: &StackState<BC>,
             local_ip: Ipv6Addr,
             remote_ip: Ipv6Addr,
         ) -> Option<Mtu> {

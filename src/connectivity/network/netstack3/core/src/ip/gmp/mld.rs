@@ -69,18 +69,18 @@ pub(crate) trait MldNonSyncContext<DeviceId>:
     RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
-    MldNonSyncContext<DeviceId> for C
+impl<DeviceId, BC: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
+    MldNonSyncContext<DeviceId> for BC
 {
 }
 
 /// Provides immutable access to MLD state.
-pub(crate) trait MldStateContext<C: MldNonSyncContext<Self::DeviceId>>:
+pub(crate) trait MldStateContext<BC: MldNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -88,12 +88,12 @@ pub(crate) trait MldStateContext<C: MldNonSyncContext<Self::DeviceId>>:
 }
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
-pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<C, MldFrameMetadata<Self::DeviceId>>
+pub(crate) trait MldContext<BC: MldNonSyncContext<Self::DeviceId>>:
+    DeviceIdContext<AnyDevice> + SendFrameContext<BC, MldFrameMetadata<Self::DeviceId>>
 {
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.
-    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
+    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -109,11 +109,11 @@ pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
 /// A handler for incoming MLD packets.
 ///
 /// A blanket implementation is provided for all `C: MldContext`.
-pub(crate) trait MldPacketHandler<C, DeviceId> {
+pub(crate) trait MldPacketHandler<BC, DeviceId> {
     /// Receive an MLD packet.
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
@@ -121,13 +121,13 @@ pub(crate) trait MldPacketHandler<C, DeviceId> {
     );
 }
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> MldPacketHandler<C, SC::DeviceId>
-    for SC
+impl<BC: MldNonSyncContext<CC::DeviceId>, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId>
+    for CC
 {
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         _src_ip: Ipv6SourceAddr,
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
@@ -197,17 +197,19 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, C>
-    for SC
+impl<BC: MldNonSyncContext<CC::DeviceId>, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BC>
+    for CC
 {
     type ProtocolSpecific = MldProtocolSpecific;
-    type GroupState = MldGroupState<C::Instant>;
+    type GroupState = MldGroupState<BC::Instant>;
 }
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldStateContext<C>> GmpStateContext<Ipv6, C> for SC {
+impl<BC: MldNonSyncContext<CC::DeviceId>, CC: MldStateContext<BC>> GmpStateContext<Ipv6, BC>
+    for CC
+{
     fn with_gmp_state<
         O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<C::Instant>>) -> O,
+        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -217,10 +219,10 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldStateContext<C>> GmpStateContext
     }
 }
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> for SC {
+impl<BC: MldNonSyncContext<CC::DeviceId>, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
     type Err = MldError;
 
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
+    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -230,7 +232,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
 
     fn send_message(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv6Addr>,
         msg_type: GmpMessageType<MldProtocolSpecific>,
@@ -265,7 +267,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
         }
     }
 
-    fn run_actions(&mut self, _bindings_ctx: &mut C, device: &SC::DeviceId, actions: Never) {
+    fn run_actions(&mut self, _bindings_ctx: &mut BC, device: &CC::DeviceId, actions: Never) {
         unreachable!("actions ({actions:?} should not be constructable; device = {device:?}")
     }
 
@@ -390,10 +392,14 @@ impl_timer_context!(
     id
 );
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>>
-    TimerHandler<C, MldDelayedReportTimerId<SC::DeviceId>> for SC
+impl<BC: MldNonSyncContext<CC::DeviceId>, CC: MldContext<BC>>
+    TimerHandler<BC, MldDelayedReportTimerId<CC::DeviceId>> for CC
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut C, timer: MldDelayedReportTimerId<SC::DeviceId>) {
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut BC,
+        timer: MldDelayedReportTimerId<CC::DeviceId>,
+    ) {
         let MldDelayedReportTimerId(id) = timer;
         gmp_handle_timer(self, bindings_ctx, id);
     }
@@ -404,13 +410,13 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>>
 /// The MLD packet being sent should have its `hop_limit` to be 1 and a
 /// `RouterAlert` option in its Hop-by-Hop Options extensions header.
 fn send_mld_packet<
-    C: MldNonSyncContext<SC::DeviceId>,
-    SC: MldContext<C>,
+    BC: MldNonSyncContext<CC::DeviceId>,
+    CC: MldContext<BC>,
     M: IcmpMldv1MessageType,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     dst_ip: MulticastAddr<Ipv6Addr>,
     msg: M,
     group_addr: M::GroupAddr,

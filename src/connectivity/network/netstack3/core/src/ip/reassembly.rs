@@ -96,21 +96,21 @@ pub(super) trait FragmentStateContext<I: Ip, Instant> {
 
 /// The non-synchronized execution context for IP packet fragment reassembly.
 trait FragmentNonSyncContext<I: Ip>: TimerContext<FragmentCacheKey<I::Addr>> {}
-impl<I: Ip, C: TimerContext<FragmentCacheKey<I::Addr>>> FragmentNonSyncContext<I> for C {}
+impl<I: Ip, BC: TimerContext<FragmentCacheKey<I::Addr>>> FragmentNonSyncContext<I> for BC {}
 
 /// The execution context for IP packet fragment reassembly.
-trait FragmentContext<I: Ip, C: FragmentNonSyncContext<I>>:
-    FragmentStateContext<I, C::Instant>
+trait FragmentContext<I: Ip, BC: FragmentNonSyncContext<I>>:
+    FragmentStateContext<I, BC::Instant>
 {
 }
 
-impl<I: Ip, C: FragmentNonSyncContext<I>, SC: FragmentStateContext<I, C::Instant>>
-    FragmentContext<I, C> for SC
+impl<I: Ip, BC: FragmentNonSyncContext<I>, CC: FragmentStateContext<I, BC::Instant>>
+    FragmentContext<I, BC> for CC
 {
 }
 
 /// An implementation of a fragment cache.
-pub(crate) trait FragmentHandler<I: IpExt, C> {
+pub(crate) trait FragmentHandler<I: IpExt, BC> {
     /// Attempts to process a packet fragment.
     ///
     /// # Panics
@@ -118,7 +118,7 @@ pub(crate) trait FragmentHandler<I: IpExt, C> {
     /// Panics if the packet has no fragment data.
     fn process_fragment<B: ByteSlice>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         packet: I::Packet<B>,
     ) -> FragmentProcessingState<I, B>
     where
@@ -143,18 +143,18 @@ pub(crate) trait FragmentHandler<I: IpExt, C> {
     /// to cancel the reassembly timer.
     fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
     ) -> Result<I::Packet<B>, FragmentReassemblyError>;
 }
 
-impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> FragmentHandler<I, C>
-    for SC
+impl<I: IpExt, BC: FragmentNonSyncContext<I>, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
+    for CC
 {
     fn process_fragment<B: ByteSlice>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         packet: I::Packet<B>,
     ) -> FragmentProcessingState<I, B>
     where
@@ -180,7 +180,7 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
 
     fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
     ) -> Result<I::Packet<B>, FragmentReassemblyError> {
@@ -203,12 +203,12 @@ impl<I: IpExt, C: FragmentNonSyncContext<I>, SC: FragmentContext<I, C>> Fragment
     }
 }
 
-impl<A: IpAddress, C: FragmentNonSyncContext<A::Version>, SC: FragmentContext<A::Version, C>>
-    TimerHandler<C, FragmentCacheKey<A>> for SC
+impl<A: IpAddress, BC: FragmentNonSyncContext<A::Version>, CC: FragmentContext<A::Version, BC>>
+    TimerHandler<BC, FragmentCacheKey<A>> for CC
 where
     A::Version: IpExt,
 {
-    fn handle_timer(&mut self, _bindings_ctx: &mut C, key: FragmentCacheKey<A>) {
+    fn handle_timer(&mut self, _bindings_ctx: &mut BC, key: FragmentCacheKey<A>) {
         // If a timer fired, the `key` must still exist in our fragment cache.
         assert_matches!(self.with_state_mut(|cache| cache.remove_data(&key)), Some(_));
     }
@@ -922,11 +922,11 @@ mod tests {
     /// be called when `I` is `Ipv4` and `Ipv6`, respectively.
     fn process_ip_fragment<
         I: TestIpExt,
-        SC: FragmentContext<I, C>,
-        C: FragmentNonSyncContext<I>,
+        CC: FragmentContext<I, BC>,
+        BC: FragmentNonSyncContext<I>,
     >(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
@@ -945,9 +945,9 @@ mod tests {
     /// Generates and processes an IPv4 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv4_fragment<SC: FragmentContext<Ipv4, C>, C: FragmentNonSyncContext<Ipv4>>(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+    fn process_ipv4_fragment<CC: FragmentContext<Ipv4, BC>, BC: FragmentNonSyncContext<Ipv4>>(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
@@ -997,9 +997,9 @@ mod tests {
     /// Generates and processes an IPv6 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv6_fragment<SC: FragmentContext<Ipv6, C>, C: FragmentNonSyncContext<Ipv6>>(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+    fn process_ipv6_fragment<CC: FragmentContext<Ipv6, BC>, BC: FragmentNonSyncContext<Ipv6>>(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         fragment_id: u16,
         fragment_offset: u16,
         m_flag: bool,
@@ -1058,9 +1058,9 @@ mod tests {
     trait TestIpExt: crate::testutil::TestIpExt {
         const HEADER_LENGTH: usize;
 
-        fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            core_ctx: &mut SC,
-            bindings_ctx: &mut C,
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+            core_ctx: &mut CC,
+            bindings_ctx: &mut BC,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
@@ -1071,9 +1071,9 @@ mod tests {
     impl TestIpExt for Ipv4 {
         const HEADER_LENGTH: usize = packet_formats::ipv4::HDR_PREFIX_LEN;
 
-        fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            core_ctx: &mut SC,
-            bindings_ctx: &mut C,
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+            core_ctx: &mut CC,
+            bindings_ctx: &mut BC,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
@@ -1092,9 +1092,9 @@ mod tests {
     impl TestIpExt for Ipv6 {
         const HEADER_LENGTH: usize = packet_formats::ipv6::IPV6_FIXED_HDR_LEN;
 
-        fn process_ip_fragment<SC: FragmentContext<Self, C>, C: FragmentNonSyncContext<Self>>(
-            core_ctx: &mut SC,
-            bindings_ctx: &mut C,
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+            core_ctx: &mut CC,
+            bindings_ctx: &mut BC,
             fragment_id: u16,
             fragment_offset: u16,
             m_flag: bool,
@@ -1114,11 +1114,11 @@ mod tests {
     /// Tries to reassemble the packet with the given fragment ID.
     fn try_reassemble_ip_packet<
         I: TestIpExt,
-        SC: FragmentContext<I, C>,
-        C: FragmentNonSyncContext<I>,
+        CC: FragmentContext<I, BC>,
+        BC: FragmentNonSyncContext<I>,
     >(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         fragment_id: u16,
         total_body_len: usize,
     ) {

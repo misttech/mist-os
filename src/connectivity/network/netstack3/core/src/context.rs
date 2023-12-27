@@ -108,7 +108,7 @@ use crate::{
 /// [this issue]: https://github.com/rust-lang/rust/issues/97811
 pub(crate) trait NonTestCtxMarker {}
 
-impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<NonSyncCtx>, L> {}
+impl<BC: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<BC>, L> {}
 
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
 /// implementation.
@@ -213,9 +213,9 @@ pub trait TimerContext<Id>: InstantContext {
 /// A handler for timer firing events.
 ///
 /// A `TimerHandler` is a type capable of handling the event of a timer firing.
-pub(crate) trait TimerHandler<C, Id> {
+pub(crate) trait TimerHandler<BC, Id> {
     /// Handle a timer firing.
-    fn handle_timer(&mut self, bindings_ctx: &mut C, id: Id);
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
 }
 
 // NOTE:
@@ -244,15 +244,15 @@ pub trait RngContext {
 }
 
 /// A context for receiving frames.
-pub trait RecvFrameContext<C, Meta> {
+pub trait RecvFrameContext<BC, Meta> {
     /// Receive a frame.
     ///
     /// `receive_frame` receives a frame with the given metadata.
-    fn receive_frame<B: BufferMut>(&mut self, bindings_ctx: &mut C, metadata: Meta, frame: B);
+    fn receive_frame<B: BufferMut>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: B);
 }
 
 /// A context for sending frames.
-pub trait SendFrameContext<C, Meta> {
+pub trait SendFrameContext<BC, Meta> {
     // TODO(joshlf): Add an error type parameter or associated type once we need
     // different kinds of errors.
 
@@ -264,7 +264,7 @@ pub trait SendFrameContext<C, Meta> {
     /// unmodified `Serializer` is returned.
     ///
     /// [`Serializer`]: packet::Serializer
-    fn send_frame<S>(&mut self, bindings_ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
+    fn send_frame<S>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: S) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -365,7 +365,7 @@ pub trait NonSyncContext:
 {
 }
 impl<
-        C: BindingsTypes
+        BC: BindingsTypes
             + RngContext
             + TimerContext<TimerId<Self>>
             + EventContext<
@@ -406,7 +406,7 @@ impl<
             + TracingContext
             + ReferenceNotifiers
             + 'static,
-    > NonSyncContext for C
+    > NonSyncContext for BC
 {
 }
 
@@ -416,9 +416,9 @@ pub struct SyncCtx<BT: BindingsTypes> {
     pub state: StackState<BT>,
 }
 
-impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
+impl<BC: NonSyncContext> SyncCtx<BC> {
     /// Create a new `SyncCtx`.
-    pub fn new(bindings_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
+    pub fn new(bindings_ctx: &mut BC) -> SyncCtx<BC> {
         SyncCtx { state: StackStateBuilder::default().build_with_ctx(bindings_ctx) }
     }
 }
@@ -1092,21 +1092,27 @@ pub(crate) mod testutil {
     pub(crate) fn handle_timer_helper_with_sc_ref_mut<
         'a,
         Id,
-        SC,
-        C,
-        F: FnMut(&mut SC, &mut C, Id) + 'a,
+        CC,
+        BC,
+        F: FnMut(&mut CC, &mut BC, Id) + 'a,
     >(
-        core_ctx: &'a mut SC,
+        core_ctx: &'a mut CC,
         mut f: F,
-    ) -> impl FnMut(&mut C, Id) + 'a {
+    ) -> impl FnMut(&mut BC, Id) + 'a {
         move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
     }
 
     #[cfg(test)]
-    pub(crate) fn handle_timer_helper_with_sc_ref<'a, Id, SC, C, F: FnMut(&SC, &mut C, Id) + 'a>(
-        core_ctx: &'a SC,
+    pub(crate) fn handle_timer_helper_with_sc_ref<
+        'a,
+        Id,
+        CC,
+        BC,
+        F: FnMut(&CC, &mut BC, Id) + 'a,
+    >(
+        core_ctx: &'a CC,
         mut f: F,
-    ) -> impl FnMut(&mut C, Id) + 'a {
+    ) -> impl FnMut(&mut BC, Id) + 'a {
         move |non_sync_ctx, id| f(core_ctx, non_sync_ctx, id)
     }
 
@@ -1419,8 +1425,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<SC, TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
-        for FakeCtxWithSyncCtx<SC, TimerId, Event, State>
+    impl<CC, TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
+        for FakeCtxWithSyncCtx<CC, TimerId, Event, State>
     {
         fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
             let Self { sync_ctx: _, non_sync_ctx } = self;
@@ -1453,8 +1459,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    pub(crate) type FakeCtxWithSyncCtx<SC, TimerId, Event, NonSyncCtxState> =
-        crate::testutil::ContextPair<SC, FakeNonSyncCtx<TimerId, Event, NonSyncCtxState>>;
+    pub(crate) type FakeCtxWithSyncCtx<CC, TimerId, Event, NonSyncCtxState> =
+        crate::testutil::ContextPair<CC, FakeNonSyncCtx<TimerId, Event, NonSyncCtxState>>;
 
     #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, NonSyncCtxState> =
@@ -1469,8 +1475,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<SC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeInstantCtx>
-        for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
+    impl<CC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeInstantCtx>
+        for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_ref(&self) -> &FakeInstantCtx {
             self.non_sync_ctx.timers.as_ref()
@@ -1478,8 +1484,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<SC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeTimerCtx<Id>>
-        for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
+    impl<CC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeTimerCtx<Id>>
+        for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_ref(&self) -> &FakeTimerCtx<Id> {
             &self.non_sync_ctx.timers
@@ -1487,8 +1493,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<SC, Id, Event: Debug, NonSyncCtxState> AsMut<FakeTimerCtx<Id>>
-        for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
+    impl<CC, Id, Event: Debug, NonSyncCtxState> AsMut<FakeTimerCtx<Id>>
+        for FakeCtxWithSyncCtx<CC, Id, Event, NonSyncCtxState>
     {
         fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
             &mut self.non_sync_ctx.timers
@@ -1574,12 +1580,12 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<C, S, Meta, DeviceId> CounterContext<C> for FakeSyncCtx<S, Meta, DeviceId>
+    impl<BC, S, Meta, DeviceId> CounterContext<BC> for FakeSyncCtx<S, Meta, DeviceId>
     where
-        S: CounterContext<C>,
+        S: CounterContext<BC>,
     {
-        fn with_counters<O, F: FnOnce(&C) -> O>(&self, cb: F) -> O {
-            CounterContext::<C>::with_counters(&self.state, cb)
+        fn with_counters<O, F: FnOnce(&BC) -> O>(&self, cb: F) -> O {
+            CounterContext::<BC>::with_counters(&self.state, cb)
         }
     }
 
@@ -2042,13 +2048,13 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<CtxId, Links, SC, C, RecvMeta>
-        FakeNetwork<CtxId, RecvMeta, crate::testutil::ContextPair<SC, C>, Links>
+    impl<CtxId, Links, CC, BC, RecvMeta>
+        FakeNetwork<CtxId, RecvMeta, crate::testutil::ContextPair<CC, BC>, Links>
     where
-        crate::testutil::ContextPair<SC, C>: FakeNetworkContext,
+        crate::testutil::ContextPair<CC, BC>: FakeNetworkContext,
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
-            <crate::testutil::ContextPair<SC, C> as FakeNetworkContext>::SendMeta,
+            <crate::testutil::ContextPair<CC, BC> as FakeNetworkContext>::SendMeta,
             RecvMeta,
             CtxId,
         >,
@@ -2056,7 +2062,7 @@ pub(crate) mod testutil {
         pub(crate) fn with_context<
             K: Into<CtxId>,
             O,
-            F: FnOnce(&mut crate::testutil::ContextPair<SC, C>) -> O,
+            F: FnOnce(&mut crate::testutil::ContextPair<CC, BC>) -> O,
         >(
             &mut self,
             context: K,
@@ -2066,13 +2072,13 @@ pub(crate) mod testutil {
         }
 
         /// Retrieves a `FakeSyncCtx` named `context`.
-        pub(crate) fn sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut SC {
+        pub(crate) fn sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut CC {
             let crate::testutil::ContextPair { sync_ctx, non_sync_ctx: _ } = self.context(context);
             sync_ctx
         }
 
         /// Retrieves a `FakeNonSyncCtx` named `context`.
-        pub(crate) fn non_sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut C {
+        pub(crate) fn non_sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut BC {
             let crate::testutil::ContextPair { sync_ctx: _, non_sync_ctx } = self.context(context);
             non_sync_ctx
         }

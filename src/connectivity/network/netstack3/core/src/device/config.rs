@@ -82,16 +82,16 @@ pub enum DeviceConfigurationUpdateError {
 /// Configuration is only applied when the `apply` method is called.
 pub struct PendingDeviceConfigurationUpdate<'a, D>(DeviceConfigurationUpdate, &'a D);
 
-impl<'a, C> PendingDeviceConfigurationUpdate<'a, DeviceId<C>>
+impl<'a, BC> PendingDeviceConfigurationUpdate<'a, DeviceId<BC>>
 where
-    C: NonSyncContext,
+    BC: NonSyncContext,
 {
     /// Applies the configuration and returns a [`DeviceConfigurationUpdate`]
     /// with the previous values for all configurations for all `Some` fields.
     ///
     /// Note that even if the previous value matched the requested value, it is
     /// still populated in the returned `DeviceConfigurationUpdate`.
-    pub fn apply(self, core_ctx: &SyncCtx<C>) -> DeviceConfigurationUpdate {
+    pub fn apply(self, core_ctx: &SyncCtx<BC>) -> DeviceConfigurationUpdate {
         let Self(DeviceConfigurationUpdate { arp, ndp }, device_id) = self;
         let eth = match device_id {
             DeviceId::Loopback(_) => {
@@ -131,10 +131,10 @@ where
 }
 
 /// Creates a new device configuration update for the given device.
-pub fn new_device_configuration_update<C: NonSyncContext>(
-    device: &DeviceId<C>,
+pub fn new_device_configuration_update<BC: NonSyncContext>(
+    device: &DeviceId<BC>,
     config: DeviceConfigurationUpdate,
-) -> Result<PendingDeviceConfigurationUpdate<'_, DeviceId<C>>, DeviceConfigurationUpdateError> {
+) -> Result<PendingDeviceConfigurationUpdate<'_, DeviceId<BC>>, DeviceConfigurationUpdateError> {
     let DeviceConfigurationUpdate { arp, ndp } = &config;
     if device.is_loopback() {
         if arp.is_some() {
@@ -148,9 +148,9 @@ pub fn new_device_configuration_update<C: NonSyncContext>(
 }
 
 /// Returns a snapshot of the given device's configuration.
-pub fn get_device_configuration<C: NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    device_id: &DeviceId<C>,
+pub fn get_device_configuration<BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    device_id: &DeviceId<BC>,
 ) -> DeviceConfiguration {
     match device_id {
         DeviceId::Loopback(_) => DeviceConfiguration { arp: None, ndp: None },

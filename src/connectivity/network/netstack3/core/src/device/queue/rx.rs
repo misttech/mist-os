@@ -63,7 +63,7 @@ pub(crate) struct ReceiveQueue<Meta, Buffer> {
     pub(crate) queue: Mutex<ReceiveQueueState<Meta, Buffer>>,
 }
 
-pub(crate) trait ReceiveQueueTypes<D: Device, C>: DeviceIdContext<D> {
+pub(crate) trait ReceiveQueueTypes<D: Device, BC>: DeviceIdContext<D> {
     /// Metadata associated with an RX frame.
     type Meta;
 
@@ -72,7 +72,7 @@ pub(crate) trait ReceiveQueueTypes<D: Device, C>: DeviceIdContext<D> {
 }
 
 /// The execution context for a receive queue.
-pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
+pub(crate) trait ReceiveQueueContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     /// Calls the function with the RX queue state.
     fn with_receive_queue_mut<O, F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O>(
         &mut self,
@@ -81,27 +81,27 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     ) -> O;
 }
 
-pub(crate) trait ReceiveDequeFrameContext<D: Device, C>: ReceiveQueueTypes<D, C> {
+pub(crate) trait ReceiveDequeFrameContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     /// Handle a received frame.
     fn handle_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
     );
 }
 
-pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
+pub(crate) trait ReceiveDequeContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     type ReceiveQueueCtx<'a>: ReceiveQueueContext<
             D,
-            C,
+            BC,
             Meta = Self::Meta,
             Buffer = Self::Buffer,
             DeviceId = Self::DeviceId,
         > + ReceiveDequeFrameContext<
             D,
-            C,
+            BC,
             Meta = Self::Meta,
             Buffer = Self::Buffer,
             DeviceId = Self::DeviceId,
@@ -119,7 +119,7 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
 }
 
 /// An implementation of a receive queue, with a buffer.
-pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
+pub(crate) trait ReceiveQueueHandler<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     /// Queues a frame for reception.
     ///
     /// # Errors
@@ -127,7 +127,7 @@ pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Returns an error with the metadata and body if the queue is full.
     fn queue_rx_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         body: Self::Buffer,
@@ -135,19 +135,19 @@ pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
 }
 
 /// Crate-internal receive queue API interaction.
-pub(crate) struct ReceiveQueueApi<SC, C, D>(Never, PhantomData<(SC, C, D)>);
+pub(crate) struct ReceiveQueueApi<CC, BT, D>(Never, PhantomData<(CC, BT, D)>);
 
-impl<SC, C, D> ReceiveQueueApi<SC, C, D>
+impl<CC, BC, D> ReceiveQueueApi<CC, BC, D>
 where
     D: Device,
-    C: ReceiveQueueNonSyncContext<D, SC::DeviceId>,
-    SC: ReceiveDequeContext<D, C>,
+    BC: ReceiveQueueNonSyncContext<D, CC::DeviceId>,
+    CC: ReceiveDequeContext<D, BC>,
 {
     /// Handle any queued RX frames.
     pub(crate) fn handle_queued_rx_frames(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
     ) -> WorkQueueReport {
         core_ctx.with_dequed_frames_and_rx_queue_ctx(
             device_id,
@@ -175,16 +175,19 @@ where
     }
 }
 
-impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueueContext<D, C>>
-    ReceiveQueueHandler<D, C> for SC
+impl<
+        D: Device,
+        BC: ReceiveQueueNonSyncContext<D, CC::DeviceId>,
+        CC: ReceiveQueueContext<D, BC>,
+    > ReceiveQueueHandler<D, BC> for CC
 {
     fn queue_rx_frame(
         &mut self,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
-        meta: SC::Meta,
-        body: SC::Buffer,
-    ) -> Result<(), ReceiveQueueFullError<(Self::Meta, SC::Buffer)>> {
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
+        meta: CC::Meta,
+        body: CC::Buffer,
+    ) -> Result<(), ReceiveQueueFullError<(Self::Meta, CC::Buffer)>> {
         self.with_receive_queue_mut(device_id, |ReceiveQueueState { queue }| {
             queue.queue_rx_frame(meta, body).map(|res| match res {
                 EnqueueResult::QueueWasPreviouslyEmpty => bindings_ctx.wake_rx_task(device_id),

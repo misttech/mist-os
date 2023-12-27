@@ -184,8 +184,8 @@ pub struct UdpCountersInner {
     pub tx_error: Counter,
 }
 
-impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
-    for SyncCtx<C>
+impl<BC: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
+    for SyncCtx<BC>
 {
     type Data = UdpCounters<I>;
     type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
@@ -195,8 +195,8 @@ impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCo
     }
 }
 
-impl<NonSyncCtx: crate::NonSyncContext, I: Ip, L> CounterContext<UdpCounters<I>>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<BC: crate::NonSyncContext, I: Ip, L> CounterContext<UdpCounters<I>>
+    for Locked<&SyncCtx<BC>, L>
 {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
@@ -1065,30 +1065,30 @@ pub(crate) trait StateNonSyncContext<I: IpExt, D>:
     InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>
 {
 }
-impl<I: IpExt, C: InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>, D>
-    StateNonSyncContext<I, D> for C
+impl<I: IpExt, BC: InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>, D>
+    StateNonSyncContext<I, D> for BC
 {
 }
 
 /// An execution context for the UDP protocol which also provides access to state.
-pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait BoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The synchronized context passed to the callback provided to methods.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C>
-        + MulticastMembershipHandler<I, C>
+    type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
     type DualStackContext: DualStackDatagramBoundStateContext<
         I,
-        C,
+        BC,
         Udp,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
     type NonDualStackContext: NonDualStackDatagramBoundStateContext<
         I,
-        C,
+        BC,
         Udp,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
@@ -1124,11 +1124,11 @@ pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::Dev
     ) -> O;
 }
 
-pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait StateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback.
-    type SocketStateCtx<'a>: BoundStateContext<I, C>
+    type SocketStateCtx<'a>: BoundStateContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + UdpStateContext;
 
@@ -1170,14 +1170,14 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId
 pub(crate) trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
-pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait DualStackBoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callbacks to methods.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C>
+    type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         // Allow creating IP sockets for the other IP version.
-        + TransportIpContext<I::OtherVersion, C>;
+        + TransportIpContext<I::OtherVersion, BC>;
 
     /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
@@ -1214,7 +1214,7 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, 
 }
 
 /// An execution context for UDP non-dual-stack operations.
-pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait NonDualStackBoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
 }
@@ -1225,12 +1225,12 @@ pub(crate) enum UdpIpTransportContext {}
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
-    C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-    SC: StateContext<I, C> + StateContext<I::OtherVersion, C> + CounterContext<UdpCounters<I>>,
+    BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
     mut buffer: B,
@@ -1314,7 +1314,7 @@ fn receive_ip_packet<
     });
 
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
-        let delivered = try_dual_stack_deliver::<I, B, C, SC>(
+        let delivered = try_dual_stack_deliver::<I, B, BC, CC>(
             core_ctx,
             bindings_ctx,
             lookup_result,
@@ -1340,14 +1340,14 @@ fn receive_ip_packet<
 /// Tries to deliver the given UDP packet to the given UDP socket.
 fn try_deliver<
     I: IpExt,
-    SC: StateContext<I, C>,
-    C: StateNonSyncContext<I, SC::DeviceId>,
+    CC: StateContext<I, BC>,
+    BC: StateNonSyncContext<I, CC::DeviceId>,
     B: BufferMut,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: SocketId<I>,
-    device: &SC::DeviceId,
+    device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     buffer: &B,
@@ -1386,13 +1386,13 @@ fn try_deliver<
 fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
-    C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-    SC: StateContext<I, C> + StateContext<I::OtherVersion, C>,
+    BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     socket: I::DualStackBoundSocketId<Udp>,
-    device: &SC::DeviceId,
+    device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     buffer: &B,
@@ -1459,17 +1459,17 @@ fn try_dual_stack_deliver<
 
 impl<
         I: IpExt,
-        C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-        SC: StateContext<I, C>
-            + StateContext<I::OtherVersion, C>
+        BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+        CC: StateContext<I, BC>
+            + StateContext<I::OtherVersion, BC>
             + NonTestCtxMarker
             + CounterContext<UdpCounters<I>>,
-    > IpTransportContext<I, C, SC> for UdpIpTransportContext
+    > IpTransportContext<I, BC, CC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
-        core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
-        _device: &SC::DeviceId,
+        core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _device: &CC::DeviceId,
         original_src_ip: Option<SpecifiedAddr<I::Addr>>,
         original_dst_ip: SpecifiedAddr<I::Addr>,
         _original_udp_packet: &[u8],
@@ -1487,9 +1487,9 @@ impl<
     }
 
     fn receive_ip_packet<B: BufferMut>(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
@@ -1528,12 +1528,12 @@ pub enum SendToError {
     RemoteUnexpectedlyNonMapped,
 }
 
-pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait SocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     fn create_udp(&mut self) -> SocketId<I>;
 
     fn connect(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_port: UdpRemotePort,
@@ -1541,42 +1541,42 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn set_device(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError>;
 
     fn get_udp_bound_device(
         &mut self,
-        bindings_ctx: &C,
+        bindings_ctx: &BC,
         id: SocketId<I>,
     ) -> Option<Self::WeakDeviceId>;
 
     fn set_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError>;
 
     fn get_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError>;
 
     fn set_udp_posix_reuse_port(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError>;
 
-    fn get_udp_posix_reuse_port(&mut self, bindings_ctx: &C, id: SocketId<I>) -> bool;
+    fn get_udp_posix_reuse_port(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> bool;
 
     fn set_udp_multicast_membership(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, Self::DeviceId>,
@@ -1585,21 +1585,21 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn set_udp_unicast_hop_limit(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         unicast_hop_limit: Option<NonZeroU8>,
     );
 
     fn set_udp_multicast_hop_limit(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_hop_limit: Option<NonZeroU8>,
     );
 
-    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &C, id: SocketId<I>) -> NonZeroU8;
+    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8;
 
-    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &C, id: SocketId<I>) -> NonZeroU8;
+    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8;
 
     fn get_udp_transparent(&mut self, id: SocketId<I>) -> bool;
 
@@ -1607,34 +1607,34 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn disconnect_connected(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> Result<(), ExpectedConnError>;
 
     fn shutdown(
         &mut self,
-        bindings_ctx: &C,
+        bindings_ctx: &BC,
         id: SocketId<I>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError>;
 
-    fn get_shutdown(&mut self, bindings_ctx: &C, id: SocketId<I>) -> Option<ShutdownType>;
+    fn get_shutdown(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> Option<ShutdownType>;
 
     fn close(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
     fn get_udp_info(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
     fn listen_udp(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
@@ -1642,14 +1642,14 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn send<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         conn: SocketId<I>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>>;
 
     fn send_to<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_port: UdpRemotePort,
@@ -1659,9 +1659,9 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
 impl<
         I: IpExt,
-        C: StateNonSyncContext<I, Self::DeviceId>,
-        SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
-    > SocketHandler<I, C> for SC
+        BC: StateNonSyncContext<I, Self::DeviceId>,
+        CC: StateContext<I, BC> + CounterContext<UdpCounters<I>>,
+    > SocketHandler<I, BC> for CC
 {
     fn create_udp(&mut self) -> SocketId<I> {
         datagram::create(self)
@@ -1669,7 +1669,7 @@ impl<
 
     fn connect(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<<I>::Addr, Self::DeviceId>>,
         remote_port: UdpRemotePort,
@@ -1679,7 +1679,7 @@ impl<
 
     fn set_device(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError> {
@@ -1688,7 +1688,7 @@ impl<
 
     fn get_udp_bound_device(
         &mut self,
-        bindings_ctx: &C,
+        bindings_ctx: &BC,
         id: SocketId<I>,
     ) -> Option<Self::WeakDeviceId> {
         datagram::get_bound_device(self, bindings_ctx, id)
@@ -1696,7 +1696,7 @@ impl<
 
     fn set_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
@@ -1733,7 +1733,7 @@ impl<
 
     fn get_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError> {
         datagram::with_other_stack_ip_options(self, bindings_ctx, id, |other_stack| {
@@ -1753,7 +1753,7 @@ impl<
 
     fn set_udp_posix_reuse_port(
         &mut self,
-        _bindings_ctx: &mut C,
+        _bindings_ctx: &mut BC,
         id: SocketId<I>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError> {
@@ -1764,13 +1764,13 @@ impl<
         )
     }
 
-    fn get_udp_posix_reuse_port(&mut self, _bindings_ctx: &C, id: SocketId<I>) -> bool {
+    fn get_udp_posix_reuse_port(&mut self, _bindings_ctx: &BC, id: SocketId<I>) -> bool {
         datagram::get_sharing(self, id).is_reuse_port()
     }
 
     fn set_udp_multicast_membership(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, Self::DeviceId>,
@@ -1789,7 +1789,7 @@ impl<
 
     fn set_udp_unicast_hop_limit(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         unicast_hop_limit: Option<NonZeroU8>,
     ) {
@@ -1803,7 +1803,7 @@ impl<
 
     fn set_udp_multicast_hop_limit(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_hop_limit: Option<NonZeroU8>,
     ) {
@@ -1815,11 +1815,11 @@ impl<
         )
     }
 
-    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &C, id: SocketId<I>) -> NonZeroU8 {
+    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8 {
         crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).unicast
     }
 
-    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &C, id: SocketId<I>) -> NonZeroU8 {
+    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8 {
         crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).multicast
     }
 
@@ -1833,7 +1833,7 @@ impl<
 
     fn disconnect_connected(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> Result<(), ExpectedConnError> {
         datagram::disconnect_connected(self, bindings_ctx, id)
@@ -1841,20 +1841,20 @@ impl<
 
     fn shutdown(
         &mut self,
-        bindings_ctx: &C,
+        bindings_ctx: &BC,
         id: SocketId<I>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
         datagram::shutdown_connected(self, bindings_ctx, id, which)
     }
 
-    fn get_shutdown(&mut self, bindings_ctx: &C, id: SocketId<I>) -> Option<ShutdownType> {
+    fn get_shutdown(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> Option<ShutdownType> {
         datagram::get_shutdown_connected(self, bindings_ctx, id)
     }
 
     fn close(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
         datagram::close(self, bindings_ctx, id).into()
@@ -1862,7 +1862,7 @@ impl<
 
     fn get_udp_info(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
         datagram::get_info(self, bindings_ctx, id).into()
@@ -1870,7 +1870,7 @@ impl<
 
     fn listen_udp(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
@@ -1880,7 +1880,7 @@ impl<
 
     fn send<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
@@ -1904,7 +1904,7 @@ impl<
 
     fn send_to<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_port: UdpRemotePort,
@@ -1966,9 +1966,9 @@ pub enum SendError {
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn send_udp<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     body: B,
 ) -> Result<(), Either<SendError, ExpectedConnError>> {
@@ -2000,11 +2000,11 @@ pub fn send_udp<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn send_udp_to<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     remote_port: UdpRemotePort,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError>> {
@@ -2031,10 +2031,10 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
     .map_err(|IpInvariant(e)| e)
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>>
-    DatagramStateContext<I, C, Udp> for SC
+impl<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
+    DatagramStateContext<I, BC, Udp> for CC
 {
-    type SocketsStateCtx<'a> = SC::SocketStateCtx<'a>;
+    type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
     fn with_sockets_state<
         O,
@@ -2072,19 +2072,19 @@ impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>
 
 impl<
         I: IpExt,
-        C: StateNonSyncContext<I, Self::DeviceId>,
-        SC: BoundStateContext<I, C> + UdpStateContext,
-    > DatagramBoundStateContext<I, C, Udp> for SC
+        BC: StateNonSyncContext<I, Self::DeviceId>,
+        CC: BoundStateContext<I, BC> + UdpStateContext,
+    > DatagramBoundStateContext<I, BC, Udp> for CC
 {
-    type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
+    type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
     // TODO(https://fxbug.dev/133884): Remove the laziness by dropping `Option`.
-    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::WeakDeviceId>>>;
+    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, CC::WeakDeviceId>>>;
 
     fn with_bound_sockets<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &DatagramBoundSockets<I, Self::WeakDeviceId, Udp, (Udp, I, SC::WeakDeviceId)>,
+            &DatagramBoundSockets<I, Self::WeakDeviceId, Udp, (Udp, I, CC::WeakDeviceId)>,
         ) -> O,
     >(
         &mut self,
@@ -2099,7 +2099,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut DatagramBoundSockets<I, Self::WeakDeviceId, Udp, (Udp, I, SC::WeakDeviceId)>,
+            &mut DatagramBoundSockets<I, Self::WeakDeviceId, Udp, (Udp, I, CC::WeakDeviceId)>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -2111,8 +2111,8 @@ impl<
         })
     }
 
-    type DualStackContext = SC::DualStackContext;
-    type NonDualStackContext = SC::NonDualStackContext;
+    type DualStackContext = CC::DualStackContext;
+    type NonDualStackContext = CC::NonDualStackContext;
     fn dual_stack_context(
         &mut self,
     ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
@@ -2128,11 +2128,11 @@ impl<
 }
 
 impl<
-        C: StateNonSyncContext<Ipv6, SC::DeviceId> + StateNonSyncContext<Ipv4, SC::DeviceId>,
-        SC: DualStackBoundStateContext<Ipv6, C> + UdpStateContext,
-    > DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
+        BC: StateNonSyncContext<Ipv6, CC::DeviceId> + StateNonSyncContext<Ipv4, CC::DeviceId>,
+        CC: DualStackBoundStateContext<Ipv6, BC> + UdpStateContext,
+    > DualStackDatagramBoundStateContext<Ipv6, BC, Udp> for CC
 {
-    type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
+    type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
     fn dual_stack_enabled(
         &self,
         state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, Udp>>,
@@ -2154,8 +2154,8 @@ impl<
         EitherIpSocket::V6(id)
     }
 
-    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, SC::WeakDeviceId>>>;
-    type OtherLocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv4, SC::WeakDeviceId>>>;
+    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, CC::WeakDeviceId>>>;
+    type OtherLocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv4, CC::WeakDeviceId>>>;
 
     fn with_both_bound_sockets_mut<
         O,
@@ -2203,9 +2203,9 @@ impl<
 }
 
 impl<
-        C: StateNonSyncContext<Ipv4, SC::DeviceId>,
-        SC: BoundStateContext<Ipv4, C> + NonDualStackBoundStateContext<Ipv4, C> + UdpStateContext,
-    > NonDualStackDatagramBoundStateContext<Ipv4, C, Udp> for SC
+        BC: StateNonSyncContext<Ipv4, CC::DeviceId>,
+        CC: BoundStateContext<Ipv4, BC> + NonDualStackBoundStateContext<Ipv4, BC> + UdpStateContext,
+    > NonDualStackDatagramBoundStateContext<Ipv4, BC, Udp> for CC
 {
     type Converter = ();
     fn converter(&self) -> Self::Converter {
@@ -2213,14 +2213,14 @@ impl<
     }
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I, D::Strong>, D: WeakId>
-    LocalIdentifierAllocator<I, D, Udp, C, (Udp, I, D)>
+impl<I: IpExt, BC: StateNonSyncContext<I, D::Strong>, D: WeakId>
+    LocalIdentifierAllocator<I, D, Udp, BC, (Udp, I, D)>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
     fn try_alloc_local_id(
         &mut self,
         bound: &UdpBoundSocketMap<I, D>,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         flow: datagram::DatagramFlowId<I::Addr, UdpRemotePort>,
     ) -> Option<NonZeroU16> {
         let DatagramFlowId { local_ip, remote_ip, remote_id } = flow;
@@ -2235,7 +2235,7 @@ impl<I: IpExt, C: StateNonSyncContext<I, D::Strong>, D: WeakId>
 /// Creates an unbound UDP socket.
 ///
 /// `create_udp` creates a new UDP socket and returns an identifier for it.
-pub fn create_udp<I: Ip, C: crate::NonSyncContext>(core_ctx: &SyncCtx<C>) -> SocketId<I> {
+pub fn create_udp<I: Ip, BC: crate::NonSyncContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
         IpInvariant(&mut sync_ctx),
@@ -2266,11 +2266,11 @@ pub fn create_udp<I: Ip, C: crate::NonSyncContext>(core_ctx: &SyncCtx<C>) -> Soc
 /// # Panics
 ///
 /// `connect` panics if `id` is not a valid [`UnboundId`].
-pub fn connect<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn connect<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     remote_port: UdpRemotePort,
 ) -> Result<(), ConnectError> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2298,11 +2298,11 @@ pub fn connect<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn set_udp_device<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_device<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
-    device_id: Option<&DeviceId<C>>,
+    device_id: Option<&DeviceId<BC>>,
 ) -> Result<(), SocketError> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip::<_, Result<_, _>>(
@@ -2322,14 +2322,14 @@ pub fn set_udp_device<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid socket ID.
-pub fn get_udp_bound_device<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn get_udp_bound_device<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
-) -> Option<WeakDeviceId<C>> {
+) -> Option<WeakDeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     let id = id.clone();
-    let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<C>>>>(
+    let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<BC>>>>(
         (IpInvariant((&mut sync_ctx, bindings_ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             IpInvariant(SocketHandler::<Ipv4, _>::get_udp_bound_device(sync_ctx, ctx, id))
@@ -2353,9 +2353,9 @@ pub fn get_udp_bound_device<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn set_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     enabled: bool,
 ) -> Result<(), SetDualStackEnabledError> {
@@ -2383,9 +2383,9 @@ pub fn set_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
 ) -> Result<bool, NotDualStackCapableError> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2411,9 +2411,9 @@ pub fn get_udp_dual_stack_enabled<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `set_udp_posix_reuse_port` panics if `id` is not a valid `SocketId`.
-pub fn set_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     reuse_port: bool,
 ) -> Result<(), ExpectedUnboundError> {
@@ -2434,9 +2434,9 @@ pub fn set_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn get_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> bool {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2460,12 +2460,12 @@ pub fn get_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
 /// leaving a group that was not joined, or joining a group multiple times) or
 /// if the device to use to join is unspecified or conflicts with the existing
 /// socket state.
-pub fn set_udp_multicast_membership<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_multicast_membership<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     multicast_group: MulticastAddr<I::Addr>,
-    interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
+    interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<BC>>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2507,9 +2507,9 @@ pub fn set_udp_multicast_membership<I: Ip, C: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     unicast_hop_limit: Option<NonZeroU8>,
 ) {
@@ -2540,9 +2540,9 @@ pub fn set_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
     multicast_hop_limit: Option<NonZeroU8>,
 ) {
@@ -2570,9 +2570,9 @@ pub fn set_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
 }
 
 /// Gets the hop limit for packets sent by the socket to a unicast destination.
-pub fn get_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> NonZeroU8 {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2593,9 +2593,9 @@ pub fn get_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
 ///
 /// Gets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn get_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> NonZeroU8 {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2613,8 +2613,8 @@ pub fn get_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
 }
 
 /// Gets the transparent option.
-pub fn get_udp_transparent<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
+pub fn get_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
     id: &SocketId<I>,
 ) -> bool {
     I::map_ip(
@@ -2625,8 +2625,8 @@ pub fn get_udp_transparent<I: Ip, C: crate::NonSyncContext>(
 }
 
 /// Sets the transparent option.
-pub fn set_udp_transparent<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
+pub fn set_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
     id: &SocketId<I>,
     value: bool,
 ) {
@@ -2653,9 +2653,9 @@ pub fn set_udp_transparent<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn disconnect_udp_connected<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn disconnect_udp_connected<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
 ) -> Result<(), ExpectedConnError> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2679,9 +2679,9 @@ pub fn disconnect_udp_connected<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn shutdown<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn shutdown<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
@@ -2706,9 +2706,9 @@ pub fn shutdown<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_shutdown<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &C,
+pub fn get_shutdown<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> Option<ShutdownType> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -2752,11 +2752,11 @@ impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<I, D, Udp>> for SocketInfo<I::
 /// # Panics
 ///
 /// `get_udp_info` panics if `id` is not a valid `SocketId`.
-pub fn get_udp_info<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn get_udp_info<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
-) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
+) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, bindings_ctx)), id.clone()),
@@ -2774,11 +2774,11 @@ pub fn get_udp_info<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn close<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn close<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: SocketId<I>,
-) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
+) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, bindings_ctx)), id.clone()),
@@ -2807,11 +2807,11 @@ pub fn close<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `listen_udp` panics if `id` is not a valid [`SocketId`].
-pub fn listen_udp<I: Ip, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
+pub fn listen_udp<I: Ip, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     id: &SocketId<I>,
-    addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     port: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -3327,9 +3327,9 @@ mod tests {
     fn receive_udp_packet<
         A: IpAddress,
         D: FakeStrongDeviceId,
-        SC: DeviceIdContext<AnyDevice, DeviceId = D>,
+        CC: DeviceIdContext<AnyDevice, DeviceId = D>,
     >(
-        core_ctx: &mut SC,
+        core_ctx: &mut CC,
         bindings_ctx: &mut FakeUdpNonSyncCtx,
         device: D,
         src_ip: A,
@@ -3339,7 +3339,7 @@ mod tests {
         body: &[u8],
     ) where
         A::Version: TestIpExt,
-        UdpIpTransportContext: IpTransportContext<A::Version, FakeUdpNonSyncCtx, SC>,
+        UdpIpTransportContext: IpTransportContext<A::Version, FakeUdpNonSyncCtx, CC>,
     {
         let builder =
             UdpPacketBuilder::new(src_ip, dst_ip, NonZeroU16::new(src_port.into()), dst_port);
@@ -4198,9 +4198,9 @@ mod tests {
         #[derive(Debug)]
         struct NotWriteableError;
 
-        fn send<I: Ip + TestIpExt, SC: SocketHandler<I, FakeUdpNonSyncCtx>>(
-            remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
-            core_ctx: &mut SC,
+        fn send<I: Ip + TestIpExt, CC: SocketHandler<I, FakeUdpNonSyncCtx>>(
+            remote_ip: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
+            core_ctx: &mut CC,
             bindings_ctx: &mut FakeUdpNonSyncCtx,
             id: SocketId<I>,
         ) -> Result<(), NotWriteableError> {
@@ -5268,11 +5268,11 @@ mod tests {
 
         fn listen_unbound<
             I: Ip + TestIpExt,
-            C: StateNonSyncContext<I, SC::DeviceId>,
-            SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
+            BC: StateNonSyncContext<I, CC::DeviceId>,
+            CC: StateContext<I, BC> + CounterContext<UdpCounters<I>>,
         >(
-            core_ctx: &mut SC,
-            bindings_ctx: &mut C,
+            core_ctx: &mut CC,
+            bindings_ctx: &mut BC,
             socket: SocketId<I>,
         ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
             SocketHandler::listen_udp(
@@ -6897,9 +6897,9 @@ mod tests {
     const V4_REMOTE_IP_MAPPED: SpecifiedAddr<Ipv6Addr> =
         unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("::FFFF:192.0.2.1")) };
 
-    fn get_dual_stack_context<'a, C: 'a, SC: DatagramBoundStateContext<Ipv6, C, Udp>>(
-        core_ctx: &'a mut SC,
-    ) -> &'a mut SC::DualStackContext {
+    fn get_dual_stack_context<'a, BC: 'a, CC: DatagramBoundStateContext<Ipv6, BC, Udp>>(
+        core_ctx: &'a mut CC,
+    ) -> &'a mut CC::DualStackContext {
         match core_ctx.dual_stack_context() {
             MaybeDualStack::NotDualStack(_) => unreachable!("UDP is a dual stack enabled protocol"),
             MaybeDualStack::DualStack(ds) => ds,
@@ -7819,10 +7819,10 @@ mod tests {
     }
 
     impl OriginalSocketState {
-        fn create_socket<I: TestIpExt, SC: SocketHandler<I, C>, C>(
+        fn create_socket<I: TestIpExt, CC: SocketHandler<I, BC>, BC>(
             &self,
-            core_ctx: &mut SC,
-            bindings_ctx: &mut C,
+            core_ctx: &mut CC,
+            bindings_ctx: &mut BC,
         ) -> SocketId<I> {
             let socket = SocketHandler::<I, _>::create_udp(core_ctx);
             match self {

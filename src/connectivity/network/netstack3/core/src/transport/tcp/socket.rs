@@ -222,32 +222,32 @@ pub enum TimerId<D: device::WeakId, BT: TcpBindingsTypes> {
     V6(WeakTcpSocketId<Ipv6, D, BT>),
 }
 
-impl<I, D, C> TimerContext<WeakTcpSocketId<I, D, C>> for C
+impl<I, D, BC> TimerContext<WeakTcpSocketId<I, D, BC>> for BC
 where
-    C: TimerContext<TimerId<D, C>> + TcpBindingsTypes,
+    BC: TimerContext<TimerId<D, BC>> + TcpBindingsTypes,
     I: DualStackIpExt,
     D: device::WeakId,
 {
     fn schedule_timer_instant(
         &mut self,
         time: Self::Instant,
-        id: WeakTcpSocketId<I, D, C>,
+        id: WeakTcpSocketId<I, D, BC>,
     ) -> Option<Self::Instant> {
-        TimerContext::<TimerId<D, C>>::schedule_timer_instant(self, time, id.into())
+        TimerContext::<TimerId<D, BC>>::schedule_timer_instant(self, time, id.into())
     }
 
-    fn cancel_timer(&mut self, id: WeakTcpSocketId<I, D, C>) -> Option<Self::Instant> {
-        TimerContext::<TimerId<D, C>>::cancel_timer(self, id.into())
+    fn cancel_timer(&mut self, id: WeakTcpSocketId<I, D, BC>) -> Option<Self::Instant> {
+        TimerContext::<TimerId<D, BC>>::cancel_timer(self, id.into())
     }
 
-    fn cancel_timers_with<F: FnMut(&WeakTcpSocketId<I, D, C>) -> bool>(&mut self, mut f: F) {
-        TimerContext::<TimerId<D, C>>::cancel_timers_with(self, |id| {
+    fn cancel_timers_with<F: FnMut(&WeakTcpSocketId<I, D, BC>) -> bool>(&mut self, mut f: F) {
+        TimerContext::<TimerId<D, BC>>::cancel_timers_with(self, |id| {
             id.as_inner::<I>().map(|i| f(i)).unwrap_or(false)
         })
     }
 
-    fn scheduled_instant(&self, id: WeakTcpSocketId<I, D, C>) -> Option<Self::Instant> {
-        TimerContext::<TimerId<D, C>>::scheduled_instant(self, id.into())
+    fn scheduled_instant(&self, id: WeakTcpSocketId<I, D, BC>) -> Option<Self::Instant> {
+        TimerContext::<TimerId<D, BC>>::scheduled_instant(self, id.into())
     }
 }
 
@@ -387,50 +387,50 @@ impl<'a, SS: 'a, DS: AsSingleStack<SS> + 'a, SC, DC>
 }
 
 /// Sync context for TCP.
-pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
-    DemuxSyncContext<I, Self::WeakDeviceId, C> + IpSocketHandler<I, C>
+pub(crate) trait SyncContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
+    DemuxSyncContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
 {
     /// The sync context that will give access to this version of the IP layer.
-    type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + DeviceIpSocketHandler<I, C>
-        + DemuxSyncContext<I, Self::WeakDeviceId, C>;
+    type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + DeviceIpSocketHandler<I, BC>
+        + DemuxSyncContext<I, Self::WeakDeviceId, BC>;
 
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
     type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-        I::ConnectionAndAddr<Self::WeakDeviceId, C>,
+        I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
         (
-            Connection<I, I, Self::WeakDeviceId, C>,
+            Connection<I, I, Self::WeakDeviceId, BC>,
             ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
         ),
     >;
 
     /// The sync context that will give access to both versions of the IP layer.
-    type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + DeviceIpSocketHandler<I, C>
-        + DemuxSyncContext<I, Self::WeakDeviceId, C>
+    type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + DeviceIpSocketHandler<I, BC>
+        + DemuxSyncContext<I, Self::WeakDeviceId, BC>
         + TransportIpContext<
             I::OtherVersion,
-            C,
+            BC,
             DeviceId = Self::DeviceId,
             WeakDeviceId = Self::WeakDeviceId,
-        > + DeviceIpSocketHandler<I::OtherVersion, C>
-        + DemuxSyncContext<I::OtherVersion, Self::WeakDeviceId, C>
+        > + DeviceIpSocketHandler<I::OtherVersion, BC>
+        + DemuxSyncContext<I::OtherVersion, Self::WeakDeviceId, BC>
         + AsSingleStack<Self::SingleStackIpTransportAndDemuxCtx<'a>>;
 
     /// A collection of type assertions that must be true in the dual stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
     type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-        I::ConnectionAndAddr<Self::WeakDeviceId, C>,
+        I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
         EitherStack<
             (
-                Connection<I, I, Self::WeakDeviceId, C>,
+                Connection<I, I, Self::WeakDeviceId, BC>,
                 ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
             ),
             (
-                Connection<I, I::OtherVersion, Self::WeakDeviceId, C>,
+                Connection<I, I::OtherVersion, Self::WeakDeviceId, BC>,
                 ConnAddr<
                     ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
                     Self::WeakDeviceId,
@@ -440,7 +440,7 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
     >;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
-    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<I, Self::WeakDeviceId, C>) -> O>(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -448,12 +448,12 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
     /// Called whenever a socket has had its destruction deferred.
     ///
     /// Used for tests context implementations to forbid deferred destruction.
-    fn socket_destruction_deferred(&mut self, socket: WeakTcpSocketId<I, Self::WeakDeviceId, C>);
+    fn socket_destruction_deferred(&mut self, socket: WeakTcpSocketId<I, Self::WeakDeviceId, BC>);
 
     /// Calls the callback once for each currently installed socket.
     fn for_each_socket<
         F: FnMut(
-            &TcpSocketState<I, Self::WeakDeviceId, C>,
+            &TcpSocketState<I, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ),
     >(
@@ -470,19 +470,19 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
                 (&'a mut Self::DualStackIpTransportAndDemuxCtx<'a>, Self::DualStackConverter),
                 (&'a mut Self::SingleStackIpTransportAndDemuxCtx<'a>, Self::SingleStackConverter),
             >,
-            &mut TcpSocketState<I, Self::WeakDeviceId, C>,
-            &IsnGenerator<C::Instant>,
+            &mut TcpSocketState<I, Self::WeakDeviceId, BC>,
+            &IsnGenerator<BC::Instant>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O;
 
     /// Calls the function with immutable access to the socket state.
-    fn with_socket<O, F: FnOnce(&TcpSocketState<I, Self::WeakDeviceId, C>) -> O>(
+    fn with_socket<O, F: FnOnce(&TcpSocketState<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         self.with_socket_and_converter(id, |socket_state, _converter| cb(socket_state))
@@ -493,12 +493,12 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
     fn with_socket_and_converter<
         O,
         F: FnOnce(
-            &TcpSocketState<I, Self::WeakDeviceId, C>,
+            &TcpSocketState<I, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O;
 
@@ -511,11 +511,11 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
                 (&'a mut Self::DualStackIpTransportAndDemuxCtx<'a>, Self::DualStackConverter),
                 (&'a mut Self::SingleStackIpTransportAndDemuxCtx<'a>, Self::SingleStackConverter),
             >,
-            &mut TcpSocketState<I, Self::WeakDeviceId, C>,
+            &mut TcpSocketState<I, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         self.with_socket_mut_isn_transport_demux(id, |ctx, socket_state, _isn| {
@@ -524,9 +524,9 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
     }
 
     /// Calls the function with mutable access to the socket state.
-    fn with_socket_mut<O, F: FnOnce(&mut TcpSocketState<I, Self::WeakDeviceId, C>) -> O>(
+    fn with_socket_mut<O, F: FnOnce(&mut TcpSocketState<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         self.with_socket_mut_isn_transport_demux(id, |_ctx, socket_state, _isn| cb(socket_state))
@@ -537,12 +537,12 @@ pub(crate) trait SyncContext<I: DualStackIpExt, C: TcpBindingsTypes>:
     fn with_socket_mut_and_converter<
         O,
         F: FnOnce(
-            &mut TcpSocketState<I, Self::WeakDeviceId, C>,
+            &mut TcpSocketState<I, Self::WeakDeviceId, BC>,
             MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
         ) -> O,
     >(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         self.with_socket_mut_isn_transport_demux(id, |ctx, socket_state, _isn| {
@@ -1360,13 +1360,13 @@ pub struct Connection<
 
 fn make_connection<
     I: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<I, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
 >(
-    conn: Connection<I, I, SC::WeakDeviceId, C>,
-    addr: ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
-    converter: &MaybeDualStack<SC::DualStackConverter, SC::SingleStackConverter>,
-) -> I::ConnectionAndAddr<SC::WeakDeviceId, C> {
+    conn: Connection<I, I, CC::WeakDeviceId, BC>,
+    addr: ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+    converter: &MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
+) -> I::ConnectionAndAddr<CC::WeakDeviceId, BC> {
     match converter {
         MaybeDualStack::NotDualStack(nds) => nds.convert_back((conn, addr)),
         MaybeDualStack::DualStack(ds) => ds.convert_back(EitherStack::ThisStack((conn, addr))),
@@ -1378,14 +1378,14 @@ fn make_connection<
 fn try_into_this_stack_conn_mut<
     'a,
     I: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<I, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
 >(
-    conn: &'a mut I::ConnectionAndAddr<SC::WeakDeviceId, C>,
-    converter: &MaybeDualStack<SC::DualStackConverter, SC::SingleStackConverter>,
+    conn: &'a mut I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
+    converter: &MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
 ) -> Option<&'a mut (
-    Connection<I, I, SC::WeakDeviceId, C>,
-    ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
+    Connection<I, I, CC::WeakDeviceId, BC>,
+    ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
 )> {
     match converter {
         MaybeDualStack::NotDualStack(nds) => Some(nds.convert(conn)),
@@ -1580,125 +1580,125 @@ impl HandshakeStatus {
         }
     }
 }
-pub(crate) trait SocketHandler<I: DualStackIpExt, C: NonSyncContext<Self::WeakDeviceId>>:
+pub(crate) trait SocketHandler<I: DualStackIpExt, BC: NonSyncContext<Self::WeakDeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     fn create_socket(
         &mut self,
-        bindings_ctx: &mut C,
-        socket_extra: C::ListenerNotifierOrProvidedBuffers,
-    ) -> TcpSocketId<I, Self::WeakDeviceId, C>;
+        bindings_ctx: &mut BC,
+        socket_extra: BC::ListenerNotifierOrProvidedBuffers,
+    ) -> TcpSocketId<I, Self::WeakDeviceId, BC>;
 
     fn bind(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError>;
 
     fn listen(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         backlog: NonZeroUsize,
     ) -> Result<(), ListenError>;
 
     fn accept(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Result<
         (
-            TcpSocketId<I, Self::WeakDeviceId, C>,
+            TcpSocketId<I, Self::WeakDeviceId, BC>,
             SocketAddr<I::Addr, Self::WeakDeviceId>,
-            C::ReturnedBuffers,
+            BC::ReturnedBuffers,
         ),
         AcceptError,
     >;
 
     fn connect(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError>;
 
-    fn close(&mut self, bindings_ctx: &mut C, id: TcpSocketId<I, Self::WeakDeviceId, C>);
+    fn close(&mut self, bindings_ctx: &mut BC, id: TcpSocketId<I, Self::WeakDeviceId, BC>);
 
     fn shutdown(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         shutdown: Shutdown,
     ) -> Result<bool, NoConnection>;
 
     fn get_info(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
-    fn do_send(&mut self, bindings_ctx: &mut C, conn_id: &TcpSocketId<I, Self::WeakDeviceId, C>);
+    fn do_send(&mut self, bindings_ctx: &mut BC, conn_id: &TcpSocketId<I, Self::WeakDeviceId, BC>);
 
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut C,
-        conn_id: WeakTcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        conn_id: WeakTcpSocketId<I, Self::WeakDeviceId, BC>,
     );
 
     fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         f: F,
     ) -> R;
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         f: F,
     ) -> R;
 
     fn set_device(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError>;
 
     fn set_send_buffer_size(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         size: usize,
     );
     fn send_buffer_size(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<usize>;
     fn set_receive_buffer_size(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         size: usize,
     );
     fn receive_buffer_size(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<usize>;
 
     fn set_reuseaddr(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         reuse: bool,
     ) -> Result<(), SetReuseAddrError>;
-    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, C>) -> bool;
+    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, BC>) -> bool;
 
     /// Receives an ICMP error from the IP layer.
     fn on_icmp_error(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         orig_src_ip: SpecifiedAddr<I::Addr>,
         orig_dst_ip: SpecifiedAddr<I::Addr>,
         orig_src_port: NonZeroU16,
@@ -1709,23 +1709,23 @@ pub(crate) trait SocketHandler<I: DualStackIpExt, C: NonSyncContext<Self::WeakDe
 
     fn get_socket_error(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<ConnectionError>;
 
     fn with_info<V: InfoVisitor<I, Self::WeakDeviceId>>(&mut self, cb: &mut V);
 }
 
-impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, C>>
-    SocketHandler<I, C> for SC
+impl<I: DualStackIpExt, BC: NonSyncContext<CC::WeakDeviceId>, CC: SyncContext<I, BC>>
+    SocketHandler<I, BC> for CC
 {
     fn create_socket(
         &mut self,
-        _bindings_ctx: &mut C,
-        socket_extra: C::ListenerNotifierOrProvidedBuffers,
-    ) -> TcpSocketId<I, Self::WeakDeviceId, C> {
+        _bindings_ctx: &mut BC,
+        socket_extra: BC::ListenerNotifierOrProvidedBuffers,
+    ) -> TcpSocketId<I, Self::WeakDeviceId, BC> {
         self.with_all_sockets_mut(|all_sockets| {
             let (sock, primary) = TcpSocketId::new(TcpSocketState::Unbound(Unbound {
-                buffer_sizes: C::default_buffer_sizes(),
+                buffer_sizes: BC::default_buffer_sizes(),
                 bound_device: Default::default(),
                 sharing: Default::default(),
                 socket_options: Default::default(),
@@ -1741,8 +1741,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn bind(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError> {
@@ -1787,7 +1787,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                         )
                         .map_err(LocalAddressError::Zone)?;
 
-                    let mut assigned_to = <<SC as SyncContext<I, _>>::SingleStackIpTransportAndDemuxCtx<'_> as TransportIpContext<
+                    let mut assigned_to = <<CC as SyncContext<I, _>>::SingleStackIpTransportAndDemuxCtx<'_> as TransportIpContext<
                         I,
                         _,
                     >>::get_devices_with_assigned_addr(
@@ -1858,7 +1858,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn listen(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         backlog: NonZeroUsize,
     ) -> Result<(), ListenError> {
         debug!("listen on {id:?} with backlog {backlog}");
@@ -1909,13 +1909,13 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn accept(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Result<
         (
-            TcpSocketId<I, Self::WeakDeviceId, C>,
+            TcpSocketId<I, Self::WeakDeviceId, BC>,
             SocketAddr<I::Addr, Self::WeakDeviceId>,
-            C::ReturnedBuffers,
+            BC::ReturnedBuffers,
         ),
         AcceptError,
     > {
@@ -1945,7 +1945,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
         let addr = self.with_socket_mut_and_converter(&conn_id, |socket_state, converter| {
             let (conn, conn_addr) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, C, SC>(conn, &converter).expect("TODO(https://fxbug.dev/136316): dual stack listener not supported yet"),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter).expect("TODO(https://fxbug.dev/136316): dual stack listener not supported yet"),
                 "invalid socket ID"
             );
             conn.accept_queue = None;
@@ -1959,8 +1959,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn connect(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
@@ -2139,7 +2139,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
         })
     }
 
-    fn close(&mut self, bindings_ctx: &mut C, id: TcpSocketId<I, Self::WeakDeviceId, C>) {
+    fn close(&mut self, bindings_ctx: &mut BC, id: TcpSocketId<I, Self::WeakDeviceId, BC>) {
         let (destroy, pending) = self.with_socket_mut_transport_demux(
             &id,
             |sync_ctx, socket_state| match socket_state {
@@ -2174,23 +2174,23 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                     (true, Some(pending))
                 }
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    fn do_close<SockI, WireI, SC, C>(
-                        core_ctx: &mut SC,
-                        bindings_ctx: &mut C,
-                        id: &TcpSocketId<SockI, SC::WeakDeviceId, C>,
-                        demux_id: &WireI::DemuxSocketId<SC::WeakDeviceId, C>,
-                        conn: &mut Connection<SockI, WireI, SC::WeakDeviceId, C>,
+                    fn do_close<SockI, WireI, CC, BC>(
+                        core_ctx: &mut CC,
+                        bindings_ctx: &mut BC,
+                        id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                        demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+                        conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
                         addr: &ConnAddr<
                             ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                            SC::WeakDeviceId,
+                            CC::WeakDeviceId,
                         >,
                     ) -> bool
                     where
                         SockI: DualStackIpExt,
                         WireI: DualStackIpExt,
-                        C: NonSyncContext<SC::WeakDeviceId>,
-                        SC: TransportIpContext<WireI, C>
-                            + DemuxSyncContext<WireI, SC::WeakDeviceId, C>,
+                        BC: NonSyncContext<CC::WeakDeviceId>,
+                        CC: TransportIpContext<WireI, BC>
+                            + DemuxSyncContext<WireI, CC::WeakDeviceId, BC>,
                     {
                         conn.defunct = true;
                         let already_closed = match conn.state.close(
@@ -2261,8 +2261,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn shutdown(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         shutdown: Shutdown,
     ) -> Result<bool, NoConnection> {
         let (result, pending) = self.with_socket_mut_transport_demux(
@@ -2274,22 +2274,22 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                     if !shutdown.send {
                         return Ok((true, None));
                     }
-                    fn do_shutdown<SockI, WireI, SC, C>(
-                        core_ctx: &mut SC,
-                        bindings_ctx: &mut C,
-                        id: &TcpSocketId<SockI, SC::WeakDeviceId, C>,
-                        conn: &mut Connection<SockI, WireI, SC::WeakDeviceId, C>,
+                    fn do_shutdown<SockI, WireI, CC, BC>(
+                        core_ctx: &mut CC,
+                        bindings_ctx: &mut BC,
+                        id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                        conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
                         addr: &ConnAddr<
                             ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                            SC::WeakDeviceId,
+                            CC::WeakDeviceId,
                         >,
                     ) -> Result<(), NoConnection>
                     where
                         SockI: DualStackIpExt,
                         WireI: DualStackIpExt,
-                        C: NonSyncContext<SC::WeakDeviceId>,
-                        SC: TransportIpContext<WireI, C>
-                            + DemuxSyncContext<WireI, SC::WeakDeviceId, C>,
+                        BC: NonSyncContext<CC::WeakDeviceId>,
+                        CC: TransportIpContext<WireI, BC>
+                            + DemuxSyncContext<WireI, CC::WeakDeviceId, BC>,
                     {
                         match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
                             Ok(()) => {
@@ -2375,8 +2375,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn set_device(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         new_device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError> {
         let weak_device = new_device.as_ref().map(|d| self.downgrade_device_id(d));
@@ -2389,7 +2389,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                     Ok(())
                 }
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    let (conn, addr) = try_into_this_stack_conn_mut::<I, C, SC>(conn, &converter)
+                    let (conn, addr) = try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter)
                         .ok_or(SetDeviceError::DualStackNotSupported)?;
                     let ConnAddr {
                         device: old_device,
@@ -2476,8 +2476,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn get_info(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
-    ) -> SocketInfo<I::Addr, SC::WeakDeviceId> {
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+    ) -> SocketInfo<I::Addr, CC::WeakDeviceId> {
         self.with_socket_and_converter(id, |socket_state, _converter| match socket_state {
             TcpSocketState::Unbound(unbound) => SocketInfo::Unbound(unbound.into()),
             TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
@@ -2528,7 +2528,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
         })
     }
 
-    fn do_send(&mut self, bindings_ctx: &mut C, conn_id: &TcpSocketId<I, Self::WeakDeviceId, C>) {
+    fn do_send(&mut self, bindings_ctx: &mut BC, conn_id: &TcpSocketId<I, Self::WeakDeviceId, BC>) {
         self.with_socket_mut_transport_demux(conn_id, |sync_ctx, socket_state| {
             let (conn, _sharing) = assert_matches!(
                 socket_state,
@@ -2553,8 +2553,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut C,
-        weak_id: WeakTcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        weak_id: WeakTcpSocketId<I, Self::WeakDeviceId, BC>,
     ) {
         let id = match weak_id.upgrade() {
             Some(c) => c,
@@ -2570,23 +2570,23 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                 socket_state,
                 TcpSocketState::Bound(BoundSocketState::Connected(conn)) => conn
             );
-            fn do_handle_timer<SockI, WireI, SC, C>(
-                core_ctx: &mut SC,
-                bindings_ctx: &mut C,
-                weak_id: WeakTcpSocketId<SockI, SC::WeakDeviceId, C>,
-                id: &TcpSocketId<SockI, SC::WeakDeviceId, C>,
-                demux_id: &WireI::DemuxSocketId<SC::WeakDeviceId, C>,
-                conn: &mut Connection<SockI, WireI, SC::WeakDeviceId, C>,
+            fn do_handle_timer<SockI, WireI, CC, BC>(
+                core_ctx: &mut CC,
+                bindings_ctx: &mut BC,
+                weak_id: WeakTcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+                conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
                 addr: &ConnAddr<
                     ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                    SC::WeakDeviceId,
+                    CC::WeakDeviceId,
                 >,
             ) -> bool
             where
                 SockI: DualStackIpExt,
                 WireI: DualStackIpExt,
-                C: NonSyncContext<SC::WeakDeviceId>,
-                SC: TransportIpContext<WireI, C> + DemuxSyncContext<WireI, SC::WeakDeviceId, C>,
+                BC: NonSyncContext<CC::WeakDeviceId>,
+                CC: TransportIpContext<WireI, BC> + DemuxSyncContext<WireI, CC::WeakDeviceId, BC>,
             {
                 do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
                 if conn.defunct && matches!(conn.state, State::Closed(_)) {
@@ -2642,8 +2642,8 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
         &mut self,
-        bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         f: F,
     ) -> R {
         self.with_socket_mut_transport_demux(id, |sync_ctx, socket_state| match socket_state {
@@ -2692,7 +2692,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         f: F,
     ) -> R {
         self.with_socket_and_converter(id, |socket_state, converter| match socket_state {
@@ -2725,41 +2725,41 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn set_send_buffer_size(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         size: usize,
     ) {
-        set_buffer_size::<SendBufferSize, I, C, SC>(self, id, size)
+        set_buffer_size::<SendBufferSize, I, BC, CC>(self, id, size)
     }
 
     fn send_buffer_size(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<usize> {
-        get_buffer_size::<SendBufferSize, I, C, SC>(self, id)
+        get_buffer_size::<SendBufferSize, I, BC, CC>(self, id)
     }
 
     fn set_receive_buffer_size(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         size: usize,
     ) {
-        set_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id, size)
+        set_buffer_size::<ReceiveBufferSize, I, BC, CC>(self, id, size)
     }
 
     fn receive_buffer_size(
         &mut self,
-        _bindings_ctx: &mut C,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        _bindings_ctx: &mut BC,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<usize> {
-        get_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id)
+        get_buffer_size::<ReceiveBufferSize, I, BC, CC>(self, id)
     }
 
     fn set_reuseaddr(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
         reuse: bool,
     ) -> Result<(), SetReuseAddrError> {
         let new_sharing = match reuse {
@@ -2802,13 +2802,13 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
         })
     }
 
-    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, C>) -> bool {
+    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, BC>) -> bool {
         get_reuseaddr(self, id)
     }
 
     fn on_icmp_error(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         orig_src_ip: SpecifiedAddr<I::Addr>,
         orig_dst_ip: SpecifiedAddr<I::Addr>,
         orig_src_port: NonZeroU16,
@@ -2859,7 +2859,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
                 addr,
             )) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, C, SC>(conn, &converter),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter),
                 "invalid socket ID"
             ) else {
                 // TODO(https://fxbug.dev/136316): Destroy the other stack
@@ -2901,7 +2901,7 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 
     fn get_socket_error(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, C>,
+        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
     ) -> Option<ConnectionError> {
         self.with_socket_mut_and_converter(id, |socket_state, converter| match socket_state {
             TcpSocketState::Unbound(_) | TcpSocketState::Bound(BoundSocketState::Listener(_)) => {
@@ -2986,10 +2986,14 @@ impl<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, 
 }
 
 /// Destroys the socket with `id`.
-fn destroy_socket<I: DualStackIpExt, SC: SyncContext<I, C>, C: NonSyncContext<SC::WeakDeviceId>>(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
-    id: TcpSocketId<I, SC::WeakDeviceId, C>,
+fn destroy_socket<
+    I: DualStackIpExt,
+    CC: SyncContext<I, BC>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+>(
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    id: TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) {
     let deferred = core_ctx.with_all_sockets_mut(move |all_sockets| {
         let entry = all_sockets.entry(id);
@@ -3069,9 +3073,13 @@ fn destroy_socket<I: DualStackIpExt, SC: SyncContext<I, C>, C: NonSyncContext<SC
     }
 }
 
-fn get_reuseaddr<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: SyncContext<I, C>>(
-    core_ctx: &mut SC,
-    id: &TcpSocketId<I, SC::WeakDeviceId, C>,
+fn get_reuseaddr<
+    I: DualStackIpExt,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
+>(
+    core_ctx: &mut CC,
+    id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) -> bool {
     core_ctx.with_socket(id, |socket_state| match socket_state {
         TcpSocketState::Unbound(Unbound { sharing, .. })
@@ -3089,17 +3097,17 @@ fn get_reuseaddr<I: DualStackIpExt, C: NonSyncContext<SC::WeakDeviceId>, SC: Syn
 ///
 /// Used to cleanup all pending sockets in the accept queue when a listener
 /// socket is shutdown or closed.
-fn close_pending_sockets<I, SC, C>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    pending: impl Iterator<Item = TcpSocketId<I, SC::WeakDeviceId, C>>,
+fn close_pending_sockets<I, CC, BC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    pending: impl Iterator<Item = TcpSocketId<I, CC::WeakDeviceId, BC>>,
 ) where
     I: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<I, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
 {
     for conn_id in pending {
-        let _: Option<C::Instant> = bindings_ctx.cancel_timer(conn_id.downgrade().into());
+        let _: Option<BC::Instant> = bindings_ctx.cancel_timer(conn_id.downgrade().into());
         core_ctx.with_socket_mut_transport_demux(&conn_id, |sync_ctx, socket_state| {
             let (sync_ctx, converter)= sync_ctx.into_single_stack();
             let (conn, conn_addr) = assert_matches!(
@@ -3137,17 +3145,17 @@ fn close_pending_sockets<I, SC, C>(
     }
 }
 
-fn do_send_inner<SockI, WireI, SC, C>(
-    conn_id: &TcpSocketId<SockI, SC::WeakDeviceId, C>,
-    conn: &mut Connection<SockI, WireI, SC::WeakDeviceId, C>,
-    addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
-    ip_transport_ctx: &mut SC,
-    bindings_ctx: &mut C,
+fn do_send_inner<SockI, WireI, CC, BC>(
+    conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+    conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+    addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+    ip_transport_ctx: &mut CC,
+    bindings_ctx: &mut BC,
 ) where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: TransportIpContext<WireI, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: TransportIpContext<WireI, BC>,
 {
     while let Some(seg) = conn.state.poll_send(u32::MAX, bindings_ctx.now(), &conn.socket_options) {
         let ser = tcp_serialize_segment(seg, addr.ip.clone());
@@ -3241,11 +3249,11 @@ impl AccessBufferSize for ReceiveBufferSize {
 fn set_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<I, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
 >(
-    core_ctx: &mut SC,
-    id: &TcpSocketId<I, SC::WeakDeviceId, C>,
+    core_ctx: &mut CC,
+    id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
     size: usize,
 ) {
     core_ctx.with_socket_mut_and_converter(id, |socket_state, converter| match socket_state {
@@ -3277,11 +3285,11 @@ fn set_buffer_size<
 fn get_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<I, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<I, BC>,
 >(
-    core_ctx: &mut SC,
-    id: &TcpSocketId<I, SC::WeakDeviceId, C>,
+    core_ctx: &mut CC,
+    id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) -> Option<usize> {
     core_ctx.with_socket_and_converter(id, |socket, converter| {
         let sizes = match socket {
@@ -3313,14 +3321,14 @@ fn get_buffer_size<
 }
 
 /// Creates a new socket in unbound state.
-pub fn create_socket<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    socket_extra: C::ListenerNotifierOrProvidedBuffers,
-) -> TcpSocketId<I, WeakDeviceId<C>, C>
+pub fn create_socket<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    socket_extra: BC::ListenerNotifierOrProvidedBuffers,
+) -> TcpSocketId<I, WeakDeviceId<BC>, BC>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3352,15 +3360,15 @@ pub enum SetDeviceError {
 /// Sets the device on a socket.
 ///
 /// Passing `None` clears the bound device.
-pub fn set_device<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
-    device: Option<DeviceId<C>>,
+pub fn set_device<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
+    device: Option<DeviceId<BC>>,
 ) -> Result<(), SetDeviceError>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3380,16 +3388,16 @@ where
 /// provided; otherwise to all addresses. If `port` is specified (is `Some`),
 /// the socket will be bound to that port. Otherwise a port will be selected to
 /// not conflict with existing bound or connected sockets.
-pub fn bind<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
-    local_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+pub fn bind<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
+    local_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     port: Option<NonZeroU16>,
 ) -> Result<(), BindError>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3404,14 +3412,14 @@ where
 }
 
 /// Listens on an already bound socket.
-pub fn listen<I, C>(
-    core_ctx: &SyncCtx<C>,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn listen<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     backlog: NonZeroUsize,
 ) -> Result<(), ListenError>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3458,16 +3466,20 @@ pub enum SetReuseAddrError {
 }
 
 /// Accepts an established socket from the queue of a listener socket.
-pub fn accept<I: DualStackIpExt, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn accept<I: DualStackIpExt, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Result<
-    (TcpSocketId<I, WeakDeviceId<C>, C>, SocketAddr<I::Addr, WeakDeviceId<C>>, C::ReturnedBuffers),
+    (
+        TcpSocketId<I, WeakDeviceId<BC>, BC>,
+        SocketAddr<I::Addr, WeakDeviceId<BC>>,
+        BC::ReturnedBuffers,
+    ),
     AcceptError,
 >
 where
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip::<_, Result<_, _>>(
@@ -3531,16 +3543,16 @@ pub enum BindError {
 /// It is up to the caller (Bindings) to determine when the connection has been
 /// established. Bindings are free to use anything available on the platform to
 /// check, for instance, signals.
-pub fn connect<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+pub fn connect<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     remote_port: NonZeroU16,
 ) -> Result<(), ConnectError>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3554,35 +3566,35 @@ where
     )
 }
 
-fn connect_inner<SC, C, SockI, WireI>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    id: &WireI::DemuxSocketId<SC::WeakDeviceId, C>,
-    isn: &IsnGenerator<C::Instant>,
-    listener_addr: Option<ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, SC::WeakDeviceId>>,
+fn connect_inner<CC, BC, SockI, WireI>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+    isn: &IsnGenerator<BC::Instant>,
+    listener_addr: Option<ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>>,
     local_ip: Option<SocketIpAddr<WireI::Addr>>,
-    remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, SC::DeviceId>,
-    bound_device: Option<SC::WeakDeviceId>,
+    remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, CC::DeviceId>,
+    bound_device: Option<CC::WeakDeviceId>,
     local_port: Option<NonZeroU16>,
     remote_port: NonZeroU16,
-    netstack_buffers: C::ListenerNotifierOrProvidedBuffers,
+    netstack_buffers: BC::ListenerNotifierOrProvidedBuffers,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
 ) -> Result<
     (
-        Connection<SockI, WireI, SC::WeakDeviceId, C>,
-        ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
+        Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+        ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     ),
     ConnectError,
 >
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: TransportIpContext<WireI, C>
-        + DeviceIpSocketHandler<WireI, C>
-        + DemuxSyncContext<WireI, SC::WeakDeviceId, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: TransportIpContext<WireI, BC>
+        + DeviceIpSocketHandler<WireI, BC>
+        + DemuxSyncContext<WireI, CC::WeakDeviceId, BC>,
 {
     let (remote_ip, device) = crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
         remote_ip,
@@ -3671,7 +3683,7 @@ where
         Mss::default::<WireI>(),
         &socket_options,
     );
-    let state = State::<_, C::ReceiveBuffer, C::SendBuffer, _>::SynSent(syn_sent);
+    let state = State::<_, BC::ReceiveBuffer, BC::SendBuffer, _>::SynSent(syn_sent);
     let poll_send_at = state.poll_send_at().expect("no retrans timer");
 
     // Send first SYN packet.
@@ -3710,15 +3722,15 @@ where
 /// Returns Err(NoConnection) if the shutdown option does not apply. Otherwise,
 /// Whether a connection has been shutdown is returned, i.e., if the socket was
 /// a listener, the operation will succeed but false will be returned.
-pub fn shutdown<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn shutdown<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     shutdown: Shutdown,
 ) -> Result<bool, NoConnection>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3733,13 +3745,13 @@ where
 }
 
 /// Closes a socket.
-pub fn close<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn close<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3750,14 +3762,14 @@ pub fn close<I, C>(
 }
 
 /// Sets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn set_reuseaddr<I, C>(
-    core_ctx: &SyncCtx<C>,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn set_reuseaddr<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     reuse: bool,
 ) -> Result<(), SetReuseAddrError>
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3768,10 +3780,10 @@ where
 }
 
 /// Gets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn reuseaddr<I, C>(core_ctx: &SyncCtx<C>, id: &TcpSocketId<I, WeakDeviceId<C>, C>) -> bool
+pub fn reuseaddr<I, BC>(core_ctx: &SyncCtx<BC>, id: &TcpSocketId<I, WeakDeviceId<BC>, BC>) -> bool
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -3796,13 +3808,13 @@ pub trait InfoVisitor<I: Ip, D> {
 }
 
 /// Provides access to shared and per-socket TCP stats via a visitor.
-pub fn with_info<I, C, V>(core_ctx: &SyncCtx<C>, cb: &mut V)
+pub fn with_info<I, BC, V>(core_ctx: &SyncCtx<BC>, cb: &mut V)
 where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
-    V: InfoVisitor<I, device::WeakDeviceId<C>>
-        + InfoVisitor<Ipv4, device::WeakDeviceId<C>>
-        + InfoVisitor<Ipv6, device::WeakDeviceId<C>>,
+    BC: crate::NonSyncContext,
+    V: InfoVisitor<I, device::WeakDeviceId<BC>>
+        + InfoVisitor<Ipv4, device::WeakDeviceId<BC>>
+        + InfoVisitor<Ipv6, device::WeakDeviceId<BC>>,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(r) = I::map_ip(
@@ -3911,10 +3923,10 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
 }
 
 /// Get information for a TCP socket.
-pub fn get_info<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
-) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
+pub fn get_info<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
+) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -3926,13 +3938,13 @@ pub fn get_info<I: DualStackIpExt, C: crate::NonSyncContext>(
 /// Access options mutably for a TCP socket.
 pub fn with_socket_options_mut<
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
     R,
     F: FnOnce(&mut SocketOptions) -> R,
 >(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     f: F,
 ) -> R {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -3951,12 +3963,12 @@ pub fn with_socket_options_mut<
 /// Access socket options immutably for a TCP socket.
 pub fn with_socket_options<
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
     R,
     F: FnOnce(&SocketOptions) -> R,
 >(
-    core_ctx: &SyncCtx<C>,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+    core_ctx: &SyncCtx<BC>,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     f: F,
 ) -> R {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -3973,10 +3985,10 @@ pub fn with_socket_options<
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_send_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn set_send_buffer_size<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     size: usize,
 ) {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -3992,10 +4004,10 @@ pub fn set_send_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
 }
 
 /// Get the size of the send buffer for this socket and future derived sockets.
-pub fn send_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn send_buffer_size<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<usize> {
     let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(size) = I::map_ip(
@@ -4011,10 +4023,10 @@ pub fn send_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_receive_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn set_receive_buffer_size<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     size: usize,
 ) {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -4031,10 +4043,10 @@ pub fn set_receive_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
 
 /// Get the size of the receive buffer for this socket and future derived
 /// sockets.
-pub fn receive_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn receive_buffer_size<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<usize> {
     let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(size) = I::map_ip(
@@ -4050,9 +4062,9 @@ pub fn receive_buffer_size<I: DualStackIpExt, C: crate::NonSyncContext>(
 }
 
 /// Gets the last error on the connection.
-pub fn get_socket_error<I: DualStackIpExt, C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn get_socket_error<I: DualStackIpExt, BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<ConnectionError> {
     let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(err) = I::map_ip(
@@ -4068,13 +4080,13 @@ pub fn get_socket_error<I: DualStackIpExt, C: crate::NonSyncContext>(
 /// - A retransmission timer fires.
 /// - An ack received from peer so that our send window is enlarged.
 /// - The user puts data into the buffer and we are notified.
-pub fn do_send<I, C>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    conn_id: &TcpSocketId<I, WeakDeviceId<C>, C>,
+pub fn do_send<I, BC>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    conn_id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) where
     I: DualStackIpExt,
-    C: crate::NonSyncContext,
+    BC: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
@@ -4084,13 +4096,13 @@ pub fn do_send<I, C>(
     )
 }
 
-pub(crate) fn handle_timer<SC, C>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    timer_id: TimerId<SC::WeakDeviceId, C>,
+pub(crate) fn handle_timer<CC, BC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    timer_id: TimerId<CC::WeakDeviceId, BC>,
 ) where
-    C: NonSyncContext<SC::WeakDeviceId>,
-    SC: SyncContext<Ipv4, C> + SyncContext<Ipv6, C>,
+    BC: NonSyncContext<CC::WeakDeviceId>,
+    CC: SyncContext<Ipv4, BC> + SyncContext<Ipv6, BC>,
 {
     match timer_id {
         TimerId::V4(conn_id) => {
@@ -4234,20 +4246,20 @@ mod tests {
         fn converter() -> MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>;
     }
 
-    struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongDeviceId, C: TcpBindingsTypes> {
-        isn_generator: Rc<IsnGenerator<C::Instant>>,
-        demux: DemuxState<I, D::Weak, C>,
+    struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
+        isn_generator: Rc<IsnGenerator<BT::Instant>>,
+        demux: DemuxState<I, D::Weak, BT>,
         // Always destroy all sockets last so the strong references in the demux
         // are gone.
-        all_sockets: TcpSocketSet<I, D::Weak, C>,
+        all_sockets: TcpSocketSet<I, D::Weak, BT>,
     }
 
-    impl<I, D, C> Default for FakeTcpState<I, D, C>
+    impl<I, D, BT> Default for FakeTcpState<I, D, BT>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes,
-        C::Instant: Default,
+        BT: TcpBindingsTypes,
+        BT::Instant: Default,
     {
         fn default() -> Self {
             Self {
@@ -4261,24 +4273,24 @@ mod tests {
         }
     }
 
-    struct FakeDualStackTcpState<D: FakeStrongDeviceId, C: TcpBindingsTypes> {
-        v4: FakeTcpState<Ipv4, D, C>,
-        v6: FakeTcpState<Ipv6, D, C>,
+    struct FakeDualStackTcpState<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
+        v4: FakeTcpState<Ipv4, D, BT>,
+        v6: FakeTcpState<Ipv6, D, BT>,
     }
 
-    impl<D, C> Default for FakeDualStackTcpState<D, C>
+    impl<D, BT> Default for FakeDualStackTcpState<D, BT>
     where
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes,
-        C::Instant: Default,
+        BT: TcpBindingsTypes,
+        BT::Instant: Default,
     {
         fn default() -> Self {
             Self { v4: Default::default(), v6: Default::default() }
         }
     }
 
-    type TcpSyncCtx<D, C> = WrappedFakeSyncCtx<
-        FakeDualStackTcpState<D, C>,
+    type TcpSyncCtx<D, BT> = WrappedFakeSyncCtx<
+        FakeDualStackTcpState<D, BT>,
         FakeDualStackIpSocketCtx<D>,
         DualStackSendIpPacketMeta<D>,
         D,
@@ -4412,15 +4424,15 @@ mod tests {
         }
     }
 
-    impl<I, D, C> DeviceIpSocketHandler<I, C> for TcpSyncCtx<D, C>
+    impl<I, D, BC> DeviceIpSocketHandler<I, BC> for TcpSyncCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes + IpSocketNonSyncContext,
+        BC: TcpBindingsTypes + IpSocketNonSyncContext,
     {
         fn get_mms<O: SendOptions<I>>(
             &mut self,
-            _bindings_ctx: &mut C,
+            _bindings_ctx: &mut BC,
             _ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
         ) -> Result<Mms, MmsError> {
             Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
@@ -4428,34 +4440,34 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<I, D, C> TransportIpContext<I, C> for TcpSyncCtx<D, C>
+    impl<I, D, BC> TransportIpContext<I, BC> for TcpSyncCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes + IpSocketNonSyncContext,
-        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, C, DeviceId = Self::DeviceId>,
+        BC: TcpBindingsTypes + IpSocketNonSyncContext,
+        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
-        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, C>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, C>::get_devices_with_assigned_addr(self.inner.get_mut(), addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.inner.get_mut(), addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, C>::get_default_hop_limits(self.inner.get_mut(), device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(self.inner.get_mut(), device)
         }
 
         fn confirm_reachable_with_destination(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, C>::confirm_reachable_with_destination(
+            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
                 self.inner.get_mut(),
                 bindings_ctx,
                 dst,
@@ -4465,12 +4477,12 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, C: TcpBindingsTypes + IpSocketNonSyncContext>
-        IpSocketContext<I, C> for TcpSyncCtx<D, C>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketNonSyncContext>
+        IpSocketContext<I, BC> for TcpSyncCtx<D, BC>
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
@@ -4480,7 +4492,7 @@ mod tests {
 
         fn send_ip_packet<SS>(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -4502,16 +4514,16 @@ mod tests {
         }
     }
 
-    impl<D, C> DemuxSyncContext<Ipv4, D::Weak, C> for TcpSyncCtx<D, C>
+    impl<D, BC> DemuxSyncContext<Ipv4, D::Weak, BC> for TcpSyncCtx<D, BC>
     where
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes + IpSocketNonSyncContext,
+        BC: TcpBindingsTypes + IpSocketNonSyncContext,
     {
-        fn with_demux<O, F: FnOnce(&DemuxState<Ipv4, D::Weak, C>) -> O>(&mut self, cb: F) -> O {
+        fn with_demux<O, F: FnOnce(&DemuxState<Ipv4, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
             cb(&self.outer.v4.demux)
         }
 
-        fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv4, D::Weak, C>) -> O>(
+        fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv4, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
@@ -4519,16 +4531,16 @@ mod tests {
         }
     }
 
-    impl<D, C> DemuxSyncContext<Ipv6, D::Weak, C> for TcpSyncCtx<D, C>
+    impl<D, BC> DemuxSyncContext<Ipv6, D::Weak, BC> for TcpSyncCtx<D, BC>
     where
         D: FakeStrongDeviceId,
-        C: TcpBindingsTypes + IpSocketNonSyncContext,
+        BC: TcpBindingsTypes + IpSocketNonSyncContext,
     {
-        fn with_demux<O, F: FnOnce(&DemuxState<Ipv6, D::Weak, C>) -> O>(&mut self, cb: F) -> O {
+        fn with_demux<O, F: FnOnce(&DemuxState<Ipv6, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
             cb(&self.outer.v6.demux)
         }
 
-        fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv6, D::Weak, C>) -> O>(
+        fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv6, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
@@ -4536,8 +4548,8 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, C: TcpBindingsTypes + IpSocketNonSyncContext> SyncContext<Ipv6, C>
-        for TcpSyncCtx<D, C>
+    impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketNonSyncContext> SyncContext<Ipv6, BC>
+        for TcpSyncCtx<D, BC>
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = crate::convert::UninstantiableConverter;
@@ -4545,7 +4557,7 @@ mod tests {
         type DualStackConverter = ();
         fn with_all_sockets_mut<
             O,
-            F: FnOnce(&mut TcpSocketSet<Ipv6, Self::WeakDeviceId, C>) -> O,
+            F: FnOnce(&mut TcpSocketSet<Ipv6, Self::WeakDeviceId, BC>) -> O,
         >(
             &mut self,
             cb: F,
@@ -4555,7 +4567,7 @@ mod tests {
 
         fn socket_destruction_deferred(
             &mut self,
-            socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+            socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
         ) {
             let WeakTcpSocketId(rc) = &socket;
             panic!(
@@ -4566,7 +4578,7 @@ mod tests {
 
         fn for_each_socket<
             F: FnMut(
-                &TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
+                &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
                 MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
             ),
         >(
@@ -4586,12 +4598,12 @@ mod tests {
                         Self::SingleStackConverter,
                     ),
                 >,
-                &mut TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
-                &IsnGenerator<C::Instant>,
+                &mut TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
+                &IsnGenerator<BC::Instant>,
             ) -> O,
         >(
             &mut self,
-            id: &TcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+            id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
             cb: F,
         ) -> O {
             let isn = Rc::clone(&self.outer.v6.isn_generator);
@@ -4601,20 +4613,20 @@ mod tests {
         fn with_socket_and_converter<
             O,
             F: FnOnce(
-                &TcpSocketState<Ipv6, Self::WeakDeviceId, C>,
+                &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
                 MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
             ) -> O,
         >(
             &mut self,
-            id: &TcpSocketId<Ipv6, Self::WeakDeviceId, C>,
+            id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
             cb: F,
         ) -> O {
             cb(id.get_mut().deref_mut(), MaybeDualStack::DualStack(()))
         }
     }
 
-    impl<D: FakeStrongDeviceId, C: TcpBindingsTypes + IpSocketNonSyncContext> SyncContext<Ipv4, C>
-        for TcpSyncCtx<D, C>
+    impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketNonSyncContext> SyncContext<Ipv4, BC>
+        for TcpSyncCtx<D, BC>
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = ();
@@ -4622,7 +4634,7 @@ mod tests {
         type DualStackConverter = crate::convert::UninstantiableConverter;
         fn with_all_sockets_mut<
             O,
-            F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, C>) -> O,
+            F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, BC>) -> O,
         >(
             &mut self,
             cb: F,
@@ -4632,7 +4644,7 @@ mod tests {
 
         fn socket_destruction_deferred(
             &mut self,
-            socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+            socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
         ) {
             let WeakTcpSocketId(rc) = &socket;
             panic!(
@@ -4643,7 +4655,7 @@ mod tests {
 
         fn for_each_socket<
             F: FnMut(
-                &TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
+                &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
                 MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
             ),
         >(
@@ -4663,15 +4675,15 @@ mod tests {
                         Self::SingleStackConverter,
                     ),
                 >,
-                &mut TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
-                &IsnGenerator<C::Instant>,
+                &mut TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
+                &IsnGenerator<BC::Instant>,
             ) -> O,
         >(
             &mut self,
-            id: &TcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+            id: &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
             cb: F,
         ) -> O {
-            let isn: Rc<IsnGenerator<<C as InstantBindingsTypes>::Instant>> =
+            let isn: Rc<IsnGenerator<<BC as InstantBindingsTypes>::Instant>> =
                 Rc::clone(&self.outer.v4.isn_generator);
             cb(MaybeDualStack::NotDualStack((self, ())), id.get_mut().deref_mut(), isn.deref())
         }
@@ -4679,12 +4691,12 @@ mod tests {
         fn with_socket_and_converter<
             O,
             F: FnOnce(
-                &TcpSocketState<Ipv4, Self::WeakDeviceId, C>,
+                &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
                 MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
             ) -> O,
         >(
             &mut self,
-            id: &TcpSocketId<Ipv4, Self::WeakDeviceId, C>,
+            id: &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
             cb: F,
         ) -> O {
             cb(id.get_mut().deref_mut(), MaybeDualStack::NotDualStack(()))
@@ -4893,14 +4905,14 @@ mod tests {
     fn assert_this_stack_conn<
         'a,
         I: DualStackIpExt,
-        C: NonSyncContext<SC::WeakDeviceId>,
-        SC: SyncContext<I, C>,
+        BC: NonSyncContext<CC::WeakDeviceId>,
+        CC: SyncContext<I, BC>,
     >(
-        conn: &'a I::ConnectionAndAddr<SC::WeakDeviceId, C>,
-        converter: &MaybeDualStack<SC::DualStackConverter, SC::SingleStackConverter>,
+        conn: &'a I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
+        converter: &MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
     ) -> &'a (
-        Connection<I, I, SC::WeakDeviceId, C>,
-        ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
+        Connection<I, I, CC::WeakDeviceId, BC>,
+        ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     ) {
         match converter {
             MaybeDualStack::NotDualStack(nds) => nds.convert(conn),
@@ -7153,12 +7165,12 @@ mod tests {
 
     fn deliver_icmp_error<
         I: TcpTestIpExt + IcmpIpExt,
-        SC: SyncContext<I, C, DeviceId = FakeDeviceId>
-            + SyncContext<I::OtherVersion, C, DeviceId = FakeDeviceId>,
-        C: NonSyncContext<SC::WeakDeviceId>,
+        CC: SyncContext<I, BC, DeviceId = FakeDeviceId>
+            + SyncContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>,
+        BC: NonSyncContext<CC::WeakDeviceId>,
     >(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         original_src_ip: SpecifiedAddr<I::Addr>,
         original_dst_ip: SpecifiedAddr<I::Addr>,
         original_body: &[u8],

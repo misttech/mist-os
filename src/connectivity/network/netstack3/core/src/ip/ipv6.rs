@@ -43,9 +43,9 @@ pub(crate) enum Ipv6PacketAction {
 /// headers in `packet`. Otherwise, we will only attempt to process the
 /// hop-by-hop extension header (which MUST be the first extension header if
 /// present) as per RFC 8200 section 4.
-pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    core_ctx: &mut C,
-    device: &C::DeviceId,
+pub(crate) fn handle_extension_headers<CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
+    core_ctx: &mut CC,
+    device: &CC::DeviceId,
     frame_dst: FrameDestination,
     packet: &Ipv6Packet<B>,
     at_destination: bool,
@@ -118,12 +118,12 @@ pub(crate) fn handle_extension_headers<C: DeviceIdContext<AnyDevice>, B: ByteSli
 // and so this function will never be called.
 fn handle_hop_by_hop_options_ext_hdr<
     'a,
-    C: DeviceIdContext<AnyDevice>,
+    CC: DeviceIdContext<AnyDevice>,
     B: ByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<HopByHopOptionData<'a>>>,
 >(
-    _bindings_ctx: &mut C,
-    _device: &C::DeviceId,
+    _bindings_ctx: &mut CC,
+    _device: &CC::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
     options: I,
@@ -145,9 +145,9 @@ fn handle_hop_by_hop_options_ext_hdr<
 
 /// Handles a routing extension header for a `packet`.
 // TODO(rheacock): Remove `_` prefix when this is used.
-fn _handle_routing_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    _bindings_ctx: &mut C,
-    _device: &C::DeviceId,
+fn _handle_routing_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
+    _bindings_ctx: &mut CC,
+    _device: &CC::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
     _routing_data: &RoutingData<'a>,
@@ -159,9 +159,9 @@ fn _handle_routing_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
 }
 
 /// Handles a fragment extension header for a `packet`.
-fn handle_fragment_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    _bindings_ctx: &mut C,
-    _device: &C::DeviceId,
+fn handle_fragment_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
+    _bindings_ctx: &mut CC,
+    _device: &CC::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
     _fragment_data: &FragmentData<'a>,
@@ -176,12 +176,12 @@ fn handle_fragment_ext_hdr<'a, C: DeviceIdContext<AnyDevice>, B: ByteSlice>(
 // and so this function will never be called.
 fn handle_destination_options_ext_hdr<
     'a,
-    C: DeviceIdContext<AnyDevice>,
+    CC: DeviceIdContext<AnyDevice>,
     B: ByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<DestinationOptionData<'a>>>,
 >(
-    _bindings_ctx: &mut C,
-    _device: &C::DeviceId,
+    _bindings_ctx: &mut CC,
+    _device: &CC::DeviceId,
     _frame_dst: FrameDestination,
     _packet: &Ipv6Packet<B>,
     options: I,

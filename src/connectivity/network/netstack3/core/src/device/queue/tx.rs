@@ -64,7 +64,7 @@ pub(crate) trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
 }
 
 /// The execution context for a transmit queue.
-pub(crate) trait TransmitQueueContext<D: Device, C>: TransmitQueueCommon<D, C> {
+pub(crate) trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
     /// Returns the queue state, mutably.
     fn with_transmit_queue_mut<
         O,
@@ -81,21 +81,21 @@ pub(crate) trait TransmitQueueContext<D: Device, C>: TransmitQueueCommon<D, C> {
     /// error must be returned.
     fn send_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>>;
 }
 
-pub(crate) trait TransmitDequeueContext<D: Device, C>: TransmitQueueCommon<D, C> {
+pub(crate) trait TransmitDequeueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
     type TransmitQueueCtx<'a>: TransmitQueueContext<
             D,
-            C,
+            BC,
             Meta = Self::Meta,
             Buffer = Self::Buffer,
             DeviceId = Self::DeviceId,
-        > + DeviceSocketHandler<D, C>;
+        > + DeviceSocketHandler<D, BC>;
 
     /// Calls the function with the TX deque state and the TX queue context.
     fn with_dequed_packets_and_tx_queue_ctx<
@@ -117,11 +117,11 @@ pub enum TransmitQueueConfiguration {
 }
 
 /// An implementation of a transmit queue that stores egress frames.
-pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
+pub(crate) trait TransmitQueueHandler<D: Device, BC>: TransmitQueueCommon<D, BC> {
     /// Queues a frame for transmission.
     fn queue_tx_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         body: S,
@@ -132,19 +132,19 @@ pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
 }
 
 /// Crate-internal transmit queue API interaction.
-pub(crate) struct TransmitQueueApi<SC, C, D>(Never, PhantomData<(SC, C, D)>);
+pub(crate) struct TransmitQueueApi<CC, BT, D>(Never, PhantomData<(CC, BT, D)>);
 
 impl<
         D: Device,
-        C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-        SC: TransmitDequeueContext<D, C> + DeviceSocketHandler<D, C>,
-    > TransmitQueueApi<SC, C, D>
+        BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+        CC: TransmitDequeueContext<D, BC> + DeviceSocketHandler<D, BC>,
+    > TransmitQueueApi<CC, BC, D>
 {
     /// Transmits any queued frames.
     pub(crate) fn transmit_queued_frames(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
     ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
         core_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
@@ -192,9 +192,9 @@ impl<
 
     /// Sets the queue configuration for the device.
     pub(crate) fn set_configuration(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
         config: TransmitQueueConfiguration,
     ) {
         // We take the dequeue lock as well to make sure we finish any current
@@ -237,7 +237,7 @@ impl<
                             Err(DeviceSendFrameError::DeviceNotReady(x)) => {
                                 // We swapped to no-queue and device cannot send
                                 // the frame so we just drop it.
-                                let _: (SC::Meta, SC::Buffer) = x;
+                                let _: (CC::Meta, CC::Buffer) = x;
                             }
                         }
                     }
@@ -254,16 +254,16 @@ impl<
 
 fn deliver_to_device_sockets<
     D: Device,
-    C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-    SC: TransmitQueueCommon<D, C> + DeviceSocketHandler<D, C>,
+    BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+    CC: TransmitQueueCommon<D, BC> + DeviceSocketHandler<D, BC>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device_id: &SC::DeviceId,
-    buffer: &SC::Buffer,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    buffer: &CC::Buffer,
 ) {
     let bytes = buffer.as_ref();
-    match SC::parse_outgoing_frame(bytes) {
+    match CC::parse_outgoing_frame(bytes) {
         Ok(sent_frame) => DeviceSocketHandler::handle_frame(
             core_ctx,
             bindings_ctx,
@@ -283,18 +283,18 @@ fn deliver_to_device_sockets<
 
 impl<
         D: Device,
-        C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-        SC: TransmitQueueContext<D, C> + DeviceSocketHandler<D, C>,
-    > TransmitQueueHandler<D, C> for SC
+        BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+        CC: TransmitQueueContext<D, BC> + DeviceSocketHandler<D, BC>,
+    > TransmitQueueHandler<D, BC> for CC
 where
-    for<'a> &'a mut SC::Allocator: BufferAlloc<SC::Buffer>,
-    SC::Buffer: ReusableBuffer,
+    for<'a> &'a mut CC::Allocator: BufferAlloc<CC::Buffer>,
+    CC::Buffer: ReusableBuffer,
 {
     fn queue_tx_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
-        device_id: &SC::DeviceId,
-        meta: SC::Meta,
+        bindings_ctx: &mut BC,
+        device_id: &CC::DeviceId,
+        meta: CC::Meta,
         body: S,
     ) -> Result<(), TransmitQueueFrameError<S>>
     where

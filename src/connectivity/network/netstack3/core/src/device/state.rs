@@ -17,9 +17,9 @@ use crate::{
 /// [`BaseDeviceState`].
 pub trait DeviceStateSpec: Send + Sync + 'static {
     /// The link state.
-    type Link<C: DeviceLayerTypes>: Send + Sync;
+    type Link<BT: DeviceLayerTypes>: Send + Sync;
     /// The external (bindings) state.
-    type External<C: DeviceLayerTypes>: Send + Sync;
+    type External<BT: DeviceLayerTypes>: Send + Sync;
     /// Marker for loopback devices.
     const IS_LOOPBACK: bool;
     /// Marker used to print debug information for device identifiers.
@@ -32,34 +32,34 @@ pub trait DeviceStateSpec: Send + Sync + 'static {
 /// infallibly. The `WeakCookie` is kept inside [`BaseDeviceState`] in an `Arc`
 /// to group all the information that is cloned out to support weak device
 /// references.
-pub(crate) struct WeakCookie<T: DeviceStateSpec, C: DeviceLayerTypes> {
-    pub(crate) bindings_id: C::DeviceIdentifier,
-    pub(crate) weak_ref: WeakRc<BaseDeviceState<T, C>>,
+pub(crate) struct WeakCookie<T: DeviceStateSpec, BT: DeviceLayerTypes> {
+    pub(crate) bindings_id: BT::DeviceIdentifier,
+    pub(crate) weak_ref: WeakRc<BaseDeviceState<T, BT>>,
 }
 
-pub(crate) struct BaseDeviceState<T: DeviceStateSpec, C: DeviceLayerTypes> {
-    pub(crate) ip: IpLinkDeviceState<T, C>,
-    pub(crate) external_state: T::External<C>,
-    pub(crate) weak_cookie: Arc<WeakCookie<T, C>>,
+pub(crate) struct BaseDeviceState<T: DeviceStateSpec, BT: DeviceLayerTypes> {
+    pub(crate) ip: IpLinkDeviceState<T, BT>,
+    pub(crate) external_state: T::External<BT>,
+    pub(crate) weak_cookie: Arc<WeakCookie<T, BT>>,
 }
 
 /// A convenience wrapper around `IpLinkDeviceStateInner` that uses
 /// `DeviceStateSpec` to extract the link state type and make type signatures
 /// shorter.
-pub(crate) type IpLinkDeviceState<T, C> =
-    IpLinkDeviceStateInner<<T as DeviceStateSpec>::Link<C>, C>;
+pub(crate) type IpLinkDeviceState<T, BT> =
+    IpLinkDeviceStateInner<<T as DeviceStateSpec>::Link<BT>, BT>;
 
 /// State for a link-device that is also an IP device.
 ///
 /// `D` is the link-specific state.
-pub(crate) struct IpLinkDeviceStateInner<T, C: DeviceLayerTypes> {
-    pub ip: DualStackIpDeviceState<C::Instant>,
+pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
+    pub ip: DualStackIpDeviceState<BT::Instant>,
     pub link: T,
     pub(super) origin: OriginTracker,
-    pub(super) sockets: RwLock<HeldDeviceSockets<C>>,
+    pub(super) sockets: RwLock<HeldDeviceSockets<BT>>,
 }
 
-impl<T, C: DeviceLayerTypes> IpLinkDeviceStateInner<T, C> {
+impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
     pub(super) fn new(link: T, origin: OriginTracker) -> Self {
         Self {
@@ -71,10 +71,10 @@ impl<T, C: DeviceLayerTypes> IpLinkDeviceStateInner<T, C> {
     }
 }
 
-impl<T, C: DeviceLayerTypes> AsRef<DualStackIpDeviceState<C::Instant>>
-    for IpLinkDeviceStateInner<T, C>
+impl<T, BT: DeviceLayerTypes> AsRef<DualStackIpDeviceState<BT::Instant>>
+    for IpLinkDeviceStateInner<T, BT>
 {
-    fn as_ref(&self) -> &DualStackIpDeviceState<C::Instant> {
+    fn as_ref(&self) -> &DualStackIpDeviceState<BT::Instant> {
         &self.ip
     }
 }

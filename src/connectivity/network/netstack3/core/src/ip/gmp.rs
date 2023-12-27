@@ -286,7 +286,7 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
 }
 
 /// An implementation of query operations on a Group Management Protocol (GMP).
-pub(crate) trait GmpQueryHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Returns true if the device is a member of the group.
     fn gmp_is_in_group(
         &mut self,
@@ -298,25 +298,25 @@ pub(crate) trait GmpQueryHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member
     /// state. Should be called anytime a configuration change occurs which
     /// results in GMP potentially being enabled. E.g. when IP or GMP
     /// transitions to being enabled.
-    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId);
+    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId);
 
     /// Handles GMP being disabled.
     ///
     /// All joined groups will transition to the non-member state but still
     /// remain locally joined.
-    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId);
+    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId);
 
     /// Joins the given multicast group.
     fn gmp_join_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupJoinResult;
@@ -324,14 +324,14 @@ pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Leaves the given multicast group.
     fn gmp_leave_group(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult;
 }
 
-impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpStateContext<I, C>>
-    GmpQueryHandler<I, C> for SC
+impl<I: IpExt, BC: GmpNonSyncContext<I, CC::DeviceId>, CC: GmpStateContext<I, BC>>
+    GmpQueryHandler<I, BC> for CC
 {
     fn gmp_is_in_group(
         &mut self,
@@ -342,21 +342,21 @@ impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpStateContext<I, C>>
     }
 }
 
-impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpContext<I, C>> GmpHandler<I, C>
-    for SC
+impl<I: IpExt, BC: GmpNonSyncContext<I, CC::DeviceId>, CC: GmpContext<I, BC>> GmpHandler<I, BC>
+    for CC
 {
-    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId) {
+    fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId) {
         gmp_handle_maybe_enabled(self, bindings_ctx, device)
     }
 
-    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut C, device: &Self::DeviceId) {
+    fn gmp_handle_disabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId) {
         gmp_handle_disabled(self, bindings_ctx, device)
     }
 
     fn gmp_join_group(
         &mut self,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupJoinResult {
         gmp_join_group(self, bindings_ctx, device, group_addr)
@@ -364,8 +364,8 @@ impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpContext<I, C>> GmpH
 
     fn gmp_leave_group(
         &mut self,
-        bindings_ctx: &mut C,
-        device: &SC::DeviceId,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult {
         gmp_leave_group(self, bindings_ctx, device, group_addr)
@@ -898,8 +898,11 @@ trait GmpNonSyncContext<I: Ip, DeviceId>:
     RngContext + TimerContext<GmpDelayedReportTimerId<I::Addr, DeviceId>>
 {
 }
-impl<DeviceId, I: Ip, C: RngContext + TimerContext<GmpDelayedReportTimerId<I::Addr, DeviceId>>>
-    GmpNonSyncContext<I, DeviceId> for C
+impl<
+        DeviceId,
+        I: Ip,
+        BC: RngContext + TimerContext<GmpDelayedReportTimerId<I::Addr, DeviceId>>,
+    > GmpNonSyncContext<I, DeviceId> for BC
 {
 }
 
@@ -915,17 +918,19 @@ pub(crate) struct GmpState<'a, A: IpAddress, GroupState> {
 }
 
 /// Provides IP-specific associated types for GMP.
-trait GmpTypeLayout<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
+trait GmpTypeLayout<I: IpExt, BC: GmpNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     type ProtocolSpecific: ProtocolSpecific;
-    type GroupState: From<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
-        + Into<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
-        + AsMut<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>;
+    type GroupState: From<GmpStateMachine<BC::Instant, Self::ProtocolSpecific>>
+        + Into<GmpStateMachine<BC::Instant, Self::ProtocolSpecific>>
+        + AsMut<GmpStateMachine<BC::Instant, Self::ProtocolSpecific>>;
 }
 
 /// Provides immutable access to GMP state.
-trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayout<I, C> {
+trait GmpStateContext<I: IpExt, BC: GmpNonSyncContext<I, Self::DeviceId>>:
+    GmpTypeLayout<I, BC>
+{
     /// Calls the function with immutable access to the [`MulticastGroupSet`].
     fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, Self::GroupState>) -> O>(
         &mut self,
@@ -937,7 +942,7 @@ trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTyp
 /// Provides common functionality for GMP context implementations.
 ///
 /// This trait implements portions of a group management protocol.
-trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayout<I, C> {
+trait GmpContext<I: IpExt, BC: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayout<I, BC> {
     type Err;
 
     /// Calls the function with a boolean indicating whether GMP is disabled and
@@ -951,7 +956,7 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
     /// Sends a GMP message.
     fn send_message(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
         msg_type: GmpMessageType<Self::ProtocolSpecific>,
@@ -960,7 +965,7 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
     /// Runs protocol-specific actions.
     fn run_actions(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         actions: <Self::ProtocolSpecific as ProtocolSpecific>::Actions,
     );
@@ -968,13 +973,13 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayo
     fn not_a_member_err(addr: I::Addr) -> Self::Err;
 }
 
-fn gmp_handle_timer<I, C, SC>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    GmpDelayedReportTimerId { device, group_addr }: GmpDelayedReportTimerId<I::Addr, SC::DeviceId>,
+fn gmp_handle_timer<I, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    GmpDelayedReportTimerId { device, group_addr }: GmpDelayedReportTimerId<I::Addr, CC::DeviceId>,
 ) where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     let ReportTimerExpiredActions { send_report } =
@@ -993,22 +998,22 @@ trait GmpMessage<I: Ip> {
     fn group_addr(&self) -> I::Addr;
 }
 
-fn handle_report_message<I, C, SC>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+fn handle_report_message<I, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-) -> Result<(), SC::Err>
+) -> Result<(), CC::Err>
 where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     let ReportReceivedActions { stop_timer } =
         core_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
             groups
                 .get_mut(&group_addr)
-                .ok_or(SC::not_a_member_err(*group_addr))
+                .ok_or(CC::not_a_member_err(*group_addr))
                 .map(|a| a.as_mut().report_received())
         })?;
 
@@ -1029,16 +1034,16 @@ enum QueryTarget<A> {
     Specified(MulticastAddr<A>),
 }
 
-fn handle_query_message<I, C, SC>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+fn handle_query_message<I, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     target: QueryTarget<I::Addr>,
     max_response_time: Duration,
-) -> Result<(), SC::Err>
+) -> Result<(), CC::Err>
 where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     let addr_and_actions =
@@ -1062,7 +1067,7 @@ where
                     group_addr,
                     groups
                         .get_mut(&group_addr)
-                        .ok_or(SC::not_a_member_err(*group_addr))?
+                        .ok_or(CC::not_a_member_err(*group_addr))?
                         .as_mut()
                         .query_received(&mut rng, max_response_time, now),
                 )]),
@@ -1075,7 +1080,7 @@ where
     ) in addr_and_actions.into_iter()
     {
         if let Some(generic_actions) = generic_actions {
-            let _: Option<C::Instant> = match generic_actions {
+            let _: Option<BC::Instant> = match generic_actions {
                 QueryReceivedGenericAction::ScheduleTimer(delay) => bindings_ctx.schedule_timer(
                     delay,
                     GmpDelayedReportTimerId { device: device.clone(), group_addr },
@@ -1103,13 +1108,13 @@ where
     Ok(())
 }
 
-fn gmp_handle_maybe_enabled<C, SC, I>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+fn gmp_handle_maybe_enabled<BC, CC, I>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
 ) where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     let actions = core_ctx.with_gmp_state_mut(device, |GmpState { enabled, groups }| {
@@ -1150,10 +1155,10 @@ fn gmp_handle_maybe_enabled<C, SC, I>(
     }
 }
 
-fn gmp_handle_disabled<C, SC, I>(core_ctx: &mut SC, bindings_ctx: &mut C, device: &SC::DeviceId)
+fn gmp_handle_disabled<BC, CC, I>(core_ctx: &mut CC, bindings_ctx: &mut BC, device: &CC::DeviceId)
 where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     let actions = core_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
@@ -1184,15 +1189,15 @@ where
     }
 }
 
-fn gmp_join_group<C, SC, I>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+fn gmp_join_group<BC, CC, I>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
 ) -> GroupJoinResult
 where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     core_ctx
@@ -1227,15 +1232,15 @@ where
         })
 }
 
-fn gmp_leave_group<C, SC, I>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    device: &SC::DeviceId,
+fn gmp_leave_group<BC, CC, I>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
 ) -> GroupLeaveResult
 where
-    C: GmpNonSyncContext<I, SC::DeviceId>,
-    SC: GmpContext<I, C>,
+    BC: GmpNonSyncContext<I, CC::DeviceId>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
 {
     core_ctx
@@ -1285,15 +1290,15 @@ mod testutil {
         A::Version: IpDeviceStateIpExt,
     {
         pub(crate) fn join_multicast_group<
-            C: RngContext + InstantContext<Instant = FakeInstant>,
+            BC: RngContext + InstantContext<Instant = FakeInstant>,
         >(
             &mut self,
-            bindings_ctx: &mut C,
+            bindings_ctx: &mut BC,
             addr: MulticastAddr<A>,
         ) {
-            fn new_state_machine<C: RngContext + InstantContext, P: Default + ProtocolSpecific>(
-                bindings_ctx: &mut C,
-            ) -> GmpStateMachine<C::Instant, P> {
+            fn new_state_machine<BC: RngContext + InstantContext, P: Default + ProtocolSpecific>(
+                bindings_ctx: &mut BC,
+            ) -> GmpStateMachine<BC::Instant, P> {
                 let now = bindings_ctx.now();
                 let (machine, _actions) =
                     GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, false);

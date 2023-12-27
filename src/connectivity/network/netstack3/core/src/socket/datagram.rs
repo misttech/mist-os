@@ -530,10 +530,10 @@ impl<A: IpAddress, D: crate::device::Id, LI, RI: Copy> ConnAddr<ConnIpAddr<A, LI
     }
 }
 
-fn leave_all_joined_groups<A: IpAddress, C, SC: MulticastMembershipHandler<A::Version, C>>(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    memberships: MulticastMemberships<A, SC::WeakDeviceId>,
+fn leave_all_joined_groups<A: IpAddress, BC, CC: MulticastMembershipHandler<A::Version, BC>>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    memberships: MulticastMemberships<A, CC::WeakDeviceId>,
 ) {
     for (addr, device) in memberships {
         let Some(device) = core_ctx.upgrade_weak_device_id(&device) else {
@@ -566,11 +566,11 @@ pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
     pub(crate) remote_id: RI,
 }
 
-pub(crate) trait DatagramStateContext<I: IpExt, C, S: DatagramSocketSpec>:
+pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback provided to methods.
-    type SocketsStateCtx<'a>: DatagramBoundStateContext<I, C, S>
+    type SocketsStateCtx<'a>: DatagramBoundStateContext<I, BC, S>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
     /// Calls the function with an immutable reference to the datagram sockets.
@@ -598,12 +598,12 @@ pub(crate) trait DatagramStateContext<I: IpExt, C, S: DatagramSocketSpec>:
     ) -> O;
 }
 
-pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: DatagramSocketSpec>:
+pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback provided to methods.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C>
-        + MulticastMembershipHandler<I, C>
+    type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
     /// Context for dual-stack socket state access.
@@ -617,7 +617,7 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
     /// which is uninstantiable.
     type DualStackContext: DualStackDatagramBoundStateContext<
         I,
-        C,
+        BC,
         S,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
@@ -630,7 +630,7 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
     /// necessary to implement sockets that do not support dual-stack operation.
     type NonDualStackContext: NonDualStackDatagramBoundStateContext<
         I,
-        C,
+        BC,
         S,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
@@ -642,7 +642,7 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
         I,
         Self::WeakDeviceId,
         S::AddrSpec,
-        C,
+        BC,
         S::SocketMapSpec<I, Self::WeakDeviceId>,
     >;
 
@@ -709,12 +709,12 @@ impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOver
 }
 
 impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
-    fn to_converter<I: IpExt, C, S: DatagramSocketSpec>(
+    fn to_converter<I: IpExt, BC, S: DatagramSocketSpec>(
         self,
     ) -> MaybeDualStack<DS::Converter, NDS::Converter>
     where
-        DS: DualStackDatagramBoundStateContext<I, C, S>,
-        NDS: NonDualStackDatagramBoundStateContext<I, C, S>,
+        DS: DualStackDatagramBoundStateContext<I, BC, S>,
+        NDS: NonDualStackDatagramBoundStateContext<I, BC, S>,
     {
         match self {
             MaybeDualStack::DualStack(ds) => MaybeDualStack::DualStack(ds.converter()),
@@ -724,14 +724,14 @@ impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
 }
 
 /// Provides access to dual-stack socket state.
-pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec>:
+pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callbacks to methods.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C>
+    type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         // Allow creating IP sockets for the other IP version.
-        + TransportIpContext<I::OtherVersion, C>;
+        + TransportIpContext<I::OtherVersion, BC>;
 
     /// Returns if the socket state indicates dual-stack operation is enabled.
     fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
@@ -791,7 +791,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         I,
         Self::WeakDeviceId,
         S::AddrSpec,
-        C,
+        BC,
         S::SocketMapSpec<I, Self::WeakDeviceId>,
     >;
 
@@ -800,7 +800,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         I::OtherVersion,
         Self::WeakDeviceId,
         S::AddrSpec,
-        C,
+        BC,
         S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
     >;
 
@@ -856,7 +856,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
 }
 
 /// Provides access to socket state for a single IP version.
-pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec>:
+pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// A type for converting between address types.
@@ -1001,10 +1001,10 @@ impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     }
 }
 
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    DualStackDatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
+impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, BC, S>, BC>
+    DualStackDatagramBoundStateContext<I, BC, S> for UninstantiableContext<I, S, P>
 where
-    for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, C>,
+    for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, BC>,
 {
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
 
@@ -1088,7 +1088,7 @@ where
 }
 
 pub(crate) trait DatagramStateNonSyncContext<I: Ip, S>: RngContext {}
-impl<C: RngContext, I: Ip, S> DatagramStateNonSyncContext<I, S> for C {}
+impl<BC: RngContext, I: Ip, S> DatagramStateNonSyncContext<I, S> for BC {}
 
 /// Types and behavior for datagram socket demultiplexing map.
 ///
@@ -1428,8 +1428,8 @@ pub(crate) trait DatagramSocketSpec {
 
 pub(crate) struct InUseError;
 
-pub(crate) fn create<I: IpExt, S: DatagramSocketSpec, C, SC: DatagramStateContext<I, C, S>>(
-    core_ctx: &mut SC,
+pub(crate) fn create<I: IpExt, S: DatagramSocketSpec, BC, CC: DatagramStateContext<I, BC, S>>(
+    core_ctx: &mut CC,
 ) -> S::SocketId<I> {
     core_ctx.with_sockets_state_mut(|_sync_ctx, state| {
         state.push(SocketState::Unbound(UnboundSocketState::default())).into()
@@ -1446,13 +1446,13 @@ pub(crate) enum SocketInfo<I: Ip + DualStackIpExt, D, S: DatagramSocketSpec> {
 pub(crate) fn close<
     I: IpExt,
     S: DatagramSocketSpec,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-) -> SocketInfo<I, SC::WeakDeviceId, S> {
+) -> SocketInfo<I, CC::WeakDeviceId, S> {
     core_ctx.with_sockets_state_mut(|sync_ctx, state| {
         let (ip_options, info) = match state.remove(id.get_key_index()).expect("invalid socket ID")
         {
@@ -1585,8 +1585,8 @@ impl<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>
 // `SocketI` are the same type).
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
     /// Constructs the remove operation from existing socket state.
-    fn new_from_state<C, SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
-        core_ctx: &mut SC,
+    fn new_from_state<BC, CC: NonDualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
+        core_ctx: &mut CC,
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
@@ -1752,8 +1752,8 @@ struct DualStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
 
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, S> {
     /// Constructs the removal operation from existing socket state.
-    fn new_from_state<C, SC: DualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
-        core_ctx: &mut SC,
+    fn new_from_state<BC, CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
+        core_ctx: &mut CC,
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
@@ -1994,13 +1994,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
 pub(crate) fn get_info<
     I: IpExt,
     S: DatagramSocketSpec,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-) -> SocketInfo<I, SC::WeakDeviceId, S> {
+) -> SocketInfo<I, CC::WeakDeviceId, S> {
     core_ctx.with_sockets_state(|_sync_ctx, state| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
@@ -2021,18 +2021,18 @@ pub(crate) fn get_info<
 
 pub(crate) fn listen<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     core_ctx.with_sockets_state_mut(|sync_ctx, state| {
-        listen_inner::<_, C, _, S>(sync_ctx, bindings_ctx, state, id, addr, local_id)
+        listen_inner::<_, BC, _, S>(sync_ctx, bindings_ctx, state, id, addr, local_id)
     })
 }
 
@@ -2270,11 +2270,11 @@ fn try_pick_identifier<
     S: DatagramSocketSpec,
     D: device::WeakId,
     BS: BoundStateHandler<I, S, D>,
-    C: RngContext,
+    BC: RngContext,
 >(
     addr: BS::ListenerAddr,
     bound: &BS,
-    bindings_ctx: &mut C,
+    bindings_ctx: &mut BC,
     sharing: &S::SharingState,
 ) -> Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
     S::try_alloc_listen_identifier::<I, D>(bindings_ctx, move |identifier| {
@@ -2285,13 +2285,13 @@ fn try_pick_identifier<
     })
 }
 
-fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
-    addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, SC::DeviceId>>,
-    device: &Option<SC::WeakDeviceId>,
-    core_ctx: &mut SC,
+fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
+    addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, CC::DeviceId>>,
+    device: &Option<CC::WeakDeviceId>,
+    core_ctx: &mut CC,
     identifier: LI,
 ) -> Result<
-    (Option<SocketIpAddr<I::Addr>>, Option<EitherDeviceId<SC::DeviceId, SC::WeakDeviceId>>, LI),
+    (Option<SocketIpAddr<I::Addr>>, Option<EitherDeviceId<CC::DeviceId, CC::WeakDeviceId>>, LI),
     LocalAddressError,
 > {
     let (addr, device, identifier) = match addr {
@@ -2314,7 +2314,7 @@ fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
                         return Err(LocalAddressError::AddressMismatch);
                     }
                 } else {
-                    if !assigned_to.any(|_: SC::DeviceId| true) {
+                    if !assigned_to.any(|_: CC::DeviceId| true) {
                         return Err(LocalAddressError::CannotBindToAddress);
                     }
                 }
@@ -2328,15 +2328,15 @@ fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
 
 fn listen_inner<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramBoundStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
-    state: &mut SocketsState<I, SC::WeakDeviceId, S>,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    state: &mut SocketsState<I, CC::WeakDeviceId, S>,
     id: S::SocketId<I>,
-    addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     /// Possible operations that might be performed, depending on whether the
@@ -2419,26 +2419,26 @@ fn listen_inner<
     fn try_bind_single_stack<
         I: IpExt,
         S: DatagramSocketSpec,
-        SC: TransportIpContext<I, C>,
-        C: RngContext,
+        CC: TransportIpContext<I, BC>,
+        BC: RngContext,
     >(
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         bound: &mut BoundSocketMap<
             I,
-            SC::WeakDeviceId,
+            CC::WeakDeviceId,
             S::AddrSpec,
-            S::SocketMapSpec<I, SC::WeakDeviceId>,
+            S::SocketMapSpec<I, CC::WeakDeviceId>,
         >,
-        addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, SC::DeviceId>>,
-        device: &Option<SC::WeakDeviceId>,
+        addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, CC::DeviceId>>,
+        device: &Option<CC::WeakDeviceId>,
         local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-        id: <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
+        id: <S::SocketMapSpec<I, CC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
         sharing: S::SharingState,
     ) -> Result<
         ListenerAddr<
             ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-            SC::WeakDeviceId,
+            CC::WeakDeviceId,
         >,
         LocalAddressError,
     > {
@@ -2471,7 +2471,7 @@ fn listen_inner<
         .map(|()| ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device: weak_device })
     }
 
-    let bound_addr: ListenerAddr<S::ListenerIpAddr<I>, SC::WeakDeviceId> = match bound_operation {
+    let bound_addr: ListenerAddr<S::ListenerIpAddr<I>, CC::WeakDeviceId> = match bound_operation {
         BoundOperation::OnlyCurrentStack(either_dual_stack, addr) => {
             let converter = either_dual_stack.to_converter();
             core_ctx
@@ -2648,13 +2648,13 @@ fn connect_inner<
     D: WeakId,
     S: DatagramSocketSpec,
     R,
-    C,
-    SC: IpSocketHandler<WireI, C, WeakDeviceId = D, DeviceId = D::Strong>,
-    A: LocalIdentifierAllocator<WireI, D, S::AddrSpec, C, S::SocketMapSpec<WireI, D>>,
+    BC,
+    CC: IpSocketHandler<WireI, BC, WeakDeviceId = D, DeviceId = D::Strong>,
+    A: LocalIdentifierAllocator<WireI, D, S::AddrSpec, BC, S::SocketMapSpec<WireI, D>>,
 >(
     connect_params: ConnectParameters<WireI, SocketI, D, S>,
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
     allocator: &mut A,
     remove_original: impl FnOnce(
@@ -2757,10 +2757,10 @@ struct SingleStackConnectOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, D, S> {
     /// Constructs the connect operation from existing socket state.
     fn new_from_state<
-        C,
-        SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D, DeviceId = D::Strong>,
+        BC,
+        CC: NonDualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
-        core_ctx: &mut SC,
+        core_ctx: &mut CC,
         socket_id: S::SocketId<I>,
         state: &SocketState<I, D, S>,
         remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
@@ -2859,13 +2859,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
     fn apply<
-        C,
-        SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>,
-        A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+        BC,
+        CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>,
+        A: LocalIdentifierAllocator<I, D, S::AddrSpec, BC, S::SocketMapSpec<I, D>>,
     >(
         self,
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
         allocator: &mut A,
     ) -> Result<(ConnState<I, I, D, S>, S::SharingState), ConnectError> {
@@ -2904,10 +2904,10 @@ struct DualStackConnectOperation<I: DualStackIpExt, D: WeakId, S: DatagramSocket
 impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperation<I, D, S> {
     /// Constructs the connect operation from existing socket state.
     fn new_from_state<
-        C,
-        SC: DualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D, DeviceId = D::Strong>,
+        BC,
+        CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
-        core_ctx: &mut SC,
+        core_ctx: &mut CC,
         socket_id: S::SocketId<I>,
         state: &SocketState<I, D, S>,
         remote_ip: DualStackRemoteIp<I, D::Strong>,
@@ -3169,21 +3169,21 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
     fn apply<
-        C,
-        SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>
-            + IpSocketHandler<I::OtherVersion, C, WeakDeviceId = D, DeviceId = D::Strong>,
-        A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+        BC,
+        CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>
+            + IpSocketHandler<I::OtherVersion, BC, WeakDeviceId = D, DeviceId = D::Strong>,
+        A: LocalIdentifierAllocator<I, D, S::AddrSpec, BC, S::SocketMapSpec<I, D>>,
         OA: LocalIdentifierAllocator<
             I::OtherVersion,
             D,
             S::AddrSpec,
-            C,
+            BC,
             S::SocketMapSpec<I::OtherVersion, D>,
         >,
     >(
         self,
-        core_ctx: &mut SC,
-        bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
         socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
         other_socket_map: &mut BoundSocketMap<
             I::OtherVersion,
@@ -3282,14 +3282,14 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
 
 pub(crate) fn connect<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     extra: S::ConnStateExtra,
 ) -> Result<(), ConnectError> {
@@ -3373,12 +3373,12 @@ pub struct ExpectedUnboundError;
 
 pub(crate) fn disconnect_connected<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
     id: S::SocketId<I>,
 ) -> Result<(), ExpectedConnError> {
     core_ctx.with_sockets_state_mut(|sync_ctx, state| {
@@ -3436,15 +3436,15 @@ pub(crate) fn disconnect_connected<
 /// socket's new state.
 fn disconnect_to_unbound<
     I: IpExt,
-    C,
-    SC: DatagramBoundStateContext<I, C, S>,
+    BC,
+    CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
     clear_device_on_disconnect: bool,
-    socket_state: &BoundSocketState<I, SC::WeakDeviceId, S>,
-) -> UnboundSocketState<I, SC::WeakDeviceId, S> {
+    socket_state: &BoundSocketState<I, CC::WeakDeviceId, S>,
+) -> UnboundSocketState<I, CC::WeakDeviceId, S> {
     let (ip_options, sharing, mut device) = match core_ctx.dual_stack_context() {
         MaybeDualStack::NotDualStack(nds) => {
             let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, socket_state);
@@ -3474,16 +3474,16 @@ fn disconnect_to_unbound<
 /// socket's new state.
 fn disconnect_to_listener<
     I: IpExt,
-    C,
-    SC: DatagramBoundStateContext<I, C, S>,
+    BC,
+    CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
     listener_ip: S::ListenerIpAddr<I>,
     clear_device_on_disconnect: bool,
-    socket_state: &BoundSocketState<I, SC::WeakDeviceId, S>,
-) -> BoundSocketState<I, SC::WeakDeviceId, S> {
+    socket_state: &BoundSocketState<I, CC::WeakDeviceId, S>,
+) -> BoundSocketState<I, CC::WeakDeviceId, S> {
     let (ip_options, sharing, device) = match core_ctx.dual_stack_context() {
         MaybeDualStack::NotDualStack(nds) => {
             let ListenerIpAddr { addr, identifier } = nds.converter().convert(listener_ip.clone());
@@ -3584,12 +3584,12 @@ pub enum ShutdownType {
 
 pub(crate) fn shutdown_connected<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &BC,
     id: S::SocketId<I>,
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
@@ -3622,12 +3622,12 @@ pub(crate) fn shutdown_connected<
 
 pub(crate) fn get_shutdown_connected<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &BC,
     id: S::SocketId<I>,
 ) -> Option<ShutdownType> {
     core_ctx.with_sockets_state(|sync_ctx, state| {
@@ -3669,13 +3669,13 @@ pub enum SendError<SE> {
 
 pub(crate) fn send_conn<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
     body: B,
 ) -> Result<(), SendError<S::SerializeError>> {
@@ -3706,15 +3706,15 @@ pub(crate) fn send_conn<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            C: DatagramStateNonSyncContext<I, S>,
-            DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
-            SC: DatagramBoundStateContext<I, C, S>,
+            BC: DatagramStateNonSyncContext<I, S>,
+            DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
+            CC: DatagramBoundStateContext<I, BC, S>,
         > {
-            SendToThisStack((SendParams<'a, I, S, D>, &'a mut SC)),
+            SendToThisStack((SendParams<'a, I, S, D>, &'a mut CC)),
             SendToOtherStack((SendParams<'a, I::OtherVersion, S, D>, &'a mut DualStackSC)),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
-            _Phantom((Never, PhantomData<C>)),
+            _Phantom((Never, PhantomData<BC>)),
         }
 
         let (shutdown, operation) = match sync_ctx.dual_stack_context() {
@@ -3802,15 +3802,15 @@ pub enum SendToError<SE> {
 
 pub(crate) fn send_to<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>> {
@@ -3831,19 +3831,20 @@ pub(crate) fn send_to<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            C: DatagramStateNonSyncContext<I, S>,
-            DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
-            SC: DatagramBoundStateContext<I, C, S>,
+            BC: DatagramStateNonSyncContext<I, S>,
+            DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
+            CC: DatagramBoundStateContext<I, BC, S>,
             O: SendOptions<I>,
             OtherO: SendOptions<I::OtherVersion>,
         > {
-            SendToThisStack((SendOneshotParameters<'a, I, S, D, O>, &'a mut SC)),
+            SendToThisStack((SendOneshotParameters<'a, I, S, D, O>, &'a mut CC)),
+
             SendToOtherStack(
                 (SendOneshotParameters<'a, I::OtherVersion, S, D, OtherO>, &'a mut DualStackSC),
             ),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
-            _Phantom((Never, PhantomData<C>)),
+            _Phantom((Never, PhantomData<BC>)),
         }
 
         let (operation, shutdown) = match (
@@ -4093,13 +4094,13 @@ struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId, O: 
 fn send_oneshot<
     I: IpExt,
     S: DatagramSocketSpec,
-    SC: IpSocketHandler<I, C>,
-    C,
+    CC: IpSocketHandler<I, BC>,
+    BC,
     B: BufferMut,
     O: SendOptions<I>,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     SendOneshotParameters {
         local_ip,
         local_id,
@@ -4107,7 +4108,7 @@ fn send_oneshot<
         remote_id,
         device,
         send_options,
-    }: SendOneshotParameters<'_, I, S, SC::WeakDeviceId, O>,
+    }: SendOneshotParameters<'_, I, S, CC::WeakDeviceId, O>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
@@ -4167,11 +4168,11 @@ fn set_bound_device_single_stack<
     SocketI: IpExt,
     D: WeakId,
     S: DatagramSocketSpec,
-    C,
-    SC: IpSocketHandler<WireI, C, WeakDeviceId = D, DeviceId = D::Strong>,
+    BC,
+    CC: IpSocketHandler<WireI, BC, WeakDeviceId = D, DeviceId = D::Strong>,
 >(
-    bindings_ctx: &mut C,
-    core_ctx: &mut SC,
+    bindings_ctx: &mut BC,
+    core_ctx: &mut CC,
     params: SetBoundDeviceParameters<'a, WireI, SocketI, D, S>,
     sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
     socket_id: &<
@@ -4352,14 +4353,14 @@ fn set_bound_device_listener_both_stacks<'a, I: IpExt, D: WeakId, S: DatagramSoc
 
 pub(crate) fn set_device<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    new_device: Option<&SC::DeviceId>,
+    new_device: Option<&CC::DeviceId>,
 ) -> Result<(), SocketError> {
     core_ctx.with_sockets_state_mut(|sync_ctx, state| {
         match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
@@ -4371,10 +4372,10 @@ pub(crate) fn set_device<
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 // Information about the set-device operation for the given
                 // socket.
-                enum Operation<'a, I: IpExt, D: WeakId, S: DatagramSocketSpec, SC, DualStackSC> {
+                enum Operation<'a, I: IpExt, D: WeakId, S: DatagramSocketSpec, CC, DualStackSC> {
                     ThisStack {
                         params: SetBoundDeviceParameters<'a, I, I, D, S>,
-                        sync_ctx: SC,
+                        sync_ctx: CC,
                     },
                     OtherStack {
                         params: SetBoundDeviceParameters<'a, I::OtherVersion, I, D, S>,
@@ -4503,14 +4504,14 @@ pub(crate) fn set_device<
 
 pub(crate) fn get_bound_device<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &BC,
     id: S::SocketId<I>,
-) -> Option<SC::WeakDeviceId> {
+) -> Option<CC::WeakDeviceId> {
     core_ctx.with_sockets_state(|sync_ctx, state| {
         let (_, device): (&IpOptions<_, _, _>, _) =
             get_options_device(sync_ctx, state.get(id.get_key_index()).expect("missing socket"));
@@ -4544,13 +4545,13 @@ pub enum SetMulticastMembershipError {
 fn pick_interface_for_addr<
     A: IpAddress,
     S: DatagramSocketSpec,
-    C: DatagramStateNonSyncContext<A::Version, S>,
-    SC: DatagramBoundStateContext<A::Version, C, S>,
+    BC: DatagramStateNonSyncContext<A::Version, S>,
+    CC: DatagramBoundStateContext<A::Version, BC, S>,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     _remote_addr: MulticastAddr<A>,
     source_addr: Option<SpecifiedAddr<A>>,
-) -> Result<SC::DeviceId, SetMulticastMembershipError>
+) -> Result<CC::DeviceId, SetMulticastMembershipError>
 where
     A::Version: IpExt,
 {
@@ -4611,15 +4612,15 @@ impl<A: IpAddress, D> From<MulticastInterfaceSelector<A, D>>
 /// socket state.
 pub(crate) fn set_multicast_membership<
     I: IpExt,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: DatagramStateContext<I, C, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: S::SocketId<I>,
     multicast_group: MulticastAddr<I::Addr>,
-    interface: MulticastMembershipInterfaceSelector<I::Addr, SC::DeviceId>,
+    interface: MulticastMembershipInterfaceSelector<I::Addr, CC::DeviceId>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
     core_ctx.with_sockets_state_mut(|sync_ctx, state| {
@@ -4714,12 +4715,12 @@ pub(crate) fn get_options_device<
     'a,
     I: IpExt,
     S: DatagramSocketSpec,
-    C,
-    SC: DatagramBoundStateContext<I, C, S>,
+    BC,
+    CC: DatagramBoundStateContext<I, BC, S>,
 >(
-    core_ctx: &mut SC,
-    state: &'a SocketState<I, SC::WeakDeviceId, S>,
-) -> (&'a IpOptions<I, SC::WeakDeviceId, S>, &'a Option<SC::WeakDeviceId>) {
+    core_ctx: &mut CC,
+    state: &'a SocketState<I, CC::WeakDeviceId, S>,
+) -> (&'a IpOptions<I, CC::WeakDeviceId, S>, &'a Option<CC::WeakDeviceId>) {
     match state {
         SocketState::Unbound(state) => {
             let UnboundSocketState { ip_options, device, sharing: _ } = state;
@@ -4756,11 +4757,17 @@ pub(crate) fn get_options_device<
     }
 }
 
-fn get_options_mut<'a, I: IpExt, S: DatagramSocketSpec, C, SC: DatagramBoundStateContext<I, C, S>>(
-    core_ctx: &mut SC,
-    state: &'a mut SocketsState<I, SC::WeakDeviceId, S>,
+fn get_options_mut<
+    'a,
+    I: IpExt,
+    S: DatagramSocketSpec,
+    BC,
+    CC: DatagramBoundStateContext<I, BC, S>,
+>(
+    core_ctx: &mut CC,
+    state: &'a mut SocketsState<I, CC::WeakDeviceId, S>,
     id: S::SocketId<I>,
-) -> &'a mut IpOptions<I, SC::WeakDeviceId, S>
+) -> &'a mut IpOptions<I, CC::WeakDeviceId, S>
 where
     S::SocketId<I>: EntryKey,
 {
@@ -4798,12 +4805,12 @@ where
 
 pub(crate) fn update_ip_hop_limit<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
     id: S::SocketId<I>,
     update: impl FnOnce(&mut SocketHopLimits),
 ) {
@@ -4816,12 +4823,12 @@ pub(crate) fn update_ip_hop_limit<
 
 pub(crate) fn get_ip_hop_limits<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &BC,
     id: S::SocketId<I>,
 ) -> HopLimits {
     core_ctx.with_sockets_state(|sync_ctx, state| {
@@ -4842,13 +4849,13 @@ pub(crate) fn get_ip_hop_limits<
 /// `ExpectedUnboundError` is returned.
 pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
     R,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
     id: S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
 ) -> Result<R, ExpectedUnboundError> {
@@ -4868,13 +4875,13 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
 
 pub(crate) fn with_other_stack_ip_options<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
     R,
 >(
-    core_ctx: &mut SC,
-    _bindings_ctx: &mut C,
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
     id: S::SocketId<I>,
     cb: impl FnOnce(&S::OtherStackIpOptions<I>) -> R,
 ) -> R {
@@ -4888,12 +4895,12 @@ pub(crate) fn with_other_stack_ip_options<
 
 pub(crate) fn update_sharing<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec<SharingState = Sharing>,
     Sharing: Clone,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
     new_sharing: Sharing,
 ) -> Result<(), ExpectedUnboundError> {
@@ -4911,12 +4918,12 @@ pub(crate) fn update_sharing<
 
 pub(crate) fn get_sharing<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec<SharingState = Sharing>,
     Sharing: Clone,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
 ) -> Sharing {
     core_ctx.with_sockets_state(|_sync_ctx, state| {
@@ -4938,11 +4945,11 @@ pub(crate) fn get_sharing<
 
 pub(crate) fn set_ip_transparent<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
     value: bool,
 ) {
@@ -4953,11 +4960,11 @@ pub(crate) fn set_ip_transparent<
 
 pub(crate) fn get_ip_transparent<
     I: IpExt,
-    SC: DatagramStateContext<I, C, S>,
-    C: DatagramStateNonSyncContext<I, S>,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateNonSyncContext<I, S>,
     S: DatagramSocketSpec,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     id: S::SocketId<I>,
 ) -> bool {
     core_ctx.with_sockets_state(|sync_ctx, state| {
@@ -4989,14 +4996,14 @@ pub(crate) mod testutil {
         TimerId,
         Event: Debug,
         NonSyncCtxState: Default,
-        SC,
+        CC,
         D: FakeStrongDeviceId,
     >(
         local_ip: IpAddr,
         remote_ip: SpecifiedAddr<IpAddr>,
         devices: impl IntoIterator<Item = D>,
-        sync_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> SC,
-    ) -> FakeCtxWithSyncCtx<SC, TimerId, Event, NonSyncCtxState> {
+        sync_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> CC,
+    ) -> FakeCtxWithSyncCtx<CC, TimerId, Event, NonSyncCtxState> {
         // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
         fn unmap_ip(addr: IpAddr) -> IpAddr {
             match addr {

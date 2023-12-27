@@ -77,7 +77,10 @@ pub trait CounterVisitor {
 }
 
 /// Provides access to stack counters via a visitor.
-pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(core_ctx: &SyncCtx<C>, visitor: &V) {
+pub fn inspect_counters<BC: NonSyncContext, V: CounterVisitor>(
+    core_ctx: &SyncCtx<BC>,
+    visitor: &V,
+) {
     let counters = StackCounters {
         ipv4_common: core_ctx.state.ip_counters::<Ipv4>(),
         ipv6_common: core_ctx.state.ip_counters::<Ipv6>(),

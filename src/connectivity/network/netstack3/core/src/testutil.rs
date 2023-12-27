@@ -101,9 +101,9 @@ pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// A structure holding a sync context and a non sync context.
 #[derive(Default)]
-pub struct ContextPair<SC, C> {
+pub struct ContextPair<CC, BT> {
     /// The synchronized context.
-    pub sync_ctx: SC,
+    pub sync_ctx: CC,
     /// The non-synchronized context.
     // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
     // dropped before `non-sync_ctx` so that the existence of strongly-referenced
@@ -113,29 +113,29 @@ pub struct ContextPair<SC, C> {
     // Note that if strongly-referenced (device) IDs exist when dropping the
     // primary reference, the primary reference's drop impl will panic. See
     // `crate::sync::PrimaryRc::drop` for details.
-    pub non_sync_ctx: C,
+    pub non_sync_ctx: BT,
 }
 
-impl<SC, C> ContextPair<SC, C> {
+impl<CC, BC> ContextPair<CC, BC> {
     #[cfg(test)]
-    pub(crate) fn with_sync_ctx(core_ctx: SC) -> Self
+    pub(crate) fn with_sync_ctx(core_ctx: CC) -> Self
     where
-        C: Default,
+        BC: Default,
     {
-        Self { sync_ctx: core_ctx, non_sync_ctx: C::default() }
+        Self { sync_ctx: core_ctx, non_sync_ctx: BC::default() }
     }
 }
 
 /// Context available during the execution of the netstack.
-pub type Ctx<NonSyncCtx> = ContextPair<SyncCtx<NonSyncCtx>, NonSyncCtx>;
+pub type Ctx<BT> = ContextPair<SyncCtx<BT>, BT>;
 
-impl<NonSyncCtx: crate::NonSyncContext + Default> Default for Ctx<NonSyncCtx> {
+impl<BC: crate::NonSyncContext + Default> Default for Ctx<BC> {
     fn default() -> Self {
         Self::new_with_builder(StackStateBuilder::default())
     }
 }
 
-impl<NonSyncCtx: crate::NonSyncContext + Default> Ctx<NonSyncCtx> {
+impl<BC: crate::NonSyncContext + Default> Ctx<BC> {
     pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
         let mut non_sync_ctx = Default::default();
         let state = builder.build_with_ctx(&mut non_sync_ctx);
@@ -1376,10 +1376,10 @@ pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
 
 /// Add a route directly to the forwarding table.
 #[cfg(any(test, feature = "testutils"))]
-pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
-    core_ctx: &crate::SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<NonSyncCtx>>,
+pub fn add_route<BC: crate::NonSyncContext>(
+    core_ctx: &crate::SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
     let mut sync_ctx = lock_order::Locked::new(core_ctx);
     match entry {
@@ -1403,9 +1403,9 @@ pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
 /// Delete a route from the forwarding table, returning `Err` if no route was
 /// found to be deleted.
 #[cfg(any(test, feature = "testutils"))]
-pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
-    core_ctx: &crate::SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
+pub fn del_routes_to_subnet<BC: crate::NonSyncContext>(
+    core_ctx: &crate::SyncCtx<BC>,
+    bindings_ctx: &mut BC,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
     let mut sync_ctx = lock_order::Locked::new(core_ctx);
@@ -1425,10 +1425,10 @@ pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
     .map_err(From::from)
 }
 
-pub(crate) fn del_device_routes<NonSyncCtx: crate::NonSyncContext>(
-    core_ctx: &crate::SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
+pub(crate) fn del_device_routes<BC: crate::NonSyncContext>(
+    core_ctx: &crate::SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    device: &DeviceId<BC>,
 ) {
     let mut sync_ctx = lock_order::Locked::new(core_ctx);
     crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
@@ -1444,10 +1444,10 @@ pub(crate) fn del_device_routes<NonSyncCtx: crate::NonSyncContext>(
 }
 
 /// Removes all of the routes through the device, then removes the device.
-pub fn clear_routes_and_remove_ethernet_device<NonSyncCtx: crate::NonSyncContext>(
-    core_ctx: &crate::SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    ethernet_device: crate::device::EthernetDeviceId<NonSyncCtx>,
+pub fn clear_routes_and_remove_ethernet_device<BC: crate::NonSyncContext>(
+    core_ctx: &crate::SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    ethernet_device: crate::device::EthernetDeviceId<BC>,
 ) {
     let device_id = crate::device::DeviceId::Ethernet(ethernet_device);
     del_device_routes(core_ctx, bindings_ctx, &device_id);

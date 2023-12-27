@@ -29,7 +29,7 @@ use crate::{
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub struct TimerId<C: NonSyncContext>(pub(crate) TimerIdInner<C>);
+pub struct TimerId<BC: NonSyncContext>(pub(crate) TimerIdInner<BC>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -39,48 +39,48 @@ pub struct TimerId<C: NonSyncContext>(pub(crate) TimerIdInner<C>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) enum TimerIdInner<C: NonSyncContext> {
+pub(crate) enum TimerIdInner<BC: NonSyncContext> {
     /// A timer event in the device layer.
-    DeviceLayer(DeviceLayerTimerId<C>),
+    DeviceLayer(DeviceLayerTimerId<BC>),
     /// A timer event in the transport layer.
-    TransportLayer(TransportLayerTimerId<C>),
+    TransportLayer(TransportLayerTimerId<BC>),
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(Ipv4DeviceTimerId<DeviceId<C>>),
+    Ipv4Device(Ipv4DeviceTimerId<DeviceId<BC>>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(Ipv6DeviceTimerId<DeviceId<C>>),
+    Ipv6Device(Ipv6DeviceTimerId<DeviceId<BC>>),
     /// A no-op timer event (used for tests)
     #[cfg(test)]
     Nop(usize),
 }
 
-impl<C: NonSyncContext> From<DeviceLayerTimerId<C>> for TimerId<C> {
-    fn from(id: DeviceLayerTimerId<C>) -> TimerId<C> {
+impl<BC: NonSyncContext> From<DeviceLayerTimerId<BC>> for TimerId<BC> {
+    fn from(id: DeviceLayerTimerId<BC>) -> TimerId<BC> {
         TimerId(TimerIdInner::DeviceLayer(id))
     }
 }
 
-impl<C: NonSyncContext> From<Ipv4DeviceTimerId<DeviceId<C>>> for TimerId<C> {
-    fn from(id: Ipv4DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
+impl<BC: NonSyncContext> From<Ipv4DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
+    fn from(id: Ipv4DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
         TimerId(TimerIdInner::Ipv4Device(id))
     }
 }
 
-impl<C: NonSyncContext> From<Ipv6DeviceTimerId<DeviceId<C>>> for TimerId<C> {
-    fn from(id: Ipv6DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
+impl<BC: NonSyncContext> From<Ipv6DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
+    fn from(id: Ipv6DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
         TimerId(TimerIdInner::Ipv6Device(id))
     }
 }
 
-impl<C: NonSyncContext> From<IpLayerTimerId> for TimerId<C> {
-    fn from(id: IpLayerTimerId) -> TimerId<C> {
+impl<BC: NonSyncContext> From<IpLayerTimerId> for TimerId<BC> {
+    fn from(id: IpLayerTimerId) -> TimerId<BC> {
         TimerId(TimerIdInner::IpLayer(id))
     }
 }
 
-impl<C: NonSyncContext> From<TransportLayerTimerId<C>> for TimerId<C> {
-    fn from(id: TransportLayerTimerId<C>) -> Self {
+impl<BC: NonSyncContext> From<TransportLayerTimerId<BC>> for TimerId<BC> {
+    fn from(id: TransportLayerTimerId<BC>) -> Self {
         TimerId(TimerIdInner::TransportLayer(id))
     }
 }
@@ -122,10 +122,10 @@ impl_timer_context!(
 );
 
 /// Handles a generic timer event.
-pub fn handle_timer<NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    id: TimerId<NonSyncCtx>,
+pub fn handle_timer<BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    id: TimerId<BC>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
     let mut sync_ctx = Locked::new(core_ctx);
@@ -164,8 +164,8 @@ pub(crate) struct TimerCounters {
 }
 
 #[cfg(test)]
-impl<C: NonSyncContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
-    for SyncCtx<C>
+impl<BC: NonSyncContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
+    for SyncCtx<BC>
 {
     type Data = TimerCounters;
     type Guard<'l> = &'l TimerCounters where Self: 'l;
@@ -176,8 +176,8 @@ impl<C: NonSyncContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::T
 }
 
 #[cfg(test)]
-impl<NonSyncCtx: NonSyncContext, L> crate::context::CounterContext<TimerCounters>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<BC: NonSyncContext, L> crate::context::CounterContext<TimerCounters>
+    for Locked<&SyncCtx<BC>, L>
 {
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())

@@ -91,10 +91,10 @@ impl TransportStateBuilder {
         &mut self.udp
     }
 
-    pub(crate) fn build_with_ctx<C: NonSyncContext>(
+    pub(crate) fn build_with_ctx<BC: NonSyncContext>(
         self,
-        bindings_ctx: &mut C,
-    ) -> TransportLayerState<C> {
+        bindings_ctx: &mut BC,
+    ) -> TransportLayerState<BC> {
         let now = bindings_ctx.now();
         let mut rng = bindings_ctx.rng();
         TransportLayerState {
@@ -124,8 +124,8 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<C> {
-    type Data = udp::BoundSockets<Ipv4, WeakDeviceId<C>>;
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<BC> {
+    type Data = udp::BoundSockets<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -137,8 +137,8 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for S
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for SyncCtx<C> {
-    type Data = udp::BoundSockets<Ipv6, WeakDeviceId<C>>;
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for SyncCtx<BC> {
+    type Data = udp::BoundSockets<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -150,8 +150,8 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for S
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for SyncCtx<C> {
-    type Data = udp::SocketsState<Ipv4, WeakDeviceId<C>>;
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for SyncCtx<BC> {
+    type Data = udp::SocketsState<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -163,8 +163,8 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> f
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for SyncCtx<C> {
-    type Data = udp::SocketsState<Ipv6, WeakDeviceId<C>>;
+impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for SyncCtx<BC> {
+    type Data = udp::SocketsState<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -185,25 +185,25 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> f
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) enum TransportLayerTimerId<C: crate::NonSyncContext> {
-    Tcp(tcp::socket::TimerId<WeakDeviceId<C>, C>),
+pub(crate) enum TransportLayerTimerId<BC: crate::NonSyncContext> {
+    Tcp(tcp::socket::TimerId<WeakDeviceId<BC>, BC>),
 }
 
 /// Handle a timer event firing in the transport layer.
-pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    core_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
-    bindings_ctx: &mut NonSyncCtx,
-    id: TransportLayerTimerId<NonSyncCtx>,
+pub(crate) fn handle_timer<BC: NonSyncContext>(
+    core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
+    bindings_ctx: &mut BC,
+    id: TransportLayerTimerId<BC>,
 ) {
     match id {
         TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(core_ctx, bindings_ctx, id),
     }
 }
 
-impl<C: crate::NonSyncContext> From<tcp::socket::TimerId<WeakDeviceId<C>, C>>
-    for TransportLayerTimerId<C>
+impl<BC: crate::NonSyncContext> From<tcp::socket::TimerId<WeakDeviceId<BC>, BC>>
+    for TransportLayerTimerId<BC>
 {
-    fn from(id: tcp::socket::TimerId<WeakDeviceId<C>, C>) -> Self {
+    fn from(id: tcp::socket::TimerId<WeakDeviceId<BC>, BC>) -> Self {
         TransportLayerTimerId::Tcp(id)
     }
 }

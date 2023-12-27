@@ -172,15 +172,15 @@ struct Target<D> {
 pub(crate) struct DeviceSockets<Id>(HashSet<Id>);
 
 /// Convenience alias for use in device state storage.
-pub(super) type HeldDeviceSockets<C> =
-    DeviceSockets<StrongId<<C as DeviceSocketTypes>::SocketState, WeakDeviceId<C>>>;
+pub(super) type HeldDeviceSockets<BT> =
+    DeviceSockets<StrongId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>>;
 
 /// Convenience alias for use in shared storage.
 ///
 /// The type parameter is expected to implement [`crate::NonSyncContext`].
-pub(super) type HeldSockets<C> = Sockets<
-    PrimaryId<<C as DeviceSocketTypes>::SocketState, WeakDeviceId<C>>,
-    StrongId<<C as DeviceSocketTypes>::SocketState, WeakDeviceId<C>>,
+pub(super) type HeldSockets<BT> = Sockets<
+    PrimaryId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
+    StrongId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
 >;
 
 /// Common types across all synchronized context traits for device sockets.
@@ -193,11 +193,11 @@ trait SyncContextTypes {
 }
 
 /// Synchronzied context for accessing socket state.
-trait SyncContext<C: NonSyncContext<Self::DeviceId>>: DeviceSocketAccessor<C> {
+trait SyncContext<BC: NonSyncContext<Self::DeviceId>>: DeviceSocketAccessor<BC> {
     /// The synchronized context available in callbacks to methods on this
     /// context.
     type SocketTablesSyncCtx<'a>: DeviceSocketAccessor<
-        C,
+        BC,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
         SocketId = Self::SocketId,
@@ -207,7 +207,7 @@ trait SyncContext<C: NonSyncContext<Self::DeviceId>>: DeviceSocketAccessor<C> {
     ///
     /// The ID returned by this method must be removed by calling
     /// [`SyncContext::remove_socket`] once it is no longer in use.
-    fn create_socket(&mut self, state: C::SocketState) -> Self::SocketId;
+    fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId;
 
     /// Removes a socket.
     ///
@@ -236,7 +236,7 @@ trait SyncContext<C: NonSyncContext<Self::DeviceId>>: DeviceSocketAccessor<C> {
 }
 
 /// Synchronized context for accessing the state of an individual socket.
-trait SocketStateAccessor<C: NonSyncContext<Self::DeviceId>>:
+trait SocketStateAccessor<BC: NonSyncContext<Self::DeviceId>>:
     SyncContextTypes + DeviceIdContext<AnyDevice>
 {
     /// Synchronized context available in callbacks to methods on this context.
@@ -249,7 +249,7 @@ trait SocketStateAccessor<C: NonSyncContext<Self::DeviceId>>:
     /// Provides read-only access to the state of a socket.
     fn with_socket_state<
         F: FnOnce(
-            &C::SocketState,
+            &BC::SocketState,
             &Target<Self::WeakDeviceId>,
             &mut Self::SocketStateSyncCtx<'_>,
         ) -> R,
@@ -263,7 +263,7 @@ trait SocketStateAccessor<C: NonSyncContext<Self::DeviceId>>:
     /// Provides mutable access to the state of a socket.
     fn with_socket_state_mut<
         F: FnOnce(
-            &C::SocketState,
+            &BC::SocketState,
             &mut Target<Self::WeakDeviceId>,
             &mut Self::SocketStateSyncCtx<'_>,
         ) -> R,
@@ -276,10 +276,10 @@ trait SocketStateAccessor<C: NonSyncContext<Self::DeviceId>>:
 }
 
 /// Synchronized context for accessing the socket state for a device.
-trait DeviceSocketAccessor<C: NonSyncContext<Self::DeviceId>>: SocketStateAccessor<C> {
+trait DeviceSocketAccessor<BC: NonSyncContext<Self::DeviceId>>: SocketStateAccessor<BC> {
     /// Synchronized context available in callbacks to methods on this context.
     type DeviceSocketSyncCtx<'a>: SocketStateAccessor<
-        C,
+        BC,
         SocketId = Self::SocketId,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
@@ -309,11 +309,11 @@ trait DeviceSocketAccessor<C: NonSyncContext<Self::DeviceId>>: SocketStateAccess
 }
 
 /// Internal implementation trait that allows abstracting over device ID types.
-trait DeviceSocketApi<C: NonSyncContext<Self::DeviceId>>:
+trait DeviceSocketApi<BC: NonSyncContext<Self::DeviceId>>:
     SyncContextTypes + DeviceIdContext<AnyDevice>
 {
     /// Creates a new packet socket.
-    fn create(&mut self, external_state: C::SocketState) -> Self::SocketId;
+    fn create(&mut self, external_state: BC::SocketState) -> Self::SocketId;
 
     /// Sets the device for a packet socket without affecting the protocol.
     fn set_device(&mut self, socket: &Self::SocketId, device: TargetDevice<&Self::DeviceId>);
@@ -335,7 +335,7 @@ trait DeviceSocketApi<C: NonSyncContext<Self::DeviceId>>:
     /// Sends a frame exactly as provided, or returns an error.
     fn send_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         socket: &Self::SocketId,
         params: SendFrameParams<Self::DeviceId>,
         body: S,
@@ -348,7 +348,7 @@ trait DeviceSocketApi<C: NonSyncContext<Self::DeviceId>>:
     /// error.
     fn send_datagram<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         socket: &Self::SocketId,
         params: SendDatagramParams<Self::DeviceId>,
         body: S,
@@ -400,10 +400,10 @@ enum MaybeUpdate<T> {
     NewValue(T),
 }
 
-fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>>(
-    core_ctx: &mut SC,
-    socket: &SC::SocketId,
-    new_device: TargetDevice<&SC::DeviceId>,
+fn update_device_and_protocol<CC: SyncContext<BC>, BC: NonSyncContext<CC::DeviceId>>(
+    core_ctx: &mut CC,
+    socket: &CC::SocketId,
+    new_device: TargetDevice<&CC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
     core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
@@ -414,7 +414,7 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId
         // delivered to the socket from either device.
         let old_device = sync_ctx.with_socket_state_mut(
             socket,
-            |_: &C::SocketState, Target { protocol, device }, sync_ctx| {
+            |_: &BC::SocketState, Target { protocol, device }, sync_ctx| {
                 match protocol_update {
                     MaybeUpdate::NewValue(p) => *protocol = Some(p),
                     MaybeUpdate::NoChange => (),
@@ -467,12 +467,12 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId
     })
 }
 
-impl<SC, C> DeviceSocketApi<C> for SC
+impl<CC, BC> DeviceSocketApi<BC> for CC
 where
-    SC: SyncContext<C> + SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>>,
-    C: NonSyncContext<SC::DeviceId>,
+    CC: SyncContext<BC> + SendFrameContext<BC, DeviceSocketMetadata<CC::DeviceId>>,
+    BC: NonSyncContext<CC::DeviceId>,
 {
-    fn create(&mut self, external_state: C::SocketState) -> Self::SocketId {
+    fn create(&mut self, external_state: BC::SocketState) -> Self::SocketId {
         let strong = self.create_socket(external_state);
         self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), _sync_ctx| {
             // On creation, sockets do not target any device or protocol.
@@ -486,14 +486,14 @@ where
         strong
     }
 
-    fn set_device(&mut self, socket: &Self::SocketId, device: TargetDevice<&SC::DeviceId>) {
+    fn set_device(&mut self, socket: &Self::SocketId, device: TargetDevice<&CC::DeviceId>) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NoChange)
     }
 
     fn set_device_and_protocol(
         &mut self,
         socket: &Self::SocketId,
-        device: TargetDevice<&SC::DeviceId>,
+        device: TargetDevice<&CC::DeviceId>,
         protocol: Protocol,
     ) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NewValue(protocol))
@@ -508,7 +508,7 @@ where
     fn remove(&mut self, id: Self::SocketId) {
         self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
             let old_device =
-                sync_ctx.with_socket_state_mut(&id, |_: &C::SocketState, target, sync_ctx| {
+                sync_ctx.with_socket_state_mut(&id, |_: &BC::SocketState, target, sync_ctx| {
                     let Target { device, protocol: _ } = target;
                     match &device {
                         TargetDevice::SpecificDevice(device) => {
@@ -535,16 +535,16 @@ where
 
     fn send_frame<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: &Self::SocketId,
-        params: SendFrameParams<SC::DeviceId>,
+        params: SendFrameParams<CC::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let metadata = match self.with_socket_state(id, |_: &C::SocketState, target, sync_ctx| {
+        let metadata = match self.with_socket_state(id, |_: &BC::SocketState, target, sync_ctx| {
             make_send_metadata(sync_ctx, target, params, None)
         }) {
             Ok(metadata) => metadata,
@@ -555,7 +555,7 @@ where
 
     fn send_datagram<S>(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         id: &Self::SocketId,
         params: SendDatagramParams<Self::DeviceId>,
         body: S,
@@ -566,7 +566,7 @@ where
     {
         let metadata = match self.with_socket_state(
             id,
-            |_: &C::SocketState, target @ Target { device: _, protocol }, sync_ctx| {
+            |_: &BC::SocketState, target @ Target { device: _, protocol }, sync_ctx| {
                 let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
                 let protocol = match target_protocol.or_else(|| {
                     protocol.and_then(|p| match p {
@@ -607,12 +607,12 @@ pub(super) struct DatagramHeader {
     pub(super) protocol: EtherType,
 }
 
-fn make_send_metadata<SC: DeviceIdContext<AnyDevice>>(
-    core_ctx: &mut SC,
-    bound: &Target<SC::WeakDeviceId>,
-    params: SendFrameParams<<SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+fn make_send_metadata<CC: DeviceIdContext<AnyDevice>>(
+    core_ctx: &mut CC,
+    bound: &Target<CC::WeakDeviceId>,
+    params: SendFrameParams<<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     header: Option<DatagramHeader>,
-) -> Result<DeviceSocketMetadata<SC::DeviceId>, SendFrameError> {
+) -> Result<DeviceSocketMetadata<CC::DeviceId>, SendFrameError> {
     let Target { protocol: _, device } = bound;
     let SendFrameParams { device: target_device } = params;
 
@@ -632,13 +632,13 @@ fn make_send_metadata<SC: DeviceIdContext<AnyDevice>>(
 /// Strongly owns the state of the socket. So long as the `SocketId` for a
 /// socket is not dropped, the socket is guaranteed to exist.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = "C::SocketState: Debug"))]
-pub struct SocketId<C: crate::NonSyncContext>(StrongId<C::SocketState, WeakDeviceId<C>>);
+#[derivative(Clone(bound = ""), Debug(bound = "BC::SocketState: Debug"))]
+pub struct SocketId<BC: crate::NonSyncContext>(StrongId<BC::SocketState, WeakDeviceId<BC>>);
 
-impl<C: crate::NonSyncContext> SocketId<C> {
+impl<BC: crate::NonSyncContext> SocketId<BC> {
     /// Provides immutable access to [`DeviceSocketTypes::SocketState`] for the
     /// socket.
-    pub fn socket_state(&self) -> &C::SocketState {
+    pub fn socket_state(&self) -> &BC::SocketState {
         let Self(StrongId(strong)) = self;
         let SocketState { external_state, all_sockets_index: _, target: _ } = &**strong;
         external_state
@@ -646,29 +646,29 @@ impl<C: crate::NonSyncContext> SocketId<C> {
 }
 
 /// Creates an packet socket with no protocol set configured for all devices.
-pub fn create<C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    external_state: C::SocketState,
-) -> SocketId<C> {
+pub fn create<BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    external_state: BC::SocketState,
+) -> SocketId<BC> {
     let mut sync_ctx = Locked::new(core_ctx);
     SocketId(DeviceSocketApi::create(&mut sync_ctx, external_state))
 }
 
 /// Sets the device for which a packet socket will receive packets.
-pub fn set_device<C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    SocketId(id): &SocketId<C>,
-    device: TargetDevice<&DeviceId<C>>,
+pub fn set_device<BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    SocketId(id): &SocketId<BC>,
+    device: TargetDevice<&DeviceId<BC>>,
 ) {
     let mut sync_ctx = Locked::new(core_ctx);
     DeviceSocketApi::set_device(&mut sync_ctx, id, device)
 }
 
 /// Sets the device and protocol for which a socket will receive packets.
-pub fn set_device_and_protocol<C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    SocketId(id): &SocketId<C>,
-    device: TargetDevice<&DeviceId<C>>,
+pub fn set_device_and_protocol<BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    SocketId(id): &SocketId<BC>,
+    device: TargetDevice<&DeviceId<BC>>,
     protocol: Protocol,
 ) {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -676,10 +676,10 @@ pub fn set_device_and_protocol<C: crate::NonSyncContext>(
 }
 
 /// Gets the bound info for a socket.
-pub fn get_info<C: crate::NonSyncContext>(
-    core_ctx: &SyncCtx<C>,
-    SocketId(id): &SocketId<C>,
-) -> SocketInfo<WeakDeviceId<C>> {
+pub fn get_info<BC: crate::NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    SocketId(id): &SocketId<BC>,
+) -> SocketInfo<WeakDeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     DeviceSocketApi::get_info(&mut sync_ctx, id)
 }
@@ -690,17 +690,17 @@ pub fn get_info<C: crate::NonSyncContext>(
 ///
 /// If the provided [`SocketId`] is not the last instance for a socket, this
 /// method will panic.
-pub fn remove<C: crate::NonSyncContext>(core_ctx: &SyncCtx<C>, SocketId(id): SocketId<C>) {
+pub fn remove<BC: crate::NonSyncContext>(core_ctx: &SyncCtx<BC>, SocketId(id): SocketId<BC>) {
     let mut sync_ctx = Locked::new(core_ctx);
     DeviceSocketApi::remove(&mut sync_ctx, id)
 }
 
 /// Sends a frame for the specified socket without any additional framing.
-pub fn send_frame<C: crate::NonSyncContext, B: BufferMut>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    SocketId(id): &SocketId<C>,
-    params: SendFrameParams<DeviceId<C>>,
+pub fn send_frame<BC: crate::NonSyncContext, B: BufferMut>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    SocketId(id): &SocketId<BC>,
+    params: SendFrameParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendFrameError)> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -708,11 +708,11 @@ pub fn send_frame<C: crate::NonSyncContext, B: BufferMut>(
 }
 
 /// Sends a datagram with system-determined framing.
-pub fn send_datagram<C: crate::NonSyncContext, B: BufferMut>(
-    core_ctx: &SyncCtx<C>,
-    bindings_ctx: &mut C,
-    SocketId(id): &SocketId<C>,
-    params: SendDatagramParams<DeviceId<C>>,
+pub fn send_datagram<BC: crate::NonSyncContext, B: BufferMut>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    SocketId(id): &SocketId<BC>,
+    params: SendDatagramParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendDatagramError)> {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -723,11 +723,11 @@ pub fn send_datagram<C: crate::NonSyncContext, B: BufferMut>(
 ///
 /// This is implemented on top of [`SyncContext`] and abstracts packet socket
 /// delivery from the rest of the system.
-pub(crate) trait DeviceSocketHandler<D: Device, C>: DeviceIdContext<D> {
+pub(crate) trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
     /// Dispatch a received frame to sockets.
     fn handle_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         frame: Frame<&[u8]>,
         whole_frame: &[u8],
@@ -844,15 +844,15 @@ impl<B> Frame<B> {
 
 impl<
         D: Device,
-        C: NonSyncContext<<SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: SyncContext<C> + DeviceIdContext<D>,
-    > DeviceSocketHandler<D, C> for SC
+        BC: NonSyncContext<<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        CC: SyncContext<BC> + DeviceIdContext<D>,
+    > DeviceSocketHandler<D, BC> for CC
 where
-    <SC as DeviceIdContext<D>>::DeviceId: Into<<SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    <CC as DeviceIdContext<D>>::DeviceId: Into<<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     fn handle_frame(
         &mut self,
-        bindings_ctx: &mut C,
+        bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         frame: Frame<&[u8]>,
         whole_frame: &[u8],
@@ -911,16 +911,16 @@ where
     }
 }
 
-impl<C: crate::NonSyncContext, L> SyncContextTypes for Locked<&SyncCtx<C>, L> {
-    type SocketId = StrongId<C::SocketState, WeakDeviceId<C>>;
+impl<BC: crate::NonSyncContext, L> SyncContextTypes for Locked<&SyncCtx<BC>, L> {
+    type SocketId = StrongId<BC::SocketState, WeakDeviceId<BC>>;
 }
 
-impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>> SyncContext<C>
-    for Locked<&SyncCtx<C>, L>
+impl<BC: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
+    SyncContext<BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketTablesSyncCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::AnyDeviceSockets>;
+    type SocketTablesSyncCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::AnyDeviceSockets>;
 
-    fn create_socket(&mut self, state: C::SocketState) -> Self::SocketId {
+    fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId {
         let mut sockets = self.lock();
         let AllSockets(sockets) = &mut *sockets;
         let entry = sockets.push_with(|index| {
@@ -970,14 +970,14 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSock
     }
 }
 
-impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
-    SocketStateAccessor<C> for Locked<&SyncCtx<C>, L>
+impl<BC: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
+    SocketStateAccessor<BC> for Locked<&SyncCtx<BC>, L>
 {
-    type SocketStateSyncCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::DeviceSocketState>;
+    type SocketStateSyncCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::DeviceSocketState>;
 
     fn with_socket_state<
         F: FnOnce(
-            &C::SocketState,
+            &BC::SocketState,
             &Target<Self::WeakDeviceId>,
             &mut Self::SocketStateSyncCtx<'_>,
         ) -> R,
@@ -993,7 +993,7 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSocketS
 
     fn with_socket_state_mut<
         F: FnOnce(
-            &C::SocketState,
+            &BC::SocketState,
             &mut Target<Self::WeakDeviceId>,
             &mut Self::SocketStateSyncCtx<'_>,
         ) -> R,
@@ -1008,10 +1008,10 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSocketS
     }
 }
 
-impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
-    DeviceSocketAccessor<C> for Locked<&SyncCtx<C>, L>
+impl<BC: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
+    DeviceSocketAccessor<BC> for Locked<&SyncCtx<BC>, L>
 {
-    type DeviceSocketSyncCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::DeviceSockets>;
+    type DeviceSocketSyncCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::DeviceSockets>;
 
     fn with_device_sockets<
         F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketSyncCtx<'_>) -> R,
@@ -1074,11 +1074,11 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
     }
 }
 
-impl<C: crate::NonSyncContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets> for SyncCtx<C> {
-    type Data = AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
+impl<BC: crate::NonSyncContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets> for SyncCtx<BC> {
+    type Data = AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>>
         where Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -1089,9 +1089,9 @@ impl<C: crate::NonSyncContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets>
     }
 }
 
-impl<C: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> for SyncCtx<C> {
-    type Data = AllSockets<PrimaryId<C::SocketState, WeakDeviceId<C>>>;
-    type Guard<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<C::SocketState, WeakDeviceId<C>>>>
+impl<BC: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> for SyncCtx<BC> {
+    type Data = AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
@@ -1351,9 +1351,9 @@ mod tests {
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool;
     }
 
-    impl<SC: FakeDeviceIdContext> DeviceIdContext<AnyDevice> for SC {
-        type DeviceId = SC::DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<SC::DeviceId>;
+    impl<CC: FakeDeviceIdContext> DeviceIdContext<AnyDevice> for CC {
+        type DeviceId = CC::DeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<CC::DeviceId>;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             FakeWeakDeviceId(device_id.clone())
         }
@@ -1742,12 +1742,12 @@ mod tests {
 
     const WRONG_PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08ff));
 
-    fn make_bound<SC: DeviceSocketApi<C>, C: NonSyncContext<SC::DeviceId>>(
-        core_ctx: &mut SC,
-        device: TargetDevice<SC::DeviceId>,
+    fn make_bound<CC: DeviceSocketApi<BC>, BC: NonSyncContext<CC::DeviceId>>(
+        core_ctx: &mut CC,
+        device: TargetDevice<CC::DeviceId>,
         protocol: Option<Protocol>,
-        state: C::SocketState,
-    ) -> SC::SocketId {
+        state: BC::SocketState,
+    ) -> CC::SocketId {
         let id = DeviceSocketApi::create(core_ctx, state);
         let device = match &device {
             TargetDevice::AnyDevice => TargetDevice::AnyDevice,

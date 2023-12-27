@@ -57,10 +57,10 @@ impl From<crate::error::ExistsError> for AddRouteError {
 /// by the client.
 /// This can be used to construct an `Entry` from an `AddableEntry` the same
 /// way that the core routing table does.
-pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
+pub fn select_device_for_gateway<BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
     gateway: SpecifiedAddr<IpAddr>,
-) -> Option<DeviceId<NonSyncCtx>> {
+) -> Option<DeviceId<BC>> {
     let mut sync_ctx = Locked::new(core_ctx);
     match gateway.into() {
         IpAddr::V4(gateway) => {
@@ -74,12 +74,12 @@ pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
 
 fn select_device_for_gateway_inner<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpStateContext<I, C>,
+    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    CC: IpStateContext<I, BC>,
 >(
-    core_ctx: &mut SC,
+    core_ctx: &mut CC,
     gateway: SpecifiedAddr<I::Addr>,
-) -> Option<SC::DeviceId> {
+) -> Option<CC::DeviceId> {
     core_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
         table.lookup(sync_ctx, None, *gateway).and_then(
             |Destination { next_hop: found_next_hop, device: found_device }| match found_next_hop {
@@ -96,16 +96,14 @@ fn select_device_for_gateway_inner<
 /// suboptimal for performance, it simplifies the API exposed by core for route
 /// table modifications to allow for evolution of the routing table in the
 /// future.
-pub fn set_routes<I: Ip, NonSyncCtx: NonSyncContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    entries: Vec<EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
+pub fn set_routes<I: Ip, BC: NonSyncContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    entries: Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>,
 ) {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    struct Wrap<I: Ip, NonSyncCtx: NonSyncContext>(
-        Vec<EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
-    );
+    struct Wrap<I: Ip, BC: NonSyncContext>(Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>);
 
     let () = net_types::map_ip_twice!(
         I,
@@ -127,9 +125,9 @@ pub fn set_routes<I: Ip, NonSyncCtx: NonSyncContext>(
 pub(crate) fn request_context_add_route<
     I: IpLayerIpExt,
     DeviceId,
-    C: IpLayerNonSyncContext<I, DeviceId>,
+    BC: IpLayerNonSyncContext<I, DeviceId>,
 >(
-    bindings_ctx: &mut C,
+    bindings_ctx: &mut BC,
     entry: AddableEntry<I::Addr, DeviceId>,
 ) {
     bindings_ctx.on_event(IpLayerEvent::AddRoute(entry))
@@ -140,9 +138,9 @@ pub(crate) fn request_context_add_route<
 pub(crate) fn request_context_del_routes<
     I: IpLayerIpExt,
     DeviceId,
-    C: IpLayerNonSyncContext<I, DeviceId>,
+    BC: IpLayerNonSyncContext<I, DeviceId>,
 >(
-    bindings_ctx: &mut C,
+    bindings_ctx: &mut BC,
     del_subnet: Subnet<I::Addr>,
     del_device: DeviceId,
     del_gateway: Option<SpecifiedAddr<I::Addr>>,
@@ -155,25 +153,25 @@ pub(crate) fn request_context_del_routes<
 }
 
 /// Visitor for route table state.
-pub trait RoutesVisitor<'a, C: DeviceLayerTypes + 'a> {
+pub trait RoutesVisitor<'a, BT: DeviceLayerTypes + 'a> {
     /// The result of [`RoutesVisitor::visit`].
     type VisitResult;
 
     /// Consumes an Entry iterator to produce a `VisitResult`.
     fn visit<'b, I: Ip>(
         &mut self,
-        stats: impl Iterator<Item = &'b Entry<I::Addr, DeviceId<C>>> + 'b,
+        stats: impl Iterator<Item = &'b Entry<I::Addr, DeviceId<BT>>> + 'b,
     ) -> Self::VisitResult
     where
         'a: 'b;
 }
 
 /// Provides access to the state of the route table via a visitor.
-pub fn with_routes<'a, I, C, V>(core_ctx: &SyncCtx<C>, cb: &mut V) -> V::VisitResult
+pub fn with_routes<'a, I, BC, V>(core_ctx: &SyncCtx<BC>, cb: &mut V) -> V::VisitResult
 where
     I: IpExt,
-    C: NonSyncContext + 'a,
-    V: RoutesVisitor<'a, C>,
+    BC: NonSyncContext + 'a,
+    V: RoutesVisitor<'a, BC>,
 {
     let mut sync_ctx = Locked::new(core_ctx);
     let IpInvariant(r) = I::map_ip(
@@ -280,13 +278,13 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     ///
     /// If multiple entries match `address` or the first entry will be selected.
     /// See [`ForwardingTable`] for more details of how entries are sorted.
-    pub(crate) fn lookup<SC: IpForwardingDeviceContext<I, DeviceId = D>>(
+    pub(crate) fn lookup<CC: IpForwardingDeviceContext<I, DeviceId = D>>(
         &self,
-        core_ctx: &mut SC,
+        core_ctx: &mut CC,
         local_device: Option<&D>,
         address: I::Addr,
     ) -> Option<Destination<I::Addr, D>> {
-        self.lookup_filter_map(core_ctx, local_device, address, |_: &mut SC, _: &D| Some(()))
+        self.lookup_filter_map(core_ctx, local_device, address, |_: &mut CC, _: &D| Some(()))
             .map(|(Destination { device, next_hop }, ())| Destination {
                 device: device.clone(),
                 next_hop,
@@ -294,12 +292,12 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             .next()
     }
 
-    pub(crate) fn lookup_filter_map<'a, SC: IpForwardingDeviceContext<I, DeviceId = D>, R>(
+    pub(crate) fn lookup_filter_map<'a, CC: IpForwardingDeviceContext<I, DeviceId = D>, R>(
         &'a self,
-        core_ctx: &'a mut SC,
+        core_ctx: &'a mut CC,
         local_device: Option<&'a D>,
         address: I::Addr,
-        mut f: impl FnMut(&mut SC, &D) -> Option<R> + 'a,
+        mut f: impl FnMut(&mut CC, &D) -> Option<R> + 'a,
     ) -> impl Iterator<Item = (Destination<I::Addr, &D>, R)> + 'a {
         let Self { table } = self;
         // Get all potential routes we could take to reach `address`.
@@ -348,9 +346,9 @@ pub(crate) mod testutil {
 
     // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
     // observing the device's metric, if applicable.
-    fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
-        core_ctx: &mut SC,
-        device: &SC::DeviceId,
+    fn observe_metric<I: Ip, CC: IpForwardingDeviceContext<I>>(
+        core_ctx: &mut CC,
+        device: &CC::DeviceId,
         metric: AddableMetric,
     ) -> Metric {
         match metric {
@@ -365,15 +363,15 @@ pub(crate) mod testutil {
     /// dispatching an event requesting that the route be added.
     pub(crate) fn add_route<
         I: IpLayerIpExt,
-        C: IpLayerNonSyncContext<I, SC::DeviceId>,
-        SC: IpStateContext<I, C>,
+        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        CC: IpStateContext<I, BC>,
     >(
-        core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
-        entry: crate::ip::types::AddableEntry<I::Addr, SC::DeviceId>,
+        core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        entry: crate::ip::types::AddableEntry<I::Addr, CC::DeviceId>,
     ) -> Result<(), AddRouteError>
     where
-        SC::DeviceId: PartialOrd,
+        CC::DeviceId: PartialOrd,
     {
         let crate::ip::types::AddableEntry { subnet, device, gateway, metric } = entry;
         core_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
@@ -396,11 +394,11 @@ pub(crate) mod testutil {
     // TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
     pub(crate) fn del_routes_to_subnet<
         I: IpLayerIpExt,
-        C: IpLayerNonSyncContext<I, SC::DeviceId>,
-        SC: IpStateContext<I, C>,
+        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        CC: IpStateContext<I, BC>,
     >(
-        core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
+        core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
         del_subnet: Subnet<I::Addr>,
     ) -> Result<(), crate::error::NotFoundError> {
         core_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
@@ -418,12 +416,12 @@ pub(crate) mod testutil {
 
     pub(crate) fn del_device_routes<
         I: IpLayerIpExt,
-        SC: IpStateContext<I, C>,
-        C: IpLayerNonSyncContext<I, SC::DeviceId>,
+        CC: IpStateContext<I, BC>,
+        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
     >(
-        core_ctx: &mut SC,
-        _bindings_ctx: &mut C,
-        del_device: &SC::DeviceId,
+        core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        del_device: &CC::DeviceId,
     ) {
         debug!("deleting routes on device: {del_device:?}");
 
