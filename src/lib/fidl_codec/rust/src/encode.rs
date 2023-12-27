@@ -74,6 +74,9 @@ impl<'n> EncodeBuffer<'n> {
             Direction::Response => (method.response.as_ref(), method.has_response),
         };
 
+        let dynamic_flags =
+            if method.strict { DynamicFlags::empty() } else { DynamicFlags::FLEXIBLE };
+
         if !has {
             return Err(Error::LibraryError(format!(
                 "Method '{}' on protocol '{}' has no {}",
@@ -85,7 +88,7 @@ impl<'n> EncodeBuffer<'n> {
 
         buf.bytes.extend(&txid.to_le_bytes());
         buf.bytes.extend(&AtRestFlags::USE_V2_WIRE_FORMAT.bits().to_le_bytes());
-        buf.bytes.push(DynamicFlags::empty().bits());
+        buf.bytes.push(dynamic_flags.bits());
         buf.bytes.push(MAGIC_NUMBER_INITIAL);
         buf.bytes.extend(&method.ordinal.to_le_bytes());
 

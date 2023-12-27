@@ -264,11 +264,6 @@ struct ValueMemberExpanded {
 
 #[derive(Deserialize)]
 struct ValueBlock {
-    literal: LiteralBlock,
-}
-
-#[derive(Deserialize)]
-struct LiteralBlock {
     value: String,
 }
 
@@ -302,27 +297,26 @@ fn convert_expanded_value_member(
     container: &str,
     members: Vec<ValueMemberExpanded>,
 ) -> std::result::Result<Vec<ValueMember>, ValueConvertError> {
-    type ConverterType = Box<dyn Fn(String) -> std::result::Result<Value, ValueConvertError>>;
+    type ConverterType = dyn Fn(String) -> std::result::Result<Value, ValueConvertError>;
 
     let converter = match ty {
-        Type::U8 => Box::new(&|x: String| Ok(Value::U8(x.parse::<u8>()?))) as ConverterType,
-        Type::U16 => Box::new(&|x: String| Ok(Value::U16(x.parse::<u16>()?))) as ConverterType,
-        Type::U32 => Box::new(&|x: String| Ok(Value::U32(x.parse::<u32>()?))) as ConverterType,
-        Type::U64 => Box::new(&|x: String| Ok(Value::U64(x.parse::<u64>()?))) as ConverterType,
-        Type::I8 => Box::new(&|x: String| Ok(Value::I8(x.parse::<i8>()?))) as ConverterType,
-        Type::I16 => Box::new(&|x: String| Ok(Value::I16(x.parse::<i16>()?))) as ConverterType,
-        Type::I32 => Box::new(&|x: String| Ok(Value::I32(x.parse::<i32>()?))) as ConverterType,
-        Type::I64 => Box::new(&|x: String| Ok(Value::I64(x.parse::<i64>()?))) as ConverterType,
-        Type::F32 => Box::new(&|x: String| Ok(Value::F32(x.parse::<f32>()?))) as ConverterType,
-        Type::F64 => Box::new(&|x: String| Ok(Value::F64(x.parse::<f64>()?))) as ConverterType,
+        Type::U8 => (&|x: String| Ok(Value::U8(x.parse::<u8>()?))) as &ConverterType,
+        Type::U16 => (&|x: String| Ok(Value::U16(x.parse::<u16>()?))) as &ConverterType,
+        Type::U32 => (&|x: String| Ok(Value::U32(x.parse::<u32>()?))) as &ConverterType,
+        Type::U64 => (&|x: String| Ok(Value::U64(x.parse::<u64>()?))) as &ConverterType,
+        Type::I8 => (&|x: String| Ok(Value::I8(x.parse::<i8>()?))) as &ConverterType,
+        Type::I16 => (&|x: String| Ok(Value::I16(x.parse::<i16>()?))) as &ConverterType,
+        Type::I32 => (&|x: String| Ok(Value::I32(x.parse::<i32>()?))) as &ConverterType,
+        Type::I64 => (&|x: String| Ok(Value::I64(x.parse::<i64>()?))) as &ConverterType,
+        Type::F32 => (&|x: String| Ok(Value::F32(x.parse::<f32>()?))) as &ConverterType,
+        Type::F64 => (&|x: String| Ok(Value::F64(x.parse::<f64>()?))) as &ConverterType,
         _ => return Err(ValueConvertError::BadPrimitive(container.to_owned())),
     };
 
     let mut result = Vec::new();
 
     for member in members {
-        result
-            .push(ValueMember { name: member.name, value: converter(member.value.literal.value)? });
+        result.push(ValueMember { name: member.name, value: converter(member.value.value)? });
     }
 
     Ok(result)
@@ -435,6 +429,7 @@ struct TypeShape {
 pub struct Method {
     pub name: String,
     pub ordinal: u64,
+    pub strict: bool,
     pub has_request: bool,
     #[serde(rename = "maybe_request_payload")]
     pub request: Option<Type>,
