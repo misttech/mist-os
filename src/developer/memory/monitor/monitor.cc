@@ -278,15 +278,6 @@ void Monitor::CreateMetrics(const std::vector<memory::BucketMatch>& bucket_match
       [this](const Capture& c, Digest* d) { GetDigest(c, d); });
 }
 
-void Monitor::Watch(fidl::InterfaceHandle<fuchsia::memory::Watcher> watcher) {
-  fuchsia::memory::WatcherPtr watcher_proxy = watcher.Bind();
-  fuchsia::memory::Watcher* proxy_raw_ptr = watcher_proxy.get();
-  watcher_proxy.set_error_handler(
-      [this, proxy_raw_ptr](zx_status_t status) { ReleaseWatcher(proxy_raw_ptr); });
-  watchers_.push_back(std::move(watcher_proxy));
-  SampleAndPost();
-}
-
 void Monitor::CollectJsonStats(zx::socket socket) {
   // We set |include_starnix_processes| to true to avoid any change of behavior to the current
   // clients.
@@ -328,29 +319,6 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
 
   // Send string through socket.
   fsl::BlockingCopyFromString(json_string, socket);
-}
-
-void Monitor::ReleaseWatcher(fuchsia::memory::Watcher* watcher) {
-  auto predicate = [watcher](const auto& target) { return target.get() == watcher; };
-  watchers_.erase(std::remove_if(watchers_.begin(), watchers_.end(), predicate));
-}
-
-void Monitor::NotifyWatchers(const zx_info_kmem_stats_t& kmem_stats) {
-  fuchsia::memory::Stats stats{
-      .total_bytes = kmem_stats.total_bytes,
-      .free_bytes = kmem_stats.free_bytes,
-      .wired_bytes = kmem_stats.wired_bytes,
-      .total_heap_bytes = kmem_stats.total_heap_bytes,
-      .free_heap_bytes = kmem_stats.free_heap_bytes,
-      .vmo_bytes = kmem_stats.vmo_bytes,
-      .mmu_overhead_bytes = kmem_stats.mmu_overhead_bytes,
-      .ipc_bytes = kmem_stats.ipc_bytes,
-      .other_bytes = kmem_stats.other_bytes,
-  };
-
-  for (auto& watcher : watchers_) {
-    watcher->OnChange(stats);
-  }
 }
 
 void Monitor::PrintHelp() {
@@ -421,7 +389,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 }
 
 void Monitor::SampleAndPost() {
-  if (logging_ || tracing_ || watchers_.size() > 0) {
+  if (logging_ || tracing_) {
     Capture capture;
     auto strategy = std::make_unique<StarnixCaptureStrategy>();
     auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
@@ -441,9 +409,7 @@ void Monitor::SampleAndPost() {
       TRACE_COUNTER(kTraceName, "free", 0, "free", kmem.free_bytes, "free_heap",
                     kmem.free_heap_bytes);
     }
-    NotifyWatchers(kmem);
-    async::PostDelayedTask(
-        dispatcher_, [this] { SampleAndPost(); }, delay_);
+    async::PostDelayedTask(dispatcher_, [this] { SampleAndPost(); }, delay_);
   }
 }
 
