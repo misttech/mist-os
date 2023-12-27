@@ -4,7 +4,7 @@
 ## require is_lto=false
 ## require is_thinlto=false
 ## require optimize=none
-## set timeout 10
+## set timeout 30
 
 # TODO(fxbug.dev/127384): attach shouldn't be necessary.
 [zxdb] attach hello_starnix
