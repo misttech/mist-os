@@ -184,7 +184,7 @@ pub struct UdpCountersInner {
     pub tx_error: Counter,
 }
 
-impl<BC: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
+impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
     for SyncCtx<BC>
 {
     type Data = UdpCounters<I>;
@@ -195,7 +195,7 @@ impl<BC: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpC
     }
 }
 
-impl<BC: crate::NonSyncContext, I: Ip, L> CounterContext<UdpCounters<I>>
+impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>>
     for Locked<&SyncCtx<BC>, L>
 {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -1060,18 +1060,18 @@ pub trait UdpBindingsContext<I: IcmpIpExt, D> {
     );
 }
 
-/// The non-synchronized context for UDP.
-pub(crate) trait StateNonSyncContext<I: IpExt, D>:
+/// The bindings context for UDP.
+pub(crate) trait UdpStateBindingsContext<I: IpExt, D>:
     InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>
 {
 }
 impl<I: IpExt, BC: InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>, D>
-    StateNonSyncContext<I, D> for BC
+    UdpStateBindingsContext<I, D> for BC
 {
 }
 
 /// An execution context for the UDP protocol which also provides access to state.
-pub(crate) trait BoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The synchronized context passed to the callback provided to methods.
@@ -1124,7 +1124,7 @@ pub(crate) trait BoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::De
     ) -> O;
 }
 
-pub(crate) trait StateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
+pub(crate) trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback.
@@ -1170,8 +1170,10 @@ pub(crate) trait StateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceI
 pub(crate) trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
-pub(crate) trait DualStackBoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
-    DeviceIdContext<AnyDevice>
+pub(crate) trait DualStackBoundStateContext<
+    I: IpExt,
+    BC: UdpStateBindingsContext<I, Self::DeviceId>,
+>: DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
@@ -1214,8 +1216,10 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, BC: StateNonSyncContext<I,
 }
 
 /// An execution context for UDP non-dual-stack operations.
-pub(crate) trait NonDualStackBoundStateContext<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>>:
-    DeviceIdContext<AnyDevice>
+pub(crate) trait NonDualStackBoundStateContext<
+    I: IpExt,
+    BC: UdpStateBindingsContext<I, Self::DeviceId>,
+>: DeviceIdContext<AnyDevice>
 {
 }
 
@@ -1225,7 +1229,8 @@ pub(crate) enum UdpIpTransportContext {}
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
-    BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+    BC: UdpStateBindingsContext<I, CC::DeviceId>
+        + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
 >(
     core_ctx: &mut CC,
@@ -1341,7 +1346,7 @@ fn receive_ip_packet<
 fn try_deliver<
     I: IpExt,
     CC: StateContext<I, BC>,
-    BC: StateNonSyncContext<I, CC::DeviceId>,
+    BC: UdpStateBindingsContext<I, CC::DeviceId>,
     B: BufferMut,
 >(
     core_ctx: &mut CC,
@@ -1386,7 +1391,8 @@ fn try_deliver<
 fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
-    BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+    BC: UdpStateBindingsContext<I, CC::DeviceId>
+        + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC>,
 >(
     core_ctx: &mut CC,
@@ -1459,7 +1465,8 @@ fn try_dual_stack_deliver<
 
 impl<
         I: IpExt,
-        BC: StateNonSyncContext<I, CC::DeviceId> + StateNonSyncContext<I::OtherVersion, CC::DeviceId>,
+        BC: UdpStateBindingsContext<I, CC::DeviceId>
+            + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
         CC: StateContext<I, BC>
             + StateContext<I::OtherVersion, BC>
             + NonTestCtxMarker
@@ -1659,7 +1666,7 @@ pub(crate) trait SocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 impl<
         I: IpExt,
-        BC: StateNonSyncContext<I, Self::DeviceId>,
+        BC: UdpStateBindingsContext<I, Self::DeviceId>,
         CC: StateContext<I, BC> + CounterContext<UdpCounters<I>>,
     > SocketHandler<I, BC> for CC
 {
@@ -1966,7 +1973,7 @@ pub enum SendError {
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
+pub fn send_udp<I: Ip, B: BufferMut, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2000,7 +2007,7 @@ pub fn send_udp<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp_to<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
+pub fn send_udp_to<I: Ip, B: BufferMut, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2031,7 +2038,7 @@ pub fn send_udp_to<I: Ip, B: BufferMut, BC: crate::NonSyncContext>(
     .map_err(|IpInvariant(e)| e)
 }
 
-impl<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
+impl<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
     DatagramStateContext<I, BC, Udp> for CC
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
@@ -2072,7 +2079,7 @@ impl<I: IpExt, BC: StateNonSyncContext<I, Self::DeviceId>, CC: StateContext<I, B
 
 impl<
         I: IpExt,
-        BC: StateNonSyncContext<I, Self::DeviceId>,
+        BC: UdpStateBindingsContext<I, Self::DeviceId>,
         CC: BoundStateContext<I, BC> + UdpStateContext,
     > DatagramBoundStateContext<I, BC, Udp> for CC
 {
@@ -2128,7 +2135,7 @@ impl<
 }
 
 impl<
-        BC: StateNonSyncContext<Ipv6, CC::DeviceId> + StateNonSyncContext<Ipv4, CC::DeviceId>,
+        BC: UdpStateBindingsContext<Ipv6, CC::DeviceId> + UdpStateBindingsContext<Ipv4, CC::DeviceId>,
         CC: DualStackBoundStateContext<Ipv6, BC> + UdpStateContext,
     > DualStackDatagramBoundStateContext<Ipv6, BC, Udp> for CC
 {
@@ -2203,7 +2210,7 @@ impl<
 }
 
 impl<
-        BC: StateNonSyncContext<Ipv4, CC::DeviceId>,
+        BC: UdpStateBindingsContext<Ipv4, CC::DeviceId>,
         CC: BoundStateContext<Ipv4, BC> + NonDualStackBoundStateContext<Ipv4, BC> + UdpStateContext,
     > NonDualStackDatagramBoundStateContext<Ipv4, BC, Udp> for CC
 {
@@ -2213,7 +2220,7 @@ impl<
     }
 }
 
-impl<I: IpExt, BC: StateNonSyncContext<I, D::Strong>, D: WeakId>
+impl<I: IpExt, BC: UdpStateBindingsContext<I, D::Strong>, D: WeakId>
     LocalIdentifierAllocator<I, D, Udp, BC, (Udp, I, D)>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
@@ -2235,7 +2242,7 @@ impl<I: IpExt, BC: StateNonSyncContext<I, D::Strong>, D: WeakId>
 /// Creates an unbound UDP socket.
 ///
 /// `create_udp` creates a new UDP socket and returns an identifier for it.
-pub fn create_udp<I: Ip, BC: crate::NonSyncContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
+pub fn create_udp<I: Ip, BC: crate::BindingsContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
     let mut sync_ctx = Locked::new(core_ctx);
     I::map_ip(
         IpInvariant(&mut sync_ctx),
@@ -2266,7 +2273,7 @@ pub fn create_udp<I: Ip, BC: crate::NonSyncContext>(core_ctx: &SyncCtx<BC>) -> S
 /// # Panics
 ///
 /// `connect` panics if `id` is not a valid [`UnboundId`].
-pub fn connect<I: Ip, BC: crate::NonSyncContext>(
+pub fn connect<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2298,7 +2305,7 @@ pub fn connect<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn set_udp_device<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_device<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2322,7 +2329,7 @@ pub fn set_udp_device<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid socket ID.
-pub fn get_udp_bound_device<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_bound_device<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2353,7 +2360,7 @@ pub fn get_udp_bound_device<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2383,7 +2390,7 @@ pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2411,7 +2418,7 @@ pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `set_udp_posix_reuse_port` panics if `id` is not a valid `SocketId`.
-pub fn set_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_posix_reuse_port<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2434,7 +2441,7 @@ pub fn set_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_posix_reuse_port<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2460,7 +2467,7 @@ pub fn get_udp_posix_reuse_port<I: Ip, BC: crate::NonSyncContext>(
 /// leaving a group that was not joined, or joining a group multiple times) or
 /// if the device to use to join is unspecified or conflicts with the existing
 /// socket state.
-pub fn set_udp_multicast_membership<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_multicast_membership<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2507,7 +2514,7 @@ pub fn set_udp_multicast_membership<I: Ip, BC: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2540,7 +2547,7 @@ pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2570,7 +2577,7 @@ pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
 }
 
 /// Gets the hop limit for packets sent by the socket to a unicast destination.
-pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2593,7 +2600,7 @@ pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
 ///
 /// Gets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2613,7 +2620,7 @@ pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::NonSyncContext>(
 }
 
 /// Gets the transparent option.
-pub fn get_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_transparent<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     id: &SocketId<I>,
 ) -> bool {
@@ -2625,7 +2632,7 @@ pub fn get_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
 }
 
 /// Sets the transparent option.
-pub fn set_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
+pub fn set_udp_transparent<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     id: &SocketId<I>,
     value: bool,
@@ -2653,7 +2660,7 @@ pub fn set_udp_transparent<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn disconnect_udp_connected<I: Ip, BC: crate::NonSyncContext>(
+pub fn disconnect_udp_connected<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2679,7 +2686,7 @@ pub fn disconnect_udp_connected<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn shutdown<I: Ip, BC: crate::NonSyncContext>(
+pub fn shutdown<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2706,7 +2713,7 @@ pub fn shutdown<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_shutdown<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_shutdown<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
@@ -2752,7 +2759,7 @@ impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<I, D, Udp>> for SocketInfo<I::
 /// # Panics
 ///
 /// `get_udp_info` panics if `id` is not a valid `SocketId`.
-pub fn get_udp_info<I: Ip, BC: crate::NonSyncContext>(
+pub fn get_udp_info<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -2774,7 +2781,7 @@ pub fn get_udp_info<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn close<I: Ip, BC: crate::NonSyncContext>(
+pub fn close<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: SocketId<I>,
@@ -2807,7 +2814,7 @@ pub fn close<I: Ip, BC: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `listen_udp` panics if `id` is not a valid [`SocketId`].
-pub fn listen_udp<I: Ip, BC: crate::NonSyncContext>(
+pub fn listen_udp<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
@@ -5268,7 +5275,7 @@ mod tests {
 
         fn listen_unbound<
             I: Ip + TestIpExt,
-            BC: StateNonSyncContext<I, CC::DeviceId>,
+            BC: UdpStateBindingsContext<I, CC::DeviceId>,
             CC: StateContext<I, BC> + CounterContext<UdpCounters<I>>,
         >(
             core_ctx: &mut CC,

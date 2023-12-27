@@ -105,7 +105,7 @@ impl<DeviceId, BC, CC: TimerHandler<BC, IgmpTimerId<DeviceId>>>
 
 /// Handle an IPv4 device timer firing.
 pub(crate) fn handle_ipv4_timer<
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -233,7 +233,7 @@ impl<
 
 /// Handle an IPv6 device timer firing.
 pub(crate) fn handle_ipv6_timer<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv6, BC>,
 >(
     core_ctx: &mut CC,
@@ -384,12 +384,12 @@ pub(crate) struct DualStackDeviceStateRef<'a, I: Instant> {
     pub(crate) ipv6: &'a IpDeviceAddresses<I, Ipv6>,
 }
 
-/// The non-synchronized execution context for dual-stack devices.
-pub(crate) trait DualStackDeviceNonSyncContext: InstantContext {}
-impl<BC: InstantContext> DualStackDeviceNonSyncContext for BC {}
+/// The bindings execution context for dual-stack devices.
+pub(crate) trait DualStackDeviceBindingsContext: InstantContext {}
+impl<BC: InstantContext> DualStackDeviceBindingsContext for BC {}
 
-/// The synchronized execution context for dual-stack devices.
-pub(crate) trait DualStackDeviceContext<BC: DualStackDeviceNonSyncContext>:
+/// The core execution context for dual-stack devices.
+pub(crate) trait DualStackDeviceContext<BC: DualStackDeviceBindingsContext>:
     DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable view into the dual-stack device's
@@ -407,7 +407,7 @@ pub(crate) trait DualStackDeviceHandler<BC>: DeviceIdContext<AnyDevice> {
     fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither>;
 }
 
-impl<BC: DualStackDeviceNonSyncContext, CC: DualStackDeviceContext<BC>> DualStackDeviceHandler<BC>
+impl<BC: DualStackDeviceBindingsContext, CC: DualStackDeviceContext<BC>> DualStackDeviceHandler<BC>
     for CC
 {
     fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither> {
@@ -426,8 +426,8 @@ impl<BC: DualStackDeviceNonSyncContext, CC: DualStackDeviceContext<BC>> DualStac
     }
 }
 
-/// The non-synchronized execution context for IP devices.
-pub(crate) trait IpDeviceNonSyncContext<I: IpDeviceIpExt, DeviceId>:
+/// The bindings execution context for IP devices.
+pub(crate) trait IpDeviceBindingsContext<I: IpDeviceIpExt, DeviceId>:
     RngContext
     + TimerContext<I::Timer<DeviceId>>
     + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
@@ -439,7 +439,7 @@ impl<
         BC: RngContext
             + TimerContext<I::Timer<DeviceId>>
             + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
-    > IpDeviceNonSyncContext<I, DeviceId> for BC
+    > IpDeviceBindingsContext<I, DeviceId> for BC
 {
 }
 
@@ -621,7 +621,7 @@ pub(crate) trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BC: Instant
 /// The execution context for IP devices.
 pub(crate) trait IpDeviceConfigurationContext<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, Self::DeviceId>,
+    BC: IpDeviceBindingsContext<I, Self::DeviceId>,
 >: IpDeviceStateContext<I, BC> + DeviceIdContext<AnyDevice>
 {
     type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
@@ -680,7 +680,7 @@ pub(crate) trait IpDeviceConfigurationContext<
 /// The context provided to the callback passed to
 /// [`Ipv6DeviceConfigurationContext::with_ipv6_device_configuration_mut`].
 pub(crate) trait WithIpv6DeviceConfigurationMutInner<
-    BC: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>,
 >: WithIpDeviceConfigurationMutInner<Ipv6, BC>
 {
     type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<BC, DeviceId = Self::DeviceId>
@@ -701,7 +701,7 @@ pub(crate) trait WithIpv6DeviceConfigurationMutInner<
     ) -> (&Ipv6DeviceConfiguration, Self::Ipv6DeviceStateCtx<'_>);
 }
 
-pub(crate) trait Ipv6DeviceConfigurationContext<BC: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>:
+pub(crate) trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceConfigurationContext<Ipv6, BC>
 {
     type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<BC, DeviceId = Self::DeviceId, AddressId = Self::AddressId>
@@ -739,7 +739,7 @@ pub(crate) trait Ipv6DeviceConfigurationContext<BC: IpDeviceNonSyncContext<Ipv6,
 }
 
 /// The execution context for an IPv6 device.
-pub(crate) trait Ipv6DeviceContext<BC: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>:
+pub(crate) trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceStateContext<Ipv6, BC>
 {
     /// A link-layer address.
@@ -785,7 +785,7 @@ pub(crate) trait IpDeviceHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 
 impl<
         I: IpDeviceIpExt,
-        BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+        BC: IpDeviceBindingsContext<I, CC::DeviceId>,
         CC: IpDeviceConfigurationContext<I, BC>,
     > IpDeviceHandler<I, BC> for CC
 {
@@ -809,7 +809,7 @@ pub(crate) fn receive_igmp_packet<CC, BC, B>(
     buffer: B,
 ) where
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>: IpDeviceStateContext<Ipv4, BC, DeviceId = CC::DeviceId>
         + IgmpPacketHandler<BC, CC::DeviceId>,
     B: BufferMut,
@@ -895,7 +895,7 @@ pub(crate) trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
 }
 
 impl<
-        BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
         CC: Ipv6DeviceContext<BC> + Ipv6DeviceConfigurationContext<BC>,
     > Ipv6DeviceHandler<BC> for CC
 {
@@ -1033,7 +1033,7 @@ pub(crate) trait IpDeviceSendContext<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 }
 
 fn enable_ipv6_device_with_config<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + RsHandler<BC> + DadHandler<BC>,
 >(
     core_ctx: &mut CC,
@@ -1120,7 +1120,7 @@ fn enable_ipv6_device_with_config<
 }
 
 fn disable_ipv6_device_with_config<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceContext<BC>
         + GmpHandler<Ipv6, BC>
         + RsHandler<BC>
@@ -1194,7 +1194,7 @@ fn disable_ipv6_device_with_config<
 }
 
 fn enable_ipv4_device_with_config<
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -1223,7 +1223,7 @@ fn enable_ipv4_device_with_config<
 }
 
 fn disable_ipv4_device_with_config<
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC> + NudIpHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -1287,7 +1287,7 @@ pub(crate) fn get_ipv6_hop_limit<BC: InstantContext, CC: IpDeviceStateContext<Ip
 /// Is IP packet forwarding enabled?
 pub(crate) fn is_ip_forwarding_enabled<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -1300,7 +1300,7 @@ pub(crate) fn is_ip_forwarding_enabled<
 
 fn join_ip_multicast_with_config<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceStateContext<I, BC> + GmpHandler<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -1333,7 +1333,7 @@ fn join_ip_multicast_with_config<
 /// multicast group.
 pub(crate) fn join_ip_multicast<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -1354,7 +1354,7 @@ pub(crate) fn join_ip_multicast<
 
 fn leave_ip_multicast_with_config<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceStateContext<I, BC> + GmpHandler<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -1395,7 +1395,7 @@ fn leave_ip_multicast_with_config<
 /// If `device_id` is not currently in the multicast group `multicast_addr`.
 pub(crate) fn leave_ip_multicast<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -1417,7 +1417,7 @@ pub(crate) fn leave_ip_multicast<
 /// Adds an IPv4 address and associated subnet to this device.
 pub(crate) fn add_ipv4_addr_subnet<
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1454,7 +1454,7 @@ pub(crate) fn add_ipv4_addr_subnet<
 /// `config` is the way this address is being configured. See [`AddrConfig`]
 /// for more details.
 pub(crate) fn add_ipv6_addr_subnet<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceConfigurationContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1477,7 +1477,7 @@ pub(crate) fn add_ipv6_addr_subnet<
 }
 
 fn add_ipv6_addr_subnet_with_config<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpDeviceStateContext<Ipv6, BC> + GmpHandler<Ipv6, BC> + DadHandler<BC>,
 >(
     core_ctx: &mut CC,
@@ -1522,7 +1522,7 @@ fn add_ipv6_addr_subnet_with_config<
 
 pub(crate) fn set_ipv4_addr_properties<
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1549,7 +1549,7 @@ pub(crate) fn set_ipv4_addr_properties<
 
 pub(crate) fn set_ipv6_addr_properties<
     CC: IpDeviceConfigurationContext<Ipv6, BC>,
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1580,7 +1580,7 @@ pub(crate) fn set_ipv6_addr_properties<
 /// Removes an IPv4 address and associated subnet from this device.
 pub(crate) fn del_ipv4_addr<
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1604,7 +1604,7 @@ pub(crate) enum DelIpv6Addr<A> {
 }
 
 fn del_ipv6_addr_with_config<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + DadHandler<BC>,
 >(
     core_ctx: &mut CC,
@@ -1635,7 +1635,7 @@ fn del_ipv6_addr_with_config<
 
 /// Removes an IPv6 address and associated subnet from this device.
 pub(crate) fn del_ipv6_addr_with_reason<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceConfigurationContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1658,7 +1658,7 @@ pub(crate) fn del_ipv6_addr_with_reason<
 
 /// Removes an IPv6 address and associated subnet from this device.
 fn del_ipv6_addr_with_reason_with_config<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + DadHandler<BC> + SlaacHandler<BC>,
 >(
     core_ctx: &mut CC,
@@ -1684,7 +1684,7 @@ fn del_ipv6_addr_with_reason_with_config<
 }
 
 pub(crate) fn get_ipv4_configuration_and_flags<
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -1699,7 +1699,7 @@ pub(crate) fn get_ipv4_configuration_and_flags<
 }
 
 pub(crate) fn get_ipv6_configuration_and_flags<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv6, BC>,
 >(
     core_ctx: &mut CC,
@@ -1770,7 +1770,7 @@ pub struct PendingIpv4DeviceConfigurationUpdate<'a, D>(Ipv4DeviceConfigurationUp
 
 // TODO(https://fxbug.dev/133996): Get rid of this impl block and make the inner
 // function publicly accessible once we can safely expose sealed traits.
-impl<'a, BC: crate::NonSyncContext>
+impl<'a, BC: crate::BindingsContext>
     PendingIpv4DeviceConfigurationUpdate<'a, crate::device::DeviceId<BC>>
 {
     /// Applies this pending device configuration.
@@ -1833,7 +1833,7 @@ where
     ) -> Ipv4DeviceConfigurationUpdate
     where
         CC: IpDeviceConfigurationContext<Ipv4, BC, DeviceId = D>,
-        BC: IpDeviceNonSyncContext<Ipv4, D>,
+        BC: IpDeviceBindingsContext<Ipv4, D>,
     {
         let Self(Ipv4DeviceConfigurationUpdate { ip_config }, device_id) = self;
         let device_id: &CC::DeviceId = device_id;
@@ -1935,7 +1935,7 @@ pub struct PendingIpv6DeviceConfigurationUpdate<'a, D>(Ipv6DeviceConfigurationUp
 
 // TODO(https://fxbug.dev/133996): Get rid of this impl block and make the inner
 // function publicly accessible once we can safely expose sealed traits.
-impl<'a, BC: crate::NonSyncContext>
+impl<'a, BC: crate::BindingsContext>
     PendingIpv6DeviceConfigurationUpdate<'a, crate::device::DeviceId<BC>>
 {
     /// Applies this pending device configuration.
@@ -1990,7 +1990,7 @@ where
     ) -> Ipv6DeviceConfigurationUpdate
     where
         CC: Ipv6DeviceConfigurationContext<BC, DeviceId = D>,
-        BC: IpDeviceNonSyncContext<Ipv6, D>,
+        BC: IpDeviceBindingsContext<Ipv6, D>,
     {
         let Self(
             Ipv6DeviceConfigurationUpdate {
@@ -2128,7 +2128,7 @@ where
 
 pub(super) fn is_ip_device_enabled<
     I: IpDeviceIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceStateContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -2139,7 +2139,7 @@ pub(super) fn is_ip_device_enabled<
 
 /// Removes IPv4 state for the device without emitting events.
 pub(crate) fn clear_ipv4_device_state<
-    BC: IpDeviceNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -2164,7 +2164,7 @@ pub(crate) fn clear_ipv4_device_state<
 
 /// Removes IPv6 state for the device without emitting events.
 pub(crate) fn clear_ipv6_device_state<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: Ipv6DeviceConfigurationContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -2213,7 +2213,7 @@ pub(crate) mod testutil {
     ///
     /// See [`Tentative`] and [`AddrSubnet`] for more information.
     pub(crate) fn with_assigned_ipv6_addr_subnets<
-        BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
         CC: Ipv6DeviceContext<BC>,
         O,
         F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv6Addr>> + '_>) -> O,

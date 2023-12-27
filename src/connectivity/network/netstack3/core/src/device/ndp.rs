@@ -182,7 +182,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        Instant, NonSyncContext, SyncCtx, TimerId,
+        BindingsContext, Instant, SyncCtx, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -198,7 +198,7 @@ mod tests {
         }
     }
 
-    fn get_global_ipv6_addrs<BC: NonSyncContext>(
+    fn get_global_ipv6_addrs<BC: BindingsContext>(
         core_ctx: &SyncCtx<BC>,
         device_id: &DeviceId<BC>,
     ) -> Vec<GlobalIpv6Addr<BC::Instant>> {

@@ -101,12 +101,12 @@ pub(super) trait RsContext<BC>: DeviceIdContext<AnyDevice> {
     ) -> Result<(), S>;
 }
 
-/// The non-synchronized execution context for router solicitation.
-pub(super) trait RsNonSyncContext<DeviceId>:
+/// The bindings execution context for router solicitation.
+pub(super) trait RsBindingsContext<DeviceId>:
     RngContext + TimerContext<RsTimerId<DeviceId>>
 {
 }
-impl<DeviceId, BC: RngContext + TimerContext<RsTimerId<DeviceId>>> RsNonSyncContext<DeviceId>
+impl<DeviceId, BC: RngContext + TimerContext<RsTimerId<DeviceId>>> RsBindingsContext<DeviceId>
     for BC
 {
 }
@@ -124,7 +124,7 @@ pub(crate) trait RsHandler<BC>:
     fn stop_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>> RsHandler<BC> for CC {
+impl<BC: RsBindingsContext<CC::DeviceId>, CC: RsContext<BC>> RsHandler<BC> for CC {
     fn start_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         let remaining = self.with_rs_remaining_mut_and_max(device_id, |remaining, max| {
             *remaining = max;
@@ -154,7 +154,7 @@ impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>> RsHandler<BC> for CC
     }
 }
 
-impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>>
+impl<BC: RsBindingsContext<CC::DeviceId>, CC: RsContext<BC>>
     TimerHandler<BC, RsTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
@@ -167,7 +167,7 @@ impl<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>>
 }
 
 /// Solicit routers once and schedule next message.
-fn do_router_solicitation<BC: RsNonSyncContext<CC::DeviceId>, CC: RsContext<BC>>(
+fn do_router_solicitation<BC: RsBindingsContext<CC::DeviceId>, CC: RsContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,

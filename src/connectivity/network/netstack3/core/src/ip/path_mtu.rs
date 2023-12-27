@@ -39,14 +39,14 @@ pub(super) trait PmtuStateContext<I: Ip, Instant> {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, Instant>) -> O>(&mut self, cb: F) -> O;
 }
 
-/// The non-synchronized execution context for path MTU discovery.
-trait PmtuNonSyncContext<I: Ip>: TimerContext<PmtuTimerId<I>> {}
-impl<I: Ip, BC: TimerContext<PmtuTimerId<I>>> PmtuNonSyncContext<I> for BC {}
+/// The bindings execution context for path MTU discovery.
+trait PmtuBindingsContext<I: Ip>: TimerContext<PmtuTimerId<I>> {}
+impl<I: Ip, BC: TimerContext<PmtuTimerId<I>>> PmtuBindingsContext<I> for BC {}
 
 /// The execution context for path MTU discovery.
-trait PmtuContext<I: Ip, BC: PmtuNonSyncContext<I>>: PmtuStateContext<I, BC::Instant> {}
+trait PmtuContext<I: Ip, BC: PmtuBindingsContext<I>>: PmtuStateContext<I, BC::Instant> {}
 
-impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuStateContext<I, BC::Instant>> PmtuContext<I, BC>
+impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuStateContext<I, BC::Instant>> PmtuContext<I, BC>
     for CC
 {
 }
@@ -80,7 +80,7 @@ pub(crate) trait PmtuHandler<I: Ip, BC> {
     );
 }
 
-fn maybe_schedule_timer<I: Ip, BC: PmtuNonSyncContext<I>>(
+fn maybe_schedule_timer<I: Ip, BC: PmtuBindingsContext<I>>(
     bindings_ctx: &mut BC,
     cache_is_empty: bool,
 ) {
@@ -105,7 +105,7 @@ fn maybe_schedule_timer<I: Ip, BC: PmtuNonSyncContext<I>>(
     }
 }
 
-fn handle_update_result<I: Ip, BC: PmtuNonSyncContext<I>>(
+fn handle_update_result<I: Ip, BC: PmtuBindingsContext<I>>(
     bindings_ctx: &mut BC,
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
@@ -117,7 +117,7 @@ fn handle_update_result<I: Ip, BC: PmtuNonSyncContext<I>>(
     });
 }
 
-impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
+impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
     fn update_pmtu_if_less(
         &mut self,
         bindings_ctx: &mut BC,
@@ -147,7 +147,7 @@ impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, BC
     }
 }
 
-impl<I: Ip, BC: PmtuNonSyncContext<I>, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
+impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
     for CC
 {
     fn handle_timer(&mut self, bindings_ctx: &mut BC, _timer: PmtuTimerId<I>) {

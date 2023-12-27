@@ -44,10 +44,10 @@ use crate::{
         seqnum::{SeqNum, UnscaledWindowSize},
         socket::{
             do_send_inner, isn::IsnGenerator, make_connection, try_into_this_stack_conn_mut,
-            BoundSocketState, Connection, DemuxState, DemuxSyncContext, DeviceIpSocketHandler,
-            DualStackIpExt, EitherStack, HandshakeStatus, Listener, ListenerAddrState,
-            ListenerSharingState, MaybeDualStack, MaybeListener, NonSyncContext, PrimaryRc,
-            SocketHandler, SyncContext, TcpBindingsTypes, TcpIpTransportContext, TcpPortSpec,
+            BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler, DualStackIpExt,
+            EitherStack, HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState,
+            MaybeDualStack, MaybeListener, PrimaryRc, SocketHandler, TcpBindingsContext,
+            TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpIpTransportContext, TcpPortSpec,
             TcpSocketId, TcpSocketSetEntry, TcpSocketState,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
@@ -70,14 +70,14 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
 impl<I, BC, CC> IpTransportContext<I, BC, CC> for TcpIpTransportContext
 where
     I: DualStackIpExt,
-    BC: NonSyncContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: SyncContext<I, BC> + SyncContext<I::OtherVersion, BC>,
+    CC: TcpContext<I, BC> + TcpContext<I::OtherVersion, BC>,
 {
     fn receive_icmp_error(
         core_ctx: &mut CC,
@@ -180,14 +180,14 @@ fn handle_incoming_packet<I, B, BC, CC>(
 ) where
     I: DualStackIpExt,
     B: BufferMut,
-    BC: NonSyncContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: SyncContext<I, BC> + SyncContext<I::OtherVersion, BC>,
+    CC: TcpContext<I, BC> + TcpContext<I::OtherVersion, BC>,
 {
     trace_duration!(bindings_ctx, "tcp::handle_incoming_packet");
     let mut tw_reuse = None;
@@ -422,8 +422,8 @@ fn lookup_socket<I, CC, BC>(
 ) -> Option<SocketLookupResult<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    BC: NonSyncContext<CC::WeakDeviceId>,
-    CC: SyncContext<I, BC>,
+    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    CC: TcpContext<I, BC>,
 {
     addrs_to_search.find_map(|addr| {
         match addr {
@@ -488,17 +488,17 @@ where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     B: BufferMut,
-    BC: NonSyncContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: SyncContext<SockI, BC>,
+    CC: TcpContext<SockI, BC>,
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<SockI, BC>
-        + DemuxSyncContext<WireI, CC::WeakDeviceId, BC>,
+        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
     let Connection {
         accept_queue,
@@ -583,7 +583,7 @@ where
                 // enter Closed state, and the user has already promised
                 // not to use the connection again, we can remove the
                 // connection from the socketmap.
-                DemuxSyncContext::<WireI, _, _>::with_demux_mut(
+                TcpDemuxContext::<WireI, _, _>::with_demux_mut(
                     core_ctx,
                     |DemuxState { socketmap, .. }| {
                         assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
@@ -644,14 +644,14 @@ fn try_handle_incoming_for_listener<I, CC, BC, B>(
 where
     I: DualStackIpExt,
     B: BufferMut,
-    BC: NonSyncContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: SyncContext<I, BC>,
+    CC: TcpContext<I, BC>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,

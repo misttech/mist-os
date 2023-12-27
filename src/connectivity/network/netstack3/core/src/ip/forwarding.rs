@@ -21,9 +21,9 @@ use crate::{
         types::{
             AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
         },
-        IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext, IpStateContext,
+        IpExt, IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
     },
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -57,7 +57,7 @@ impl From<crate::error::ExistsError> for AddRouteError {
 /// by the client.
 /// This can be used to construct an `Entry` from an `AddableEntry` the same
 /// way that the core routing table does.
-pub fn select_device_for_gateway<BC: NonSyncContext>(
+pub fn select_device_for_gateway<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     gateway: SpecifiedAddr<IpAddr>,
 ) -> Option<DeviceId<BC>> {
@@ -74,7 +74,7 @@ pub fn select_device_for_gateway<BC: NonSyncContext>(
 
 fn select_device_for_gateway_inner<
     I: IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpStateContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -96,14 +96,14 @@ fn select_device_for_gateway_inner<
 /// suboptimal for performance, it simplifies the API exposed by core for route
 /// table modifications to allow for evolution of the routing table in the
 /// future.
-pub fn set_routes<I: Ip, BC: NonSyncContext>(
+pub fn set_routes<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     entries: Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>,
 ) {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    struct Wrap<I: Ip, BC: NonSyncContext>(Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>);
+    struct Wrap<I: Ip, BC: BindingsContext>(Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>);
 
     let () = net_types::map_ip_twice!(
         I,
@@ -125,7 +125,7 @@ pub fn set_routes<I: Ip, BC: NonSyncContext>(
 pub(crate) fn request_context_add_route<
     I: IpLayerIpExt,
     DeviceId,
-    BC: IpLayerNonSyncContext<I, DeviceId>,
+    BC: IpLayerBindingsContext<I, DeviceId>,
 >(
     bindings_ctx: &mut BC,
     entry: AddableEntry<I::Addr, DeviceId>,
@@ -138,7 +138,7 @@ pub(crate) fn request_context_add_route<
 pub(crate) fn request_context_del_routes<
     I: IpLayerIpExt,
     DeviceId,
-    BC: IpLayerNonSyncContext<I, DeviceId>,
+    BC: IpLayerBindingsContext<I, DeviceId>,
 >(
     bindings_ctx: &mut BC,
     del_subnet: Subnet<I::Addr>,
@@ -170,7 +170,7 @@ pub trait RoutesVisitor<'a, BT: DeviceLayerTypes + 'a> {
 pub fn with_routes<'a, I, BC, V>(core_ctx: &SyncCtx<BC>, cb: &mut V) -> V::VisitResult
 where
     I: IpExt,
-    BC: NonSyncContext + 'a,
+    BC: BindingsContext + 'a,
     V: RoutesVisitor<'a, BC>,
 {
     let mut sync_ctx = Locked::new(core_ctx);
@@ -339,7 +339,7 @@ pub(crate) mod testutil {
 
     use crate::ip::{
         types::{AddableMetric, Entry, EntryAndGeneration, Generation, Metric},
-        IpLayerIpExt, IpLayerNonSyncContext, IpStateContext,
+        IpLayerBindingsContext, IpLayerIpExt, IpStateContext,
     };
 
     use super::*;
@@ -363,7 +363,7 @@ pub(crate) mod testutil {
     /// dispatching an event requesting that the route be added.
     pub(crate) fn add_route<
         I: IpLayerIpExt,
-        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        BC: IpLayerBindingsContext<I, CC::DeviceId>,
         CC: IpStateContext<I, BC>,
     >(
         core_ctx: &mut CC,
@@ -394,7 +394,7 @@ pub(crate) mod testutil {
     // TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
     pub(crate) fn del_routes_to_subnet<
         I: IpLayerIpExt,
-        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        BC: IpLayerBindingsContext<I, CC::DeviceId>,
         CC: IpStateContext<I, BC>,
     >(
         core_ctx: &mut CC,
@@ -417,7 +417,7 @@ pub(crate) mod testutil {
     pub(crate) fn del_device_routes<
         I: IpLayerIpExt,
         CC: IpStateContext<I, BC>,
-        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        BC: IpLayerBindingsContext<I, CC::DeviceId>,
     >(
         core_ctx: &mut CC,
         _bindings_ctx: &mut BC,

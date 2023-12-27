@@ -34,51 +34,6 @@
 //! contexts, then customizing which transport layer protocols are supported is
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
-//!
-//! # Synchronized vs Non-Synchronized Contexts
-//!
-//! Since Netstack3 aspires to be multi-threaded in the future, some resources
-//! need to be shared between threads, including resources which are accessed
-//! via context traits. Sometimes, this resource sharing has implications for
-//! how the context's behavior is exposed via its API, and thus has implications
-//! for how the consuming code needs to interact with that API.
-//!
-//! For this reason, some modules require two different contexts - a
-//! "synchronized" context and a "non-synchronized" context. Traits implementing
-//! a synchronized context are named `FooSyncContext` while traits implementing
-//! a non-synchronized context are named `FooContext`. Note that the
-//! implementation of a non-synchronized context trait may still provide access
-//! to shared resources - the distinction is simply that the consumer doesn't
-//! need to be aware that that's what's happening under the hood. As a result,
-//! this shared access is not assumed by the context trait itself. Its API is
-//! designed just as it would be if exclusive access were assumed. For example,
-//! even though a multi-threaded implementation of [`TimerContext`] would need
-//! to synchronize on a shared set of timers, the `TimerContext` trait is
-//! designed as though it were providing a vanilla, unsynchronized container.
-//!
-//! When synchronized contexts provide access to state, they do it via a
-//! `with`-style API:
-//!
-//! ```rust
-//! trait FooSyncContext<S> {
-//!     fn with_state<O, F: FnOnce(&mut S) -> O>(&mut self, f: F) -> O;
-//! }
-//! ```
-//!
-//! This style is easy to implement when state is shared and mutated via
-//! interior mutability (e.g., using mutexes), and is also easy to implement
-//! when state is accessed exclusively (e.g., when writing a test fake). It also
-//! makes it clear that a critical section is starting and ending, and thus
-//! makes it clear to the programmer that they're performing a potentially
-//! expensive operation, and hopefully encourages them to minimize the duration
-//! of the critical section.
-//!
-//! Since the `with_xxx` method operates on `&mut self`, it prevents other
-//! operations on the context from happening concurrently. This prevents
-//! deadlocks which occur as a result of a single mutex being locked while it is
-//! held by the locking thread - in other words, it prevents lock reentrance.
-//!
-//! [`ArpContext`]: crate::device::arp::ArpContext
 
 use core::{ffi::CStr, fmt::Debug, time::Duration};
 
@@ -92,7 +47,7 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     device::{self, ethernet::EthernetLinkDevice, DeviceId, DeviceLayerTypes},
-    ip::{self, icmp::IcmpBindingsContext},
+    ip::{self, icmp::IcmpEchoBindingsContext},
     state::{StackState, StackStateBuilder},
     sync,
     transport::{tcp::socket::TcpBindingsTypes, udp::UdpBindingsContext},
@@ -108,7 +63,7 @@ use crate::{
 /// [this issue]: https://github.com/rust-lang/rust/issues/97811
 pub(crate) trait NonTestCtxMarker {}
 
-impl<BC: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<BC>, L> {}
+impl<BC: BindingsContext, L> NonTestCtxMarker for Locked<&SyncCtx<BC>, L> {}
 
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
 /// implementation.
@@ -327,8 +282,8 @@ pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTy
 
 impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
 
-/// The non-synchronized context for the stack.
-pub trait NonSyncContext:
+/// The execution context provided by bindings.
+pub trait BindingsContext:
     BindingsTypes
     + RngContext
     + TimerContext<TimerId<Self>>
@@ -354,11 +309,11 @@ pub trait NonSyncContext:
         >,
     > + UdpBindingsContext<Ipv4, DeviceId<Self>>
     + UdpBindingsContext<Ipv6, DeviceId<Self>>
-    + IcmpBindingsContext<Ipv4, DeviceId<Self>>
-    + IcmpBindingsContext<Ipv6, DeviceId<Self>>
+    + IcmpEchoBindingsContext<Ipv4, DeviceId<Self>>
+    + IcmpEchoBindingsContext<Ipv6, DeviceId<Self>>
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
-    + device::socket::NonSyncContext<DeviceId<Self>>
+    + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
     + ReferenceNotifiers
     + TracingContext
     + 'static
@@ -398,15 +353,15 @@ impl<
                 >,
             > + UdpBindingsContext<Ipv4, DeviceId<Self>>
             + UdpBindingsContext<Ipv6, DeviceId<Self>>
-            + IcmpBindingsContext<Ipv4, DeviceId<Self>>
-            + IcmpBindingsContext<Ipv6, DeviceId<Self>>
+            + IcmpEchoBindingsContext<Ipv4, DeviceId<Self>>
+            + IcmpEchoBindingsContext<Ipv6, DeviceId<Self>>
             + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
             + device::DeviceLayerEventDispatcher
-            + device::socket::NonSyncContext<DeviceId<Self>>
+            + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
             + TracingContext
             + ReferenceNotifiers
             + 'static,
-    > NonSyncContext for BC
+    > BindingsContext for BC
 {
 }
 
@@ -416,7 +371,7 @@ pub struct SyncCtx<BT: BindingsTypes> {
     pub state: StackState<BT>,
 }
 
-impl<BC: NonSyncContext> SyncCtx<BC> {
+impl<BC: BindingsContext> SyncCtx<BC> {
     /// Create a new `SyncCtx`.
     pub fn new(bindings_ctx: &mut BC) -> SyncCtx<BC> {
         SyncCtx { state: StackStateBuilder::default().build_with_ctx(bindings_ctx) }

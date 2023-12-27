@@ -18,9 +18,9 @@ use net_types::ethernet::Mac;
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     device_socket::{
-        DeviceSocketTypes, EthernetFrame, Frame, FrameDestination, NonSyncContext, Protocol,
-        ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams,
-        SentFrame, SocketId, SocketInfo, TargetDevice,
+        DeviceSocketBindingsContext, DeviceSocketTypes, EthernetFrame, Frame, FrameDestination,
+        Protocol, ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError,
+        SendFrameParams, SentFrame, SocketId, SocketInfo, TargetDevice,
     },
     sync::Mutex,
     SyncCtx,
@@ -54,7 +54,7 @@ impl DeviceSocketTypes for BindingsNonSyncCtxImpl {
     type SocketState = SocketState;
 }
 
-impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
+impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
     fn receive_frame(
         &self,
         state: &Self::SocketState,

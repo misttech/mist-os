@@ -67,7 +67,7 @@ use crate::{
     sync::{PrimaryRc, RwLock},
     trace_duration,
     work_queue::WorkQueueReport,
-    Instant, NonSyncContext, SyncCtx,
+    BindingsContext, Instant, SyncCtx,
 };
 
 /// A device.
@@ -117,13 +117,13 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// Implements `Iterator<Item=DeviceId<C>>` by pulling from provided loopback
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
-pub(crate) struct DevicesIter<'s, BC: NonSyncContext> {
+pub(crate) struct DevicesIter<'s, BC: BindingsContext> {
     pub(super) ethernet:
         alloc::collections::hash_map::Values<'s, EthernetDeviceId<BC>, EthernetPrimaryDeviceId<BC>>,
     pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BC>>,
 }
 
-impl<'s, BC: NonSyncContext> Iterator for DevicesIter<'s, BC> {
+impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
     type Item = DeviceId<BC>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -135,7 +135,7 @@ impl<'s, BC: NonSyncContext> Iterator for DevicesIter<'s, BC> {
     }
 }
 
-impl<I: IpDeviceIpExt, BC: NonSyncContext, L> IpForwardingDeviceContext<I>
+impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I>
     for Locked<&SyncCtx<BC>, L>
 where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
@@ -157,7 +157,7 @@ where
 }
 
 /// Gets the routing metric for the device.
-pub fn get_routing_metric<BC: NonSyncContext>(
+pub fn get_routing_metric<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device_id: &DeviceId<BC>,
 ) -> RawMetric {
@@ -169,7 +169,7 @@ pub fn get_routing_metric<BC: NonSyncContext>(
 }
 
 /// Visitor for NUD state.
-pub trait NeighborVisitor<BC: NonSyncContext, T: Instant> {
+pub trait NeighborVisitor<BC: BindingsContext, T: Instant> {
     /// Performs a user-defined operation over an iterator of neighbor state
     /// describing the neighbors associated with a given `device`.
     ///
@@ -188,7 +188,7 @@ pub trait NeighborVisitor<BC: NonSyncContext, T: Instant> {
 ///
 /// The argument `filter_map` defines a filtering function, so that unneeded
 /// devices are not copied and returned in the snapshot.
-pub(crate) fn snapshot_device_ids<T, BC: NonSyncContext, F: FnMut(DeviceId<BC>) -> Option<T>>(
+pub(crate) fn snapshot_device_ids<T, BC: BindingsContext, F: FnMut(DeviceId<BC>) -> Option<T>>(
     core_ctx: &SyncCtx<BC>,
     filter_map: F,
 ) -> impl IntoIterator<Item = T> {
@@ -203,7 +203,7 @@ pub(crate) fn snapshot_device_ids<T, BC: NonSyncContext, F: FnMut(DeviceId<BC>) 
 /// Provides access to NUD state via a `visitor`.
 pub fn inspect_neighbors<BC, V>(core_ctx: &SyncCtx<BC>, visitor: &V)
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     V: NeighborVisitor<BC, <BC as InstantBindingsTypes>::Instant>,
 {
     let device_ids = snapshot_device_ids(core_ctx, |device| match device {
@@ -227,13 +227,13 @@ where
 }
 
 /// Visitor for Device state.
-pub trait DevicesVisitor<BC: NonSyncContext> {
+pub trait DevicesVisitor<BC: BindingsContext> {
     /// Performs a user-defined operation over an iterator of device state.
     fn visit_devices(&self, devices: impl Iterator<Item = InspectDeviceState<BC>>);
 }
 
 /// The state of a Device, for exporting to Inspect.
-pub struct InspectDeviceState<BC: NonSyncContext> {
+pub struct InspectDeviceState<BC: BindingsContext> {
     /// A strong ID identifying a Device.
     pub device_id: DeviceId<BC>,
 
@@ -242,7 +242,7 @@ pub struct InspectDeviceState<BC: NonSyncContext> {
 }
 
 /// Provides access to Device state via a `visitor`.
-pub fn inspect_devices<BC: NonSyncContext, V: DevicesVisitor<BC>>(
+pub fn inspect_devices<BC: BindingsContext, V: DevicesVisitor<BC>>(
     core_ctx: &SyncCtx<BC>,
     visitor: &V,
 ) {
@@ -311,7 +311,7 @@ impl<BT: DeviceLayerTypes> From<EthernetTimerId<EthernetDeviceId<BT>>> for Devic
 }
 
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     DeviceLayerTimerId<C>,
     EthernetTimerId<EthernetDeviceId<C>>,
     DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id)),
@@ -319,7 +319,7 @@ impl_timer_context!(
 );
 
 /// Handle a timer event firing in the device layer.
-pub(crate) fn handle_timer<BC: NonSyncContext>(
+pub(crate) fn handle_timer<BC: BindingsContext>(
     core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     DeviceLayerTimerId(id): DeviceLayerTimerId<BC>,
@@ -467,7 +467,7 @@ pub struct CommonDeviceCounters {
     pub recv_unsupported_ethertype: Counter,
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for SyncCtx<BC> {
     type Data = DeviceCounters;
     type Guard<'l> = &'l DeviceCounters where Self: 'l;
 
@@ -476,7 +476,7 @@ impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> fo
     }
 }
 
-impl<BC: NonSyncContext, L> CounterContext<DeviceCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
     }
@@ -513,7 +513,9 @@ impl OriginTracker {
     }
 }
 
-impl<BC: DeviceLayerTypes + socket::NonSyncContext<DeviceId<BC>>> DeviceLayerState<BC> {
+impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
+    DeviceLayerState<BC>
+{
     /// Creates a new [`DeviceLayerState`] instance.
     pub(crate) fn new() -> Self {
         Self {
@@ -665,7 +667,7 @@ pub enum DeviceSendFrameError<T> {
 }
 
 /// Sets the TX queue configuration for a device.
-pub fn set_tx_queue_configuration<BC: NonSyncContext>(
+pub fn set_tx_queue_configuration<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -689,7 +691,7 @@ pub fn set_tx_queue_configuration<BC: NonSyncContext>(
 }
 
 /// Does the work of transmitting frames for a device.
-pub fn transmit_queued_tx_frames<BC: NonSyncContext>(
+pub fn transmit_queued_tx_frames<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -717,7 +719,7 @@ pub fn transmit_queued_tx_frames<BC: NonSyncContext>(
 /// handled, the RX task will be scheduled to run again so the next batch of
 /// RX packets may be handled. See [`DeviceLayerEventDispatcher::wake_rx_task`]
 /// for more details.
-pub fn handle_queued_rx_packets<BC: NonSyncContext>(
+pub fn handle_queued_rx_packets<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &LoopbackDeviceId<BC>,
@@ -756,7 +758,7 @@ impl<R> RemoveDeviceResult<R, Never> {
 pub type RemoveDeviceResultWithContext<S, BT> =
     RemoveDeviceResult<S, <BT as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
-fn remove_device<T: DeviceStateSpec, BC: NonSyncContext>(
+fn remove_device<T: DeviceStateSpec, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: BaseDeviceId<T, BC>,
@@ -806,7 +808,7 @@ where
 /// # Panics
 ///
 /// Panics if the caller holds strong device IDs for `device`.
-pub fn remove_ethernet_device<BC: NonSyncContext>(
+pub fn remove_ethernet_device<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: EthernetDeviceId<BC>,
@@ -826,7 +828,7 @@ pub fn remove_ethernet_device<BC: NonSyncContext>(
 /// # Panics
 ///
 /// Panics if the caller holds strong device IDs for `device`.
-pub fn remove_loopback_device<BC: NonSyncContext>(
+pub fn remove_loopback_device<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: LoopbackDeviceId<BC>,
@@ -839,7 +841,7 @@ pub fn remove_loopback_device<BC: NonSyncContext>(
 
 /// Adds a new Ethernet device to the stack.
 pub fn add_ethernet_device_with_state<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     F: FnOnce() -> (BC::EthernetDeviceState, BC::DeviceIdentifier),
 >(
     core_ctx: &SyncCtx<BC>,
@@ -853,7 +855,7 @@ pub fn add_ethernet_device_with_state<
 
 /// Adds a new Ethernet device to the stack.
 #[cfg(any(test, feature = "testutils"))]
-pub(crate) fn add_ethernet_device<BC: NonSyncContext>(
+pub(crate) fn add_ethernet_device<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxEthernetFrameSize,
@@ -872,7 +874,7 @@ where
 /// installed at any point in time, so if there is one already, an error is
 /// returned.
 pub fn add_loopback_device_with_state<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     F: FnOnce() -> (BC::LoopbackDeviceState, BC::DeviceIdentifier),
 >(
     core_ctx: &SyncCtx<BC>,
@@ -889,7 +891,7 @@ pub fn add_loopback_device_with_state<
 /// installed at any point in time, so if there is one already, an error is
 /// returned.
 #[cfg(test)]
-pub(crate) fn add_loopback_device<BC: NonSyncContext>(
+pub(crate) fn add_loopback_device<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     mtu: Mtu,
     metric: RawMetric,
@@ -902,7 +904,7 @@ where
 }
 
 /// Receive a device layer frame from the network.
-pub fn receive_frame<B: BufferMut, BC: NonSyncContext>(
+pub fn receive_frame<B: BufferMut, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &EthernetDeviceId<BC>,
@@ -916,7 +918,7 @@ pub fn receive_frame<B: BufferMut, BC: NonSyncContext>(
 /// Set the promiscuous mode flag on `device`.
 // TODO(rheacock): remove `allow(dead_code)` when this is used.
 #[allow(dead_code)]
-pub(crate) fn set_promiscuous_mode<BC: NonSyncContext>(
+pub(crate) fn set_promiscuous_mode<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -934,7 +936,7 @@ pub(crate) fn set_promiscuous_mode<BC: NonSyncContext>(
 }
 
 /// Get all IPv4 and IPv6 address/subnet pairs configured on a device
-pub fn get_all_ip_addr_subnets<BC: NonSyncContext>(
+pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Vec<AddrSubnetEither> {
@@ -945,7 +947,7 @@ pub fn get_all_ip_addr_subnets<BC: NonSyncContext>(
 ///
 /// For IPv6, this function also joins the solicited-node multicast group and
 /// begins performing Duplicate Address Detection (DAD).
-pub fn add_ip_addr_subnet<BC: NonSyncContext>(
+pub fn add_ip_addr_subnet<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -982,7 +984,7 @@ pub fn add_ip_addr_subnet<BC: NonSyncContext>(
 }
 
 /// Sets properties on an IP address.
-pub fn set_ip_addr_properties<BC: NonSyncContext, A: IpAddress>(
+pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1015,7 +1017,7 @@ pub fn set_ip_addr_properties<BC: NonSyncContext, A: IpAddress>(
 }
 
 /// Delete an IP address on a device.
-pub fn del_ip_addr<BC: NonSyncContext>(
+pub fn del_ip_addr<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1055,7 +1057,7 @@ fn validate_ipv6_neighbor_addr(addr: Ipv6Addr) -> Option<UnicastAddr<Ipv6Addr>> 
 }
 
 /// Inserts a static neighbor entry for a neighbor.
-pub fn insert_static_neighbor_entry<I: Ip, BC: NonSyncContext>(
+pub fn insert_static_neighbor_entry<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1093,7 +1095,7 @@ pub fn insert_static_neighbor_entry<I: Ip, BC: NonSyncContext>(
 ///
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
-pub(crate) fn insert_static_arp_table_entry<BC: NonSyncContext>(
+pub(crate) fn insert_static_arp_table_entry<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1117,7 +1119,7 @@ pub(crate) fn insert_static_arp_table_entry<BC: NonSyncContext>(
 ///
 /// This will cause any conflicting dynamic entry to be removed, and NDP
 /// messages about `addr` to be ignored.
-pub(crate) fn insert_static_ndp_table_entry<BC: NonSyncContext>(
+pub(crate) fn insert_static_ndp_table_entry<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1138,7 +1140,7 @@ pub(crate) fn insert_static_ndp_table_entry<BC: NonSyncContext>(
 }
 
 /// Remove a static or dynamic neighbor table entry.
-pub fn remove_neighbor_table_entry<I: Ip, BC: NonSyncContext>(
+pub fn remove_neighbor_table_entry<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1186,7 +1188,7 @@ pub fn remove_neighbor_table_entry<I: Ip, BC: NonSyncContext>(
 }
 
 /// Flush neighbor table entries.
-pub fn flush_neighbor_table<I: Ip, BC: NonSyncContext>(
+pub fn flush_neighbor_table<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1218,7 +1220,7 @@ pub fn flush_neighbor_table<I: Ip, BC: NonSyncContext>(
 }
 
 /// Gets the IPv4 configuration and flags for a `device`.
-pub fn get_ipv4_configuration_and_flags<BC: NonSyncContext>(
+pub fn get_ipv4_configuration_and_flags<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Ipv4DeviceConfigurationAndFlags {
@@ -1226,7 +1228,7 @@ pub fn get_ipv4_configuration_and_flags<BC: NonSyncContext>(
 }
 
 /// Gets the IPv6 configuration and flags for a `device`.
-pub fn get_ipv6_configuration_and_flags<BC: NonSyncContext>(
+pub fn get_ipv6_configuration_and_flags<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Ipv6DeviceConfigurationAndFlags {
@@ -1246,7 +1248,7 @@ pub fn get_ipv6_configuration_and_flags<BC: NonSyncContext>(
 ///
 /// This function returns a [`PendingIpv4DeviceConfigurationUpdate`] which is validated
 /// and its `apply` method can be called to apply the configuration.
-pub fn new_ipv4_configuration_update<'a, BC: NonSyncContext>(
+pub fn new_ipv4_configuration_update<'a, BC: BindingsContext>(
     device: &'a DeviceId<BC>,
     config: Ipv4DeviceConfigurationUpdate,
 ) -> Result<
@@ -1269,7 +1271,7 @@ pub fn new_ipv4_configuration_update<'a, BC: NonSyncContext>(
 ///
 /// This function returns a [`PendingIpv6DeviceConfigurationUpdate`] which is validated
 /// and its `apply` method can be called to apply the configuration.
-pub fn new_ipv6_configuration_update<'a, BC: NonSyncContext>(
+pub fn new_ipv6_configuration_update<'a, BC: BindingsContext>(
     device: &'a DeviceId<BC>,
     config: Ipv6DeviceConfigurationUpdate,
 ) -> Result<
@@ -1334,7 +1336,7 @@ pub(crate) mod testutil {
 
     /// Calls [`receive_frame`], with a [`Ctx`].
     #[cfg(test)]
-    pub(crate) fn receive_frame<B: BufferMut, BC: NonSyncContext>(
+    pub(crate) fn receive_frame<B: BufferMut, BC: BindingsContext>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<BC>,
         device: EthernetDeviceId<BC>,
         buffer: B,
@@ -1342,7 +1344,7 @@ pub(crate) mod testutil {
         crate::device::receive_frame(sync_ctx, non_sync_ctx, &device, buffer)
     }
 
-    pub fn enable_device<BC: NonSyncContext>(
+    pub fn enable_device<BC: BindingsContext>(
         core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -1367,7 +1369,7 @@ pub(crate) mod testutil {
 
     /// Enables or disables IP packet routing on `device`.
     #[cfg(test)]
-    pub(crate) fn set_forwarding_enabled<BC: NonSyncContext, I: Ip>(
+    pub(crate) fn set_forwarding_enabled<BC: BindingsContext, I: Ip>(
         core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -1405,7 +1407,7 @@ pub(crate) mod testutil {
 
     /// Returns whether IP packet routing is enabled on `device`.
     #[cfg(test)]
-    pub(crate) fn is_forwarding_enabled<BC: NonSyncContext, I: Ip>(
+    pub(crate) fn is_forwarding_enabled<BC: BindingsContext, I: Ip>(
         core_ctx: &SyncCtx<BC>,
         device: &DeviceId<BC>,
     ) -> bool {
@@ -1450,7 +1452,7 @@ pub(crate) mod testutil {
     }
 
     /// A shortcut to update IPv4 configuration in a single call.
-    pub fn update_ipv4_configuration<BC: crate::NonSyncContext>(
+    pub fn update_ipv4_configuration<BC: crate::BindingsContext>(
         core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -1461,7 +1463,7 @@ pub(crate) mod testutil {
     }
 
     /// A shortcut to update IPv6 configuration in a single call.
-    pub fn update_ipv6_configuration<BC: crate::NonSyncContext>(
+    pub fn update_ipv6_configuration<BC: crate::BindingsContext>(
         core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,

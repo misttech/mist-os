@@ -72,7 +72,7 @@ use netstack3_core::{
     },
     error::NetstackError,
     handle_timer,
-    icmp::{self, IcmpBindingsContext},
+    icmp::{self, IcmpEchoBindingsContext},
     ip::{
         AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent, IpExt,
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
@@ -81,14 +81,14 @@ use netstack3_core::{
     neighbor,
     routes::RawMetric,
     transport::udp::{self, UdpBindingsContext},
-    EventContext, InstantBindingsTypes, InstantContext, NonSyncContext, RngContext, SyncCtx,
+    BindingsContext, EventContext, InstantBindingsTypes, InstantContext, RngContext, SyncCtx,
     TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {
     use super::*;
 
-    /// Provides an implementation of [`NonSyncContext`].
+    /// Provides an implementation of [`BindingsContext`].
     pub(crate) struct BindingsNonSyncCtxImpl(Arc<BindingsNonSyncCtxImplInner>);
 
     impl Deref for BindingsNonSyncCtxImpl {
@@ -538,7 +538,7 @@ impl<
         I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
             + icmp::IcmpIpExt
             + IpExt,
-    > IcmpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
+    > IcmpEchoBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
@@ -801,7 +801,7 @@ impl BindingsNonSyncCtxImpl {
     }
 }
 
-fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
+fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,

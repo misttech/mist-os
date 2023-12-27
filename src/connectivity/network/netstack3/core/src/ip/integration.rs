@@ -12,18 +12,18 @@ use net_types::{
 
 use crate::{
     ip::{
-        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
+        device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::{FragmentStateContext, IpPacketFragmentCache},
         MulticastMembershipHandler,
     },
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 impl<I, BC, L> FragmentStateContext<I, BC::Instant> for Locked<&SyncCtx<BC>, L>
 where
     I: Ip,
-    BC: NonSyncContext,
+    BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateFragmentCache<I>>,
 {
     fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, BC::Instant>) -> O>(
@@ -35,7 +35,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
     PmtuStateContext<Ipv4, BC::Instant> for Locked<&SyncCtx<BC>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, BC::Instant>) -> O>(&mut self, cb: F) -> O {
@@ -44,7 +44,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ip
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
     PmtuStateContext<Ipv6, BC::Instant> for Locked<&SyncCtx<BC>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, BC::Instant>) -> O>(&mut self, cb: F) -> O {
@@ -55,7 +55,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ip
 
 impl<
         I: Ip + IpDeviceIpExt,
-        BC: NonSyncContext + IpDeviceNonSyncContext<I, Self::DeviceId>,
+        BC: BindingsContext + IpDeviceBindingsContext<I, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, BC> for Locked<&SyncCtx<BC>, L>
 where

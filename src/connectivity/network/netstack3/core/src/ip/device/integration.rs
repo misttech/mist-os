@@ -51,7 +51,7 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
-            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext,
+            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceBindingsContext, IpDeviceIpExt,
             IpDeviceSendContext, IpDeviceStateContext,
         },
         gmp::{
@@ -65,12 +65,12 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 use super::state::Ipv6NetworkLearnedParameters;
 
-pub(crate) struct SlaacAddrs<'a, BC: NonSyncContext> {
+pub(crate) struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) sync_ctx: SyncCtxWithIpDeviceConfiguration<
         'a,
         &'a Ipv6DeviceConfiguration,
@@ -87,13 +87,13 @@ pub(crate) struct SlaacAddrs<'a, BC: NonSyncContext> {
     pub(crate) _marker: PhantomData<BC>,
 }
 
-impl<'a, BC: NonSyncContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, BC> {
+impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, BC> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
         cb(self.sync_ctx.sync_ctx.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
 }
 
-impl<'a, BC: NonSyncContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
+impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, BC::Instant>)>(&mut self, mut cb: F) {
         let SlaacAddrs { sync_ctx, device_id, config: _, _marker } = self;
         let SyncCtxWithIpDeviceConfiguration { config: _, sync_ctx } = sync_ctx;
@@ -229,7 +229,7 @@ impl<'a, BC: NonSyncContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_igmp_state<
@@ -247,8 +247,8 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>> MldStateContext<BC>
-    for Locked<&SyncCtx<BC>, L>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
+    MldStateContext<BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_mld_state<
         O,
@@ -330,7 +330,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     ip::IpDeviceStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
@@ -366,7 +366,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
     ip::IpDeviceContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -413,7 +413,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurati
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     ip::IpDeviceStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
@@ -463,7 +463,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
     ip::IpDeviceContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -543,7 +543,7 @@ fn assignment_state_v4<
 }
 
 fn assignment_state_v6<
-    BC: IpDeviceNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: device::Ipv6DeviceContext<BC> + GmpQueryHandler<Ipv6, BC>,
 >(
     core_ctx: &mut CC,
@@ -575,12 +575,12 @@ fn assignment_state_v6<
         AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
     }
 }
-pub(crate) struct SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC: NonSyncContext> {
+pub(crate) struct SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> {
     pub config: Config,
     pub sync_ctx: Locked<&'a SyncCtx<BC>, L>,
 }
 
-impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: NonSyncContext>
+impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
     device::WithIpDeviceConfigurationMutInner<I, BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
@@ -630,7 +630,7 @@ where
     }
 }
 
-impl<'a, BC: NonSyncContext> device::WithIpv6DeviceConfigurationMutInner<BC>
+impl<'a, BC: BindingsContext> device::WithIpv6DeviceConfigurationMutInner<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         &mut Ipv6DeviceConfiguration,
@@ -660,7 +660,7 @@ where
     }
 }
 
-impl<'a, Config, BC: NonSyncContext, L> DeviceIdContext<AnyDevice>
+impl<'a, Config, BC: BindingsContext, L> DeviceIdContext<AnyDevice>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     type DeviceId = <Locked<&'a SyncCtx<BC>, L> as DeviceIdContext<AnyDevice>>::DeviceId;
@@ -685,7 +685,7 @@ impl<'a, Config, BC: NonSyncContext, L> DeviceIdContext<AnyDevice>
     }
 }
 
-impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> SlaacContext<BC>
+impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -741,7 +741,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> SlaacConte
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadAddressContext<BC>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadAddressContext<BC>
     for SyncCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
 {
     fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
@@ -793,7 +793,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> Dad
     }
 }
 
-impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> DadContext<BC>
+impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> DadContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -896,7 +896,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> DadContext
     }
 }
 
-impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> RsContext<BC>
+impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -985,7 +985,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: NonSyncContext> RsContext<
     }
 }
 
-impl<BC: NonSyncContext> Ipv6DiscoveredRoutesContext<BC>
+impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
     for Locked<&SyncCtx<BC>, crate::lock_ordering::Ipv6DeviceRouteDiscovery>
 {
     fn add_discovered_ipv6_route(
@@ -1036,7 +1036,7 @@ impl<BC: NonSyncContext> Ipv6DiscoveredRoutesContext<BC>
     }
 }
 
-impl<'a, Config, BC: NonSyncContext> Ipv6RouteDiscoveryContext<BC>
+impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -1082,7 +1082,7 @@ impl<'a, Config, BC: NonSyncContext> Ipv6RouteDiscoveryContext<BC>
     }
 }
 
-impl<'a, Config, BC: NonSyncContext> device::Ipv6DeviceContext<BC>
+impl<'a, Config, BC: BindingsContext> device::Ipv6DeviceContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -1129,7 +1129,7 @@ impl<'a, Config, BC: NonSyncContext> device::Ipv6DeviceContext<BC>
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, L, BC: NonSyncContext> device::IpDeviceAddressIdContext<I>
+impl<'a, Config, I: IpDeviceIpExt, L, BC: BindingsContext> device::IpDeviceAddressIdContext<I>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
     Locked<&'a SyncCtx<BC>, L>: device::IpDeviceAddressIdContext<I>,
@@ -1137,7 +1137,7 @@ where
     type AddressId = <Locked<&'a SyncCtx<BC>, L> as device::IpDeviceAddressIdContext<I>>::AddressId;
 }
 
-impl<'a, Config, I: IpDeviceIpExt, BC: NonSyncContext, L> device::IpDeviceAddressContext<I, BC>
+impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> device::IpDeviceAddressContext<I, BC>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
     Locked<&'a SyncCtx<BC>, L>: device::IpDeviceAddressContext<I, BC>,
@@ -1167,7 +1167,7 @@ where
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, BC: NonSyncContext, L> device::IpDeviceStateContext<I, BC>
+impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> device::IpDeviceStateContext<I, BC>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
     Locked<&'a SyncCtx<BC>, L>: device::IpDeviceStateContext<I, BC>,
@@ -1276,7 +1276,7 @@ where
     }
 }
 
-impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: NonSyncContext> IgmpContext<BC>
+impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpContext<BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -1318,7 +1318,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: NonSyncContext> IgmpContex
     }
 }
 
-impl<'a, Config, BC: NonSyncContext>
+impl<'a, Config, BC: BindingsContext>
     SendFrameContext<BC, IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
@@ -1351,7 +1351,7 @@ impl<'a, Config, BC: NonSyncContext>
 impl<
         'a,
         Config: Borrow<Ipv6DeviceConfiguration>,
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
     > MldContext<BC> for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
@@ -1407,7 +1407,7 @@ impl<
     }
 }
 
-impl<'a, Config, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<'a, Config, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     SendFrameContext<BC, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
@@ -1432,7 +1432,7 @@ impl<'a, Config, BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, BC: NonSyncContext> NudIpHandler<I, BC>
+impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext> NudIpHandler<I, BC>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,

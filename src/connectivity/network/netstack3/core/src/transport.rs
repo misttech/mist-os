@@ -75,7 +75,7 @@ use crate::{
         tcp::TcpState,
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
-    BindingsTypes, NonSyncContext, SyncCtx,
+    BindingsContext, BindingsTypes, SyncCtx,
 };
 
 /// A builder for transport layer state.
@@ -91,7 +91,7 @@ impl TransportStateBuilder {
         &mut self.udp
     }
 
-    pub(crate) fn build_with_ctx<BC: NonSyncContext>(
+    pub(crate) fn build_with_ctx<BC: BindingsContext>(
         self,
         bindings_ctx: &mut BC,
     ) -> TransportLayerState<BC> {
@@ -124,7 +124,7 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<BC> {
     type Data = udp::BoundSockets<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
@@ -137,7 +137,7 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for 
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for SyncCtx<BC> {
     type Data = udp::BoundSockets<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
@@ -150,7 +150,7 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for 
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for SyncCtx<BC> {
     type Data = udp::SocketsState<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
@@ -163,7 +163,7 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> 
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for SyncCtx<BC> {
     type Data = udp::SocketsState<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
@@ -185,12 +185,12 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> 
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) enum TransportLayerTimerId<BC: crate::NonSyncContext> {
+pub(crate) enum TransportLayerTimerId<BC: crate::BindingsContext> {
     Tcp(tcp::socket::TimerId<WeakDeviceId<BC>, BC>),
 }
 
 /// Handle a timer event firing in the transport layer.
-pub(crate) fn handle_timer<BC: NonSyncContext>(
+pub(crate) fn handle_timer<BC: BindingsContext>(
     core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     id: TransportLayerTimerId<BC>,
@@ -200,7 +200,7 @@ pub(crate) fn handle_timer<BC: NonSyncContext>(
     }
 }
 
-impl<BC: crate::NonSyncContext> From<tcp::socket::TimerId<WeakDeviceId<BC>, BC>>
+impl<BC: crate::BindingsContext> From<tcp::socket::TimerId<WeakDeviceId<BC>, BC>>
     for TransportLayerTimerId<BC>
 {
     fn from(id: tcp::socket::TimerId<WeakDeviceId<BC>, BC>) -> Self {
@@ -209,7 +209,7 @@ impl<BC: crate::NonSyncContext> From<tcp::socket::TimerId<WeakDeviceId<BC>, BC>>
 }
 
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TransportLayerTimerId<C>,
     tcp::socket::TimerId<WeakDeviceId<C>, C>,
     TransportLayerTimerId::Tcp(id),

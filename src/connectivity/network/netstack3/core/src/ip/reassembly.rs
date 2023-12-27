@@ -94,17 +94,17 @@ pub(super) trait FragmentStateContext<I: Ip, Instant> {
     ) -> O;
 }
 
-/// The non-synchronized execution context for IP packet fragment reassembly.
-trait FragmentNonSyncContext<I: Ip>: TimerContext<FragmentCacheKey<I::Addr>> {}
-impl<I: Ip, BC: TimerContext<FragmentCacheKey<I::Addr>>> FragmentNonSyncContext<I> for BC {}
+/// The bindings execution context for IP packet fragment reassembly.
+trait FragmentBindingsContext<I: Ip>: TimerContext<FragmentCacheKey<I::Addr>> {}
+impl<I: Ip, BC: TimerContext<FragmentCacheKey<I::Addr>>> FragmentBindingsContext<I> for BC {}
 
 /// The execution context for IP packet fragment reassembly.
-trait FragmentContext<I: Ip, BC: FragmentNonSyncContext<I>>:
+trait FragmentContext<I: Ip, BC: FragmentBindingsContext<I>>:
     FragmentStateContext<I, BC::Instant>
 {
 }
 
-impl<I: Ip, BC: FragmentNonSyncContext<I>, CC: FragmentStateContext<I, BC::Instant>>
+impl<I: Ip, BC: FragmentBindingsContext<I>, CC: FragmentStateContext<I, BC::Instant>>
     FragmentContext<I, BC> for CC
 {
 }
@@ -149,7 +149,7 @@ pub(crate) trait FragmentHandler<I: IpExt, BC> {
     ) -> Result<I::Packet<B>, FragmentReassemblyError>;
 }
 
-impl<I: IpExt, BC: FragmentNonSyncContext<I>, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
+impl<I: IpExt, BC: FragmentBindingsContext<I>, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
     for CC
 {
     fn process_fragment<B: ByteSlice>(
@@ -203,8 +203,11 @@ impl<I: IpExt, BC: FragmentNonSyncContext<I>, CC: FragmentContext<I, BC>> Fragme
     }
 }
 
-impl<A: IpAddress, BC: FragmentNonSyncContext<A::Version>, CC: FragmentContext<A::Version, BC>>
-    TimerHandler<BC, FragmentCacheKey<A>> for CC
+impl<
+        A: IpAddress,
+        BC: FragmentBindingsContext<A::Version>,
+        CC: FragmentContext<A::Version, BC>,
+    > TimerHandler<BC, FragmentCacheKey<A>> for CC
 where
     A::Version: IpExt,
 {
@@ -923,7 +926,7 @@ mod tests {
     fn process_ip_fragment<
         I: TestIpExt,
         CC: FragmentContext<I, BC>,
-        BC: FragmentNonSyncContext<I>,
+        BC: FragmentBindingsContext<I>,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -945,7 +948,7 @@ mod tests {
     /// Generates and processes an IPv4 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv4_fragment<CC: FragmentContext<Ipv4, BC>, BC: FragmentNonSyncContext<Ipv4>>(
+    fn process_ipv4_fragment<CC: FragmentContext<Ipv4, BC>, BC: FragmentBindingsContext<Ipv4>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         fragment_id: u16,
@@ -997,7 +1000,7 @@ mod tests {
     /// Generates and processes an IPv6 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv6_fragment<CC: FragmentContext<Ipv6, BC>, BC: FragmentNonSyncContext<Ipv6>>(
+    fn process_ipv6_fragment<CC: FragmentContext<Ipv6, BC>, BC: FragmentBindingsContext<Ipv6>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         fragment_id: u16,
@@ -1058,7 +1061,7 @@ mod tests {
     trait TestIpExt: crate::testutil::TestIpExt {
         const HEADER_LENGTH: usize;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1071,7 +1074,7 @@ mod tests {
     impl TestIpExt for Ipv4 {
         const HEADER_LENGTH: usize = packet_formats::ipv4::HDR_PREFIX_LEN;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1092,7 +1095,7 @@ mod tests {
     impl TestIpExt for Ipv6 {
         const HEADER_LENGTH: usize = packet_formats::ipv6::IPV6_FIXED_HDR_LEN;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentNonSyncContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1115,7 +1118,7 @@ mod tests {
     fn try_reassemble_ip_packet<
         I: TestIpExt,
         CC: FragmentContext<I, BC>,
-        BC: FragmentNonSyncContext<I>,
+        BC: FragmentBindingsContext<I>,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,

@@ -35,7 +35,7 @@ use crate::{
     device::{AnyDevice, DeviceIdContext, Id},
     error::{ExistsError, NotFoundError},
     ip::device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-    Instant, NonSyncContext, SyncCtx,
+    BindingsContext, Instant, SyncCtx,
 };
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
@@ -164,7 +164,7 @@ pub(super) struct SlaacAddrsMutAndConfig<'a, BC: InstantContext, A: SlaacAddress
 }
 
 /// The execution context for SLAAC.
-pub(super) trait SlaacContext<BC: SlaacNonSyncContext<Self::DeviceId>>:
+pub(super) trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     type SlaacAddrs<'a>: SlaacAddresses<BC> + CounterContext<SlaacCounters> + 'a;
@@ -204,7 +204,7 @@ pub(crate) struct SlaacCounters {
     pub(crate) generated_slaac_addr_exists: Counter,
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for SyncCtx<BC> {
     type Data = SlaacCounters;
     type Guard<'l> = &'l SlaacCounters where Self: 'l;
 
@@ -213,7 +213,7 @@ impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for
     }
 }
 
-impl<BC: NonSyncContext, L> CounterContext<SlaacCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<SlaacCounters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
@@ -249,12 +249,12 @@ fn update_slaac_addr_valid_until<I: Instant>(
     };
 }
 
-/// The non-synchronized execution context for SLAAC.
-pub(super) trait SlaacNonSyncContext<DeviceId>:
+/// The bindings execution context for SLAAC.
+pub(super) trait SlaacBindingsContext<DeviceId>:
     RngContext + TimerContext<SlaacTimerId<DeviceId>>
 {
 }
-impl<DeviceId, BC: RngContext + TimerContext<SlaacTimerId<DeviceId>>> SlaacNonSyncContext<DeviceId>
+impl<DeviceId, BC: RngContext + TimerContext<SlaacTimerId<DeviceId>>> SlaacBindingsContext<DeviceId>
     for BC
 {
 }
@@ -295,7 +295,7 @@ pub(crate) trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
     fn remove_all_slaac_addresses(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<BC: SlaacNonSyncContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
+impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
     fn apply_slaac_update(
         &mut self,
         bindings_ctx: &mut BC,
@@ -549,7 +549,7 @@ impl<BC: SlaacNonSyncContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<B
     }
 }
 
-fn apply_slaac_update_to_addr<D: Id, BC: SlaacNonSyncContext<D>>(
+fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext<D>>(
     address_entry: SlaacAddressEntryMut<'_, BC::Instant>,
     subnet: Subnet<Ipv6Addr>,
     device_id: &D,
@@ -874,7 +874,7 @@ fn apply_slaac_update_to_addr<D: Id, BC: SlaacNonSyncContext<D>>(
     ControlFlow::Continue(slaac_type)
 }
 
-impl<BC: SlaacNonSyncContext<CC::DeviceId>, CC: SlaacContext<BC>>
+impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>
     TimerHandler<BC, SlaacTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
@@ -1095,7 +1095,7 @@ fn desync_factor<R: RngCore>(
     })
 }
 
-fn regenerate_temporary_slaac_addr<BC: SlaacNonSyncContext<CC::DeviceId>, CC: SlaacContext<BC>>(
+fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -1361,7 +1361,7 @@ fn generate_global_temporary_address(
     address
 }
 
-fn add_slaac_addr_sub<BC: SlaacNonSyncContext<CC::DeviceId>, CC: SlaacContext<BC>>(
+fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     slaac_addrs: &mut CC::SlaacAddrs<'_>,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,

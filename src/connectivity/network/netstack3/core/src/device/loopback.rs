@@ -29,14 +29,14 @@ use crate::{
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
         queue::{
             rx::{
-                ReceiveDequeContext, ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueContext,
-                ReceiveQueueHandler, ReceiveQueueNonSyncContext, ReceiveQueueState,
-                ReceiveQueueTypes,
+                ReceiveDequeContext, ReceiveDequeFrameContext, ReceiveQueue,
+                ReceiveQueueBindingsContext, ReceiveQueueContext, ReceiveQueueHandler,
+                ReceiveQueueState, ReceiveQueueTypes,
             },
             tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue, TransmitQueueCommon,
-                TransmitQueueContext, TransmitQueueHandler, TransmitQueueNonSyncContext,
-                TransmitQueueState,
+                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue,
+                TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext,
+                TransmitQueueHandler, TransmitQueueState,
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
@@ -49,7 +49,7 @@ use crate::{
         DeviceSendFrameError, FrameDestination,
     },
     ip::types::RawMetric,
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 /// The MAC address corresponding to the loopback interface.
@@ -86,7 +86,7 @@ impl DeviceStateSpec for LoopbackDevice {
     const DEBUG_TYPE: &'static str = "Loopback";
 }
 
-impl<BC: NonSyncContext, L> DeviceIdContext<LoopbackDevice> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for Locked<&SyncCtx<BC>, L> {
     type DeviceId = LoopbackDeviceId<BC>;
     type WeakDeviceId = LoopbackWeakDeviceId<BC>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -120,7 +120,7 @@ impl LoopbackDeviceState {
     }
 }
 
-impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
+impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
     for IpLinkDeviceState<LoopbackDevice, BC>
 {
     type Data = ReceiveQueueState<(), Buf<Vec<u8>>>;
@@ -132,7 +132,7 @@ impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
     }
 }
 
-impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
+impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
     for IpLinkDeviceState<LoopbackDevice, BC>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
@@ -144,7 +144,7 @@ impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
     }
 }
 
-impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
+impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
     for IpLinkDeviceState<LoopbackDevice, BC>
 {
     type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
@@ -156,7 +156,7 @@ impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
     }
 }
 
-impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
+impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
     for IpLinkDeviceState<LoopbackDevice, BC>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
@@ -168,7 +168,7 @@ impl<BC: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<LoopbackDevice, BC>
 {
     type Data = HeldDeviceSockets<BC>;
@@ -186,7 +186,7 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     SendFrameContext<BC, DeviceSocketMetadata<LoopbackDeviceId<BC>>> for Locked<&SyncCtx<BC>, L>
 {
     fn send_frame<S>(
@@ -222,7 +222,7 @@ pub(super) fn send_ip_frame<BC, A, S, L>(
     packet: S,
 ) -> Result<(), S>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     A: IpAddress,
     S: Serializer,
     S::Buffer: BufferMut,
@@ -248,7 +248,7 @@ fn send_as_ethernet_frame_to_dst<BC, S, L>(
     dst_mac: Mac,
 ) -> Result<(), S>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     S: Serializer,
     S::Buffer: BufferMut,
     L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
@@ -280,7 +280,7 @@ where
     L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: NonSyncContext,
+    BC: BindingsContext,
 {
     core_ctx.with_counters(|counters: &DeviceCounters| {
         counters.loopback.common.send_total_frames.increment();
@@ -317,7 +317,7 @@ where
 }
 
 /// Get the routing metric associated with this device.
-pub(super) fn get_routing_metric<BC: NonSyncContext, L>(
+pub(super) fn get_routing_metric<BC: BindingsContext, L>(
     core_ctx: &mut Locked<&SyncCtx<BC>, L>,
     device_id: &LoopbackDeviceId<BC>,
 ) -> RawMetric {
@@ -327,7 +327,7 @@ pub(super) fn get_routing_metric<BC: NonSyncContext, L>(
 }
 
 /// Gets the MTU associated with this device.
-pub(super) fn get_mtu<BC: NonSyncContext, L>(
+pub(super) fn get_mtu<BC: BindingsContext, L>(
     core_ctx: &mut Locked<&SyncCtx<BC>, L>,
     device_id: &LoopbackDeviceId<BC>,
 ) -> Mtu {
@@ -336,20 +336,20 @@ pub(super) fn get_mtu<BC: NonSyncContext, L>(
     })
 }
 
-impl<BC: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<BC>> for BC {
+impl<BC: BindingsContext> ReceiveQueueBindingsContext<LoopbackDevice, LoopbackDeviceId<BC>> for BC {
     fn wake_rx_task(&mut self, device_id: &LoopbackDeviceId<BC>) {
         DeviceLayerEventDispatcher::wake_rx_task(self, device_id)
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueTypes<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type Meta = ();
     type Buffer = Buf<Vec<u8>>;
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_receive_queue_mut<
@@ -367,7 +367,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     }
 }
 
-impl<BC: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
+impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
     for Locked<&SyncCtx<BC>, crate::lock_ordering::LoopbackRxDequeue>
 {
     fn handle_frame(
@@ -449,7 +449,7 @@ impl<BC: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
     ReceiveDequeContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type ReceiveQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::LoopbackRxDequeue>;
@@ -474,13 +474,15 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
     }
 }
 
-impl<BC: NonSyncContext> TransmitQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<BC>> for BC {
+impl<BC: BindingsContext> TransmitQueueBindingsContext<LoopbackDevice, LoopbackDeviceId<BC>>
+    for BC
+{
     fn wake_tx_task(&mut self, device_id: &LoopbackDeviceId<BC>) {
         DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     TransmitQueueCommon<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type Meta = ();
@@ -492,7 +494,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     TransmitQueueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_transmit_queue_mut<
@@ -536,7 +538,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
     TransmitDequeueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
 {
     type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::LoopbackTxDequeue>;

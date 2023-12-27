@@ -15,7 +15,7 @@ use crate::{
         IpCounters, Ipv4State, Ipv6State,
     },
     transport::{self, udp::UdpCounters, TransportLayerState},
-    BindingsTypes, NonSyncContext,
+    BindingsContext, BindingsTypes,
 };
 
 /// A builder for [`StackState`].
@@ -40,7 +40,7 @@ impl StackStateBuilder {
     }
 
     /// Consume this builder and produce a `StackState`.
-    pub(crate) fn build_with_ctx<BC: NonSyncContext>(
+    pub(crate) fn build_with_ctx<BC: BindingsContext>(
         self,
         bindings_ctx: &mut BC,
     ) -> StackState<BC> {

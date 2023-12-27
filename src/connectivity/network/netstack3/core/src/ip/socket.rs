@@ -390,15 +390,15 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // the caller. We will still need to have a separate enforcement mechanism for
 // raw IP sockets once we support those.
 
-/// The non-synchronized execution context for IP sockets.
-pub(crate) trait IpSocketNonSyncContext: InstantContext + TracingContext {}
-impl<BC: InstantContext + TracingContext> IpSocketNonSyncContext for BC {}
+/// The bindings execution context for IP sockets.
+pub(crate) trait IpSocketBindingsContext: InstantContext + TracingContext {}
+impl<BC: InstantContext + TracingContext> IpSocketBindingsContext for BC {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub(crate) trait IpSocketContext<I, BC: IpSocketNonSyncContext>:
+pub(crate) trait IpSocketContext<I, BC: IpSocketBindingsContext>:
     DeviceIdContext<AnyDevice>
 where
     I: IpDeviceStateIpExt + IpExt,
@@ -429,7 +429,7 @@ where
 
 impl<
         I: Ip + IpExt + IpDeviceStateIpExt,
-        BC: IpSocketNonSyncContext,
+        BC: IpSocketBindingsContext,
         CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
     > IpSocketHandler<I, BC> for CC
 {
@@ -549,7 +549,7 @@ where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: IpSocketNonSyncContext,
+    BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
     O: SendOptions<I>,
 {
@@ -601,7 +601,7 @@ where
 
 impl<
         I: IpLayerIpExt + IpDeviceStateIpExt,
-        BC: IpSocketNonSyncContext,
+        BC: IpSocketBindingsContext,
         CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + NonTestCtxMarker,
     > DeviceIpSocketHandler<I, BC> for CC
 {
@@ -1558,7 +1558,7 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt + IpExt,
             DeviceId: FakeStrongDeviceId,
-            BC: IpSocketNonSyncContext,
+            BC: IpSocketBindingsContext,
         > IpSocketContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn lookup_route(
@@ -1795,8 +1795,9 @@ mod tests {
         device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{
+                IpDeviceBindingsContext,
                 IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext, IpDeviceEvent,
-                IpDeviceIpExt, IpDeviceNonSyncContext,
+                IpDeviceIpExt,
             },
             types::{AddableEntryEither, AddableMetric, RawMetric},
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
@@ -1866,7 +1867,7 @@ mod tests {
                 FakeNonSyncCtx,
                 DeviceId = DeviceId<FakeNonSyncCtx>,
             >,
-        FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
+        FakeNonSyncCtx: IpDeviceBindingsContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
         let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
             &mut Locked::new(core_ctx),

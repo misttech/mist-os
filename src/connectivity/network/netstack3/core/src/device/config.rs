@@ -10,7 +10,7 @@ use net_types::ip::{Ipv4, Ipv6};
 use crate::{
     device::{id::Id as _, DeviceId},
     ip::device::nud::{NudUserConfig, NudUserConfigUpdate},
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 /// Device ARP configuration.
@@ -84,7 +84,7 @@ pub struct PendingDeviceConfigurationUpdate<'a, D>(DeviceConfigurationUpdate, &'
 
 impl<'a, BC> PendingDeviceConfigurationUpdate<'a, DeviceId<BC>>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
 {
     /// Applies the configuration and returns a [`DeviceConfigurationUpdate`]
     /// with the previous values for all configurations for all `Some` fields.
@@ -131,7 +131,7 @@ where
 }
 
 /// Creates a new device configuration update for the given device.
-pub fn new_device_configuration_update<BC: NonSyncContext>(
+pub fn new_device_configuration_update<BC: BindingsContext>(
     device: &DeviceId<BC>,
     config: DeviceConfigurationUpdate,
 ) -> Result<PendingDeviceConfigurationUpdate<'_, DeviceId<BC>>, DeviceConfigurationUpdateError> {
@@ -148,7 +148,7 @@ pub fn new_device_configuration_update<BC: NonSyncContext>(
 }
 
 /// Returns a snapshot of the given device's configuration.
-pub fn get_device_configuration<BC: NonSyncContext>(
+pub fn get_device_configuration<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device_id: &DeviceId<BC>,
 ) -> DeviceConfiguration {

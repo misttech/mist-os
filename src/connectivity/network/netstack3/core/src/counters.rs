@@ -14,7 +14,7 @@ use crate::{
         IpCounters, Ipv4Counters, Ipv6Counters,
     },
     transport::udp::UdpCounters,
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 /// An atomic counter for packet statistics, e.g. IPv4 packets received.
@@ -77,7 +77,7 @@ pub trait CounterVisitor {
 }
 
 /// Provides access to stack counters via a visitor.
-pub fn inspect_counters<BC: NonSyncContext, V: CounterVisitor>(
+pub fn inspect_counters<BC: BindingsContext, V: CounterVisitor>(
     core_ctx: &SyncCtx<BC>,
     visitor: &V,
 ) {

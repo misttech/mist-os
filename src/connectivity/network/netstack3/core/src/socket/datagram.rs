@@ -1087,8 +1087,8 @@ where
     }
 }
 
-pub(crate) trait DatagramStateNonSyncContext<I: Ip, S>: RngContext {}
-impl<BC: RngContext, I: Ip, S> DatagramStateNonSyncContext<I, S> for BC {}
+pub(crate) trait DatagramStateBindingsContext<I: Ip, S>: RngContext {}
+impl<BC: RngContext, I: Ip, S> DatagramStateBindingsContext<I, S> for BC {}
 
 /// Types and behavior for datagram socket demultiplexing map.
 ///
@@ -1446,7 +1446,7 @@ pub(crate) enum SocketInfo<I: Ip + DualStackIpExt, D, S: DatagramSocketSpec> {
 pub(crate) fn close<
     I: IpExt,
     S: DatagramSocketSpec,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
 >(
     core_ctx: &mut CC,
@@ -1994,7 +1994,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
 pub(crate) fn get_info<
     I: IpExt,
     S: DatagramSocketSpec,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
 >(
     core_ctx: &mut CC,
@@ -2021,7 +2021,7 @@ pub(crate) fn get_info<
 
 pub(crate) fn listen<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -2328,7 +2328,7 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
 
 fn listen_inner<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3282,7 +3282,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
 
 pub(crate) fn connect<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3373,7 +3373,7 @@ pub struct ExpectedUnboundError;
 
 pub(crate) fn disconnect_connected<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3584,7 +3584,7 @@ pub enum ShutdownType {
 
 pub(crate) fn shutdown_connected<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3622,7 +3622,7 @@ pub(crate) fn shutdown_connected<
 
 pub(crate) fn get_shutdown_connected<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3669,7 +3669,7 @@ pub enum SendError<SE> {
 
 pub(crate) fn send_conn<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
@@ -3706,7 +3706,7 @@ pub(crate) fn send_conn<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            BC: DatagramStateNonSyncContext<I, S>,
+            BC: DatagramStateBindingsContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
             CC: DatagramBoundStateContext<I, BC, S>,
         > {
@@ -3802,7 +3802,7 @@ pub enum SendToError<SE> {
 
 pub(crate) fn send_to<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
@@ -3831,7 +3831,7 @@ pub(crate) fn send_to<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            BC: DatagramStateNonSyncContext<I, S>,
+            BC: DatagramStateBindingsContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
             CC: DatagramBoundStateContext<I, BC, S>,
             O: SendOptions<I>,
@@ -4353,7 +4353,7 @@ fn set_bound_device_listener_both_stacks<'a, I: IpExt, D: WeakId, S: DatagramSoc
 
 pub(crate) fn set_device<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -4504,7 +4504,7 @@ pub(crate) fn set_device<
 
 pub(crate) fn get_bound_device<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -4545,7 +4545,7 @@ pub enum SetMulticastMembershipError {
 fn pick_interface_for_addr<
     A: IpAddress,
     S: DatagramSocketSpec,
-    BC: DatagramStateNonSyncContext<A::Version, S>,
+    BC: DatagramStateBindingsContext<A::Version, S>,
     CC: DatagramBoundStateContext<A::Version, BC, S>,
 >(
     core_ctx: &mut CC,
@@ -4612,7 +4612,7 @@ impl<A: IpAddress, D> From<MulticastInterfaceSelector<A, D>>
 /// socket state.
 pub(crate) fn set_multicast_membership<
     I: IpExt,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     CC: DatagramStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -4806,7 +4806,7 @@ where
 pub(crate) fn update_ip_hop_limit<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
@@ -4824,7 +4824,7 @@ pub(crate) fn update_ip_hop_limit<
 pub(crate) fn get_ip_hop_limits<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
@@ -4850,7 +4850,7 @@ pub(crate) fn get_ip_hop_limits<
 pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
     R,
 >(
@@ -4876,7 +4876,7 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
 pub(crate) fn with_other_stack_ip_options<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
     R,
 >(
@@ -4896,7 +4896,7 @@ pub(crate) fn with_other_stack_ip_options<
 pub(crate) fn update_sharing<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec<SharingState = Sharing>,
     Sharing: Clone,
 >(
@@ -4919,7 +4919,7 @@ pub(crate) fn update_sharing<
 pub(crate) fn get_sharing<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec<SharingState = Sharing>,
     Sharing: Clone,
 >(
@@ -4946,7 +4946,7 @@ pub(crate) fn get_sharing<
 pub(crate) fn set_ip_transparent<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
@@ -4961,7 +4961,7 @@ pub(crate) fn set_ip_transparent<
 pub(crate) fn get_ip_transparent<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
-    BC: DatagramStateNonSyncContext<I, S>,
+    BC: DatagramStateBindingsContext<I, S>,
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,

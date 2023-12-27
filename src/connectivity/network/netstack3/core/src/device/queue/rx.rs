@@ -43,8 +43,8 @@ impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
     }
 }
 
-/// The non-synchonized context for the receive queue.
-pub(crate) trait ReceiveQueueNonSyncContext<D: Device, DeviceId> {
+/// The bindings context for the receive queue.
+pub(crate) trait ReceiveQueueBindingsContext<D: Device, DeviceId> {
     /// Wakes up RX task.
     fn wake_rx_task(&mut self, device_id: &DeviceId);
 }
@@ -140,7 +140,7 @@ pub(crate) struct ReceiveQueueApi<CC, BT, D>(Never, PhantomData<(CC, BT, D)>);
 impl<CC, BC, D> ReceiveQueueApi<CC, BC, D>
 where
     D: Device,
-    BC: ReceiveQueueNonSyncContext<D, CC::DeviceId>,
+    BC: ReceiveQueueBindingsContext<D, CC::DeviceId>,
     CC: ReceiveDequeContext<D, BC>,
 {
     /// Handle any queued RX frames.
@@ -177,7 +177,7 @@ where
 
 impl<
         D: Device,
-        BC: ReceiveQueueNonSyncContext<D, CC::DeviceId>,
+        BC: ReceiveQueueBindingsContext<D, CC::DeviceId>,
         CC: ReceiveQueueContext<D, BC>,
     > ReceiveQueueHandler<D, BC> for CC
 {
@@ -230,7 +230,7 @@ mod tests {
     type FakeSyncCtxImpl = FakeSyncCtx<FakeRxQueueState, (), FakeLinkDeviceId>;
     type FakeNonSyncCtxImpl = FakeNonSyncCtx<(), (), FakeRxQueueNonSyncCtxState>;
 
-    impl ReceiveQueueNonSyncContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
+    impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
         fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state_mut().woken_rx_tasks.push(device_id.clone())
         }

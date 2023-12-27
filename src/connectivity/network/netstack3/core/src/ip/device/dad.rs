@@ -129,13 +129,13 @@ pub(super) enum DadEvent<DeviceId> {
     },
 }
 
-/// The non-synchronized execution context for DAD.
-pub(super) trait DadNonSyncContext<DeviceId>:
+/// The bindings execution context for DAD.
+pub(super) trait DadBindingsContext<DeviceId>:
     TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>
 {
 }
 impl<DeviceId, BC: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>>
-    DadNonSyncContext<DeviceId> for BC
+    DadBindingsContext<DeviceId> for BC
 {
 }
 
@@ -171,7 +171,7 @@ enum DoDadVariation {
     Continue,
 }
 
-fn do_duplicate_address_detection<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>>(
+fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -298,7 +298,7 @@ fn do_duplicate_address_detection<BC: DadNonSyncContext<CC::DeviceId>, CC: DadCo
     );
 }
 
-impl<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> for CC {
+impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> for CC {
     fn start_duplicate_address_detection(
         &mut self,
         bindings_ctx: &mut BC,
@@ -357,7 +357,7 @@ impl<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> for
     }
 }
 
-impl<BC: DadNonSyncContext<CC::DeviceId>, CC: DadContext<BC>>
+impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>>
     TimerHandler<BC, DadTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(

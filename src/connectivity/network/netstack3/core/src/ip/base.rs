@@ -53,8 +53,8 @@ use crate::{
     },
     ip::{
         device::{
-            self, slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceIpExt,
-            IpDeviceNonSyncContext, IpDeviceSendContext,
+            self, slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceBindingsContext,
+            IpDeviceIpExt, IpDeviceSendContext,
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp,
@@ -70,14 +70,14 @@ use crate::{
         reassembly::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
-        socket::{IpSocketContext, IpSocketHandler, IpSocketNonSyncContext},
+        socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler},
         types,
         types::{Destination, NextHop, ResolvedRoute},
     },
     socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
-    BindingsTypes, Instant, NonSyncContext, SyncCtx,
+    BindingsContext, BindingsTypes, Instant, SyncCtx,
 };
 
 /// Default IPv4 TTL.
@@ -595,8 +595,8 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
     },
 }
 
-/// The non-synchronized execution context for the IP layer.
-pub(crate) trait IpLayerNonSyncContext<I: Ip, DeviceId>:
+/// The bindings execution context for the IP layer.
+pub(crate) trait IpLayerBindingsContext<I: Ip, DeviceId>:
     InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext
 {
 }
@@ -604,21 +604,21 @@ impl<
         I: Ip,
         DeviceId,
         BC: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
-    > IpLayerNonSyncContext<I, DeviceId> for BC
+    > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
 
 /// The execution context for the IP layer.
 pub(crate) trait IpLayerContext<
     I: IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
+    BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >: IpStateContext<I, BC> + IpDeviceContext<I, BC>
 {
 }
 
 impl<
         I: IpLayerIpExt,
-        BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpStateContext<I, BC> + IpDeviceContext<I, BC>,
     > IpLayerContext<I, BC> for CC
 {
@@ -648,7 +648,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 
 fn is_local_assigned_address<
     I: Ip + IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceStateContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -666,7 +666,7 @@ fn is_local_assigned_address<
 // `None`.
 fn get_local_addr<
     I: Ip + IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceStateContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -704,7 +704,7 @@ pub enum ResolveRouteError {
 // over a device with the address assigned.
 fn resolve_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
-    BC: IpDeviceNonSyncContext<I, CC::DeviceId> + IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC>
         + device::IpDeviceConfigurationContext<I, BC>
         + IpDeviceStateContext<I, BC>
@@ -825,9 +825,9 @@ fn resolve_route_to_destination<
 
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
-        BC: IpDeviceNonSyncContext<I, CC::DeviceId>
-            + IpLayerNonSyncContext<I, CC::DeviceId>
-            + IpSocketNonSyncContext,
+        BC: IpDeviceBindingsContext<I, CC::DeviceId>
+            + IpLayerBindingsContext<I, CC::DeviceId>
+            + IpSocketBindingsContext,
         CC: IpLayerContext<I, BC>
             + device::IpDeviceConfigurationContext<I, BC>
             + IpDeviceStateContext<I, BC>
@@ -863,19 +863,19 @@ impl<
     }
 }
 
-impl<BC: NonSyncContext, I: Ip, L> CounterContext<IpCounters<I>> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, I: Ip, L> CounterContext<IpCounters<I>> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
     }
 }
 
-impl<BC: NonSyncContext, L> CounterContext<Ipv4Counters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<Ipv4Counters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateCounters>())
     }
 }
 
-impl<BC: NonSyncContext, L> CounterContext<Ipv6Counters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<Ipv6Counters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv6StateCounters>())
     }
@@ -884,7 +884,7 @@ impl<BC: NonSyncContext, L> CounterContext<Ipv6Counters> for Locked<&SyncCtx<BC>
 impl<I, BC, L> IpStateContext<I, BC> for Locked<&SyncCtx<BC>, L>
 where
     I: IpLayerIpExt,
-    BC: NonSyncContext,
+    BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
 
     // These bounds ensure that we can fulfill all the traits for the associated
@@ -947,7 +947,7 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
 /// frame.
 pub(crate) trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
-    BC: IpLayerNonSyncContext<I, Self::DeviceId>,
+    BC: IpLayerBindingsContext<I, Self::DeviceId>,
 >:
     IpTransportDispatchContext<I, BC>
     + IpDeviceStateContext<I, BC>
@@ -960,7 +960,7 @@ pub(crate) trait IpLayerIngressContext<
 
 impl<
         I: IpLayerIpExt + IcmpHandlerIpExt,
-        BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+        BC: IpLayerBindingsContext<I, CC::DeviceId>,
         CC: IpTransportDispatchContext<I, BC>
             + IpDeviceStateContext<I, BC>
             + IpDeviceSendContext<I, BC>
@@ -971,7 +971,7 @@ impl<
 {
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
     IpTransportDispatchContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
@@ -1025,7 +1025,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ip
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
     IpTransportDispatchContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
@@ -1376,7 +1376,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
     for SyncCtx<BC>
 {
     type Data = AtomicU16;
@@ -1462,7 +1462,7 @@ pub struct Ipv6Counters {
     pub extension_header_discard: Counter,
 }
 
-impl<BC: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
+impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
     for SyncCtx<BC>
 {
     type Data = IpCounters<I>;
@@ -1473,7 +1473,7 @@ impl<BC: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCoun
     }
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<BC> {
     type Data = Ipv4Counters;
     type Guard<'l> = &'l Ipv4Counters where Self: 'l;
 
@@ -1482,7 +1482,7 @@ impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters>
     }
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<BC> {
     type Data = Ipv6Counters;
     type Guard<'l> = &'l Ipv6Counters where Self: 'l;
 
@@ -1559,7 +1559,7 @@ impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv4>, IpLayerTimerId::PmtuTimeo
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeoutv6(id), id);
 
 /// Handle a timer event firing in the IP layer.
-pub(crate) fn handle_timer<BC: NonSyncContext>(
+pub(crate) fn handle_timer<BC: BindingsContext>(
     core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     id: IpLayerTimerId,
@@ -1597,7 +1597,7 @@ pub(crate) fn handle_timer<BC: NonSyncContext>(
 /// coming from a device, i.e., `device` given is `None`,
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
-    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     B: BufferMut,
     CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
@@ -1690,7 +1690,7 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv6_packet` has the same semantics as
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
-    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     B: BufferMut,
     CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
@@ -1934,7 +1934,7 @@ macro_rules! try_parse_ip_packet {
 /// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
 /// depending on the type parameter, `I`.
 #[cfg(test)]
-pub(crate) fn receive_ip_packet<B: BufferMut, BC: NonSyncContext, I: Ip>(
+pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1957,7 +1957,7 @@ pub(crate) fn receive_ip_packet<B: BufferMut, BC: NonSyncContext, I: Ip>(
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
 /// for options.
 pub(crate) fn receive_ipv4_packet<
-    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     B: BufferMut,
     CC: IpLayerIngressContext<Ipv4, BC>
         + CounterContext<IpCounters<Ipv4>>
@@ -2207,7 +2207,7 @@ pub(crate) fn receive_ipv4_packet<
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
 /// for options.
 pub(crate) fn receive_ipv6_packet<
-    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     B: BufferMut,
     CC: IpLayerIngressContext<Ipv6, BC>
         + CounterContext<IpCounters<Ipv6>>
@@ -2555,7 +2555,7 @@ enum DropReason {
 
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
-    BC: IpLayerNonSyncContext<Ipv4, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>> + CounterContext<Ipv4Counters>,
 >(
     core_ctx: &mut CC,
@@ -2603,7 +2603,7 @@ fn receive_ipv4_packet_action<
 
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
-    BC: IpLayerNonSyncContext<Ipv6, CC::DeviceId>,
+    BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>> + CounterContext<Ipv6Counters>,
 >(
     core_ctx: &mut CC,
@@ -2716,7 +2716,7 @@ fn receive_ipv6_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
     core_ctx: &mut CC,
@@ -2763,7 +2763,7 @@ fn receive_ip_packet_action_common<
 // Look up the route to a host.
 fn lookup_route_table<
     I: IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, CC::DeviceId>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -2775,7 +2775,7 @@ fn lookup_route_table<
 }
 
 /// Get all the routes.
-pub fn get_all_routes<BC: NonSyncContext>(
+pub fn get_all_routes<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
 ) -> Vec<types::EntryEither<DeviceId<BC>>> {
     {
@@ -2849,7 +2849,7 @@ pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 impl<
         I: IpLayerIpExt,
-        BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC> + NonTestCtxMarker,
     > IpLayerHandler<I, BC> for CC
 {
@@ -2885,7 +2885,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
-    BC: IpLayerNonSyncContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC>,
     S: Serializer,
     S::Buffer: BufferMut,
@@ -2930,7 +2930,7 @@ where
 }
 
 impl<
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
@@ -3029,7 +3029,7 @@ impl<
 }
 
 impl<
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
@@ -3127,10 +3127,10 @@ impl<
     }
 }
 
-impl<L, BC: NonSyncContext> icmp::IcmpStateContext for Locked<&SyncCtx<BC>, L> {}
+impl<L, BC: BindingsContext> icmp::IcmpStateContext for Locked<&SyncCtx<BC>, L> {}
 
 impl<
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
@@ -3174,7 +3174,7 @@ impl<
 }
 
 impl<
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
@@ -3221,7 +3221,7 @@ impl<
 ///
 /// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
 /// or `None` if the destination is unreachable.
-pub fn resolve_route<I: Ip, BC: NonSyncContext>(
+pub fn resolve_route<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     destination: I::Addr,
 ) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
@@ -3621,7 +3621,7 @@ mod tests {
 
     /// Process an IP fragment depending on the `Ip` `process_ip_fragment` is
     /// specialized with.
-    fn process_ip_fragment<I: Ip, BC: NonSyncContext>(
+    fn process_ip_fragment<I: Ip, BC: BindingsContext>(
         core_ctx: &mut &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -3654,7 +3654,7 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv4_fragment<BC: NonSyncContext>(
+    fn process_ipv4_fragment<BC: BindingsContext>(
         core_ctx: &mut &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -3688,7 +3688,7 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv6_fragment<BC: NonSyncContext>(
+    fn process_ipv6_fragment<BC: BindingsContext>(
         core_ctx: &mut &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
@@ -4335,7 +4335,7 @@ mod tests {
     }
 
     trait GetPmtuIpExt: Ip {
-        fn get_pmtu<BC: NonSyncContext>(
+        fn get_pmtu<BC: BindingsContext>(
             state: &StackState<BC>,
             local_ip: Self::Addr,
             remote_ip: Self::Addr,
@@ -4343,7 +4343,7 @@ mod tests {
     }
 
     impl GetPmtuIpExt for Ipv4 {
-        fn get_pmtu<BC: NonSyncContext>(
+        fn get_pmtu<BC: BindingsContext>(
             state: &StackState<BC>,
             local_ip: Ipv4Addr,
             remote_ip: Ipv4Addr,
@@ -4353,7 +4353,7 @@ mod tests {
     }
 
     impl GetPmtuIpExt for Ipv6 {
-        fn get_pmtu<BC: NonSyncContext>(
+        fn get_pmtu<BC: BindingsContext>(
             state: &StackState<BC>,
             local_ip: Ipv6Addr,
             remote_ip: Ipv6Addr,

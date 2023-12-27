@@ -48,8 +48,8 @@ pub(crate) struct TransmitQueue<Meta, Buffer, Allocator> {
     pub(crate) queue: Mutex<TransmitQueueState<Meta, Buffer, Allocator>>,
 }
 
-/// The non-synchonized context for the transmit queue.
-pub(crate) trait TransmitQueueNonSyncContext<D: Device, DeviceId> {
+/// The bindings context for the transmit queue.
+pub(crate) trait TransmitQueueBindingsContext<D: Device, DeviceId> {
     /// Wakes up TX task.
     fn wake_tx_task(&mut self, device_id: &DeviceId);
 }
@@ -136,7 +136,7 @@ pub(crate) struct TransmitQueueApi<CC, BT, D>(Never, PhantomData<(CC, BT, D)>);
 
 impl<
         D: Device,
-        BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+        BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
         CC: TransmitDequeueContext<D, BC> + DeviceSocketHandler<D, BC>,
     > TransmitQueueApi<CC, BC, D>
 {
@@ -254,7 +254,7 @@ impl<
 
 fn deliver_to_device_sockets<
     D: Device,
-    BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+    BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
     CC: TransmitQueueCommon<D, BC> + DeviceSocketHandler<D, BC>,
 >(
     core_ctx: &mut CC,
@@ -283,7 +283,7 @@ fn deliver_to_device_sockets<
 
 impl<
         D: Device,
-        BC: TransmitQueueNonSyncContext<D, CC::DeviceId>,
+        BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
         CC: TransmitQueueContext<D, BC> + DeviceSocketHandler<D, BC>,
     > TransmitQueueHandler<D, BC> for CC
 where
@@ -393,7 +393,7 @@ mod tests {
     type FakeSyncCtxImpl = FakeSyncCtx<FakeTxQueueState, (), FakeLinkDeviceId>;
     type FakeNonSyncCtxImpl = FakeNonSyncCtx<(), (), FakeTxQueueNonSyncCtxState>;
 
-    impl TransmitQueueNonSyncContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
+    impl TransmitQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
         fn wake_tx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state_mut().woken_tx_tasks.push(device_id.clone())
         }

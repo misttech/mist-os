@@ -21,15 +21,15 @@ use crate::{
         },
         udp::{self},
     },
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
-impl<I, L, BC> tcp::socket::DemuxSyncContext<I, WeakDeviceId<BC>, BC> for Locked<&SyncCtx<BC>, L>
+impl<I, L, BC> tcp::socket::TcpDemuxContext<I, WeakDeviceId<BC>, BC> for Locked<&SyncCtx<BC>, L>
 where
     I: crate::ip::IpExt
         + crate::ip::device::IpDeviceIpExt
         + crate::transport::tcp::socket::DualStackIpExt,
-    BC: NonSyncContext,
+    BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpDemux<I>>,
 {
     fn with_demux<O, F: FnOnce(&tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
@@ -47,9 +47,9 @@ where
     }
 }
 
-impl<L, BC> tcp::socket::SyncContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
+impl<L, BC> tcp::socket::TcpContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>,
 {
     type SingleStackIpTransportAndDemuxCtx<'a> =
@@ -144,9 +144,9 @@ where
     }
 }
 
-impl<L, BC> tcp::socket::SyncContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
+impl<L, BC> tcp::socket::TcpContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>,
 {
     type SingleStackIpTransportAndDemuxCtx<'a> =
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
     udp::StateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpSocketsTable<Ipv4>>;
@@ -285,7 +285,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::BoundStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
@@ -330,7 +330,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
     udp::StateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpSocketsTable<Ipv6>>;
@@ -374,7 +374,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::BoundStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
@@ -419,9 +419,9 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<L, BC: NonSyncContext> udp::UdpStateContext for Locked<&SyncCtx<BC>, L> {}
+impl<L, BC: BindingsContext> udp::UdpStateContext for Locked<&SyncCtx<BC>, L> {}
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::DualStackBoundStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
@@ -464,12 +464,12 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::NonDualStackBoundStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     RwLockFor<crate::lock_ordering::TcpAllSocketsSet<I>> for SyncCtx<BC>
 {
     type Data = tcp::socket::TcpSocketSet<I, WeakDeviceId<BC>, BC>;
@@ -490,7 +490,7 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     RwLockFor<crate::lock_ordering::TcpDemux<I>> for SyncCtx<BC>
 {
     type Data = tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>;
@@ -511,7 +511,7 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: NonSyncContext>
+impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for SyncCtx<BC>
 {
     type Data = IsnGenerator<BC::Instant>;

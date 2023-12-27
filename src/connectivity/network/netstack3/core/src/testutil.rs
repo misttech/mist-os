@@ -66,7 +66,7 @@ use crate::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
-        icmp::{IcmpBindingsContext, IcmpIpExt},
+        icmp::{IcmpEchoBindingsContext, IcmpIpExt},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -129,13 +129,13 @@ impl<CC, BC> ContextPair<CC, BC> {
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = ContextPair<SyncCtx<BT>, BT>;
 
-impl<BC: crate::NonSyncContext + Default> Default for Ctx<BC> {
+impl<BC: crate::BindingsContext + Default> Default for Ctx<BC> {
     fn default() -> Self {
         Self::new_with_builder(StackStateBuilder::default())
     }
 }
 
-impl<BC: crate::NonSyncContext + Default> Ctx<BC> {
+impl<BC: crate::BindingsContext + Default> Ctx<BC> {
     pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
         let mut non_sync_ctx = Default::default();
         let state = builder.build_with_ctx(&mut non_sync_ctx);
@@ -1152,7 +1152,7 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv4>,
@@ -1168,7 +1168,7 @@ impl IcmpBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv6>,
@@ -1188,7 +1188,7 @@ impl crate::device::socket::DeviceSocketTypes for FakeNonSyncCtx {
     type SocketState = Mutex<Vec<(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)>>;
 }
 
-impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
+impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_frame(
         &self,
         state: &Self::SocketState,
@@ -1376,7 +1376,7 @@ pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
 
 /// Add a route directly to the forwarding table.
 #[cfg(any(test, feature = "testutils"))]
-pub fn add_route<BC: crate::NonSyncContext>(
+pub fn add_route<BC: crate::BindingsContext>(
     core_ctx: &crate::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
@@ -1403,7 +1403,7 @@ pub fn add_route<BC: crate::NonSyncContext>(
 /// Delete a route from the forwarding table, returning `Err` if no route was
 /// found to be deleted.
 #[cfg(any(test, feature = "testutils"))]
-pub fn del_routes_to_subnet<BC: crate::NonSyncContext>(
+pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
     core_ctx: &crate::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     subnet: net_types::ip::SubnetEither,
@@ -1425,7 +1425,7 @@ pub fn del_routes_to_subnet<BC: crate::NonSyncContext>(
     .map_err(From::from)
 }
 
-pub(crate) fn del_device_routes<BC: crate::NonSyncContext>(
+pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
     core_ctx: &crate::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
@@ -1444,7 +1444,7 @@ pub(crate) fn del_device_routes<BC: crate::NonSyncContext>(
 }
 
 /// Removes all of the routes through the device, then removes the device.
-pub fn clear_routes_and_remove_ethernet_device<BC: crate::NonSyncContext>(
+pub fn clear_routes_and_remove_ethernet_device<BC: crate::BindingsContext>(
     core_ctx: &crate::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     ethernet_device: crate::device::EthernetDeviceId<BC>,

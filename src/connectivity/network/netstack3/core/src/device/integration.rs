@@ -49,10 +49,10 @@ use crate::{
         IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
     for SyncCtx<BC>
 {
     type Data = OriginTracker;
@@ -74,7 +74,7 @@ fn bytes_to_mac(b: &[u8]) -> Option<Mac> {
 
 impl<
         I: Ip,
-        BC: NonSyncContext,
+        BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::EthernetIpv4Arp>
             + LockBefore<crate::lock_ordering::EthernetIpv6Nud>,
     > NudIpHandler<I, BC> for Locked<&SyncCtx<BC>, L>
@@ -141,7 +141,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     IpDeviceSendContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn send_ip_frame<S>(
@@ -159,7 +159,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
     IpDeviceConfigurationContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, BC>;
@@ -241,11 +241,11 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurati
     }
 }
 
-impl<BC: NonSyncContext, L> IpDeviceAddressIdContext<Ipv4> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for Locked<&SyncCtx<BC>, L> {
     type AddressId = StrongRc<Ipv4AddressEntry<BC::Instant>>;
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
     IpDeviceAddressContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_ip_address_state<O, F: FnOnce(&Ipv4AddressState<BC::Instant>) -> O>(
@@ -273,7 +273,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressSt
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
     IpDeviceStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpDeviceAddressCtx<'a> =
@@ -401,7 +401,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<I
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
     Ipv6DeviceConfigurationContext<BC> for Locked<&SyncCtx<BC>, L>
 {
     type Ipv6DeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<
@@ -442,7 +442,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurati
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
     IpDeviceConfigurationContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, BC>;
@@ -524,11 +524,11 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurati
     }
 }
 
-impl<BC: NonSyncContext, L> IpDeviceAddressIdContext<Ipv6> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for Locked<&SyncCtx<BC>, L> {
     type AddressId = StrongRc<Ipv6AddressEntry<BC::Instant>>;
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
     IpDeviceAddressContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn with_ip_address_state<O, F: FnOnce(&Ipv6AddressState<BC::Instant>) -> O>(
@@ -554,7 +554,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressSt
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     IpDeviceStateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpDeviceAddressCtx<'a> =
@@ -684,7 +684,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<I
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     Ipv6DeviceContext<BC> for Locked<&SyncCtx<BC>, L>
 {
     type LinkLayerAddr = Ipv6DeviceLinkLayerAddr;
@@ -744,7 +744,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<I
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     IpDeviceSendContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     fn send_ip_frame<S>(
@@ -762,7 +762,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     }
 }
 
-impl<BC: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> DeviceIdContext<EthernetLinkDevice> for Locked<&SyncCtx<BC>, L> {
     type DeviceId = EthernetDeviceId<BC>;
     type WeakDeviceId = EthernetWeakDeviceId<BC>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -796,8 +796,8 @@ impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters
     }
 }
 
-impl<BC: socket::NonSyncContext<DeviceId<BC>> + DeviceLayerEventDispatcher>
-    socket::NonSyncContext<EthernetDeviceId<BC>> for BC
+impl<BC: socket::DeviceSocketBindingsContext<DeviceId<BC>> + DeviceLayerEventDispatcher>
+    socket::DeviceSocketBindingsContext<EthernetDeviceId<BC>> for BC
 {
     fn receive_frame(
         &self,
@@ -810,7 +810,7 @@ impl<BC: socket::NonSyncContext<DeviceId<BC>> + DeviceLayerEventDispatcher>
     }
 }
 
-impl<BC: NonSyncContext, L> SendFrameContext<BC, socket::DeviceSocketMetadata<DeviceId<BC>>>
+impl<BC: BindingsContext, L> SendFrameContext<BC, socket::DeviceSocketMetadata<DeviceId<BC>>>
     for Locked<&SyncCtx<BC>, L>
 where
     Self: SendFrameContext<BC, socket::DeviceSocketMetadata<EthernetDeviceId<BC>>>
@@ -844,7 +844,7 @@ where
     }
 }
 
-impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceLayerState> for SyncCtx<BC> {
     type Data = Devices<BC>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Devices<BC>>
         where
@@ -860,7 +860,7 @@ impl<BC: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState> for S
     }
 }
 
-impl<BC: DeviceLayerTypes + socket::NonSyncContext<DeviceId<BC>>>
+impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
     RwLockFor<crate::lock_ordering::DeviceLayerState> for DeviceLayerState<BC>
 {
     type Data = Devices<BC>;
@@ -878,7 +878,7 @@ impl<BC: DeviceLayerTypes + socket::NonSyncContext<DeviceId<BC>>>
     }
 }
 
-impl<BC: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncCtx<BC>, L> {
     type DeviceId = DeviceId<BC>;
     type WeakDeviceId = WeakDeviceId<BC>;
 
@@ -891,7 +891,7 @@ impl<BC: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncCtx<BC>, 
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
     RecvFrameContext<BC, RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv4>> for Locked<&SyncCtx<BC>, L>
 {
     fn receive_frame<B: BufferMut>(
@@ -910,7 +910,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
     }
 }
 
-impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
     RecvFrameContext<BC, RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv6>> for Locked<&SyncCtx<BC>, L>
 {
     fn receive_frame<B: BufferMut>(
@@ -930,7 +930,7 @@ impl<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
 }
 
 pub(crate) fn with_ethernet_state_and_sync_ctx<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(
         Locked<&IpLinkDeviceState<EthernetLinkDevice, BC>, L>,
@@ -956,7 +956,7 @@ pub(crate) fn with_ethernet_state_and_sync_ctx<
 }
 
 pub(crate) fn with_ethernet_state<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(Locked<&IpLinkDeviceState<EthernetLinkDevice, BC>, L>) -> O,
     L,
@@ -971,7 +971,7 @@ pub(crate) fn with_ethernet_state<
 }
 
 pub(crate) fn with_loopback_state<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(Locked<&'_ IpLinkDeviceState<LoopbackDevice, BC>, L>) -> O,
     L,
@@ -986,7 +986,7 @@ pub(crate) fn with_loopback_state<
 }
 
 pub(crate) fn with_loopback_state_and_sync_ctx<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(Locked<&IpLinkDeviceState<LoopbackDevice, BC>, L>, &mut Locked<&SyncCtx<BC>, L>) -> O,
     L,
@@ -1009,7 +1009,7 @@ pub(crate) fn with_loopback_state_and_sync_ctx<
 }
 
 pub(crate) fn with_ip_device_state<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(Locked<&DualStackIpDeviceState<BC::Instant>, L>) -> O,
     L,
@@ -1025,7 +1025,7 @@ pub(crate) fn with_ip_device_state<
 }
 
 pub(crate) fn with_ip_device_state_and_sync_ctx<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     O,
     F: FnOnce(Locked<&DualStackIpDeviceState<BC::Instant>, L>, &mut Locked<&SyncCtx<BC>, L>) -> O,
     L,
@@ -1044,7 +1044,7 @@ pub(crate) fn with_ip_device_state_and_sync_ctx<
     }
 }
 
-fn get_mtu<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
+fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
     core_ctx: &mut Locked<&SyncCtx<BC>, L>,
     device: &DeviceId<BC>,
 ) -> Mtu {
@@ -1055,7 +1055,7 @@ fn get_mtu<BC: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerSt
 }
 
 fn join_link_multicast_group<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     A: IpAddress,
     L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
 >(
@@ -1076,7 +1076,7 @@ fn join_link_multicast_group<
 }
 
 fn leave_link_multicast_group<
-    BC: NonSyncContext,
+    BC: BindingsContext,
     A: IpAddress,
     L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
 >(
@@ -1096,7 +1096,7 @@ fn leave_link_multicast_group<
     }
 }
 
-impl<BC: NonSyncContext> DualStackDeviceContext<BC>
+impl<BC: BindingsContext> DualStackDeviceContext<BC>
     for Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>
 {
     fn with_dual_stack_device_state<O, F: FnOnce(DualStackDeviceStateRef<'_, BC::Instant>) -> O>(
@@ -1121,7 +1121,7 @@ fn send_ip_frame<BC, S, A, L>(
     body: S,
 ) -> Result<(), S>
 where
-    BC: NonSyncContext,
+    BC: BindingsContext,
     S: Serializer,
     S::Buffer: BufferMut,
     A: IpAddress,

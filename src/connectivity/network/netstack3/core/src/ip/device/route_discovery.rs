@@ -94,12 +94,12 @@ pub(super) trait Ipv6RouteDiscoveryContext<BC>: DeviceIdContext<AnyDevice> {
 }
 
 /// The non-synchronized execution context for IPv6 route discovery.
-trait Ipv6RouteDiscoveryNonSyncContext<DeviceId>:
+trait Ipv6RouteDiscoveryBindingsContext<DeviceId>:
     TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>
 {
 }
 impl<DeviceId, BC: TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>>
-    Ipv6RouteDiscoveryNonSyncContext<DeviceId> for BC
+    Ipv6RouteDiscoveryBindingsContext<DeviceId> for BC
 {
 }
 
@@ -123,7 +123,7 @@ pub(crate) trait RouteDiscoveryHandler<BC>: DeviceIdContext<AnyDevice> {
     fn invalidate_routes(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
+impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
     RouteDiscoveryHandler<BC> for CC
 {
     fn update_route(
@@ -200,7 +200,7 @@ impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryC
     }
 }
 
-impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
+impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryContext<BC>>
     TimerHandler<BC, Ipv6DiscoveredRouteTimerId<CC::DeviceId>> for CC
 {
     fn handle_timer(
@@ -219,7 +219,7 @@ impl<BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>, CC: Ipv6RouteDiscoveryC
 }
 
 fn del_discovered_ipv6_route<
-    BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>,
+    BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>,
     CC: Ipv6DiscoveredRoutesContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -231,7 +231,7 @@ fn del_discovered_ipv6_route<
 }
 
 fn invalidate_route<
-    BC: Ipv6RouteDiscoveryNonSyncContext<CC::DeviceId>,
+    BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>,
     CC: Ipv6DiscoveredRoutesContext<BC>,
 >(
     core_ctx: &mut CC,

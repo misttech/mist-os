@@ -17,7 +17,7 @@ use crate::{
         IpLayerTimerId,
     },
     transport::{self, TransportLayerTimerId},
-    NonSyncContext, SyncCtx,
+    BindingsContext, SyncCtx,
 };
 
 /// The identifier for any timer event.
@@ -29,7 +29,7 @@ use crate::{
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub struct TimerId<BC: NonSyncContext>(pub(crate) TimerIdInner<BC>);
+pub struct TimerId<BC: BindingsContext>(pub(crate) TimerIdInner<BC>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -39,7 +39,7 @@ pub struct TimerId<BC: NonSyncContext>(pub(crate) TimerIdInner<BC>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) enum TimerIdInner<BC: NonSyncContext> {
+pub(crate) enum TimerIdInner<BC: BindingsContext> {
     /// A timer event in the device layer.
     DeviceLayer(DeviceLayerTimerId<BC>),
     /// A timer event in the transport layer.
@@ -55,66 +55,66 @@ pub(crate) enum TimerIdInner<BC: NonSyncContext> {
     Nop(usize),
 }
 
-impl<BC: NonSyncContext> From<DeviceLayerTimerId<BC>> for TimerId<BC> {
+impl<BC: BindingsContext> From<DeviceLayerTimerId<BC>> for TimerId<BC> {
     fn from(id: DeviceLayerTimerId<BC>) -> TimerId<BC> {
         TimerId(TimerIdInner::DeviceLayer(id))
     }
 }
 
-impl<BC: NonSyncContext> From<Ipv4DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
+impl<BC: BindingsContext> From<Ipv4DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
     fn from(id: Ipv4DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
         TimerId(TimerIdInner::Ipv4Device(id))
     }
 }
 
-impl<BC: NonSyncContext> From<Ipv6DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
+impl<BC: BindingsContext> From<Ipv6DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
     fn from(id: Ipv6DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
         TimerId(TimerIdInner::Ipv6Device(id))
     }
 }
 
-impl<BC: NonSyncContext> From<IpLayerTimerId> for TimerId<BC> {
+impl<BC: BindingsContext> From<IpLayerTimerId> for TimerId<BC> {
     fn from(id: IpLayerTimerId) -> TimerId<BC> {
         TimerId(TimerIdInner::IpLayer(id))
     }
 }
 
-impl<BC: NonSyncContext> From<TransportLayerTimerId<BC>> for TimerId<BC> {
+impl<BC: BindingsContext> From<TransportLayerTimerId<BC>> for TimerId<BC> {
     fn from(id: TransportLayerTimerId<BC>) -> Self {
         TimerId(TimerIdInner::TransportLayer(id))
     }
 }
 
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TimerId<C>,
     DeviceLayerTimerId<C>,
     TimerId(TimerIdInner::DeviceLayer(id)),
     id
 );
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TimerId<C>,
     IpLayerTimerId,
     TimerId(TimerIdInner::IpLayer(id)),
     id
 );
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TimerId<C>,
     Ipv4DeviceTimerId<DeviceId<C>>,
     TimerId(TimerIdInner::Ipv4Device(id)),
     id
 );
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TimerId<C>,
     Ipv6DeviceTimerId<DeviceId<C>>,
     TimerId(TimerIdInner::Ipv6Device(id)),
     id
 );
 impl_timer_context!(
-    C: NonSyncContext,
+    C: BindingsContext,
     TimerId<C>,
     TransportLayerTimerId<C>,
     TimerId(TimerIdInner::TransportLayer(id)),
@@ -122,7 +122,7 @@ impl_timer_context!(
 );
 
 /// Handles a generic timer event.
-pub fn handle_timer<BC: NonSyncContext>(
+pub fn handle_timer<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: TimerId<BC>,
@@ -164,7 +164,7 @@ pub(crate) struct TimerCounters {
 }
 
 #[cfg(test)]
-impl<BC: NonSyncContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
+impl<BC: BindingsContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
     for SyncCtx<BC>
 {
     type Data = TimerCounters;
@@ -176,7 +176,7 @@ impl<BC: NonSyncContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::
 }
 
 #[cfg(test)]
-impl<BC: NonSyncContext, L> crate::context::CounterContext<TimerCounters>
+impl<BC: BindingsContext, L> crate::context::CounterContext<TimerCounters>
     for Locked<&SyncCtx<BC>, L>
 {
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {

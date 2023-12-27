@@ -107,9 +107,9 @@ pub mod device_socket {
     pub use crate::device::{
         base::FrameDestination,
         socket::{
-            DeviceSocketTypes, EthernetFrame, Frame, NonSyncContext, Protocol, ReceivedFrame,
-            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SentFrame,
-            SocketId, SocketInfo, TargetDevice,
+            DeviceSocketBindingsContext, DeviceSocketTypes, EthernetFrame, Frame, Protocol,
+            ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams,
+            SentFrame, SocketId, SocketInfo, TargetDevice,
         },
     };
 }
@@ -144,7 +144,7 @@ pub mod icmp {
     };
 
     // Re-exported types.
-    pub use crate::ip::icmp::{IcmpBindingsContext, IcmpIpExt, SocketId, SocketInfo};
+    pub use crate::ip::icmp::{IcmpEchoBindingsContext, IcmpIpExt, SocketId, SocketInfo};
 }
 
 /// The Internet Protocol, versions 4 and 6.
@@ -240,7 +240,7 @@ pub mod types {
 }
 
 pub use context::{
-    BindingsTypes, EventContext, InstantBindingsTypes, InstantContext, NonSyncContext,
+    BindingsContext, BindingsTypes, EventContext, InstantBindingsTypes, InstantContext,
     ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext,
 };
 pub use time::{handle_timer, Instant, TimerId};

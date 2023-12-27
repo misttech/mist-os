@@ -33,7 +33,7 @@ use crate::{
         LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler, NudSenderContext,
         NudState, NudTimerId, NudUserConfig,
     },
-    Instant, NonSyncContext, SyncCtx,
+    BindingsContext, Instant, SyncCtx,
 };
 
 // NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
@@ -98,7 +98,7 @@ pub struct ArpCounters {
     pub tx_responses: Counter,
 }
 
-impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for SyncCtx<BC> {
     type Data = ArpCounters;
     type Guard<'l> = &'l ArpCounters where Self: 'l;
 
@@ -107,7 +107,7 @@ impl<BC: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for S
     }
 }
 
-impl<BC: NonSyncContext, L> CounterContext<ArpCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<ArpCounters> for Locked<&SyncCtx<BC>, L> {
     fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
     }
@@ -115,7 +115,7 @@ impl<BC: NonSyncContext, L> CounterContext<ArpCounters> for Locked<&SyncCtx<BC>,
 
 /// An execution context for the ARP protocol that allows sending IP packets to
 /// specific neighbors.
-pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpNonSyncCtx<D, Self::DeviceId>>:
+pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     ArpConfigContext + DeviceIdContext<D>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
@@ -149,8 +149,8 @@ pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpNonSyncCtx<D, Self::Devic
 // `StateContext`, `TimerContext`, and `FrameContext` impls would all conflict
 // for similar reasons).
 
-/// The non-synchronized execution context for the ARP protocol.
-pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
+/// The execution context for the ARP protocol provided by bindings.
+pub(crate) trait ArpBindingsContext<D: ArpDevice, DeviceId>:
     TimerContext<ArpTimerId<D, DeviceId>>
     + TracingContext
     + LinkResolutionContext<D>
@@ -167,12 +167,12 @@ impl<
             + EventContext<
                 nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,
             >,
-    > ArpNonSyncCtx<D, DeviceId> for BC
+    > ArpBindingsContext<D, DeviceId> for BC
 {
 }
 
 /// An execution context for the ARP protocol.
-pub(crate) trait ArpContext<D: ArpDevice, BC: ArpNonSyncCtx<D, Self::DeviceId>>:
+pub(crate) trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     DeviceIdContext<D> + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
 {
     type ConfigCtx<'a>: ArpConfigContext;
@@ -232,7 +232,7 @@ pub(crate) trait ArpConfigContext {
 
 impl<
         D: ArpDevice,
-        BC: ArpNonSyncCtx<D, CC::DeviceId>,
+        BC: ArpBindingsContext<D, CC::DeviceId>,
         CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
     > NudContext<Ipv4, D, BC> for CC
 {
@@ -285,7 +285,7 @@ impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for CC {
     }
 }
 
-impl<D: ArpDevice, BC: ArpNonSyncCtx<D, CC::DeviceId>, CC: ArpSenderContext<D, BC>>
+impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext<D, BC>>
     NudSenderContext<Ipv4, D, BC> for CC
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
@@ -314,7 +314,7 @@ pub(crate) trait ArpPacketHandler<D: ArpDevice, BC>: DeviceIdContext<D> {
 
 impl<
         D: ArpDevice,
-        BC: ArpNonSyncCtx<D, CC::DeviceId>,
+        BC: ArpBindingsContext<D, CC::DeviceId>,
         CC: ArpContext<D, BC>
             + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
             + NudHandler<Ipv4, D, BC>
@@ -335,7 +335,7 @@ impl<
 
 fn handle_packet<
     D: ArpDevice,
-    BC: ArpNonSyncCtx<D, CC::DeviceId>,
+    BC: ArpBindingsContext<D, CC::DeviceId>,
     B: BufferMut,
     CC: ArpContext<D, BC>
         + SendFrameContext<BC, ArpFrameMetadata<D, CC::DeviceId>>
@@ -572,7 +572,7 @@ const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_T
 
 fn send_arp_request<
     D: ArpDevice,
-    BC: ArpNonSyncCtx<D, CC::DeviceId>,
+    BC: ArpBindingsContext<D, CC::DeviceId>,
     CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
 >(
     core_ctx: &mut CC,
