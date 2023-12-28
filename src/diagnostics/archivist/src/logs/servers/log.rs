@@ -52,7 +52,7 @@ impl LogServer {
     }
 
     /// Instructs the server to stop accepting new connections.
-    pub async fn stop(&self) {
+    pub fn stop(&self) {
         if let Ok(mut task_guard) = self.task_sender.lock() {
             task_guard.disconnect();
         }

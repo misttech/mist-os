@@ -65,7 +65,6 @@ impl InspectRepository {
             .read()
             .await
             .fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
-            .await
     }
 
     async fn add_inspect_artifacts(
@@ -247,7 +246,7 @@ impl InspectRepositoryInner {
         }
     }
 
-    async fn fetch_inspect_data(
+    fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
         moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
@@ -290,7 +289,7 @@ impl InspectRepositoryInner {
 
 #[cfg(test)]
 impl InspectRepositoryInner {
-    pub(crate) async fn get(
+    pub(crate) fn get(
         &self,
         identity: &Arc<ComponentIdentity>,
     ) -> Option<&InspectArtifactsContainer> {
@@ -347,7 +346,7 @@ mod tests {
             })
             .await;
 
-        assert!(inspect_repo.inner.read().await.get(&identity).await.is_some());
+        assert!(inspect_repo.inner.read().await.get(&identity).is_some());
     }
 
     #[fuchsia::test]
@@ -367,10 +366,10 @@ mod tests {
                     }),
                 })
                 .await;
-            assert!(data_repo.inner.read().await.get(&identity).await.is_some());
+            assert!(data_repo.inner.read().await.get(&identity).is_some());
         }
         drop(server_end);
-        while data_repo.inner.read().await.get(&identity).await.is_some() {
+        while data_repo.inner.read().await.get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
     }
@@ -395,7 +394,7 @@ mod tests {
                     }),
                 })
                 .await;
-            assert!(data_repo.inner.read().await.get(&identity).await.is_some());
+            assert!(data_repo.inner.read().await.get(&identity).is_some());
             assert!(pipeline
                 .read()
                 .await
@@ -407,7 +406,7 @@ mod tests {
 
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
-        while data_repo.inner.read().await.get(&identity).await.is_some() {
+        while data_repo.inner.read().await.get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
@@ -451,29 +450,20 @@ mod tests {
             })
             .await;
 
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).await.len());
+        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/foo:root").expect("parse selector")
         ]);
-        assert_eq!(
-            1,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(1, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/f*:root").expect("parse selector")
         ]);
-        assert_eq!(
-            2,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
 
         let selectors =
             Some(vec![selectors::parse_selector::<FastError>("foo:root").expect("parse selector")]);
-        assert_eq!(
-            0,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(0, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
     }
 }

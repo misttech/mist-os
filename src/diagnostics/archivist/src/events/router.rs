@@ -405,7 +405,7 @@ mod tests {
     }
 
     impl TestEventProducer {
-        async fn emit(&mut self, event_type: EventType, identity: Arc<ComponentIdentity>) {
+        fn emit(&mut self, event_type: EventType, identity: Arc<ComponentIdentity>) {
             let event = match event_type {
                 EventType::DiagnosticsReady => {
                     let (directory, _) =
@@ -470,7 +470,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn invalid_routing() {
+    fn invalid_routing() {
         let mut producer = TestEventProducer::default();
         let (_receiver, consumer) = TestEventConsumer::new();
         let mut router = EventRouter::new(inspect::Node::default());
@@ -668,9 +668,9 @@ mod tests {
             events: vec![EventType::InspectSinkRequested],
         });
 
-        producer1.emit(EventType::DiagnosticsReady, IDENTITY.clone()).await;
-        producer2.emit(EventType::LogSinkRequested, IDENTITY.clone()).await;
-        producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone()).await;
+        producer1.emit(EventType::DiagnosticsReady, IDENTITY.clone());
+        producer2.emit(EventType::LogSinkRequested, IDENTITY.clone());
+        producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone());
 
         // Consume the events.
         let (_terminate_handle, fut) = router.start().unwrap();
@@ -729,10 +729,10 @@ mod tests {
             Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str(moniker).unwrap(), TEST_URL))
         };
 
-        producer1.emit(EventType::DiagnosticsReady, identity("./a")).await;
-        producer2.emit(EventType::DiagnosticsReady, identity("./b")).await;
-        producer1.emit(EventType::DiagnosticsReady, identity("./c")).await;
-        producer2.emit(EventType::DiagnosticsReady, identity("./d")).await;
+        producer1.emit(EventType::DiagnosticsReady, identity("./a"));
+        producer2.emit(EventType::DiagnosticsReady, identity("./b"));
+        producer1.emit(EventType::DiagnosticsReady, identity("./c"));
+        producer2.emit(EventType::DiagnosticsReady, identity("./d"));
 
         // We should see the events in order of emission.
         let (_terminate_handle, fut) = router.start().unwrap();
@@ -770,7 +770,7 @@ mod tests {
             events: vec![EventType::DiagnosticsReady],
         });
 
-        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone()).await;
+        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone());
 
         let (terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
@@ -783,7 +783,7 @@ mod tests {
         drain_finished.await;
 
         // We must never see any new event emitted by the producer.
-        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone()).await;
+        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone());
         assert!(receiver.next().now_or_never().is_none());
     }
 

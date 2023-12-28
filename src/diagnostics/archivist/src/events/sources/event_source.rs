@@ -23,7 +23,7 @@ impl EventSource {
     }
 
     #[cfg(test)]
-    async fn new_for_test(event_stream: EventStreamProxy) -> Self {
+    fn new_for_test(event_stream: EventStreamProxy) -> Self {
         // Connect to /events/event_stream which contains our newer FIDL protocol
         Self { event_stream, dispatcher: Dispatcher::default() }
     }
@@ -71,7 +71,7 @@ pub mod tests {
         let events = BTreeSet::from([EventType::DiagnosticsReady, EventType::LogSinkRequested]);
         let (mut event_stream, dispatcher) = Dispatcher::new_for_test(events);
         let (stream_server, _server_task, sender) = spawn_fake_event_stream();
-        let mut source = EventSource::new_for_test(stream_server).await;
+        let mut source = EventSource::new_for_test(stream_server);
         source.set_dispatcher(dispatcher);
         let _task = fasync::Task::spawn(async move { source.spawn().await });
 

@@ -226,7 +226,7 @@ mod tests {
         }
 
         /// Drop the server(s) associated with `component`, as initialized by `serve`.
-        async fn drop_tree_servers(&mut self, component: &Arc<ComponentIdentity>) {
+        fn drop_tree_servers(&mut self, component: &Arc<ComponentIdentity>) {
             for (id, ref mut server) in &mut self.tree_pairs {
                 if id != component {
                     continue;
@@ -483,7 +483,7 @@ mod tests {
         })
         .await;
 
-        test.drop_tree_servers(&identity).await;
+        test.drop_tree_servers(&identity);
 
         // this executing to completion means the identity is not there anymore; we know
         // it previously was present

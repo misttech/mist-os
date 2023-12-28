@@ -139,7 +139,7 @@ impl ArchiveAccessorServer {
         }
     }
 
-    pub async fn stop(&self) {
+    pub fn stop(&self) {
         if let Ok(mut guard) = self.server_task_sender.lock() {
             guard.disconnect();
         }

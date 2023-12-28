@@ -268,9 +268,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn inspect_sink_capability_requested() {
+    fn inspect_sink_capability_requested() {
+        let _exec = fuchsia_async::LocalExecutor::new();
         let (_, inspect_sink_server_end) =
-            fidl::endpoints::create_proxy::<finspect::InspectSinkMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<finspect::InspectSinkMarker>();
         let event = create_inspect_sink_requested_event(
             "a/b".into(),
             "".into(),
@@ -289,8 +290,9 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn log_sink_capability_requested() {
-        let (_, log_sink_server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+    fn log_sink_capability_requested() {
+        let _exec = fuchsia_async::LocalExecutor::new();
+        let (_, log_sink_server_end) = fidl::endpoints::create_endpoints::<LogSinkMarker>();
         let event = create_log_sink_requested_event(
             "a/b".into(),
             "".into(),
@@ -309,8 +311,9 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn diagnostics_ready() {
-        let (directory, _) = fidl::endpoints::create_request_stream::<fio::NodeMarker>().unwrap();
+    fn diagnostics_ready() {
+        let _exec = fuchsia_async::LocalExecutor::new();
+        let (directory, _) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
         let event = create_diagnostics_ready_event("a/b".into(), "".into(), directory);
         let actual = event.try_into().unwrap();
 

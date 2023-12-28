@@ -29,8 +29,9 @@ impl<T: FnOnce()> Drop for AutoCall<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[fuchsia::test]
-    async fn drop_test() {
+    fn drop_test() {
         let mut called = false;
         {
             let _call = AutoCall::new(|| {

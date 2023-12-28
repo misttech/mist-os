@@ -591,7 +591,7 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).await.unwrap();
+                let directory = collector::find_directory_proxy(path).unwrap();
                 verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
@@ -627,7 +627,7 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).await.unwrap();
+                let directory = collector::find_directory_proxy(path).unwrap();
                 verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
@@ -669,7 +669,7 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).await.unwrap();
+                let directory = collector::find_directory_proxy(path).unwrap();
                 verify_reader_with_mode(
                     InspectServiceMethod::DiagnosticsDir(directory),
                     VerifyMode::ExpectComponentFailure,
@@ -761,7 +761,7 @@ mod tests {
                 let id_and_directory_proxy =
                     join_all(dir_name_and_filecount.iter().map(|(dir, _)| async move {
                         let full_path = format!("{path}/{dir}");
-                        let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
+                        let proxy = collector::find_directory_proxy(&full_path).unwrap();
                         let unique_cid =
                             ExtendedMoniker::parse_str(&format!("./component_{dir}")).unwrap();
                         (unique_cid, proxy)

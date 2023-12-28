@@ -564,7 +564,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn only_one_directory_proxy_is_populated() {
+    fn only_one_directory_proxy_is_populated() {
+        let _executor = fuchsia_async::LocalExecutor::new();
         let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (mut container, _rx) = InspectArtifactsContainer::new(directory);
         let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

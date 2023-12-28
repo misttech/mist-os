@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #![warn(clippy::clone_on_ref_ptr)]
+#![warn(clippy::unused_async)]
 // TODO(https://fxbug.dev/126170): remove after the lint is fixed
 #![allow(unknown_lints, clippy::items_after_test_module)]
 

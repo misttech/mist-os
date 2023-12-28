@@ -163,7 +163,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
 
 /// Convert a fully-qualified path to a directory-proxy in the executing namespace.
 #[cfg(test)]
-pub async fn find_directory_proxy(
+pub fn find_directory_proxy(
     path: &str,
 ) -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
     fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
@@ -172,7 +172,6 @@ pub async fn find_directory_proxy(
 #[cfg(test)]
 pub async fn collect(path: &str) -> Result<DataMap, anyhow::Error> {
     let inspect_proxy = find_directory_proxy(path)
-        .await
         .with_context(|| format!("Failed to open out directory at {path}"))?;
     Ok(populate_data_map(&[inspect_proxy.into()]).await)
 }

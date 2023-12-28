@@ -272,7 +272,7 @@ impl Archivist {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
-        self.serve_protocols(&mut fs).await;
+        self.serve_protocols(&mut fs);
         let run_outgoing = fs.collect::<()>();
         let _inspect_server_task = inspect_runtime::publish(
             component::inspector(),
@@ -316,8 +316,9 @@ impl Archivist {
                 for task in incoming_external_event_producers {
                     task.cancel().await;
                 }
-                future::join(log_server.stop(), inspect_sink_server.stop()).await;
-                accessor_server.stop().await;
+                log_server.stop();
+                inspect_sink_server.stop().await;
+                accessor_server.stop();
                 logs_repo.stop_accepting_new_log_sinks().await;
                 abort_handle.abort()
             }
@@ -334,7 +335,7 @@ impl Archivist {
         future::join3(abortable_fut, stop_fut, all_msg).map(|_| Ok(())).await
     }
 
-    async fn serve_protocols(&mut self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) {
+    fn serve_protocols(&mut self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) {
         component::serve_inspect_stats();
 
         let mut svc_dir = fs.dir("svc");
