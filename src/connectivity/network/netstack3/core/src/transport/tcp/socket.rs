@@ -390,7 +390,7 @@ impl<'a, SS: 'a, DS: AsSingleStack<SS> + 'a, SC, DC>
 pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
 {
-    /// The sync context that will give access to this version of the IP layer.
+    /// The core context that will give access to this version of the IP layer.
     type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>;
@@ -406,7 +406,7 @@ pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         ),
     >;
 
-    /// The sync context that will give access to both versions of the IP layer.
+    /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>

@@ -177,7 +177,7 @@ pub(super) type HeldDeviceSockets<BT> =
 
 /// Convenience alias for use in shared storage.
 ///
-/// The type parameter is expected to implement [`crate::NonSyncContext`].
+/// The type parameter is expected to implement [`crate::BindingsContext`].
 pub(super) type HeldSockets<BT> = Sockets<
     PrimaryId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
     StrongId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
@@ -196,8 +196,7 @@ trait DeviceSocketContextTypes {
 trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     DeviceSocketAccessor<BC>
 {
-    /// The synchronized context available in callbacks to methods on this
-    /// context.
+    /// The core context available in callbacks to methods on this context.
     type SocketTablesCoreCtx<'a>: DeviceSocketAccessor<
         BC,
         DeviceId = Self::DeviceId,
@@ -208,7 +207,7 @@ trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     /// Creates a new socket with the given external state.
     ///
     /// The ID returned by this method must be removed by calling
-    /// [`SyncContext::remove_socket`] once it is no longer in use.
+    /// [`DeviceSocketContext::remove_socket`] once it is no longer in use.
     fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId;
 
     /// Removes a socket.
@@ -237,11 +236,11 @@ trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     ) -> R;
 }
 
-/// Synchronized context for accessing the state of an individual socket.
+/// Core context for accessing the state of an individual socket.
 trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     DeviceSocketContextTypes + DeviceIdContext<AnyDevice>
 {
-    /// Synchronized context available in callbacks to methods on this context.
+    /// Core context available in callbacks to methods on this context.
     type SocketStateCoreCtx<'a>: DeviceIdContext<
         AnyDevice,
         DeviceId = Self::DeviceId,
@@ -277,11 +276,11 @@ trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     ) -> R;
 }
 
-/// Synchronized context for accessing the socket state for a device.
+/// Core context for accessing the socket state for a device.
 trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     SocketStateAccessor<BC>
 {
-    /// Synchronized context available in callbacks to methods on this context.
+    /// Core context available in callbacks to methods on this context.
     type DeviceSocketCoreCtx<'a>: SocketStateAccessor<
         BC,
         SocketId = Self::SocketId,
@@ -728,8 +727,8 @@ pub fn send_datagram<BC: crate::BindingsContext, B: BufferMut>(
 
 /// Allows the rest of the stack to dispatch packets to listening sockets.
 ///
-/// This is implemented on top of [`SyncContext`] and abstracts packet socket
-/// delivery from the rest of the system.
+/// This is implemented on top of [`DeviceSocketContext`] and abstracts packet
+/// socket delivery from the rest of the system.
 pub(crate) trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
     /// Dispatch a received frame to sockets.
     fn handle_frame(

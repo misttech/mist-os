@@ -754,7 +754,7 @@ impl<R> RemoveDeviceResult<R, Never> {
 }
 
 /// An alias for [`RemoveDeviceResult`] that extracts the receiver type from the
-/// NonSyncContext.
+/// bindings context.
 pub type RemoveDeviceResultWithContext<S, BT> =
     RemoveDeviceResult<S, <BT as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 

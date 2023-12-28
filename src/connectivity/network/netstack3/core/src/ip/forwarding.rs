@@ -108,13 +108,13 @@ pub fn set_routes<I: Ip, BC: BindingsContext>(
     let () = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx)), Wrap(entries)),
-        |(IpInvariant((sync_ctx, _ctx)), Wrap(mut entries))| {
-            let mut sync_ctx = Locked::new(sync_ctx);
+        |(IpInvariant((core_ctx, _bindings_ctx)), Wrap(mut entries))| {
+            let mut core_ctx = Locked::new(core_ctx);
             // Make sure to sort the entries _before_ taking the routing table lock.
             entries.sort_unstable_by(|a, b| {
                 OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
             });
-            IpStateContext::<I, _>::with_ip_routing_table_mut(&mut sync_ctx, |_sync_ctx, table| {
+            IpStateContext::<I, _>::with_ip_routing_table_mut(&mut core_ctx, |_core_ctx, table| {
                 table.table = entries;
             });
         },
@@ -1052,8 +1052,8 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(|sync_ctx, device, device_unusable| {
-        let disabled_devices = sync_ctx.get_mut().disabled_devices_mut();
+    #[test_case(|core_ctx, device, device_unusable| {
+        let disabled_devices = core_ctx.get_mut().disabled_devices_mut();
         if device_unusable {
             let _: bool = disabled_devices.insert(device);
         } else {
@@ -1396,7 +1396,6 @@ mod tests {
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         let metric = RawMetric(9999);
-        //let device_id = sync_ctx.state.device.add_ethernet_device(
         let device_id = crate::device::add_ethernet_device(
             &core_ctx,
             I::FAKE_CONFIG.local_mac,

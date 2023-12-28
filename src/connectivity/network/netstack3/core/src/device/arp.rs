@@ -180,7 +180,7 @@ pub(crate) trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::Device
     type ArpSenderCtx<'a>: ArpSenderContext<D, BC, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a mutable reference to ARP state and the
-    /// synchronized context.
+    /// core sender context.
     fn with_arp_state_mut_and_sender_ctx<
         O,
         F: FnOnce(&mut ArpState<D, BC::Instant, BC::Notifier>, &mut Self::ArpSenderCtx<'_>) -> O,

@@ -1182,8 +1182,7 @@ pub(crate) mod testutil {
         fn duration(&self, _: &'static CStr) {}
     }
 
-    /// A test helper used to provide an implementation of a non-synchronized
-    /// context.
+    /// A test helper used to provide an implementation of a bindings context.
     pub(crate) struct FakeBindingsCtx<TimerId, Event: Debug, State> {
         pub(crate) rng: FakeCryptoRng<XorShiftRng>,
         pub(crate) timers: FakeTimerCtx<TimerId>,
@@ -1509,8 +1508,7 @@ pub(crate) mod testutil {
         }
     }
 
-    /// A test helper used to provide an implementation of a synchronized
-    /// context.
+    /// A test helper used to provide an implementation of a core context.
     #[cfg(test)]
     #[derive(Derivative)]
     #[derivative(Default(bound = "S: Default"))]

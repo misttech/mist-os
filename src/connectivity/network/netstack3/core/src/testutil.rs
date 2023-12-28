@@ -99,15 +99,15 @@ pub mod context {
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
-/// A structure holding a sync context and a non sync context.
+/// A structure holding a core and a bindings context.
 #[derive(Default)]
 pub struct ContextPair<CC, BT> {
-    /// The synchronized context.
+    /// The core context.
     pub core_ctx: CC,
-    /// The non-synchronized context.
-    // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
-    // dropped before `non-sync_ctx` so that the existence of strongly-referenced
-    // device IDs in `non_sync_ctx` causes test failures, forcing proper cleanup
+    /// The bindings context.
+    // We put `bindings_ctx` after `core_ctx` to make sure that `core_ctx` is
+    // dropped before `bindings_ctx` so that the existence of strongly-referenced
+    // device IDs in `bindings_ctx` causes test failures, forcing proper cleanup
     // of device IDs in our unit tests.
     //
     // Note that if strongly-referenced (device) IDs exist when dropping the
@@ -208,7 +208,7 @@ pub(crate) mod benchmarks {
 }
 
 #[derive(Default)]
-/// Non-sync context state held by [`FakeNonSyncCtx`].
+/// Bindings context state held by [`FakeBindingsCtx`].
 pub struct FakeBindingsCtxState {
     icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<Vec<u8>>>,
     icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<Vec<u8>>>,
@@ -236,12 +236,12 @@ impl FakeBindingsCtxState {
     }
 }
 
-/// Shorthand for [`Ctx`] with a [`FakeNonSyncCtx`].
+/// Shorthand for [`Ctx`] with a [`FakeBindingsCtx`].
 pub type FakeCtx = Ctx<FakeBindingsCtx>;
-/// Shorthand for [`SyncCtx`] that uses a [`FakeNonSyncCtx`].
+/// Shorthand for [`SyncCtx`] that uses a [`FakeBindingsCtx`].
 pub type FakeCoreCtx = SyncCtx<FakeBindingsCtx>;
 
-/// Test-only implementation of [`crate::NonSyncContext`].
+/// Test-only implementation of [`crate::BindingsContext`].
 #[derive(Default, Clone)]
 pub struct FakeBindingsCtx(
     Arc<
@@ -519,7 +519,7 @@ impl crate::ReferenceNotifiers for FakeBindingsCtx {
         // always single-threaded and single-task, and we want to encourage
         // explicit cleanup.
         panic!(
-            "FakeNonSyncCtx can't create deferred reference notifiers for type {}: \
+            "FakeBindingsCtx can't create deferred reference notifiers for type {}: \
             debug_references={debug_references:?}",
             core::any::type_name::<T>()
         );

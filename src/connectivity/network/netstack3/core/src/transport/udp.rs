@@ -1074,7 +1074,7 @@ impl<I: IpExt, BC: InstantContext + RngContext + TracingContext + UdpBindingsCon
 pub(crate) trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
-    /// The synchronized context passed to the callback provided to methods.
+    /// The core context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
@@ -1127,7 +1127,7 @@ pub(crate) trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self
 pub(crate) trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callback.
+    /// The core context passed to the callback.
     type SocketStateCtx<'a>: BoundStateContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + UdpStateContext;
@@ -1175,7 +1175,7 @@ pub(crate) trait DualStackBoundStateContext<
     BC: UdpStateBindingsContext<I, Self::DeviceId>,
 >: DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callbacks to methods.
+    /// The core context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         // Allow creating IP sockets for the other IP version.
@@ -3049,11 +3049,11 @@ mod tests {
     type FakeUdpInnerCoreCtx<D> =
         Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>>, FakeBufferCoreCtx<D>>;
 
-    /// `FakeNonSyncCtx` specialized for UDP.
+    /// `FakeBindingsCtx` specialized for UDP.
     type FakeUdpBindingsCtx = FakeBindingsCtx<(), (), FakeBindingsCtxState>;
 
-    /// The FakeSyncCtx held as the inner state of the [`WrappedFakeSyncCtx`] that
-    /// is [`FakeUdpSyncCtx`].
+    /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
+    /// is [`FakeUdpCoreCtx`].
     type FakeBufferCoreCtx<D> =
         FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>;
 
@@ -3278,7 +3278,7 @@ mod tests {
         }
     }
 
-    /// Ip packet delivery for the [`FakeUdpSyncCtx`].
+    /// Ip packet delivery for the [`FakeUdpCoreCtx`].
     impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId>
         IpTransportContext<I, FakeUdpBindingsCtx, FakeUdpCoreCtx<D>> for UdpIpTransportContext
     {
@@ -3311,9 +3311,18 @@ mod tests {
             let IpInvariant(result) = net_types::map_ip_twice!(
                 I,
                 (IpInvariant((core_ctx, bindings_ctx, device, buffer)), SrcWrapper(src_ip), dst_ip),
-                |(IpInvariant((sync_ctx, ctx, device, buffer)), SrcWrapper(src_ip), dst_ip)| {
+                |(
+                    IpInvariant((core_ctx, bindings_ctx, device, buffer)),
+                    SrcWrapper(src_ip),
+                    dst_ip,
+                )| {
                     IpInvariant(receive_ip_packet::<I, _, _, _>(
-                        sync_ctx, ctx, device, src_ip, dst_ip, buffer,
+                        core_ctx,
+                        bindings_ctx,
+                        device,
+                        src_ip,
+                        dst_ip,
+                        buffer,
                     ))
                 }
             );

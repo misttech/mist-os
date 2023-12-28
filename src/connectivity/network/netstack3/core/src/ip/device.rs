@@ -2561,7 +2561,7 @@ mod tests {
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut Locked::new(*core_ctx),
                 device_id,
-                |addrs, _sync_ctx| {
+                |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
                 }
             ),
@@ -2776,7 +2776,7 @@ mod tests {
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut Locked::new(core_ctx),
                 &device_id,
-                |addrs, _sync_ctx| {
+                |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
                 }
             ),
@@ -2861,7 +2861,7 @@ mod tests {
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut Locked::new(core_ctx),
                 &device_id,
-                |addrs, _sync_ctx| {
+                |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
                 }
             ),
@@ -2996,7 +2996,7 @@ mod tests {
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut Locked::new(core_ctx),
                 &device_id,
-                |addrs, _sync_ctx| {
+                |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
                 }
             ),
@@ -3342,7 +3342,7 @@ mod tests {
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut Locked::new(&core_ctx),
                 &device_id,
-                |addrs, _sync_ctx| {
+                |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
                 }
             ),

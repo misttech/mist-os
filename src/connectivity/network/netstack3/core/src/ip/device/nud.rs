@@ -1592,7 +1592,7 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, S
     type SenderCtx<'a>: NudSenderContext<I, D, BC, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a mutable reference to the NUD state and the
-    /// synchronized context.
+    /// core sender context.
     fn with_nud_state_mut_and_sender_ctx<
         O,
         F: FnOnce(&mut NudState<I, D, BC::Instant, BC::Notifier>, &mut Self::SenderCtx<'_>) -> O,

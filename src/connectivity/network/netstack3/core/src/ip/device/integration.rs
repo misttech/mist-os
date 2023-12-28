@@ -840,9 +840,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> DadContex
         );
 
         let mut entry = {
-            // Get a `Locked` at the same lock-level of our `sync_ctx`. We show
-            // add an empty assignment here for readability to make it clear that
-            // we are operating at the same lock-level.
+            // Get a `Locked` at the same lock-level of our `core_ctx`. We show
+            // add an empty assignment here for readability to make it clear
+            // that we are operating at the same lock-level.
             type CurrentLockLevel = crate::lock_ordering::IpDeviceConfiguration<Ipv6>;
             let _: &mut Locked<_, CurrentLockLevel> = core_ctx;
             Locked::<_, CurrentLockLevel>::new_locked(addr.deref())
@@ -1061,7 +1061,7 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
             |mut state, core_ctx| {
                 let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>();
                 // We lock the state according to the IPv6 route discovery
-                // lock level but the callback needs access to the sync context
+                // lock level but the callback needs access to the core context
                 // so we cast its lock-level to IPv6 route discovery so that
                 // only locks that may be acquired _after_ the IPv6 route
                 // discovery lock may be acquired.

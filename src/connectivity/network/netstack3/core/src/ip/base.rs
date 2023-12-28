@@ -1801,10 +1801,10 @@ macro_rules! drop_packet_and_undo_parse {
 /// ready to do so. If the packet isn't fragmented, or a packet was reassembled,
 /// attempt to dispatch the packet.
 macro_rules! process_fragment {
-    ($sync_ctx:expr, $ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident) => {{
+    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident) => {{
         match FragmentHandler::<$ip, _>::process_fragment::<&mut [u8]>(
-            $sync_ctx,
-            $ctx,
+            $core_ctx,
+            $bindings_ctx,
             $packet,
         ) {
             // Handle the packet right away since reassembly is not needed.
@@ -1814,8 +1814,8 @@ macro_rules! process_fragment {
                 // - Check for already-expired TTL?
                 let (_, _, proto, meta) = packet.into_metadata();
                 $dispatch(
-                    $sync_ctx,
-                    $ctx,
+                    $core_ctx,
+                    $bindings_ctx,
                     $device,
                     $frame_dst,
                     $src_ip,
@@ -1833,8 +1833,8 @@ macro_rules! process_fragment {
 
                 // Attempt to reassemble the packet.
                 match FragmentHandler::<$ip, _>::reassemble_packet(
-                    $sync_ctx,
-                    $ctx,
+                    $core_ctx,
+                    $bindings_ctx,
                     &key,
                     buffer.buffer_view_mut(),
                 ) {
@@ -1845,8 +1845,8 @@ macro_rules! process_fragment {
                         // - Check for already-expired TTL?
                         let (_, _, proto, meta) = packet.into_metadata();
                         $dispatch::<_, Buf<Vec<u8>>, _>(
-                            $sync_ctx,
-                            $ctx,
+                            $core_ctx,
+                            $bindings_ctx,
                             $device,
                             $frame_dst,
                             $src_ip,
@@ -1861,7 +1861,7 @@ macro_rules! process_fragment {
                     _ => return,
                     #[allow(unreachable_patterns)]
                     Err(e) => {
-                        $sync_ctx.with_counters(|counters: &IpCounters<$ip>| {
+                        $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
                             counters.fragment_reassembly_error.increment();
                         });
                         trace!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
@@ -1871,20 +1871,20 @@ macro_rules! process_fragment {
             // Cannot proceed since we need more fragments before we
             // can reassemble a packet.
             FragmentProcessingState::NeedMoreFragments => {
-                $sync_ctx.with_counters(|counters: &IpCounters<$ip>| {
+                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
                     counters.need_more_fragments.increment();
                 });
                 trace!("receive_ip_packet: fragmented, need more before reassembly")
             }
             // TODO(ghanan): Handle invalid fragments.
             FragmentProcessingState::InvalidFragment => {
-                $sync_ctx.with_counters(|counters: &IpCounters<$ip>| {
+                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
                     counters.invalid_fragment.increment();
                 });
                 trace!("receive_ip_packet: fragmented, invalid")
             }
             FragmentProcessingState::OutOfMemory => {
-                $sync_ctx.with_counters(|counters: &IpCounters<$ip>| {
+                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
                     counters.fragment_cache_full.increment();
                 });
                 trace!("receive_ip_packet: fragmented, dropped because OOM")

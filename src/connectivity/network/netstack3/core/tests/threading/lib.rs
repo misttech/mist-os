@@ -372,7 +372,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Remove the device so that existing NUD timers get cleaned up;
         // otherwise, they would hold dangling references to the device when the
-        // sync context is dropped at the end of the test.
+        // core context is dropped at the end of the test.
         netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
             &core_ctx,
             &mut bindings_ctx,
@@ -473,7 +473,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         set_static_neighbor.join().unwrap();
 
         // Remove the device so that existing references to it get cleaned up
-        // before the sync context is dropped at the end of the test.
+        // before the core context is dropped at the end of the test.
         netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
             &core_ctx,
             &mut bindings_ctx,

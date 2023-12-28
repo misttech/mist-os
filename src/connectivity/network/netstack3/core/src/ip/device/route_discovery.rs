@@ -93,7 +93,7 @@ pub(super) trait Ipv6RouteDiscoveryContext<BC>: DeviceIdContext<AnyDevice> {
     );
 }
 
-/// The non-synchronized execution context for IPv6 route discovery.
+/// The bindings execution context for IPv6 route discovery.
 trait Ipv6RouteDiscoveryBindingsContext<DeviceId>:
     TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>
 {

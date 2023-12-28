@@ -412,8 +412,8 @@ fn dispatch(
         }
         AdvanceTime(SmallDuration(duration)) => {
             let _: Vec<TimerId<_>> = bindings_ctx
-                .trigger_timers_for(duration, |non_sync_ctx, id| {
-                    netstack3_core::handle_timer(core_ctx, non_sync_ctx, id)
+                .trigger_timers_for(duration, |bindings_ctx, id| {
+                    netstack3_core::handle_timer(core_ctx, bindings_ctx, id)
                 });
         }
     }

@@ -1137,7 +1137,7 @@ pub(crate) mod testutil {
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
-            panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeSyncCtx instead");
+            panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
         }
     }
 
@@ -1597,7 +1597,7 @@ pub(crate) mod testutil {
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
         ) -> Result<(), S> {
-            panic!("FakeDualStackIpSocketCtx can't send packets, wrap it in a FakeSyncCtx instead");
+            panic!("FakeDualStackIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
         }
     }
 

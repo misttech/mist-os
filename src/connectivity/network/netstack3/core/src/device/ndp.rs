@@ -327,7 +327,7 @@ mod tests {
 
         // Remove the devices so that existing NUD timers get cleaned up;
         // otherwise, they would hold dangling references to the device when the
-        // sync context is dropped at the end of the test.
+        // core context is dropped at the end of the test.
         let local_device_id_clone = local_eth_device_id.clone();
         let remote_device_id_clone = remote_eth_device_id.clone();
         let mut net = scopeguard::guard(net, move |mut net| {

@@ -754,7 +754,7 @@ pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<
     >
     where
         I: datagram::IpExt;
-    /// The synchronized context passed to the callback provided to methods.
+    /// The core context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -1275,8 +1275,8 @@ impl<BC: IcmpBindingsContext<Ipv6, Self::DeviceId>, CC: InnerIcmpContext<Ipv6, B
 
 /// Attempt to send an ICMP or ICMPv6 error message, applying a rate limit.
 ///
-/// `try_send_error!($sync_ctx, $ctx, $e)` attempts to consume a token from the
-/// token bucket at `$sync_ctx.get_state_mut().error_send_bucket`. If it
+/// `try_send_error!($core_ctx, $bindings_ctx, $e)` attempts to consume a token from the
+/// token bucket at `$core_ctx.get_state_mut().error_send_bucket`. If it
 /// succeeds, it invokes the expression `$e`, and otherwise does nothing. It
 /// assumes that the type of `$e` is `Result<(), _>` and, in the case that the
 /// rate limit is exceeded and it does not invoke `$e`, returns `Ok(())`.
@@ -1287,17 +1287,17 @@ impl<BC: IcmpBindingsContext<Ipv6, Self::DeviceId>, CC: InnerIcmpContext<Ipv6, B
 ///
 /// [RFC 4443 Section 2.4]: https://tools.ietf.org/html/rfc4443#section-2.4
 macro_rules! try_send_error {
-    ($sync_ctx:expr, $ctx:expr, $e:expr) => {{
+    ($core_ctx:expr, $bindings_ctx:expr, $e:expr) => {{
         // TODO(joshlf): Figure out a way to avoid querying for the current time
         // unconditionally. See the documentation on the `CachedInstantCtx` type
         // for more information.
-        let instant_ctx = crate::context::new_cached_instant_context($ctx);
-        let send = $sync_ctx.with_error_send_bucket_mut(|error_send_bucket| {
+        let instant_ctx = crate::context::new_cached_instant_context($bindings_ctx);
+        let send = $core_ctx.with_error_send_bucket_mut(|error_send_bucket| {
             error_send_bucket.try_take(&instant_ctx)
         });
 
         if send {
-            $sync_ctx.with_counters(|counters| {
+            $core_ctx.with_counters(|counters| {
                 counters.error.increment();
             });
             $e
@@ -3735,8 +3735,8 @@ impl<
 
 /// Creates a new unbound ICMP socket.
 pub fn new_socket<I: Ip, BC: BindingsContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
-    net_types::map_ip_twice!(I, IpInvariant(core_ctx), |IpInvariant(sync_ctx)| {
-        SocketHandler::<I, BC>::create(&mut Locked::new(sync_ctx))
+    net_types::map_ip_twice!(I, IpInvariant(core_ctx), |IpInvariant(core_ctx)| {
+        SocketHandler::<I, BC>::create(&mut Locked::new(core_ctx))
     },)
 }
 
@@ -3753,10 +3753,10 @@ pub fn connect<I: Ip, BC: BindingsContext>(
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip)| {
+        |(IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip)| {
             IpInvariant(SocketHandler::<I, BC>::connect(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
                 remote_ip,
                 remote_id,
@@ -3780,10 +3780,10 @@ pub fn bind<I: Ip, BC: BindingsContext>(
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip),
-        |(IpInvariant((sync_ctx, ctx, icmp_id)), id, local_ip)| {
+        |(IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip)| {
             IpInvariant(SocketHandler::<I, _>::bind(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
                 local_ip,
                 icmp_id,
@@ -3803,10 +3803,10 @@ pub fn send<I: Ip, B: BufferMut, BC: BindingsContext>(
     body: B,
 ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, body)), id), |(
-        IpInvariant((sync_ctx, ctx, body)),
+        IpInvariant((core_ctx, bindings_ctx, body)),
         id,
     )| {
-        SocketHandler::<I, BC>::send(&mut Locked::new(sync_ctx), ctx, id, body)
+        SocketHandler::<I, BC>::send(&mut Locked::new(core_ctx), bindings_ctx, id, body)
     })
 }
 
@@ -3826,10 +3826,10 @@ pub fn send_to<I: Ip, B: BufferMut, BC: BindingsContext>(
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id)),
-        |(IpInvariant((sync_ctx, ctx, body)), (remote_ip, id))| {
+        |(IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id))| {
             IpInvariant(SocketHandler::<I, BC>::send_to(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
                 remote_ip,
                 body,
@@ -3877,10 +3877,10 @@ pub fn get_info<I: Ip, BC: BindingsContext>(
     id: &SocketId<I>,
 ) -> SocketInfo<I::Addr, crate::device::WeakDeviceId<BC>> {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((sync_ctx, ctx)),
+        IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::get_info(&mut Locked::new(sync_ctx), ctx, id)
+        SocketHandler::<I, BC>::get_info(&mut Locked::new(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3898,10 +3898,10 @@ pub fn set_device<I: Ip, BC: crate::BindingsContext>(
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx, device_id)), id),
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx, device_id)), id)| {
             IpInvariant(SocketHandler::<I, _>::set_device(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
                 device_id,
             ))
@@ -3919,10 +3919,10 @@ pub fn get_bound_device<I: Ip, BC: crate::BindingsContext>(
     let IpInvariant(device) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, _>::get_bound_device(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
             ))
         }
@@ -3937,10 +3937,10 @@ pub fn disconnect<I: Ip, BC: BindingsContext>(
     id: &SocketId<I>,
 ) -> Result<(), datagram::ExpectedConnError> {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((sync_ctx, ctx)),
+        IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::disconnect(&mut Locked::new(sync_ctx), ctx, id)
+        SocketHandler::<I, BC>::disconnect(&mut Locked::new(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3952,10 +3952,15 @@ pub fn shutdown<I: Ip, BC: BindingsContext>(
     shutdown_type: ShutdownType,
 ) -> Result<(), datagram::ExpectedConnError> {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, shutdown_type)), id), |(
-        IpInvariant((sync_ctx, ctx, shutdown_type)),
+        IpInvariant((core_ctx, bindings_ctx, shutdown_type)),
         id,
     )| {
-        SocketHandler::<I, BC>::shutdown(&mut Locked::new(sync_ctx), ctx, id, shutdown_type)
+        SocketHandler::<I, BC>::shutdown(
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
+            id,
+            shutdown_type,
+        )
     })
 }
 
@@ -3966,10 +3971,10 @@ pub fn get_shutdown<I: Ip, BC: BindingsContext>(
     id: &SocketId<I>,
 ) -> Option<ShutdownType> {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((sync_ctx, ctx)),
+        IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::get_shutdown(&mut Locked::new(sync_ctx), ctx, id)
+        SocketHandler::<I, BC>::get_shutdown(&mut Locked::new(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3980,10 +3985,10 @@ pub fn close<I: Ip, BC: BindingsContext>(
     id: SocketId<I>,
 ) {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((sync_ctx, ctx)),
+        IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::close(&mut Locked::new(sync_ctx), ctx, id)
+        SocketHandler::<I, BC>::close(&mut Locked::new(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3995,12 +4000,12 @@ pub fn set_unicast_hop_limit<I: Ip, BC: BindingsContext>(
     hop_limit: Option<NonZeroU8>,
 ) {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, hop_limit)), id), |(
-        IpInvariant((sync_ctx, ctx, hop_limit)),
+        IpInvariant((core_ctx, bindings_ctx, hop_limit)),
         id,
     )| {
         SocketHandler::<I, BC>::set_unicast_hop_limit(
-            &mut Locked::new(sync_ctx),
-            ctx,
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
             id,
             hop_limit,
         )
@@ -4015,12 +4020,12 @@ pub fn set_multicast_hop_limit<I: Ip, BC: BindingsContext>(
     hop_limit: Option<NonZeroU8>,
 ) {
     net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, hop_limit)), id), |(
-        IpInvariant((sync_ctx, ctx, hop_limit)),
+        IpInvariant((core_ctx, bindings_ctx, hop_limit)),
         id,
     )| {
         SocketHandler::<I, BC>::set_multicast_hop_limit(
-            &mut Locked::new(sync_ctx),
-            ctx,
+            &mut Locked::new(core_ctx),
+            bindings_ctx,
             id,
             hop_limit,
         )
@@ -4036,10 +4041,10 @@ pub fn get_unicast_hop_limit<I: Ip, BC: BindingsContext>(
     let IpInvariant(hop_limit) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, BC>::get_unicast_hop_limit(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
             ))
         }
@@ -4056,10 +4061,10 @@ pub fn get_multicast_hop_limit<I: Ip, BC: BindingsContext>(
     let IpInvariant(hop_limit) = net_types::map_ip_twice!(
         I,
         (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, BC>::get_multicast_hop_limit(
-                &mut Locked::new(sync_ctx),
-                ctx,
+                &mut Locked::new(core_ctx),
+                bindings_ctx,
                 id,
             ))
         }
@@ -4126,8 +4131,8 @@ mod tests {
         }
     }
 
-    /// The FakeSyncCtx held as the inner state of the [`WrappedFakeSyncCtx`] that
-    /// is [`FakeSyncCtx`].
+    /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
+    /// is [`FakeCoreCtx`].
     type FakeBufferCoreCtx = FakeCoreCtx<
         FakeDualStackIpSocketCtx<FakeDeviceId>,
         DualStackSendIpPacketMeta<FakeDeviceId>,
@@ -4202,14 +4207,14 @@ mod tests {
         }
     }
 
-    /// `FakeSyncCtx` specialized for ICMP.
+    /// `FakeCoreCtx` specialized for ICMP.
     type FakeIcmpCoreCtx<I> =
         Wrapped<SocketsState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerCoreCtx<I>>;
 
     type FakeIcmpInnerCoreCtx<I> =
         Wrapped<FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
 
-    /// `FakeNonSyncCtx` specialized for ICMP.
+    /// `FakeBindingsCtx` specialized for ICMP.
     type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>>;
 
     type FakeIcmpCtx<I> =

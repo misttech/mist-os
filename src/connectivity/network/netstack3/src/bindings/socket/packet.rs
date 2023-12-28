@@ -42,7 +42,7 @@ use crate::bindings::{
     BindingsCtx, Ctx,
 };
 
-/// State held in the non-sync context for a single socket.
+/// State held in the bindings context for a single socket.
 #[derive(Debug)]
 pub(crate) struct SocketState {
     /// The received messages for the socket.

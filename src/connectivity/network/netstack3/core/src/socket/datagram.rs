@@ -569,7 +569,7 @@ pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
 pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callback provided to methods.
+    /// The core context passed to the callback provided to methods.
     type SocketsStateCtx<'a>: DatagramBoundStateContext<I, BC, S>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
@@ -601,7 +601,7 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
 pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callback provided to methods.
+    /// The core context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
@@ -727,7 +727,7 @@ impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
 pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callbacks to methods.
+    /// The core context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         // Allow creating IP sockets for the other IP version.
@@ -4989,9 +4989,9 @@ pub(crate) mod testutil {
         ip::socket::testutil::FakeDeviceConfig, testutil::TestIpExt,
     };
 
-    // Helper function to ensure the Fake SyncCtx and NonSyncCtx are
-    // setup with [`FakeDeviceConfig`] (one per provided device), with
-    // remote/local IPs that support a connection to the given remote_ip.
+    // Helper function to ensure the Fake CoreCtx and BindingsCtx are setup with
+    // [`FakeDeviceConfig`] (one per provided device), with remote/local IPs
+    // that support a connection to the given remote_ip.
     pub(crate) fn setup_fake_ctx_with_dualstack_conn_addrs<
         TimerId,
         Event: Debug,

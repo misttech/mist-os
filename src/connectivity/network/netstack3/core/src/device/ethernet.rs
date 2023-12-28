@@ -211,11 +211,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             self,
             device_id,
             |mut state, core_ctx| {
-                // We lock the state at the Ethernet IPv6 NUD lock level, but the
-                // callback needs access to the sync context as well as the NUD
-                // state, so we also cast its lock level to the same so that only
-                // locks that may be acquired _after_ the IPv6 NUD lock may be
-                // acquired in the callback.
+                // We lock the state at the Ethernet IPv6 NUD lock level, but
+                // the callback needs access to the core context as well as the
+                // NUD state, so we also cast its lock level to the same so that
+                // only locks that may be acquired _after_ the IPv6 NUD lock may
+                // be acquired in the callback.
                 type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
                 let mut nud = state.lock::<LockLevel>();
                 let mut locked = CoreCtxWithDeviceId {
@@ -242,11 +242,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             self,
             device_id,
             |mut state, core_ctx| {
-                // We lock the state at the Ethernet IPv6 NUD lock level, but the
-                // callback needs access to the sync context as well as the NUD
-                // state, so we also cast its lock level to the same so that only
-                // locks that may be acquired _after_ the IPv6 NUD lock may be
-                // acquired in the callback.
+                // We lock the state at the Ethernet IPv6 NUD lock level, but
+                // the callback needs access to the core context as well as the
+                // NUD state, so we also cast its lock level to the same so that
+                // only locks that may be acquired _after_ the IPv6 NUD lock may
+                // be acquired in the callback.
                 type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
                 let mut nud = state.lock::<LockLevel>();
                 let mut locked = CoreCtxWithDeviceId {
