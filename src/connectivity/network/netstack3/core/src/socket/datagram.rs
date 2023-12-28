@@ -978,11 +978,6 @@ pub(crate) trait DualStackIpExt: super::DualStackIpExt {
     where
         Self: IpExt;
 
-    /// Convert a `Self::DualStackBoundSocketId` into an [`DualStackIpSocket`].
-    fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackBoundSocketId<S>,
-    ) -> DualStackIpSocket<'a, Self, S>;
-
     /// Retrieves the associated connection address from the connection state.
     fn conn_addr_from_state<D: Eq + Hash + Debug + Clone, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
@@ -1000,12 +995,6 @@ pub(crate) trait DualStackIpExt: super::DualStackIpExt {
 pub(crate) enum EitherIpSocket<S: DatagramSocketSpec> {
     V4(S::SocketId<Ipv4>),
     V6(S::SocketId<Ipv6>),
-}
-
-/// An IP Socket ID that is either `I` or `I::OtherVersion`.
-pub(crate) enum DualStackIpSocket<'a, I: IpExt, S: DatagramSocketSpec> {
-    CurrentStack(&'a S::SocketId<I>),
-    OtherStack(&'a S::SocketId<I::OtherVersion>),
 }
 
 impl DualStackIpExt for Ipv4 {
@@ -1029,15 +1018,6 @@ impl DualStackIpExt for Ipv4 {
         id: S::SocketId<Self>,
     ) -> Self::DualStackBoundSocketId<S> {
         EitherIpSocket::V4(id)
-    }
-
-    fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackBoundSocketId<S>,
-    ) -> DualStackIpSocket<'a, Self, S> {
-        match id {
-            EitherIpSocket::V4(id) => DualStackIpSocket::CurrentStack(id),
-            EitherIpSocket::V6(id) => DualStackIpSocket::OtherStack(id),
-        }
     }
 
     fn conn_addr_from_state<D: Clone + Debug + Eq + Hash, S: DatagramSocketSpec>(
@@ -1079,12 +1059,6 @@ impl DualStackIpExt for Ipv6 {
         id: S::SocketId<Self>,
     ) -> Self::DualStackBoundSocketId<S> {
         id
-    }
-
-    fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackBoundSocketId<S>,
-    ) -> DualStackIpSocket<'a, Self, S> {
-        DualStackIpSocket::CurrentStack(id)
     }
 
     fn conn_addr_from_state<D: Clone + Debug + Eq + Hash, S: DatagramSocketSpec>(
