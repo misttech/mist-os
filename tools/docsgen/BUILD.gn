@@ -66,36 +66,16 @@ action("invoke_fidldoc") {
 }
 
 clidoc_tarfile = "clidoc_out.tar.gz"
-
-# Some SDK dependencies lifted from //src/developer/ffx/build/ffx_action.
-# This is the actual label for the sdk host tools, and is used to provide the
-# path to the sdk molecule manifest.
-sdk_host_tools_visibility_bridge_label =
-    "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
-_sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
-sdk_host_tools_manifest =
-    get_label_info(_sdk_host_tools_label, "root_out_dir") +
-    "/sdk/manifest/host_tools.internal"
-
 compiled_action("invoke_clidoc") {
   tool = "//tools/clidoc:clidoc_bin"
   tool_output_name = "clidoc"
   depfile = "$target_out_dir/$target_name.d"
   deps = [
     "//sdk:host_tools",
-    sdk_host_tools_visibility_bridge_label,
+
+    # TODO(https://fxbug.dev/86553) check if triage belongs in sdk docs.
+    "//src/diagnostics/triage:triage_bin",
   ]
-  if (is_host) {
-    deps += [
-      "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
-      "//src/developer/ffx/plugins/component:ffx_component($host_toolchain)",
-      "//src/developer/ffx/tools($host_toolchain)",
-
-      # TODO(https://fxbug.dev/86553) check if triage belongs in sdk docs.
-      "//src/diagnostics/triage:triage_bin",
-    ]
-  }
-
   metadata = {
     # Record metadata for the //tools/docsgen build API.
     generated_docset = [
@@ -110,8 +90,6 @@ compiled_action("invoke_clidoc") {
       },
     ]
   }
-
-  inputs = [ sdk_host_tools_manifest ]
   outputs = [ "$target_out_dir/$clidoc_tarfile" ]
   args = [
     "-o",
@@ -121,10 +99,6 @@ compiled_action("invoke_clidoc") {
     rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir),
     "--depfile",
     rebase_path(depfile, root_build_dir),
-    "--sdk-root",
-    rebase_path(root_build_dir, root_build_dir),
-    "--sdk-manifest",
-    rebase_path(sdk_host_tools_manifest, root_build_dir),
   ]
 }
 

@@ -3,25 +3,24 @@
 // found in the LICENSE file.
 
 //! Clidoc generates documentation for host tool commands consisting of their --help output.
-use anyhow::{bail, Context, Result};
-use argh::FromArgs;
-use flate2::{write::GzEncoder, Compression};
-use lazy_static::lazy_static;
-use serde_json::Value;
-use std::{
-    collections::HashSet,
-    env,
-    ffi::{OsStr, OsString},
-    fs::{self, File},
-    io::{BufWriter, Write},
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Once,
+use {
+    anyhow::{bail, Context, Result},
+    argh::FromArgs,
+    flate2::{write::GzEncoder, Compression},
+    lazy_static::lazy_static,
+    std::{
+        collections::HashSet,
+        env,
+        ffi::{OsStr, OsString},
+        fs::{self, File},
+        io::{BufWriter, Write},
+        path::{Path, PathBuf},
+        process::Command,
+        sync::Once,
+    },
+    tar::Builder,
+    tracing::{debug, info},
 };
-use tar::Builder;
-use tracing::{debug, info};
-
-mod ffx_doc;
 
 enum HelpError {
     Ignore,
@@ -66,14 +65,6 @@ struct Opt {
     /// depfile is a Ninja term and does not need to be split into 2 words.
     #[argh(option)]
     depfile: Option<PathBuf>,
-
-    /// path to sdk manifest used to add files read by ffx to the depfile.
-    #[argh(option)]
-    sdk_manifest: Option<PathBuf>,
-
-    /// root of the sdk for ffx
-    #[argh(option)]
-    sdk_root: Option<PathBuf>,
 
     /// commands to run, otherwise defaults to internal list of commands.
     /// relative paths are on the input_path. Absolute paths are used as-is.
@@ -194,24 +185,10 @@ fn run(opt: Opt) -> Result<()> {
 
     // Write documentation output for each command.
     for cmd_path in cmd_paths.iter() {
-        // ffx can export the help info in JSON format.
-        if cmd_path.ends_with("ffx") {
-            ffx_doc::write_formatted_output_for_ffx(
-                &cmd_path,
-                output_path,
-                &opt.sdk_root,
-                &&opt.sdk_manifest,
-            )
-            .context(format!(
-                "Unable to write generate doc for {:?} to {:?}",
-                cmd_path, output_path
-            ))?;
-        } else {
-            write_formatted_output(&cmd_path, output_path).context(format!(
-                "Unable to write generate doc for {:?} to {:?}",
-                cmd_path, output_path
-            ))?;
-        }
+        write_formatted_output(&cmd_path, output_path).context(format!(
+            "Unable to write generate doc for {:?} to {:?}",
+            cmd_path, output_path
+        ))?;
     }
 
     info!("Generated documentation at dir: {}", &output_path.display());
@@ -220,35 +197,19 @@ fn run(opt: Opt) -> Result<()> {
         // First check if depfile is needed as well since this will probably be invoked
         // as part of a BUILD action.
         if let Some(depfile_path) = opt.depfile {
+            info!("Creating depfile at {:?} with {:?}", depfile_path, cmd_paths);
             let mut f = File::create(depfile_path).expect("Unable to create file");
-            let output_filename = tardir.display();
-            // Documented tools live in host_$ARCH path of build directory
-            let input_path_last = input_path.file_name().expect("input path trailing element");
-            let rel_path: PathBuf = PathBuf::from(input_path_last);
-            // Collect the metadata files for ffx also.
-            let metadata_paths = if let Some(ffx) = cmd_paths.iter().find(|p| p.ends_with("ffx")) {
-                find_ffx_metadata(&ffx, &opt.sdk_manifest)?
-            } else {
-                info!("No ffx in the commands?");
-                vec![]
-            };
-
-            for m in metadata_paths {
-                let filename: PathBuf = if m.is_absolute() {
-                    let tool = m.file_name();
-                    rel_path.join(tool.expect("get toolname"))
-                } else {
-                    m
-                };
-                info!("depfile: {output_filename}: {filename:?}");
-                write!(f, "{output_filename}: {}\n", filename.display())?;
-            }
-
-            for cmd_path in cmd_paths {
+            for cmd_path in cmd_paths.iter() {
+                // Documented tools live in host_$ARCH path of build directory
+                let input_path_last = input_path.file_name().expect("input path trailing element");
+                let p = PathBuf::from(input_path_last);
                 let tool = cmd_path.file_name();
-                let filename = rel_path.join(tool.expect("get toolname"));
-                info!("depfile: {output_filename}: {filename:?}");
-                write!(f, "{output_filename}: {}\n", filename.display())?;
+                write!(
+                    f,
+                    "{}: {}\n",
+                    tardir.display(),
+                    p.join(tool.expect("get toolname")).display()
+                )?;
             }
         }
 
@@ -473,70 +434,15 @@ fn help_output_for(tool: &Path, subcommands: &Vec<&String>) -> Result<Vec<String
 }
 
 /// Given a cmd name and a dir, create a full path ending in cmd.md.
-pub(crate) fn md_path(file_stem: &OsStr, dir: &PathBuf) -> PathBuf {
+fn md_path(file_stem: &OsStr, dir: &PathBuf) -> PathBuf {
     let mut path = Path::new(dir).join(file_stem);
     path.set_extension("md");
     path
 }
 
-/// Helper function to collect ffx subcommand metadata files.
-fn find_ffx_metadata(ffx: &PathBuf, sdk_manifest: &Option<PathBuf>) -> Result<Vec<PathBuf>> {
-    if let Some(input_path) = ffx.parent() {
-        let paths = fs::read_dir(&input_path)?;
-        let mut meta_data: Vec<_> = paths
-            .filter_map(|p| p.ok())
-            .filter_map(|p| if p.path().is_file() { Some(p.path()) } else { None })
-            .filter(|p| if let Some(ext) = p.extension() { ext == "json" } else { false })
-            .collect();
-        //read the manifest and get the sdk.meta.json files for ffx plugins.
-        if let Some(manifest) = sdk_manifest {
-            info!("Opening sdk_manifest: {sdk_manifest:?}");
-            let file = fs::File::open(manifest)?;
-            if let Value::Object(data) = serde_json::from_reader(file)? {
-                if let Some(Value::Array(atoms)) = data.get("atoms") {
-                    meta_data.extend(
-                        atoms
-                            .iter()
-                            .filter_map(|a| a.as_object())
-                            .filter_map(|a| {
-                                if let Some(Value::String(t)) = a.get("type") {
-                                    if t == "ffx_tool" {
-                                        a.get("files").unwrap().as_array()
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            })
-                            .flatten()
-                            .filter_map(|f| {
-                                if let Some(Value::String(src)) = f.get("source") {
-                                    if src.ends_with("sdk.meta.json") {
-                                        // the metadata is relative to parent of the root_dir.
-                                        Some(PathBuf::from(src))
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            }),
-                    );
-                }
-                meta_data.push(PathBuf::from(manifest));
-            }
-        }
-
-        return Ok(meta_data);
-    }
-    Ok(vec![])
-}
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use flate2::read::GzDecoder;
-    use tar::Archive;
+    use {super::*, flate2::read::GzDecoder, tar::Archive};
 
     #[test]
     fn run_test_commands() {
