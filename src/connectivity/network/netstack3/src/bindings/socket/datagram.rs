@@ -59,7 +59,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
-    BindingId, BindingsNonSyncCtxImpl, Ctx,
+    BindingId, BindingsCtx, Ctx,
 };
 
 use super::{
@@ -637,13 +637,11 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
     }
 }
 
-impl<I: icmp::IcmpIpExt> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
-    for SocketCollection<I, Udp>
-{
+impl<I: icmp::IcmpIpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
-        device_id: &DeviceId<BindingsNonSyncCtxImpl>,
+        device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
@@ -933,13 +931,11 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
     }
 }
 
-impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
-    for SocketCollection<I, IcmpEcho>
-{
+impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, IcmpEcho> {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -998,12 +994,12 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
-    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
+    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     /// Creates a new `BindingData`.
     fn new(
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        bindings_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsCtx>,
+        bindings_ctx: &mut BindingsCtx,
         properties: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -1128,11 +1124,9 @@ where
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
-    DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
+    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
@@ -1149,11 +1143,7 @@ where
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(
-        self,
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    ) {
+    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx) {
         let id = self.info.id;
         let _: Option<_> =
             I::with_collection_mut(bindings_ctx, |c| c.received.remove(id.get_key_index()));
@@ -1193,11 +1183,9 @@ where
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
-    DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
+    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     fn handle_request(
         mut self,
@@ -2288,7 +2276,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        T::set_ip_transparent(ctx.sync_ctx(), id, value)
+        T::set_ip_transparent(ctx.core_ctx(), id, value)
     }
 
     fn get_ip_transparent(self) -> bool {
@@ -2302,7 +2290,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        T::get_ip_transparent(ctx.sync_ctx(), id)
+        T::get_ip_transparent(ctx.core_ctx(), id)
     }
 }
 
@@ -3081,7 +3069,7 @@ mod tests {
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
+        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new()
             .add_endpoint()
@@ -3231,7 +3219,7 @@ mod tests {
                 for i in 0..2 {
                     t.get(i).with_ctx(|ctx| {
                         <A::AddrType as IpAddress>::Version::with_collection(
-                            ctx.non_sync_ctx(),
+                            ctx.bindings_ctx(),
                             |SocketCollection { received }| {
                                 assert_matches!(
                                     received.key_ordered_iter().collect::<Vec<_>>()[..],
@@ -3259,7 +3247,7 @@ mod tests {
                 for i in 0..2 {
                     t.get(i).with_ctx(|ctx| {
                         <A::AddrType as IpAddress>::Version::with_collection(
-                            ctx.non_sync_ctx(),
+                            ctx.bindings_ctx(),
                             |SocketCollection { received }| {
                                 assert_matches!(
                                     received.key_ordered_iter().collect::<Vec<_>>()[..],
@@ -3292,7 +3280,7 @@ mod tests {
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
+        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         // Make sure we cannot close twice from the same channel so that we
         // maintain the correct refcount.
@@ -3315,7 +3303,7 @@ mod tests {
         // empty
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.non_sync_ctx(),
+                ctx.bindings_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], [_]);
                 },
@@ -3330,7 +3318,7 @@ mod tests {
         // Now it should become empty
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.non_sync_ctx(),
+                ctx.bindings_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
@@ -3349,7 +3337,7 @@ mod tests {
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
+        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
@@ -3368,7 +3356,7 @@ mod tests {
         // No socket should be there now.
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.non_sync_ctx(),
+                ctx.bindings_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
@@ -3387,7 +3375,7 @@ mod tests {
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
+        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
@@ -3402,7 +3390,7 @@ mod tests {
         // make sure we don't leak anything.
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.non_sync_ctx(),
+                ctx.bindings_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
@@ -3546,7 +3534,7 @@ mod tests {
     ) where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         <A::AddrType as IpAddress>::Version: IcmpIpExt,
-        BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
+        BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
@@ -3583,7 +3571,7 @@ mod tests {
         };
         loop {
             let all_delivered = stack.with_ctx(|ctx| {
-                let bindings_ctx = ctx.non_sync_ctx_mut();
+                let bindings_ctx = ctx.bindings_ctx_mut();
                 <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<T>>::with_collection(
                     bindings_ctx,
                     |SocketCollection { received }| {

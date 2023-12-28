@@ -64,7 +64,7 @@ use crate::bindings::{
     devices, netdevice_worker,
     routes::{self, admin::RouteSet},
     util::{IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
-    BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _, Netstack, StackTime,
+    BindingId, BindingsCtx, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
@@ -584,7 +584,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
     // Cancel the `AddressStateProvider` workers and drive them to completion.
     let address_state_providers = {
         let core_id =
-            ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
+            ctx.bindings_ctx().devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
             futures::stream::FuturesUnordered::from_iter(i.addresses.values_mut().map(
                 |devices::AddressInfo {
@@ -674,8 +674,8 @@ async fn dispatch_control_request(
 
 async fn wait_for_device_removal<T: 'static>(
     id: BindingId,
-    result: netstack3_core::device::RemoveDeviceResultWithContext<T, BindingsNonSyncCtxImpl>,
-    weak_id: &netstack3_core::device::WeakDeviceId<BindingsNonSyncCtxImpl>,
+    result: netstack3_core::device::RemoveDeviceResultWithContext<T, BindingsCtx>,
+    weak_id: &netstack3_core::device::WeakDeviceId<BindingsCtx>,
 ) -> T {
     let mut receiver = match result {
         netstack3_core::device::RemoveDeviceResult::Removed(r) => {
@@ -763,7 +763,7 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         }
     };
     let core_id =
-        ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
+        ctx.bindings_ctx().devices.get_core_id(id).expect("missing device info for interface");
     let Some((worker, cancelation_sender)) = ({
         core_id.external_state().with_common_info_mut(|i| {
             i.addresses.get_mut(&specified_addr).map(
@@ -1100,7 +1100,7 @@ fn add_address(
     };
 
     let core_id =
-        ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
+        ctx.bindings_ctx().devices.get_core_id(id).expect("missing device info for interface");
     core_id.external_state().with_common_info_mut(|i| {
         let vacant_address_entry = match i.addresses.entry(specified_addr) {
             hash_map::Entry::Occupied(_occupied) => {
@@ -1214,7 +1214,7 @@ async fn run_address_state_provider(
         }
         Ok(()) => {
             let state_to_remove = if add_subnet_route {
-                let bindings_ctx = ctx.non_sync_ctx();
+                let bindings_ctx = ctx.bindings_ctx();
                 let core_id = bindings_ctx
                     .devices
                     .get_core_id(id)
@@ -1692,7 +1692,7 @@ mod enabled {
                 Netdevice(B),
             }
 
-            let core_id = ctx.non_sync_ctx().devices.get_core_id(*id).expect("device not present");
+            let core_id = ctx.bindings_ctx().devices.get_core_id(*id).expect("device not present");
             let port_handler = {
                 let mut info = match core_id.external_state() {
                     devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
@@ -1757,7 +1757,7 @@ mod enabled {
             let Self { id, ctx } = self;
             let mut ctx = ctx.lock().await;
             match ctx
-                .non_sync_ctx()
+                .bindings_ctx()
                 .devices
                 .get_core_id(*id)
                 .expect("device not present")

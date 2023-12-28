@@ -11,7 +11,7 @@ use super::{
     devices::{
         DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
     },
-    BindingsNonSyncCtxImpl, Ctx, StackTime,
+    BindingsCtx, Ctx, StackTime,
 };
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
@@ -61,11 +61,8 @@ impl Visitor {
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsNonSyncCtxImpl>> for DualIpVisitor {
-        fn visit(
-            &mut self,
-            socket: tcp::socket::SocketStats<I, WeakDeviceId<BindingsNonSyncCtxImpl>>,
-        ) {
+    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor {
+        fn visit(&mut self, socket: tcp::socket::SocketStats<I, WeakDeviceId<BindingsCtx>>) {
             let tcp::socket::SocketStats { local, remote } = socket;
             self.record_unique_child(|node| {
                 node.record_string("TransportProtocol", "TCP");
@@ -91,7 +88,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             })
         }
     }
-    let core_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.core_ctx();
     let mut visitor = DualIpVisitor::new();
     tcp::socket::with_info::<Ipv4, _, _>(core_ctx, &mut visitor);
     tcp::socket::with_info::<Ipv6, _, _>(core_ctx, &mut visitor);
@@ -101,16 +98,12 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a> netstack3_core::routes::RoutesVisitor<'a, BindingsNonSyncCtxImpl> for DualIpVisitor {
+    impl<'a> netstack3_core::routes::RoutesVisitor<'a, BindingsCtx> for DualIpVisitor {
         type VisitResult = ();
         fn visit<'b, I: Ip>(
             &mut self,
-            per_route: impl Iterator<
-                    Item = &'b netstack3_core::routes::Entry<
-                        I::Addr,
-                        DeviceId<BindingsNonSyncCtxImpl>,
-                    >,
-                > + 'b,
+            per_route: impl Iterator<Item = &'b netstack3_core::routes::Entry<I::Addr, DeviceId<BindingsCtx>>>
+                + 'b,
         ) -> Self::VisitResult
         where
             'a: 'b,
@@ -142,18 +135,18 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let core_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.core_ctx();
     let mut visitor = DualIpVisitor::new();
-    netstack3_core::routes::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(core_ctx, &mut visitor);
-    netstack3_core::routes::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(core_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv4, BindingsCtx, _>(core_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv6, BindingsCtx, _>(core_ctx, &mut visitor);
     visitor.inspector
 }
 
 pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl device::DevicesVisitor<BindingsNonSyncCtxImpl> for Visitor {
+    impl device::DevicesVisitor<BindingsCtx> for Visitor {
         fn visit_devices(
             &self,
-            devices: impl Iterator<Item = device::InspectDeviceState<BindingsNonSyncCtxImpl>>,
+            devices: impl Iterator<Item = device::InspectDeviceState<BindingsCtx>>,
         ) {
             use crate::bindings::DeviceIdExt as _;
             let Self(inspector) = self;
@@ -211,18 +204,18 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let core_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.core_ctx();
     let visitor = Visitor::new();
-    device::inspect_devices::<BindingsNonSyncCtxImpl, _>(core_ctx, &visitor);
+    device::inspect_devices::<BindingsCtx, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
 
 pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
+    impl device::NeighborVisitor<BindingsCtx, StackTime> for Visitor {
         fn visit_neighbors<LinkAddress: fmt::Debug>(
             &self,
-            device: DeviceId<BindingsNonSyncCtxImpl>,
+            device: DeviceId<BindingsCtx>,
             neighbors: impl Iterator<
                 Item = netstack3_core::neighbor::NeighborStateInspect<LinkAddress, StackTime>,
             >,
@@ -251,9 +244,9 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             });
         }
     }
-    let core_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.core_ctx();
     let visitor = Visitor::new();
-    device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(core_ctx, &visitor);
+    device::inspect_neighbors::<BindingsCtx, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
@@ -641,7 +634,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             });
         }
     }
-    let core_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.core_ctx();
     let visitor = Visitor::new();
     netstack3_core::inspect::inspect_counters::<_, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;

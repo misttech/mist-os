@@ -89,7 +89,7 @@ pub(crate) async fn serve(
             match req {
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                     let response = {
-                        let bindings_ctx = ctx.non_sync_ctx();
+                        let bindings_ctx = ctx.bindings_ctx();
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
                             .and_then(|id| id.try_into_core_with_ctx(bindings_ctx))
@@ -102,7 +102,7 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {
-                        let bindings_ctx = ctx.non_sync_ctx();
+                        let bindings_ctx = ctx.bindings_ctx();
                         let devices = AsRef::<Devices<_>>::as_ref(bindings_ctx);
                         let result = devices
                             .get_device_by_name(&name)
@@ -210,7 +210,7 @@ fn get_interface_flags(
     ctx: &Ctx,
     name: &str,
 ) -> Result<psocket::InterfaceFlags, zx::sys::zx_status_t> {
-    let bindings_ctx = ctx.non_sync_ctx();
+    let bindings_ctx = ctx.bindings_ctx();
     let device =
         bindings_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
     Ok(flags_for_device(&device.external_state()))

@@ -62,7 +62,7 @@ use crate::bindings::{
         NeedsDataNotifier, NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext,
         TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx,
+    BindingsCtx, Ctx,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
@@ -70,8 +70,7 @@ const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
 const MAX_TCP_KEEPINTVL_SECS: u64 = 32767;
 const MAX_TCP_KEEPCNT: u8 = 127;
 
-type TcpSocketId<I> =
-    tcp::socket::TcpSocketId<I, WeakDeviceId<BindingsNonSyncCtxImpl>, BindingsNonSyncCtxImpl>;
+type TcpSocketId<I> = tcp::socket::TcpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
 
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
@@ -130,7 +129,7 @@ impl ListenerNotifier for LocalZirconSocketAndNotifier {
     }
 }
 
-impl TcpBindingsTypes for BindingsNonSyncCtxImpl {
+impl TcpBindingsTypes for BindingsCtx {
     type ReceiveBuffer = ReceiveBufferWithZirconSocket;
     type SendBuffer = SendBufferWithZirconSocket;
     type ReturnedBuffers = PeerZirconSocketAndWatcher;
@@ -455,8 +454,8 @@ struct BindingData<I: IpExt + DualStackIpExt> {
 
 impl<I: IpExt + DualStackIpExt> BindingData<I> {
     fn new(
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        bindings_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsCtx>,
+        bindings_ctx: &mut BindingsCtx,
         properties: SocketWorkerProperties,
     ) -> Self {
         let (local, peer) = zx::Socket::create_stream();
@@ -486,10 +485,8 @@ enum InitialSocketState {
 
 impl<I: IpExt + DualStackIpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
-    DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Request = fposix_socket::StreamSocketRequest;
     type RequestStream = fposix_socket::StreamSocketRequestStream;
@@ -531,11 +528,7 @@ where
         RequestHandler { ctx, data: self }.handle_request(request, spawners)
     }
 
-    fn close(
-        self,
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    ) {
+    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx) {
         let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
         close::<I, _>(core_ctx, bindings_ctx, id);
         if let Some(send_task_abort) = send_task_abort {
@@ -720,10 +713,8 @@ struct RequestHandler<'a, I: IpExt + DualStackIpExt> {
 
 impl<I: IpSockAddrExt + IpExt + DualStackIpExt> RequestHandler<'_, I>
 where
-    DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self {
@@ -769,7 +760,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.sync_ctx();
+        let core_ctx = ctx.core_ctx();
         // The POSIX specification for `listen` [1] says
         //
         //   If listen() is called with a backlog argument value that is
@@ -876,7 +867,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.sync_ctx();
+        let core_ctx = ctx.core_ctx();
         match get_socket_error(core_ctx, id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
@@ -977,7 +968,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.sync_ctx();
+        let core_ctx = ctx.core_ctx();
         set_reuseaddr(core_ctx, id, value).map_err(IntoErrno::into_errno)
     }
 
@@ -986,7 +977,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.sync_ctx();
+        let core_ctx = ctx.core_ctx();
         reuseaddr(core_ctx, id)
     }
 
@@ -1579,7 +1570,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        with_socket_options(ctx.sync_ctx(), id, f)
+        with_socket_options(ctx.core_ctx(), id, f)
     }
 }
 
@@ -1592,20 +1583,16 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt + DualStackIpExt>(
     watcher: NeedsDataWatcher,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) where
-    DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
-        move |_: &SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
-            BindingData {
-                id: accepted,
-                peer,
-                local_socket_and_watcher: Some((local_socket, watcher)),
-                send_task_abort: None,
-            }
+        move |_: &SyncCtx<_>, _: &mut BindingsCtx, SocketWorkerProperties {}| BindingData {
+            id: accepted,
+            peer,
+            local_socket_and_watcher: Some((local_socket, watcher)),
+            send_task_abort: None,
         },
         SocketWorkerProperties {},
         request_stream,

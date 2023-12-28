@@ -89,12 +89,12 @@ mod ctx {
     use super::*;
 
     /// Provides an implementation of [`BindingsContext`].
-    pub(crate) struct BindingsNonSyncCtxImpl(Arc<BindingsNonSyncCtxImplInner>);
+    pub(crate) struct BindingsCtx(Arc<BindingsCtxInner>);
 
-    impl Deref for BindingsNonSyncCtxImpl {
-        type Target = BindingsNonSyncCtxImplInner;
+    impl Deref for BindingsCtx {
+        type Target = BindingsCtxInner;
 
-        fn deref(&self) -> &BindingsNonSyncCtxImplInner {
+        fn deref(&self) -> &BindingsCtxInner {
             let Self(this) = self;
             this.deref()
         }
@@ -106,54 +106,48 @@ mod ctx {
         // that dropping a primary reference while holding onto strong references
         // will cause a panic. See `netstack3_core::sync::PrimaryRc` for more
         // details.
-        bindings_ctx: BindingsNonSyncCtxImpl,
-        core_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+        bindings_ctx: BindingsCtx,
+        core_ctx: Arc<SyncCtx<BindingsCtx>>,
     }
 
     #[derive(Debug)]
     pub(crate) enum DestructionError {
-        NonSyncCtxStillCloned(usize),
-        SyncCtxStillCloned(usize),
+        BindingsCtxStillCloned(usize),
+        CoreCtxStillCloned(usize),
     }
 
     impl Ctx {
         fn new(routes_change_sink: routes::ChangeSink) -> Self {
-            let mut bindings_ctx = BindingsNonSyncCtxImpl(Arc::new(
-                BindingsNonSyncCtxImplInner::new(routes_change_sink),
-            ));
+            let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(routes_change_sink)));
             let core_ctx = Arc::new(SyncCtx::new(&mut bindings_ctx));
             Self { bindings_ctx, core_ctx }
         }
 
-        pub(crate) fn sync_ctx(&self) -> &Arc<SyncCtx<BindingsNonSyncCtxImpl>> {
+        pub(crate) fn core_ctx(&self) -> &Arc<SyncCtx<BindingsCtx>> {
             &self.core_ctx
         }
 
-        pub(crate) fn non_sync_ctx(&self) -> &BindingsNonSyncCtxImpl {
+        pub(crate) fn bindings_ctx(&self) -> &BindingsCtx {
             &self.bindings_ctx
         }
 
-        pub(crate) fn non_sync_ctx_mut(&mut self) -> &mut BindingsNonSyncCtxImpl {
+        pub(crate) fn bindings_ctx_mut(&mut self) -> &mut BindingsCtx {
             &mut self.bindings_ctx
         }
 
-        pub(crate) fn contexts(
-            &self,
-        ) -> (&Arc<SyncCtx<BindingsNonSyncCtxImpl>>, &BindingsNonSyncCtxImpl) {
+        pub(crate) fn contexts(&self) -> (&Arc<SyncCtx<BindingsCtx>>, &BindingsCtx) {
             let Ctx { bindings_ctx, core_ctx } = self;
             (core_ctx, bindings_ctx)
         }
 
-        pub(crate) fn contexts_mut(
-            &mut self,
-        ) -> (&Arc<SyncCtx<BindingsNonSyncCtxImpl>>, &mut BindingsNonSyncCtxImpl) {
+        pub(crate) fn contexts_mut(&mut self) -> (&Arc<SyncCtx<BindingsCtx>>, &mut BindingsCtx) {
             let Ctx { bindings_ctx, core_ctx } = self;
             (core_ctx, bindings_ctx)
         }
 
         /// Destroys the last standing clone of [`Ctx`].
         pub(crate) fn try_destroy_last(self) -> Result<(), DestructionError> {
-            let Self { bindings_ctx: BindingsNonSyncCtxImpl(bindings_ctx), core_ctx } = self;
+            let Self { bindings_ctx: BindingsCtx(bindings_ctx), core_ctx } = self;
 
             fn unwrap_and_drop_or_get_count<T>(arc: Arc<T>) -> Result<(), usize> {
                 match Arc::try_unwrap(arc) {
@@ -164,15 +158,15 @@ mod ctx {
 
             // Always destroy NonSyncCtx first.
             unwrap_and_drop_or_get_count(bindings_ctx)
-                .map_err(DestructionError::NonSyncCtxStillCloned)?;
-            unwrap_and_drop_or_get_count(core_ctx).map_err(DestructionError::SyncCtxStillCloned)
+                .map_err(DestructionError::BindingsCtxStillCloned)?;
+            unwrap_and_drop_or_get_count(core_ctx).map_err(DestructionError::CoreCtxStillCloned)
         }
     }
 
     impl Clone for Ctx {
         fn clone(&self) -> Self {
-            let Self { bindings_ctx: BindingsNonSyncCtxImpl(inner), core_ctx } = self;
-            Self { bindings_ctx: BindingsNonSyncCtxImpl(inner.clone()), core_ctx: core_ctx.clone() }
+            let Self { bindings_ctx: BindingsCtx(inner), core_ctx } = self;
+            Self { bindings_ctx: BindingsCtx(inner.clone()), core_ctx: core_ctx.clone() }
         }
     }
 
@@ -206,7 +200,7 @@ mod ctx {
     }
 }
 
-pub(crate) use ctx::{BindingsNonSyncCtxImpl, Ctx, NetstackSeed};
+pub(crate) use ctx::{BindingsCtx, Ctx, NetstackSeed};
 
 use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
 
@@ -216,7 +210,7 @@ trait DeviceIdExt {
     fn external_state(&self) -> DeviceSpecificInfo<'_>;
 }
 
-impl DeviceIdExt for DeviceId<BindingsNonSyncCtxImpl> {
+impl DeviceIdExt for DeviceId<BindingsCtx> {
     fn external_state(&self) -> DeviceSpecificInfo<'_> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
@@ -269,15 +263,15 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 
-pub(crate) struct BindingsNonSyncCtxImplInner {
-    timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
-    devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
+pub(crate) struct BindingsCtxInner {
+    timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
+    devices: Devices<DeviceId<BindingsCtx>>,
     udp_sockets: UdpSockets,
     icmp_echo_sockets: IcmpEchoSockets,
     routes: routes::ChangeSink,
 }
 
-impl BindingsNonSyncCtxImplInner {
+impl BindingsCtxInner {
     fn new(routes_change_sink: routes::ChangeSink) -> Self {
         Self {
             timers: Default::default(),
@@ -289,44 +283,42 @@ impl BindingsNonSyncCtxImplInner {
     }
 }
 
-impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
-    fn as_ref(&self) -> &TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
+impl AsRef<timers::TimerDispatcher<TimerId<BindingsCtx>>> for BindingsCtx {
+    fn as_ref(&self) -> &TimerDispatcher<TimerId<BindingsCtx>> {
         &self.timers
     }
 }
 
-impl AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
-    fn as_ref(&self) -> &Devices<DeviceId<BindingsNonSyncCtxImpl>> {
+impl AsRef<Devices<DeviceId<BindingsCtx>>> for BindingsCtx {
+    fn as_ref(&self) -> &Devices<DeviceId<BindingsCtx>> {
         &self.devices
     }
 }
 
-impl AsRef<UdpSockets> for BindingsNonSyncCtxImpl {
+impl AsRef<UdpSockets> for BindingsCtx {
     fn as_ref(&self) -> &UdpSockets {
         &self.udp_sockets
     }
 }
 
-impl AsRef<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
+impl AsRef<IcmpEchoSockets> for BindingsCtx {
     fn as_ref(&self) -> &IcmpEchoSockets {
         &self.icmp_echo_sockets
     }
 }
 
-impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx {
-    fn handle_expired_timer(&mut self, timer: TimerId<BindingsNonSyncCtxImpl>) {
+impl timers::TimerHandler<TimerId<BindingsCtx>> for Ctx {
+    fn handle_expired_timer(&mut self, timer: TimerId<BindingsCtx>) {
         let (core_ctx, bindings_ctx) = self.contexts_mut();
         handle_timer(core_ctx, bindings_ctx, timer)
     }
 
-    fn get_timer_dispatcher(
-        &mut self,
-    ) -> &timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
-        self.non_sync_ctx().as_ref()
+    fn get_timer_dispatcher(&mut self) -> &timers::TimerDispatcher<TimerId<BindingsCtx>> {
+        self.bindings_ctx().as_ref()
     }
 }
 
-impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
+impl timers::TimerContext<TimerId<BindingsCtx>> for Netstack {
     type Handler = Ctx;
     fn handler(&self) -> Ctx {
         self.ctx.clone()
@@ -335,13 +327,13 @@ impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
 
 impl<D> ConversionContext for D
 where
-    D: AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>>,
+    D: AsRef<Devices<DeviceId<BindingsCtx>>>,
 {
-    fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+    fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
         self.as_ref().get_core_id(binding_id)
     }
 
-    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
+    fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
         core_id.bindings_id().id
     }
 }
@@ -388,17 +380,17 @@ impl std::fmt::Display for StackTime {
     }
 }
 
-impl InstantBindingsTypes for BindingsNonSyncCtxImpl {
+impl InstantBindingsTypes for BindingsCtx {
     type Instant = StackTime;
 }
 
-impl InstantContext for BindingsNonSyncCtxImpl {
+impl InstantContext for BindingsCtx {
     fn now(&self) -> StackTime {
         StackTime(fasync::Time::now())
     }
 }
 
-impl TracingContext for BindingsNonSyncCtxImpl {
+impl TracingContext for BindingsCtx {
     type DurationScope = fuchsia_trace::DurationScope<'static>;
 
     fn duration(&self, name: &'static CStr) -> fuchsia_trace::DurationScope<'static> {
@@ -448,7 +440,7 @@ impl RngCore for RngImpl {
 
 impl CryptoRng for RngImpl where OsRng: CryptoRng {}
 
-impl RngContext for BindingsNonSyncCtxImpl {
+impl RngContext for BindingsCtx {
     type Rng<'a> = RngImpl;
 
     fn rng(&mut self) -> RngImpl {
@@ -459,42 +451,42 @@ impl RngContext for BindingsNonSyncCtxImpl {
     }
 }
 
-impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
+impl TimerContext<TimerId<BindingsCtx>> for BindingsCtx {
     fn schedule_timer_instant(
         &mut self,
         time: StackTime,
-        id: TimerId<BindingsNonSyncCtxImpl>,
+        id: TimerId<BindingsCtx>,
     ) -> Option<StackTime> {
         self.timers.schedule_timer(id, time)
     }
 
-    fn cancel_timer(&mut self, id: TimerId<BindingsNonSyncCtxImpl>) -> Option<StackTime> {
+    fn cancel_timer(&mut self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
         self.timers.cancel_timer(&id)
     }
 
-    fn cancel_timers_with<F: FnMut(&TimerId<BindingsNonSyncCtxImpl>) -> bool>(&mut self, f: F) {
+    fn cancel_timers_with<F: FnMut(&TimerId<BindingsCtx>) -> bool>(&mut self, f: F) {
         self.timers.cancel_timers_with(f);
     }
 
-    fn scheduled_instant(&self, id: TimerId<BindingsNonSyncCtxImpl>) -> Option<StackTime> {
+    fn scheduled_instant(&self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
         self.timers.scheduled_time(&id)
     }
 }
 
-impl DeviceLayerStateTypes for BindingsNonSyncCtxImpl {
+impl DeviceLayerStateTypes for BindingsCtx {
     type LoopbackDeviceState = LoopbackInfo;
     type EthernetDeviceState = NetdeviceInfo;
     type DeviceIdentifier = DeviceIdAndName;
 }
 
-impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
+impl DeviceLayerEventDispatcher for BindingsCtx {
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>) {
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             device.external_state();
         rx_notifier.schedule()
     }
 
-    fn wake_tx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
+    fn wake_tx_task(&mut self, device: &DeviceId<BindingsCtx>) {
         let external_state = device.external_state();
         let StaticCommonInfo { tx_notifier } = external_state.static_common_info();
         tx_notifier.schedule()
@@ -535,12 +527,12 @@ impl<
         I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
             + icmp::IcmpIpExt
             + IpExt,
-    > IcmpEchoBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
+    > IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -552,14 +544,14 @@ impl<
     }
 }
 
-impl<I> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
+impl<I> UdpBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &DeviceId<BindingsCtx>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),
         body: &B,
@@ -568,10 +560,8 @@ where
     }
 }
 
-impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, StackTime>>
-    for BindingsNonSyncCtxImpl
-{
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, StackTime>) {
+impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for BindingsCtx {
+    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>) {
         match event {
             IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
                 let valid_until = valid_until.into_zx_time();
@@ -621,13 +611,10 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, Stac
     }
 }
 
-impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>>
-    for BindingsNonSyncCtxImpl
+impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>>
+    for BindingsCtx
 {
-    fn on_event(
-        &mut self,
-        event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>,
-    ) {
+    fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>) {
         // Core dispatched a routes-change request but has no expectation of
         // observing the result, so we just discard the result receiver.
         match event {
@@ -653,7 +640,7 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
 }
 
 impl<I: Ip> EventContext<neighbor::Event<Mac, EthernetDeviceId<Self>, I, StackTime>>
-    for BindingsNonSyncCtxImpl
+    for BindingsCtx
 {
     fn on_event(
         &mut self,
@@ -695,7 +682,7 @@ impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
     }
 }
 
-impl netstack3_core::ReferenceNotifiers for BindingsNonSyncCtxImpl {
+impl netstack3_core::ReferenceNotifiers for BindingsCtx {
     type ReferenceReceiver<T: 'static> = futures::channel::oneshot::Receiver<T>;
 
     type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
@@ -708,12 +695,8 @@ impl netstack3_core::ReferenceNotifiers for BindingsNonSyncCtxImpl {
     }
 }
 
-impl BindingsNonSyncCtxImpl {
-    fn notify_interface_update(
-        &self,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
-        event: InterfaceUpdate,
-    ) {
+impl BindingsCtx {
+    fn notify_interface_update(&self, device: &DeviceId<BindingsCtx>, event: InterfaceUpdate) {
         device
             .external_state()
             .with_common_info(|i| i.events.notify(event).expect("interfaces worker closed"));
@@ -722,7 +705,7 @@ impl BindingsNonSyncCtxImpl {
     /// Notify `AddressStateProvider.WatchAddressAssignmentState` watchers.
     fn notify_address_update(
         &self,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &DeviceId<BindingsCtx>,
         address: SpecifiedAddr<IpAddr>,
         state: netstack3_core::ip::IpAddressState,
     ) {
@@ -740,7 +723,7 @@ impl BindingsNonSyncCtxImpl {
 
     fn notify_dad_failed(
         &mut self,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &DeviceId<BindingsCtx>,
         address: SpecifiedAddr<IpAddr>,
     ) {
         device.external_state().with_common_info_mut(|i| {
@@ -798,10 +781,10 @@ impl BindingsNonSyncCtxImpl {
     }
 }
 
-fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
-    core_ctx: &SyncCtx<NonSyncCtx>,
-    bindings_ctx: &mut NonSyncCtx,
-    loopback: &DeviceId<NonSyncCtx>,
+fn add_loopback_ip_addrs<BC: BindingsContext>(
+    core_ctx: &SyncCtx<BC>,
+    bindings_ctx: &mut BC,
+    loopback: &DeviceId<BC>,
 ) -> Result<(), NetstackError> {
     for addr_subnet in [
         AddrSubnetEither::V4(
@@ -820,10 +803,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
 
 /// Adds the IPv4 and IPv6 Loopback and multicast subnet routes, and the IPv4
 /// limited broadcast subnet route.
-async fn add_loopback_routes(
-    bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    loopback: &DeviceId<BindingsNonSyncCtxImpl>,
-) {
+async fn add_loopback_routes(bindings_ctx: &mut BindingsCtx, loopback: &DeviceId<BindingsCtx>) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
 
     let v4_changes = [
@@ -913,13 +893,13 @@ impl Netstack {
     ) {
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
-        let devices: &Devices<_> = self.ctx.non_sync_ctx().as_ref();
+        let devices: &Devices<_> = self.ctx.bindings_ctx().as_ref();
         let (control_sender, control_receiver) =
             interfaces_admin::OwnedControlHandle::new_channel();
         let loopback_rx_notifier = Default::default();
 
         let loopback = netstack3_core::device::add_loopback_device_with_state(
-            self.ctx.sync_ctx(),
+            self.ctx.core_ctx(),
             DEFAULT_LOOPBACK_MTU,
             RawMetric(DEFAULT_INTERFACE_METRIC),
             || {
@@ -1126,7 +1106,7 @@ impl NetstackSeed {
 
         // Start servicing timers.
         let timers_task =
-            NamedTask::new("timers", netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone()));
+            NamedTask::new("timers", netstack.ctx.bindings_ctx().timers.spawn(netstack.clone()));
 
         let (route_update_dispatcher_v4, route_update_dispatcher_v6) =
             routes_change_runner.route_update_dispatchers();
@@ -1376,7 +1356,7 @@ impl NetstackSeed {
                             debug_interfaces
                                 .serve_with(|rs| {
                                     debug_fidl_worker::serve_interfaces(
-                                        netstack.ctx.non_sync_ctx(),
+                                        netstack.ctx.bindings_ctx(),
                                         rs,
                                     )
                                 })
@@ -1455,7 +1435,7 @@ impl NetstackSeed {
             .send(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
             .expect("loopback task must still be running");
         // Stop the timer dispatcher.
-        ctx.non_sync_ctx().timers.stop();
+        ctx.bindings_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
         // Stop the neighbor watcher worker.
@@ -1468,7 +1448,7 @@ impl NetstackSeed {
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
 
         // Stop the routes change runner.
-        ctx.non_sync_ctx().routes.close_senders();
+        ctx.bindings_ctx().routes.close_senders();
         let _task_name: &str = routes_change_task_fut.await;
 
         // Drop all inspector data, it holds ctx clones.

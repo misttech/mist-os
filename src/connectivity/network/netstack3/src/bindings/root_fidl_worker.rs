@@ -51,7 +51,7 @@ async fn handle_get_admin(
 ) {
     debug!(interface_id, "handling fuchsia.net.root.Interfaces::GetAdmin");
     let core_id =
-        BindingId::new(interface_id).and_then(|id| ns.ctx.non_sync_ctx().devices.get_core_id(id));
+        BindingId::new(interface_id).and_then(|id| ns.ctx.bindings_ctx().devices.get_core_id(id));
     let core_id = match core_id {
         Some(c) => c,
         None => {
@@ -75,7 +75,7 @@ async fn handle_get_admin(
 fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetMacResult {
     debug!(interface_id, "handling fuchsia.net.root.Interfaces::GetMac");
     BindingId::new(interface_id)
-        .and_then(|id| ns.ctx.non_sync_ctx().devices.get_core_id(id))
+        .and_then(|id| ns.ctx.bindings_ctx().devices.get_core_id(id))
         .ok_or(fnet_root::InterfacesGetMacError::NotFound)
         .map(|core_id| {
             let mac = match core_id.external_state() {

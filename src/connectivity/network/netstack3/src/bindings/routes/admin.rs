@@ -17,7 +17,7 @@ use netstack3_core::{device::DeviceId, routes::AddableEntry};
 use crate::bindings::{
     routes,
     util::{TaskWaitGroupSpawner, TryFromFidlWithContext},
-    BindingsNonSyncCtxImpl,
+    BindingsCtx,
 };
 
 async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
@@ -181,13 +181,13 @@ impl UserRouteSet {
 
         consume_outcome(
             self.ctx
-                .non_sync_ctx()
+                .bindings_ctx()
                 .apply_route_change::<Ipv4>(routes::Change::RemoveSet(self.weak_set_id()))
                 .await,
         );
         consume_outcome(
             self.ctx
-                .non_sync_ctx()
+                .bindings_ctx()
                 .apply_route_change::<Ipv6>(routes::Change::RemoveSet(self.weak_set_id()))
                 .await,
         );
@@ -282,7 +282,7 @@ pub(crate) trait RouteSet: Send + Sync {
         op: routes::RouteOp<A>,
     ) -> Result<routes::ChangeOutcome, routes::Error> {
         self.ctx()
-            .non_sync_ctx()
+            .bindings_ctx()
             .apply_route_change::<A::Version>(routes::Change::RouteOp(op, self.set()))
             .await
     }
@@ -291,7 +291,7 @@ pub(crate) trait RouteSet: Send + Sync {
         &self,
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
-        let addable_entry = try_to_addable_entry::<I>(self.ctx().non_sync_ctx(), route)?
+        let addable_entry = try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
             .map_device_id(|d| d.downgrade());
 
         let result = self.apply_route_op::<I::Addr>(routes::RouteOp::Add(addable_entry)).await;
@@ -319,7 +319,7 @@ pub(crate) trait RouteSet: Send + Sync {
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
         let AddableEntry { subnet, device, gateway, metric } =
-            try_to_addable_entry::<I>(self.ctx().non_sync_ctx(), route)?
+            try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
                 .map_device_id(|d| d.downgrade());
 
         let result = self
@@ -351,10 +351,9 @@ pub(crate) trait RouteSet: Send + Sync {
 }
 
 fn try_to_addable_entry<I: Ip>(
-    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsCtx,
     route: fnet_routes_ext::Route<I>,
-) -> Result<AddableEntry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>, fnet_routes_admin::RouteSetError>
-{
+) -> Result<AddableEntry<I::Addr, DeviceId<BindingsCtx>>, fnet_routes_admin::RouteSetError> {
     AddableEntry::try_from_fidl_with_ctx(bindings_ctx, route).map_err(|err| match err {
         crate::bindings::util::AddableEntryFromRoutesExtError::DeviceNotFound => {
             fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists

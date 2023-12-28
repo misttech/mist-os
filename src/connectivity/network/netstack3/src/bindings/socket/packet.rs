@@ -39,7 +39,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidlWithContext,
         TryIntoCoreWithContext as _, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx,
+    BindingsCtx, Ctx,
 };
 
 /// State held in the non-sync context for a single socket.
@@ -50,11 +50,11 @@ pub(crate) struct SocketState {
     kind: fppacket::Kind,
 }
 
-impl DeviceSocketTypes for BindingsNonSyncCtxImpl {
+impl DeviceSocketTypes for BindingsCtx {
     type SocketState = SocketState;
 }
 
-impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
+impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
     fn receive_frame(
         &self,
         state: &Self::SocketState,
@@ -129,7 +129,7 @@ struct BindingData {
     /// The event to hand off for [`fppacket::SocketRequest::Describe`].
     peer_event: zx::EventPair,
     /// The identifier for the [`netstack3_core`] socket resource.
-    id: SocketId<BindingsNonSyncCtxImpl>,
+    id: SocketId<BindingsCtx>,
 }
 
 struct IntoMessage<'a>(MessageData, &'a [u8]);
@@ -167,7 +167,7 @@ enum MessageDataInfo {
 }
 
 impl MessageData {
-    fn new(frame: &Frame<&[u8]>, device: &DeviceId<BindingsNonSyncCtxImpl>) -> Self {
+    fn new(frame: &Frame<&[u8]>, device: &DeviceId<BindingsCtx>) -> Self {
         let (packet_type, info) = match frame {
             Frame::Sent(sent) => (
                 fppacket::PacketType::Outgoing,
@@ -211,8 +211,8 @@ impl BodyLen for Message {
 
 impl BindingData {
     fn new(
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsCtx>,
+        _bindings_ctx: &mut BindingsCtx,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
@@ -253,11 +253,7 @@ impl worker::SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(
-        self,
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    ) {
+    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, _bindings_ctx: &mut BindingsCtx) {
         let Self { peer_event: _, id } = self;
         netstack3_core::device_socket::remove(core_ctx, id)
     }
@@ -557,16 +553,14 @@ impl<'a> RequestHandler<'a> {
     }
 }
 
-fn iface_type(device: &DeviceId<BindingsNonSyncCtxImpl>) -> fppacket::HardwareType {
+fn iface_type(device: &DeviceId<BindingsCtx>) -> fppacket::HardwareType {
     match device {
         DeviceId::Ethernet(_) => fppacket::HardwareType::Ethernet,
         DeviceId::Loopback(_) => fppacket::HardwareType::Loopback,
     }
 }
 
-impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
-    for WeakDeviceId<BindingsNonSyncCtxImpl>
-{
+impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<BindingsCtx> {
     type Error = DeviceNotFoundError;
     fn try_into_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
         self,

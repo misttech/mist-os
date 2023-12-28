@@ -13,7 +13,7 @@ use netstack3_core::SyncCtx;
 use tracing::error;
 use zx::{HandleBased, Peered};
 
-use crate::bindings::{BindingsNonSyncCtxImpl, Ctx};
+use crate::bindings::{BindingsCtx, Ctx};
 
 use super::{
     worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
@@ -28,8 +28,8 @@ struct BindingData {
 
 impl BindingData {
     fn new(
-        _core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
+        _core_ctx: &SyncCtx<BindingsCtx>,
+        _bindings_ctx: &mut BindingsCtx,
         _domain: fposix_socket::Domain,
         _proto: fpraw::ProtocolAssociation,
         SocketWorkerProperties {}: SocketWorkerProperties,
@@ -70,12 +70,7 @@ impl SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(
-        self,
-        _core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    ) {
-    }
+    fn close(self, _core_ctx: &SyncCtx<BindingsCtx>, _bindings_ctx: &mut BindingsCtx) {}
 }
 
 struct RequestHandler<'a> {

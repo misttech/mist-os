@@ -39,7 +39,7 @@ use tracing_subscriber::{
 };
 
 use crate::bindings::{
-    ctx::BindingsNonSyncCtxImpl,
+    ctx::BindingsCtx,
     devices::{BindingId, Devices},
     routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
@@ -723,7 +723,7 @@ async fn test_list_del_routes() {
     let if_id = test_stack.get_named_endpoint_id(EP_NAME);
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
-    let device = test_stack.ctx().non_sync_ctx().get_core_id(if_id).expect("device exists");
+    let device = test_stack.ctx().bindings_ctx().get_core_id(if_id).expect("device exists");
     let sub1 = net_subnet_v4!("192.168.0.0/24");
     let route1: AddableEntryEither<_> = AddableEntry::without_gateway(
         sub1,
@@ -750,7 +750,7 @@ async fn test_list_del_routes() {
     for route in [route1, route2, route3] {
         test_stack
             .ctx()
-            .non_sync_ctx()
+            .bindings_ctx()
             .apply_route_change_either(match route.into() {
                 netstack3_core::routes::AddableEntryEither::V4(entry) => {
                     routes::ChangeEither::V4(routes::Change::RouteOp(
@@ -1021,7 +1021,7 @@ async fn test_neighbor_table_inspect() {
         let device = devices.get_core_id(bindings_id).expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");
         let v4_neigh_mac = net_mac!("AA:BB:CC:DD:EE:FF");
-        insert_static_neighbor_entry::<Ipv4, BindingsNonSyncCtxImpl>(
+        insert_static_neighbor_entry::<Ipv4, BindingsCtx>(
             core_ctx,
             bindings_ctx,
             &device,
@@ -1031,7 +1031,7 @@ async fn test_neighbor_table_inspect() {
         .expect("failed to insert static neighbor entry");
         let v6_neigh_addr = net_ip_v6!("2001:DB8::1");
         let v6_neigh_mac = net_mac!("00:11:22:33:44:55");
-        insert_static_neighbor_entry::<Ipv6, BindingsNonSyncCtxImpl>(
+        insert_static_neighbor_entry::<Ipv6, BindingsCtx>(
             core_ctx,
             bindings_ctx,
             &device,
@@ -1273,7 +1273,7 @@ async fn device_strong_ids_delay_clean_shutdown() {
     let mut t = TestSetupBuilder::new().add_empty_stack().build().await;
     let test_stack = t.get(0);
     let loopback_id = test_stack.wait_for_loopback_id().await;
-    let loopback_id = test_stack.ctx().non_sync_ctx().devices.get_core_id(loopback_id).unwrap();
+    let loopback_id = test_stack.ctx().bindings_ctx().devices.get_core_id(loopback_id).unwrap();
 
     let shutdown = t.shutdown();
     futures::pin_mut!(shutdown);

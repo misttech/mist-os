@@ -31,7 +31,7 @@ use net_types::{
 };
 use netstack3_core::SyncCtx;
 
-use crate::bindings::{util::TryIntoFidlWithContext, BindingsNonSyncCtxImpl, Ctx};
+use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx};
 use netstack3_core::routes::AddableMetric;
 
 pub(crate) mod admin;
@@ -39,8 +39,8 @@ use admin::{StrongUserRouteSet, WeakUserRouteSet};
 
 pub(crate) mod state;
 
-type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
-type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
+type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsCtx>;
+type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;
 
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
@@ -405,7 +405,7 @@ impl<I: Ip> State<I> {
 }
 
 fn to_entry<I: Ip>(
-    core_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+    core_ctx: &Arc<SyncCtx<BindingsCtx>>,
     addable_entry: netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
 ) -> netstack3_core::routes::Entry<I::Addr, DeviceId> {
     let device_metric = netstack3_core::device::get_routing_metric(core_ctx, &addable_entry.device);
@@ -568,7 +568,7 @@ async fn handle_change<I: Ip>(
 }
 
 async fn notify_removed_routes<I: Ip>(
-    bindings_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &mut crate::bindings::BindingsCtx,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
     table: &Table<I::Addr>,

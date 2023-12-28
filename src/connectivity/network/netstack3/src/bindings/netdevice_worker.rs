@@ -29,15 +29,15 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, routes, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx,
-    DeviceId, DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
+    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<BindingsNonSyncCtxImpl>>>>,
+    state: Arc<Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<BindingsCtx>>>>,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -502,10 +502,7 @@ impl DeviceHandler {
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
-async fn add_initial_routes(
-    bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    device: &DeviceId<BindingsNonSyncCtxImpl>,
-) {
+async fn add_initial_routes(bindings_ctx: &mut BindingsCtx, device: &DeviceId<BindingsCtx>) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
 

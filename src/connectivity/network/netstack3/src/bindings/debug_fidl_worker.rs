@@ -16,7 +16,7 @@ use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo};
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
 pub(crate) async fn serve_interfaces(
-    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsCtx,
     rs: fnet_debug::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
     debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
@@ -32,7 +32,7 @@ pub(crate) async fn serve_interfaces(
 }
 
 fn handle_get_port(
-    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsCtx,
     interface_id: u64,
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {

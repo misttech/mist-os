@@ -28,7 +28,7 @@ use netstack3_core::{
 use tracing::warn;
 
 use crate::bindings::{
-    interfaces_admin, neighbor_worker, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx,
+    interfaces_admin, neighbor_worker, util::NeedsDataNotifier, BindingsCtx, Ctx,
 };
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
@@ -103,12 +103,9 @@ where
     }
 }
 
-impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
+impl Devices<DeviceId<BindingsCtx>> {
     /// Retrieves the device with the given name.
-    pub(crate) fn get_device_by_name(
-        &self,
-        name: &str,
-    ) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+    pub(crate) fn get_device_by_name(&self, name: &str) -> Option<DeviceId<BindingsCtx>> {
         self.id_map
             .read()
             .iter()
@@ -161,7 +158,7 @@ impl DeviceSpecificInfo<'_> {
 pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
     mut ctx: Ctx,
-    device_id: &LoopbackDeviceId<BindingsNonSyncCtxImpl>,
+    device_id: &LoopbackDeviceId<BindingsCtx>,
 ) -> fuchsia_async::Task<()> {
     let watcher = notifier.watcher();
     let device_id = device_id.downgrade();
@@ -180,7 +177,7 @@ pub(crate) fn spawn_rx_task(
 pub(crate) fn spawn_tx_task(
     notifier: &NeedsDataNotifier,
     mut ctx: Ctx,
-    device_id: DeviceId<BindingsNonSyncCtxImpl>,
+    device_id: DeviceId<BindingsCtx>,
 ) -> fuchsia_async::Task<()> {
     let watcher = notifier.watcher();
     let device_id = device_id.downgrade();

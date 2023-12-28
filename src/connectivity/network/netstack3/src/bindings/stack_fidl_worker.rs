@@ -84,19 +84,19 @@ impl StackFidlWorker {
         &mut self,
         entry: ForwardingEntry,
     ) -> Result<(), fidl_net_stack::Error> {
-        let bindings_ctx = self.netstack.ctx.non_sync_ctx();
+        let bindings_ctx = self.netstack.ctx.bindings_ctx();
         let entry = match AddableEntryEither::try_from_fidl_with_ctx(bindings_ctx, entry) {
             Ok(entry) => entry,
             Err(e) => return Err(e.into()),
         };
 
-        type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
+        type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;
         fn try_to_addable_entry<I: Ip>(
             ctx: &mut Ctx,
             entry: AddableEntry<I::Addr, Option<DeviceId>>,
         ) -> Option<AddableEntry<I::Addr, DeviceId>> {
             let AddableEntry { subnet, device, gateway, metric } = entry;
-            let core_ctx = ctx.sync_ctx();
+            let core_ctx = ctx.core_ctx();
             let (device, gateway) = match (device, gateway) {
                 (Some(device), gateway) => (device, gateway),
                 (None, gateway) => {
@@ -128,7 +128,7 @@ impl StackFidlWorker {
 
         self.netstack
             .ctx
-            .non_sync_ctx()
+            .bindings_ctx()
             .apply_route_change_either(routes::ChangeEither::add(
                 entry,
                 routes::SetMembership::Global,
@@ -153,7 +153,7 @@ impl StackFidlWorker {
         &mut self,
         subnet: fidl_net::Subnet,
     ) -> Result<(), fidl_net_stack::Error> {
-        let bindings_ctx = self.netstack.ctx.non_sync_ctx_mut();
+        let bindings_ctx = self.netstack.ctx.bindings_ctx_mut();
         if let Ok(subnet) = subnet.try_into_core() {
             bindings_ctx
                 .apply_route_change_either(match subnet {

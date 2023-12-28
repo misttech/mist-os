@@ -51,7 +51,7 @@ use netstack3_core::{
 use crate::bindings::{
     devices::BindingId,
     socket::{IntoErrno, IpSockAddrExt, SockAddr},
-    BindingsNonSyncCtxImpl,
+    BindingsCtx,
 };
 
 /// The value used to specify that a `ForwardingEntry.metric` is unset, and the
@@ -744,10 +744,10 @@ pub(crate) trait ConversionContext {
     /// identifier `DeviceId`.
     ///
     /// Returns `None` if there is no core mapping equivalent for `binding_id`.
-    fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsNonSyncCtxImpl>>;
+    fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsCtx>>;
 
     /// Converts a core identifier `DeviceId` to a FIDL-compatible [`BindingId`].
-    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId;
+    fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId;
 }
 
 /// A core type which can be fallibly converted from the FIDL type `F` given a
@@ -997,7 +997,7 @@ where
     }
 }
 
-impl TryFromFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
+impl TryFromFidlWithContext<BindingId> for DeviceId<BindingsCtx> {
     type Error = DeviceNotFoundError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
@@ -1008,7 +1008,7 @@ impl TryFromFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
     }
 }
 
-impl TryIntoFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
+impl TryIntoFidlWithContext<BindingId> for DeviceId<BindingsCtx> {
     type Error = Never;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, ctx: &C) -> Result<BindingId, Never> {
@@ -1016,7 +1016,7 @@ impl TryIntoFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
     }
 }
 
-impl TryIntoFidlWithContext<BindingId> for WeakDeviceId<BindingsNonSyncCtxImpl> {
+impl TryIntoFidlWithContext<BindingId> for WeakDeviceId<BindingsCtx> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -1033,7 +1033,7 @@ impl TryIntoFidlWithContext<BindingId> for WeakDeviceId<BindingsNonSyncCtxImpl> 
 /// By default we don't want to provide this conversion infallibly and hidden
 /// behind the conversion traits, so `AllowBindingIdFromWeak` acts as an
 /// explicit opt-in for that conversion.
-pub(crate) struct AllowBindingIdFromWeak(pub(crate) WeakDeviceId<BindingsNonSyncCtxImpl>);
+pub(crate) struct AllowBindingIdFromWeak(pub(crate) WeakDeviceId<BindingsCtx>);
 
 impl TryIntoFidlWithContext<BindingId> for AllowBindingIdFromWeak {
     type Error = Never;
@@ -1088,17 +1088,14 @@ impl From<ForwardingConversionError> for fidl_net_stack::Error {
 }
 
 impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
-    for AddableEntryEither<Option<DeviceId<BindingsNonSyncCtxImpl>>>
+    for AddableEntryEither<Option<DeviceId<BindingsCtx>>>
 {
     type Error = ForwardingConversionError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
         ctx: &C,
         fidl: fidl_net_stack::ForwardingEntry,
-    ) -> Result<
-        AddableEntryEither<Option<DeviceId<BindingsNonSyncCtxImpl>>>,
-        ForwardingConversionError,
-    > {
+    ) -> Result<AddableEntryEither<Option<DeviceId<BindingsCtx>>>, ForwardingConversionError> {
         let fidl_net_stack::ForwardingEntry { subnet, device_id, next_hop, metric } = fidl;
         let subnet = subnet.try_into_core()?;
         let device =
@@ -1134,7 +1131,7 @@ pub(crate) enum AddableEntryFromRoutesExtError {
 }
 
 impl<I: Ip> TryFromFidlWithContext<fnet_routes_ext::Route<I>>
-    for AddableEntry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>
+    for AddableEntry<I::Addr, DeviceId<BindingsCtx>>
 {
     type Error = AddableEntryFromRoutesExtError;
 
@@ -1156,7 +1153,7 @@ impl<I: Ip> TryFromFidlWithContext<fnet_routes_ext::Route<I>>
             }
             fnet_routes_ext::RouteAction::Forward(target) => target,
         };
-        let device: DeviceId<BindingsNonSyncCtxImpl> = BindingId::new(outbound_interface)
+        let device: DeviceId<BindingsCtx> = BindingId::new(outbound_interface)
             .ok_or(AddableEntryFromRoutesExtError::DeviceNotFound)?
             .try_into_core_with_ctx(ctx)
             .map_err(|DeviceNotFoundError| AddableEntryFromRoutesExtError::DeviceNotFound)?;
@@ -1175,7 +1172,7 @@ impl<I: Ip> TryFromFidlWithContext<fnet_routes_ext::Route<I>>
 }
 
 impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
-    for EntryEither<DeviceId<BindingsNonSyncCtxImpl>>
+    for EntryEither<DeviceId<BindingsCtx>>
 {
     type Error = Never;
 
@@ -1212,7 +1209,7 @@ impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
 }
 
 impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
-    for Entry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>
+    for Entry<I::Addr, DeviceId<BindingsCtx>>
 {
     type Error = Never;
 
@@ -1378,7 +1375,7 @@ mod tests {
 
     struct FakeConversionContext {
         binding: BindingId,
-        core: DeviceId<BindingsNonSyncCtxImpl>,
+        core: DeviceId<BindingsCtx>,
         test_stack: TestStack,
     }
 
@@ -1395,13 +1392,13 @@ mod tests {
             let binding = BindingId::MIN;
             test_stack.wait_for_interface_online(binding).await;
             let ctx = test_stack.ctx();
-            let core = ctx.non_sync_ctx().get_core_id(binding).expect("should get core ID");
+            let core = ctx.bindings_ctx().get_core_id(binding).expect("should get core ID");
             Self { binding, core, test_stack }
         }
     }
 
     impl ConversionContext for FakeConversionContext {
-        fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+        fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
             if binding_id == self.binding {
                 Some(self.core.clone())
             } else {
@@ -1409,18 +1406,18 @@ mod tests {
             }
         }
 
-        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
+        fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
             core_id.bindings_id().id
         }
     }
 
     struct EmptyFakeConversionContext;
     impl ConversionContext for EmptyFakeConversionContext {
-        fn get_core_id(&self, _binding_id: BindingId) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+        fn get_core_id(&self, _binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
             None
         }
 
-        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
+        fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
             core_id.bindings_id().id
         }
     }
@@ -1546,11 +1543,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sock_addr_into_core_err<A: SockAddr>(addr: A, expected: SocketAddressError)
     where
-        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
+        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
-        DeviceId<BindingsNonSyncCtxImpl>:
-            TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+        DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new().await;
         let result: Result<(Option<_>, _), _> = addr.try_into_core_with_ctx(&ctx);
@@ -1602,12 +1598,12 @@ mod tests {
         addr: A,
         (zoned, port): (Option<ZonedAddr<SpecifiedAddr<A::AddrType>, ReplaceWithCoreId>>, u16),
     ) where
-        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
+        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError> + TryIntoFidlWithContext<A>,
-        <(Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16) as
+        <(Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16) as
                  TryIntoFidlWithContext<A>>::Error: Debug,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
-        DeviceId<BindingsNonSyncCtxImpl>:
+        DeviceId<BindingsCtx>:
             TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new().await;

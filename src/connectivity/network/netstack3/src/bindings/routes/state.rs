@@ -34,7 +34,7 @@ use tracing::{error, info, warn};
 
 use crate::bindings::{
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
-    BindingsNonSyncCtxImpl, Ctx, SyncCtx,
+    BindingsCtx, Ctx, SyncCtx,
 };
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
@@ -43,7 +43,7 @@ use crate::bindings::{
 // so that we don't artificially truncate the allowed batch size.
 const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
 
-impl LinkResolutionContext<EthernetLinkDevice> for BindingsNonSyncCtxImpl {
+impl LinkResolutionContext<EthernetLinkDevice> for BindingsCtx {
     type Notifier = LinkResolutionNotifier;
 }
 
@@ -151,9 +151,9 @@ async fn resolve_inner<A: IpAddress>(
 
 /// Performs link-layer resolution of the remote IP Address on the given device.
 async fn resolve_ethernet_link_addr<A: IpAddress>(
-    core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-    bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    device: &EthernetDeviceId<BindingsNonSyncCtxImpl>,
+    core_ctx: &SyncCtx<BindingsCtx>,
+    bindings_ctx: &mut BindingsCtx,
+    device: &EthernetDeviceId<BindingsCtx>,
     remote: &SpecifiedAddr<A>,
 ) -> Result<Mac, zx::Status> {
     match netstack3_core::device::resolve_ethernet_link_addr::<A::Version, _>(

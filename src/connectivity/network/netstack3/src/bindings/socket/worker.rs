@@ -10,7 +10,7 @@ use futures::StreamExt as _;
 use netstack3_core::SyncCtx;
 use tracing::error;
 
-use crate::bindings::{socket::SocketWorkerProperties, BindingsNonSyncCtxImpl, Ctx};
+use crate::bindings::{socket::SocketWorkerProperties, BindingsCtx, Ctx};
 
 pub(crate) struct SocketWorker<Data> {
     ctx: Ctx,
@@ -92,11 +92,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// This is called when the last stream for the managed socket is closed,
     /// and should be used to free up any resources in `netstack3_core` for the
     /// socket.
-    fn close(
-        self,
-        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        bindings_ctx: &mut BindingsNonSyncCtxImpl,
-    );
+    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx);
 }
 
 /// Abstraction over the "close" behavior for a socket.
@@ -175,11 +171,7 @@ impl<S> From<S> for ProviderScopedSpawner<S> {
 impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Starts servicing events from the provided state and event stream.
     pub(crate) async fn serve_stream_with<
-        F: FnOnce(
-                &SyncCtx<BindingsNonSyncCtxImpl>,
-                &mut BindingsNonSyncCtxImpl,
-                SocketWorkerProperties,
-            ) -> H
+        F: FnOnce(&SyncCtx<BindingsCtx>, &mut BindingsCtx, SocketWorkerProperties) -> H
             + Send
             + 'static,
     >(

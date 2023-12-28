@@ -28,7 +28,7 @@ use tracing::{error, info, warn};
 
 use crate::bindings::{
     devices::{BindingId, DeviceIdAndName},
-    BindingsNonSyncCtxImpl, Ctx, StackTime,
+    BindingsCtx, Ctx, StackTime,
 };
 use netstack3_core::{
     device::EthernetWeakDeviceId,
@@ -38,7 +38,7 @@ use netstack3_core::{
 
 #[derive(Debug)]
 pub(crate) struct Event {
-    pub(crate) id: EthernetWeakDeviceId<BindingsNonSyncCtxImpl>,
+    pub(crate) id: EthernetWeakDeviceId<BindingsCtx>,
     pub(crate) addr: SpecifiedAddr<IpAddr>,
     pub(crate) kind: neighbor::EventKind<Mac>,
     pub(crate) at: StackTime,
@@ -444,13 +444,13 @@ pub(super) async fn serve_controller(
                     let result = match neighbor.into_ext() {
                         IpAddr::V4(v4) => netstack3_core::device::insert_static_neighbor_entry::<
                             Ipv4,
-                            BindingsNonSyncCtxImpl,
+                            BindingsCtx,
                         >(
                             core_ctx, bindings_ctx, &device_id, v4, mac
                         ),
                         IpAddr::V6(v6) => netstack3_core::device::insert_static_neighbor_entry::<
                             Ipv6,
-                            BindingsNonSyncCtxImpl,
+                            BindingsCtx,
                         >(
                             core_ctx, bindings_ctx, &device_id, v6, mac
                         ),
@@ -473,18 +473,18 @@ pub(super) async fn serve_controller(
                         return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
                     };
                     let result = match neighbor.into_ext() {
-                        IpAddr::V4(v4) => {
-                            netstack3_core::device::remove_neighbor_table_entry::<
-                                Ipv4,
-                                BindingsNonSyncCtxImpl,
-                            >(core_ctx, bindings_ctx, &device_id, v4)
-                        }
-                        IpAddr::V6(v6) => {
-                            netstack3_core::device::remove_neighbor_table_entry::<
-                                Ipv6,
-                                BindingsNonSyncCtxImpl,
-                            >(core_ctx, bindings_ctx, &device_id, v6)
-                        }
+                        IpAddr::V4(v4) => netstack3_core::device::remove_neighbor_table_entry::<
+                            Ipv4,
+                            BindingsCtx,
+                        >(
+                            core_ctx, bindings_ctx, &device_id, v4
+                        ),
+                        IpAddr::V6(v6) => netstack3_core::device::remove_neighbor_table_entry::<
+                            Ipv6,
+                            BindingsCtx,
+                        >(
+                            core_ctx, bindings_ctx, &device_id, v6
+                        ),
                     }
                     .map_err(|e| {
                         match e {
@@ -508,18 +508,18 @@ pub(super) async fn serve_controller(
                         }
                     };
                     let result = match ip_version {
-                        fnet::IpVersion::V4 => {
-                            netstack3_core::device::flush_neighbor_table::<
-                                Ipv4,
-                                BindingsNonSyncCtxImpl,
-                            >(core_ctx, bindings_ctx, &device_id)
-                        }
-                        fnet::IpVersion::V6 => {
-                            netstack3_core::device::flush_neighbor_table::<
-                                Ipv6,
-                                BindingsNonSyncCtxImpl,
-                            >(core_ctx, bindings_ctx, &device_id)
-                        }
+                        fnet::IpVersion::V4 => netstack3_core::device::flush_neighbor_table::<
+                            Ipv4,
+                            BindingsCtx,
+                        >(
+                            core_ctx, bindings_ctx, &device_id
+                        ),
+                        fnet::IpVersion::V6 => netstack3_core::device::flush_neighbor_table::<
+                            Ipv6,
+                            BindingsCtx,
+                        >(
+                            core_ctx, bindings_ctx, &device_id
+                        ),
                     }
                     .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());
                     responder.send(result)
