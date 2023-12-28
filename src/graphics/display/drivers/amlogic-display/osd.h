@@ -79,6 +79,14 @@ class Osd {
   Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
       fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
 
+  // Sets up the OSD layers before they are scaled and blended.
+  //
+  // The OSD layers read images of `layer_image_size` and display them on
+  // a display device of `display_contents_size`.
+  //
+  // TODO(fxbug.dev/42062952): Fully support multiple layers.
+  void SetupOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size);
+
   // Sets up the blending modules on the OSD layers and the Video Post
   // Processor (VPP) to display a single layer.
   //

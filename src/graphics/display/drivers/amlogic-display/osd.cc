@@ -462,6 +462,47 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   rdma_->ExecRdmaTable(next_table_idx, config_stamp, info->is_afbc);
 }
 
+void Osd::SetupOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size) {
+  // init osd fifo control and set DDR request priority to be urgent
+  uint32_t reg_val = 1;
+  reg_val |= 4 << 5;   // hold_fifo_lines
+  reg_val |= 1 << 10;  // burst_len_sel 3 = 64. This bit is split between 10 and 31
+  reg_val |= 2 << 22;
+  reg_val |= 2 << 24;
+  reg_val |= 1 << 31;
+  reg_val |= 32 << 12;  // fifo_depth_val: 32*8 = 256
+  vpu_mmio_.Write32(reg_val, VPU_VIU_OSD1_FIFO_CTRL_STAT);
+  vpu_mmio_.Write32(reg_val, VPU_VIU_OSD2_FIFO_CTRL_STAT);
+
+  osd1_registers.ctrl_stat.FromValue(0)
+      .set_blk_en(1)
+      .set_global_alpha(kMaximumAlpha)
+      .set_osd_mem_mode(0)
+      .set_premult_en(0)
+      .set_osd_en(1)
+      .WriteTo(&vpu_mmio_);
+
+  // TODO: split this method into HwInit for each OSD.
+  Osd2CtrlStatReg::Get()
+      .FromValue(0)
+      .set_blk_en(1)
+      .set_global_alpha(kMaximumAlpha)
+      .set_osd_mem_mode(0)
+      .set_premult_en(0)
+      .set_osd_en(1)
+      .WriteTo(&vpu_mmio_);
+
+  // Set range of the virtual canvas coordinates.
+  vpu_mmio_.Write32(((layer_image_size.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
+  vpu_mmio_.Write32(((layer_image_size.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
+
+  // Set geometry to normal mode
+  uint32_t data32 = ((display_contents_size.width - 1) & 0xfff) << 16;
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
+  data32 = ((display_contents_size.height - 1) & 0xfff) << 16;
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
+}
+
 void Osd::SetupSingleLayerBlending(PixelGridSize2D layer_size,
                                    PixelGridSize2D display_contents_size) {
   // TODO(fxbug.dev/317961333): The documentation below needs to be
@@ -680,50 +721,12 @@ void Osd::HwInit() {
   ZX_DEBUG_ASSERT(layer_image_size_.height == display_contents_size_.height);
 
   // init vpu fifo control register
-  uint32_t regVal = vpu_mmio_.Read32(VPP_OFIFO_SIZE);
-  regVal = 0xfff << 20;
-  regVal |= (0xfff + 1);
-  vpu_mmio_.Write32(regVal, VPP_OFIFO_SIZE);
+  uint32_t reg_val = vpu_mmio_.Read32(VPP_OFIFO_SIZE);
+  reg_val = 0xfff << 20;
+  reg_val |= (0xfff + 1);
+  vpu_mmio_.Write32(reg_val, VPP_OFIFO_SIZE);
 
-  // init osd fifo control and set DDR request priority to be urgent
-  regVal = 1;
-  regVal |= 4 << 5;   // hold_fifo_lines
-  regVal |= 1 << 10;  // burst_len_sel 3 = 64. This bit is split between 10 and 31
-  regVal |= 2 << 22;
-  regVal |= 2 << 24;
-  regVal |= 1 << 31;
-  regVal |= 32 << 12;  // fifo_depth_val: 32*8 = 256
-  vpu_mmio_.Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
-  vpu_mmio_.Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
-
-  osd1_registers.ctrl_stat.FromValue(0)
-      .set_blk_en(1)
-      .set_global_alpha(kMaximumAlpha)
-      .set_osd_mem_mode(0)
-      .set_premult_en(0)
-      .set_osd_en(1)
-      .WriteTo(&vpu_mmio_);
-
-  // TODO: split this method into HwInit for each OSD.
-  Osd2CtrlStatReg::Get()
-      .FromValue(0)
-      .set_blk_en(1)
-      .set_global_alpha(kMaximumAlpha)
-      .set_osd_mem_mode(0)
-      .set_premult_en(0)
-      .set_osd_en(1)
-      .WriteTo(&vpu_mmio_);
-
-  // Set range of the virtual canvas coordinates.
-  vpu_mmio_.Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
-  vpu_mmio_.Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
-
-  // Set geometry to normal mode
-  uint32_t data32 = ((display_contents_size_.width - 1) & 0xfff) << 16;
-  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
-  data32 = ((display_contents_size_.height - 1) & 0xfff) << 16;
-  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
-
+  SetupOsdLayers(layer_image_size_, display_contents_size_);
   DisableScaling();
   SetupSingleLayerBlending(/*layer_size=*/layer_image_size_, display_contents_size_);
 
