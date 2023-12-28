@@ -190,8 +190,7 @@ OsdRegisters osd1_registers = {
 display::ConfigStamp Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
 
 Osd::Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-         inspect::Node* unused_osd_inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
-         std::unique_ptr<RdmaEngine> rdma)
+         fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)),
       layer_image_size_(layer_image_size),
       display_contents_size_(display_contents_size),
@@ -199,12 +198,12 @@ Osd::Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size
 
 void Osd::Disable(display::ConfigStamp config_stamp) {
   rdma_->StopRdma();
-  osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_)).set_blk_en(0).WriteTo(&(*vpu_mmio_));
+  osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(0).WriteTo(&vpu_mmio_);
   rdma_->ResetConfigStamp(config_stamp);
 }
 
 void Osd::Enable(void) {
-  osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_)).set_blk_en(1).WriteTo(&(*vpu_mmio_));
+  osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(1).WriteTo(&vpu_mmio_);
 }
 
 uint32_t Osd::FloatToFixed2_10(float f) {
@@ -229,13 +228,13 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
   if (!config->cc_flags) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
-                             vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_EN_CTRL) & ~(1 << 0));
+                             vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) & ~(1 << 0));
     return;
   }
 
   // Set enable bit
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
-                           vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_EN_CTRL) | (1 << 0));
+                           vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) | (1 << 0));
 
   // Load PreOffset values (or 0 if none entered)
   auto offset0_1 = (config->cc_flags & COLOR_CONVERSION_PREOFFSET
@@ -348,8 +347,8 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   rdma_->SetRdmaTableValue(next_table_idx, IDX_BLK0_CFG_W0, cfg_w0.reg_value());
 
   // Configure ctrl_stat and ctrl_stat2 registers
-  auto osd_ctrl_stat_val = osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_));
-  auto osd_ctrl_stat2_val = osd1_registers.ctrl_stat2.ReadFrom(&(*vpu_mmio_));
+  auto osd_ctrl_stat_val = osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_);
+  auto osd_ctrl_stat2_val = osd1_registers.ctrl_stat2.ReadFrom(&vpu_mmio_);
 
   // enable OSD Block
   osd_ctrl_stat_val.set_blk_en(1);
@@ -408,19 +407,18 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
     rdma_->SetRdmaTableValue(next_table_idx, IDX_AFBC_HEAD_BUF_ADDR_HIGH, (info->paddr >> 32));
 
     // Set OSD to unpack Mali source
-    auto upackreg = osd1_registers.mali_unpack_ctrl.ReadFrom(&(*vpu_mmio_)).set_mali_unpack_en(1);
+    auto upackreg = osd1_registers.mali_unpack_ctrl.ReadFrom(&vpu_mmio_).set_mali_unpack_en(1);
     rdma_->SetRdmaTableValue(next_table_idx, IDX_MALI_UNPACK_CTRL, upackreg.reg_value());
 
     // Switch OSD to Mali Source
-    auto miscctrl = OsdPathMiscCtrlReg::Get(VPU_OSD_PATH_MISC_CTRL)
-                        .ReadFrom(&(*vpu_mmio_))
-                        .set_osd1_mali_sel(1);
+    auto miscctrl =
+        OsdPathMiscCtrlReg::Get(VPU_OSD_PATH_MISC_CTRL).ReadFrom(&vpu_mmio_).set_osd1_mali_sel(1);
     rdma_->SetRdmaTableValue(next_table_idx, IDX_PATH_MISC_CTRL, miscctrl.reg_value());
 
     // S0 is our index of 0, which is programmed for OSD1
     rdma_->SetRdmaTableValue(next_table_idx, IDX_AFBC_SURFACE_CFG,
                              AfbcSurfaceCfgReg::Get(VPU_MAFBC_SURFACE_CFG)
-                                 .ReadFrom(&(*vpu_mmio_))
+                                 .ReadFrom(&vpu_mmio_)
                                  .set_cont(0)
                                  .set_s0_en(1)
                                  .reg_value());
@@ -429,19 +427,18 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
         AfbcCommandReg::Get(VPU_MAFBC_COMMAND).FromValue(0).set_direct_swap(1).reg_value());
   } else {
     // Set OSD to unpack Normal source
-    auto upackreg = osd1_registers.mali_unpack_ctrl.ReadFrom(&(*vpu_mmio_)).set_mali_unpack_en(0);
+    auto upackreg = osd1_registers.mali_unpack_ctrl.ReadFrom(&vpu_mmio_).set_mali_unpack_en(0);
     rdma_->SetRdmaTableValue(next_table_idx, IDX_MALI_UNPACK_CTRL, upackreg.reg_value());
 
     // Switch OSD to DDR Source
-    auto miscctrl = OsdPathMiscCtrlReg::Get(VPU_OSD_PATH_MISC_CTRL)
-                        .ReadFrom(&(*vpu_mmio_))
-                        .set_osd1_mali_sel(0);
+    auto miscctrl =
+        OsdPathMiscCtrlReg::Get(VPU_OSD_PATH_MISC_CTRL).ReadFrom(&vpu_mmio_).set_osd1_mali_sel(0);
     rdma_->SetRdmaTableValue(next_table_idx, IDX_PATH_MISC_CTRL, miscctrl.reg_value());
 
     // Disable afbc sourcing
     rdma_->SetRdmaTableValue(next_table_idx, IDX_AFBC_SURFACE_CFG,
                              AfbcSurfaceCfgReg::Get(VPU_MAFBC_SURFACE_CFG)
-                                 .ReadFrom(&(*vpu_mmio_))
+                                 .ReadFrom(&vpu_mmio_)
                                  .set_s0_en(0)
                                  .reg_value());
     // clear command - This uses a separate RDMA Table
@@ -467,66 +464,66 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
 
 void Osd::DefaultSetup() {
   // osd blend ctrl
-  vpu_mmio_->Write32(4 << 29 | 0 << 27 |  // blend2_premult_en
-                         1 << 26 |        // blend_din0 input to blend0
-                         0 << 25 |        // blend1_dout to blend2
-                         0 << 24 |        // blend1_din3 input to blend1
-                         1 << 20 |        // blend_din_en
-                         0 << 16 |        // din_premult_en
-                         1 << 0,          // din_reoder_sel = OSD1
-                     VIU_OSD_BLEND_CTRL);
+  vpu_mmio_.Write32(4 << 29 | 0 << 27 |  // blend2_premult_en
+                        1 << 26 |        // blend_din0 input to blend0
+                        0 << 25 |        // blend1_dout to blend2
+                        0 << 24 |        // blend1_din3 input to blend1
+                        1 << 20 |        // blend_din_en
+                        0 << 16 |        // din_premult_en
+                        1 << 0,          // din_reoder_sel = OSD1
+                    VIU_OSD_BLEND_CTRL);
 
   // vpp osd1 blend ctrl
-  vpu_mmio_->Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (3 & 0xf) << 8 |  // postbld_src3_sel
-                         (0 & 0x1) << 16 |                               // postbld_osd1_premult
-                         (1 & 0x1) << 20,
-                     OSD1_BLEND_SRC_CTRL);
+  vpu_mmio_.Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (3 & 0xf) << 8 |  // postbld_src3_sel
+                        (0 & 0x1) << 16 |                               // postbld_osd1_premult
+                        (1 & 0x1) << 20,
+                    OSD1_BLEND_SRC_CTRL);
   // vpp osd2 blend ctrl
-  vpu_mmio_->Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (0 & 0xf) << 8 |  // postbld_src4_sel
-                         (0 & 0x1) << 16 |                               // postbld_osd2_premult
-                         (1 & 0x1) << 20,
-                     OSD2_BLEND_SRC_CTRL);
+  vpu_mmio_.Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (0 & 0xf) << 8 |  // postbld_src4_sel
+                        (0 & 0x1) << 16 |                               // postbld_osd2_premult
+                        (1 & 0x1) << 20,
+                    OSD2_BLEND_SRC_CTRL);
 
   // used default dummy data
-  vpu_mmio_->Write32(0x0 << 16 | 0x0 << 8 | 0x0, VIU_OSD_BLEND_DUMMY_DATA0);
+  vpu_mmio_.Write32(0x0 << 16 | 0x0 << 8 | 0x0, VIU_OSD_BLEND_DUMMY_DATA0);
   // used default dummy alpha data
-  vpu_mmio_->Write32(0x0 << 20 | 0x0 << 11 | 0x0, VIU_OSD_BLEND_DUMMY_ALPHA);
+  vpu_mmio_.Write32(0x0 << 20 | 0x0 << 11 | 0x0, VIU_OSD_BLEND_DUMMY_ALPHA);
 
   // osdx setting
-  vpu_mmio_->Write32((layer_image_size_.width - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
+  vpu_mmio_.Write32((layer_image_size_.width - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
 
-  vpu_mmio_->Write32((layer_image_size_.height - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
+  vpu_mmio_.Write32((layer_image_size_.height - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
 
-  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width,
-                     VIU_OSD_BLEND_BLEND0_SIZE);
-  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width,
-                     VIU_OSD_BLEND_BLEND1_SIZE);
-  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(DOLBY_PATH_CTRL), /*field_begin_bit=*/2,
-                                     /*field_size_bits=*/2, /*field_value=*/0x3),
-                     DOLBY_PATH_CTRL);
+  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+                    VIU_OSD_BLEND_BLEND0_SIZE);
+  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+                    VIU_OSD_BLEND_BLEND1_SIZE);
+  vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(DOLBY_PATH_CTRL), /*field_begin_bit=*/2,
+                                    /*field_size_bits=*/2, /*field_value=*/0x3),
+                    DOLBY_PATH_CTRL);
 
-  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width, VPP_OSD1_IN_SIZE);
+  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width, VPP_OSD1_IN_SIZE);
 
   // setting blend scope
-  vpu_mmio_->Write32(0 << 16 | (layer_image_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_->Write32(0 << 16 | (layer_image_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
+  vpu_mmio_.Write32(0 << 16 | (layer_image_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_.Write32(0 << 16 | (layer_image_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
 
   // Set geometry to normal mode
   uint32_t data32 = ((layer_image_size_.width - 1) & 0xfff) << 16;
-  vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
   data32 = ((layer_image_size_.height - 1) & 0xfff) << 16;
-  vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 
-  vpu_mmio_->Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
-  vpu_mmio_->Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
+  vpu_mmio_.Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
+  vpu_mmio_.Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
 
   // enable osd blk0
-  osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_))
+  osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_)
       .set_rsv(0)
       .set_osd_mem_mode(0)
       .set_premult_en(0)
       .set_blk_en(1)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 }
 
 void Osd::EnableScaling(bool enable) {
@@ -554,10 +551,10 @@ void Osd::EnableScaling(bool enable) {
     /* enable osd scaler */
     data32 |= 1 << 2; /* enable osd scaler */
     data32 |= 1 << 3; /* enable osd scaler path */
-    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SC_CTRL0);
+    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SC_CTRL0);
   } else {
     /* disable osd scaler path */
-    vpu_mmio_->Write32(0, VPU_VPP_OSD_SC_CTRL0);
+    vpu_mmio_.Write32(0, VPU_VPP_OSD_SC_CTRL0);
   }
   hf_phase_step = (src_w << 18) / dst_w;
   hf_phase_step = (hf_phase_step << 6);
@@ -569,11 +566,11 @@ void Osd::EnableScaling(bool enable) {
   data32 = 0x0;
   if (enable) {
     data32 = (((src_h - 1) & 0x1fff) | ((src_w - 1) & 0x1fff) << 16);
-    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCI_WH_M1);
+    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCI_WH_M1);
     data32 = (((display_contents_size_.width - 1) & 0xfff));
-    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_H_START_END);
+    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCO_H_START_END);
     data32 = (((display_contents_size_.height - 1) & 0xfff));
-    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_V_START_END);
+    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCO_V_START_END);
   }
   data32 = 0x0;
   if (enable) {
@@ -581,30 +578,30 @@ void Osd::EnableScaling(bool enable) {
         (vf_bank_len & 0x7) | ((vsc_ini_rcv_num & 0xf) << 3) | ((vsc_ini_rpt_p0_num & 0x3) << 8);
     data32 |= 1 << 24;
   }
-  vpu_mmio_->Write32(data32, VPU_VPP_OSD_VSC_CTRL0);
+  vpu_mmio_.Write32(data32, VPU_VPP_OSD_VSC_CTRL0);
   data32 = 0x0;
   if (enable) {
     data32 |=
         (hf_bank_len & 0x7) | ((hsc_ini_rcv_num & 0xf) << 3) | ((hsc_ini_rpt_p0_num & 0x3) << 8);
     data32 |= 1 << 22;
   }
-  vpu_mmio_->Write32(data32, VPU_VPP_OSD_HSC_CTRL0);
+  vpu_mmio_.Write32(data32, VPU_VPP_OSD_HSC_CTRL0);
   data32 = 0x0;
   if (enable) {
     data32 |= (bot_ini_phase & 0xffff) << 16;
-    vpu_mmio_->Write32(
-        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_HSC_PHASE_STEP), /*field_begin_bit=*/0,
+    vpu_mmio_.Write32(
+        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_HSC_PHASE_STEP), /*field_begin_bit=*/0,
                         /*field_size_bits=*/28, /*field_value=*/hf_phase_step),
         VPU_VPP_OSD_HSC_PHASE_STEP);
-    vpu_mmio_->Write32(
-        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_HSC_INI_PHASE), /*field_begin_bit=*/0,
+    vpu_mmio_.Write32(
+        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_HSC_INI_PHASE), /*field_begin_bit=*/0,
                         /*field_size_bits=*/16, /*field_value=*/0),
         VPU_VPP_OSD_HSC_INI_PHASE);
-    vpu_mmio_->Write32(
-        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_VSC_PHASE_STEP), /*field_begin_bit=*/0,
+    vpu_mmio_.Write32(
+        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_VSC_PHASE_STEP), /*field_begin_bit=*/0,
                         /*field_size_bits=*/28, /*field_value=*/vf_phase_step),
         VPU_VPP_OSD_VSC_PHASE_STEP);
-    vpu_mmio_->Write32(data32, VPU_VPP_OSD_VSC_INI_PHASE);
+    vpu_mmio_.Write32(data32, VPU_VPP_OSD_VSC_INI_PHASE);
   }
 }
 
@@ -617,7 +614,7 @@ void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
       .set_r_clamp(minimum_rgb << 2)
       .set_g_clamp(minimum_rgb << 2)
       .set_b_clamp(minimum_rgb << 2)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 }
 
 // These configuration could be done during initialization.
@@ -633,55 +630,53 @@ zx_status_t Osd::ConfigAfbc() {
       .set_yuv_transform_enabled(true)
       .set_super_block_aspect(kAfbcb16x16Pixel)
       .set_pixel_format(kAfbcRGBA8888)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // Setup color RGBA channel order
-  osd1_registers.mali_unpack_ctrl.ReadFrom(&(*vpu_mmio_))
+  osd1_registers.mali_unpack_ctrl.ReadFrom(&vpu_mmio_)
       .set_r(kAfbcColorReorderR)
       .set_g(kAfbcColorReorderG)
       .set_b(kAfbcColorReorderB)
       .set_a(kAfbcColorReorderA)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // Set afbc input buffer width/height in pixel
   osd1_registers.afbc_buffer_width_s.FromValue(0)
       .set_buffer_width(layer_image_size_.width)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
   osd1_registers.afbc_buffer_height_s.FromValue(0)
       .set_buffer_height(layer_image_size_.height)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // Set afbc input buffer
-  osd1_registers.afbc_bounding_box_x_start_s.FromValue(0).set_buffer_x_start(0).WriteTo(
-      &(*vpu_mmio_));
+  osd1_registers.afbc_bounding_box_x_start_s.FromValue(0).set_buffer_x_start(0).WriteTo(&vpu_mmio_);
   osd1_registers.afbc_bounding_box_x_end_s.FromValue(0)
       .set_buffer_x_end(layer_image_size_.width -
                         1)  // vendor code has width - 1 - 1, which is technically
                             // incorrect and gives the same result as this.
-      .WriteTo(&(*vpu_mmio_));
-  osd1_registers.afbc_bounding_box_y_start_s.FromValue(0).set_buffer_y_start(0).WriteTo(
-      &(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
+  osd1_registers.afbc_bounding_box_y_start_s.FromValue(0).set_buffer_y_start(0).WriteTo(&vpu_mmio_);
   osd1_registers.afbc_bounding_box_y_end_s.FromValue(0)
       .set_buffer_y_end(layer_image_size_.height -
                         1)  // vendor code has height -1 -1, but that cuts off the bottom row.
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // Set output buffer stride
   osd1_registers.afbc_output_buf_stride_s.FromValue(0)
       .set_output_buffer_stride(layer_image_size_.width * 4)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // Set afbc output buffer index
   // The way this is calculated based on vendor code is as follows:
   // Take OSD being used (1-based index): Therefore OSD1 -> index 1
   // out_addr = index << 24
   osd1_registers.afbc_output_buf_addr_low_s.FromValue(0).set_output_buffer_addr(1 << 24).WriteTo(
-      &(*vpu_mmio_));
+      &vpu_mmio_);
   osd1_registers.afbc_output_buf_addr_high_s.FromValue(0).set_output_buffer_addr(0).WriteTo(
-      &(*vpu_mmio_));
+      &vpu_mmio_);
 
   // Set linear address to the out_addr mentioned above
-  osd1_registers.blk1_cfg_w4.FromValue(0).set_frame_addr(1 << 24).WriteTo(&(*vpu_mmio_));
+  osd1_registers.blk1_cfg_w4.FromValue(0).set_frame_addr(1 << 24).WriteTo(&vpu_mmio_);
 
   return ZX_OK;
 }
@@ -693,13 +688,13 @@ void Osd::HwInit() {
                       layer_image_size_.width, layer_image_size_.height);
 
   // Setup VPP horizontal width
-  vpu_mmio_->Write32(display_contents_size_.width, VPP_POSTBLEND_H_SIZE);
+  vpu_mmio_.Write32(display_contents_size_.width, VPP_POSTBLEND_H_SIZE);
 
   // init vpu fifo control register
-  uint32_t regVal = vpu_mmio_->Read32(VPP_OFIFO_SIZE);
+  uint32_t regVal = vpu_mmio_.Read32(VPP_OFIFO_SIZE);
   regVal = 0xfff << 20;
   regVal |= (0xfff + 1);
-  vpu_mmio_->Write32(regVal, VPP_OFIFO_SIZE);
+  vpu_mmio_.Write32(regVal, VPP_OFIFO_SIZE);
 
   // init osd fifo control and set DDR request priority to be urgent
   regVal = 1;
@@ -709,17 +704,17 @@ void Osd::HwInit() {
   regVal |= 2 << 24;
   regVal |= 1 << 31;
   regVal |= 32 << 12;  // fifo_depth_val: 32*8 = 256
-  vpu_mmio_->Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
-  vpu_mmio_->Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
+  vpu_mmio_.Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
+  vpu_mmio_.Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
 
-  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) | VPP_POSTBLEND_EN, VPP_MISC);
-  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) & ~(VPP_PREBLEND_EN), VPP_MISC);
+  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) | VPP_POSTBLEND_EN, VPP_MISC);
+  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) & ~(VPP_PREBLEND_EN), VPP_MISC);
 
   osd1_registers.ctrl_stat.FromValue(0)
       .set_blk_en(1)
       .set_global_alpha(kMaximumAlpha)
       .set_osd_en(1)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // TODO: split this method into HwInit for each OSD.
   Osd2CtrlStatReg::Get()
@@ -727,36 +722,36 @@ void Osd::HwInit() {
       .set_blk_en(1)
       .set_global_alpha(kMaximumAlpha)
       .set_osd_en(1)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   DefaultSetup();
 
   EnableScaling(false);
 
   // Apply scale coefficients
-  osd1_registers.scale_coef_idx.ReadFrom(&(*vpu_mmio_))
+  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
       .set_hi_res_coef(0)
       .set_h_coef(0)
       .set_index(0)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
   for (unsigned int i : osd_filter_coefs_bicubic) {
-    osd1_registers.scale_coef.FromValue(i).WriteTo(&(*vpu_mmio_));
+    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
   }
 
-  osd1_registers.scale_coef_idx.ReadFrom(&(*vpu_mmio_))
+  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
       .set_hi_res_coef(0)
       .set_h_coef(1)
       .set_index(0)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
   for (unsigned int i : osd_filter_coefs_bicubic) {
-    osd1_registers.scale_coef.FromValue(i).WriteTo(&(*vpu_mmio_));
+    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
   }
 
   // update blending
-  vpu_mmio_->Write32(0 << 16 | (display_contents_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_->Write32(0 << 16 | (display_contents_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
-  vpu_mmio_->Write32((display_contents_size_.width << 16) | display_contents_size_.height,
-                     VPU_VPP_OUT_H_V_SIZE);
+  vpu_mmio_.Write32(0 << 16 | (display_contents_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_.Write32(0 << 16 | (display_contents_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
+  vpu_mmio_.Write32((display_contents_size_.width << 16) | display_contents_size_.height,
+                    VPU_VPP_OUT_H_V_SIZE);
 
   // Configure AFBC Engine's one-time programmable fields, so it's ready
   ConfigAfbc();
@@ -768,16 +763,16 @@ void Osd::Dump() {
   rdma_->DumpRdmaRegisters();
 }
 
-#define LOG_REG(reg) zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), vpu_mmio_->Read32((reg)))
-#define LOG_REG_INSTANCE(reg, offset, index)                                                 \
-  zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), vpu_mmio_->Read32((reg)), \
+#define LOG_REG(reg) zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), vpu_mmio_.Read32((reg)))
+#define LOG_REG_INSTANCE(reg, offset, index)                                                \
+  zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), vpu_mmio_.Read32((reg)), \
          index + 1)
 void Osd::DumpNonRdmaRegisters() {
   uint32_t offset = 0;
   uint32_t index = 0;
 
   zxlogf(INFO, "VPU_VIU_VENC_MUX_CTRL: 0x%08x",
-         VideoInputUnitEncoderMuxControl::Get().ReadFrom(&*vpu_mmio_).reg_value());
+         VideoInputUnitEncoderMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
   LOG_REG(VPU_VPP_MISC);
   LOG_REG(VPU_VPP_OFIFO_SIZE);
   LOG_REG(VPU_VPP_HOLD_LINES);
@@ -831,24 +826,22 @@ void Osd::DumpNonRdmaRegisters() {
 
   zxlogf(INFO, "Dumping all Color Correction Matrix related Registers");
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF00_01 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF00_01));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF00_01));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF02_10 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF02_10));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF02_10));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF11_12 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF11_12));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF11_12));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF20_21 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF20_21));
-  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF22 = 0x%x", vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF22));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF20_21));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF22 = 0x%x", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF22));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_OFFSET0_1 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
-  zxlogf(INFO, "VPU_VPP_POST_MATRIX_OFFSET2 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET2));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_OFFSET2 = 0x%x", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET2));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET0_1 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET2 = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
-  zxlogf(INFO, "VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x",
-         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
+         vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
 }
 
 void Osd::Release() {
@@ -872,14 +865,14 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, PixelGridSize2
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Osd> self(new (&ac) Osd(layer_image_size, display_contents_size, osd_node,
+  std::unique_ptr<Osd> self(new (&ac) Osd(layer_image_size, display_contents_size,
                                           std::move(vpu_mmio_result).value(),
                                           std::move(rdma_result).value()));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx_status_t status = self->rdma_->SetupRdma(&(*self->vpu_mmio_));
+  zx_status_t status = self->rdma_->SetupRdma(&(self->vpu_mmio_));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not setup RDMA");
     return zx::error(status);

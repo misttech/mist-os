@@ -37,7 +37,7 @@ class Osd {
   static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev,
                                                  PixelGridSize2D layer_image_size,
                                                  PixelGridSize2D display_contents_size,
-                                                 inspect::Node* parent_node);
+                                                 inspect::Node* osd_node);
 
   Osd(Osd& other) = delete;
 
@@ -77,8 +77,7 @@ class Osd {
 
  private:
   Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-      inspect::Node* inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
-      std::unique_ptr<RdmaEngine> rdma);
+      fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
   void DefaultSetup();
   // this function sets up scaling based on framebuffer and actual display
   // dimensions. The scaling IP and registers and undocumented.
@@ -89,7 +88,7 @@ class Osd {
 
   void DumpNonRdmaRegisters();
 
-  std::optional<fdf::MmioBuffer> vpu_mmio_;
+  fdf::MmioBuffer vpu_mmio_;
 
   PixelGridSize2D layer_image_size_ = kInvalidPixelGridSize2D;
   PixelGridSize2D display_contents_size_ = kInvalidPixelGridSize2D;
