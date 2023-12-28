@@ -35,7 +35,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
-#include "src/graphics/display/drivers/amlogic-display/osd.h"
+#include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
@@ -307,14 +307,14 @@ class AmlogicDisplay
 
   // Objects: only valid if fully_initialized()
   std::unique_ptr<Vpu> vpu_;
-  std::unique_ptr<Osd> osd_;
+  std::unique_ptr<VideoInputUnit> video_input_unit_;
   std::unique_ptr<Vout> vout_;
 
   // Monitoring. We create a named "amlogic-display" node to allow for easier filtering
   // of inspect tree when defining selectors and metrics.
   inspect::Inspector inspector_;
   inspect::Node root_node_;
-  inspect::Node osd_node_;
+  inspect::Node video_input_unit_node_;
 
   display::DisplayId display_id_ TA_GUARDED(display_mutex_) = kPanelDisplayId;
   bool display_attached_ TA_GUARDED(display_mutex_) = false;

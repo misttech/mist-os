@@ -15,7 +15,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/amlogic-display/osd.h"
+#include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -661,30 +661,30 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
 
 TEST(AmlogicDisplay, FloatToFix3_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000u, Osd::FloatToFixed3_10(0.0f));
-  EXPECT_EQ(0x0066u, Osd::FloatToFixed3_10(0.1f));
-  EXPECT_EQ(0x1f9au, Osd::FloatToFixed3_10(-0.1f));
+  EXPECT_EQ(0x0000u, VideoInputUnit::FloatToFixed3_10(0.0f));
+  EXPECT_EQ(0x0066u, VideoInputUnit::FloatToFixed3_10(0.1f));
+  EXPECT_EQ(0x1f9au, VideoInputUnit::FloatToFixed3_10(-0.1f));
   // Test for maximum positive (<4)
-  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(4.0f));
-  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(40.0f));
-  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(3.9999f));
+  EXPECT_EQ(0x0FFFu, VideoInputUnit::FloatToFixed3_10(4.0f));
+  EXPECT_EQ(0x0FFFu, VideoInputUnit::FloatToFixed3_10(40.0f));
+  EXPECT_EQ(0x0FFFu, VideoInputUnit::FloatToFixed3_10(3.9999f));
   // Test for minimum negative (>= -4)
-  EXPECT_EQ(0x1000u, Osd::FloatToFixed3_10(-4.0f));
-  EXPECT_EQ(0x1000u, Osd::FloatToFixed3_10(-14.0f));
+  EXPECT_EQ(0x1000u, VideoInputUnit::FloatToFixed3_10(-4.0f));
+  EXPECT_EQ(0x1000u, VideoInputUnit::FloatToFixed3_10(-14.0f));
 }
 
 TEST(AmlogicDisplay, FloatToFixed2_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000u, Osd::FloatToFixed2_10(0.0f));
-  EXPECT_EQ(0x0066u, Osd::FloatToFixed2_10(0.1f));
-  EXPECT_EQ(0x0f9au, Osd::FloatToFixed2_10(-0.1f));
+  EXPECT_EQ(0x0000u, VideoInputUnit::FloatToFixed2_10(0.0f));
+  EXPECT_EQ(0x0066u, VideoInputUnit::FloatToFixed2_10(0.1f));
+  EXPECT_EQ(0x0f9au, VideoInputUnit::FloatToFixed2_10(-0.1f));
   // Test for maximum positive (<2)
-  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(2.0f));
-  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(20.0f));
-  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(1.9999f));
+  EXPECT_EQ(0x07FFu, VideoInputUnit::FloatToFixed2_10(2.0f));
+  EXPECT_EQ(0x07FFu, VideoInputUnit::FloatToFixed2_10(20.0f));
+  EXPECT_EQ(0x07FFu, VideoInputUnit::FloatToFixed2_10(1.9999f));
   // Test for minimum negative (>= -2)
-  EXPECT_EQ(0x0800u, Osd::FloatToFixed2_10(-2.0f));
-  EXPECT_EQ(0x0800u, Osd::FloatToFixed2_10(-14.0f));
+  EXPECT_EQ(0x0800u, VideoInputUnit::FloatToFixed2_10(-2.0f));
+  EXPECT_EQ(0x0800u, VideoInputUnit::FloatToFixed2_10(-14.0f));
 }
 
 TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {

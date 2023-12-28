@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/amlogic-display/osd.h"
+#include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
@@ -187,26 +187,29 @@ OsdRegisters osd1_registers = {
 
 }  // namespace
 
-display::ConfigStamp Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
+display::ConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
+  return rdma_->GetLastConfigStampApplied();
+}
 
-Osd::Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-         fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
+VideoInputUnit::VideoInputUnit(PixelGridSize2D layer_image_size,
+                               PixelGridSize2D display_contents_size, fdf::MmioBuffer vpu_mmio,
+                               std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)),
       layer_image_size_(layer_image_size),
       display_contents_size_(display_contents_size),
       rdma_(std::move(rdma)) {}
 
-void Osd::Disable(display::ConfigStamp config_stamp) {
+void VideoInputUnit::DisableLayer(display::ConfigStamp config_stamp) {
   rdma_->StopRdma();
   osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(0).WriteTo(&vpu_mmio_);
   rdma_->ResetConfigStamp(config_stamp);
 }
 
-void Osd::Enable(void) {
+void VideoInputUnit::EnableLayer() {
   osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(1).WriteTo(&vpu_mmio_);
 }
 
-uint32_t Osd::FloatToFixed2_10(float f) {
+uint32_t VideoInputUnit::FloatToFixed2_10(float f) {
   auto fixed_num = static_cast<int32_t>(round(f * kFloatToFixed2_10ScaleFactor));
 
   // Amlogic hardware accepts values [-2 2). Let's make sure the result is within this range.
@@ -215,7 +218,7 @@ uint32_t Osd::FloatToFixed2_10(float f) {
   return fixed_num & kFloatToFixed2_10Mask;
 }
 
-uint32_t Osd::FloatToFixed3_10(float f) {
+uint32_t VideoInputUnit::FloatToFixed3_10(float f) {
   auto fixed_num = static_cast<int32_t>(round(f * kFloatToFixed3_10ScaleFactor));
 
   // Amlogic hardware accepts values [-4 4). Let's make sure the result is within this range.
@@ -224,7 +227,7 @@ uint32_t Osd::FloatToFixed3_10(float f) {
   return fixed_num & kFloatToFixed3_10Mask;
 }
 
-void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config) {
+void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config) {
   if (!config->cc_flags) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
@@ -289,8 +292,8 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
          coef02_10, coef11_12, coef20_21, coef22);
 }
 
-void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
-                      display::ConfigStamp config_stamp) {
+void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
+                                 display::ConfigStamp config_stamp) {
   auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image.handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
@@ -462,7 +465,8 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   rdma_->ExecRdmaTable(next_table_idx, config_stamp, info->is_afbc);
 }
 
-void Osd::SetupOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size) {
+void VideoInputUnit::SetupOsdLayers(PixelGridSize2D layer_image_size,
+                                    PixelGridSize2D display_contents_size) {
   // init osd fifo control and set DDR request priority to be urgent
   uint32_t reg_val = 1;
   reg_val |= 4 << 5;   // hold_fifo_lines
@@ -503,8 +507,8 @@ void Osd::SetupOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D displ
   vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 }
 
-void Osd::SetupSingleLayerBlending(PixelGridSize2D layer_size,
-                                   PixelGridSize2D display_contents_size) {
+void VideoInputUnit::SetupSingleLayerBlending(PixelGridSize2D layer_size,
+                                              PixelGridSize2D display_contents_size) {
   // TODO(fxbug.dev/317961333): The documentation below needs to be
   // re-organized. Move the descriptions of the blenders and the blender muxes
   // to the blender register definitions; at this function we should only keep
@@ -607,7 +611,7 @@ void Osd::SetupSingleLayerBlending(PixelGridSize2D layer_size,
                     VPU_VPP_OUT_H_V_SIZE);
 }
 
-void Osd::DisableScaling() {
+void VideoInputUnit::DisableScaling() {
   // Disable osd scaler path.
   vpu_mmio_.Write32(0, VPU_VPP_OSD_SC_CTRL0);
   vpu_mmio_.Write32(0, VPU_VPP_OSD_VSC_CTRL0);
@@ -633,7 +637,7 @@ void Osd::DisableScaling() {
   }
 }
 
-void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
+void VideoInputUnit::SetMinimumRgb(uint8_t minimum_rgb) {
   // According to spec, minimum rgb should be set as follows:
   // Shift value by 2bits (8bit -> 10bit) and write new value for
   // each channel separately.
@@ -645,7 +649,7 @@ void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
       .WriteTo(&vpu_mmio_);
 }
 
-void Osd::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
+void VideoInputUnit::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   // The format specifier must match the sysmem format modifier flags specified
   // in AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints().
   //
@@ -706,7 +710,7 @@ void Osd::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   osd1_registers.blk1_cfg_w4.FromValue(0).set_frame_addr(1 << 24).WriteTo(&vpu_mmio_);
 }
 
-void Osd::HwInit() {
+void VideoInputUnit::HwInit() {
   ZX_DEBUG_ASSERT_MSG(display_contents_size_.IsValid(), "Invalid display size (%d x %d)",
                       display_contents_size_.width, display_contents_size_.height);
   ZX_DEBUG_ASSERT_MSG(layer_image_size_.IsValid(), "Invalid framebuffer size (%d x %d)",
@@ -730,7 +734,7 @@ void Osd::HwInit() {
 }
 
 #define REG_OFFSET (0x20 << 2)
-void Osd::Dump() {
+void VideoInputUnit::Dump() {
   DumpNonRdmaRegisters();
   rdma_->DumpRdmaRegisters();
 }
@@ -739,7 +743,7 @@ void Osd::Dump() {
 #define LOG_REG_INSTANCE(reg, offset, index)                                                \
   zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), vpu_mmio_.Read32((reg)), \
          index + 1)
-void Osd::DumpNonRdmaRegisters() {
+void VideoInputUnit::DumpNonRdmaRegisters() {
   uint32_t offset = 0;
   uint32_t index = 0;
 
@@ -816,30 +820,31 @@ void Osd::DumpNonRdmaRegisters() {
   zxlogf(INFO, "VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
 }
 
-void Osd::Release() {
-  Disable();
+void VideoInputUnit::Release() {
+  DisableLayer();
   rdma_->Release();
   thrd_join(rdma_irq_thread_, nullptr);
 }
 
 // static
-zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, PixelGridSize2D layer_image_size,
-                                             PixelGridSize2D display_contents_size,
-                                             inspect::Node* osd_node) {
+zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
+    ddk::PDevFidl* pdev, PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
+    inspect::Node* video_input_unit_node) {
   zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
 
-  zx::result<std::unique_ptr<RdmaEngine>> rdma_result = RdmaEngine::Create(pdev, osd_node);
+  zx::result<std::unique_ptr<RdmaEngine>> rdma_result =
+      RdmaEngine::Create(pdev, video_input_unit_node);
   if (rdma_result.is_error()) {
     return rdma_result.take_error();
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Osd> self(new (&ac) Osd(layer_image_size, display_contents_size,
-                                          std::move(vpu_mmio_result).value(),
-                                          std::move(rdma_result).value()));
+  std::unique_ptr<VideoInputUnit> self(
+      new (&ac) VideoInputUnit(layer_image_size, display_contents_size,
+                               std::move(vpu_mmio_result).value(), std::move(rdma_result).value()));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }

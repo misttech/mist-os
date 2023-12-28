@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_OSD_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_OSD_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -32,24 +32,31 @@
 
 namespace amlogic_display {
 
-class Osd {
+// The Video Input Unit (VIU) retrieves pixel data (images) from its input
+// channels, and scales, post-processes and blends the pixel data into the
+// display contents for the Video Output (VOUT) module to encode and transmit
+// as electronic signals.
+//
+// The VideoInputUnit class is an abstraction of the VIU hardware block. It
+// controls the OSD layers, scalers and blenders within the VIU.
+class VideoInputUnit {
  public:
-  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev,
-                                                 PixelGridSize2D layer_image_size,
-                                                 PixelGridSize2D display_contents_size,
-                                                 inspect::Node* osd_node);
+  static zx::result<std::unique_ptr<VideoInputUnit>> Create(ddk::PDevFidl* pdev,
+                                                            PixelGridSize2D layer_image_size,
+                                                            PixelGridSize2D display_contents_size,
+                                                            inspect::Node* video_input_unit_node);
 
-  Osd(Osd& other) = delete;
+  VideoInputUnit(VideoInputUnit& other) = delete;
 
   void HwInit();
 
-  // Disable the OSD and set the latest stamp to |config_stamp|.
-  // If the driver disables (pauses) the OSD because the client sets an empty
+  // Disable the OSD layer and set the latest stamp to |config_stamp|.
+  // If the driver disables (pauses) the layer because the client sets an empty
   // config, the |config_stamp| should be the client-provided stamp; otherwise
   // it should use the invalid stamp value indicating that the OSD has been
   // invalidated.
-  void Disable(display::ConfigStamp config_stamp = display::kInvalidConfigStamp);
-  void Enable();
+  void DisableLayer(display::ConfigStamp config_stamp = display::kInvalidConfigStamp);
+  void EnableLayer();
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
@@ -76,8 +83,8 @@ class Osd {
   void SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-      fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
+  VideoInputUnit(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
+                 fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
 
   // Sets up the OSD layers before they are scaled and blended.
   //
@@ -121,4 +128,4 @@ class Osd {
 
 }  // namespace amlogic_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_OSD_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_

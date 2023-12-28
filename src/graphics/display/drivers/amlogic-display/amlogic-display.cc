@@ -164,7 +164,7 @@ bool AmlogicDisplay::IsNewDisplayTiming(const display::DisplayTiming& timing) {
 
 zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
   if (fully_initialized()) {
-    osd_->SetMinimumRgb(minimum_rgb);
+    video_input_unit_->SetMinimumRgb(minimum_rgb);
     return ZX_OK;
   }
   return ZX_ERR_INTERNAL;
@@ -208,10 +208,6 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   // driver.
   vpu_->AfbcPower(true);
 
-  // The "osd" node must be created because these metric paths are load-bearing
-  // for some triage workflows.
-  osd_node_ = root_node_.CreateChild("osd");
-
   // TODO(fxbug.dev/317922128): Use the unscaled layer source frame size
   // instead.
   PixelGridSize2D layer_image_size = {.width = static_cast<int>(vout_->fb_width()),
@@ -219,15 +215,18 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   PixelGridSize2D display_contents_size = {.width = static_cast<int>(vout_->display_width()),
                                            .height = static_cast<int>(vout_->display_height())};
 
-  zx::result<std::unique_ptr<Osd>> osd_create_result =
-      Osd::Create(&pdev_, layer_image_size, display_contents_size, &osd_node_);
-  if (osd_create_result.is_error()) {
-    zxlogf(ERROR, "Failed to create OSD instance: %s", osd_create_result.status_string());
-    return osd_create_result.status_value();
+  video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
+  zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
+      VideoInputUnit::Create(&pdev_, layer_image_size, display_contents_size,
+                             &video_input_unit_node_);
+  if (video_input_unit_create_result.is_error()) {
+    zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
+           video_input_unit_create_result.status_string());
+    return video_input_unit_create_result.status_value();
   }
-  osd_ = std::move(osd_create_result).value();
+  video_input_unit_ = std::move(video_input_unit_create_result).value();
 
-  osd_->HwInit();
+  video_input_unit_->HwInit();
   return ZX_OK;
 }
 
@@ -585,7 +584,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     // a checked configuration could be invalid at this point.
     auto info =
         reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
-    osd_->FlipOnVsync(info->canvas_idx, display_configs[0], config_stamp);
+    video_input_unit_->FlipOnVsync(info->canvas_idx, display_configs[0], config_stamp);
   } else {
     if (fully_initialized()) {
       {
@@ -596,7 +595,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
           current_capture_target_image_ = nullptr;
         }
       }
-      osd_->Disable(config_stamp);
+      video_input_unit_->DisableLayer(config_stamp);
     }
   }
 
@@ -619,7 +618,7 @@ void AmlogicDisplay::DdkSuspend(ddk::SuspendTxn txn) {
     return;
   }
   if (fully_initialized()) {
-    osd_->Disable();
+    video_input_unit_->DisableLayer();
   }
 
   fbl::AutoLock l(&image_mutex_);
@@ -636,7 +635,7 @@ void AmlogicDisplay::DdkSuspend(ddk::SuspendTxn txn) {
 
 void AmlogicDisplay::DdkResume(ddk::ResumeTxn txn) {
   if (fully_initialized()) {
-    osd_->Enable();
+    video_input_unit_->EnableLayer();
   }
   txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
 }
@@ -660,7 +659,7 @@ void AmlogicDisplay::DdkRelease() {
   // destroyed. Otherwise other threads may still write to the VPU MMIO which
   // can cause the system to hang.
   if (fully_initialized()) {
-    osd_->Release();
+    video_input_unit_->Release();
     vpu_->PowerOff();
   }
 
@@ -1084,7 +1083,7 @@ void AmlogicDisplay::VSyncThreadEntryPoint() {
     }
     display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
     if (fully_initialized()) {
-      current_config_stamp = osd_->GetLastConfigStampApplied();
+      current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
     }
     fbl::AutoLock lock(&display_mutex_);
     if (dc_intf_.is_valid() && display_attached_) {

@@ -26,9 +26,9 @@ namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
-                                                           inspect::Node* osd_node) {
+                                                           inspect::Node* video_input_unit_node) {
   fbl::AllocChecker ac;
-  std::unique_ptr<RdmaEngine> rdma(new (&ac) RdmaEngine(osd_node));
+  std::unique_ptr<RdmaEngine> rdma(new (&ac) RdmaEngine(video_input_unit_node));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
