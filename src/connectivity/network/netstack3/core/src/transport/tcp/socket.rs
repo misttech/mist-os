@@ -95,13 +95,6 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     fn into_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT>;
-
-    // TODO(https://issues.fuchsia.dev/316408184): Improve type safety and avoid
-    // this method that is unreachable for Ipv4.
-    /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
-    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
-        id: TcpSocketId<Self, D, BT>,
-    ) -> <Self::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
 }
 
 impl DualStackIpExt for Ipv4 {
@@ -128,14 +121,6 @@ impl DualStackIpExt for Ipv4 {
     ) -> Self::DemuxSocketId<D, BT> {
         EitherStack::ThisStack(id)
     }
-
-    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
-        _id: TcpSocketId<Self, D, BT>,
-    ) -> <Self::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
-        // TODO(https://issues.fuchsia.dev/316408184): Improve type safety and avoid
-        // this method that is unreachable for Ipv4.
-        unreachable!()
-    }
 }
 
 impl DualStackIpExt for Ipv6 {
@@ -160,12 +145,6 @@ impl DualStackIpExt for Ipv6 {
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT> {
         id
-    }
-
-    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
-        id: TcpSocketId<Self, D, BT>,
-    ) -> <Self::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
-        EitherStack::OtherStack(id)
     }
 }
 
@@ -417,6 +396,7 @@ pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
             WeakDeviceId = Self::WeakDeviceId,
         > + DeviceIpSocketHandler<I::OtherVersion, BC>
         + TcpDemuxContext<I::OtherVersion, Self::WeakDeviceId, BC>
+        + TcpDualStackContext<I>
         + AsSingleStack<Self::SingleStackIpTransportAndDemuxCtx<'a>>;
 
     /// A collection of type assertions that must be true in the dual stack
@@ -557,6 +537,15 @@ pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
             cb(socket_state, converter)
         })
     }
+}
+
+/// A provider of dualstack socket functionality required by TCP sockets.
+pub(crate) trait TcpDualStackContext<I: DualStackIpExt> {
+    /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
+    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+        &self,
+        id: TcpSocketId<I, D, BT>,
+    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -2110,7 +2099,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                     let conn_and_addr = connect_inner(
                         core_ctx,
                         bindings_ctx,
-                        &I::into_other_demux_socket_id(id.clone()),
+                        &core_ctx.into_other_demux_socket_id(id.clone()),
                         isn,
                         listener_addr,
                         local_ip,
@@ -2240,7 +2229,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                                     core_ctx,
                                     bindings_ctx,
                                     &id,
-                                    &I::into_other_demux_socket_id(id.clone()),
+                                    &core_ctx.into_other_demux_socket_id(id.clone()),
                                     conn,
                                     addr,
                                 ),
@@ -2627,7 +2616,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                         ctx,
                         weak_id,
                         id,
-                        &I::into_other_demux_socket_id(id.clone()),
+                        &core_ctx.into_other_demux_socket_id(id.clone()),
                         conn,
                         addr,
                     ),
@@ -4726,6 +4715,17 @@ mod tests {
             cb: F,
         ) -> O {
             cb(id.get_mut().deref_mut(), MaybeDualStack::NotDualStack(()))
+        }
+    }
+
+    impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes + IpSocketBindingsContext>
+        TcpDualStackContext<Ipv6> for TcpCoreCtx<D, BT>
+    {
+        fn into_other_demux_socket_id<D2: device::WeakId, BT2: TcpBindingsTypes>(
+            &self,
+            id: TcpSocketId<Ipv6, D2, BT2>,
+        ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D2, BT2> {
+            EitherStack::OtherStack(id)
         }
     }
 

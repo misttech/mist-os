@@ -10,8 +10,8 @@ use lock_order::{
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
-    device::WeakDeviceId,
-    socket::MaybeDualStack,
+    device::{self, WeakDeviceId},
+    socket::{EitherStack, MaybeDualStack},
     transport::{
         tcp::{
             self,
@@ -244,6 +244,15 @@ where
                 |(_ctx, id)| id,
             );
         cb(&socket_state, MaybeDualStack::DualStack(()))
+    }
+}
+
+impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for Locked<&SyncCtx<BC>, L> {
+    fn into_other_demux_socket_id<D: device::WeakId, BT: tcp::socket::TcpBindingsTypes>(
+        &self,
+        id: tcp::socket::TcpSocketId<Ipv6, D, BT>,
+    ) -> <Ipv4 as tcp::socket::DualStackIpExt>::DemuxSocketId<D, BT> {
+        EitherStack::OtherStack(id)
     }
 }
 

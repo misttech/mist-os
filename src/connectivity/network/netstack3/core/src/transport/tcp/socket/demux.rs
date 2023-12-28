@@ -47,8 +47,8 @@ use crate::{
             BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler, DualStackIpExt,
             EitherStack, HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState,
             MaybeDualStack, MaybeListener, PrimaryRc, SocketHandler, TcpBindingsContext,
-            TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpIpTransportContext, TcpPortSpec,
-            TcpSocketId, TcpSocketSetEntry, TcpSocketState,
+            TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
+            TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -267,9 +267,7 @@ fn handle_incoming_packet<I, B, BC, CC>(
                                     bindings_ctx,
                                     conn_addr.clone(),
                                     &conn_id,
-                                    // TODO(https://issues.fuchsia.dev/316408184):
-                                    // Improve type safety to avoid clone.
-                                    I::OtherVersion::into_other_demux_socket_id(conn_id.clone()),
+                                    core_ctx.into_other_demux_socket_id(conn_id.clone()),
                                     conn,
                                     incoming,
                                 )

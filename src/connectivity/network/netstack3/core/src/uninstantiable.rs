@@ -342,3 +342,14 @@ impl<P> tcp_socket::AsSingleStack<P> for UninstantiableWrapper<P> {
         self.uninstantiable_unreachable()
     }
 }
+
+impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
+    for UninstantiableWrapper<P>
+{
+    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+        &self,
+        _id: tcp_socket::TcpSocketId<I, D, BT>,
+    ) -> <I::OtherVersion as tcp_socket::DualStackIpExt>::DemuxSocketId<D, BT> {
+        self.uninstantiable_unreachable()
+    }
+}
