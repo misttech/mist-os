@@ -11,7 +11,6 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fit/function.h>
-#include <lib/syslog/cpp/macros.h>
 
 #include <functional>
 #include <iterator>
