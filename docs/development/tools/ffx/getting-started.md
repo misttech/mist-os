@@ -6,7 +6,7 @@ of the design and components of `ffx`, see [the ffx overview](/docs/development/
 ## Contacting the ffx team
 
 If you discover possible bugs or have questions or suggestions,
-[file a bug](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=ffx+User+Bug).
+[file a bug](https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957).
 
 ## Prerequisites
 
@@ -370,8 +370,7 @@ Attempting to communicate with RCS...success
 SUCCESS. You should be able to run ffx commands now.
 ```
 
-If `doctor` fails, it will try to suggest a resolution to the problem. It will
-also provide a link to the Monorail component in which you can file a bug if you
+If `doctor` fails, it will try to suggest a resolution to the problem. You can [file a bug](https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957) for the ffx team if you
 persistently have problems. For example, if `doctor` is unable to start the RCS,
 you would see the following:
 
