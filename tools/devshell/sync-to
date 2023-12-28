@@ -145,7 +145,7 @@ class SyncToCommand:
 
     @property
     def integration_dir(self) -> pathlib.Path:
-        return self.fuchsia_dir.joinpath(self.project)
+        return self.fuchsia_dir.joinpath("integration")
 
     @functools.cached_property
     def gsutil_path(self) -> str:
@@ -174,33 +174,6 @@ class SyncToCommand:
                 )
             )
 
-        self.confirm_ok_to_change_source_code()
-
-        # Always update the integration repo to avoid missing refs. This should
-        # be a safe operation, and it avoids false negatives.
-        print("Fetching refs in the integration repo...")
-        self.run_command(
-            "git",
-            "-C",
-            self.integration_dir,
-            "fetch",
-            "--quiet",
-            "origin",
-            stderr=subprocess.PIPE,
-            dry_run_safe=True,
-        )
-
-        # Force-checkout every repository at JIRI_HEAD to ensure subsequent
-        # `jiri update` calls won't skip repos not at JIRI_HEAD. This will
-        # intentionally fail if there are any uncommitted changes (which should
-        # have been detected by `confirm_ok_to_change_source_code` anyway) to
-        # avoid permanently deleting code.
-        self.jiri(
-            "runp",
-            f"-exit-on-error={str(not self.force).lower()}",
-            "git checkout --quiet JIRI_HEAD",
-        )
-
         if self.state == "reset":
             self.reset_checkout()
         elif re.match(RELEASE_BRANCH_REGEX, self.state):
@@ -226,8 +199,51 @@ class SyncToCommand:
         if not self.dry_run:
             self.print_synced_revision()
 
+    def set_baseline(self) -> None:
+        """Set the checkout to a known-good state.
+
+        Should be run before taking any syncing actions that change the state of
+        the checkout.
+        """
+        self.integration_fetch()
+
+        self.confirm_ok_to_change_source_code()
+
+        # Force-checkout every repository at JIRI_HEAD to ensure subsequent
+        # `jiri update` calls won't skip repos not at JIRI_HEAD. This will
+        # intentionally fail if there are any uncommitted changes (which should
+        # have been detected by `confirm_ok_to_change_source_code` anyway) to
+        # avoid permanently deleting code.
+        self.jiri(
+            "runp",
+            f"-exit-on-error={str(not self.force).lower()}",
+            "git checkout --quiet JIRI_HEAD",
+        )
+
+    @functools.cache  # Need only be run once per `sync-to` run.
+    def integration_fetch(self) -> None:
+        """Fetch all remote refs of the integration repo.
+
+        This ensures the local listing of valid integration refs is up-to-date.
+        """
+        # Always update the integration repo to avoid missing refs. This should
+        # be a safe operation, and it avoids false negatives.
+        print("Fetching refs in the integration repo...")
+        self.run_command(
+            "git",
+            "-C",
+            self.integration_dir,
+            "fetch",
+            "--quiet",
+            "origin",
+            stderr=subprocess.PIPE,
+            dry_run_safe=True,
+        )
+
     def reset_checkout(self) -> None:
         """Sync all repos back to JIRI_HEAD."""
+        self.confirm_ok_to_change_source_code()
+
         # TODO(olivernewman): Have `fx sync-to` create a snapshot of the
         # checkout prior to syncing and have `reset` restore the exact contents
         # of the old checkout instead of always going back to JIRI_HEAD.
@@ -297,11 +313,16 @@ class SyncToCommand:
             .splitlines()[-1]
         )
         self.assert_correct_integration_repo(integration_remote)
+
+        self.set_baseline()
+
         print(f"Syncing to Jiri snapshot {str(snapshot_file)!r}")
         self.jiri("update", "-local-manifest", "-gc", snapshot_file)
 
     def sync_to_integration_ref(self, ref: str) -> None:
         """Sync to a branch, tag, or revision of the integration repo."""
+        self.set_baseline()
+
         print(f"Checking out integration repo at {ref}")
 
         self.run_command(
@@ -330,6 +351,7 @@ class SyncToCommand:
 
     def is_valid_integration_rev(self, rev: str) -> bool:
         """Determine whether `rev` exists in the local integration repo."""
+        self.integration_fetch()
         return (
             self.run_command(
                 "git",
@@ -346,30 +368,25 @@ class SyncToCommand:
         )
 
     def assert_correct_integration_repo(self, remote: str) -> None:
-        jiri_manifest = self.fuchsia_dir.joinpath(".jiri_manifest")
-        local_remote = (
-            self.jiri(
-                "manifest",
-                "-element=" + self.project,
-                "-template={{.Remote}}",
-                jiri_manifest,
-                dry_run_safe=True,
-                stdout=subprocess.PIPE,
-            )
-            .stdout.strip()
-            .splitlines()[-1]
-        )
+        local_remote = self.run_command(
+            "git",
+            "-C",
+            self.integration_dir,
+            "remote",
+            "get-url",
+            "origin",
+            stdout=subprocess.PIPE,
+            dry_run_safe=True,
+        ).stdout.strip()
         if local_remote != remote:
             raise Error(
                 f"Integration remote {remote!r} does not match local"
                 f" checkout remote {local_remote!r}."
-                f"\nIf syncing to a public build ID, use a public checkout."
-                f" You can create a public checkout in a separate directory"
-                f" by following the directions here:"
+                f"\n"
+                f"\nIf syncing to a public build ID, use a public checkout:"
                 f"\nhttps://fuchsia.dev/fuchsia-src/get-started/get_fuchsia_source#download-the-fuchsia-source-code"
                 f"\n"
-                f"\nThen cd into the public checkout directory and run:"
-                f"\n  ./scripts/fx sync-to {self.state}"
+                f"\nOtherwise, ensure you are using the appropriate internal checkout."
             )
 
     def assert_correct_integration_manifest(self, checkout_info: dict) -> None:
@@ -446,6 +463,7 @@ class SyncToCommand:
             self.sync_to_legacy_build_id(build_id)
             return
         self.project = checkout_info.get("manifest_project", "integration")
+        # Check that self.project corresponds to current checkout
         integration_remote = checkout_info["manifest_remote"]
         self.assert_correct_integration_repo(integration_remote)
         self.assert_correct_integration_manifest(checkout_info)
