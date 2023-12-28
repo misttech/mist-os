@@ -98,7 +98,12 @@ class Osd {
   // TODO(fxbug.dev/317922128): Add OSD scaler support.
   void DisableScaling();
 
-  zx_status_t ConfigAfbc();
+  // Sets up the AFBC (ARM Frame Buffer Compression) decoder IP block for the
+  // OSD1 layer. The input image of the layer is of `layer_image_size`.
+  //
+  // TODO(fxbug.dev/42062952): Fully support multiple layers.
+  void ConfigAfbcDecoder(PixelGridSize2D layer_image_size);
+
   void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config);
 
   void DumpNonRdmaRegisters();

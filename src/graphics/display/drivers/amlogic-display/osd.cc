@@ -645,8 +645,7 @@ void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
       .WriteTo(&vpu_mmio_);
 }
 
-// These configuration could be done during initialization.
-zx_status_t Osd::ConfigAfbc() {
+void Osd::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   // The format specifier must match the sysmem format modifier flags specified
   // in AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints().
   //
@@ -670,28 +669,28 @@ zx_status_t Osd::ConfigAfbc() {
 
   // Set afbc input buffer width/height in pixel
   osd1_registers.afbc_buffer_width_s.FromValue(0)
-      .set_buffer_width(layer_image_size_.width)
+      .set_buffer_width(layer_image_size.width)
       .WriteTo(&vpu_mmio_);
   osd1_registers.afbc_buffer_height_s.FromValue(0)
-      .set_buffer_height(layer_image_size_.height)
+      .set_buffer_height(layer_image_size.height)
       .WriteTo(&vpu_mmio_);
 
   // Set afbc input buffer
   osd1_registers.afbc_bounding_box_x_start_s.FromValue(0).set_buffer_x_start(0).WriteTo(&vpu_mmio_);
   osd1_registers.afbc_bounding_box_x_end_s.FromValue(0)
-      .set_buffer_x_end(layer_image_size_.width -
+      .set_buffer_x_end(layer_image_size.width -
                         1)  // vendor code has width - 1 - 1, which is technically
                             // incorrect and gives the same result as this.
       .WriteTo(&vpu_mmio_);
   osd1_registers.afbc_bounding_box_y_start_s.FromValue(0).set_buffer_y_start(0).WriteTo(&vpu_mmio_);
   osd1_registers.afbc_bounding_box_y_end_s.FromValue(0)
-      .set_buffer_y_end(layer_image_size_.height -
+      .set_buffer_y_end(layer_image_size.height -
                         1)  // vendor code has height -1 -1, but that cuts off the bottom row.
       .WriteTo(&vpu_mmio_);
 
   // Set output buffer stride
   osd1_registers.afbc_output_buf_stride_s.FromValue(0)
-      .set_output_buffer_stride(layer_image_size_.width * 4)
+      .set_output_buffer_stride(layer_image_size.width * 4)
       .WriteTo(&vpu_mmio_);
 
   // Set afbc output buffer index
@@ -705,8 +704,6 @@ zx_status_t Osd::ConfigAfbc() {
 
   // Set linear address to the out_addr mentioned above
   osd1_registers.blk1_cfg_w4.FromValue(0).set_frame_addr(1 << 24).WriteTo(&vpu_mmio_);
-
-  return ZX_OK;
 }
 
 void Osd::HwInit() {
@@ -729,9 +726,7 @@ void Osd::HwInit() {
   SetupOsdLayers(layer_image_size_, display_contents_size_);
   DisableScaling();
   SetupSingleLayerBlending(/*layer_size=*/layer_image_size_, display_contents_size_);
-
-  // Configure AFBC Engine's one-time programmable fields, so it's ready
-  ConfigAfbc();
+  ConfigAfbcDecoder(layer_image_size_);
 }
 
 #define REG_OFFSET (0x20 << 2)
