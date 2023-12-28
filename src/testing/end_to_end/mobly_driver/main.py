@@ -5,6 +5,7 @@
 """Entry point of Mobly Driver which conducts Mobly test execution."""
 
 import argparse
+import os
 import sys
 
 import driver_factory
@@ -69,7 +70,7 @@ def main():
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
-        ffx_path=args.ffx_path,
+        ffx_path=os.path.abspath(args.ffx_path),
     )
     driver = factory.get_driver()
 

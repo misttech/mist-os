@@ -77,6 +77,7 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 def new_testbed_config(
     testbed_name: str,
     log_path: str,
+    ffx_path: str,
     mobly_controllers: List[Dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: Dict[str, str],
@@ -111,7 +112,8 @@ def new_testbed_config(
                     "ipv4":"192.168.42.112",
                     "ipv6":"",
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
-                    "ssh_private_key":"/etc/botanist/keys/pkey_infra"
+                    "ssh_private_key":"/etc/botanist/keys/pkey_infra",
+                    "ffx_path":"/path/to/ffx",
                   }
                 ],
                 "AccessPoint": [
@@ -130,6 +132,7 @@ def new_testbed_config(
     Args:
         testbed_name: Mobly testbed name to use.
         log_path: absolute path to Mobly's top-level output directory.
+        ffx_path: absolute path to the FFX binary.
         mobly_controllers: List of Mobly controller objects.
         test_params_dict: Mobly testbed params dictionary.
         botanist_honeydew_map: Dictionary that maps Botanist config names to
@@ -141,10 +144,12 @@ def new_testbed_config(
     for controller in mobly_controllers:
         controller_type = controller["type"]
         del controller["type"]
-        # Convert botanist key names to relative Honeydew key names for fuchsia
-        # devices. This is done here so that Honeydew does not have to do
-        # the conversions itself.
         if api_infra.FUCHSIA_DEVICE == controller_type:
+            # Add the "ffx_path" field for every Fuchsia device.
+            controller["ffx_path"] = ffx_path
+            # Convert botanist key names to relative Honeydew key names for
+            # fuchsia devices. This is done here so that Honeydew does not have
+            # to do the conversions itself.
             for botanist_key, honeydew_key in botanist_honeydew_map.items():
                 if botanist_key in controller:
                     controller[honeydew_key] = controller.pop(botanist_key)

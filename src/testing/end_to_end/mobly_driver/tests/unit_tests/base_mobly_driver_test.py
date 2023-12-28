@@ -42,7 +42,9 @@ class BaseMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for initialization success"""
         with patch.dict(os.environ, test_env, clear=True):
-            d = base_mobly_driver.BaseDriver(log_path=log_path)
+            d = base_mobly_driver.BaseDriver(
+                ffx_path="ffx_path", log_path=log_path
+            )
             self.assertEqual(d._log_path, expected_log_path)
 
     @patch.multiple(base_mobly_driver.BaseDriver, __abstractmethods__=set())
@@ -50,4 +52,4 @@ class BaseMoblyDriverTest(unittest.TestCase):
         """Test case for initialization failure"""
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(KeyError):
-                d = base_mobly_driver.BaseDriver()
+                d = base_mobly_driver.BaseDriver(ffx_path="ffx_path")

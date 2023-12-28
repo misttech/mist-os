@@ -23,7 +23,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for successful config generation"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", params_path="params/path", log_path=""
+            tb_json_path="tb/json/path",
+            ffx_path="ffx/path",
+            params_path="params/path",
+            log_path="",
         )
         ret = driver.generate_test_config()
 
@@ -41,7 +44,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for successful config without params generation"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", log_path=""
+            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
         )
         ret = driver.generate_test_config()
 
@@ -61,7 +64,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for successful config without params generation"""
         transport_name = "transport"
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", log_path=""
+            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
         )
         ret = driver.generate_test_config(transport=transport_name)
 
@@ -75,7 +78,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid JSON content"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", log_path=""
+            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -89,7 +92,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid YAML content"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", params_path="params/path", log_path=""
+            tb_json_path="tb/json/path",
+            ffx_path="ffx/path",
+            params_path="params/path",
+            log_path="",
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -100,7 +106,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid testbed JSON path"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="/does/not/exist", log_path=""
+            tb_json_path="/does/not/exist", ffx_path="ffx/path", log_path=""
         )
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
@@ -112,6 +118,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid params YAML path"""
         driver = infra_driver.InfraDriver(
             tb_json_path="/does/not/exist",
+            ffx_path="ffx/path",
             params_path="params/path",
             log_path="",
         )
@@ -129,7 +136,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("builtins.print")
     def test_teardown_success(self, mock_print, mock_rm, *unused_args):
         """Test case for teardown"""
-        driver = infra_driver.InfraDriver(tb_json_path="", log_path="")
+        driver = infra_driver.InfraDriver(
+            tb_json_path="", ffx_path="ffx/path", log_path=""
+        )
         driver.teardown()
 
         self.assertIn(
@@ -150,7 +159,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
         self, mock_print, mock_rm, *unused_args
     ):
         """Test case for teardown succeeding despite missing results"""
-        driver = infra_driver.InfraDriver(tb_json_path="", log_path="")
+        driver = infra_driver.InfraDriver(
+            tb_json_path="", ffx_path="ffx/path", log_path=""
+        )
         driver.teardown()
 
         mock_print.assert_not_called()

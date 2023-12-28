@@ -105,6 +105,7 @@ class ApiMoblyTest(unittest.TestCase):
         config_obj = api_mobly.new_testbed_config(
             "tb_name",
             "log_path",
+            "ffx_path",
             controllers,
             params_dict,
             botanist_honeydew_map,

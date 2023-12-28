@@ -35,13 +35,14 @@ _TIMEOUTS: dict[str, float] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+_ABS_BINARY_PATH: str = "ffx"
 _ISOLATE_DIR: fuchsia_controller.IsolateDir | None = None
 _LOGS_DIR: str | None = None
 
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
 
-def setup(logs_dir: str) -> None:
+def setup(binary_path: str, logs_dir: str) -> None:
     """Set up method.
 
     It does the following:
@@ -51,6 +52,7 @@ def setup(logs_dir: str) -> None:
     * Registers FFX isolation dir clean up to run on normal program termination.
 
     Args:
+        binary_path: absolute path to the FFX binary.
         logs_dir: Directory for storing FFX logs (ffx.log and ffx.daemon.log).
                   If not passed, FFX logs will not be stored.
 
@@ -67,6 +69,9 @@ def setup(logs_dir: str) -> None:
     """
     global _ISOLATE_DIR
     global _LOGS_DIR
+    global _ABS_BINARY_PATH
+
+    _ABS_BINARY_PATH = binary_path
 
     if _ISOLATE_DIR or _LOGS_DIR:
         raise errors.FfxCommandError("setup has already been called once.")
@@ -661,7 +666,7 @@ class FFX:
             FFX command to be run as list of string.
         """
         ffx_args: list[str] = FFX._generate_ffx_args(target)
-        return ["ffx"] + ffx_args + cmd
+        return [_ABS_BINARY_PATH] + ffx_args + cmd
 
     def _get_label_entry(
         self, data: list[dict[str, Any]], label_value: str

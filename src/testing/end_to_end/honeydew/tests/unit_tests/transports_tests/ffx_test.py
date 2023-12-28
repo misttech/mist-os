@@ -164,17 +164,17 @@ class FfxCliTests(unittest.TestCase):
 
     def test_ffx_setup(self) -> None:
         """Test case for ffx.setup()."""
-        ffx.setup(logs_dir="/tmp/ffx_logs/")
+        ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs/")
 
         # calling setup again should fail
         with self.assertRaises(errors.FfxCommandError):
-            ffx.setup(logs_dir="/tmp/ffx_logs_2/")
+            ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs_2/")
 
     def test_ffx_get_config(self) -> None:
         """Test case for ffx.get_config()."""
         # Ensure ffx.get_config() will return valid FFXConfig when called after
         # ffx.setup()
-        ffx.setup(logs_dir="/tmp/ffx_logs/")
+        ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs/")
         ffx_config = ffx.get_config()
         self.assertEqual(ffx_config.logs_dir, "/tmp/ffx_logs/")
 

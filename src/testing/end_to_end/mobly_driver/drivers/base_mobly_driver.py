@@ -22,17 +22,22 @@ class BaseDriver(ABC):
     """
 
     def __init__(
-        self, log_path: Optional[str] = None, params_path: Optional[str] = None
+        self,
+        ffx_path: str,
+        log_path: Optional[str] = None,
+        params_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
         Args:
+          ffx_path: absolute path to the FFX binary.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
 
         Raises:
           KeyError if required environment variables not found.
         """
+        self._ffx_path = ffx_path
         self._params_path = params_path
         self._log_path = (
             log_path if log_path is not None else os.environ[TEST_OUTDIR_ENV]

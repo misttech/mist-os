@@ -26,6 +26,7 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for successful config generation from file"""
         driver = local_driver.LocalDriver(
+            ffx_path="ffx/path",
             log_path="log/path",
             config_path="config/path",
             params_path="params/path",
@@ -45,7 +46,7 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for successful config without params generation"""
         driver = local_driver.LocalDriver(
-            log_path="log/path", config_path="config/path"
+            ffx_path="ffx/path", log_path="log/path", config_path="config/path"
         )
         ret = driver.generate_test_config()
 
@@ -64,7 +65,7 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for successful config without params generation"""
         transport_name = "transport"
         driver = local_driver.LocalDriver(
-            log_path="log/path", config_path="config/path"
+            ffx_path="ffx/path", log_path="log/path", config_path="config/path"
         )
         ret = driver.generate_test_config(transport=transport_name)
 
@@ -79,7 +80,7 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid YAML content"""
         driver = local_driver.LocalDriver(
-            log_path="log/path", config_path="config/path"
+            ffx_path="ffx/path", log_path="log/path", config_path="config/path"
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -91,7 +92,9 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised for invalid path"""
         driver = local_driver.LocalDriver(
-            log_path="log/path", config_path="/does/not/exist"
+            ffx_path="ffx/path",
+            log_path="log/path",
+            config_path="/does/not/exist",
         )
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
@@ -113,7 +116,9 @@ class LocalDriverTest(unittest.TestCase):
         *unused_args,
     ):
         """Test case for successful env config generation"""
-        driver = local_driver.LocalDriver(log_path="log/path")
+        driver = local_driver.LocalDriver(
+            ffx_path="ffx/path", log_path="log/path"
+        )
         ret = driver.generate_test_config()
 
         mock_new_tb_config.assert_called_once()
@@ -149,7 +154,7 @@ class LocalDriverTest(unittest.TestCase):
         )
 
         driver = local_driver.LocalDriver(
-            log_path="log/path", multi_device=True
+            ffx_path="ffx/path", log_path="log/path", multi_device=True
         )
         ret = driver.generate_test_config()
 
@@ -183,7 +188,7 @@ class LocalDriverTest(unittest.TestCase):
         )
 
         driver = local_driver.LocalDriver(
-            log_path="log/path", multi_device=False
+            ffx_path="ffx/path", log_path="log/path", multi_device=False
         )
         ret = driver.generate_test_config()
 
@@ -206,6 +211,7 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised when no devices are found"""
         driver = local_driver.LocalDriver(
+            ffx_path="ffx/path",
             log_path="log/path",
         )
         with self.assertRaises(common.DriverException):
@@ -221,7 +227,9 @@ class LocalDriverTest(unittest.TestCase):
         self, mock_check_output, *unused_args
     ):
         """Test case for exception being raised from discovery failure"""
-        driver = local_driver.LocalDriver(log_path="log/path")
+        driver = local_driver.LocalDriver(
+            ffx_path="ffx/path", log_path="log/path"
+        )
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()
 
@@ -239,6 +247,8 @@ class LocalDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = discovery_output
-        driver = local_driver.LocalDriver(log_path="log/path")
+        driver = local_driver.LocalDriver(
+            ffx_path="ffx/path", log_path="log/path"
+        )
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()

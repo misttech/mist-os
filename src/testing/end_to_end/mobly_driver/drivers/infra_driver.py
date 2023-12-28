@@ -36,6 +36,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
     def __init__(
         self,
         tb_json_path: str,
+        ffx_path: str,
         log_path: Optional[str] = None,
         params_path: Optional[str] = None,
     ) -> None:
@@ -43,13 +44,16 @@ class InfraDriver(base_mobly_driver.BaseDriver):
 
         Args:
           tb_json_path: absolute path to the testbed definition JSON file.
+          ffx_path: absolute path to the FFX binary.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
 
         Raises:
           KeyError if required environment variables not found.
         """
-        super().__init__(log_path=log_path, params_path=params_path)
+        super().__init__(
+            ffx_path=ffx_path, log_path=log_path, params_path=params_path
+        )
         self._tb_json_path = tb_json_path
 
     def generate_test_config(self, transport: Optional[str] = None) -> str:
@@ -98,6 +102,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
             config = api_mobly.new_testbed_config(
                 self._TESTBED_NAME,
                 self._log_path,
+                self._ffx_path,
                 tb_config,
                 test_params,
                 botanist_honeydew_translation_map,

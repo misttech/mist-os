@@ -54,14 +54,15 @@ class DriverFactory:
         botanist_config_path = os.getenv(api_infra.BOT_ENV_TESTBED_CONFIG)
         if not botanist_config_path:
             return local_driver.LocalDriver(
+                ffx_path=self._ffx_path,
                 multi_device=self._multi_device,
                 config_path=self._config_path,
                 params_path=self._params_path,
-                ffx_path=self._ffx_path,
             )
         try:
             return infra_driver.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
+                ffx_path=self._ffx_path,
                 params_path=self._params_path,
             )
         except KeyError as e:

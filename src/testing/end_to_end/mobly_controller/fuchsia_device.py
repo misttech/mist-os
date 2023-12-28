@@ -39,6 +39,7 @@ def create(
             * ssh_user - Username to be used to SSH into fuchsia device.
             * transport - Transport to be used to perform the host-target
                 interactions.
+            * ffx_path - Abosolute path to FFX binary to use for the device.
 
     Returns:
         A list of FuchsiaDevice objects.
@@ -49,11 +50,12 @@ def create(
     )
 
     test_logs_dir: Optional[str] = _get_log_directory()
+    ffx_path: str = _get_ffx_path(configs)
     if test_logs_dir:
         # Call `ffx.setup` before calling `create_device` as
         # `create_device` results in calling an FFX command and we
         # don't want to miss those FFX logs
-        ffx.setup(logs_dir=f"{test_logs_dir}/ffx/")
+        ffx.setup(binary_path=ffx_path, logs_dir=f"{test_logs_dir}/ffx/")
 
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
@@ -234,3 +236,21 @@ def _get_log_directory() -> Optional[str]:
         "log_path",  # Set by Mobly in base_test.BaseTestClass.run.
         None,
     )
+
+
+def _get_ffx_path(configs: List[Dict[str, Any]]) -> str:
+    """Returns the path to the FFX binary to use.
+
+    Args:
+      configs: List of dicts. Each dict representing a configuration for a
+            Fuchsia device.
+
+    Returns:
+        Absolute path to FFX.
+    """
+    # FFX CLI is currently global and not localized to the individual devices so
+    # just return the the first "ffx_path" encountered.
+    for config in configs:
+        if "ffx_path" in config:
+            return config["ffx_path"]
+    raise RuntimeError("No FFX path found in any device config")
