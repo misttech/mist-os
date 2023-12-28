@@ -58,9 +58,7 @@ RdmaEngine::RdmaEngine(inspect::Node* inspect_node)
       last_rdma_pending_in_vsync_interval_ns_(
           inspect_node->CreateUint("last_rdma_pending_in_vsync_interval_ns", 0)),
       last_rdma_pending_in_vsync_timestamp_ns_prop_(
-          inspect_node->CreateUint("last_rdma_pending_in_vsync_timestamp_ns", 0)),
-      rdma_stall_count_(inspect_node->CreateUint("rdma_stalls", 0)),
-      last_rdma_stall_timestamp_ns_(inspect_node->CreateUint("last_rdma_stall_timestamp_ns", 0)) {}
+          inspect_node->CreateUint("last_rdma_pending_in_vsync_timestamp_ns", 0)) {}
 
 void RdmaEngine::TryResolvePendingRdma() {
   ZX_DEBUG_ASSERT(rdma_active_);

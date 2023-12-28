@@ -194,7 +194,7 @@ class RdmaEngine {
 
  private:
   // All arguments must outlive the RdmaEngine.
-  RdmaEngine(inspect::Node* node);
+  explicit RdmaEngine(inspect::Node* node);
 
   fdf::MmioBuffer* vpu_mmio_;
   zx::bti bti_;
@@ -232,10 +232,6 @@ class RdmaEngine {
   inspect::UintProperty rdma_pending_in_vsync_count_;
   inspect::UintProperty last_rdma_pending_in_vsync_interval_ns_;
   inspect::UintProperty last_rdma_pending_in_vsync_timestamp_ns_prop_;
-
-  // Unused inspect properties (but still queried by lapis/detect for metrics and triage reporting).
-  inspect::UintProperty rdma_stall_count_;
-  inspect::UintProperty last_rdma_stall_timestamp_ns_;
 
   zx::time last_rdma_pending_in_vsync_timestamp_;
 };
