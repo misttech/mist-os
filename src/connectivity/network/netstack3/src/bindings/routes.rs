@@ -405,10 +405,10 @@ impl<I: Ip> State<I> {
 }
 
 fn to_entry<I: Ip>(
-    sync_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+    core_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
     addable_entry: netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
 ) -> netstack3_core::routes::Entry<I::Addr, DeviceId> {
-    let device_metric = netstack3_core::device::get_routing_metric(sync_ctx, &addable_entry.device);
+    let device_metric = netstack3_core::device::get_routing_metric(core_ctx, &addable_entry.device);
     addable_entry.resolve_metric(device_metric)
 }
 
@@ -418,7 +418,7 @@ async fn handle_change<I: Ip>(
     change: Change<I::Addr>,
     route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, Error> {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
     tracing::debug!("routes::handle_change {change:?}");
 
@@ -436,7 +436,7 @@ async fn handle_change<I: Ip>(
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(sync_ctx, addable_entry))
+                    TableChange::Add(to_entry::<I>(core_ctx, addable_entry))
                 }
             }
         }
@@ -448,7 +448,7 @@ async fn handle_change<I: Ip>(
                     TableChange::Remove(itertools::Either::Left(
                         entries
                             .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry)),
+                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
                     ))
                 }
             }
@@ -469,7 +469,7 @@ async fn handle_change<I: Ip>(
                     TableChange::Remove(itertools::Either::Right(itertools::Either::Left(
                         entries
                             .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry)),
+                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
                     )))
                 }
             }
@@ -494,7 +494,7 @@ async fn handle_change<I: Ip>(
                     itertools::Either::Right(itertools::Either::Right(itertools::Either::Left(
                         routes_from_table
                             .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry)),
+                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
                     ))),
                 ),
             }
@@ -506,21 +506,21 @@ async fn handle_change<I: Ip>(
             }
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
                 itertools::Either::Right(
-                    entries.into_iter().map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry)),
+                    entries.into_iter().map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
                 ),
             )))
         }
     };
 
     netstack3_core::routes::set_routes::<I, _>(
-        sync_ctx,
-        non_sync_ctx,
+        core_ctx,
+        bindings_ctx,
         table
             .inner
             .iter()
             .map(|(entry, data)| {
                 let device_metric =
-                    netstack3_core::device::get_routing_metric(sync_ctx, &entry.device);
+                    netstack3_core::device::get_routing_metric(core_ctx, &entry.device);
                 entry.clone().resolve_metric(device_metric).with_generation(data.generation)
             })
             .collect::<Vec<_>>(),
@@ -540,7 +540,7 @@ async fn handle_change<I: Ip>(
                     .count()
                     == 1
                 {
-                    non_sync_ctx.notify_interface_update(
+                    bindings_ctx.notify_interface_update(
                         &entry.device,
                         crate::bindings::InterfaceUpdate::DefaultRouteChanged {
                             version: I::VERSION,
@@ -550,7 +550,7 @@ async fn handle_change<I: Ip>(
                 }
             }
             let installed_route = entry
-                .try_into_fidl_with_ctx(non_sync_ctx)
+                .try_into_fidl_with_ctx(bindings_ctx)
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
                 .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
@@ -560,7 +560,7 @@ async fn handle_change<I: Ip>(
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
-            notify_removed_routes::<I>(non_sync_ctx, route_update_dispatcher, removed, table).await;
+            notify_removed_routes::<I>(bindings_ctx, route_update_dispatcher, removed, table).await;
         }
     };
 
@@ -568,7 +568,7 @@ async fn handle_change<I: Ip>(
 }
 
 async fn notify_removed_routes<I: Ip>(
-    non_sync_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
     table: &Table<I::Addr>,
@@ -593,7 +593,7 @@ async fn notify_removed_routes<I: Ip>(
             if !devices_with_default_routes.contains(&entry.device)
                 && already_notified_devices.insert(entry.device.clone())
             {
-                non_sync_ctx.notify_interface_update(
+                bindings_ctx.notify_interface_update(
                     &entry.device,
                     crate::bindings::InterfaceUpdate::DefaultRouteChanged {
                         version: I::VERSION,
@@ -603,7 +603,7 @@ async fn notify_removed_routes<I: Ip>(
             }
         }
         let installed_route =
-            entry.try_into_fidl_with_ctx(non_sync_ctx).expect("failed to convert route to FIDL");
+            entry.try_into_fidl_with_ctx(bindings_ctx).expect("failed to convert route to FIDL");
         dispatcher
             .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,

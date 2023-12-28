@@ -94,8 +94,8 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// socket.
     fn close(
         self,
-        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        bindings_ctx: &mut BindingsNonSyncCtxImpl,
     );
 }
 
@@ -191,9 +191,9 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         provider_spawner: ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     ) {
         let data = {
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
-            make_data(sync_ctx, non_sync_ctx, properties)
+            make_data(core_ctx, bindings_ctx, properties)
         };
         let worker = Self { ctx, data };
 
@@ -277,8 +277,8 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         };
 
         let Self { mut ctx, data } = self;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        data.close(sync_ctx, non_sync_ctx);
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        data.close(core_ctx, bindings_ctx);
 
         // Join all tasks created by this socket.
         std::mem::drop(spawners);

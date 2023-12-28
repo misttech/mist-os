@@ -91,10 +91,10 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             })
         }
     }
-    let sync_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.sync_ctx();
     let mut visitor = DualIpVisitor::new();
-    tcp::socket::with_info::<Ipv4, _, _>(sync_ctx, &mut visitor);
-    tcp::socket::with_info::<Ipv6, _, _>(sync_ctx, &mut visitor);
+    tcp::socket::with_info::<Ipv4, _, _>(core_ctx, &mut visitor);
+    tcp::socket::with_info::<Ipv6, _, _>(core_ctx, &mut visitor);
 
     visitor.inspector
 }
@@ -142,10 +142,10 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let sync_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.sync_ctx();
     let mut visitor = DualIpVisitor::new();
-    netstack3_core::routes::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
-    netstack3_core::routes::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(core_ctx, &mut visitor);
+    netstack3_core::routes::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(core_ctx, &mut visitor);
     visitor.inspector
 }
 
@@ -211,9 +211,9 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let sync_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.sync_ctx();
     let visitor = Visitor::new();
-    device::inspect_devices::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
+    device::inspect_devices::<BindingsNonSyncCtxImpl, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
@@ -251,9 +251,9 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             });
         }
     }
-    let sync_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.sync_ctx();
     let visitor = Visitor::new();
-    device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
+    device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
@@ -641,9 +641,9 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             });
         }
     }
-    let sync_ctx = ctx.sync_ctx();
+    let core_ctx = ctx.sync_ctx();
     let visitor = Visitor::new();
-    netstack3_core::inspect::inspect_counters::<_, _>(sync_ctx, &visitor);
+    netstack3_core::inspect::inspect_counters::<_, _>(core_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }

@@ -84,8 +84,8 @@ impl StackFidlWorker {
         &mut self,
         entry: ForwardingEntry,
     ) -> Result<(), fidl_net_stack::Error> {
-        let non_sync_ctx = self.netstack.ctx.non_sync_ctx();
-        let entry = match AddableEntryEither::try_from_fidl_with_ctx(non_sync_ctx, entry) {
+        let bindings_ctx = self.netstack.ctx.non_sync_ctx();
+        let entry = match AddableEntryEither::try_from_fidl_with_ctx(bindings_ctx, entry) {
             Ok(entry) => entry,
             Err(e) => return Err(e.into()),
         };
@@ -96,13 +96,13 @@ impl StackFidlWorker {
             entry: AddableEntry<I::Addr, Option<DeviceId>>,
         ) -> Option<AddableEntry<I::Addr, DeviceId>> {
             let AddableEntry { subnet, device, gateway, metric } = entry;
-            let sync_ctx = ctx.sync_ctx();
+            let core_ctx = ctx.sync_ctx();
             let (device, gateway) = match (device, gateway) {
                 (Some(device), gateway) => (device, gateway),
                 (None, gateway) => {
                     let gateway = gateway?;
                     let device = netstack3_core::routes::select_device_for_gateway(
-                        sync_ctx,
+                        core_ctx,
                         gateway.into(),
                     )?;
                     (device, Some(gateway))
@@ -153,9 +153,9 @@ impl StackFidlWorker {
         &mut self,
         subnet: fidl_net::Subnet,
     ) -> Result<(), fidl_net_stack::Error> {
-        let non_sync_ctx = self.netstack.ctx.non_sync_ctx_mut();
+        let bindings_ctx = self.netstack.ctx.non_sync_ctx_mut();
         if let Ok(subnet) = subnet.try_into_core() {
-            non_sync_ctx
+            bindings_ctx
                 .apply_route_change_either(match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => routes::Change::RouteOp(
                         routes::RouteOp::RemoveToSubnet(subnet),

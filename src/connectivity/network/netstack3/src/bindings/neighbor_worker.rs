@@ -431,12 +431,12 @@ pub(super) async fn serve_controller(
     stream
         .try_for_each(|request| async {
             let mut ctx = ctx.clone();
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
             match request {
                 ControllerRequest::AddEntry { interface, neighbor, mac, responder } => {
                     let Some(device_id) = BindingId::new(interface)
-                        .and_then(|id| non_sync_ctx.devices.get_core_id(id))
+                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
                     else {
                         return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
                     };
@@ -446,13 +446,13 @@ pub(super) async fn serve_controller(
                             Ipv4,
                             BindingsNonSyncCtxImpl,
                         >(
-                            sync_ctx, non_sync_ctx, &device_id, v4, mac
+                            core_ctx, bindings_ctx, &device_id, v4, mac
                         ),
                         IpAddr::V6(v6) => netstack3_core::device::insert_static_neighbor_entry::<
                             Ipv6,
                             BindingsNonSyncCtxImpl,
                         >(
-                            sync_ctx, non_sync_ctx, &device_id, v6, mac
+                            core_ctx, bindings_ctx, &device_id, v6, mac
                         ),
                     }
                     .map_err(|e| match e {
@@ -468,7 +468,7 @@ pub(super) async fn serve_controller(
                 }
                 ControllerRequest::RemoveEntry { interface, neighbor, responder } => {
                     let Some(device_id) = BindingId::new(interface)
-                        .and_then(|id| non_sync_ctx.devices.get_core_id(id))
+                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
                     else {
                         return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
                     };
@@ -477,13 +477,13 @@ pub(super) async fn serve_controller(
                             netstack3_core::device::remove_neighbor_table_entry::<
                                 Ipv4,
                                 BindingsNonSyncCtxImpl,
-                            >(sync_ctx, non_sync_ctx, &device_id, v4)
+                            >(core_ctx, bindings_ctx, &device_id, v4)
                         }
                         IpAddr::V6(v6) => {
                             netstack3_core::device::remove_neighbor_table_entry::<
                                 Ipv6,
                                 BindingsNonSyncCtxImpl,
-                            >(sync_ctx, non_sync_ctx, &device_id, v6)
+                            >(core_ctx, bindings_ctx, &device_id, v6)
                         }
                     }
                     .map_err(|e| {
@@ -500,7 +500,7 @@ pub(super) async fn serve_controller(
                 }
                 ControllerRequest::ClearEntries { interface, ip_version, responder } => {
                     let device_id = match BindingId::new(interface)
-                        .and_then(|id| non_sync_ctx.devices.get_core_id(id))
+                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
                     {
                         Some(device_id) => device_id,
                         None => {
@@ -512,13 +512,13 @@ pub(super) async fn serve_controller(
                             netstack3_core::device::flush_neighbor_table::<
                                 Ipv4,
                                 BindingsNonSyncCtxImpl,
-                            >(sync_ctx, non_sync_ctx, &device_id)
+                            >(core_ctx, bindings_ctx, &device_id)
                         }
                         fnet::IpVersion::V6 => {
                             netstack3_core::device::flush_neighbor_table::<
                                 Ipv6,
                                 BindingsNonSyncCtxImpl,
-                            >(sync_ctx, non_sync_ctx, &device_id)
+                            >(core_ctx, bindings_ctx, &device_id)
                         }
                     }
                     .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());

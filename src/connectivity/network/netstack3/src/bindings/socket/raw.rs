@@ -28,8 +28,8 @@ struct BindingData {
 
 impl BindingData {
     fn new(
-        _sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        _core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
         _domain: fposix_socket::Domain,
         _proto: fpraw::ProtocolAssociation,
         SocketWorkerProperties {}: SocketWorkerProperties,
@@ -72,8 +72,8 @@ impl SocketWorkerHandler for BindingData {
 
     fn close(
         self,
-        _sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        _core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
     }
 }
@@ -383,8 +383,8 @@ pub(crate) async fn serve(
 
                     spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        move |sync_ctx, non_sync_ctx, properties| {
-                            BindingData::new(sync_ctx, non_sync_ctx, domain, proto, properties)
+                        move |core_ctx, bindings_ctx, properties| {
+                            BindingData::new(core_ctx, bindings_ctx, domain, proto, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,

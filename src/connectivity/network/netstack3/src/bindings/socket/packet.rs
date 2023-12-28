@@ -104,8 +104,8 @@ pub(crate) async fn serve(
                         });
                     spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        move |sync_ctx, non_sync_ctx, properties| {
-                            BindingData::new(sync_ctx, non_sync_ctx, kind, properties)
+                        move |core_ctx, bindings_ctx, properties| {
+                            BindingData::new(core_ctx, bindings_ctx, kind, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,
@@ -211,8 +211,8 @@ impl BodyLen for Message {
 
 impl BindingData {
     fn new(
-        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
@@ -223,7 +223,7 @@ impl BindingData {
         }
 
         let id = netstack3_core::device_socket::create(
-            sync_ctx,
+            core_ctx,
             SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind },
         );
 
@@ -255,11 +255,11 @@ impl worker::SocketWorkerHandler for BindingData {
 
     fn close(
         self,
-        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        _bindings_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { peer_event: _, id } = self;
-        netstack3_core::device_socket::remove(sync_ctx, id)
+        netstack3_core::device_socket::remove(core_ctx, id)
     }
 }
 
@@ -297,12 +297,12 @@ impl<'a> RequestHandler<'a> {
             })
             .transpose()?;
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
                 let id = BindingId::new(id).ok_or(DeviceNotFoundError.into_errno())?;
-                Some(id.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?)
+                Some(id.try_into_core_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?)
             }
         };
         let device_selector = match device.as_ref() {
@@ -312,12 +312,12 @@ impl<'a> RequestHandler<'a> {
 
         match protocol {
             Some(protocol) => netstack3_core::device_socket::set_device_and_protocol(
-                sync_ctx,
+                core_ctx,
                 id,
                 device_selector,
                 protocol,
             ),
-            None => netstack3_core::device_socket::set_device(sync_ctx, id, device_selector),
+            None => netstack3_core::device_socket::set_device(core_ctx, id, device_selector),
         }
         Ok(())
     }
@@ -329,15 +329,15 @@ impl<'a> RequestHandler<'a> {
         fposix::Errno,
     > {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
-        let SocketInfo { device, protocol } = netstack3_core::device_socket::get_info(sync_ctx, id);
+        let SocketInfo { device, protocol } = netstack3_core::device_socket::get_info(core_ctx, id);
         let SocketState { queue: _, kind } = *id.socket_state();
 
         let interface = match device {
             TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
             TargetDevice::SpecificDevice(d) => fppacket::BoundInterface::Specified(
-                d.try_into_fidl_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?,
+                d.try_into_fidl_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?,
             ),
         };
 
@@ -379,16 +379,16 @@ impl<'a> RequestHandler<'a> {
         data: Vec<u8>,
     ) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let SocketState { kind, queue: _ } = *id.socket_state();
 
         let data = Buf::new(data, ..);
         match kind {
             fppacket::Kind::Network => {
-                let params = packet_info.try_into_core_with_ctx(non_sync_ctx)?;
+                let params = packet_info.try_into_core_with_ctx(bindings_ctx)?;
                 netstack3_core::device_socket::send_datagram(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     id,
                     params,
                     data,
@@ -397,9 +397,9 @@ impl<'a> RequestHandler<'a> {
             }
             fppacket::Kind::Link => {
                 let params = packet_info
-                    .try_into_core_with_ctx(non_sync_ctx)
+                    .try_into_core_with_ctx(bindings_ctx)
                     .map_err(IntoErrno::into_errno)?;
-                netstack3_core::device_socket::send_frame(sync_ctx, non_sync_ctx, id, params, data)
+                netstack3_core::device_socket::send_frame(core_ctx, bindings_ctx, id, params, data)
                     .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
             }
         }

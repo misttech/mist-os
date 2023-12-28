@@ -104,9 +104,9 @@ async fn resolve_inner<A: IpAddress>(
     destination: A,
     mut ctx: Ctx,
 ) -> Result<fnet_routes::Resolved, zx::Status> {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
     let ResolvedRoute { device, src_addr, next_hop } =
-        match netstack3_core::routes::resolve_route::<A::Version, _>(sync_ctx, destination) {
+        match netstack3_core::routes::resolve_route::<A::Version, _>(core_ctx, destination) {
             Err(e) => {
                 info!("Resolve failed for {}, {:?}", destination, e);
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
@@ -123,7 +123,7 @@ async fn resolve_inner<A: IpAddress>(
         DeviceId::Loopback(_device) => None,
         DeviceId::Ethernet(device) => {
             if let Some(addr) = next_hop_addr {
-                Some(resolve_ethernet_link_addr(sync_ctx, non_sync_ctx, device, &addr).await?)
+                Some(resolve_ethernet_link_addr(core_ctx, bindings_ctx, device, &addr).await?)
             } else {
                 warn!("Cannot attempt Ethernet link resolution for the unspecified address.");
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
@@ -136,7 +136,7 @@ async fn resolve_inner<A: IpAddress>(
             next_hop_addr.map_or(A::Version::UNSPECIFIED_ADDRESS, |a| *a).to_ip_addr().into_fidl();
         let source_address = src_addr.to_ip_addr().into_fidl();
         let mac = remote_mac.map(|mac| mac.into_fidl());
-        let interface_id = non_sync_ctx.get_binding_id(device);
+        let interface_id = bindings_ctx.get_binding_id(device);
         fnet_routes::Destination {
             address: Some(address),
             mac,
@@ -151,14 +151,14 @@ async fn resolve_inner<A: IpAddress>(
 
 /// Performs link-layer resolution of the remote IP Address on the given device.
 async fn resolve_ethernet_link_addr<A: IpAddress>(
-    sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-    non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    core_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+    bindings_ctx: &mut BindingsNonSyncCtxImpl,
     device: &EthernetDeviceId<BindingsNonSyncCtxImpl>,
     remote: &SpecifiedAddr<A>,
 ) -> Result<Mac, zx::Status> {
     match netstack3_core::device::resolve_ethernet_link_addr::<A::Version, _>(
-        sync_ctx,
-        non_sync_ctx,
+        core_ctx,
+        bindings_ctx,
         device,
         remote,
     ) {

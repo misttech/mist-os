@@ -706,9 +706,9 @@ async fn wait_for_device_removal<T: 'static>(
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
     let (devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ }, weak_id) = {
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let core_id =
-            non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
+            bindings_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
         // Keep a weak ID around to debug pending destruction.
         let weak_id = core_id.downgrade();
         match core_id {
@@ -718,8 +718,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that we don't race with any new routes being added through
                 // that device.
                 let result =
-                    netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, core_id);
-                non_sync_ctx.remove_routes_on_device(&weak_id).await;
+                    netstack3_core::device::remove_ethernet_device(core_ctx, bindings_ctx, core_id);
+                bindings_ctx.remove_routes_on_device(&weak_id).await;
                 let info = wait_for_device_removal(id, result, &weak_id).await;
                 (info, weak_id)
             }
@@ -729,8 +729,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that we don't race with any new routes being added through
                 // that device.
                 let result =
-                    netstack3_core::device::remove_loopback_device(sync_ctx, non_sync_ctx, core_id);
-                non_sync_ctx.remove_routes_on_device(&weak_id).await;
+                    netstack3_core::device::remove_loopback_device(core_ctx, bindings_ctx, core_id);
+                bindings_ctx.remove_routes_on_device(&weak_id).await;
                 let devices::LoopbackInfo {
                     static_common_info: _,
                     dynamic_common_info: _,
@@ -780,10 +780,10 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // TODO(https://fxbug.dev/135102): Rather than falling back in this way,
         // make it impossible to make this mistake by centralizing the
         // "source of truth" for addresses on a device.
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         return match netstack3_core::device::del_ip_addr(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &core_id,
             specified_addr,
         ) {
@@ -818,8 +818,8 @@ fn set_configuration(
     id: BindingId,
     config: fnet_interfaces_admin::Configuration,
 ) -> fnet_interfaces_admin::ControlSetConfigurationResult {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let core_id = non_sync_ctx
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let core_id = bindings_ctx
         .devices
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
@@ -928,14 +928,14 @@ fn set_configuration(
         }
     })?;
 
-    let DeviceConfigurationUpdate { arp, ndp } = device_update.apply(sync_ctx);
+    let DeviceConfigurationUpdate { arp, ndp } = device_update.apply(core_ctx);
 
     // Apply both updates now that we have checked for errors and get the deltas
     // back. If we didn't apply updates, use the default struct to construct the
     // delta responses.
     let ipv4 = {
         let Ipv4DeviceConfigurationUpdate { ip_config } =
-            ipv4_update.map(|u| u.apply(sync_ctx, non_sync_ctx)).unwrap_or_default();
+            ipv4_update.map(|u| u.apply(core_ctx, bindings_ctx)).unwrap_or_default();
         ip_config.map(
             move |IpDeviceConfigurationUpdate {
                       forwarding_enabled,
@@ -958,7 +958,7 @@ fn set_configuration(
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-        } = ipv6_update.map(|u| u.apply(sync_ctx, non_sync_ctx)).unwrap_or_default();
+        } = ipv6_update.map(|u| u.apply(core_ctx, bindings_ctx)).unwrap_or_default();
         ip_config.map(
             move |IpDeviceConfigurationUpdate {
                       forwarding_enabled,
@@ -984,19 +984,19 @@ fn set_configuration(
 
 /// Returns the configuration used for the interface with the given `id`.
 fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Configuration {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let core_id = non_sync_ctx
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let core_id = bindings_ctx
         .devices
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
 
     let DeviceConfiguration { arp, ndp } =
-        netstack3_core::device::get_device_configuration(&sync_ctx, &core_id);
+        netstack3_core::device::get_device_configuration(&core_ctx, &core_id);
 
     fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv4_configuration_and_flags(&sync_ctx, &core_id)
+                netstack3_core::device::get_ipv4_configuration_and_flags(&core_ctx, &core_id)
                     .config
                     .ip_config
                     .forwarding_enabled,
@@ -1012,7 +1012,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv6_configuration_and_flags(&sync_ctx, &core_id)
+                netstack3_core::device::get_ipv6_configuration_and_flags(&core_ctx, &core_id)
                     .config
                     .ip_config
                     .forwarding_enabled,
@@ -1191,11 +1191,11 @@ async fn run_address_state_provider(
     // for the address to exist in core (e.g. auto-configured addresses such as
     // loopback or SLAAC).
     let add_to_core_result = {
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
         netstack3_core::device::add_ip_addr_subnet(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             addr_subnet_and_config,
         )
@@ -1214,8 +1214,8 @@ async fn run_address_state_provider(
         }
         Ok(()) => {
             let state_to_remove = if add_subnet_route {
-                let non_sync_ctx = ctx.non_sync_ctx();
-                let core_id = non_sync_ctx
+                let bindings_ctx = ctx.non_sync_ctx();
+                let core_id = bindings_ctx
                     .devices
                     .get_core_id(id)
                     .expect("missing device info for interface")
@@ -1311,8 +1311,8 @@ async fn run_address_state_provider(
     };
 
     // Remove the address.
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let core_id = non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let core_id = bindings_ctx.devices.get_core_id(id).expect("missing device info for interface");
     // Don't drop the worker yet; it's what's driving THIS function.
     let _worker: futures::future::Shared<fuchsia_async::Task<()>> =
         match core_id.external_state().with_common_info_mut(|i| i.addresses.remove(&address)) {
@@ -1326,7 +1326,7 @@ async fn run_address_state_provider(
         };
 
     let StateInCore { address: remove_address, subnet_route } = state_to_remove_from_core;
-    let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+    let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
 
     // The presence of this `route_set` indicates that we added a subnet route
     // previously due to the `add_subnet_route` AddressParameters option.
@@ -1337,7 +1337,7 @@ async fn run_address_state_provider(
 
     if remove_address {
         assert_matches!(
-            netstack3_core::device::del_ip_addr(sync_ctx, non_sync_ctx, &device_id, address),
+            netstack3_core::device::del_ip_addr(core_ctx, bindings_ctx, &device_id, address),
             Ok(())
         );
     }
@@ -1590,12 +1590,12 @@ fn dispatch_address_state_provider_request(
             if preferred_lifetime_info.is_some() {
                 tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/105011)");
             }
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-            let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+            let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
             let result = match address.into() {
                 IpAddr::V4(address) => netstack3_core::device::set_ip_addr_properties(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &device_id,
                     address,
                     valid_lifetime_end_nanos
@@ -1603,8 +1603,8 @@ fn dispatch_address_state_provider_request(
                         .unwrap_or(Lifetime::Infinite),
                 ),
                 IpAddr::V6(address) => netstack3_core::device::set_ip_addr_properties(
-                    sync_ctx,
-                    non_sync_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &device_id,
                     address,
                     valid_lifetime_end_nanos
@@ -1785,8 +1785,8 @@ mod enabled {
         /// Panics if `should_enable` is `false` but the device state reflects
         /// that it should be enabled.
         fn update_enabled_state(ctx: &mut Ctx, id: BindingId) {
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-            let core_id = non_sync_ctx
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+            let core_id = bindings_ctx
                 .devices
                 .get_core_id(id)
                 .expect("tried to enable/disable nonexisting device");
@@ -1830,7 +1830,7 @@ mod enabled {
                 Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
             )
             .expect("changing ip_enabled should never fail")
-            .apply(sync_ctx, non_sync_ctx)
+            .apply(core_ctx, bindings_ctx)
             .ip_config
             .expect("ip config must be informed")
             .ip_enabled
@@ -1841,7 +1841,7 @@ mod enabled {
                 Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
             )
             .expect("changing ip_enabled should never fail")
-            .apply(sync_ctx, non_sync_ctx)
+            .apply(core_ctx, bindings_ctx)
             .ip_config
             .expect("ip config must be informed")
             .ip_enabled

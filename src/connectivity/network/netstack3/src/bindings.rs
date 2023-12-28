@@ -101,13 +101,13 @@ mod ctx {
     }
 
     pub(crate) struct Ctx {
-        // `non_sync_ctx` is the first member so all strongly-held references are
-        // dropped before primary references held in `sync_ctx` are dropped. Note
+        // `bindings_ctx` is the first member so all strongly-held references are
+        // dropped before primary references held in `core_ctx` are dropped. Note
         // that dropping a primary reference while holding onto strong references
         // will cause a panic. See `netstack3_core::sync::PrimaryRc` for more
         // details.
-        non_sync_ctx: BindingsNonSyncCtxImpl,
-        sync_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+        bindings_ctx: BindingsNonSyncCtxImpl,
+        core_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
     }
 
     #[derive(Debug)]
@@ -118,42 +118,42 @@ mod ctx {
 
     impl Ctx {
         fn new(routes_change_sink: routes::ChangeSink) -> Self {
-            let mut non_sync_ctx = BindingsNonSyncCtxImpl(Arc::new(
+            let mut bindings_ctx = BindingsNonSyncCtxImpl(Arc::new(
                 BindingsNonSyncCtxImplInner::new(routes_change_sink),
             ));
-            let sync_ctx = Arc::new(SyncCtx::new(&mut non_sync_ctx));
-            Self { non_sync_ctx, sync_ctx }
+            let core_ctx = Arc::new(SyncCtx::new(&mut bindings_ctx));
+            Self { bindings_ctx, core_ctx }
         }
 
         pub(crate) fn sync_ctx(&self) -> &Arc<SyncCtx<BindingsNonSyncCtxImpl>> {
-            &self.sync_ctx
+            &self.core_ctx
         }
 
         pub(crate) fn non_sync_ctx(&self) -> &BindingsNonSyncCtxImpl {
-            &self.non_sync_ctx
+            &self.bindings_ctx
         }
 
         pub(crate) fn non_sync_ctx_mut(&mut self) -> &mut BindingsNonSyncCtxImpl {
-            &mut self.non_sync_ctx
+            &mut self.bindings_ctx
         }
 
         pub(crate) fn contexts(
             &self,
         ) -> (&Arc<SyncCtx<BindingsNonSyncCtxImpl>>, &BindingsNonSyncCtxImpl) {
-            let Ctx { non_sync_ctx, sync_ctx } = self;
-            (sync_ctx, non_sync_ctx)
+            let Ctx { bindings_ctx, core_ctx } = self;
+            (core_ctx, bindings_ctx)
         }
 
         pub(crate) fn contexts_mut(
             &mut self,
         ) -> (&Arc<SyncCtx<BindingsNonSyncCtxImpl>>, &mut BindingsNonSyncCtxImpl) {
-            let Ctx { non_sync_ctx, sync_ctx } = self;
-            (sync_ctx, non_sync_ctx)
+            let Ctx { bindings_ctx, core_ctx } = self;
+            (core_ctx, bindings_ctx)
         }
 
         /// Destroys the last standing clone of [`Ctx`].
         pub(crate) fn try_destroy_last(self) -> Result<(), DestructionError> {
-            let Self { non_sync_ctx: BindingsNonSyncCtxImpl(non_sync_ctx), sync_ctx } = self;
+            let Self { bindings_ctx: BindingsNonSyncCtxImpl(bindings_ctx), core_ctx } = self;
 
             fn unwrap_and_drop_or_get_count<T>(arc: Arc<T>) -> Result<(), usize> {
                 match Arc::try_unwrap(arc) {
@@ -163,19 +163,16 @@ mod ctx {
             }
 
             // Always destroy NonSyncCtx first.
-            unwrap_and_drop_or_get_count(non_sync_ctx)
+            unwrap_and_drop_or_get_count(bindings_ctx)
                 .map_err(DestructionError::NonSyncCtxStillCloned)?;
-            unwrap_and_drop_or_get_count(sync_ctx).map_err(DestructionError::SyncCtxStillCloned)
+            unwrap_and_drop_or_get_count(core_ctx).map_err(DestructionError::SyncCtxStillCloned)
         }
     }
 
     impl Clone for Ctx {
         fn clone(&self) -> Self {
-            let Self { non_sync_ctx: BindingsNonSyncCtxImpl(inner_non_sync_ctx), sync_ctx } = self;
-            Self {
-                non_sync_ctx: BindingsNonSyncCtxImpl(inner_non_sync_ctx.clone()),
-                sync_ctx: sync_ctx.clone(),
-            }
+            let Self { bindings_ctx: BindingsNonSyncCtxImpl(inner), core_ctx } = self;
+            Self { bindings_ctx: BindingsNonSyncCtxImpl(inner.clone()), core_ctx: core_ctx.clone() }
         }
     }
 
@@ -318,8 +315,8 @@ impl AsRef<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
 
 impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx {
     fn handle_expired_timer(&mut self, timer: TimerId<BindingsNonSyncCtxImpl>) {
-        let (sync_ctx, non_sync_ctx) = self.contexts_mut();
-        handle_timer(sync_ctx, non_sync_ctx, timer)
+        let (core_ctx, bindings_ctx) = self.contexts_mut();
+        handle_timer(core_ctx, bindings_ctx, timer)
     }
 
     fn get_timer_dispatcher(
@@ -802,8 +799,8 @@ impl BindingsNonSyncCtxImpl {
 }
 
 fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    non_sync_ctx: &mut NonSyncCtx,
+    core_ctx: &SyncCtx<NonSyncCtx>,
+    bindings_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), NetstackError> {
     for addr_subnet in [
@@ -816,7 +813,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
                 .expect("error creating IPv6 loopback AddrSub"),
         ),
     ] {
-        netstack3_core::device::add_ip_addr_subnet(sync_ctx, non_sync_ctx, loopback, addr_subnet)?
+        netstack3_core::device::add_ip_addr_subnet(core_ctx, bindings_ctx, loopback, addr_subnet)?
     }
     Ok(())
 }
@@ -824,7 +821,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: BindingsContext>(
 /// Adds the IPv4 and IPv6 Loopback and multicast subnet routes, and the IPv4
 /// limited broadcast subnet route.
 async fn add_loopback_routes(
-    non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    bindings_ctx: &mut BindingsNonSyncCtxImpl,
     loopback: &DeviceId<BindingsNonSyncCtxImpl>,
 ) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
@@ -871,7 +868,7 @@ async fn add_loopback_routes(
     .map(Into::into);
 
     for change in v4_changes.chain(v6_changes) {
-        non_sync_ctx
+        bindings_ctx
             .apply_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
@@ -981,14 +978,14 @@ impl Netstack {
             gmp_enabled: Some(false),
         });
 
-        let (sync_ctx, non_sync_ctx) = self.ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = self.ctx.contexts_mut();
         let _: Ipv4DeviceConfigurationUpdate =
             netstack3_core::device::new_ipv4_configuration_update(
                 &loopback,
                 Ipv4DeviceConfigurationUpdate { ip_config },
             )
             .unwrap()
-            .apply(sync_ctx, non_sync_ctx);
+            .apply(core_ctx, bindings_ctx);
         let _: Ipv6DeviceConfigurationUpdate =
             netstack3_core::device::new_ipv6_configuration_update(
                 &loopback,
@@ -1003,10 +1000,10 @@ impl Netstack {
                 },
             )
             .unwrap()
-            .apply(sync_ctx, non_sync_ctx);
-        add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
+            .apply(core_ctx, bindings_ctx);
+        add_loopback_ip_addrs(core_ctx, bindings_ctx, &loopback)
             .expect("error adding loopback addresses");
-        add_loopback_routes(non_sync_ctx, &loopback).await;
+        add_loopback_routes(bindings_ctx, &loopback).await;
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 

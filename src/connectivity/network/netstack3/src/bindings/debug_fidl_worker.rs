@@ -16,14 +16,14 @@ use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo};
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
 pub(crate) async fn serve_interfaces(
-    non_sync_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
     rs: fnet_debug::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
     debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
     rs.try_for_each(|req| async {
         match req {
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
-                handle_get_port(non_sync_ctx, id, port);
+                handle_get_port(bindings_ctx, id, port);
             }
         }
         Ok(())
@@ -32,11 +32,11 @@ pub(crate) async fn serve_interfaces(
 }
 
 fn handle_get_port(
-    non_sync_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
     interface_id: u64,
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {
-    let core_id = BindingId::new(interface_id).and_then(|id| non_sync_ctx.devices.get_core_id(id));
+    let core_id = BindingId::new(interface_id).and_then(|id| bindings_ctx.devices.get_core_id(id));
     let port_handler =
         core_id.as_ref().ok_or(zx::Status::NOT_FOUND).map(|core_id| core_id.external_state());
     let port_handler = port_handler.as_ref().map_err(Clone::clone).and_then(|state| match state {

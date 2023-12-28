@@ -351,11 +351,11 @@ pub(crate) trait RouteSet: Send + Sync {
 }
 
 fn try_to_addable_entry<I: Ip>(
-    non_sync_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
+    bindings_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
     route: fnet_routes_ext::Route<I>,
 ) -> Result<AddableEntry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>, fnet_routes_admin::RouteSetError>
 {
-    AddableEntry::try_from_fidl_with_ctx(non_sync_ctx, route).map_err(|err| match err {
+    AddableEntry::try_from_fidl_with_ctx(bindings_ctx, route).map_err(|err| match err {
         crate::bindings::util::AddableEntryFromRoutesExtError::DeviceNotFound => {
             fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists
         }

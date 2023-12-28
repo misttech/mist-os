@@ -511,8 +511,8 @@ impl TestSetupBuilder {
 
                 // Disable DAD for simplicity of testing.
                 stack.with_ctx(|ctx| {
-                    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-                    let devices: &Devices<_> = non_sync_ctx.as_ref();
+                    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+                    let devices: &Devices<_> = bindings_ctx.as_ref();
                     let device = devices.get_core_id(if_id).unwrap();
                     let _: Ipv6DeviceConfigurationUpdate =
                         netstack3_core::device::new_ipv6_configuration_update(
@@ -523,19 +523,19 @@ impl TestSetupBuilder {
                             },
                         )
                         .unwrap()
-                        .apply(sync_ctx, non_sync_ctx);
+                        .apply(core_ctx, bindings_ctx);
                 });
                 if let Some(addr) = addr {
                     stack.with_ctx(|ctx| {
-                        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-                        let core_id = non_sync_ctx
+                        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+                        let core_id = bindings_ctx
                             .devices
                             .get_core_id(if_id)
                             .unwrap_or_else(|| panic!("failed to get device {if_id} info"));
 
                         netstack3_core::device::add_ip_addr_subnet(
-                            sync_ctx,
-                            non_sync_ctx,
+                            core_ctx,
+                            bindings_ctx,
                             &core_id,
                             addr,
                         )
@@ -854,12 +854,12 @@ async fn test_list_del_routes() {
 
     fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
         let mut ctx = ts.ctx();
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        netstack3_core::routes::get_all_routes(sync_ctx)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        netstack3_core::routes::get_all_routes(core_ctx)
             .into_iter()
             .map(|entry| {
                 entry
-                    .try_into_fidl_with_ctx(&non_sync_ctx)
+                    .try_into_fidl_with_ctx(&bindings_ctx)
                     .expect("failed to map forwarding entry into FIDL")
             })
             .collect()
@@ -951,9 +951,9 @@ fn get_slaac_secret<'s>(
     if_id: BindingId,
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack.with_ctx(|ctx| {
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
-        netstack3_core::device::get_ipv6_configuration_and_flags(sync_ctx, &device)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        let device = AsRef::<Devices<_>>::as_ref(bindings_ctx).get_core_id(if_id).unwrap();
+        netstack3_core::device::get_ipv6_configuration_and_flags(core_ctx, &device)
             .config
             .slaac_config
             .temporary_address_configuration
@@ -1016,14 +1016,14 @@ async fn test_neighbor_table_inspect() {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     test_stack.with_ctx(|ctx| {
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let devices: &Devices<_> = non_sync_ctx.as_ref();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        let devices: &Devices<_> = bindings_ctx.as_ref();
         let device = devices.get_core_id(bindings_id).expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");
         let v4_neigh_mac = net_mac!("AA:BB:CC:DD:EE:FF");
         insert_static_neighbor_entry::<Ipv4, BindingsNonSyncCtxImpl>(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             v4_neigh_addr,
             v4_neigh_mac,
@@ -1032,8 +1032,8 @@ async fn test_neighbor_table_inspect() {
         let v6_neigh_addr = net_ip_v6!("2001:DB8::1");
         let v6_neigh_mac = net_mac!("00:11:22:33:44:55");
         insert_static_neighbor_entry::<Ipv6, BindingsNonSyncCtxImpl>(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             v6_neigh_addr,
             v6_neigh_mac,
@@ -1112,14 +1112,14 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = bindings_ctx.as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
     );
     let observer = assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(observer) => observer
     );
     let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
@@ -1143,7 +1143,7 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
         .expect("remove_entry FIDL")
         .expect("remove_entry");
     assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(_)
     );
 
@@ -1180,14 +1180,14 @@ async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = bindings_ctx.as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
     );
     let observer = assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(observer) => observer
     );
 
@@ -1228,8 +1228,8 @@ async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = bindings_ctx.as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
@@ -1251,13 +1251,13 @@ async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
         .expect("clear_entries");
 
     assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(_)
     );
     assert_matches!(
         resolve_ethernet_link_addr::<I::OtherIp, _>(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &ethernet_device_id,
             &I::OtherIp::ADDR
         ),

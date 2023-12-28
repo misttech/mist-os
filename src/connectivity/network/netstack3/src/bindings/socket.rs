@@ -89,10 +89,10 @@ pub(crate) async fn serve(
             match req {
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                     let response = {
-                        let non_sync_ctx = ctx.non_sync_ctx();
+                        let bindings_ctx = ctx.non_sync_ctx();
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
-                            .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
+                            .and_then(|id| id.try_into_core_with_ctx(bindings_ctx))
                             .map(|core_id: DeviceId<_>| core_id.bindings_id().name.clone())
                             .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
                     };
@@ -102,8 +102,8 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {
-                        let non_sync_ctx = ctx.non_sync_ctx();
-                        let devices = AsRef::<Devices<_>>::as_ref(non_sync_ctx);
+                        let bindings_ctx = ctx.non_sync_ctx();
+                        let devices = AsRef::<Devices<_>>::as_ref(bindings_ctx);
                         let result = devices
                             .get_device_by_name(&name)
                             .map(|d| d.bindings_id().id.get())
@@ -177,15 +177,15 @@ pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
 }
 
 fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts();
-    non_sync_ctx.devices.with_devices(|devices| {
+    let (core_ctx, bindings_ctx) = ctx.contexts();
+    bindings_ctx.devices.with_devices(|devices| {
         devices
             .map(|d| {
                 // Generally, calling into `netstack3_core` while operating
                 // on the non-sync context is a recipe for deadlocks. That's
                 // not an issue here since the non-sync context isn't being
                 // passed into `get_all_ip_addr_subnets`.
-                let addresses = netstack3_core::device::get_all_ip_addr_subnets(&*sync_ctx, d)
+                let addresses = netstack3_core::device::get_all_ip_addr_subnets(&*core_ctx, d)
                     .into_iter()
                     .map(fidl_fuchsia_net_ext::FromExt::from_ext)
                     .collect();
@@ -210,9 +210,9 @@ fn get_interface_flags(
     ctx: &Ctx,
     name: &str,
 ) -> Result<psocket::InterfaceFlags, zx::sys::zx_status_t> {
-    let non_sync_ctx = ctx.non_sync_ctx();
+    let bindings_ctx = ctx.non_sync_ctx();
     let device =
-        non_sync_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+        bindings_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
     Ok(flags_for_device(&device.external_state()))
 }
 

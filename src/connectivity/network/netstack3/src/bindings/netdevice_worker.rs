@@ -126,7 +126,7 @@ impl NetdeviceWorker {
                 Error::Client(e)
             })?;
 
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
             let Some(id) = id.upgrade() else {
                 // This is okay because we hold a weak reference; the device may
@@ -163,8 +163,8 @@ impl NetdeviceWorker {
             }
 
             netstack3_core::device::receive_frame(
-                sync_ctx,
-                non_sync_ctx,
+                core_ctx,
+                bindings_ctx,
                 &id,
                 packet::Buf::new(&mut buff[..frame_length], ..),
             )
@@ -371,13 +371,13 @@ impl DeviceHandler {
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
         let Netstack { interfaces_event_sink, neighbor_event_sink, ctx } = ns;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
         // Check if there already exists an interface with this name.
         // Interface names are unique.
         let name = name
             .map(|name| {
-                if let Some(_device_info) = non_sync_ctx.devices.get_device_by_name(&name) {
+                if let Some(_device_info) = bindings_ctx.devices.get_device_by_name(&name) {
                     return Err(Error::DuplicateName(name));
                 };
                 Ok(name)
@@ -387,12 +387,12 @@ impl DeviceHandler {
         let max_frame_size = MaxEthernetFrameSize::new(max_eth_frame_size)
             .ok_or(Error::ConfigurationNotSupported)?;
         let core_id = netstack3_core::device::add_ethernet_device_with_state(
-            sync_ctx,
+            core_ctx,
             mac_addr,
             max_frame_size,
             RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
             || {
-                let binding_id = non_sync_ctx.devices.alloc_new_id();
+                let binding_id = bindings_ctx.devices.alloc_new_id();
 
                 let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
                 let info = devices::NetdeviceInfo {
@@ -442,19 +442,19 @@ impl DeviceHandler {
         let devices::StaticCommonInfo { tx_notifier } = external_state.static_common_info();
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         netstack3_core::device::set_tx_queue_configuration(
-            sync_ctx,
-            non_sync_ctx,
+            core_ctx,
+            bindings_ctx,
             &core_id,
             netstack3_core::device::TransmitQueueConfiguration::Fifo,
         );
-        add_initial_routes(non_sync_ctx, &core_id).await;
+        add_initial_routes(bindings_ctx, &core_id).await;
 
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        non_sync_ctx.rng().fill(&mut secret_key);
+        bindings_ctx.rng().fill(&mut secret_key);
 
         let ip_config = Some(IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),
@@ -482,16 +482,16 @@ impl DeviceHandler {
                 },
             )
             .unwrap()
-            .apply(sync_ctx, non_sync_ctx);
+            .apply(core_ctx, bindings_ctx);
         let _: Ipv4DeviceConfigurationUpdate =
             netstack3_core::device::new_ipv4_configuration_update(
                 &core_id,
                 Ipv4DeviceConfigurationUpdate { ip_config },
             )
             .unwrap()
-            .apply(sync_ctx, non_sync_ctx);
+            .apply(core_ctx, bindings_ctx);
 
-        non_sync_ctx.devices.add_device(binding_id, core_id.clone());
+        bindings_ctx.devices.add_device(binding_id, core_id.clone());
 
         Ok((binding_id, status_stream, task))
     }
@@ -503,7 +503,7 @@ impl DeviceHandler {
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
 async fn add_initial_routes(
-    non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    bindings_ctx: &mut BindingsNonSyncCtxImpl,
     device: &DeviceId<BindingsNonSyncCtxImpl>,
 ) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
@@ -552,7 +552,7 @@ async fn add_initial_routes(
     .map(Into::into);
 
     for change in v4_changes.chain(v6_changes) {
-        non_sync_ctx
+        bindings_ctx
             .apply_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))

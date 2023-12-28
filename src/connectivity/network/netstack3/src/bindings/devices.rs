@@ -169,10 +169,10 @@ pub(crate) fn spawn_rx_task(
     fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
         watcher,
         move || {
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
             device_id
                 .upgrade()
-                .map(|device_id| handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id))
+                .map(|device_id| handle_queued_rx_packets(core_ctx, bindings_ctx, &device_id))
         },
     ))
 }
@@ -188,9 +188,9 @@ pub(crate) fn spawn_tx_task(
     fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
         watcher,
         move || {
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
             device_id.upgrade().map(|device_id| {
-                transmit_queued_tx_frames(sync_ctx, non_sync_ctx, &device_id).unwrap_or_else(
+                transmit_queued_tx_frames(core_ctx, bindings_ctx, &device_id).unwrap_or_else(
                     |DeviceSendFrameError::DeviceNotReady(())| {
                         warn!(
                             "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
