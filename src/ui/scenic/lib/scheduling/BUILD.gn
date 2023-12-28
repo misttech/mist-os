@@ -39,6 +39,7 @@ source_set("frame_scheduler") {
     ":frame_scheduler_interface",
     ":id",
     ":vsync_timing",
+    "//sdk/lib/syslog/cpp",
     "//src/ui/scenic/lib/utils",
     "//third_party/cobalt/src/lib/client/cpp:buckets_config",
     "//zircon/system/ulib/inspect",
@@ -61,6 +62,7 @@ source_set("vsync_timing") {
     "vsync_timing.h",
   ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/zx",
   ]

@@ -14,5 +14,8 @@ static_library("escher_base") {
     "typed_reffable.h",
   ]
 
-  public_deps = [ "//src/lib/fxl" ]
+  public_deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl",
+  ]
 }
