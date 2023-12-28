@@ -37,20 +37,13 @@ syntax = "proto3";
 // https://github.com/googleapis/googleapis/blob/master/google/type/date.proto
 import "google/type/date.proto";
 
-// Monorail contains the project configuration for the Monorail issue tracker.
-message Monorail {
-  string project = 1;
-  string component = 2;
-}
-
 // IssueTracker contains the project configuration for the Google
-// Issue Tracker service.
+// Issue Tracker.
 message IssueTracker {
   int64 component_id = 1;
 }
 
 message Tracker {
-  repeated Monorail monorail = 1;
   repeated IssueTracker issue_tracker = 2;
   // for_automation defines whether this tracker should be used by automated
   // processes (e.g. alerts).
@@ -90,10 +83,9 @@ last_reviewed_date: {
     day: 23
 }
 trackers: {
-    monorail: {
-        project: "fuchsia"
-        component: "EngProd"
-    }
+  issue_tracker: {
+    component_id: 1478090
+  }
 }
 
 presubmits: {
