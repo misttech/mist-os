@@ -17,6 +17,9 @@ const MAX_COUNT_DEVICES uint32 = 256;
 type DeviceInfo = flexible union {
     /// Device supports the fuchsia.hardware.audio/StreamConfig protocol.
     1: stream_config StreamConfigDeviceInfo;
+
+    /// Device supports the fuchsia.hardware.audio/Composite protocol.
+    2: composite CompositeDeviceInfo;
 };
 
 /// Information about a device that supports the fuchsia.hardware.audio/StreamConfig protocol.
@@ -42,6 +45,23 @@ type StreamConfigDeviceInfo = table {
     /// Required.
     4: plug_state fuchsia.hardware.audio.PlugState;
 };
+
+/// Information about a device that supports the fuchsia.hardware.audio/Composite protocol.
+type CompositeDeviceInfo = table {
+    /// Top level static properties of the stream.
+    ///
+    /// Required.
+    1: composite_properties fuchsia.hardware.audio.CompositeProperties;
+
+    /// Supported DAI Formats
+    2: supported_dai_formats
+            vector<fuchsia.hardware.audio.DaiSupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
+
+    /// Supported ring buffer formats.
+    3: supported_ring_buffer_formats
+            vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
+};
+
 
 /// Identifies which device to retrieve information about.
 type DeviceSelector = table {

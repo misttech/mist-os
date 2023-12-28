@@ -71,6 +71,7 @@ rustc_binary("bin") {
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hound",

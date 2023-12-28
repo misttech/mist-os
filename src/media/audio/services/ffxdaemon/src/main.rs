@@ -527,19 +527,22 @@ impl AudioDaemon {
         &self,
         request: PlayerPlayRequest,
     ) -> Result<PlayerPlayResponse, anyhow::Error> {
-        let device_id = request
+        let device_selector = request
             .destination
             .ok_or(anyhow::anyhow!("Device id argument missing."))
             .and_then(|play_location| match play_location {
-            PlayDestination::DeviceRingBuffer(device_selector) => {
-                device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
-            }
-            _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
-        })?;
+                PlayDestination::DeviceRingBuffer(device_selector) => Ok(device_selector),
+                _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
+            })?;
 
         let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
-        let device = device::Device::connect(format!("/dev/class/audio-output/{}", device_id))?;
+        let device_controller = device::get_device_controller(
+            format_utils::path_for_selector(&device_selector)?,
+            device_selector.device_type.ok_or(anyhow::anyhow!("Decice type not specified"))?,
+        )?;
+
+        let mut device = device::Device::new(device_controller);
 
         let async_socket = fasync::Socket::from_socket(data_socket)?;
         device.play(async_socket).await
@@ -558,19 +561,14 @@ impl AudioDaemon {
             format!("Socket for wav data missing."),
         ))?;
 
-        let device_id = request
+        let device_selector = request
             .source
             .ok_or(error::ControllerError::new(
                 fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
                 format!("Record source missing."),
             ))
             .and_then(|location| match location {
-                RecordSource::DeviceRingBuffer(device_selector) => {
-                    device_selector.id.ok_or(error::ControllerError::new(
-                        fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
-                        format!("Device ID missing."),
-                    ))
-                }
+                RecordSource::DeviceRingBuffer(device_selector) => Ok(device_selector),
                 unknown_source => Err(error::ControllerError::new(
                     fidl_fuchsia_audio_controller::Error::InvalidArguments,
                     format!("Expected ring buffer source, found {unknown_source:?}"),
@@ -581,14 +579,19 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
 
-        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
+        let device_controller = device::get_device_controller(
+            format_utils::path_for_selector(&device_selector)?,
+            device_selector.device_type.ok_or(anyhow::anyhow!("Decice type not specified"))?,
+        );
 
-        match device {
+        match device_controller {
             Err(e) => Err(error::ControllerError::new(
                 fidl_fuchsia_audio_controller::Error::DeviceNotReachable,
                 format!("Failed to connect to device with error: {e}",),
             )),
-            Ok(device) => {
+            Ok(device_controller) => {
+                let mut device = device::Device::new(device_controller);
+
                 device
                     .record(
                         format_utils::Format::from(&stream_type),
@@ -734,49 +737,48 @@ impl AudioDaemon {
                     let device_selector =
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
 
-                    let device =
-                        device::Device::connect(format_utils::path_for_selector(&device_selector)?);
+                    let device_controller = device::get_device_controller(
+                        format_utils::path_for_selector(&device_selector)?,
+                        device_selector
+                            .device_type
+                            .ok_or(anyhow::anyhow!("Decice type not specified"))?,
+                    )?;
 
-                    match device {
+                    let mut device = device::Device::new(device_controller);
+
+                    let info = device.get_info().await;
+                    match info {
+                        Ok(info) => {
+                            let response = DeviceControlGetDeviceInfoResponse {
+                                device_info: Some(info),
+                                ..Default::default()
+                            };
+                            responder
+                                .send(Ok(response))
+                                .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                        }
                         Err(e) => {
                             println!("Could not connect to device. {e}");
                             responder
                                 .send(Err(zx::Status::INTERNAL.into_raw()))
                                 .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                         }
-
-                        Ok(device) => {
-                            let info = device.get_info().await;
-                            match info {
-                                Ok(info) => {
-                                    let response = DeviceControlGetDeviceInfoResponse {
-                                        device_info: Some(info),
-                                        ..Default::default()
-                                    };
-                                    responder
-                                        .send(Ok(response))
-                                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
-                                }
-                                Err(e) => {
-                                    println!("Could not connect to device. {e}");
-                                    responder
-                                        .send(Err(zx::Status::INTERNAL.into_raw()))
-                                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
-                                }
-                            }
-                        }
                     }
                 }
-
                 DeviceControlRequest::DeviceSetGainState { payload, responder } => {
                     let (device_selector, gain_state) = (
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?,
                         payload.gain_state.ok_or(anyhow::anyhow!("No gain state specified"))?,
                     );
 
-                    let device = device::Device::connect(format_utils::path_for_selector(
-                        &device_selector,
-                    )?)?;
+                    let device_controller = device::get_device_controller(
+                        format_utils::path_for_selector(&device_selector)?,
+                        device_selector
+                            .device_type
+                            .ok_or(anyhow::anyhow!("Device type not specified"))?,
+                    )?;
+
+                    let mut device = device::Device::new(device_controller);
 
                     device.set_gain(gain_state)?;
                     responder

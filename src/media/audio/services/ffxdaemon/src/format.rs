@@ -324,7 +324,7 @@ pub fn path_for_selector(device_selector: &DeviceSelector) -> Result<String, Err
                 }
             },
             fidl_fuchsia_hardware_audio::DeviceType::Composite => {
-                Ok(format!("dev/class/audio-composite/{}", id))
+                Ok(format!("/dev/class/audio-composite/{}", id))
             }
             _ => Err(anyhow::anyhow!("Unexpected device type.")),
         },
