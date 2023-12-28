@@ -379,12 +379,10 @@ impl State {
                 }
                 Status::Pending(ref mut pending) => match pending.pop_front() {
                     None => {
-                        self.global_stats
-                            .record_component_duration(
-                                self.unpopulated.identity.moniker.to_string(),
-                                self.elapsed_time + (zx::Time::get_monotonic() - start_time),
-                            )
-                            .await;
+                        self.global_stats.record_component_duration(
+                            self.unpopulated.identity.moniker.to_string(),
+                            self.elapsed_time + (zx::Time::get_monotonic() - start_time),
+                        );
                         return None;
                     }
                     Some((name, data)) => {

@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_lock::Mutex;
 use fuchsia_inspect::{
     ExponentialHistogramParams, HistogramProperty, LinearHistogramParams, Node, NumericProperty,
     UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
 };
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration};
 use lazy_static::lazy_static;
 use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        Arc, OnceLock,
     },
 };
 
@@ -117,13 +117,13 @@ pub struct GlobalConnectionStats {
     /// cause a component to exceed its configured size budget.
     schema_truncation_count: UintProperty,
     /// Optional histogram of processing times for individual components in GetNext
-    component_time_usec: Mutex<Option<UintExponentialHistogramProperty>>,
+    component_time_usec: OnceLock<UintExponentialHistogramProperty>,
     /// Histogram of max aggregated snapshot sizes for overall Snapshot requests.
     max_snapshot_sizes_bytes: UintLinearHistogramProperty,
     /// Percentage of schemas in a single snapshot that got truncated.
     snapshot_schema_truncation_percentage: UintLinearHistogramProperty,
     /// Longest processing times for individual components, with timestamps.
-    processing_time_tracker: Mutex<Option<ProcessingTimeTracker>>,
+    processing_time_tracker: OnceLock<Mutex<ProcessingTimeTracker>>,
     /// Node under which the batch iterator connections stats are created.
     batch_iterator_connections: Node,
     /// The id of the next BatchIterator connection.
@@ -161,8 +161,8 @@ impl GlobalConnectionStats {
             max_snapshot_sizes_bytes,
             snapshot_schema_truncation_percentage,
             schema_truncation_count,
-            component_time_usec: Mutex::new(None),
-            processing_time_tracker: Mutex::new(None),
+            component_time_usec: OnceLock::new(),
+            processing_time_tracker: OnceLock::new(),
             next_connection_id: AtomicUsize::new(0),
         }
     }
@@ -195,28 +195,26 @@ impl GlobalConnectionStats {
     }
 
     /// Record the duration of obtaining data from a single component.
-    pub async fn record_component_duration(&self, moniker: impl AsRef<str>, duration: Duration) {
+    pub fn record_component_duration(&self, moniker: impl AsRef<str>, duration: Duration) {
         let nanos = duration.into_nanos();
         if nanos >= 0 {
             // Lazily initialize stats that may not be needed for all diagnostics types.
 
-            let mut component_time_usec = self.component_time_usec.lock().await;
-            if component_time_usec.is_none() {
-                *component_time_usec = Some(self.node.create_uint_exponential_histogram(
+            let component_time_usec = self.component_time_usec.get_or_init(|| {
+                self.node.create_uint_exponential_histogram(
                     "component_time_usec",
                     TIME_USEC_PARAMS.clone(),
-                ));
-            }
+                )
+            });
 
-            let mut processing_time_tracker = self.processing_time_tracker.lock().await;
-            if processing_time_tracker.is_none() {
-                *processing_time_tracker = Some(ProcessingTimeTracker::new(
+            let processing_time_tracker = self.processing_time_tracker.get_or_init(|| {
+                Mutex::new(ProcessingTimeTracker::new(
                     self.node.create_child("longest_processing_times"),
-                ));
-            }
+                ))
+            });
 
-            component_time_usec.as_ref().unwrap().insert(nanos as u64 / 1000);
-            processing_time_tracker.as_mut().unwrap().track(moniker.as_ref(), nanos as u64);
+            component_time_usec.insert(nanos as u64 / 1000);
+            processing_time_tracker.lock().track(moniker.as_ref(), nanos as u64);
         }
     }
 }
