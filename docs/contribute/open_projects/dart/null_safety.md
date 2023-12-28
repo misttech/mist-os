@@ -64,7 +64,7 @@ sources you migrated.
 ### Completing a task
 
 When your change is ready, send it out for the corresponding owners for review.
-Preferable you can create a bug in Monorail to track the progress. If you do,
+Preferable you can create a bug in Fuchsia's Issue Tracker to track the progress. If you do,
 make sure to mark it blocking the [main bug 84961][fxb84961]{: .external}, and
 close it after your change has merged.
 

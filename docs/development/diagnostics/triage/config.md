@@ -201,8 +201,8 @@ is met.
 *   `tag`, an optional field, associates a tag with this Action.
 *   `file_bug`, an optional string field, specifies that a bug should be filed
     and where. Triage does not file bugs directly; this field simply informs the
-    consumer (a human user or an automated pipeline). It can be a Monorail
-    component (e.g. "I18N>Fonts") or references to other issue trackers
+    consumer (a human user or an automated pipeline). It can be an Issue Tracker
+    component (e.g. "Fuchsia > Internationalization  (i18n)") or references to other issue trackers
     understood by the consumer.
 
 ```json5
