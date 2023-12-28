@@ -42,6 +42,9 @@ class Driver;
 
 // Device is an implementation of a DFv1 device.
 class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::DeviceInterface {
+  // Forward declaration.
+  struct DelayedReleaseOp;
+
  public:
   Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
          std::optional<Device*> parent, std::shared_ptr<fdf::Logger> logger,
@@ -107,6 +110,9 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // Serves the |inspect_vmo| from the driver's diagnostics directory.
   zx_status_t ServeInspectVmo(zx::vmo inspect_vmo);
 
+  // Stores the child's release op, to be called after dispatcher shutdown.
+  void AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op);
+
   std::string_view topological_path() const { return topological_path_; }
   void set_topological_path(std::string path) { topological_path_ = std::move(path); }
   void set_fragments(std::vector<std::string> names) { fragments_ = std::move(names); }
@@ -127,6 +133,15 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   std::optional<Device*>& parent() { return parent_; }
 
  private:
+  // Holds the device's release op to call later.
+  struct DelayedReleaseOp {
+    device_t compat_symbol;
+    const zx_protocol_device_t* ops;
+
+    explicit DelayedReleaseOp(std::shared_ptr<Device> device);
+    ~DelayedReleaseOp();
+  };
+
   Device(Device&&) = delete;
   Device& operator=(Device&&) = delete;
 
@@ -169,8 +184,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
     // shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client should have been torn
     // down by the driver runtime canceling all outstanding waits by the time stop has been called,
     // allowing shutdown to proceed.
-    return (release_with_null_parent_ || parent_) &&
-           system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
+    return parent_ && system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
   }
 
   bool HasChildNamed(std::string_view name) const;
@@ -242,7 +256,13 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   fidl::WireSharedClient<fuchsia_driver_framework::NodeController> controller_;
 
   std::optional<Device*> parent_;
-  bool release_with_null_parent_ = false;
+  // If true, the release op will be called after the dispatcher has been shutdown.
+  // This is to keep with DFv1 behavior which only applies to the last remaining
+  // device of a driver.
+  bool release_after_dispatcher_shutdown_ = false;
+  // These will automatically destruct when this device
+  // (the fake compat device created by the Driver class in the DFv1 shim) destructs.
+  std::vector<std::unique_ptr<DelayedReleaseOp>> delayed_child_release_ops_;
 
   // The Device's children. The Device has full ownership of the children,
   // but these are shared pointers so that the NodeController can get a weak

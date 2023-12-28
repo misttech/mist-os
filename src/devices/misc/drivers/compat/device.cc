@@ -186,6 +186,20 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   return properties;
 }
 
+Device::DelayedReleaseOp::DelayedReleaseOp(std::shared_ptr<Device> device) {
+  memcpy(&compat_symbol, &device->compat_symbol_, sizeof(compat_symbol));
+  memcpy(&ops, &device->ops_, sizeof(ops));
+}
+
+Device::DelayedReleaseOp::~DelayedReleaseOp() {
+  // We shouldn't need to call the parent's pre-release hook here,
+  // as we should have only delayed the release hook if the device
+  // was the last device of the driver.
+  if (HasOp(ops, &zx_protocol_device_t::release)) {
+    ops->release(compat_symbol.context);
+  }
+}
+
 Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, std::shared_ptr<fdf::Logger> logger,
                async_dispatcher_t* dispatcher)
@@ -203,7 +217,7 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
-  if (ShouldCallRelease()) {
+  if (!release_after_dispatcher_shutdown_ && ShouldCallRelease()) {
     // Call the parent's pre-release.
     if (HasOp((*parent_)->ops_, &zx_protocol_device_t::child_pre_release)) {
       (*parent_)->ops_->child_pre_release((*parent_)->compat_symbol_.context,
@@ -713,10 +727,16 @@ void Device::UnbindAndRelease() {
       UnbindOp().then([device = shared_from_this()](fpromise::result<void>& init) {
         if (device->parent_.value()->parent_ == std::nullopt &&
             device->parent_.value()->children_.size() == 1) {
-          // We are the last remaing child. We should break the reference cycle and let destruction
-          // happen when the driver destructs in order to make sure the release hook is only invoked
-          // after the the dispatcher is shutdown.
-          device->release_with_null_parent_ = true;
+          // We are the last remaining child. We should break the reference cycle and delay
+          // calling the driver's release hook until the driver destructs, so the hook
+          // is only invoked after the the dispatcher is shutdown.
+          device->release_after_dispatcher_shutdown_ = true;
+          if (device->ShouldCallRelease()) {
+            auto op = std::make_unique<DelayedReleaseOp>(device);
+            device->parent_.value()->AddDelayedChildReleaseOp(std::move(op));
+          }
+          // Make sure the device otherwise destructs as normal.
+          device->parent_.value()->children_.remove(device);
           device->parent_.reset();
 
           auto completers = std::move(device->remove_completers_);
@@ -1049,6 +1069,10 @@ zx_status_t Device::ServeInspectVmo(zx::vmo inspect_vmo) {
     return status;
   }
   return ZX_OK;
+}
+
+void Device::AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op) {
+  delayed_child_release_ops_.push_back(std::move(op));
 }
 
 void Device::LogError(const char* error) {
