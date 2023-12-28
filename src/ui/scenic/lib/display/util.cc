@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/util.h"
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
@@ -18,7 +19,7 @@ bool ImportBufferCollection(
     allocation::GlobalBufferCollectionId buffer_collection_id,
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::ImageConfig& image_config) {
+    const fuchsia::hardware::display::types::ImageConfig& image_config) {
   zx_status_t status;
 
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
@@ -89,7 +90,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
 
 zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    const fuchsia::hardware::display::ImageConfig& image_config,
+    const fuchsia::hardware::display::types::ImageConfig& image_config,
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
     allocation::GlobalImageId image_id) {
   if (buffer_collection_id == 0) {
@@ -97,14 +98,15 @@ zx_status_t ImportImageForCapture(
     return 0;
   }
 
-  if (image_config.type != fuchsia::hardware::display::TYPE_CAPTURE) {
+  if (image_config.type != fuchsia::hardware::display::types::TYPE_CAPTURE) {
     FX_LOGS(ERROR) << "Image config type must be TYPE_CAPTURE.";
     return 0;
   }
 
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
-  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
+  const fuchsia::hardware::display::types::ImageId fidl_image_id =
+      allocation::ToFidlImageId(image_id);
   zx_status_t import_result;
   auto status =
       display_coordinator->ImportImage(image_config, /*buffer_id=*/

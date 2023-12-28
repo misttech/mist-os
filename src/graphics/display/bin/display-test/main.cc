@@ -385,8 +385,8 @@ zx_status_t capture_setup() {
   }
 
   // set buffer constraints
-  fhd::wire::ImageConfig image_config = {};
-  image_config.type = fhd::wire::kTypeCapture;
+  fhdt::wire::ImageConfig image_config = {};
+  image_config.type = fhdt::wire::kTypeCapture;
   auto constraints_resp = dc->SetBufferCollectionConstraints(
       display::ToFidlBufferCollectionId(kBufferCollectionId), image_config);
   if (constraints_resp.status() != ZX_OK) {
@@ -456,7 +456,7 @@ zx_status_t capture_setup() {
 
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
   // import image for capture
-  fhd::wire::ImageConfig capture_cfg = {};  // will contain a handle
+  fhdt::wire::ImageConfig capture_cfg = {};  // will contain a handle
   fidl::WireResult import_capture_result = dc->ImportImage(
       capture_cfg,
       fhd::wire::BufferId{

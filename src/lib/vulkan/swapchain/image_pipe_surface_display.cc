@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/images2/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
@@ -34,7 +35,7 @@ namespace {
 
 const char* const kTag = "ImagePipeSurfaceDisplay";
 
-constexpr inline fuchsia::hardware::display::ImageId ToFidlImageId(uint32_t image_id) {
+constexpr inline fuchsia::hardware::display::types::ImageId ToFidlImageId(uint32_t image_id) {
   return {.value = image_id};
 }
 
@@ -279,7 +280,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  fuchsia::hardware::display::ImageConfig image_config = {
+  fuchsia::hardware::display::types::ImageConfig image_config = {
       .width = extent.width,
       .height = extent.height,
   };
@@ -488,7 +489,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     }
 
     uint32_t image_id = next_image_id();
-    const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
+    const fuchsia::hardware::display::types::ImageId fidl_image_id = ToFidlImageId(image_id);
     display_coordinator_->ImportImage(image_config, /*buffer_id=*/
                                       {
                                           .buffer_collection_id = kBufferCollectionId,
@@ -604,7 +605,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
   }
 
   // image_id is also used in DisplayController interface.
-  const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
+  const fuchsia::hardware::display::types::ImageId fidl_image_id = ToFidlImageId(image_id);
   display_coordinator_->SetLayerImage(layer_id_, fidl_image_id, wait_event_id, signal_event_id);
   display_coordinator_->ApplyConfig();
 

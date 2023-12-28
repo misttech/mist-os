@@ -54,9 +54,9 @@ closed protocol Coordinator {
     /// Returns `ZX_ERR_ALREADY_EXISTS` if `image_id` was used in a successful
     /// `ImportImage()` without a corresponding `ReleaseImage()`.
     strict ImportImage(struct {
-        image_config ImageConfig;
+        image_config fuchsia.hardware.display.types.ImageConfig;
         buffer_id BufferId;
-        image_id ImageId;
+        image_id fuchsia.hardware.display.types.ImageId;
     }) -> (struct {
         res zx.Status;
     });
@@ -80,7 +80,7 @@ closed protocol Coordinator {
     // non-capture images. We should have a unified design on image reuse for
     // both capture and non-capture images.
     strict ReleaseImage(struct {
-        image_id ImageId;
+        image_id fuchsia.hardware.display.types.ImageId;
     });
 
     /// Imports an event into the driver and associates it with the given id.
@@ -187,7 +187,7 @@ closed protocol Coordinator {
     // It is illegal to pass an invalid layer id.
     strict SetLayerPrimaryConfig(struct {
         layer_id LayerId;
-        image_config ImageConfig;
+        image_config fuchsia.hardware.display.types.ImageConfig;
     });
 
     // Sets the layer transform, scaling, and positioning.
@@ -236,7 +236,7 @@ closed protocol Coordinator {
     // It is illegal to call this on an invalid layer.
     strict SetLayerCursorConfig(struct {
         layer_id LayerId;
-        image_config ImageConfig;
+        image_config fuchsia.hardware.display.types.ImageConfig;
     });
 
     // Updates the cursor position.
@@ -300,7 +300,7 @@ closed protocol Coordinator {
     // another layer that has not been presented is waiting on.
     strict SetLayerImage(struct {
         layer_id LayerId;
-        image_id ImageId;
+        image_id fuchsia.hardware.display.types.ImageId;
         wait_event_id EventId;
         signal_event_id EventId;
     });
@@ -476,7 +476,7 @@ closed protocol Coordinator {
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
         buffer_collection_id BufferCollectionId;
-        config ImageConfig;
+        config fuchsia.hardware.display.types.ImageConfig;
     }) -> (struct {
         res zx.Status;
     });
@@ -493,7 +493,7 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     strict StartCapture(struct {
         signal_event_id EventId;
-        image_id ImageId;
+        image_id fuchsia.hardware.display.types.ImageId;
     }) -> () error zx.Status;
 
     /// Set the minimum value of rgb channels. Valid range [0 255] inclusive. Returns

@@ -113,7 +113,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
 
-  if (request->image_config.type == fuchsia_hardware_display::wire::kTypeCapture) {
+  if (request->image_config.type == fuchsia_hardware_display_types::wire::kTypeCapture) {
     completer.Reply(
         ImportImageForCapture(request->image_config, ToBufferId(request->buffer_id), image_id));
     return;
@@ -123,9 +123,9 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 }
 
 zx_status_t Client::ImportImageForDisplay(
-    const fuchsia_hardware_display::wire::ImageConfig& image_config, BufferId buffer_id,
+    const fuchsia_hardware_display_types::wire::ImageConfig& image_config, BufferId buffer_id,
     ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_config.type != fuchsia_hardware_display::wire::kTypeCapture);
+  ZX_DEBUG_ASSERT(image_config.type != fuchsia_hardware_display_types::wire::kTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -751,9 +751,9 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
 }
 
 zx_status_t Client::ImportImageForCapture(
-    const fuchsia_hardware_display::wire::ImageConfig& image_config, BufferId buffer_id,
+    const fuchsia_hardware_display_types::wire::ImageConfig& image_config, BufferId buffer_id,
     ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_config.type == fuchsia_hardware_display::wire::kTypeCapture);
+  ZX_DEBUG_ASSERT(image_config.type == fuchsia_hardware_display_types::wire::kTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 

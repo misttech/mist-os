@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/testing/client-utils/image.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -45,6 +46,7 @@ static constexpr uint32_t kAfbcTilePixelWidth = 16u;
 static constexpr uint32_t kAfbcTilePixelHeight = 16u;
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display_test {
 
@@ -122,7 +124,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     return nullptr;
   }
 
-  fhd::wire::ImageConfig image_config = {};
+  fhdt::wire::ImageConfig image_config = {};
   image_config.height = height;
   image_config.width = width;
   image_config.type = 0;  // 0 for any image type.
@@ -461,7 +463,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
   }
 }
 
-void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
+void Image::GetConfig(fhdt::wire::ImageConfig* config_out) const {
   config_out->height = height_;
   config_out->width = width_;
   if (modifier_ != fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled) {
@@ -500,7 +502,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
     }
   }
 
-  fhd::wire::ImageConfig image_config;
+  fhdt::wire::ImageConfig image_config;
   GetConfig(&image_config);
   const fidl::WireResult import_result = dc->ImportImage(
       image_config,

@@ -282,7 +282,7 @@ impl Coordinator {
             proxy
                 .set_buffer_collection_constraints(
                     &id.into(),
-                    &display::ImageConfig { width: 0, height: 0, type_: 0 },
+                    &display_types::ImageConfig { width: 0, height: 0, type_: 0 },
                 )
                 .await?,
         )?;
@@ -299,7 +299,7 @@ impl Coordinator {
         &self,
         collection_id: BufferCollectionId,
         image_id: ImageId,
-        config: display::ImageConfig,
+        config: display_types::ImageConfig,
     ) -> Result<()> {
         let result = self
             .proxy()

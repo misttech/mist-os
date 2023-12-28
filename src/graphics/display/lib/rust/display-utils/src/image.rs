@@ -4,7 +4,7 @@
 
 use {
     fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy},
-    fidl_fuchsia_hardware_display as fdisplay,
+    fidl_fuchsia_hardware_display_types as fdisplay_types,
     fidl_fuchsia_sysmem::{
         self as fsysmem, AllocatorMarker, BufferCollectionInfo2, BufferCollectionMarker,
         BufferCollectionProxy, BufferCollectionTokenMarker, BufferCollectionTokenProxy,
@@ -112,15 +112,15 @@ impl Drop for Image {
     }
 }
 
-impl From<&ImageParameters> for fdisplay::ImageConfig {
+impl From<&ImageParameters> for fdisplay_types::ImageConfig {
     fn from(src: &ImageParameters) -> Self {
-        Self { width: src.width, height: src.height, type_: fdisplay::TYPE_SIMPLE }
+        Self { width: src.width, height: src.height, type_: fdisplay_types::TYPE_SIMPLE }
     }
 }
 
-impl From<ImageParameters> for fdisplay::ImageConfig {
+impl From<ImageParameters> for fdisplay_types::ImageConfig {
     fn from(src: ImageParameters) -> Self {
-        fdisplay::ImageConfig::from(&src)
+        fdisplay_types::ImageConfig::from(&src)
     }
 }
 

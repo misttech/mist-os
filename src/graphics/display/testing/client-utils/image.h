@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_IMAGE_H_
 #define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_IMAGE_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/zx/channel.h>
@@ -47,7 +48,7 @@ class Image {
   fuchsia_images2::wire::PixelFormat format() { return format_; }
   uint64_t modifier() const { return modifier_; }
 
-  void GetConfig(fuchsia_hardware_display::wire::ImageConfig* config_out) const;
+  void GetConfig(fuchsia_hardware_display_types::wire::ImageConfig* config_out) const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
               display::ImageId image_id, image_import_t* info_out) const;
 

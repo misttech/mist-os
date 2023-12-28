@@ -181,7 +181,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
       layer->import_info[alt_image_].events[WAIT_EVENT].signal(0, ZX_EVENT_SIGNALED);
     }
 
-    fhd::wire::ImageConfig image_config;
+    fhdt::wire::ImageConfig image_config;
     images_[0]->GetConfig(&image_config);
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
@@ -344,7 +344,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
-    const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
+    const fhdt::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
     const fhd::wire::EventId fidl_signal_event_id =
@@ -403,10 +403,10 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     }
     layer->import_info[0].events[WAIT_EVENT].signal(0, ZX_EVENT_SIGNALED);
 
-    fhd::wire::ImageConfig image_config = {};
+    fhdt::wire::ImageConfig image_config = {};
     image_config.height = info.height;
     image_config.width = info.width;
-    image_config.type = fhd::wire::kTypeSimple;
+    image_config.type = fhdt::wire::kTypeSimple;
 
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerCursorConfig(fidl_layer_id, image_config);

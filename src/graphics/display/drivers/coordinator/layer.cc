@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
@@ -19,6 +21,7 @@
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display {
 
@@ -34,7 +37,7 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
   }
 }
 
-static void populate_image(const fhd::wire::ImageConfig& image, image_t* image_out) {
+static void populate_image(const fhdt::wire::ImageConfig& image, image_t* image_out) {
   image_out->width = image.width;
   image_out->height = image.height;
   image_out->type = image.type;
@@ -243,7 +246,7 @@ bool Layer::AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_inde
   }
 }
 
-void Layer::SetPrimaryConfig(fhd::wire::ImageConfig image_config) {
+void Layer::SetPrimaryConfig(fhdt::wire::ImageConfig image_config) {
   pending_layer_.type = LAYER_TYPE_PRIMARY;
   auto* primary = &pending_layer_.cfg.primary;
   populate_image(image_config, &primary->image);
@@ -289,7 +292,7 @@ void Layer::SetPrimaryAlpha(fhd::wire::AlphaMode mode, float val) {
   config_change_ = true;
 }
 
-void Layer::SetCursorConfig(fhd::wire::ImageConfig image_config) {
+void Layer::SetCursorConfig(fhdt::wire::ImageConfig image_config) {
   pending_layer_.type = LAYER_TYPE_CURSOR;
   pending_cursor_x_ = pending_cursor_y_ = 0;
 

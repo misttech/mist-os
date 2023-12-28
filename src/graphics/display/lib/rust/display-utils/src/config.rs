@@ -6,7 +6,7 @@ use crate::{
     pixel_format::PixelFormat,
     types::{DisplayId, EventId, ImageId, LayerId},
 };
-use fidl_fuchsia_hardware_display as fdisplay;
+use fidl_fuchsia_hardware_display_types as fdisplay_types;
 
 /// LayerConfig is a variant type of the three distinct layer configuration types that are
 /// supported by the display driver: Primary, Cursor, and Color.
@@ -34,7 +34,7 @@ pub enum LayerConfig {
         image_id: ImageId,
 
         /// Describes the dimensions, pixel format, and usage of the layer image.
-        image_config: fdisplay::ImageConfig,
+        image_config: fdisplay_types::ImageConfig,
 
         /// When present, the display driver will not apply the configuration until the client
         /// signals this event.

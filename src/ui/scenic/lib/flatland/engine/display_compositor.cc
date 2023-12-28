@@ -4,10 +4,10 @@
 
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
 
-#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -48,7 +48,7 @@ uint32_t BufferCollectionPixelFormatToImageType(const fuchsia::sysmem::PixelForm
         return 3;  // IMAGE_TYPE_YF_TILED
     }
   }
-  return fuchsia::hardware::display::TYPE_SIMPLE;
+  return fuchsia::hardware::display::types::TYPE_SIMPLE;
 }
 
 fuchsia::hardware::display::AlphaMode GetAlphaMode(
@@ -313,7 +313,7 @@ bool DisplayCompositor::ImportBufferCollection(
   return ImportBufferCollectionToDisplayCoordinator(
       collection_id, std::move(display_token),
       // Indicate that no specific size, format, or type is required.
-      fuchsia::hardware::display::ImageConfig{.type = 0});
+      fuchsia::hardware::display::types::ImageConfig{.type = 0});
 }
 
 void DisplayCompositor::ReleaseBufferCollection(
@@ -342,14 +342,14 @@ fuchsia::sysmem::BufferCollectionSyncPtr DisplayCompositor::TakeDisplayBufferCol
   return token;
 }
 
-fuchsia::hardware::display::ImageConfig DisplayCompositor::CreateImageConfig(
+fuchsia::hardware::display::types::ImageConfig DisplayCompositor::CreateImageConfig(
     const allocation::ImageMetadata& metadata) const {
   // TODO(fxbug.dev/71344): Pixel format should be ignored when using sysmem. We do not want to have
   // to deal with this default image format. Work was in progress to address this, but is currently
   // stalled: see fxr/716543.
   FX_DCHECK(buffer_collection_pixel_format_.count(metadata.collection_id));
   const auto pixel_format = buffer_collection_pixel_format_.at(metadata.collection_id);
-  return fuchsia::hardware::display::ImageConfig{
+  return fuchsia::hardware::display::types::ImageConfig{
       .width = metadata.width,
       .height = metadata.height,
       .type = BufferCollectionPixelFormatToImageType(pixel_format)};
@@ -402,10 +402,10 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
     return true;
   }
 
-  const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(metadata);
+  const fuchsia::hardware::display::types::ImageConfig image_config = CreateImageConfig(metadata);
   zx_status_t import_image_status = ZX_OK;
   {
-    const fuchsia::hardware::display::ImageId fidl_image_id =
+    const fuchsia::hardware::display::types::ImageId fidl_image_id =
         allocation::ToFidlImageId(metadata.identifier);
     const auto status = (*display_coordinator_)
                             ->ImportImage(image_config, /*buffer_id=*/
@@ -433,7 +433,8 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
-  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
+  const fuchsia::hardware::display::types::ImageId fidl_image_id =
+      allocation::ToFidlImageId(image_id);
   std::scoped_lock lock(lock_);
 
   if (display_imported_images_.erase(image_id) == 1) {
@@ -582,12 +583,13 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
   const auto alpha_mode = GetAlphaMode(image.blend_mode);
 
-  const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(image);
+  const fuchsia::hardware::display::types::ImageConfig image_config = CreateImageConfig(image);
   (*display_coordinator_)->SetLayerPrimaryConfig(layer_id, image_config);
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
-  const fuchsia::hardware::display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
+  const fuchsia::hardware::display::types::ImageId image_id =
+      allocation::ToFidlImageId(image.identifier);
   (*display_coordinator_)->SetLayerImage(layer_id, image_id, wait_id, signal_id);
 }
 
@@ -1030,7 +1032,7 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
   {  // Set display constraints.
     std::scoped_lock lock(lock_);
     const auto result = ImportBufferCollectionToDisplayCoordinator(
-        collection_id, std::move(display_token), fuchsia::hardware::display::ImageConfig{});
+        collection_id, std::move(display_token), fuchsia::hardware::display::types::ImageConfig{});
     FX_DCHECK(result);
   }
 
@@ -1116,7 +1118,7 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
 bool DisplayCompositor::ImportBufferCollectionToDisplayCoordinator(
     allocation::GlobalBufferCollectionId identifier,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::ImageConfig& image_config) {
+    const fuchsia::hardware::display::types::ImageConfig& image_config) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   return scenic_impl::ImportBufferCollection(identifier, *display_coordinator_, std::move(token),
                                              image_config);

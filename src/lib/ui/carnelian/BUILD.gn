@@ -37,6 +37,7 @@ rustc_library("carnelian") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_rust",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",

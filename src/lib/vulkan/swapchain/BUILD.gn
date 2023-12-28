@@ -106,6 +106,7 @@ source_set("display") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_hlcpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

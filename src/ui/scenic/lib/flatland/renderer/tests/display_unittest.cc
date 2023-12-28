@@ -146,7 +146,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   EXPECT_FALSE(import_result);
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::ImageConfig display_constraints;
+  fuchsia::hardware::display::types::ImageConfig display_constraints;
   bool res = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
                                                  std::move(display_token), display_constraints);
   ASSERT_TRUE(res);
@@ -193,7 +193,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // We should now be able to also import an image to the display coordinator, using the
   // display-specific buffer collection id. If it returns OK, then we know that the renderer
   // did fully set the DC constraints.
-  fuchsia::hardware::display::ImageConfig image_config{};
+  fuchsia::hardware::display::types::ImageConfig image_config{};
 
   // Try to import the image into the display coordinator API and make sure it succeeds.
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
@@ -236,7 +236,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator_.get());
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::ImageConfig image_config = {
+  fuchsia::hardware::display::types::ImageConfig image_config = {
       .width = kWidth,
       .height = kHeight,
   };

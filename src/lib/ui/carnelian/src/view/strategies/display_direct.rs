@@ -26,7 +26,8 @@ use display_utils::{
     INVALID_LAYER_ID,
 };
 use euclid::size2;
-use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
+use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
+use fidl_fuchsia_hardware_display_types::ImageConfig;
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};

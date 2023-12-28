@@ -21,6 +21,7 @@
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhd = fuchsia_hardware_display;
+namespace fhdt = fuchsia_hardware_display_types;
 namespace sysmem = fuchsia_sysmem;
 
 namespace display {
@@ -42,7 +43,7 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   monitor_serial_ = fbl::String(info.monitor_serial.data());
   image_config_.height = modes_[0].vertical_resolution;
   image_config_.width = modes_[0].horizontal_resolution;
-  image_config_.type = fhd::wire::kTypeSimple;
+  image_config_.type = fhdt::wire::kTypeSimple;
 }
 
 DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
@@ -286,13 +287,13 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   }
 
   if (auto reply = dc_->CheckConfig(false);
-      !reply.ok() || reply.value().res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
+      !reply.ok() || reply.value().res != fhdt::wire::ConfigResult::kOk) {
     return reply.ok() ? ZX_ERR_INVALID_ARGS : reply.status();
   }
   return dc_->ApplyConfig().status();
 }
 
-fuchsia_hardware_display_types::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
+fhdt::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
   fbl::AutoLock lock(mtx());
   EXPECT_TRUE(dc_);
   auto result = dc_->GetLatestAppliedConfigStamp();
@@ -301,7 +302,7 @@ fuchsia_hardware_display_types::wire::ConfigStamp TestFidlClient::GetRecentAppli
 }
 
 zx::result<ImageId> TestFidlClient::ImportImageWithSysmem(
-    const fhd::wire::ImageConfig& image_config) {
+    const fhdt::wire::ImageConfig& image_config) {
   fbl::AutoLock lock(mtx());
   return ImportImageWithSysmemLocked(image_config);
 }
@@ -321,7 +322,7 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
 }
 
 zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
-    const fhd::wire::ImageConfig& image_config) {
+    const fhdt::wire::ImageConfig& image_config) {
   // Create all the tokens.
   fidl::WireSyncClient<sysmem::BufferCollectionToken> local_token;
   {
@@ -431,7 +432,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   const ImageId image_id = next_image_id_++;
-  const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
+  const fhdt::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
   auto import_result = dc_->ImportImage(image_config,
                                         fhd::wire::BufferId{
                                             .buffer_collection_id = fidl_display_collection_id,

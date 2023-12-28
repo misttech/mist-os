@@ -208,7 +208,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Generates a new ImageEventData struct to be used with a client image on a display.
   ImageEventData NewImageEventData() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  fuchsia::hardware::display::ImageConfig CreateImageConfig(
+  fuchsia::hardware::display::types::ImageConfig CreateImageConfig(
       const allocation::ImageMetadata& metadata) const FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
@@ -265,7 +265,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-      const fuchsia::hardware::display::ImageConfig& image_config)
+      const fuchsia::hardware::display::types::ImageConfig& image_config)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // This mutex protects access to class members that are accessed on main thread and the Flatland

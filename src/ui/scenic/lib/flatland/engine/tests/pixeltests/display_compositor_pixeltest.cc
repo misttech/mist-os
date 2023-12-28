@@ -417,8 +417,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     }
 
     // Set up buffer collection and image for recording a snapshot.
-    fuchsia::hardware::display::ImageConfig image_config = {
-        .type = fuchsia::hardware::display::TYPE_CAPTURE};
+    fuchsia::hardware::display::types::ImageConfig image_config = {
+        .type = fuchsia::hardware::display::types::TYPE_CAPTURE};
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
     auto result = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
@@ -548,7 +548,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
-    const fuchsia::hardware::display::ImageId fidl_capture_image_id =
+    const fuchsia::hardware::display::types::ImageId fidl_capture_image_id =
         allocation::ToFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
