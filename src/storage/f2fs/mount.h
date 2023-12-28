@@ -22,6 +22,7 @@ enum class MountOption {
   kInlineDentry,
   kForceLfs,
   kReadOnly,
+  kReadExtentCache,
   kActiveLogs,  // It should be (kOptMaxNum - 1).
   kMaxNum,
 };
@@ -56,8 +57,9 @@ class MountOptions {
   // "inline_dentry", 1
   // "mode", ModeType::kModeAdaptive (0)
   // "readonly", 0
+  // "read_extent_cache", 1
   // "active_logs", 6
-  std::array<size_t, kMaxOptionCount> opt_ = {1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 6};
+  std::array<size_t, kMaxOptionCount> opt_ = {1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 6};
 };
 
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,

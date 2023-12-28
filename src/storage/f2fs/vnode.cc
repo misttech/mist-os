@@ -310,7 +310,6 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
   vnode->SetDirLevel(inode.i_dir_level);
   vnode->UpdateVersion(superblock_info.GetCheckpointVer() - 1);
   vnode->SetAdvise(inode.i_advise);
-  vnode->GetExtentInfo(inode.i_ext);
 
   if (inode.i_inline & kInlineDentry) {
     vnode->SetFlag(InodeInfoFlag::kInlineDentry);
@@ -331,6 +330,18 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
   }
   if (inode.i_inline & kDataExist) {
     vnode->SetFlag(InodeInfoFlag::kDataExist);
+  }
+
+  if (vnode->IsReg()) {
+    vnode->InitExtentTree();
+    if (inode.i_ext.blk_addr) {
+      auto extent_info = ExtentInfo{.fofs = LeToCpu(inode.i_ext.fofs),
+                                    .blk_addr = LeToCpu(inode.i_ext.blk_addr),
+                                    .len = LeToCpu(inode.i_ext.len)};
+      if (auto result = vnode->GetExtentTree().InsertExtent(extent_info); result.is_error()) {
+        vnode->SetFlag(InodeInfoFlag::kNoExtent);
+      }
+    }
   }
 
   // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
@@ -521,7 +532,15 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
   inode.i_size = CpuToLe(GetSize());
   // For on-disk i_blocks, we keep counting inode block for backward compatibility.
   inode.i_blocks = CpuToLe(safemath::CheckAdd<uint64_t>(GetBlocks(), 1).ValueOrDie());
-  SetRawExtent(inode.i_ext);
+
+  if (ExtentCacheAvailable()) {
+    auto extent_info = GetExtentTree().GetLargestExtent();
+    inode.i_ext.blk_addr = CpuToLe(extent_info.blk_addr);
+    inode.i_ext.fofs = CpuToLe(static_cast<uint32_t>(extent_info.fofs));
+    inode.i_ext.len = CpuToLe(extent_info.len);
+  } else {
+    std::memset(&inode.i_ext, 0, sizeof(inode.i_ext));
+  }
 
   inode.i_atime = CpuToLe(static_cast<uint64_t>(GetATime().tv_sec));
   inode.i_ctime = CpuToLe(static_cast<uint64_t>(GetCTime().tv_sec));
@@ -857,18 +876,20 @@ zx_status_t VnodeF2fs::WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask
   return watcher_.WatchDir(vfs, this, mask, options, std::move(watcher));
 }
 
-void VnodeF2fs::GetExtentInfo(const Extent &extent) {
-  std::lock_guard lock(extent_cache_mutex_);
-  extent_cache_.fofs = LeToCpu(extent.fofs);
-  extent_cache_.blk_addr = LeToCpu(extent.blk_addr);
-  extent_cache_.len = LeToCpu(extent.len);
+bool VnodeF2fs::ExtentCacheAvailable() {
+  return superblock_info_.TestOpt(MountOption::kReadExtentCache) && IsReg() &&
+         !TestFlag(InodeInfoFlag::kNoExtent);
 }
 
-void VnodeF2fs::SetRawExtent(Extent &extent) {
-  fs::SharedLock lock(extent_cache_mutex_);
-  extent.fofs = CpuToLe(static_cast<uint32_t>(extent_cache_.fofs));
-  extent.blk_addr = CpuToLe(extent_cache_.blk_addr);
-  extent.len = CpuToLe(extent_cache_.len);
+void VnodeF2fs::InitExtentTree() {
+  if (!ExtentCacheAvailable()) {
+    return;
+  }
+
+  // Because the lifecycle of an extent_tree is tied to the lifecycle of a vnode, the extent tree
+  // should not exist when the vnode is created.
+  ZX_DEBUG_ASSERT(extent_tree_ == nullptr);
+  extent_tree_ = std::make_unique<ExtentTree>(Ino());
 }
 
 void VnodeF2fs::Activate() { SetFlag(InodeInfoFlag::kActive); }
@@ -930,7 +951,7 @@ block_t VnodeF2fs::TruncateDnodeAddrs(LockedPage &dnode, size_t offset, size_t c
       continue;
     }
     node.SetDataBlkaddr(offset, kNullAddr);
-    UpdateExtentCache(kNullAddr, node.StartBidxOfNode(GetAddrsPerInode()) + offset);
+    UpdateExtentCache(node.StartBidxOfNode(GetAddrsPerInode()) + offset, kNullAddr);
     ++nr_free;
     if (blkaddr != kNewAddr) {
       fs()->GetSegmentManager().InvalidateBlocks(blkaddr);

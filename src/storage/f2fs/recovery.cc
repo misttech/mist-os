@@ -229,7 +229,8 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
       // Write dummy data page
       GetSegmentManager().RecoverDataPage(sum, src, dest);
       dnode_page.GetPage<NodePage>().SetDataBlkaddr(offset_in_dnode, dest);
-      vnode.UpdateExtentCache(dest, page.StartBidxOfNode(vnode.GetAddrsPerInode()));
+      vnode.UpdateExtentCache(page.StartBidxOfNode(vnode.GetAddrsPerInode()) + offset_in_dnode,
+                              dest);
     }
     ++offset_in_dnode;
   }

@@ -44,6 +44,9 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
     vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
   }
 
+  if (vnode->IsReg()) {
+    vnode->InitExtentTree();
+  }
   vnode->InitFileCache();
   vnode->SetFlag(InodeInfoFlag::kNewInode);
 

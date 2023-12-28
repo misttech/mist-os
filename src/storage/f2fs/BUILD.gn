@@ -15,6 +15,8 @@ static_library("f2fs") {
     "dir_entry_cache.cc",
     "dir_entry_cache.h",
     "dir_hash.cc",
+    "extent_cache.cc",
+    "extent_cache.h",
     "f2fs.cc",
     "f2fs_internal.h",
     "f2fs_layout.h",

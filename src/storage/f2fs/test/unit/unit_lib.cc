@@ -193,6 +193,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
   vnode->InitFileCache();
+  vnode->InitExtentTree();
   vnode->UnlockNewInode();
   fs->InsertVnode(vnode.get());
   vnode->SetDirty();
@@ -564,6 +565,12 @@ zx::result<std::unique_ptr<BcacheMapper>> MkfsTester::FormatDevice(MkfsWorker &m
 zx_status_t GcTester::DoGarbageCollect(GcManager &manager, uint32_t segno, GcType gc_type) {
   std::lock_guard lock(f2fs::GetGlobalLock());
   return manager.DoGarbageCollect(segno, gc_type);
+}
+
+zx_status_t GcTester::GcDataSegment(GcManager &manager, const SummaryBlock &sum_blk,
+                                    unsigned int segno, GcType gc_type) {
+  std::lock_guard lock(f2fs::GetGlobalLock());
+  return manager.GcDataSegment(sum_blk, segno, gc_type);
 }
 
 void DeviceTester::SetHook(F2fs *fs, DeviceTester::Hook hook) {

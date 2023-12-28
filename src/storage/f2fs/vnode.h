@@ -13,12 +13,6 @@ namespace f2fs {
 constexpr uint32_t kNullIno = std::numeric_limits<uint32_t>::max();
 
 class F2fs;
-// for in-memory extent cache entry
-struct ExtentInfo {
-  uint64_t fofs = 0;      // start offset in a file
-  uint32_t blk_addr = 0;  // start block address of the extent
-  uint32_t len = 0;       // length of the extent
-};
 
 // i_advise uses Fadvise:xxx bit. We can add additional hints later.
 enum class FAdvise {
@@ -52,6 +46,7 @@ enum class InodeInfoFlag {
   kInlineDentry,  // used for inline dentry
   kDataExist,     // indicate data exists
   kBad,           // should drop this inode without purging
+  kNoExtent,      // not to use the extent cache
   kFlagSize,
 };
 
@@ -121,7 +116,6 @@ class VnodeF2fs : public fs::PagedVnode,
 #if 0  // porting needed
   // void F2fsSetInodeFlags();
   // int F2fsIgetTest(void *data);
-  // static int CheckExtentCache(inode *inode, pgoff_t pgofs,
   // static int GetDataBlockRo(inode *inode, sector_t iblock,
   //      buffer_head *bh_result, int create);
 #endif
@@ -151,7 +145,6 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t ReserveNewBlock(NodePage &node_page, size_t ofs_in_node);
 
   zx::result<block_t> FindDataBlkAddr(pgoff_t index);
-  void UpdateExtentCache(block_t blk_addr, pgoff_t file_offset);
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
   // node page of a offset or the block address is not assigned, this function adds null LockedPage
@@ -180,8 +173,11 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
 
-  void GetExtentInfo(const Extent &i_ext) __TA_EXCLUDES(extent_cache_mutex_);
-  void SetRawExtent(Extent &i_ext) __TA_EXCLUDES(extent_cache_mutex_);
+  ExtentTree &GetExtentTree() { return *extent_tree_; }
+  bool ExtentCacheAvailable();
+  void InitExtentTree();
+  void UpdateExtentCache(pgoff_t file_offset, block_t blk_addr, uint32_t len = 1);
+  zx::result<block_t> LookupExtentCacheBlock(pgoff_t file_offset);
 
   void InitNlink() { nlink_.store(1, std::memory_order_release); }
   void IncNlink() { nlink_.fetch_add(1); }
@@ -511,8 +507,7 @@ class VnodeF2fs : public fs::PagedVnode,
   timespec mtime_ __TA_GUARDED(info_mutex_) = {0, 0};
   timespec ctime_ __TA_GUARDED(info_mutex_) = {0, 0};
 
-  fs::SharedMutex extent_cache_mutex_;                         // rwlock for consistency
-  ExtentInfo extent_cache_ __TA_GUARDED(extent_cache_mutex_);  // in-memory extent cache entry
+  std::unique_ptr<ExtentTree> extent_tree_ = nullptr;
 
   const ino_t ino_ = 0;
   F2fs *const fs_ = nullptr;

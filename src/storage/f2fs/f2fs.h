@@ -64,6 +64,7 @@
 #include "src/storage/f2fs/storage_buffer.h"
 #include "src/storage/f2fs/writeback.h"
 #include "src/storage/f2fs/reader.h"
+#include "src/storage/f2fs/extent_cache.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/f2fs/vnode_cache.h"
 #include "src/storage/f2fs/dir.h"

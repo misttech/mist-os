@@ -25,109 +25,40 @@ zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, size_t ofs_in_node) 
   return ZX_OK;
 }
 
-#if 0  // porting needed
-// int VnodeF2fs::CheckExtentCache(inode *inode, pgoff_t pgofs,
-//           buffer_head *bh_result)
-// {
-//   Inode_info *fi = F2FS_I(inode);
-//   SuperblockInfo *superblock_info = F2FS_SB(inode->i_sb);
-//   pgoff_t start_fofs, end_fofs;
-//   block_t start_blkaddr;
-
-//   ReadLock(&fi->ext.ext_lock);
-//   if (fi->ext.len == 0) {
-//     ReadUnlock(&fi->ext.ext_lock);
-//     return 0;
-//   }
-
-//   ++superblock_info->total_hit_ext;
-//   start_fofs = fi->ext.fofs;
-//   end_fofs = fi->ext.fofs + fi->ext.len - 1;
-//   start_blkaddr = fi->ext.blk_addr;
-
-//   if (pgofs >= start_fofs && pgofs <= end_fofs) {
-//     uint32_t blkbits = inode->i_sb->s_blocksize_bits;
-//     size_t count;
-
-//     clear_buffer_new(bh_result);
-//     map_bh(bh_result, inode->i_sb,
-//        start_blkaddr + pgofs - start_fofs);
-//     count = end_fofs - pgofs + 1;
-//     if (count < (UINT_MAX >> blkbits))
-//       bh_result->b_size = (count << blkbits);
-//     else
-//       bh_result->b_size = UINT_MAX;
-
-//     ++superblock_info->read_hit_ext;
-//     ReadUnlock(&fi->ext.ext_lock);
-//     return 1;
-//   }
-//   ReadUnlock(&fi->ext.ext_lock);
-//   return 0;
-// }
-#endif
-
-void VnodeF2fs::UpdateExtentCache(block_t blk_addr, pgoff_t file_offset) {
-#if 0  // TODO(fxbug.dev/118687): the extent cache has not been ported yet.
-  pgoff_t start_fofs, end_fofs;
-  block_t start_blkaddr, end_blkaddr;
-
-  ZX_DEBUG_ASSERT(blk_addr != kNewAddr);
-  do {
-    std::lock_guard ext_lock(extent_cache_lock);
-
-    start_fofs = extent_cache_.fofs;
-    end_fofs = extent_cache_.fofs + extent_cache_.->ext.len - 1;
-    start_blkaddr = extent_cache_blk_addr;
-    end_blkaddr = extent_cache_.blk_addr + extent_cache_.len - 1;
-
-    // Drop and initialize the matched extent
-    if (extent_cache_.len == 1 && file_offset == start_fofs) {
-      extent_cache_.len = 0;
-		}
-
-    // Initial extent
-    if (extent_cache_.len == 0) {
-      if (blk_addr != kNullAddr) {
-        extent_cache_.fofs = file_offset;
-        extent_cache_.blk_addr = blk_addr;
-        extent_cache_.len = 1;
-      }
-      break;
-    }
-
-    // Frone merge
-    if (file_offset == start_fofs - 1 && blk_addr == start_blkaddr - 1) {
-      --extent_cache_.fofs;
-      --extent_cache_.blk_addr;
-      ++extent_cache_.len;
-      break;
-    }
-
-    // Back merge
-    if (file_offset == end_fofs + 1 && blk_addr == end_blkaddr + 1) {
-      ++extent_cache_.len;
-      break;
-    }
-
-    /* Split the existing extent */
-    if (extent_cache_.len > 1 && file_offset >= start_fofs && file_offset <= end_fofs) {
-      if ((end_fofs - file_offset) < (fi->ext.len >> 1)) {
-        extent_cache_.len = static_cast<uint32_t>(file_offset - start_fofs);
-      } else {
-        extent_cache_.fofs = file_offset + 1;
-        extent_cache_.blk_addr = static_cast<uint32_t>(start_blkaddr + file_offset - start_fofs + 1);
-        extent_cache_.len -= file_offset - start_fofs + 1;
-      }
-      break;
-    }
+void VnodeF2fs::UpdateExtentCache(pgoff_t file_offset, block_t blk_addr, uint32_t len) {
+  if (!ExtentCacheAvailable()) {
     return;
-  } while (false);
-#endif
+  }
+
+  if (auto result = GetExtentTree().InsertExtent(ExtentInfo{file_offset, blk_addr, len});
+      result.is_error()) {
+    SetFlag(InodeInfoFlag::kNoExtent);
+    return;
+  }
+
   SetDirty();
 }
 
+zx::result<block_t> VnodeF2fs::LookupExtentCacheBlock(pgoff_t file_offset) {
+  if (!ExtentCacheAvailable()) {
+    return zx::error(ZX_ERR_UNAVAILABLE);
+  }
+
+  auto extent_info = GetExtentTree().LookupExtent(file_offset);
+  if (extent_info.is_error()) {
+    return extent_info.take_error();
+  }
+
+  return zx::ok(extent_info->blk_addr +
+                safemath::checked_cast<uint32_t>(file_offset - extent_info->fofs));
+}
+
 zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
+  if (auto data_blkaddr_or = LookupExtentCacheBlock(index); data_blkaddr_or.is_ok()) {
+    ZX_DEBUG_ASSERT(data_blkaddr_or.value() != kNullAddr || data_blkaddr_or.value() != kNewAddr);
+    return zx::ok(data_blkaddr_or.value());
+  }
+
   auto path_or = GetNodePath(*this, index);
   if (path_or.is_error()) {
     return path_or.take_error();
@@ -479,7 +410,7 @@ block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
   ZX_DEBUG_ASSERT(new_addr != kNullAddr && new_addr != kNewAddr && new_addr != old_addr);
 
   (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_addr);
-  UpdateExtentCache(new_addr, page->GetIndex());
+  UpdateExtentCache(page->GetIndex(), new_addr);
   UpdateVersion(superblock_info_.GetCheckpointVer());
   ZX_ASSERT(page->SetBlockAddr(new_addr).is_ok());
   return new_addr;
@@ -521,6 +452,12 @@ zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(
   LockedPage dnode_page;
 
   for (uint32_t iter = 0; iter < indices.size(); ++iter) {
+    if (auto data_blkaddr_or = LookupExtentCacheBlock(indices[iter]); data_blkaddr_or.is_ok()) {
+      ZX_DEBUG_ASSERT(data_blkaddr_or.value() != kNullAddr || data_blkaddr_or.value() != kNewAddr);
+      data_block_addresses[iter] = data_blkaddr_or.value();
+      continue;
+    }
+
     auto path_or = GetNodePath(*this, indices[iter]);
     if (path_or.is_error()) {
       return path_or.take_error();
