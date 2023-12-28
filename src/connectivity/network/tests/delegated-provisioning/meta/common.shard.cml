@@ -27,10 +27,9 @@
             {
                 name: "net",
                 endpoints: [
-                    // TODO(https://issues.fuchsia.dev/287297922): This is a
-                    // special name that allows delegated provisioning in
-                    // certain contexts. Rename it to something less obtuse.
-                    { name: "nothing" },
+                    // Note: This is a special name that allows delegated
+                    // provisioning in certain contexts.
+                    { name: "starnixethx1" },
                     { name: "server-ep" },
                 ],
             },
@@ -49,7 +48,7 @@
                 name: "client",
                 interfaces: [
                     {
-                        name: "nothing",
+                        name: "starnixethx1",
                         static_ips: [],
                     },
                 ],
