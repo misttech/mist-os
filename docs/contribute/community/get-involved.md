@@ -57,18 +57,18 @@ anyone who wants to contribute to Fuchsia, not just from Googlers.
 To learn more about how to contribute a code change to Fuchsia,
 see [Contribute changes](/docs/development/source_code/contribute_changes.md).
 
-In Monorail, the `GoodFirstBug` label exists. This label signals to potential
+In Issue Tracker, the `GoodFirstBug` hotlist exists. This hotlist signals to potential
 contributors that a particular bug could be a great entry point in terms of
 contributions, since that particular bug does not require extensive
 experience/knowledge with the Fuchsia project.
 
-To view the current list of bugs with the `GoodFirstBug` label, go to the
-[Good First Bug List](https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3AGoodFirstBug).
+To view the current list of bugs with the `GoodFirstBug` hotlist, go to the
+[Good First Bug List](https://issues.fuchsia.dev/issues?q=hotlistid:5515392%20status:open).
 
 ## Report an issue
 
 Did you see a line of documentation or code that you think needs to be improved?
-You can help get these kinds of concerns resolved by filing an issue in Monorail.
+You can help get these kinds of concerns resolved by filing an issue in Issue Tracker.
 For more information, see [Report an Issue](/docs/contribute/report-issue.md).
 
 All participation in groups, bugs, and forums must adhere to the
@@ -78,5 +78,5 @@ Report Code of Conduct issues directly to the Community Management team via:
  * [Email](mailto:community-managers@fuchsia.dev)
  * Discord, via the `@Community Managers` role,
    or to any individual Community Manager (identified by that role) via direct message.
- * [A Monorail ticket](https://bugs.fuchsia.dev/p/fuchsia/templates/detail?saved=1&template=Report%20Community%20Abuse&ts=1605208884).
+ * [An Issue Tracker ticket](https://issues.fuchsia.dev/issues/new?component=1477828&template=1911473).
    Note that such tickets are only visible to Community Managers.

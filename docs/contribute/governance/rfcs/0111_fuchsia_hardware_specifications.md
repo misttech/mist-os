@@ -671,7 +671,7 @@ Supported hardware has the following benefits:
 
 *   Supported hardware is tested by the Fuchsia project.
 *   No Experimental hardware contributions can break Supported hardware.
-*   The Fuchsia project is committed to responding to Monorail issues filed
+*   The Fuchsia project is committed to responding to Issue Tracker issues filed
 against Supported hardware. [Members](/docs/contribute/community/contributor-roles.md#member), as
 defined in Fuchsia contributor roles, can propose patches to add new Supported hardware platforms
 or fix existing Supported hardware platforms.
@@ -742,7 +742,7 @@ hardware and Experimental hardware platforms.
 <li>The Fuchsia project tests against Supported hardware and blocks
 contributions that might cause Supported hardware to break.
 
-<li>Monorail Issues filed against hardware in the Supported hardware tier are
+<li>Issue Tracker issues filed against hardware in the Supported hardware tier are
 responded to but there is no service level objective (SLO).</li>
 </li></ul>
 
@@ -929,7 +929,7 @@ For drivers removed based on this policy, a `/docs/reference/hardware/_driver_ep
 will list all deleted drivers and include the following information:
 
 *   `Short_description: `Provides a description of the deleted driver.
-*   `Tracking_bug`: A Monorail issue that describes the reason for the
+*   `Tracking_bug`: An Issue Tracker issue that describes the reason for the
     driver's deletion.
 *   `Gerrit_change_id: `The ID of the Gerrit change used to delete the driver.
 *   `Available_in_git: `The last known git SHA that still includes the driver.
