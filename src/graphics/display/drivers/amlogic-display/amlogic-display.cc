@@ -42,6 +42,7 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
+#include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -210,9 +211,16 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   // The "osd" node must be created because these metric paths are load-bearing
   // for some triage workflows.
   osd_node_ = root_node_.CreateChild("osd");
+
+  // TODO(fxbug.dev/317922128): Use the unscaled layer source frame size
+  // instead.
+  PixelGridSize2D layer_image_size = {.width = static_cast<int>(vout_->fb_width()),
+                                      .height = static_cast<int>(vout_->fb_height())};
+  PixelGridSize2D display_contents_size = {.width = static_cast<int>(vout_->display_width()),
+                                           .height = static_cast<int>(vout_->display_height())};
+
   zx::result<std::unique_ptr<Osd>> osd_create_result =
-      Osd::Create(&pdev_, vout_->fb_width(), vout_->fb_height(), vout_->display_width(),
-                  vout_->display_height(), &osd_node_);
+      Osd::Create(&pdev_, layer_image_size, display_contents_size, &osd_node_);
   if (osd_create_result.is_error()) {
     zxlogf(ERROR, "Failed to create OSD instance: %s", osd_create_result.status_string());
     return osd_create_result.status_value();

@@ -26,6 +26,7 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
@@ -33,9 +34,9 @@ namespace amlogic_display {
 
 class Osd {
  public:
-  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev, uint32_t fb_width,
-                                                 uint32_t fb_height, uint32_t display_width,
-                                                 uint32_t display_height,
+  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev,
+                                                 PixelGridSize2D layer_image_size,
+                                                 PixelGridSize2D display_contents_size,
                                                  inspect::Node* parent_node);
 
   Osd(Osd& other) = delete;
@@ -75,7 +76,7 @@ class Osd {
   void SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  Osd(int32_t fb_width, int32_t fb_height, int32_t display_width, int32_t display_height,
+  Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
       inspect::Node* inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
       std::unique_ptr<RdmaEngine> rdma);
   void DefaultSetup();
@@ -90,12 +91,8 @@ class Osd {
 
   std::optional<fdf::MmioBuffer> vpu_mmio_;
 
-  // Framebuffer dimension
-  int32_t fb_width_;
-  int32_t fb_height_;
-  // Actual display dimension
-  int32_t display_width_;
-  int32_t display_height_;
+  PixelGridSize2D layer_image_size_ = kInvalidPixelGridSize2D;
+  PixelGridSize2D display_contents_size_ = kInvalidPixelGridSize2D;
 
   // All current metrics have been moved to RdmaEngine.
   // inspect::Node* inspect_node_;

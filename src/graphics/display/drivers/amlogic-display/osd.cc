@@ -33,11 +33,13 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/frame.h"
 
 namespace amlogic_display {
 
@@ -187,14 +189,12 @@ OsdRegisters osd1_registers = {
 
 display::ConfigStamp Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
 
-Osd::Osd(int32_t fb_width, int32_t fb_height, int32_t display_width, int32_t display_height,
+Osd::Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
          inspect::Node* unused_osd_inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
          std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)),
-      fb_width_(fb_width),
-      fb_height_(fb_height),
-      display_width_(display_width),
-      display_height_(display_height),
+      layer_image_size_(layer_image_size),
+      display_contents_size_(display_contents_size),
       rdma_(std::move(rdma)) {}
 
 void Osd::Disable(display::ConfigStamp config_stamp) {
@@ -302,16 +302,21 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   zxlogf(TRACE, "Table index %d used", next_table_idx);
   zxlogf(TRACE, "AFBC %s", info->is_afbc ? "enabled" : "disabled");
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(config[0].mode);
+  const display::DisplayTiming display_timing = display::ToDisplayTiming(config[0].mode);
 
-  if ((display_timing.horizontal_active_px != display_width_) ||
-      (display_timing.vertical_active_lines != display_height_)) {
-    zxlogf(INFO, "Mode change (%d x %d) to (%d x %d)", display_width_, display_height_,
-           display_timing.horizontal_active_px, display_timing.vertical_active_lines);
-    display_width_ = display_timing.horizontal_active_px;
-    display_height_ = display_timing.vertical_active_lines;
-    fb_width_ = display_timing.horizontal_active_px;
-    fb_height_ = display_timing.vertical_active_lines;
+  PixelGridSize2D display_contents_size = {.width = display_timing.horizontal_active_px,
+                                           .height = display_timing.vertical_active_lines};
+
+  // TODO(fxbug.dev/317922128): Use the (unscaled) layer source frame size.
+  PixelGridSize2D layer_image_size = {.width = display_timing.horizontal_active_px,
+                                      .height = display_timing.vertical_active_lines};
+
+  if (display_contents_size_ != display_contents_size || layer_image_size_ != layer_image_size) {
+    zxlogf(INFO, "Mode change (%d x %d) to (%d x %d)", display_contents_size_.width,
+           display_contents_size_.height, display_contents_size.width,
+           display_contents_size.height);
+    display_contents_size_ = display_contents_size;
+    layer_image_size_ = layer_image_size;
     HwInit();
   }
 
@@ -488,30 +493,32 @@ void Osd::DefaultSetup() {
   vpu_mmio_->Write32(0x0 << 20 | 0x0 << 11 | 0x0, VIU_OSD_BLEND_DUMMY_ALPHA);
 
   // osdx setting
-  vpu_mmio_->Write32((fb_width_ - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
+  vpu_mmio_->Write32((layer_image_size_.width - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
 
-  vpu_mmio_->Write32((fb_height_ - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
+  vpu_mmio_->Write32((layer_image_size_.height - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
 
-  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND0_SIZE);
-  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND1_SIZE);
+  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+                     VIU_OSD_BLEND_BLEND0_SIZE);
+  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+                     VIU_OSD_BLEND_BLEND1_SIZE);
   vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(DOLBY_PATH_CTRL), /*field_begin_bit=*/2,
                                      /*field_size_bits=*/2, /*field_value=*/0x3),
                      DOLBY_PATH_CTRL);
 
-  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VPP_OSD1_IN_SIZE);
+  vpu_mmio_->Write32(layer_image_size_.height << 16 | layer_image_size_.width, VPP_OSD1_IN_SIZE);
 
   // setting blend scope
-  vpu_mmio_->Write32(0 << 16 | (fb_width_ - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_->Write32(0 << 16 | (fb_height_ - 1), VPP_OSD1_BLD_V_SCOPE);
+  vpu_mmio_->Write32(0 << 16 | (layer_image_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_->Write32(0 << 16 | (layer_image_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
 
   // Set geometry to normal mode
-  uint32_t data32 = ((fb_width_ - 1) & 0xfff) << 16;
+  uint32_t data32 = ((layer_image_size_.width - 1) & 0xfff) << 16;
   vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
-  data32 = ((fb_height_ - 1) & 0xfff) << 16;
+  data32 = ((layer_image_size_.height - 1) & 0xfff) << 16;
   vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 
-  vpu_mmio_->Write32(((fb_width_ - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
-  vpu_mmio_->Write32(((fb_height_ - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
+  vpu_mmio_->Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
+  vpu_mmio_->Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
 
   // enable osd blk0
   osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_))
@@ -537,10 +544,10 @@ void Osd::EnableScaling(bool enable) {
   vsc_ini_rcv_num = vf_bank_len;
   hsc_ini_rpt_p0_num = (hf_bank_len / 2 - 1) > 0 ? (hf_bank_len / 2 - 1) : 0;
   vsc_ini_rpt_p0_num = (vf_bank_len / 2 - 1) > 0 ? (vf_bank_len / 2 - 1) : 0;
-  src_w = fb_width_;
-  src_h = fb_height_;
-  dst_w = display_width_;
-  dst_h = display_height_;
+  src_w = layer_image_size_.width;
+  src_h = layer_image_size_.height;
+  dst_w = display_contents_size_.width;
+  dst_h = display_contents_size_.height;
 
   data32 = 0x0;
   if (enable) {
@@ -563,9 +570,9 @@ void Osd::EnableScaling(bool enable) {
   if (enable) {
     data32 = (((src_h - 1) & 0x1fff) | ((src_w - 1) & 0x1fff) << 16);
     vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCI_WH_M1);
-    data32 = (((display_width_ - 1) & 0xfff));
+    data32 = (((display_contents_size_.width - 1) & 0xfff));
     vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_H_START_END);
-    data32 = (((display_height_ - 1) & 0xfff));
+    data32 = (((display_contents_size_.height - 1) & 0xfff));
     vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_V_START_END);
   }
   data32 = 0x0;
@@ -637,29 +644,31 @@ zx_status_t Osd::ConfigAfbc() {
       .WriteTo(&(*vpu_mmio_));
 
   // Set afbc input buffer width/height in pixel
-  osd1_registers.afbc_buffer_width_s.FromValue(0).set_buffer_width(fb_width_).WriteTo(
-      &(*vpu_mmio_));
+  osd1_registers.afbc_buffer_width_s.FromValue(0)
+      .set_buffer_width(layer_image_size_.width)
+      .WriteTo(&(*vpu_mmio_));
   osd1_registers.afbc_buffer_height_s.FromValue(0)
-      .set_buffer_height(fb_height_)
+      .set_buffer_height(layer_image_size_.height)
       .WriteTo(&(*vpu_mmio_));
 
   // Set afbc input buffer
   osd1_registers.afbc_bounding_box_x_start_s.FromValue(0).set_buffer_x_start(0).WriteTo(
       &(*vpu_mmio_));
   osd1_registers.afbc_bounding_box_x_end_s.FromValue(0)
-      .set_buffer_x_end(fb_width_ - 1)  // vendor code has width - 1 - 1, which is technically
-                                        // incorrect and gives the same result as this.
+      .set_buffer_x_end(layer_image_size_.width -
+                        1)  // vendor code has width - 1 - 1, which is technically
+                            // incorrect and gives the same result as this.
       .WriteTo(&(*vpu_mmio_));
   osd1_registers.afbc_bounding_box_y_start_s.FromValue(0).set_buffer_y_start(0).WriteTo(
       &(*vpu_mmio_));
   osd1_registers.afbc_bounding_box_y_end_s.FromValue(0)
-      .set_buffer_y_end(fb_height_ -
+      .set_buffer_y_end(layer_image_size_.height -
                         1)  // vendor code has height -1 -1, but that cuts off the bottom row.
       .WriteTo(&(*vpu_mmio_));
 
   // Set output buffer stride
   osd1_registers.afbc_output_buf_stride_s.FromValue(0)
-      .set_output_buffer_stride(fb_width_ * 4)
+      .set_output_buffer_stride(layer_image_size_.width * 4)
       .WriteTo(&(*vpu_mmio_));
 
   // Set afbc output buffer index
@@ -678,8 +687,13 @@ zx_status_t Osd::ConfigAfbc() {
 }
 
 void Osd::HwInit() {
+  ZX_DEBUG_ASSERT_MSG(display_contents_size_.IsValid(), "Invalid display size (%d x %d)",
+                      display_contents_size_.width, display_contents_size_.height);
+  ZX_DEBUG_ASSERT_MSG(layer_image_size_.IsValid(), "Invalid framebuffer size (%d x %d)",
+                      layer_image_size_.width, layer_image_size_.height);
+
   // Setup VPP horizontal width
-  vpu_mmio_->Write32(display_width_, VPP_POSTBLEND_H_SIZE);
+  vpu_mmio_->Write32(display_contents_size_.width, VPP_POSTBLEND_H_SIZE);
 
   // init vpu fifo control register
   uint32_t regVal = vpu_mmio_->Read32(VPP_OFIFO_SIZE);
@@ -739,9 +753,10 @@ void Osd::HwInit() {
   }
 
   // update blending
-  vpu_mmio_->Write32(0 << 16 | (display_width_ - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_->Write32(0 << 16 | (display_height_ - 1), VPP_OSD1_BLD_V_SCOPE);
-  vpu_mmio_->Write32(display_width_ << 16 | display_height_, VPU_VPP_OUT_H_V_SIZE);
+  vpu_mmio_->Write32(0 << 16 | (display_contents_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_->Write32(0 << 16 | (display_contents_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
+  vpu_mmio_->Write32((display_contents_size_.width << 16) | display_contents_size_.height,
+                     VPU_VPP_OUT_H_V_SIZE);
 
   // Configure AFBC Engine's one-time programmable fields, so it's ready
   ConfigAfbc();
@@ -843,9 +858,9 @@ void Osd::Release() {
 }
 
 // static
-zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_width,
-                                             uint32_t fb_height, uint32_t display_width,
-                                             uint32_t display_height, inspect::Node* osd_node) {
+zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, PixelGridSize2D layer_image_size,
+                                             PixelGridSize2D display_contents_size,
+                                             inspect::Node* osd_node) {
   zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
@@ -857,8 +872,8 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_wi
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Osd> self(new (&ac) Osd(fb_width, fb_height, display_width, display_height,
-                                          osd_node, std::move(vpu_mmio_result).value(),
+  std::unique_ptr<Osd> self(new (&ac) Osd(layer_image_size, display_contents_size, osd_node,
+                                          std::move(vpu_mmio_result).value(),
                                           std::move(rdma_result).value()));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);

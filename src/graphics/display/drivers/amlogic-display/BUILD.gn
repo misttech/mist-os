@@ -64,6 +64,7 @@ source_set("common_srcs") {
     "osd.cc",
     "osd.h",
     "panel-config.h",
+    "pixel-grid-size2d.h",
     "power-regs.h",
     "rdma-regs.h",
     "rdma.cc",
@@ -146,6 +147,7 @@ test("amlogic-display-test") {
     "fixed-point-util-test.cc",
     "hdmi-transmitter-test.cc",
     "hot-plug-detection-test.cc",
+    "pixel-grid-size2d-test.cc",
     "power-regs-test.cc",
     "video-input-regs-test.cc",
   ]
