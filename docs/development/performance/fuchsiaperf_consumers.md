@@ -12,7 +12,7 @@ performance tests.
 
     *   **Post-commit regression alerting**: Chromeperf can detect
         performance regressions and report them by filing bugs in
-        Fuchsia's Monorail issue tracker. Chromeperf is only able to
+        Fuchsia's Issue Tracker. Chromeperf is only able to
         detect regressions post-commit, i.e. after the CL that causes
         a regression has landed. Chromeperf only uses performance
         results data from CI builds and not from CQ builds.
