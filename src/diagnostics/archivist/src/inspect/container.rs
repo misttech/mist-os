@@ -187,17 +187,6 @@ impl InspectArtifactsContainer {
     }
 }
 
-#[cfg(test)]
-impl InspectArtifactsContainer {
-    pub fn get_handle_by_koid(&self, koid: &zx::Koid) -> Option<Arc<InspectHandle>> {
-        self.inspect_handles.get(koid).cloned()
-    }
-
-    pub fn len(&self) -> usize {
-        self.inspect_handles.len()
-    }
-}
-
 lazy_static! {
     static ref TIMEOUT_MESSAGE: &'static str =
         "Exceeded per-component time limit for fetching diagnostics data";

@@ -1069,7 +1069,7 @@ mod tests {
 
         let test_batch_iterator_stats2 = Arc::new(test_accessor_stats.new_inspect_batch_iterator());
 
-        inspect_repo.terminate_inspect(identity).await;
+        inspect_repo.terminate_inspect(identity);
         {
             let result_json = read_snapshot(
                 Arc::clone(&inspect_repo),
@@ -1139,7 +1139,7 @@ mod tests {
         }
     }
 
-    async fn start_snapshot(
+    fn start_snapshot(
         inspect_repo: Arc<InspectRepository>,
         pipeline: Arc<Pipeline>,
         stats: Arc<BatchIteratorConnectionStats>,
@@ -1151,9 +1151,9 @@ mod tests {
         };
 
         let trace_id = ftrace::Id::random();
-        let static_selectors_matchers = pipeline.read().await.static_selectors_matchers();
+        let static_selectors_matchers = pipeline.read().static_selectors_matchers();
         let reader_server = Box::pin(ReaderServer::stream(
-            inspect_repo.fetch_inspect_data(&None, static_selectors_matchers).await,
+            inspect_repo.fetch_inspect_data(&None, static_selectors_matchers),
             test_performance_config,
             // No selectors
             None,
@@ -1188,7 +1188,7 @@ mod tests {
         _test_inspector: Arc<Inspector>,
         stats: Arc<BatchIteratorConnectionStats>,
     ) -> serde_json::Value {
-        let (consumer, server) = start_snapshot(inspect_repo, pipeline, stats).await;
+        let (consumer, server) = start_snapshot(inspect_repo, pipeline, stats);
 
         let mut result_vec: Vec<String> = Vec::new();
         loop {
@@ -1227,7 +1227,7 @@ mod tests {
         expected_batch_sizes: Vec<usize>,
         stats: Arc<BatchIteratorConnectionStats>,
     ) -> serde_json::Value {
-        let (consumer, server) = start_snapshot(inspect_repo, pipeline, stats).await;
+        let (consumer, server) = start_snapshot(inspect_repo, pipeline, stats);
 
         let mut result_vec: Vec<String> = Vec::new();
         let mut batch_counts = Vec::new();

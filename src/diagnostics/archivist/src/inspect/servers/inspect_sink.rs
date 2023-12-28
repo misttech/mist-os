@@ -70,13 +70,10 @@ impl InspectSinkServer {
                 finspect::InspectSinkRequest::Publish {
                     payload: finspect::InspectSinkPublishRequest { tree: Some(tree), name, .. },
                     ..
-                } => {
-                    repo.add_inspect_handle(
-                        Arc::clone(&component),
-                        InspectHandle::from_named_tree_proxy(tree.into_proxy()?, name),
-                    )
-                    .await;
-                }
+                } => repo.add_inspect_handle(
+                    Arc::clone(&component),
+                    InspectHandle::from_named_tree_proxy(tree.into_proxy()?, name),
+                ),
                 _ => continue,
             }
         }
@@ -117,16 +114,15 @@ impl EventConsumer for InspectSinkServer {
 
 #[cfg(test)]
 mod tests {
-    use crate::identity::ComponentIdentity;
-    use crate::inspect::container::InspectHandle;
-    use crate::inspect::repository::InspectRepository;
-    use crate::inspect::servers::InspectSinkServer;
     use crate::{
         events::{
             router::EventConsumer,
             types::{Event, EventPayload, InspectSinkRequestedPayload},
         },
-        inspect::container::InspectArtifactsContainer,
+        identity::ComponentIdentity,
+        inspect::{
+            container::InspectHandle, repository::InspectRepository, servers::InspectSinkServer,
+        },
     };
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_json_diff;
@@ -138,6 +134,7 @@ mod tests {
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::Future;
     use inspect_runtime::{service::spawn_tree_server_with_stream, TreeServerSendPreference};
+    use selectors::VerboseError;
     use std::sync::Arc;
 
     struct TestHarness {
@@ -245,14 +242,38 @@ mod tests {
         /// This function will wait for data to be available in `self.repo`, and therefore
         /// might hang indefinitely if the data never appears. This is not a problem since
         /// it is a unit test and `fx test` has timeouts available.
-        async fn assert<F, Fut>(&self, identity: &Arc<ComponentIdentity>, assertions: F)
-        where
-            F: FnOnce(&InspectArtifactsContainer) -> Fut,
+        async fn assert<const N: usize, F, Fut>(
+            &self,
+            identity: &Arc<ComponentIdentity>,
+            koids: [zx::Koid; N],
+            assertions: F,
+        ) where
+            F: FnOnce([InspectHandle; N]) -> Fut,
             Fut: Future<Output = ()>,
         {
-            if !self.repo.execute_on_identity(identity, assertions).await {
-                panic!("could not find identity");
-            }
+            self.repo.wait_for_artifact(identity).await;
+            let containers = self.repo.fetch_inspect_data(
+                &Some(vec![selectors::parse_selector::<VerboseError>(&format!("{identity}:root"))
+                    .expect("parse selector")]),
+                None,
+            );
+            assert_eq!(containers.len(), 1);
+            assertions(
+                koids
+                    .iter()
+                    .map(|koid| {
+                        containers[0]
+                            .inspect_handles
+                            .iter()
+                            .find(|handle| handle.koid() == *koid)
+                            .unwrap()
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap(),
+            )
+            .await;
         }
 
         /// Drops all published proxies, stops the server, and waits for it to complete.
@@ -283,19 +304,15 @@ mod tests {
 
         let koid = test.published_koids()[0];
 
-        test.assert(&identity, |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
-            let handle = inspect_artifacts.get_handle_by_koid(&koid).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           int: 0i64,
-                       });
-                });
-            }
+        test.assert(&identity, [koid], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       int: 0i64,
+                   });
+            });
         })
         .await;
     }
@@ -321,29 +338,24 @@ mod tests {
         let koid0 = test.published_koids()[0];
         let koid1 = test.published_koids()[1];
 
-        test.assert(&identity, |inspect_artifacts| {
-            assert_eq!(2, inspect_artifacts.len());
-            let handle1 = inspect_artifacts.get_handle_by_koid(&koid0).unwrap();
-            let handle2 = inspect_artifacts.get_handle_by_koid(&koid1).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle1,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           int: 0i64,
-                       });
-                });
+        test.assert(&identity, [koid0, koid1], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       int: 0i64,
+                   });
+            });
 
-                assert_matches!(
-                    &*handle2,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           double: 1.24,
-                       });
-                });
-            }
+            assert_matches!(
+                &handles[1],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       double: 1.24,
+                   });
+            });
         })
         .await;
     }
@@ -361,38 +373,30 @@ mod tests {
 
         let koid = test.published_koids()[0];
 
-        test.assert(&identity, |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
-            let handle = inspect_artifacts.get_handle_by_koid(&koid).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           int: 0i64,
-                       });
-                });
-            }
+        test.assert(&identity, [koid], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       int: 0i64,
+                   });
+            });
         })
         .await;
 
         test.stop_all().await;
 
         // the data must remain present as long as the tree server started above is alive
-        test.assert(&identity, |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
-            let handle = inspect_artifacts.get_handle_by_koid(&koid).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           int: 0i64,
-                       });
-                });
-            }
+        test.assert(&identity, [koid], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       int: 0i64,
+                   });
+            });
         })
         .await;
     }
@@ -422,35 +426,27 @@ mod tests {
         let koid_component_0 = test.published_koids()[0];
         let koid_component_1 = test.published_koids()[1];
 
-        test.assert(&identities[0], |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
-            let handle = inspect_artifacts.get_handle_by_koid(&koid_component_0).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           int: 0i64,
-                       });
-                });
-            }
+        test.assert(&identities[0], [koid_component_0], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       int: 0i64,
+                   });
+            });
         })
         .await;
 
-        test.assert(&identities[1], |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
-            let handle = inspect_artifacts.get_handle_by_koid(&koid_component_1).unwrap();
-            async move {
-                assert_matches!(
-                    &*handle,
-                    InspectHandle::Tree(tree, _) => {
-                       let hierarchy = read(tree).await.unwrap();
-                       assert_json_diff!(hierarchy, root: {
-                           is_insp2: true,
-                       });
-                });
-            }
+        test.assert(&identities[1], [koid_component_1], |handles| async move {
+            assert_matches!(
+                &handles[0],
+                InspectHandle::Tree(tree, _) => {
+                   let hierarchy = read(tree).await.unwrap();
+                   assert_json_diff!(hierarchy, root: {
+                       is_insp2: true,
+                   });
+            });
         })
         .await;
     }
@@ -471,8 +467,8 @@ mod tests {
         test.stop_all().await;
 
         // this executing to completion means the identity was present
-        test.assert(&identity, |inspect_artifacts| {
-            assert_eq!(1, inspect_artifacts.len());
+        test.assert(&identity, [test.published_koids()[0]], |handles: [_; 1]| {
+            assert_eq!(handles.len(), 1);
             async {}
         })
         .await;

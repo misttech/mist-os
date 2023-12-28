@@ -13,11 +13,11 @@ use crate::{
     },
     pipeline::Pipeline,
 };
-use async_lock::RwLock;
 use async_trait::async_trait;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
 use fuchsia_async as fasync;
+use fuchsia_sync::RwLock;
 use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
@@ -56,24 +56,21 @@ impl InspectRepository {
     }
     /// Return all of the DirectoryProxies that contain Inspect hierarchies
     /// which contain data that should be selected from.
-    pub async fn fetch_inspect_data(
+    pub fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
         moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
-        self.inner
-            .read()
-            .await
-            .fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
+        self.inner.read().fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
     }
 
-    async fn add_inspect_artifacts(
+    fn add_inspect_artifacts(
         self: &Arc<Self>,
         identity: Arc<ComponentIdentity>,
         proxy_handle: impl Into<InspectHandle>,
     ) {
         // Hold the lock while we insert and update pipelines.
-        let mut guard = self.inner.write().await;
+        let mut guard = self.inner.write();
         // insert_inspect_artifact_container returns None when we were already tracking the
         // directory for this component. If that's the case we can return early.
         let Some(on_closed_fut) =
@@ -84,75 +81,67 @@ impl InspectRepository {
 
         let identity_clone = Arc::clone(&identity);
         let this_weak = Arc::downgrade(self);
-        guard
-            .diagnostics_dir_closed_snd
-            .send(fasync::Task::spawn(async move {
-                if let Ok(koid_to_remove) = on_closed_fut.await {
-                    if let Some(this) = this_weak.upgrade() {
-                        // Hold the lock while we remove and update pipelines.
-                        let mut guard = this.inner.write().await;
+        let _ = guard.diagnostics_dir_closed_snd.unbounded_send(fasync::Task::spawn(async move {
+            if let Ok(koid_to_remove) = on_closed_fut.await {
+                if let Some(this) = this_weak.upgrade() {
+                    // Hold the lock while we remove and update pipelines.
+                    let mut guard = this.inner.write();
 
-                        if let Some(container) =
-                            guard.diagnostics_containers.get_mut(&identity_clone)
-                        {
-                            if container.remove_handle(koid_to_remove) != 0 {
-                                return;
-                            }
+                    if let Some(container) = guard.diagnostics_containers.get_mut(&identity_clone) {
+                        if container.remove_handle(koid_to_remove) != 0 {
+                            return;
                         }
+                    }
 
-                        guard.diagnostics_containers.remove(&identity_clone);
+                    guard.diagnostics_containers.remove(&identity_clone);
 
-                        for pipeline_weak in &this.pipelines {
-                            if let Some(pipeline) = pipeline_weak.upgrade() {
-                                pipeline.write().await.remove(&identity_clone.moniker);
-                            }
+                    for pipeline_weak in &this.pipelines {
+                        if let Some(pipeline) = pipeline_weak.upgrade() {
+                            pipeline.write().remove(&identity_clone.moniker);
                         }
                     }
                 }
-            }))
-            .await
-            .unwrap(); // this can't fail unless `self` has been destroyed.
+            }
+        }));
 
         // Let each pipeline know that a new component arrived, and allow the pipeline
         // to eagerly bucket static selectors based on that component's moniker.
         for pipeline_weak in self.pipelines.iter() {
             if let Some(pipeline) = pipeline_weak.upgrade() {
-                pipeline.write().await.add_inspect_artifacts(&identity.moniker).unwrap_or_else(
-                    |e| {
-                        warn!(%identity, ?e,
+                pipeline.write().add_inspect_artifacts(&identity.moniker).unwrap_or_else(|e| {
+                    warn!(%identity, ?e,
                                 "Failed to add inspect artifacts to pipeline wrapper");
-                    },
-                );
+                });
             }
         }
     }
 
-    pub(crate) async fn add_inspect_handle(
+    pub(crate) fn add_inspect_handle(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
         handle: impl Into<InspectHandle>,
     ) {
         debug!(identity = %component, "Diagnostics directory is ready.");
         // Update the central repository to reference the new diagnostics source.
-        self.add_inspect_artifacts(Arc::clone(&component), handle).await;
+        self.add_inspect_artifacts(Arc::clone(&component), handle);
     }
 }
 
 #[cfg(test)]
 impl InspectRepository {
-    pub(crate) async fn terminate_inspect(&self, identity: Arc<ComponentIdentity>) {
-        self.inner.write().await.diagnostics_containers.remove(&identity);
+    pub(crate) fn terminate_inspect(&self, identity: Arc<ComponentIdentity>) {
+        self.inner.write().diagnostics_containers.remove(&identity);
     }
 
-    async fn has_match(&self, identity: &Arc<ComponentIdentity>) -> bool {
-        let lock = self.inner.read().await;
+    fn has_match(&self, identity: &Arc<ComponentIdentity>) -> bool {
+        let lock = self.inner.read();
         lock.get_diagnostics_containers().get(identity).is_some()
     }
 
     /// Wait for data to appear for `identity`. Will run indefinitely if no data shows up.
-    async fn wait_for_artifact(&self, identity: &Arc<ComponentIdentity>) {
+    pub(crate) async fn wait_for_artifact(&self, identity: &Arc<ComponentIdentity>) {
         loop {
-            if self.has_match(identity).await {
+            if self.has_match(identity) {
                 return;
             }
 
@@ -166,7 +155,7 @@ impl InspectRepository {
     /// Wait until nothing is present for `identity`. Will run indefinitely if data persists.
     pub(crate) async fn wait_until_gone(&self, identity: &Arc<ComponentIdentity>) {
         loop {
-            if !self.has_match(identity).await {
+            if !self.has_match(identity) {
                 return;
             }
 
@@ -176,28 +165,6 @@ impl InspectRepository {
             .await;
         }
     }
-
-    /// Execute `assertions` on the `InspectArtifactsContainer` found for `identity`, waiting
-    /// for that data to appear.
-    pub(crate) async fn execute_on_identity<F, Fut>(
-        &self,
-        identity: &Arc<ComponentIdentity>,
-        assertions: F,
-    ) -> bool
-    where
-        F: FnOnce(&InspectArtifactsContainer) -> Fut,
-        Fut: futures::Future<Output = ()>,
-    {
-        self.wait_for_artifact(identity).await;
-        if let Some(container) = self.inner.read().await.get_diagnostics_containers().get(identity)
-        {
-            assertions(container).await;
-            true
-        } else {
-            // this can only happen if somehow the data is removed after waiting for it
-            false
-        }
-    }
 }
 
 #[async_trait]
@@ -205,7 +172,7 @@ impl EventConsumer for InspectRepository {
     async fn handle(self: Arc<Self>, event: Event) {
         match event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, directory }) => {
-                self.add_inspect_handle(component, directory).await;
+                self.add_inspect_handle(component, directory);
             }
             _ => unreachable!("Inspect repository is only subscribed to diagnostics ready"),
         }
@@ -346,7 +313,7 @@ mod tests {
             })
             .await;
 
-        assert!(inspect_repo.inner.read().await.get(&identity).is_some());
+        assert!(inspect_repo.inner.read().get(&identity).is_some());
     }
 
     #[fuchsia::test]
@@ -366,10 +333,10 @@ mod tests {
                     }),
                 })
                 .await;
-            assert!(data_repo.inner.read().await.get(&identity).is_some());
+            assert!(data_repo.inner.read().get(&identity).is_some());
         }
         drop(server_end);
-        while data_repo.inner.read().await.get(&identity).is_some() {
+        while data_repo.inner.read().get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
     }
@@ -394,23 +361,17 @@ mod tests {
                     }),
                 })
                 .await;
-            assert!(data_repo.inner.read().await.get(&identity).is_some());
-            assert!(pipeline
-                .read()
-                .await
-                .static_selectors_matchers()
-                .unwrap()
-                .get(&moniker)
-                .is_some())
+            assert!(data_repo.inner.read().get(&identity).is_some());
+            assert!(pipeline.read().static_selectors_matchers().unwrap().get(&moniker).is_some())
         }
 
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
-        while data_repo.inner.read().await.get(&identity).is_some() {
+        while data_repo.inner.read().get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
-        assert!(pipeline.read().await.static_selectors_matchers().unwrap().get(&moniker).is_none())
+        assert!(pipeline.read().static_selectors_matchers().unwrap().get(&moniker).is_none())
     }
 
     #[fuchsia::test]
@@ -450,20 +411,20 @@ mod tests {
             })
             .await;
 
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).len());
+        assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&None, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/foo:root").expect("parse selector")
         ]);
-        assert_eq!(1, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(1, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/f*:root").expect("parse selector")
         ]);
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
 
         let selectors =
             Some(vec![selectors::parse_selector::<FastError>("foo:root").expect("parse selector")]);
-        assert_eq!(0, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(0, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
     }
 }

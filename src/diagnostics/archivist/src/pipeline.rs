@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 use {
     crate::{configs, constants, diagnostics::AccessorStats, error::Error},
-    async_lock::RwLock,
     diagnostics_hierarchy::HierarchyMatcher,
     fidl::prelude::*,
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
+    fuchsia_sync::RwLock,
     moniker::ExtendedMoniker,
     selectors::SelectorExt,
     std::{collections::HashMap, ops::Deref, path::Path, sync::Arc},
