@@ -57,7 +57,7 @@ class DisplayManagerMockTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
   const size_t kTotalVsync = 10;

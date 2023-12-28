@@ -11,7 +11,7 @@
 namespace scenic_impl {
 namespace display {
 
-Display2::Display2(fuchsia::hardware::display::DisplayId display_id,
+Display2::Display2(fuchsia::hardware::display::types::DisplayId display_id,
                    std::vector<fuchsia::hardware::display::Mode> display_modes,
                    std::vector<fuchsia_images2::PixelFormat> pixel_formats)
     : display_id_(display_id),
@@ -37,7 +37,7 @@ void DisplayCoordinator::AddDisplay(Display2 display) {
   }
 }
 
-bool DisplayCoordinator::RemoveDisplay(fuchsia::hardware::display::DisplayId display_id) {
+bool DisplayCoordinator::RemoveDisplay(fuchsia::hardware::display::types::DisplayId display_id) {
   auto it = std::find_if(displays_.begin(), displays_.end(), [display_id](const Display2& display) {
     return fidl::Equals(display.display_id(), display_id);
   });

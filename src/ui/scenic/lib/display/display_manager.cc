@@ -27,7 +27,7 @@ DisplayManager::DisplayManager(fit::closure display_available_cb)
     : DisplayManager(std::nullopt, std::nullopt, std::move(display_available_cb)) {}
 
 DisplayManager::DisplayManager(
-    std::optional<fuchsia::hardware::display::DisplayId> i_can_haz_display_id,
+    std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id,
     std::optional<uint64_t> i_can_haz_display_mode, fit::closure display_available_cb)
     : i_can_haz_display_id_(i_can_haz_display_id),
       i_can_haz_display_mode_(i_can_haz_display_mode),
@@ -54,8 +54,9 @@ void DisplayManager::BindDefaultDisplayCoordinator(
   }
 }
 
-void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::Info> added,
-                                       std::vector<fuchsia::hardware::display::DisplayId> removed) {
+void DisplayManager::OnDisplaysChanged(
+    std::vector<fuchsia::hardware::display::Info> added,
+    std::vector<fuchsia::hardware::display::types::DisplayId> removed) {
   for (auto& display : added) {
     // Ignore display if |i_can_haz_display_id| is set and it doesn't match ID.
     if (i_can_haz_display_id_.has_value() && !fidl::Equals(display.id, *i_can_haz_display_id_)) {
@@ -95,7 +96,7 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
     }
   }
 
-  for (fuchsia::hardware::display::DisplayId id : removed) {
+  for (fuchsia::hardware::display::types::DisplayId id : removed) {
     if (default_display_ && fidl::Equals(default_display_->display_id(), id)) {
       // TODO(fxbug.dev/23490): handle this more robustly.
       FX_CHECK(false) << "Display disconnected";
@@ -124,7 +125,8 @@ void DisplayManager::SetVsyncCallback(VsyncCallback callback) {
   vsync_callback_ = std::move(callback);
 }
 
-void DisplayManager::OnVsync(fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
+void DisplayManager::OnVsync(fuchsia::hardware::display::types::DisplayId display_id,
+                             uint64_t timestamp,
                              fuchsia::hardware::display::types::ConfigStamp applied_config_stamp,
                              uint64_t cookie) {
   if (cookie) {

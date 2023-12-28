@@ -998,7 +998,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   // Submit the UberStruct.
   child_session.PushUberStruct(std::move(child_struct));
 
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 2 source frames, 2 destination frames, and two layers beind sent to the
@@ -1213,7 +1213,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   // Submit the UberStruct.
   parent_session.PushUberStruct(std::move(parent_struct));
 
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 1 source frame, 1 destination frame, and one layer being sent to the
@@ -1635,7 +1635,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   // Add display.
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
   glm::uvec2 kResolution(1024, 768);
   DisplayInfo display_info = {kResolution, {kPixelFormat}};
   scenic_impl::display::Display display(kDisplayId, kResolution.x, kResolution.y);

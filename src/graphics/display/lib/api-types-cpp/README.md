@@ -54,7 +54,7 @@ FIDL generated code:
   with conversion helpers for FIDL’s struct wrappers. This is especially useful
   for the Display stack, which makes extensive use of 64-bit integers as
   handles for various resources. For a concrete example, compare
-  `display::DisplayId` with the `fuchsia.hardware.display/DisplayId` FIDL
+  `display::DisplayId` with the `fuchsia.hardware.display.types/DisplayId` FIDL
   type.
 
 - Generated binding for FIDL types containing tables or unions require arena

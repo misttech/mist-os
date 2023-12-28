@@ -115,7 +115,7 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
               });
             }));
 
-    constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 1};
+    constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
     constexpr uint32_t kDisplayWidth = 640;
     constexpr uint32_t kDisplayHeight = 480;
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> importers;
@@ -228,8 +228,8 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
   // to make sure that it is only used on the test loop (which runs on the same
   // thread as test main thread).
   fit::thread_checker removed_session_thread_checker_;
-  std::unordered_set<scheduling::SessionId> removed_sessions_
-      FIT_GUARDED(removed_session_thread_checker_);
+  std::unordered_set<scheduling::SessionId> removed_sessions_ FIT_GUARDED(
+      removed_session_thread_checker_);
 
   const std::shared_ptr<LinkSystem> link_system_;
 

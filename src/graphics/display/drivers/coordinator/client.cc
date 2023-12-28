@@ -1268,7 +1268,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     coded_configs.push_back(info);
   }
 
-  std::vector<fhd::wire::DisplayId> fidl_removed_display_ids;
+  std::vector<fhdt::wire::DisplayId> fidl_removed_display_ids;
   fidl_removed_display_ids.reserve(removed_display_ids.size());
 
   for (DisplayId removed_display_id : removed_display_ids) {
@@ -1284,7 +1284,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
       return fidl::WireSendEvent(endpoint)->OnDisplaysChanged(
           fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-          fidl::VectorView<fhd::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
+          fidl::VectorView<fhdt::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
     });
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());

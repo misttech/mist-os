@@ -453,13 +453,13 @@ fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
       (*display_coordinator_)->CreateLayer(&create_layer_status, &layer_id);
   if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
-    return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
+    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   }
   return layer_id;
 }
 
 void DisplayCompositor::SetDisplayLayers(
-    const fuchsia::hardware::display::DisplayId display_id,
+    const fuchsia::hardware::display::types::DisplayId display_id,
     const std::vector<fuchsia::hardware::display::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
@@ -506,7 +506,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
         static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
-            .value = fuchsia::hardware::display::INVALID_DISP_ID};
+            .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i], /*wait_id*/ kInvalidEventId,
                         /*signal_id*/ image_event_map_[image_id].signal_id);
       } else {
@@ -877,10 +877,10 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
   }
 
   result.wait_id = scenic_impl::ImportEvent(*display_coordinator_, result.wait_event);
-  FX_DCHECK(result.wait_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.wait_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
   result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
   return result;
 }
 
@@ -899,7 +899,7 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
   }
 
   result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
 
   return result;
 }
@@ -916,7 +916,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
 
-  const fuchsia::hardware::display::DisplayId display_id = display->display_id();
+  const fuchsia::hardware::display::types::DisplayId display_id = display->display_id();
   FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())
       << "DisplayCompositor::AddDisplay(): display already exists: " << display_id.value;
 

@@ -141,6 +141,7 @@ impl PanelCmd {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use fidl_fuchsia_hardware_display_types as display_types;
     use fuchsia_zircon as zx;
     use futures::StreamExt;
 
@@ -172,7 +173,7 @@ mod tests {
                 coordinator_server.into_stream_and_control_handle().unwrap();
 
             let added_displays = &[display::Info {
-                id: display::DisplayId { value: 42 },
+                id: display_types::DisplayId { value: 42 },
                 modes: vec![],
                 pixel_format: vec![],
                 cursor_configs: vec![],
@@ -187,7 +188,7 @@ mod tests {
 
             match coordinator_request_stream.next().await.unwrap() {
                 Ok(display::CoordinatorRequest::SetDisplayPower {
-                    display_id: display::DisplayId { value: 42 },
+                    display_id: display_types::DisplayId { value: 42 },
                     responder,
                     ..
                 }) => {

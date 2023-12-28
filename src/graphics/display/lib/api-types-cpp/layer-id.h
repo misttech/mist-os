@@ -25,7 +25,7 @@ constexpr inline LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_
 constexpr inline fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
   return {.value = layer_id.value()};
 }
-constexpr LayerId kInvalidLayerId(fuchsia_hardware_display::wire::kInvalidDispId);
+constexpr LayerId kInvalidLayerId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display
 

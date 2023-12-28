@@ -23,7 +23,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:assert_matches" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_rust",
+    "//third_party/rust_crates:assert_matches",
+  ]
 
   sources = [
     "src/backlight.rs",

@@ -23,7 +23,7 @@ constexpr inline fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId e
   return {.value = event_id.value()};
 }
 
-constexpr EventId kInvalidEventId(fuchsia_hardware_display::wire::kInvalidDispId);
+constexpr EventId kInvalidEventId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display
 

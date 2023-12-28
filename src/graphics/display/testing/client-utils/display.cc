@@ -79,7 +79,7 @@ void Display::Dump() {
 
 void Display::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc,
                    ColorCorrectionArgs color_correction_args) {
-  fhd::wire::DisplayId fidl_display_id = ToFidlDisplayId(id_);
+  fhdt::wire::DisplayId fidl_display_id = ToFidlDisplayId(id_);
   if (mode_idx_ != 0) {
     ZX_ASSERT(dc->SetDisplayMode(fidl_display_id, modes_[mode_idx_]).ok());
   }

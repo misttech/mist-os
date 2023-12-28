@@ -17,7 +17,7 @@ namespace test {
 class DisplayCoordinatorTest : public gtest::TestLoopFixture {};
 
 TEST_F(DisplayCoordinatorTest, Display2Test) {
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId = {.value = 2};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
   const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
@@ -44,8 +44,8 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
 TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
   DisplayCoordinatorObjects display_controller_objs = CreateMockDisplayCoordinator();
 
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId1 = {.value = 1};
-  constexpr fuchsia::hardware::display::DisplayId kDisplayId2 = {.value = 2};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId1 = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId2 = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
   const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
@@ -63,7 +63,7 @@ TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
   EXPECT_EQ(kDisplayId1.value, dc.displays()->at(0).display_id().value);
 
   bool display_removed = false;
-  dc.set_on_display_removed_callback([&](fuchsia::hardware::display::DisplayId display_id) {
+  dc.set_on_display_removed_callback([&](fuchsia::hardware::display::types::DisplayId display_id) {
     display_removed = true;
     EXPECT_EQ(kDisplayId1.value, display_id.value);
   });

@@ -48,12 +48,12 @@ bool ImportBufferCollection(
 DisplayEventId ImportEvent(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const zx::event& event) {
-  static uint64_t id_generator = fuchsia::hardware::display::INVALID_DISP_ID + 1;
+  static uint64_t id_generator = fuchsia::hardware::display::types::INVALID_DISP_ID + 1;
 
   zx::event dup;
   if (event.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to duplicate display controller event.";
-    return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
+    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   }
 
   // Generate a new display ID after we've determined the event can be duplicated as to not
@@ -66,7 +66,7 @@ DisplayEventId ImportEvent(
     auto after = zx::clock::get_monotonic();
     FX_LOGS(ERROR) << "Failed to import display controller event. Waited "
                    << (after - before).to_msecs() << "msecs. Error code: " << status;
-    return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
+    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   }
   return event_id;
 }

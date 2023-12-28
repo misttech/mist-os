@@ -75,11 +75,11 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::LayerId));
 
   MOCK_METHOD(void, SetDisplayLayers,
-              (fuchsia::hardware::display::DisplayId,
+              (fuchsia::hardware::display::types::DisplayId,
                ::std::vector<fuchsia::hardware::display::LayerId>));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
-              (fuchsia::hardware::display::DisplayId, (std::array<float, 3>),
+              (fuchsia::hardware::display::types::DisplayId, (std::array<float, 3>),
                (std::array<float, 9>), (std::array<float, 3>)));
 
  private:

@@ -23,10 +23,10 @@ class DisplayCoordinatorListener {
  public:
   using OnDisplaysChangedCallback =
       std::function<void(std::vector<fuchsia::hardware::display::Info> added,
-                         std::vector<fuchsia::hardware::display::DisplayId> removed)>;
+                         std::vector<fuchsia::hardware::display::types::DisplayId> removed)>;
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
   using OnVsyncCallback = std::function<void(
-      fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
+      fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
       fuchsia::hardware::display::types::ConfigStamp applied_config_stamp, uint64_t cookie)>;
 
   // Binds to a Display fuchsia::hardware::display::Coordinator with channels |device| and

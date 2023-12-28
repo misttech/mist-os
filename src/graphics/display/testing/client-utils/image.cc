@@ -108,7 +108,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     display_token_handle = std::move(client);
   }
 
-  static display::BufferCollectionId next_buffer_collection_id(fhd::wire::kInvalidDispId + 1);
+  static display::BufferCollectionId next_buffer_collection_id(fhdt::wire::kInvalidDispId + 1);
   display::BufferCollectionId buffer_collection_id = next_buffer_collection_id++;
   if (!token->Sync().ok()) {
     fprintf(stderr, "Failed to sync token\n");
@@ -476,7 +476,7 @@ void Image::GetConfig(fhdt::wire::ImageConfig* config_out) const {
 bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::ImageId image_id,
                    image_import_t* info_out) const {
   for (int i = 0; i < 2; i++) {
-    static display::EventId next_event_id(fhd::wire::kInvalidDispId + 1);
+    static display::EventId next_event_id(fhdt::wire::kInvalidDispId + 1);
     zx::event e1;
     if (zx_status_t status = zx::event::create(0, &e1); status != ZX_OK) {
       printf("Failed to create event: %s\n", zx_status_get_string(status));

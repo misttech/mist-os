@@ -72,7 +72,7 @@ impl MockCoordinator {
             .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
             .map(|(_, info)| info.clone())
             .collect();
-        let removed: Vec<display::DisplayId> =
+        let removed: Vec<display_types::DisplayId> =
             self.displays.iter().map(|(_, info)| info.id).collect();
         self.displays = map;
         self.control_handle.send_on_displays_changed(&added, &removed)?;
@@ -92,7 +92,7 @@ impl MockCoordinator {
     ) -> Result<()> {
         self.control_handle
             .send_on_vsync(
-                &display::DisplayId { value: display_id_value },
+                &display_types::DisplayId { value: display_id_value },
                 zx::Time::get_monotonic().into_nanos() as u64,
                 &stamp,
                 0,
@@ -122,7 +122,7 @@ mod tests {
 
     async fn wait_for_displays_changed_event(
         events: &mut display::CoordinatorEventStream,
-    ) -> Result<(Vec<display::Info>, Vec<display::DisplayId>)> {
+    ) -> Result<(Vec<display::Info>, Vec<display_types::DisplayId>)> {
         let mut stream = events.try_filter_map(|event| match event {
             display::CoordinatorEvent::OnDisplaysChanged { added, removed } => {
                 future::ok(Some((added, removed)))
@@ -136,7 +136,7 @@ mod tests {
     async fn assign_displays_fails_with_duplicate_display_ids() {
         let displays = vec![
             display::Info {
-                id: display::DisplayId { value: 1 },
+                id: display_types::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -148,7 +148,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: display::DisplayId { value: 1 },
+                id: display_types::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -170,7 +170,7 @@ mod tests {
     async fn assign_displays_displays_added() -> Result<()> {
         let displays = vec![
             display::Info {
-                id: display::DisplayId { value: 1 },
+                id: display_types::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -182,7 +182,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: display::DisplayId { value: 2 },
+                id: display_types::DisplayId { value: 2 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -209,7 +209,7 @@ mod tests {
     #[fuchsia::test]
     async fn assign_displays_displays_removed() -> Result<()> {
         let displays = vec![display::Info {
-            id: display::DisplayId { value: 1 },
+            id: display_types::DisplayId { value: 1 },
             modes: Vec::new(),
             pixel_format: Vec::new(),
             cursor_configs: Vec::new(),
@@ -231,7 +231,7 @@ mod tests {
         mock.assign_displays(vec![])?;
         let (added, removed) = wait_for_displays_changed_event(&mut events).await?;
         assert_eq!(added, vec![]);
-        assert_eq!(removed, vec![display::DisplayId { value: 1 }]);
+        assert_eq!(removed, vec![display_types::DisplayId { value: 1 }]);
 
         Ok(())
     }

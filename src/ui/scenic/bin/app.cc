@@ -50,12 +50,12 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // escher/profiling/timestamp_profiler.cc.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
-std::optional<fuchsia::hardware::display::DisplayId> GetDisplayId(
+std::optional<fuchsia::hardware::display::types::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_id() < 0) {
     return std::nullopt;
   }
-  return std::make_optional<fuchsia::hardware::display::DisplayId>(
+  return std::make_optional<fuchsia::hardware::display::types::DisplayId>(
       {.value = static_cast<uint64_t>(values.i_can_haz_display_id())});
 }
 
@@ -110,8 +110,8 @@ scenic_structured_config::Config GetConfig() {
   FX_LOGS(INFO) << "display_composition: " << values.display_composition();
   FX_LOGS(INFO) << "Scenic i_can_haz_display_id: "
                 << GetDisplayId(values)
-                       .value_or(fuchsia::hardware::display::DisplayId{
-                           .value = fuchsia::hardware::display::INVALID_DISP_ID})
+                       .value_or(fuchsia::hardware::display::types::DisplayId{
+                           .value = fuchsia::hardware::display::types::INVALID_DISP_ID})
                        .value;
   FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
   FX_LOGS(INFO) << "Scenic display_rotation: " << GetDisplayRotation(values);

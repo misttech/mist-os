@@ -9,7 +9,8 @@ alias EventIdValue = uint64;
 /// Identifies a Zircon event shared between the Display Coordinator and a
 /// client.
 ///
-/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+/// [`fuchsia.hardware.display.types/INVALID_DISP_ID`] represents an invalid
+/// value.
 ///
 /// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
 /// facilitate feed-forward dataflow.

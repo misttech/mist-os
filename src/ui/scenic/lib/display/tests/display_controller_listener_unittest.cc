@@ -183,13 +183,14 @@ TEST_F(DisplayCoordinatorListenerTest, DisconnectCoordinatorAndDeviceChannel) {
 
 TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   std::vector<fuchsia::hardware::display::Info> displays_added;
-  std::vector<fuchsia::hardware::display::DisplayId> displays_removed;
-  auto displays_changed_cb = [&displays_added, &displays_removed](
-                                 std::vector<fuchsia::hardware::display::Info> added,
-                                 std::vector<fuchsia::hardware::display::DisplayId> removed) {
-    displays_added = added;
-    displays_removed = removed;
-  };
+  std::vector<fuchsia::hardware::display::types::DisplayId> displays_removed;
+  auto displays_changed_cb =
+      [&displays_added, &displays_removed](
+          std::vector<fuchsia::hardware::display::Info> added,
+          std::vector<fuchsia::hardware::display::types::DisplayId> removed) {
+        displays_added = added;
+        displays_removed = removed;
+      };
 
   display_coordinator_listener()->InitializeCallbacks(
       /*on_invalid_cb=*/nullptr, std::move(displays_changed_cb),
@@ -260,13 +261,13 @@ TEST_F(DisplayCoordinatorListenerTest, OnClientOwnershipChangeCallback) {
 }
 
 TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
-  fuchsia::hardware::display::DisplayId last_display_id = {
-      .value = fuchsia::hardware::display::INVALID_DISP_ID};
+  fuchsia::hardware::display::types::DisplayId last_display_id = {
+      .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   uint64_t last_timestamp = 0u;
   fuchsia::hardware::display::types::ConfigStamp last_config_stamp = {
       .value = fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE};
 
-  auto vsync_cb = [&](fuchsia::hardware::display::DisplayId display_id, uint64_t timestamp,
+  auto vsync_cb = [&](fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
                       fuchsia::hardware::display::types::ConfigStamp stamp, uint64_t cookie) {
     last_display_id = display_id;
     last_timestamp = timestamp;
@@ -277,8 +278,8 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
                                                       /*client_ownership_change_cb=*/nullptr);
   display_coordinator_listener()->SetOnVsyncCallback(std::move(vsync_cb));
 
-  constexpr fuchsia::hardware::display::DisplayId kTestDisplayId = {.value = 1};
-  constexpr fuchsia::hardware::display::DisplayId kInvalidDisplayId = {.value = 2};
+  constexpr fuchsia::hardware::display::types::DisplayId kTestDisplayId = {.value = 1};
+  constexpr fuchsia::hardware::display::types::DisplayId kInvalidDisplayId = {.value = 2};
   const uint64_t kTestTimestamp = 111111u;
   const fuchsia::hardware::display::types::ConfigStamp kConfigStamp = {.value = 2u};
   mock_display_coordinator()->events().OnVsync(kTestDisplayId, kTestTimestamp, kConfigStamp, 0);

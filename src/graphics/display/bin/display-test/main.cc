@@ -190,7 +190,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
 
   for (auto& layer : layers) {
     display::LayerId id = layer->id(display.id());
-    if (id.value() != fhd::wire::kInvalidDispId) {
+    if (id.value() != fhdt::wire::kInvalidDispId) {
       new_layers.push_back(id);
     }
   }

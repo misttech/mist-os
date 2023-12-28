@@ -24,7 +24,7 @@ constexpr inline fuchsia_hardware_display_types::wire::ImageId ToFidlImageId(Ima
   return {.value = image_id.value()};
 }
 
-constexpr ImageId kInvalidImageId(fuchsia_hardware_display::wire::kInvalidDispId);
+constexpr ImageId kInvalidImageId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display
 

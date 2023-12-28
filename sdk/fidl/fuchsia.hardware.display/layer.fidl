@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+using fuchsia.hardware.display.types;
+
 /// Type of the internal value in [`fuchsia.hardware.display/LayerId`].
 alias LayerIdValue = uint64;
 
 /// Identifies a layer resource owned by a Display Coordinator client.
 ///
-/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+/// [`fuchsia.hardware.display.types/INVALID_DISP_ID`] represents an invalid
+/// value.
 ///
 /// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
 /// facilitate feed-forward dataflow.
@@ -88,7 +91,7 @@ type ClientCompositionOpcode = strict enum : uint8 {
 type ClientCompositionOp = struct {
     /// display_id and layer_id uniquely identify the subject of the
     /// opcode.
-    display_id DisplayId;
+    display_id fuchsia.hardware.display.types.DisplayId;
 
     /// Invalid for issues that aren't scoped to a specific layer, such as
     /// unsupported color conversion tables.

@@ -61,7 +61,7 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
   }
 
   std::vector<RenderData> GenerateDisplayListForTest(
-      const std::unordered_map</*fuchsia::hardware::display::DisplayId::value*/ uint64_t,
+      const std::unordered_map</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t,
                                std::pair<DisplayInfo, TransformHandle>>& display_map) {
     const auto snapshot = uber_struct_system_->Snapshot();
     const auto links = link_system_->GetResolvedTopologyLinks();

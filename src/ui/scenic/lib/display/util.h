@@ -26,7 +26,8 @@ bool ImportBufferCollection(
 
 // Imports a zx::event to the provided display controller. The return value is an ID to
 // reference that event on other display controller functions that take an event as an
-// argument. On failure, the return value will be fuchsia::hardware::display::INVALID_DISP_ID.
+// argument. On failure, the return value will be
+// fuchsia::hardware::display::types::INVALID_DISP_ID.
 DisplayEventId ImportEvent(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const zx::event& event);

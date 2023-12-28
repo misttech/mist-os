@@ -232,7 +232,7 @@ impl<'a> DisplayDirectAppStrategy<'a> {
     async fn handle_displays_changed(
         &mut self,
         added: Vec<fidl_fuchsia_hardware_display::Info>,
-        removed: Vec<fidl_fuchsia_hardware_display::DisplayId>,
+        removed: Vec<fidl_fuchsia_hardware_display_types::DisplayId>,
     ) -> Result<(), Error> {
         let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
         for display_id in removed {

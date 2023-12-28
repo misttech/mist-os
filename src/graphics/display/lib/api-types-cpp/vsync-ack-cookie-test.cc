@@ -49,7 +49,7 @@ TEST(VsyncAckCookieTest, ToFidlVsyncAckCookieValue) {
   EXPECT_EQ(1u, ToFidlVsyncAckCookieValue(kOne));
   EXPECT_EQ(2u, ToFidlVsyncAckCookieValue(kTwo));
   EXPECT_EQ(kLargeCookieValue, ToFidlVsyncAckCookieValue(kLargeCookie));
-  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId,
+  EXPECT_EQ(fuchsia_hardware_display_types::wire::kInvalidDispId,
             ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie));
 }
 
@@ -58,7 +58,7 @@ TEST(VsyncAckCookieTest, ToVsyncAckCookieWithFidlValue) {
   EXPECT_EQ(kTwo, ToVsyncAckCookie(2));
   EXPECT_EQ(kLargeCookie, ToVsyncAckCookie(kLargeCookieValue));
   EXPECT_EQ(kInvalidVsyncAckCookie,
-            ToVsyncAckCookie(fuchsia_hardware_display::wire::kInvalidDispId));
+            ToVsyncAckCookie(fuchsia_hardware_display_types::wire::kInvalidDispId));
 }
 
 TEST(VsyncAckCookieTest, FidlVsyncAckCookieValueConversionRoundtrip) {

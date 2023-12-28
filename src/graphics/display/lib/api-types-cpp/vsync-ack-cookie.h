@@ -23,7 +23,8 @@ constexpr inline uint64_t ToFidlVsyncAckCookieValue(VsyncAckCookie vsync_ack_coo
   return vsync_ack_cookie.value();
 }
 
-constexpr VsyncAckCookie kInvalidVsyncAckCookie(fuchsia_hardware_display::wire::kInvalidDispId);
+constexpr VsyncAckCookie kInvalidVsyncAckCookie(
+    fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display
 

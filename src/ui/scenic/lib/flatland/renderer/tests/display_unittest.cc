@@ -83,13 +83,13 @@ class DisplayTest : public gtest::RealLoopFixture {
         display_coordinator->CreateLayer(&create_layer_status, &layer_id);
     if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
-      return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
+      return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
     }
 
     zx_status_t status = display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to configure display layers. Error code: " << status;
-      return {.value = fuchsia::hardware::display::INVALID_DISP_ID};
+      return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
     }
 
     return layer_id;
@@ -226,7 +226,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   fuchsia::hardware::display::LayerId layer_id =
       InitializeDisplayLayer(*display_coordinator.get(), display);
-  ASSERT_NE(layer_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
+  ASSERT_NE(layer_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
 
   const uint32_t kWidth = display->width_in_px();
   const uint32_t kHeight = display->height_in_px();
@@ -267,7 +267,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
                           allocation::ToFidlImageId(image_ids[i]), &import_image_status);
     ASSERT_EQ(transport_status, ZX_OK);
     ASSERT_EQ(import_image_status, ZX_OK);
-    ASSERT_NE(image_ids[i], fuchsia::hardware::display::INVALID_DISP_ID);
+    ASSERT_NE(image_ids[i], fuchsia::hardware::display::types::INVALID_DISP_ID);
   }
 
   // It is safe to release buffer collection because we are not going to import any more images.
@@ -284,15 +284,15 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       scenic_impl::ImportEvent(*display_coordinator.get(), display_wait_fence);
   scenic_impl::DisplayEventId display_signal_event_id =
       scenic_impl::ImportEvent(*display_coordinator.get(), display_signal_fence);
-  EXPECT_NE(display_wait_event_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
-  EXPECT_NE(display_signal_event_id.value, fuchsia::hardware::display::INVALID_DISP_ID);
+  EXPECT_NE(display_wait_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
+  EXPECT_NE(display_signal_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
   EXPECT_NE(display_wait_event_id.value, display_signal_event_id.value);
 
   // Set the layer image and apply the config.
   (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_config);
 
   static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
-      .value = fuchsia::hardware::display::INVALID_DISP_ID};
+      .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   status = (*display_coordinator.get())
                ->SetLayerImage(layer_id, allocation::ToFidlImageId(image_ids[0]),
                                /*wait_event_id=*/kInvalidEventId, display_signal_event_id);

@@ -8,11 +8,6 @@ using fuchsia.images2;
 using fuchsia.sysmem;
 using zx;
 
-// TODO(fxbug.dev/128948): Use separate invalid ID constants for each ID type.
-
-/// Invalid id for displays, images, and events.
-const INVALID_DISP_ID DisplayIdValue = 0;
-
 /// Maximum number of fences supported by
 /// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
 const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
@@ -40,7 +35,7 @@ closed protocol Coordinator {
     // or revalidate and reapply their current configuration.
     strict -> OnDisplaysChanged(struct {
         added vector<Info>:MAX;
-        removed vector<DisplayId>:MAX;
+        removed vector<fuchsia.hardware.display.types.DisplayId>:MAX;
     });
 
     /// Imports a Buffer-Collection backed image.
@@ -129,7 +124,7 @@ closed protocol Coordinator {
     //
     // It is illegal to pass a display mode which was not part of the display's Info.
     strict SetDisplayMode(struct {
-        display_id DisplayId;
+        display_id fuchsia.hardware.display.types.DisplayId;
         mode Mode;
     });
 
@@ -160,7 +155,7 @@ closed protocol Coordinator {
     // successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     // the last successfully applied state is restored.
     strict SetDisplayColorConversion(struct {
-        display_id DisplayId;
+        display_id fuchsia.hardware.display.types.DisplayId;
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
@@ -173,7 +168,7 @@ closed protocol Coordinator {
     // pending config before being added to the second display's pending config. It
     // is also illegal to pass an invalid layer id.
     strict SetDisplayLayers(struct {
-        display_id DisplayId;
+        display_id fuchsia.hardware.display.types.DisplayId;
         layer_ids vector<LayerId>:MAX;
     });
 
@@ -433,7 +428,7 @@ closed protocol Coordinator {
     // OnVsync on all display clients.
     //
     strict -> OnVsync(resource struct {
-        display_id DisplayId;
+        display_id fuchsia.hardware.display.types.DisplayId;
         timestamp uint64;
         applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
         cookie uint64;
@@ -530,7 +525,7 @@ closed protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
     /// turning on/off displays.
     strict SetDisplayPower(struct {
-        display_id DisplayId;
+        display_id fuchsia.hardware.display.types.DisplayId;
         power_on bool;
     }) -> () error zx.Status;
 };

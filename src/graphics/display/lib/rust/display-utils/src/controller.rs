@@ -460,7 +460,7 @@ mod tests {
     async fn test_init_with_displays() -> Result<()> {
         let displays = [
             display::Info {
-                id: display::DisplayId { value: 1 },
+                id: display_types::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),
@@ -472,7 +472,7 @@ mod tests {
                 using_fallback_size: false,
             },
             display::Info {
-                id: display::DisplayId { value: 2 },
+                id: display_types::DisplayId { value: 2 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
                 cursor_configs: Vec::new(),

@@ -8,7 +8,7 @@ alias ImageIdValue = uint64;
 
 /// Unique identifier for an image registered with the display coordinator.
 ///
-/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+/// [`fuchsia.hardware.display.types/INVALID_DISP_ID`] represents an invalid value.
 ///
 /// Valid values uniquely identify "live" images within a Display Coordinator
 /// connection. The identifier of an image destroyed via
