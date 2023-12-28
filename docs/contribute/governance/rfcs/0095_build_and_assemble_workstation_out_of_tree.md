@@ -295,8 +295,8 @@ the same project.
 
 ### Bug Tracking
 
-The repository will use the existing [Fuchsia Monorail](https://bugs.fuchsia.dev/p/fuchsia)
-bug tracker to track bugs. The reason for using Monorail is because it is already
+The repository will use the existing [Fuchsia Issue Tracker](https://issues.fuchsia.dev/issues)
+to track bugs. The reason for using Fuchsia Issue Tracker is because it is already
 set up for tracking Fuchsia bugs and because the board support for the Workstation
 product will still remain in fuchsia.git. There is a top-level Workstation component
 which can be used for general triage and then there are several existing components
