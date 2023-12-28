@@ -370,7 +370,6 @@ group("config_data_template_allowlist") {
     "//src/developer/sshd-host:config",
     "//src/diagnostics/config/persistence:persistence",
     "//src/diagnostics/config/pipelines/all:all_selectors",
-    "//src/diagnostics/config/triage:amlogic-display-detect",
     "//src/diagnostics/config/triage:brcmfmac-detect",
     "//src/diagnostics/config/triage:mali-detect",
     "//src/diagnostics/config/triage:omaha-client-detect",

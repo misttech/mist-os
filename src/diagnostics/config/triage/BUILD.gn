@@ -41,7 +41,6 @@ detect_unconditional_files = [
 ]
 
 detect_conditional_files = [
-  "detect/amlogic-display-detect.triage",
   "detect/mali-detect.triage",
   "detect/omaha-client-detect.triage",
   "detect/brcmfmac-detect.triage",
@@ -70,12 +69,8 @@ config_data_for_assembly("mali-detect") {
   sources = [ "detect/mali-detect.triage" ]
 }
 
-# This file will be included in builds that include the
-# //src/graphics/display/drivers/amlogic-display driver
-# target
-config_data("amlogic-display-detect") {
-  for_pkg = "triage-detect"
-  sources = [ "detect/amlogic-display-detect.triage" ]
+# TODO(b/317917028): Delete this target after all dependency is removed.
+group("amlogic-display-detect") {
 }
 
 group("triage") {
