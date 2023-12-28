@@ -263,7 +263,6 @@ class AmlogicDisplay
 
   // Zircon handles
   zx::bti bti_;
-  zx::interrupt inth_;
 
   // Thread handles
   std::optional<thrd_t> vsync_thread_;
