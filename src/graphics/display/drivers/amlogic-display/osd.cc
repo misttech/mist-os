@@ -462,7 +462,45 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   rdma_->ExecRdmaTable(next_table_idx, config_stamp, info->is_afbc);
 }
 
-void Osd::DefaultSetup() {
+void Osd::SetupSingleLayerBlending(PixelGridSize2D layer_size,
+                                   PixelGridSize2D display_contents_size) {
+  // TODO(fxbug.dev/317961333): The documentation below needs to be
+  // re-organized. Move the descriptions of the blenders and the blender muxes
+  // to the blender register definitions; at this function we should only keep
+  // how the muxes are wired to each other.
+
+  // There are two types of blenders in the Amlogic display engine:
+  // - OSD blenders;
+  // - Video post-processor (VPP) blenders.
+  //
+  // The OSD blenders consists of three blenders (BLEND0, BLEND1 and BLEND2);
+  // each blender takes up to 2 inputs where each input can be a layer or the
+  // output of a previous blender.
+  //
+  // The output of OSD blenders are then passed on to the VPP blenders.
+  // The VPP blenders set consists of a "pre-processing blender" (blend, then
+  // perform post-processing) and a "post-processing blender" (perform post-
+  // processing, then blend).
+  //
+  // Currently, for the single-layer configuration, we use the following
+  // blender configurations:
+  //
+  //              +------------------------+-------------------+
+  //              |       OSD blenders     |   VPP blenders    |
+  //              |                        |                   |
+  // OSD1 -scaler--> BLEND0 -----> BLEND2 ---->  Postblend   -----> Encoder
+  //              |             /          |                   |
+  //              |  BLEND1 ---/           |     Pre-blend     |
+  //              |                        |     (bypassed)    |
+  //              +------------------------+-------------------+
+  //
+  // BLEND0 takes the scaled layer as input, so it's input size is `layer_size`.
+  // Since there's no other scaling occurring, the output size of all the OSD
+  // blenders, and the input / output sizes of the VPP blenders are the same
+  // as the `display_contents_size`.
+
+  // TODO(fxbug.dev/42062952): Support multi-layer blender configurations.
+
   // osd blend ctrl
   vpu_mmio_.Write32(4 << 29 | 0 << 27 |  // blend2_premult_en
                         1 << 26 |        // blend_din0 input to blend0
@@ -489,41 +527,43 @@ void Osd::DefaultSetup() {
   // used default dummy alpha data
   vpu_mmio_.Write32(0x0 << 20 | 0x0 << 11 | 0x0, VIU_OSD_BLEND_DUMMY_ALPHA);
 
-  // osdx setting
-  vpu_mmio_.Write32((layer_image_size_.width - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
+  // Size of the VIU OSD blender BLEND0 input.
+  vpu_mmio_.Write32((layer_size.width - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
+  vpu_mmio_.Write32((layer_size.height - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
 
-  vpu_mmio_.Write32((layer_image_size_.height - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
-
-  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+  // Size of the VIU OSD blender BLEND0 output.
+  vpu_mmio_.Write32(display_contents_size.height << 16 | display_contents_size.width,
                     VIU_OSD_BLEND_BLEND0_SIZE);
-  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width,
+
+  // Size of the VIU OSD blender BLEND1 output.
+  // TODO(fxbug.dev/42062952): This is not used when there's only one layer.
+  vpu_mmio_.Write32(display_contents_size.height << 16 | display_contents_size.width,
                     VIU_OSD_BLEND_BLEND1_SIZE);
+
   vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(DOLBY_PATH_CTRL), /*field_begin_bit=*/2,
                                     /*field_size_bits=*/2, /*field_value=*/0x3),
                     DOLBY_PATH_CTRL);
 
-  vpu_mmio_.Write32(layer_image_size_.height << 16 | layer_image_size_.width, VPP_OSD1_IN_SIZE);
+  // Bypass VPP pre-processing blending ane only enable post-processing
+  // blending.
+  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) | VPP_POSTBLEND_EN, VPP_MISC);
+  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) & ~(VPP_PREBLEND_EN), VPP_MISC);
 
-  // setting blend scope
-  vpu_mmio_.Write32(0 << 16 | (layer_image_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_.Write32(0 << 16 | (layer_image_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
+  // "VPP OSD1" is the input of the VPP post-processing blender, which is the
+  // output of the BLEND2 OSD blender.
+  //
+  // Input size of the post-processing blender.
+  vpu_mmio_.Write32(display_contents_size.height << 16 | display_contents_size.width,
+                    VPP_OSD1_IN_SIZE);
 
-  // Set geometry to normal mode
-  uint32_t data32 = ((layer_image_size_.width - 1) & 0xfff) << 16;
-  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
-  data32 = ((layer_image_size_.height - 1) & 0xfff) << 16;
-  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
+  // Scope of the VPP post-processing blender.
+  vpu_mmio_.Write32(0 << 16 | (display_contents_size.width - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_.Write32(0 << 16 | (display_contents_size.height - 1), VPP_OSD1_BLD_V_SCOPE);
 
-  vpu_mmio_.Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
-  vpu_mmio_.Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
-
-  // enable osd blk0
-  osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_)
-      .set_rsv(0)
-      .set_osd_mem_mode(0)
-      .set_premult_en(0)
-      .set_blk_en(1)
-      .WriteTo(&vpu_mmio_);
+  // Setup VPP output.
+  vpu_mmio_.Write32(display_contents_size.width, VPP_POSTBLEND_H_SIZE);
+  vpu_mmio_.Write32((display_contents_size.width << 16) | display_contents_size.height,
+                    VPU_VPP_OUT_H_V_SIZE);
 }
 
 void Osd::DisableScaling() {
@@ -531,6 +571,25 @@ void Osd::DisableScaling() {
   vpu_mmio_.Write32(0, VPU_VPP_OSD_SC_CTRL0);
   vpu_mmio_.Write32(0, VPU_VPP_OSD_VSC_CTRL0);
   vpu_mmio_.Write32(0, VPU_VPP_OSD_HSC_CTRL0);
+
+  // Apply scale coefficients
+  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
+      .set_hi_res_coef(0)
+      .set_h_coef(0)
+      .set_index(0)
+      .WriteTo(&vpu_mmio_);
+  for (unsigned int i : osd_filter_coefs_bicubic) {
+    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
+  }
+
+  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
+      .set_hi_res_coef(0)
+      .set_h_coef(1)
+      .set_index(0)
+      .WriteTo(&vpu_mmio_);
+  for (unsigned int i : osd_filter_coefs_bicubic) {
+    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
+  }
 }
 
 void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
@@ -620,9 +679,6 @@ void Osd::HwInit() {
   ZX_DEBUG_ASSERT(layer_image_size_.width == display_contents_size_.width);
   ZX_DEBUG_ASSERT(layer_image_size_.height == display_contents_size_.height);
 
-  // Setup VPP horizontal width
-  vpu_mmio_.Write32(display_contents_size_.width, VPP_POSTBLEND_H_SIZE);
-
   // init vpu fifo control register
   uint32_t regVal = vpu_mmio_.Read32(VPP_OFIFO_SIZE);
   regVal = 0xfff << 20;
@@ -640,12 +696,11 @@ void Osd::HwInit() {
   vpu_mmio_.Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
   vpu_mmio_.Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
 
-  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) | VPP_POSTBLEND_EN, VPP_MISC);
-  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) & ~(VPP_PREBLEND_EN), VPP_MISC);
-
   osd1_registers.ctrl_stat.FromValue(0)
       .set_blk_en(1)
       .set_global_alpha(kMaximumAlpha)
+      .set_osd_mem_mode(0)
+      .set_premult_en(0)
       .set_osd_en(1)
       .WriteTo(&vpu_mmio_);
 
@@ -654,37 +709,23 @@ void Osd::HwInit() {
       .FromValue(0)
       .set_blk_en(1)
       .set_global_alpha(kMaximumAlpha)
+      .set_osd_mem_mode(0)
+      .set_premult_en(0)
       .set_osd_en(1)
       .WriteTo(&vpu_mmio_);
 
-  DefaultSetup();
+  // Set range of the virtual canvas coordinates.
+  vpu_mmio_.Write32(((layer_image_size_.width - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
+  vpu_mmio_.Write32(((layer_image_size_.height - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
+
+  // Set geometry to normal mode
+  uint32_t data32 = ((display_contents_size_.width - 1) & 0xfff) << 16;
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
+  data32 = ((display_contents_size_.height - 1) & 0xfff) << 16;
+  vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 
   DisableScaling();
-
-  // Apply scale coefficients
-  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
-      .set_hi_res_coef(0)
-      .set_h_coef(0)
-      .set_index(0)
-      .WriteTo(&vpu_mmio_);
-  for (unsigned int i : osd_filter_coefs_bicubic) {
-    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
-  }
-
-  osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)
-      .set_hi_res_coef(0)
-      .set_h_coef(1)
-      .set_index(0)
-      .WriteTo(&vpu_mmio_);
-  for (unsigned int i : osd_filter_coefs_bicubic) {
-    osd1_registers.scale_coef.FromValue(i).WriteTo(&vpu_mmio_);
-  }
-
-  // update blending
-  vpu_mmio_.Write32(0 << 16 | (display_contents_size_.width - 1), VPP_OSD1_BLD_H_SCOPE);
-  vpu_mmio_.Write32(0 << 16 | (display_contents_size_.height - 1), VPP_OSD1_BLD_V_SCOPE);
-  vpu_mmio_.Write32((display_contents_size_.width << 16) | display_contents_size_.height,
-                    VPU_VPP_OUT_H_V_SIZE);
+  SetupSingleLayerBlending(/*layer_size=*/layer_image_size_, display_contents_size_);
 
   // Configure AFBC Engine's one-time programmable fields, so it's ready
   ConfigAfbc();

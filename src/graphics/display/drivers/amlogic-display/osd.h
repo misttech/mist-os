@@ -78,7 +78,13 @@ class Osd {
  private:
   Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
       fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
-  void DefaultSetup();
+
+  // Sets up the blending modules on the OSD layers and the Video Post
+  // Processor (VPP) to display a single layer.
+  //
+  // It places the OSD1 layer (of size `layer_size`) on the top-left corner
+  // of the display (of size `display_contents_size`).
+  void SetupSingleLayerBlending(PixelGridSize2D layer_size, PixelGridSize2D display_contents_size);
 
   // Disables framebuffer scaling.
   // TODO(fxbug.dev/317922128): Add OSD scaler support.
