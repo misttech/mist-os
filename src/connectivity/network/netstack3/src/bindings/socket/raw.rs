@@ -9,11 +9,10 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
-use netstack3_core::SyncCtx;
 use tracing::error;
 use zx::{HandleBased, Peered};
 
-use crate::bindings::{BindingsCtx, Ctx};
+use crate::bindings::Ctx;
 
 use super::{
     worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
@@ -28,8 +27,7 @@ struct BindingData {
 
 impl BindingData {
     fn new(
-        _core_ctx: &SyncCtx<BindingsCtx>,
-        _bindings_ctx: &mut BindingsCtx,
+        _ctx: &Ctx,
         _domain: fposix_socket::Domain,
         _proto: fpraw::ProtocolAssociation,
         SocketWorkerProperties {}: SocketWorkerProperties,
@@ -70,7 +68,7 @@ impl SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, _core_ctx: &SyncCtx<BindingsCtx>, _bindings_ctx: &mut BindingsCtx) {}
+    fn close(self, _ctx: &mut Ctx) {}
 }
 
 struct RequestHandler<'a> {
@@ -378,9 +376,7 @@ pub(crate) async fn serve(
 
                     spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        move |core_ctx, bindings_ctx, properties| {
-                            BindingData::new(core_ctx, bindings_ctx, domain, proto, properties)
-                        },
+                        move |ctx, properties| BindingData::new(ctx, domain, proto, properties),
                         SocketWorkerProperties {},
                         request_stream,
                         (),

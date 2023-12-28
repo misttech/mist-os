@@ -45,7 +45,6 @@ use netstack3_core::{
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
     },
-    SyncCtx,
 };
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
@@ -453,11 +452,8 @@ struct BindingData<I: IpExt + DualStackIpExt> {
 }
 
 impl<I: IpExt + DualStackIpExt> BindingData<I> {
-    fn new(
-        core_ctx: &SyncCtx<BindingsCtx>,
-        bindings_ctx: &mut BindingsCtx,
-        properties: SocketWorkerProperties,
-    ) -> Self {
+    fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (local, peer) = zx::Socket::create_stream();
         let local = Arc::new(local);
         let SocketWorkerProperties {} = properties;
@@ -528,8 +524,9 @@ where
         RequestHandler { ctx, data: self }.handle_request(request, spawners)
     }
 
-    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx) {
+    fn close(self, ctx: &mut Ctx) {
         let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         close::<I, _>(core_ctx, bindings_ctx, id);
         if let Some(send_task_abort) = send_task_abort {
             // Signal the task to stop but drop the canceled error. The data
@@ -1588,7 +1585,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt + DualStackIpExt>(
 {
     spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
-        move |_: &SyncCtx<_>, _: &mut BindingsCtx, SocketWorkerProperties {}| BindingData {
+        move |_: &mut Ctx, SocketWorkerProperties {}| BindingData {
             id: accepted,
             peer,
             local_socket_and_watcher: Some((local_socket, watcher)),

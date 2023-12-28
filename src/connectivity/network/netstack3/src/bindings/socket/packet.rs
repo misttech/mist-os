@@ -23,7 +23,6 @@ use netstack3_core::{
         SendFrameParams, SentFrame, SocketId, SocketInfo, TargetDevice,
     },
     sync::Mutex,
-    SyncCtx,
 };
 use packet::Buf;
 use tracing::error;
@@ -104,9 +103,7 @@ pub(crate) async fn serve(
                         });
                     spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        move |core_ctx, bindings_ctx, properties| {
-                            BindingData::new(core_ctx, bindings_ctx, kind, properties)
-                        },
+                        move |ctx, properties| BindingData::new(ctx, kind, properties),
                         SocketWorkerProperties {},
                         request_stream,
                         (),
@@ -211,11 +208,11 @@ impl BodyLen for Message {
 
 impl BindingData {
     fn new(
-        core_ctx: &SyncCtx<BindingsCtx>,
-        _bindings_ctx: &mut BindingsCtx,
+        ctx: &Ctx,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
+        let (core_ctx, _bindings_ctx) = ctx.contexts();
         let (local_event, peer_event) = zx::EventPair::create();
         match local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             Ok(()) => (),
@@ -253,9 +250,9 @@ impl worker::SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, _bindings_ctx: &mut BindingsCtx) {
+    fn close(self, ctx: &mut Ctx) {
         let Self { peer_event: _, id } = self;
-        netstack3_core::device_socket::remove(core_ctx, id)
+        netstack3_core::device_socket::remove(ctx.core_ctx(), id)
     }
 }
 

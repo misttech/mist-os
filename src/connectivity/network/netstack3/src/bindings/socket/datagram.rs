@@ -249,136 +249,104 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
             Error = fposix::Errno,
         >;
 
-    fn create_unbound<C: BindingsContext>(ctx: &SyncCtx<C>) -> Self::SocketId;
+    fn create_unbound(ctx: &Ctx) -> Self::SocketId;
 
-    fn connect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn connect(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError>;
 
-    fn bind<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn bind(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+        addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError>;
 
-    fn disconnect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Result<(), Self::DisconnectError>;
+    fn disconnect(ctx: &mut Ctx, id: &Self::SocketId) -> Result<(), Self::DisconnectError>;
 
-    fn shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn shutdown(
+        ctx: &Ctx,
         id: &Self::SocketId,
         which: ShutdownType,
     ) -> Result<(), Self::ShutdownError>;
 
-    fn get_shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> Option<ShutdownType>;
+    fn get_shutdown(ctx: &Ctx, id: &Self::SocketId) -> Option<ShutdownType>;
 
-    fn get_socket_info<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Self::SocketInfo<C>;
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx>;
 
-    fn close<C: BindingsContext>(core_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId);
+    fn close(ctx: &mut Ctx, id: Self::SocketId);
 
-    fn set_socket_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_socket_device(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        device: Option<&DeviceId<C>>,
+        device: Option<&DeviceId<BindingsCtx>>,
     ) -> Result<(), Self::SetSocketDeviceError>;
 
-    fn get_bound_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> Option<WeakDeviceId<C>>;
+    fn get_bound_device(ctx: &Ctx, id: &Self::SocketId) -> Option<WeakDeviceId<BindingsCtx>>;
 
-    fn set_dual_stack_enabled<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_dual_stack_enabled(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError>;
 
-    fn get_dual_stack_enabled<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_dual_stack_enabled(
+        ctx: &Ctx,
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError>;
 
-    fn set_reuse_port<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_reuse_port(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         reuse_port: bool,
     ) -> Result<(), Self::SetReusePortError>;
 
-    fn get_reuse_port<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> bool;
+    fn get_reuse_port(ctx: &Ctx, id: &Self::SocketId) -> bool;
 
-    fn set_multicast_membership<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_multicast_membership(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         multicast_group: MulticastAddr<I::Addr>,
-        interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
+        interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<BindingsCtx>>,
         want_membership: bool,
     ) -> Result<(), Self::SetMulticastMembershipError>;
 
-    fn set_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_unicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError>;
 
-    fn set_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_multicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError>;
 
-    fn get_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_unicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
-    fn get_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_multicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
-    fn set_ip_transparent<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
+    fn set_ip_transparent(
+        ctx: &Ctx,
         id: &Self::SocketId,
         value: bool,
     ) -> Result<(), Self::SetIpTransparentError>;
 
-    fn get_ip_transparent<C: BindingsContext>(core_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool;
+    fn get_ip_transparent(ctx: &Ctx, id: &Self::SocketId) -> bool;
 }
 
 /// An abstraction over transport protocols that allows data to be sent via the Core.
@@ -430,91 +398,80 @@ impl<I: IpExt> TransportState<I> for Udp {
     type RemoteIdentifier = udp::UdpRemotePort;
     type SocketInfo<C: BindingsContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
 
-    fn create_unbound<C: BindingsContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
-        udp::create_udp(ctx)
+    fn create_unbound(ctx: &Ctx) -> Self::SocketId {
+        udp::create_udp(ctx.core_ctx())
     }
 
-    fn connect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn connect(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+        remote_ip: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
-        udp::connect(core_ctx, ctx, id, remote_ip, remote_id)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::connect(core_ctx, bindings_ctx, id, remote_ip, remote_id)
     }
 
-    fn bind<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn bind(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError> {
-        udp::listen_udp(core_ctx, ctx, id, addr, port)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::listen_udp(core_ctx, bindings_ctx, id, addr, port)
     }
 
-    fn disconnect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Result<(), Self::DisconnectError> {
-        udp::disconnect_udp_connected(core_ctx, ctx, id)
+    fn disconnect(ctx: &mut Ctx, id: &Self::SocketId) -> Result<(), Self::DisconnectError> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::disconnect_udp_connected(core_ctx, bindings_ctx, id)
     }
 
-    fn shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn shutdown(
+        ctx: &Ctx,
         id: &Self::SocketId,
         which: ShutdownType,
     ) -> Result<(), Self::ShutdownError> {
-        udp::shutdown(core_ctx, ctx, id, which)
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::shutdown(core_ctx, bindings_ctx, id, which)
     }
 
-    fn get_shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_shutdown(ctx: &Ctx, id: &Self::SocketId) -> Option<ShutdownType> {
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_shutdown(core_ctx, bindings_ctx, id)
+    }
+
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::get_udp_info(core_ctx, bindings_ctx, id)
+    }
+
+    fn close(ctx: &mut Ctx, id: Self::SocketId) {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        let _: Self::SocketInfo<BindingsCtx> = udp::close(core_ctx, bindings_ctx, id);
+    }
+
+    fn set_socket_device(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-    ) -> Option<ShutdownType> {
-        udp::get_shutdown(core_ctx, ctx, id)
-    }
-
-    fn get_socket_info<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Self::SocketInfo<C> {
-        udp::get_udp_info(core_ctx, ctx, id)
-    }
-
-    fn close<C: BindingsContext>(core_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
-        let _: Self::SocketInfo<C> = udp::close(core_ctx, ctx, id);
-    }
-
-    fn set_socket_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-        device: Option<&DeviceId<C>>,
+        device: Option<&DeviceId<BindingsCtx>>,
     ) -> Result<(), Self::SetSocketDeviceError> {
-        udp::set_udp_device(core_ctx, ctx, id, device)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::set_udp_device(core_ctx, bindings_ctx, id, device)
     }
 
-    fn get_bound_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> Option<WeakDeviceId<C>> {
-        udp::get_udp_bound_device(core_ctx, ctx, id)
+    fn get_bound_device(ctx: &Ctx, id: &Self::SocketId) -> Option<WeakDeviceId<BindingsCtx>> {
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_udp_bound_device(core_ctx, bindings_ctx, id)
     }
 
-    fn set_reuse_port<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_reuse_port(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         reuse_port: bool,
     ) -> Result<(), Self::SetReusePortError> {
-        match udp::set_udp_posix_reuse_port(core_ctx, ctx, id, reuse_port) {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        match udp::set_udp_posix_reuse_port(core_ctx, bindings_ctx, id, reuse_port) {
             Ok(()) => Ok(()),
             Err(e) => {
                 warn!("tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/100840");
@@ -523,42 +480,39 @@ impl<I: IpExt> TransportState<I> for Udp {
         }
     }
 
-    fn set_dual_stack_enabled<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_dual_stack_enabled(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
-        udp::set_udp_dual_stack_enabled(core_ctx, ctx, id, enabled)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::set_udp_dual_stack_enabled(core_ctx, bindings_ctx, id, enabled)
     }
 
-    fn get_dual_stack_enabled<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_dual_stack_enabled(
+        ctx: &Ctx,
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError> {
-        udp::get_udp_dual_stack_enabled(core_ctx, ctx, id)
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_udp_dual_stack_enabled(core_ctx, bindings_ctx, id)
     }
 
-    fn get_reuse_port<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> bool {
-        udp::get_udp_posix_reuse_port(core_ctx, ctx, id)
+    fn get_reuse_port(ctx: &Ctx, id: &Self::SocketId) -> bool {
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_udp_posix_reuse_port(core_ctx, bindings_ctx, id)
     }
 
-    fn set_multicast_membership<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_multicast_membership(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         multicast_group: MulticastAddr<I::Addr>,
-        interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
+        interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<BindingsCtx>>,
         want_membership: bool,
     ) -> Result<(), Self::SetMulticastMembershipError> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         udp::set_udp_multicast_membership(
             core_ctx,
-            ctx,
+            bindings_ctx,
             id,
             multicast_group,
             interface,
@@ -566,54 +520,54 @@ impl<I: IpExt> TransportState<I> for Udp {
         )
     }
 
-    fn set_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_unicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        udp::set_udp_unicast_hop_limit(core_ctx, ctx, id, hop_limit, ip_version)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::set_udp_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
     }
 
-    fn set_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_multicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        udp::set_udp_multicast_hop_limit(core_ctx, ctx, id, hop_limit, ip_version)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::set_udp_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
     }
 
-    fn get_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_unicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
-        udp::get_udp_unicast_hop_limit(core_ctx, ctx, id, ip_version)
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_udp_unicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
     }
 
-    fn get_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_multicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
-        udp::get_udp_multicast_hop_limit(core_ctx, ctx, id, ip_version)
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        udp::get_udp_multicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
     }
 
-    fn set_ip_transparent<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
+    fn set_ip_transparent(
+        ctx: &Ctx,
         id: &Self::SocketId,
         value: bool,
     ) -> Result<(), Self::SetIpTransparentError> {
-        Ok(udp::set_udp_transparent(core_ctx, id, value))
+        Ok(udp::set_udp_transparent(ctx.core_ctx(), id, value))
     }
 
-    fn get_ip_transparent<C: BindingsContext>(core_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool {
-        udp::get_udp_transparent(core_ctx, id)
+    fn get_ip_transparent(ctx: &Ctx, id: &Self::SocketId) -> bool {
+        udp::get_udp_transparent(ctx.core_ctx(), id)
     }
 }
 
@@ -695,87 +649,75 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     type RemoteIdentifier = u16;
     type SocketInfo<C: BindingsContext> = icmp::SocketInfo<I::Addr, WeakDeviceId<C>>;
 
-    fn create_unbound<C: BindingsContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
-        icmp::new_socket(ctx)
+    fn create_unbound(ctx: &Ctx) -> Self::SocketId {
+        icmp::new_socket(ctx.core_ctx())
     }
 
-    fn connect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn connect(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
-        icmp::connect(core_ctx, ctx, id, remote_ip, remote_id)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::connect(core_ctx, bindings_ctx, id, remote_ip, remote_id)
     }
 
-    fn bind<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn bind(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError> {
-        icmp::bind(core_ctx, ctx, id, addr, port)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::bind(core_ctx, bindings_ctx, id, addr, port)
     }
 
-    fn disconnect<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Result<(), Self::DisconnectError> {
-        icmp::disconnect(core_ctx, ctx, id)
+    fn disconnect(ctx: &mut Ctx, id: &Self::SocketId) -> Result<(), Self::DisconnectError> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::disconnect(core_ctx, bindings_ctx, id)
     }
 
-    fn shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn shutdown(
+        ctx: &Ctx,
         id: &Self::SocketId,
         which: ShutdownType,
     ) -> Result<(), Self::ShutdownError> {
-        icmp::shutdown(core_ctx, ctx, id, which)
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        icmp::shutdown(core_ctx, bindings_ctx, id, which)
     }
 
-    fn get_shutdown<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_shutdown(ctx: &Ctx, id: &Self::SocketId) -> Option<ShutdownType> {
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        icmp::get_shutdown(core_ctx, bindings_ctx, id)
+    }
+
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::get_info(core_ctx, bindings_ctx, id)
+    }
+
+    fn close(ctx: &mut Ctx, id: Self::SocketId) {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::close(core_ctx, bindings_ctx, id)
+    }
+
+    fn set_socket_device(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-    ) -> Option<ShutdownType> {
-        icmp::get_shutdown(core_ctx, ctx, id)
-    }
-
-    fn get_socket_info<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-    ) -> Self::SocketInfo<C> {
-        icmp::get_info(core_ctx, ctx, id)
-    }
-
-    fn close<C: BindingsContext>(core_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
-        icmp::close(core_ctx, ctx, id)
-    }
-
-    fn set_socket_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-        device: Option<&DeviceId<C>>,
+        device: Option<&DeviceId<BindingsCtx>>,
     ) -> Result<(), Self::SetSocketDeviceError> {
-        icmp::set_device(core_ctx, ctx, id, device)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::set_device(core_ctx, bindings_ctx, id, device)
     }
 
-    fn get_bound_device<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
-        id: &Self::SocketId,
-    ) -> Option<WeakDeviceId<C>> {
-        icmp::get_bound_device(core_ctx, ctx, id)
+    fn get_bound_device(ctx: &Ctx, id: &Self::SocketId) -> Option<WeakDeviceId<BindingsCtx>> {
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        icmp::get_bound_device(core_ctx, bindings_ctx, id)
     }
 
-    fn set_dual_stack_enabled<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _ctx: &mut C,
+    fn set_dual_stack_enabled(
+        _ctx: &mut Ctx,
         _id: &Self::SocketId,
         _enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
@@ -786,9 +728,8 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         return Err(SetDualStackEnabledError::NotCapable);
     }
 
-    fn get_dual_stack_enabled<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _ctx: &C,
+    fn get_dual_stack_enabled(
+        _ctx: &Ctx,
         _id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError> {
         match I::VERSION {
@@ -802,37 +743,30 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         }
     }
 
-    fn set_reuse_port<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _ctx: &mut C,
+    fn set_reuse_port(
+        _ctx: &mut Ctx,
         _id: &Self::SocketId,
         _reuse_port: bool,
     ) -> Result<(), Self::SetReusePortError> {
         Err(NotSupportedError)
     }
 
-    fn get_reuse_port<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _ctx: &C,
-        _id: &Self::SocketId,
-    ) -> bool {
+    fn get_reuse_port(_ctx: &Ctx, _id: &Self::SocketId) -> bool {
         false
     }
 
-    fn set_multicast_membership<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _ctx: &mut C,
+    fn set_multicast_membership(
+        _ctx: &mut Ctx,
         _id: &Self::SocketId,
         _multicast_group: MulticastAddr<I::Addr>,
-        _interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
+        _interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<BindingsCtx>>,
         _want_membership: bool,
     ) -> Result<(), Self::SetMulticastMembershipError> {
         Err(NotSupportedError)
     }
 
-    fn set_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_unicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
@@ -845,12 +779,12 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        Ok(icmp::set_unicast_hop_limit(core_ctx, ctx, id, hop_limit))
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        Ok(icmp::set_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit))
     }
 
-    fn set_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn set_multicast_hop_limit(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
@@ -863,12 +797,12 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        Ok(icmp::set_multicast_hop_limit(core_ctx, ctx, id, hop_limit))
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        Ok(icmp::set_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit))
     }
 
-    fn get_unicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_unicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
@@ -880,12 +814,12 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        Ok(icmp::get_unicast_hop_limit(core_ctx, ctx, id))
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        Ok(icmp::get_unicast_hop_limit(core_ctx, bindings_ctx, id))
     }
 
-    fn get_multicast_hop_limit<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &C,
+    fn get_multicast_hop_limit(
+        ctx: &Ctx,
         id: &Self::SocketId,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
@@ -897,21 +831,19 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        Ok(icmp::get_multicast_hop_limit(core_ctx, ctx, id))
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        Ok(icmp::get_multicast_hop_limit(core_ctx, bindings_ctx, id))
     }
 
-    fn set_ip_transparent<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
+    fn set_ip_transparent(
+        _ctx: &Ctx,
         _id: &Self::SocketId,
         _value: bool,
     ) -> Result<(), Self::SetIpTransparentError> {
         Err(NotSupportedError)
     }
 
-    fn get_ip_transparent<C: BindingsContext>(
-        _core_ctx: &SyncCtx<C>,
-        _id: &Self::SocketId,
-    ) -> bool {
+    fn get_ip_transparent(_ctx: &Ctx, _id: &Self::SocketId) -> bool {
         false
     }
 }
@@ -1041,11 +973,7 @@ where
     BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     /// Creates a new `BindingData`.
-    fn new(
-        core_ctx: &SyncCtx<BindingsCtx>,
-        bindings_ctx: &mut BindingsCtx,
-        properties: SocketWorkerProperties,
-    ) -> Self {
+    fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
         // signal peer that OUTGOING is available.
         // TODO(brunodalbo): We're currently not enforcing any sort of
@@ -1055,11 +983,11 @@ where
         if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             error!("socket failed to signal peer: {:?}", e);
         }
-        let id = T::create_unbound(core_ctx);
+        let id = T::create_unbound(ctx);
         let messages = Arc::new(CoreMutex::new(MessageQueue::new(local_event)));
 
         assert_matches!(
-            I::with_collection_mut(bindings_ctx, |c| c
+            I::with_collection_mut(ctx.bindings_ctx_mut(), |c| c
                 .received
                 .insert(id.get_key_index(), messages.clone())),
             None
@@ -1187,11 +1115,12 @@ where
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx) {
+    fn close(self, ctx: &mut Ctx) {
         let id = self.info.id;
-        let _: Option<_> =
-            I::with_collection_mut(bindings_ctx, |c| c.received.remove(id.get_key_index()));
-        T::close(core_ctx, bindings_ctx, id);
+        let _: Option<_> = I::with_collection_mut(ctx.bindings_ctx_mut(), |c| {
+            c.received.remove(id.get_key_index())
+        });
+        T::close(ctx, id);
     }
 }
 
@@ -1744,15 +1673,13 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let sockaddr =
             I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))?;
         trace!("connect sockaddr: {:?}", sockaddr);
         let (remote_addr, remote_port) =
-            sockaddr.try_into_core_with_ctx(&bindings_ctx).map_err(IntoErrno::into_errno)?;
+            sockaddr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
 
-        T::connect(core_ctx, bindings_ctx, id, remote_addr, remote_port.into())
-            .map_err(IntoErrno::into_errno)?;
+        T::connect(ctx, id, remote_addr, remote_port.into()).map_err(IntoErrno::into_errno)?;
 
         Ok(())
     }
@@ -1779,14 +1706,12 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
         let (sockaddr, port) =
-            TryFromFidlWithContext::try_from_fidl_with_ctx(&bindings_ctx, sockaddr)
+            TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), sockaddr)
                 .map_err(IntoErrno::into_errno)?;
         let local_port = T::LocalIdentifier::from_u16(port);
 
-        T::bind(core_ctx, bindings_ctx, id, sockaddr, local_port).map_err(IntoErrno::into_errno)?;
+        T::bind(ctx, id, sockaddr, local_port).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -1806,9 +1731,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
-        T::disconnect(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)?;
+        T::disconnect(ctx, id).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -1826,10 +1749,8 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
-        let l: LocalAddress<_, _, _> = T::get_socket_info(core_ctx, bindings_ctx, id).into_fidl();
-        l.try_into_fidl_with_ctx(bindings_ctx).map(SockAddr::into_sock_addr)
+        let l: LocalAddress<_, _, _> = T::get_socket_info(ctx, id).into_fidl();
+        l.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
     }
 
     /// Handles a [POSIX socket get_info request].
@@ -1864,13 +1785,9 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
-        T::get_socket_info(core_ctx, bindings_ctx, id).try_into_fidl().and_then(
-            |r: RemoteAddress<_, _, _>| {
-                r.try_into_fidl_with_ctx(bindings_ctx).map(SockAddr::into_sock_addr)
-            },
-        )
+        T::get_socket_info(ctx, id).try_into_fidl().and_then(|r: RemoteAddress<_, _, _>| {
+            r.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
+        })
     }
 
     fn recv_msg(
@@ -1894,8 +1811,7 @@ where
                     ip_receive_original_destination_address,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let front = I::with_collection(bindings_ctx, |c| {
+        let front = I::with_collection(ctx.bindings_ctx(), |c| {
             let messages = c.received.get(id.get_key_index()).expect("has queue");
             let mut messages = messages.lock();
             if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
@@ -1921,7 +1837,7 @@ where
                 // another thread setting the shutdown flag, then this check
                 // executing, could result in a race that causes this this code
                 // to signal EOF with a packet still waiting.
-                let shutdown = T::get_shutdown(core_ctx, bindings_ctx, id);
+                let shutdown = T::get_shutdown(ctx, id);
                 return match shutdown {
                     Some(ShutdownType::Receive | ShutdownType::SendAndReceive) => {
                         // Return empty data to signal EOF.
@@ -2023,13 +1939,13 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let device = device
-            .map(|name| bindings_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
+            .map(|name| {
+                ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
+            })
             .transpose()?;
 
-        T::set_socket_device(core_ctx, bindings_ctx, id, device.as_ref())
-            .map_err(IntoErrno::into_errno)
+        T::set_socket_device(ctx, id, device.as_ref()).map_err(IntoErrno::into_errno)
     }
 
     fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
@@ -2043,9 +1959,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-
-        let device = match T::get_bound_device(core_ctx, bindings_ctx, id) {
+        let device = match T::get_bound_device(ctx, id) {
             None => return Ok(None),
             Some(d) => d,
         };
@@ -2069,9 +1983,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_dual_stack_enabled(core_ctx, bindings_ctx, id, enabled)
-            .map_err(IntoErrno::into_errno)
+        T::set_dual_stack_enabled(ctx, id, enabled).map_err(IntoErrno::into_errno)
     }
 
     fn get_dual_stack_enabled(self) -> Result<bool, fposix::Errno> {
@@ -2085,8 +1997,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        T::get_dual_stack_enabled(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)
+        T::get_dual_stack_enabled(ctx, id).map_err(IntoErrno::into_errno)
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
@@ -2100,8 +2011,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_reuse_port(core_ctx, bindings_ctx, id, reuse_port).map_err(IntoErrno::into_errno)
+        T::set_reuse_port(ctx, id, reuse_port).map_err(IntoErrno::into_errno)
     }
 
     fn get_reuse_port(self) -> bool {
@@ -2115,9 +2025,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-
-        T::get_reuse_port(core_ctx, bindings_ctx, id)
+        T::get_reuse_port(ctx, id)
     }
 
     fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
@@ -2131,7 +2039,6 @@ where
                 },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
         let how = match (
             how.contains(fposix_socket::ShutdownMode::READ),
             how.contains(fposix_socket::ShutdownMode::WRITE),
@@ -2141,7 +2048,7 @@ where
             (true, false) => ShutdownType::Receive,
             (false, false) => return Err(fposix::Errno::Einval),
         };
-        T::shutdown(core_ctx, bindings_ctx, id, how).map_err(IntoErrno::into_errno)?;
+        T::shutdown(ctx, id, how).map_err(IntoErrno::into_errno)?;
         match how {
             ShutdownType::Receive | ShutdownType::SendAndReceive => {
                 // Make sure to signal the peer so any ongoing call to
@@ -2188,20 +2095,12 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
         let interface =
-            interface.try_into_core_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?;
+            interface.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
 
-        T::set_multicast_membership(
-            core_ctx,
-            bindings_ctx,
-            id,
-            multicast_group,
-            interface,
-            want_membership,
-        )
-        .map_err(IntoErrno::into_errno)
+        T::set_multicast_membership(ctx, id, multicast_group, interface, want_membership)
+            .map_err(IntoErrno::into_errno)
     }
 
     fn set_unicast_hop_limit(
@@ -2223,9 +2122,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
-            .map_err(IntoErrno::into_errno)
+        T::set_unicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
     }
 
     fn set_multicast_hop_limit(
@@ -2249,9 +2146,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
-            .map_err(IntoErrno::into_errno)
+        T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
     }
 
     fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
@@ -2265,8 +2160,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        T::get_unicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
+        T::get_unicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
             .map_err(IntoErrno::into_errno)
     }
@@ -2282,8 +2176,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        T::get_multicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
+        T::get_multicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
             .map_err(IntoErrno::into_errno)
     }
@@ -2299,7 +2192,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        T::set_ip_transparent(ctx.core_ctx(), id, value)
+        T::set_ip_transparent(ctx, id, value)
     }
 
     fn get_ip_transparent(self) -> bool {
@@ -2313,7 +2206,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        T::get_ip_transparent(ctx.core_ctx(), id)
+        T::get_ip_transparent(ctx, id)
     }
 }
 

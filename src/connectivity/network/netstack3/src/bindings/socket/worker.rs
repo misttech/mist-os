@@ -7,10 +7,9 @@ use std::ops::ControlFlow;
 use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use futures::StreamExt as _;
-use netstack3_core::SyncCtx;
 use tracing::error;
 
-use crate::bindings::{socket::SocketWorkerProperties, BindingsCtx, Ctx};
+use crate::bindings::{socket::SocketWorkerProperties, Ctx};
 
 pub(crate) struct SocketWorker<Data> {
     ctx: Ctx,
@@ -92,7 +91,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// This is called when the last stream for the managed socket is closed,
     /// and should be used to free up any resources in `netstack3_core` for the
     /// socket.
-    fn close(self, core_ctx: &SyncCtx<BindingsCtx>, bindings_ctx: &mut BindingsCtx);
+    fn close(self, ctx: &mut Ctx);
 }
 
 /// Abstraction over the "close" behavior for a socket.
@@ -171,9 +170,7 @@ impl<S> From<S> for ProviderScopedSpawner<S> {
 impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Starts servicing events from the provided state and event stream.
     pub(crate) async fn serve_stream_with<
-        F: FnOnce(&SyncCtx<BindingsCtx>, &mut BindingsCtx, SocketWorkerProperties) -> H
-            + Send
-            + 'static,
+        F: FnOnce(&mut Ctx, SocketWorkerProperties) -> H + Send + 'static,
     >(
         mut ctx: Ctx,
         make_data: F,
@@ -182,11 +179,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         setup_args: H::SetupArgs,
         provider_spawner: ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     ) {
-        let data = {
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
-            make_data(core_ctx, bindings_ctx, properties)
-        };
+        let data = make_data(&mut ctx, properties);
         let worker = Self { ctx, data };
 
         // When the worker finishes, that means `self` goes out of scope and is
@@ -269,8 +262,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         };
 
         let Self { mut ctx, data } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        data.close(core_ctx, bindings_ctx);
+        data.close(&mut ctx);
 
         // Join all tasks created by this socket.
         std::mem::drop(spawners);
