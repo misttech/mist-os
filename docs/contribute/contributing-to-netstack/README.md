@@ -209,13 +209,11 @@ with much of the same advice, and the list above is part of a [blog
 post](https://chris.beams.io/posts/git-commit/) by [Chris
 Beams](https://chris.beams.io/).
 
-Commit messages should make use of issue tracker integration. See [Commit-log
-message integration][commit_log-message-integration] in the monorail
-documentation.
+Commit messages should make use of issue tracker integration. See [Commit message style guide](/docs/contribute/commit-message-style-guide.md).
 
 When using issue tracker integration, don't omit necessary context that may
-also be included in the relevant issue (see "Commit messages should be
-_concise_ but self-contained" above). Many issues are Google-internal, and any
+also be included in the relevant issue (commit messages should be
+_concise_ but self-contained). Many issues are Google-internal, and any
 given issue tracker is not guaranteed to be usable at the time that the commit
 history is read.
 
@@ -315,7 +313,6 @@ If you're working on changes that affect `fdio` and `third_party/go`, add:
 [magic_number]: https://en.wikipedia.org/wiki/Magic_number_(programming)
 [rfc_process]: /docs/contribute/governance/rfcs/0001_rfc_process.md
 [commit_guidelines]: https://www.git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project#_commit_guidelines
-[commit_log-message-integration]: https://chromium.googlesource.com/infra/infra/+/HEAD/appengine/monorail/doc/userguide/power-users.md#commit_log-message-integration
 [flutter_philosophy]: https://github.com/flutter/flutter/wiki/Style-guide-for-Flutter-repo#philosophy
 [testability_rubrics]: /docs/development/testing/testability_rubric.md
 [tests_as_components]: /docs/development/testing/run_fuchsia_tests.md
