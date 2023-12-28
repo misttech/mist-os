@@ -1065,17 +1065,19 @@ impl FilesystemLauncher {
         for entry in dir_entries {
             // Destroy all fvm partitions aside from blobfs
             if !entry.name.contains("blobfs") && !entry.name.contains("device") {
-                let entry_path = format!("{fvm_topo_path}/{}/block", entry.name);
-                let entry_volume_proxy =
-                    connect_to_protocol_at_path::<VolumeMarker>(&entry_path)
-                        .context("Failed to connect to the partition VolumeProxy")?;
-                ignore_paths.insert(entry_path.to_string());
+                let entry_volume_proxy = recursive_wait_and_open::<VolumeMarker>(
+                    &fvm_directory_proxy,
+                    &format!("{}/block", entry.name),
+                )
+                .await
+                .with_context(|| format!("Failed to open partition {}", entry.name))?;
+                ignore_paths.insert(format!("{fvm_topo_path}/{}/block", entry.name));
                 let status = entry_volume_proxy
                     .destroy()
                     .await
-                    .context("Failed to destroy the data partition")?;
+                    .with_context(|| format!("Failed to destroy partition {}", entry.name))?;
                 zx::Status::ok(status).context("destroy() returned an error")?;
-                tracing::info!(topological_path = %entry_path, "Destroyed partition");
+                tracing::info!(partition = %entry.name, "Destroyed partition");
             }
         }
 
