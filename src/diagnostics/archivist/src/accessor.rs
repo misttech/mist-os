@@ -237,7 +237,6 @@ impl ArchiveAccessorServer {
                 };
                 let logs = log_repo
                     .logs_cursor(mode, selectors, trace_id)
-                    .await
                     .map(move |inner: _| (*inner).clone());
                 BatchIterator::new_serving_arrays(logs, requests, mode, stats, trace_id)?
                     .run()
@@ -742,7 +741,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo = LogsRepository::new(1_000_000, inspector.root()).await;
+        let log_repo = LogsRepository::new(1_000_000, inspector.root());
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
         let server = ArchiveAccessorServer::new(inspect_repo, log_repo, 4);
         server.spawn_server(pipeline, stream);
@@ -796,7 +795,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo = LogsRepository::new(1_000_000, inspector.root()).await;
+        let log_repo = LogsRepository::new(1_000_000, inspector.root());
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
         let server = Arc::new(ArchiveAccessorServer::new(inspect_repo, log_repo, 4));
         server.spawn_server(pipeline, stream);

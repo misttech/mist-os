@@ -99,14 +99,14 @@ impl LogServer {
             let mode =
                 if dump_logs { StreamMode::Snapshot } else { StreamMode::SnapshotThenSubscribe };
             // NOTE: The LogListener code path isn't instrumented for tracing at the moment.
-            let logs = logs_repo.logs_cursor(mode, None, ftrace::Id::random()).await;
+            let logs = logs_repo.logs_cursor(mode, None, ftrace::Id::random());
             if let Some(s) = selectors {
-                logs_repo.update_logs_interest(connection_id, s).await;
+                logs_repo.update_logs_interest(connection_id, s);
             }
 
             sender.lock().unbounded_send(listener.spawn(logs, dump_logs)).ok();
         }
-        logs_repo.finish_interest_connection(connection_id).await;
+        logs_repo.finish_interest_connection(connection_id);
         Ok(())
     }
 }

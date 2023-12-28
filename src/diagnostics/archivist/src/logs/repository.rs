@@ -15,12 +15,12 @@ use crate::{
         multiplex::{Multiplexer, MultiplexerHandle},
     },
 };
-use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::{self, LogInterestSelector, Selector, StreamMode};
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
+use fuchsia_sync::{Mutex, RwLock};
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc;
 use futures::prelude::*;
@@ -41,7 +41,7 @@ lazy_static! {
 /// LogsRepository holds all diagnostics data and is a singleton wrapped by multiple
 /// [`pipeline::Pipeline`]s in a given Archivist instance.
 pub struct LogsRepository {
-    log_sender: Arc<RwLock<mpsc::UnboundedSender<fasync::Task<()>>>>,
+    log_sender: RwLock<mpsc::UnboundedSender<fasync::Task<()>>>,
     mutable_state: RwLock<LogsRepositoryState>,
     /// Processes removal of components emitted by the budget handler. This is done to prevent a
     /// deadlock. It's behind a mutex, but it's only set once. Holds an Arc<Self>.
@@ -49,19 +49,16 @@ pub struct LogsRepository {
 }
 
 impl LogsRepository {
-    pub async fn new(
-        logs_max_cached_original_bytes: u64,
-        parent: &fuchsia_inspect::Node,
-    ) -> Arc<Self> {
+    pub fn new(logs_max_cached_original_bytes: u64, parent: &fuchsia_inspect::Node) -> Arc<Self> {
         let (remover_snd, remover_rcv) = mpsc::unbounded();
         let logs_budget = BudgetManager::new(logs_max_cached_original_bytes as usize, remover_snd);
         let (log_sender, log_receiver) = mpsc::unbounded();
         let this = Arc::new(LogsRepository {
             mutable_state: RwLock::new(LogsRepositoryState::new(logs_budget, log_receiver, parent)),
-            log_sender: Arc::new(RwLock::new(log_sender)),
+            log_sender: RwLock::new(log_sender),
             component_removal_task: Mutex::new(None),
         });
-        *this.component_removal_task.lock().await = Some(fasync::Task::spawn(
+        *this.component_removal_task.lock() = Some(fasync::Task::spawn(
             Self::process_removal_of_components(remover_rcv, Arc::clone(&this)),
         ));
         this
@@ -69,18 +66,18 @@ impl LogsRepository {
 
     /// Drain the kernel's debug log. The returned future completes once
     /// existing messages have been ingested.
-    pub async fn drain_debuglog<K>(&self, klog_reader: K)
+    pub fn drain_debuglog<K>(&self, klog_reader: K)
     where
         K: DebugLog + Send + Sync + 'static,
     {
-        let mut mutable_state = self.mutable_state.write().await;
+        let mut mutable_state = self.mutable_state.write();
         // We can only have one klog reader, if this is already set, it means we are already
         // draining klog.
         if mutable_state.drain_klog_task.is_some() {
             return;
         }
 
-        let container = mutable_state.get_log_container(KERNEL_IDENTITY.clone()).await;
+        let container = mutable_state.get_log_container(KERNEL_IDENTITY.clone());
         mutable_state.drain_klog_task = Some(fasync::Task::spawn(async move {
             debug!("Draining debuglog.");
             let mut kernel_logger = DebugLogBridge::create(klog_reader);
@@ -93,13 +90,13 @@ impl LogsRepository {
             };
             messages.sort_by_key(|m| m.timestamp());
             for message in messages {
-                container.ingest_message(message).await;
+                container.ingest_message(message);
             }
 
             let res = kernel_logger
                 .listen()
                 .try_for_each(|message| async {
-                    container.ingest_message(message).await;
+                    container.ingest_message(message);
                     Ok(())
                 })
                 .await;
@@ -109,13 +106,13 @@ impl LogsRepository {
         }));
     }
 
-    pub async fn logs_cursor(
+    pub fn logs_cursor(
         &self,
         mode: StreamMode,
         selectors: Option<Vec<Selector>>,
         parent_trace_id: ftrace::Id,
     ) -> impl Stream<Item = Arc<LogsData>> + Send + 'static {
-        let mut repo = self.mutable_state.write().await;
+        let mut repo = self.mutable_state.write();
         let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id);
         if let Some(selectors) = selectors {
             merged.set_selectors(selectors);
@@ -129,40 +126,40 @@ impl LogsRepository {
             .for_each(|(n, c)| {
                 mpx_handle.send(n, c);
             });
-        repo.logs_multiplexers.add(mode, mpx_handle).await;
+        repo.logs_multiplexers.add(mode, mpx_handle);
         merged.set_on_drop_id_sender(repo.logs_multiplexers.cleanup_sender());
 
         merged
     }
 
-    pub async fn get_log_container(
+    pub fn get_log_container(
         &self,
         identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
-        self.mutable_state.write().await.get_log_container(identity).await
+        self.mutable_state.write().get_log_container(identity)
     }
 
     /// Stop accepting new messages, ensuring that pending Cursors return Poll::Ready(None) after
     /// consuming any messages received before this call.
     pub async fn wait_for_termination(&self) {
-        let receiver = self.mutable_state.write().await.log_receiver.take().unwrap();
+        let receiver = self.mutable_state.write().log_receiver.take().unwrap();
         receiver.for_each_concurrent(None, |rx| rx).await;
         // Process messages from log sink.
         debug!("Log ingestion stopped.");
-        let mut repo = self.mutable_state.write().await;
+        let mut repo = self.mutable_state.write();
         for container in repo.logs_data_store.values() {
             container.terminate();
         }
-        repo.logs_multiplexers.terminate().await;
+        repo.logs_multiplexers.terminate();
 
         debug!("Terminated logs");
-        repo.logs_budget.terminate().await;
+        repo.logs_budget.terminate();
     }
 
     /// Closes the connection in which new logger draining tasks are sent. No more logger tasks
     /// will be accepted when this is called and we'll proceed to terminate logs.
-    pub async fn stop_accepting_new_log_sinks(&self) {
-        self.log_sender.write().await.disconnect();
+    pub fn stop_accepting_new_log_sinks(&self) {
+        self.log_sender.write().disconnect();
     }
 
     /// Returns an id to use for a new interest connection. Used by both LogSettings and Log, to
@@ -172,17 +169,13 @@ impl LogsRepository {
     }
 
     /// Updates log selectors associated with an interest connection.
-    pub async fn update_logs_interest(
-        &self,
-        connection_id: usize,
-        selectors: Vec<LogInterestSelector>,
-    ) {
-        self.mutable_state.write().await.update_logs_interest(connection_id, selectors).await;
+    pub fn update_logs_interest(&self, connection_id: usize, selectors: Vec<LogInterestSelector>) {
+        self.mutable_state.write().update_logs_interest(connection_id, selectors);
     }
 
     /// Indicates that the connection associated with the given ID is now done.
-    pub async fn finish_interest_connection(&self, connection_id: usize) {
-        self.mutable_state.write().await.finish_interest_connection(connection_id).await;
+    pub fn finish_interest_connection(&self, connection_id: usize) {
+        self.mutable_state.write().finish_interest_connection(connection_id);
     }
 
     async fn process_removal_of_components(
@@ -190,8 +183,8 @@ impl LogsRepository {
         logs_repo: Arc<LogsRepository>,
     ) {
         while let Some(identity) = removal_requests.next().await {
-            let mut repo = logs_repo.mutable_state.write().await;
-            if !repo.is_live(&identity).await {
+            let mut repo = logs_repo.mutable_state.write();
+            if !repo.is_live(&identity) {
                 debug!(%identity, "Removing component from repository.");
                 repo.remove(&identity);
             }
@@ -199,12 +192,11 @@ impl LogsRepository {
     }
 
     #[cfg(test)]
-    pub(crate) async fn default() -> Arc<Self> {
+    pub(crate) fn default() -> Arc<Self> {
         LogsRepository::new(
             crate::constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
             &Default::default(),
         )
-        .await
     }
 }
 
@@ -217,10 +209,8 @@ impl EventConsumer for LogsRepository {
                 request_stream,
             }) => {
                 debug!(identity = %component, "LogSink requested.");
-                let container = self.get_log_container(component).await;
-                container
-                    .handle_log_sink(request_stream, self.log_sender.read().await.clone())
-                    .await;
+                let container = self.get_log_container(component);
+                container.handle_log_sink(request_stream, self.log_sender.read().clone());
             }
             _ => unreachable!("Archivist state just subscribes to log sink requested"),
         }
@@ -267,56 +257,49 @@ impl LogsRepositoryState {
 
     /// Returns a container for logs artifacts, constructing one and adding it to the trie if
     /// necessary.
-    pub async fn get_log_container(
+    pub fn get_log_container(
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
         match self.logs_data_store.get(&identity) {
             None => {
-                let container = Arc::new(
-                    LogsArtifactsContainer::new(
-                        Arc::clone(&identity),
-                        self.interest_registrations.values().flat_map(|s| s.iter()),
-                        &self.inspect_node,
-                        self.logs_budget.handle(),
-                    )
-                    .await,
-                );
-                self.logs_budget.add_container(Arc::clone(&container)).await;
+                let container = Arc::new(LogsArtifactsContainer::new(
+                    Arc::clone(&identity),
+                    self.interest_registrations.values().flat_map(|s| s.iter()),
+                    &self.inspect_node,
+                    self.logs_budget.handle(),
+                ));
+                self.logs_budget.add_container(Arc::clone(&container));
                 self.logs_data_store.insert(identity, Arc::clone(&container));
-                self.logs_multiplexers.send(&container).await;
+                self.logs_multiplexers.send(&container);
                 container
             }
             Some(existing) => Arc::clone(existing),
         }
     }
 
-    async fn is_live(&self, identity: &Arc<ComponentIdentity>) -> bool {
+    fn is_live(&self, identity: &Arc<ComponentIdentity>) -> bool {
         match self.logs_data_store.get(identity) {
-            Some(container) => container.should_retain().await,
+            Some(container) => container.should_retain(),
             None => false,
         }
     }
 
-    async fn update_logs_interest(
-        &mut self,
-        connection_id: usize,
-        selectors: Vec<LogInterestSelector>,
-    ) {
+    fn update_logs_interest(&mut self, connection_id: usize, selectors: Vec<LogInterestSelector>) {
         let previous_selectors =
             self.interest_registrations.insert(connection_id, selectors).unwrap_or_default();
         // unwrap safe, we just inserted.
         let new_selectors = self.interest_registrations.get(&connection_id).unwrap();
         for logs_data in self.logs_data_store.values() {
-            logs_data.update_interest(new_selectors.iter(), &previous_selectors).await;
+            logs_data.update_interest(new_selectors.iter(), &previous_selectors);
         }
     }
 
-    pub async fn finish_interest_connection(&mut self, connection_id: usize) {
+    pub fn finish_interest_connection(&mut self, connection_id: usize) {
         let selectors = self.interest_registrations.remove(&connection_id);
         if let Some(selectors) = selectors {
             for logs_data in self.logs_data_store.values() {
-                logs_data.reset_interest(&selectors).await;
+                logs_data.reset_interest(&selectors);
             }
         }
     }
@@ -345,7 +328,7 @@ impl MultiplexerBroker {
             cleanup_sender,
             _live_iterators_cleanup_task: fasync::Task::spawn(async move {
                 while let Some(id) = receiver.next().await {
-                    live_iterators_clone.lock().await.remove(&id);
+                    live_iterators_clone.lock().remove(&id);
                 }
             }),
         }
@@ -357,23 +340,20 @@ impl MultiplexerBroker {
 
     /// A new BatchIterator has been created and must be notified when future log containers are
     /// created.
-    async fn add(&mut self, mode: StreamMode, recipient: MultiplexerHandle<Arc<LogsData>>) {
+    fn add(&mut self, mode: StreamMode, recipient: MultiplexerHandle<Arc<LogsData>>) {
         match mode {
             // snapshot streams only want to know about what's currently available
             StreamMode::Snapshot => recipient.close(),
             StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => {
-                self.live_iterators
-                    .lock()
-                    .await
-                    .insert(recipient.multiplexer_id(), (mode, recipient));
+                self.live_iterators.lock().insert(recipient.multiplexer_id(), (mode, recipient));
             }
         }
     }
 
     /// Notify existing BatchIterators of a new logs container so they can include its messages
     /// in their results.
-    pub async fn send(&mut self, container: &Arc<LogsArtifactsContainer>) {
-        self.live_iterators.lock().await.retain(|_, (mode, recipient)| {
+    pub fn send(&mut self, container: &Arc<LogsArtifactsContainer>) {
+        self.live_iterators.lock().retain(|_, (mode, recipient)| {
             recipient.send(
                 Arc::clone(&container.identity),
                 container.cursor(*mode, recipient.parent_trace_id()),
@@ -382,8 +362,8 @@ impl MultiplexerBroker {
     }
 
     /// Notify all multiplexers to terminate their streams once sub streams have terminated.
-    async fn terminate(&mut self) {
-        for (_, (_, recipient)) in self.live_iterators.lock().await.drain() {
+    fn terminate(&mut self) {
+        for (_, (_, recipient)) in self.live_iterators.lock().drain() {
             recipient.close();
         }
     }
@@ -404,37 +384,31 @@ mod tests {
 
     #[fuchsia::test]
     async fn data_repo_filters_logs_by_selectors() {
-        let repo = LogsRepository::default().await;
-        let foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./foo").unwrap(),
-                "fuchsia-pkg://foo",
-            )))
-            .await;
-        let bar_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./bar").unwrap(),
-                "fuchsia-pkg://bar",
-            )))
-            .await;
+        let repo = LogsRepository::default();
+        let foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./foo").unwrap(),
+            "fuchsia-pkg://foo",
+        )));
+        let bar_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bar").unwrap(),
+            "fuchsia-pkg://bar",
+        )));
 
-        foo_container.ingest_message(make_message("a", 1)).await;
-        bar_container.ingest_message(make_message("b", 2)).await;
-        foo_container.ingest_message(make_message("c", 3)).await;
+        foo_container.ingest_message(make_message("a", 1));
+        bar_container.ingest_message(make_message("b", 2));
+        foo_container.ingest_message(make_message("c", 3));
 
-        let stream = repo.logs_cursor(StreamMode::Snapshot, None, ftrace::Id::random()).await;
+        let stream = repo.logs_cursor(StreamMode::Snapshot, None, ftrace::Id::random());
 
         let results =
             stream.map(|value| value.msg().unwrap().to_string()).collect::<Vec<_>>().await;
         assert_eq!(results, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 
-        let filtered_stream = repo
-            .logs_cursor(
-                StreamMode::Snapshot,
-                Some(vec![selectors::parse_selector::<FastError>("foo:root").unwrap()]),
-                ftrace::Id::random(),
-            )
-            .await;
+        let filtered_stream = repo.logs_cursor(
+            StreamMode::Snapshot,
+            Some(vec![selectors::parse_selector::<FastError>("foo:root").unwrap()]),
+            ftrace::Id::random(),
+        );
 
         let results =
             filtered_stream.map(|value| value.msg().unwrap().to_string()).collect::<Vec<_>>().await;
@@ -443,22 +417,17 @@ mod tests {
 
     #[fuchsia::test]
     async fn multiplexer_broker_cleanup() {
-        let repo = LogsRepository::default().await;
+        let repo = LogsRepository::default();
         let stream =
-            repo.logs_cursor(StreamMode::SnapshotThenSubscribe, None, ftrace::Id::random()).await;
+            repo.logs_cursor(StreamMode::SnapshotThenSubscribe, None, ftrace::Id::random());
 
-        assert_eq!(
-            repo.mutable_state.read().await.logs_multiplexers.live_iterators.lock().await.len(),
-            1
-        );
+        assert_eq!(repo.mutable_state.read().logs_multiplexers.live_iterators.lock().len(), 1);
 
         // When the multiplexer goes away it must be forgotten by the broker.
         drop(stream);
         loop {
             fasync::Timer::new(Duration::from_millis(100)).await;
-            if repo.mutable_state.read().await.logs_multiplexers.live_iterators.lock().await.len()
-                == 0
-            {
+            if repo.mutable_state.read().logs_multiplexers.live_iterators.lock().len() == 0 {
                 break;
             }
         }

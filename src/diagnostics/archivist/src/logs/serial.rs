@@ -58,9 +58,11 @@ impl SerialConfig {
     /// configured to emit logs.
     pub async fn write_logs<S: Write>(self, repo: Arc<LogsRepository>, mut sink: S) {
         let Self { denied_tags, selectors } = self;
-        let mut log_stream = repo
-            .logs_cursor(StreamMode::SnapshotThenSubscribe, Some(selectors), ftrace::Id::random())
-            .await;
+        let mut log_stream = repo.logs_cursor(
+            StreamMode::SnapshotThenSubscribe,
+            Some(selectors),
+            ftrace::Id::random(),
+        );
         while let Some(log) = log_stream.next().await {
             SerialWriter::log(log.as_ref(), &denied_tags, &mut sink).ok();
         }
@@ -296,40 +298,32 @@ mod tests {
     #[fuchsia::test]
     async fn writes_ingested_logs() {
         let serial_config = SerialConfig::new(vec!["bootstrap/**", "/core/foo"], vec!["foo"]);
-        let repo = LogsRepository::default().await;
+        let repo = LogsRepository::default();
 
-        let bootstrap_foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
-                "fuchsia-pkg://bootstrap-foo",
-            )))
-            .await;
-        let bootstrap_bar_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./bootstrap/bar").unwrap(),
-                "fuchsia-pkg://bootstrap-bar",
-            )))
-            .await;
+        let bootstrap_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
+            "fuchsia-pkg://bootstrap-foo",
+        )));
+        let bootstrap_bar_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bootstrap/bar").unwrap(),
+            "fuchsia-pkg://bootstrap-bar",
+        )));
 
-        let core_foo_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./core/foo").unwrap(),
-                "fuchsia-pkg://core-foo",
-            )))
-            .await;
-        let core_baz_container = repo
-            .get_log_container(Arc::new(ComponentIdentity::new(
-                ExtendedMoniker::parse_str("./core/baz").unwrap(),
-                "fuchsia-pkg://core-baz",
-            )))
-            .await;
+        let core_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./core/foo").unwrap(),
+            "fuchsia-pkg://core-foo",
+        )));
+        let core_baz_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./core/baz").unwrap(),
+            "fuchsia-pkg://core-baz",
+        )));
 
-        bootstrap_foo_container.ingest_message(make_message("a", None, 1)).await;
-        core_baz_container.ingest_message(make_message("c", None, 2)).await;
+        bootstrap_foo_container.ingest_message(make_message("a", None, 1));
+        core_baz_container.ingest_message(make_message("c", None, 2));
         let (sink, rcv) = TestSink::new();
         let _serial_task = fasync::Task::spawn(serial_config.write_logs(Arc::clone(&repo), sink));
-        bootstrap_bar_container.ingest_message(make_message("b", Some("foo"), 3)).await;
-        core_foo_container.ingest_message(make_message("c", None, 4)).await;
+        bootstrap_bar_container.ingest_message(make_message("b", Some("foo"), 3));
+        core_foo_container.ingest_message(make_message("c", None, 4));
 
         let received = rcv.take(2).collect::<Vec<_>>().await;
 

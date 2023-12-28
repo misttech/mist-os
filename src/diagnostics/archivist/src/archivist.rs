@@ -96,8 +96,7 @@ impl Archivist {
         let logs_repo = LogsRepository::new(
             config.logs_max_cached_original_bytes,
             component::inspector().root(),
-        )
-        .await;
+        );
         let serial_task = if !config.allow_serial_logs.is_empty() {
             Some(fasync::Task::spawn(
                 SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
@@ -139,7 +138,7 @@ impl Archivist {
         // Drain klog and publish it to syslog.
         if config.enable_klog {
             match KernelDebugLog::new().await {
-                Ok(klog) => logs_repo.drain_debuglog(klog).await,
+                Ok(klog) => logs_repo.drain_debuglog(klog),
                 Err(err) => warn!(
                     ?err,
                     "Failed to start the kernel debug log reader. Klog won't be in syslog"
@@ -319,7 +318,7 @@ impl Archivist {
                 inspect_sink_server.stop();
                 log_server.stop();
                 accessor_server.stop();
-                logs_repo.stop_accepting_new_log_sinks().await;
+                logs_repo.stop_accepting_new_log_sinks();
                 abort_handle.abort()
             }
             .left_future(),

@@ -70,20 +70,20 @@ pub fn create_log_sink_requested_event(
 }
 
 impl TestHarness {
-    pub async fn default() -> Self {
-        Self::make(false).await
+    pub fn default() -> Self {
+        Self::make(false)
     }
 
     /// Create a new test harness which will keep its LogSinks alive as long as it itself is,
     /// useful for testing inspect hierarchies for attribution.
     // TODO(fxbug.dev/53932) this will be made unnecessary by historical retention of component stats
-    pub async fn with_retained_sinks() -> Self {
-        Self::make(true).await
+    pub fn with_retained_sinks() -> Self {
+        Self::make(true)
     }
 
-    async fn make(hold_sinks: bool) -> Self {
+    fn make(hold_sinks: bool) -> Self {
         let inspector = Inspector::default();
-        let log_manager = LogsRepository::new(1_000_000, inspector.root()).await;
+        let log_manager = LogsRepository::new(1_000_000, inspector.root());
         let log_server = LogServer::new(Arc::clone(&log_manager));
 
         let (log_proxy, log_stream) =
@@ -290,8 +290,8 @@ impl LogReader for DefaultLogReader {
     async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let container = self.log_manager.get_log_container(Arc::clone(&self.identity)).await;
-        container.handle_log_sink(log_sink_stream, log_sender).await;
+        let container = self.log_manager.get_log_container(Arc::clone(&self.identity));
+        container.handle_log_sink(log_sink_stream, log_sender);
         log_sink_proxy
     }
 }
@@ -320,12 +320,12 @@ impl EventStreamLogReader {
     ) {
         while let Ok(res) = stream.get_next().await {
             for event in res {
-                Self::handle_event(event, sender.clone(), Arc::clone(&log_manager)).await
+                Self::handle_event(event, sender.clone(), Arc::clone(&log_manager))
             }
         }
     }
 
-    async fn handle_event(
+    fn handle_event(
         event: fcomponent::Event,
         sender: mpsc::UnboundedSender<Task<()>>,
         log_manager: Arc<LogsRepository>,
@@ -335,8 +335,8 @@ impl EventStreamLogReader {
                 Event { payload: EventPayload::LogSinkRequested(payload), .. } => payload,
                 other => unreachable!("should never see {:?} here", other),
             };
-        let container = log_manager.get_log_container(component).await;
-        container.handle_log_sink(request_stream, sender).await;
+        let container = log_manager.get_log_container(component);
+        container.handle_log_sink(request_stream, sender);
     }
 }
 
@@ -408,11 +408,11 @@ pub async fn debuglog_test(
     debug_log: TestDebugLog,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm = LogsRepository::new(1_000_000, inspector.root()).await;
+    let lm = LogsRepository::new(1_000_000, inspector.root());
     let log_server = LogServer::new(Arc::clone(&lm));
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
     log_server.spawn(log_stream);
-    lm.drain_debuglog(debug_log).await;
+    lm.drain_debuglog(debug_log);
 
     validate_log_stream(expected, log_proxy, None).await;
     inspector

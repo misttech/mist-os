@@ -58,15 +58,15 @@ impl LogSettingsServer {
             })?;
             match request {
                 fdiagnostics::LogSettingsRequest::RegisterInterest { selectors, .. } => {
-                    logs_repo.update_logs_interest(connection_id, selectors).await;
+                    logs_repo.update_logs_interest(connection_id, selectors);
                 }
                 fdiagnostics::LogSettingsRequest::SetInterest { selectors, responder } => {
-                    logs_repo.update_logs_interest(connection_id, selectors).await;
+                    logs_repo.update_logs_interest(connection_id, selectors);
                     responder.send().ok();
                 }
             }
         }
-        logs_repo.finish_interest_connection(connection_id).await;
+        logs_repo.finish_interest_connection(connection_id);
 
         Ok(())
     }
