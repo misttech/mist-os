@@ -13,7 +13,6 @@ use {
         pipeline::Pipeline,
         ImmutableString,
     },
-    async_lock::Mutex,
     async_trait::async_trait,
     diagnostics_data::{Data, DiagnosticsData, Metadata},
     fidl::endpoints::{ControlHandle, RequestStream},
@@ -27,6 +26,7 @@ use {
     fidl_fuchsia_mem::Buffer,
     fuchsia_async::{self as fasync, Task},
     fuchsia_inspect::NumericProperty,
+    fuchsia_sync::Mutex,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::{
         channel::mpsc,
@@ -37,11 +37,7 @@ use {
     },
     selectors::{self, FastError},
     serde::Serialize,
-    std::{
-        collections::HashMap,
-        pin::Pin,
-        sync::{Arc, Mutex as SyncMutex},
-    },
+    std::{collections::HashMap, pin::Pin, sync::Arc},
     thiserror::Error,
     tracing::warn,
 };
@@ -53,7 +49,7 @@ pub struct ArchiveAccessorServer {
     inspect_repository: Arc<InspectRepository>,
     logs_repository: Arc<LogsRepository>,
     maximum_concurrent_snapshots_per_reader: u64,
-    server_task_sender: Arc<SyncMutex<mpsc::UnboundedSender<fasync::Task<()>>>>,
+    server_task_sender: Arc<Mutex<mpsc::UnboundedSender<fasync::Task<()>>>>,
     server_task_drainer: Mutex<Option<fasync::Task<()>>>,
 }
 
@@ -125,7 +121,7 @@ impl ArchiveAccessorServer {
             inspect_repository,
             logs_repository,
             maximum_concurrent_snapshots_per_reader,
-            server_task_sender: Arc::new(SyncMutex::new(snd)),
+            server_task_sender: Arc::new(Mutex::new(snd)),
             server_task_drainer: Mutex::new(Some(fasync::Task::spawn(async move {
                 rcv.for_each_concurrent(None, |rx| rx).await
             }))),
@@ -133,16 +129,16 @@ impl ArchiveAccessorServer {
     }
 
     pub async fn wait_for_servers_to_complete(&self) {
-        match self.server_task_drainer.lock().await.take() {
-            Some(task) => task.await,
-            None => unreachable!("The accessor server task is only awaited for once"),
-        }
+        let task = self
+            .server_task_drainer
+            .lock()
+            .take()
+            .expect("The accessor server task is only awaited for once");
+        task.await;
     }
 
     pub fn stop(&self) {
-        if let Ok(mut guard) = self.server_task_sender.lock() {
-            guard.disconnect();
-        }
+        self.server_task_sender.lock().disconnect();
     }
 
     async fn spawn(
@@ -262,8 +258,8 @@ impl ArchiveAccessorServer {
         let log_repo = Arc::clone(&self.logs_repository);
         let inspect_repo = Arc::clone(&self.inspect_repository);
         let maximum_concurrent_snapshots_per_reader = self.maximum_concurrent_snapshots_per_reader;
-        let Ok(guard) = self.server_task_sender.lock() else { return };
-        guard
+        self.server_task_sender
+            .lock()
             .unbounded_send(fasync::Task::spawn(async move {
                 let stats = pipeline.accessor_stats();
                 stats.global_stats.connections_opened.add(1);
@@ -277,8 +273,8 @@ impl ArchiveAccessorServer {
                     // this allows tests to fetch all isolated logs before finishing.
                     let inspect_repo_for_task = Arc::clone(&inspect_repo);
                     let log_repo_for_task = Arc::clone(&log_repo);
-                    let Ok(guard) = batch_iterator_task_sender.lock() else { continue };
-                    guard
+                    batch_iterator_task_sender
+                        .lock()
                         .unbounded_send(Task::spawn(async move {
                             if let Err(e) = Self::spawn(
                                 pipeline,
@@ -534,8 +530,8 @@ impl BatchIterator {
                     "trace_id" => u64::from(trace_id),
                     "moniker" => d.moniker.as_ref()
                 );
-                let mut unlocked_counter = stream_owned_counter.lock().await;
-                let mut tracker_guard = budget_tracker.lock().await;
+                let mut unlocked_counter = stream_owned_counter.lock();
+                let mut tracker_guard = budget_tracker.lock();
                 unlocked_counter.total_schemas += 1;
                 if d.metadata.has_errors() {
                     result_stats.add_result_error();
@@ -647,7 +643,7 @@ impl BatchIterator {
             self.stats.add_response();
             if batch.is_empty() {
                 if let Some(truncation_count) = &self.truncation_counter {
-                    let unlocked_count = truncation_count.lock().await;
+                    let unlocked_count = truncation_count.lock();
                     if unlocked_count.total_schemas > 0 {
                         self.stats.global_stats().record_percent_truncated_schemas(
                             ((unlocked_count.truncated_schemas as f32

@@ -4,14 +4,14 @@
 
 use derivative::Derivative;
 use fidl_fuchsia_diagnostics::StreamMode;
+use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use std::{
     collections::VecDeque,
     default::Default,
     fmt::Debug,
     pin::Pin,
-    // TODO(https://fxbug.dev/106877) make this an async lock
-    sync::{Arc, Mutex},
+    sync::Arc,
     task::{Context, Poll, Waker},
 };
 use tracing::{trace, warn};
@@ -29,34 +29,34 @@ impl<T> Default for ArcList<T> {
 
 impl<T> ArcList<T> {
     pub fn is_empty(&self) -> bool {
-        self.inner.lock().unwrap().items.is_empty()
+        self.inner.lock().items.is_empty()
     }
 
     pub fn push_back(&self, item: T) {
-        self.inner.lock().unwrap().push_back(item);
+        self.inner.lock().push_back(item);
     }
 
     pub fn pop_front(&self) -> Option<Arc<T>> {
-        self.inner.lock().unwrap().pop_front()
+        self.inner.lock().pop_front()
     }
 
     pub fn peek_front(&self) -> Option<Arc<T>> {
-        self.inner.lock().unwrap().peek_front().map(|item| item.value)
+        self.inner.lock().peek_front().map(|item| item.value)
     }
 
     pub fn cursor(&self, mode: StreamMode) -> Cursor<T> {
-        let id = self.inner.lock().unwrap().new_cursor_id();
+        let id = self.inner.lock().new_cursor_id();
         Cursor::new(id, self.clone(), mode)
     }
 
     /// End the stream, ignoring new values and causing Cursors to return None after the current ID.
     pub fn terminate(&self) {
-        self.inner.lock().unwrap().terminate();
+        self.inner.lock().terminate();
     }
 
     #[cfg(test)]
     pub fn final_entry(&self) -> u64 {
-        self.inner.lock().unwrap().final_entry
+        self.inner.lock().final_entry
     }
 }
 
@@ -209,13 +209,13 @@ impl<T> Cursor<T> {
         let from = match mode {
             StreamMode::Snapshot | StreamMode::SnapshotThenSubscribe => None,
             StreamMode::Subscribe => {
-                let inner = list.inner.lock().unwrap();
+                let inner = list.inner.lock();
                 Some(inner.entries_seen)
             }
         };
 
         let to = match mode {
-            StreamMode::Snapshot => list.inner.lock().unwrap().entries_seen,
+            StreamMode::Snapshot => list.inner.lock().entries_seen,
             StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => std::u64::MAX,
         };
 
@@ -223,7 +223,7 @@ impl<T> Cursor<T> {
     }
 
     fn maybe_register_for_wakeup(&mut self, cx: &mut Context<'_>) -> Poll<Option<LazyItem<T>>> {
-        let mut root = self.list.inner.lock().unwrap();
+        let mut root = self.list.inner.lock();
         let cursor_at_end = self.last_id_seen.unwrap_or(0) == root.final_entry;
         let list_fully_drained = root.final_entry == root.entries_popped;
 
@@ -262,11 +262,11 @@ impl<T> Stream for Cursor<T> {
         }
 
         let next = match self.last_id_seen {
-            Some(id) => self.list.inner.lock().unwrap().first_starting_at(id + 1),
+            Some(id) => self.list.inner.lock().first_starting_at(id + 1),
             None => {
                 // otherwise start again at the head
                 trace!("{:?} starting from the head of the list.", self.id);
-                self.list.inner.lock().unwrap().peek_front()
+                self.list.inner.lock().peek_front()
             }
         };
 

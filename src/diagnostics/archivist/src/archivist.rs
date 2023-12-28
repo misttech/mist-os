@@ -316,8 +316,8 @@ impl Archivist {
                 for task in incoming_external_event_producers {
                     task.cancel().await;
                 }
+                inspect_sink_server.stop();
                 log_server.stop();
-                inspect_sink_server.stop().await;
                 accessor_server.stop();
                 logs_repo.stop_accepting_new_log_sinks().await;
                 abort_handle.abort()

@@ -11,10 +11,10 @@ use crate::{
     inspect::{container::InspectHandle, repository::InspectRepository},
 };
 use anyhow::Error;
-use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use fidl_fuchsia_inspect as finspect;
 use fuchsia_async as fasync;
+use fuchsia_sync::{Mutex, RwLock};
 use futures::{channel::mpsc, StreamExt};
 use std::sync::Arc;
 use tracing::warn;
@@ -24,7 +24,7 @@ pub struct InspectSinkServer {
     repo: Arc<InspectRepository>,
 
     /// Sender end of drain_listeners_task.
-    task_sender: Arc<RwLock<mpsc::UnboundedSender<fasync::Task<()>>>>,
+    task_sender: RwLock<mpsc::UnboundedSender<fasync::Task<()>>>,
 
     /// Task that makes sure every handler closes down before closing down InspectSinkSErver.
     drain_listeners_task: Mutex<Option<fasync::Task<()>>>,
@@ -36,7 +36,7 @@ impl InspectSinkServer {
         let (sender, receiver) = mpsc::unbounded();
         Self {
             repo,
-            task_sender: Arc::new(RwLock::new(sender)),
+            task_sender: RwLock::new(sender),
             drain_listeners_task: Mutex::new(Some(fasync::Task::spawn(async move {
                 receiver
                     .for_each_concurrent(None, |rx| async move {
@@ -48,20 +48,14 @@ impl InspectSinkServer {
     }
 
     /// Handle incoming events. Mainly for use in EventConsumer impl.
-    async fn spawn(
-        &self,
-        component: Arc<ComponentIdentity>,
-        stream: finspect::InspectSinkRequestStream,
-    ) {
+    fn spawn(&self, component: Arc<ComponentIdentity>, stream: finspect::InspectSinkRequestStream) {
         let repo = Arc::clone(&self.repo);
 
-        if let Err(e) =
-            self.task_sender.read().await.unbounded_send(fasync::Task::spawn(async move {
-                if let Err(e) = Self::handle_requests(repo, component, stream).await {
-                    warn!("error handling InspectSink requests: {e}");
-                }
-            }))
-        {
+        if let Err(e) = self.task_sender.read().unbounded_send(fasync::Task::spawn(async move {
+            if let Err(e) = Self::handle_requests(repo, component, stream).await {
+                warn!("error handling InspectSink requests: {e}");
+            }
+        })) {
             warn!("couldn't queue listener task: {e:?}");
         }
     }
@@ -92,17 +86,17 @@ impl InspectSinkServer {
 
     /// Instructs the server to finish handling all connections.
     pub async fn wait_for_servers_to_complete(&self) {
-        self.drain_listeners_task
+        let task = self
+            .drain_listeners_task
             .lock()
-            .await
             .take()
-            .expect("the accessor server task is only awaited once")
-            .await;
+            .expect("the accessor server task is only awaited once");
+        task.await;
     }
 
     /// Instructs the server to stop accepting new connections.
-    pub async fn stop(&self) {
-        self.task_sender.write().await.disconnect();
+    pub fn stop(&self) {
+        self.task_sender.write().disconnect();
     }
 }
 
@@ -114,7 +108,7 @@ impl EventConsumer for InspectSinkServer {
                 component,
                 request_stream,
             }) => {
-                self.spawn(component, request_stream).await;
+                self.spawn(component, request_stream);
             }
             _ => unreachable!("InspectSinkServer is only subscribed to InspectSinkRequested"),
         }
@@ -267,7 +261,7 @@ mod tests {
                 proxy.take();
             }
 
-            self.server.stop().await;
+            self.server.stop();
             self.server.wait_for_servers_to_complete().await;
         }
 

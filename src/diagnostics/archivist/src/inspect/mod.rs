@@ -964,7 +964,7 @@ mod tests {
 
                 drop(proxy);
 
-                inspect_sink_server.stop().await;
+                inspect_sink_server.stop();
                 inspect_sink_server.wait_for_servers_to_complete().await;
             }
         }
