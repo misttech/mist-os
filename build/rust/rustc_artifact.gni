@@ -142,6 +142,7 @@ template("rustc_artifact") {
   _edition = invoker.edition
   _configs += [ "//build/config/rust:edition_${_edition}" ]
 
+  _group_name = target_name
   _target_name = "$target_name.actual"
   _clippy_name = "$target_name.clippy"
 
@@ -155,7 +156,11 @@ template("rustc_artifact") {
                                "testonly",
                                "rustenv",
                                "public_deps",
+                               "visibility",
                              ])
+      if (defined(visibility)) {
+        visibility += [ ":${_group_name}" ]
+      }
       clippy_crate_type = invoker.clippy_crate_type
       configs = _configs
       crate_root = _crate_root
@@ -193,7 +198,7 @@ template("rustc_artifact") {
 
   # Every rust target is actually a group of both target_name.actual and
   # optionally target_name.clippy (if include_clippy is set)
-  group(target_name) {
+  group(_group_name) {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
@@ -308,5 +313,8 @@ template("rustc_artifact") {
                              "testonly",
                              "visibility",
                            ])
+    if (defined(visibility)) {
+      visibility += [ ":${_group_name}" ]
+    }
   }
 }
