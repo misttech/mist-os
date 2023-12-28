@@ -2949,11 +2949,9 @@ mod tests {
             testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
             ResolveRouteError, SendIpPacketMeta,
         },
-        socket::{
-            self,
-            datagram::{MulticastInterfaceSelector, UninstantiableContext},
-        },
+        socket::{self, datagram::MulticastInterfaceSelector},
         testutil::{set_logger_for_test, TestIpExt as _},
+        uninstantiable::UninstantiableWrapper,
     };
 
     /// A packet received on a socket.
@@ -3392,7 +3390,7 @@ mod tests {
 
     impl TestIpExt for Ipv4 {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
-            UninstantiableContext<Self, Udp, FakeUdpInnerCoreCtx<D>>;
+            UninstantiableWrapper<FakeUdpInnerCoreCtx<D>>;
 
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             FakeUdpInnerCoreCtx<D>;
@@ -3406,7 +3404,7 @@ mod tests {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             FakeUdpInnerCoreCtx<D>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
-            UninstantiableContext<Self, Udp, FakeUdpInnerCoreCtx<D>>;
+            UninstantiableWrapper<FakeUdpInnerCoreCtx<D>>;
 
         fn try_into_recv_src_addr(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {
             Ipv6SourceAddr::new(addr)

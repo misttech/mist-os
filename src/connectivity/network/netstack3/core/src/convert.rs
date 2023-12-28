@@ -4,10 +4,6 @@
 
 //! General utilities for converting types.
 
-use core::convert::Infallible as Never;
-
-use explicit::UnreachableExt as _;
-
 /// Produces an owned value `T` from Self.
 ///
 /// This trait is useful for implementing functions that take a value that may
@@ -52,23 +48,6 @@ impl<I> BidirectionalConverter<I, I> for () {
     }
     fn convert(&self, value: I) -> I {
         value
-    }
-}
-
-pub(crate) struct UninstantiableConverter(Never);
-
-impl AsRef<Never> for UninstantiableConverter {
-    fn as_ref(&self) -> &Never {
-        &self.0
-    }
-}
-
-impl<I, O> BidirectionalConverter<I, O> for UninstantiableConverter {
-    fn convert_back(&self, _: O) -> I {
-        self.uninstantiable_unreachable()
-    }
-    fn convert(&self, _: I) -> O {
-        self.uninstantiable_unreachable()
     }
 }
 

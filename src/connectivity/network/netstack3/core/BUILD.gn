@@ -80,6 +80,7 @@ lib_sources = [
   "src/transport/tcp/socket/isn.rs",
   "src/transport/tcp/state.rs",
   "src/transport/udp.rs",
+  "src/uninstantiable.rs",
   "src/work_queue.rs",
 ]
 

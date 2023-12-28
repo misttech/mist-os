@@ -4200,6 +4200,7 @@ mod tests {
             state::{TimeWait, MSL},
             ConnectionError, Mms, DEFAULT_FIN_WAIT2_TIMEOUT,
         },
+        uninstantiable::Uninstantiable,
         Instant as _,
     };
 
@@ -4572,7 +4573,7 @@ mod tests {
         for TcpCoreCtx<D, BC>
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
-        type SingleStackConverter = crate::convert::UninstantiableConverter;
+        type SingleStackConverter = Uninstantiable;
         type DualStackIpTransportAndDemuxCtx<'a> = Self;
         type DualStackConverter = ();
         fn with_all_sockets_mut<
@@ -4651,7 +4652,7 @@ mod tests {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = ();
         type DualStackIpTransportAndDemuxCtx<'a> = Self;
-        type DualStackConverter = crate::convert::UninstantiableConverter;
+        type DualStackConverter = Uninstantiable;
         fn with_all_sockets_mut<
             O,
             F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, BC>) -> O,
@@ -4758,7 +4759,7 @@ mod tests {
 
     impl TcpTestIpExt for Ipv4 {
         type SingleStackConverter = ();
-        type DualStackConverter = crate::convert::UninstantiableConverter;
+        type DualStackConverter = Uninstantiable;
         fn converter() -> MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter> {
             MaybeDualStack::NotDualStack(())
         }
@@ -4787,7 +4788,7 @@ mod tests {
     }
 
     impl TcpTestIpExt for Ipv6 {
-        type SingleStackConverter = crate::convert::UninstantiableConverter;
+        type SingleStackConverter = Uninstantiable;
         type DualStackConverter = ();
         fn converter() -> MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter> {
             MaybeDualStack::DualStack(())

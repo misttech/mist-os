@@ -4123,6 +4123,7 @@ mod tests {
             FAKE_CONFIG_V4, FAKE_CONFIG_V6,
         },
         transport::udp::UdpStateBuilder,
+        uninstantiable::UninstantiableWrapper,
     };
 
     impl<I: Ip> SocketId<I> {
@@ -4259,7 +4260,7 @@ mod tests {
     impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>>
         for FakeIcmpInnerCoreCtx<I>
     {
-        type DualStackContext = datagram::UninstantiableContext<I, Icmp, Self>;
+        type DualStackContext = UninstantiableWrapper<Self>;
         type IpSocketsCtx<'a> = FakeBufferCoreCtx;
         fn receive_icmp_error(
             &mut self,

@@ -74,9 +74,9 @@ use crate::{
         types,
         types::{Destination, NextHop, ResolvedRoute},
     },
-    socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
+    uninstantiable::UninstantiableWrapper,
     BindingsContext, BindingsTypes, Instant, SyncCtx,
 };
 
@@ -2937,7 +2937,7 @@ impl<
     > InnerIcmpContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
-    type DualStackContext = datagram::UninstantiableContext<Ipv4, icmp::Icmp, Self>;
+    type DualStackContext = UninstantiableWrapper<Self>;
     fn receive_icmp_error(
         &mut self,
         bindings_ctx: &mut BC,
@@ -3036,7 +3036,7 @@ impl<
     > InnerIcmpContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
-    type DualStackContext = datagram::UninstantiableContext<Ipv6, icmp::Icmp, Self>;
+    type DualStackContext = UninstantiableWrapper<Self>;
     fn receive_icmp_error(
         &mut self,
         bindings_ctx: &mut BC,

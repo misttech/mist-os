@@ -11,7 +11,7 @@ use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     device::WeakDeviceId,
-    socket::{datagram::UninstantiableContext, MaybeDualStack},
+    socket::MaybeDualStack,
     transport::{
         tcp::{
             self,
@@ -21,6 +21,7 @@ use crate::{
         },
         udp::{self},
     },
+    uninstantiable::{Uninstantiable, UninstantiableWrapper},
     BindingsContext, SyncCtx,
 };
 
@@ -59,7 +60,7 @@ where
         Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>;
 
     type SingleStackConverter = ();
-    type DualStackConverter = crate::convert::UninstantiableConverter;
+    type DualStackConverter = Uninstantiable;
 
     fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv4, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
@@ -155,7 +156,7 @@ where
     type DualStackIpTransportAndDemuxCtx<'a> =
         Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv6>>;
 
-    type SingleStackConverter = crate::convert::UninstantiableConverter;
+    type SingleStackConverter = Uninstantiable;
     type DualStackConverter = ();
 
     fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<Ipv6, Self::WeakDeviceId, BC>) -> O>(
@@ -289,7 +290,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
     udp::BoundStateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
-    type DualStackContext = UninstantiableContext<Ipv4, udp::Udp, Self>;
+    type DualStackContext = UninstantiableWrapper<Self>;
     type NonDualStackContext = Self;
 
     fn with_bound_sockets<
@@ -379,7 +380,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
     type DualStackContext = Self;
-    type NonDualStackContext = UninstantiableContext<Ipv6, udp::Udp, Self>;
+    type NonDualStackContext = UninstantiableWrapper<Self>;
 
     fn with_bound_sockets<
         O,

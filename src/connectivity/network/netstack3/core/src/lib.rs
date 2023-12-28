@@ -34,6 +34,7 @@ mod lock_ordering;
 mod state;
 mod time;
 mod trace;
+mod uninstantiable;
 mod work_queue;
 
 #[cfg(test)]

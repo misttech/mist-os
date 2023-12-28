@@ -17,7 +17,6 @@ use core::{
 use dense_map::{DenseMap, Entry as DenseMapEntry, EntryKey};
 use derivative::Derivative;
 use either::Either;
-use explicit::UnreachableExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
     MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
@@ -29,7 +28,7 @@ use thiserror::Error;
 use crate::{
     algorithm::ProtocolFlowId,
     context::RngContext,
-    convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter, UninstantiableConverter},
+    convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId},
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
@@ -885,206 +884,6 @@ pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, BC, S: Datagram
     /// The returned object can be used to convert between the
     /// `S::ListenerIpAddr<I>` and the appropriate `ListenerIpAddr`.
     fn converter(&self) -> Self::Converter;
-}
-
-/// An uninstantiable type that implements  [`LocalIdentifierAllocator`].
-pub(crate) struct UninstantiableAllocator(Never);
-
-impl AsRef<Never> for UninstantiableAllocator {
-    fn as_ref(&self) -> &Never {
-        let Self(never) = self;
-        &never
-    }
-}
-
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>
-    LocalIdentifierAllocator<I, D, A, C, S> for UninstantiableAllocator
-{
-    fn try_alloc_local_id(
-        &mut self,
-        _bound: &BoundSocketMap<I, D, A, S>,
-        _bindings_ctx: &mut C,
-        _flow: DatagramFlowId<I::Addr, A::RemoteIdentifier>,
-    ) -> Option<A::LocalIdentifier> {
-        self.uninstantiable_unreachable()
-    }
-}
-
-/// An uninstantiable type that implements
-/// [`DualStackDatagramBoundStateContext`].
-pub(crate) struct UninstantiableContext<I, S, P>(Never, PhantomData<(I, S, P)>);
-
-impl<I, S, P> AsRef<Never> for UninstantiableContext<I, S, P> {
-    fn as_ref(&self) -> &Never {
-        let Self(never, _marker) = self;
-        &never
-    }
-}
-
-impl<I, S, P: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
-    for UninstantiableContext<I, S, P>
-{
-    type DeviceId = P::DeviceId;
-    type WeakDeviceId = P::WeakDeviceId;
-    fn downgrade_device_id(&self, _device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        self.uninstantiable_unreachable()
-    }
-    fn upgrade_weak_device_id(
-        &self,
-        _weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        self.uninstantiable_unreachable()
-    }
-}
-
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    DatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
-{
-    type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
-    type DualStackContext = P::DualStackContext;
-    type NonDualStackContext = P::NonDualStackContext;
-    type LocalIdAllocator = P::LocalIdAllocator;
-    fn dual_stack_context(
-        &mut self,
-    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-        self.uninstantiable_unreachable()
-    }
-    fn with_bound_sockets<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                <S as DatagramSocketSpec>::AddrSpec,
-                <S as DatagramSocketSpec>::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-        ) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-    fn with_bound_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                <S as DatagramSocketSpec>::AddrSpec,
-                <S as DatagramSocketSpec>::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-            &mut Self::LocalIdAllocator,
-        ) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-}
-
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    NonDualStackDatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
-{
-    type Converter = UninstantiableConverter;
-    fn converter(&self) -> Self::Converter {
-        self.uninstantiable_unreachable()
-    }
-}
-
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, BC, S>, BC>
-    DualStackDatagramBoundStateContext<I, BC, S> for UninstantiableContext<I, S, P>
-where
-    for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, BC>,
-{
-    type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
-
-    fn dual_stack_enabled(&self, _state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool {
-        self.uninstantiable_unreachable()
-    }
-
-    type Converter = UninstantiableConverter;
-    fn converter(&self) -> Self::Converter {
-        self.uninstantiable_unreachable()
-    }
-
-    fn to_other_bound_socket_id(
-        &self,
-        _id: S::SocketId<I>,
-    ) -> <S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId> as DatagramSocketMapSpec<
-        I::OtherVersion,
-        Self::WeakDeviceId,
-        S::AddrSpec,
-    >>::BoundSocketId {
-        self.uninstantiable_unreachable()
-    }
-
-    fn from_other_ip_addr(&self, _addr: <I::OtherVersion as Ip>::Addr) -> I::Addr {
-        self.uninstantiable_unreachable()
-    }
-
-    type LocalIdAllocator = UninstantiableAllocator;
-    type OtherLocalIdAllocator = UninstantiableAllocator;
-
-    fn with_both_bound_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-            &mut BoundSockets<
-                I::OtherVersion,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
-            >,
-            &mut Self::LocalIdAllocator,
-            &mut Self::OtherLocalIdAllocator,
-        ) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-
-    fn with_other_bound_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I::OtherVersion,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<<I>::OtherVersion, Self::WeakDeviceId>,
-            >,
-        ) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-
-    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
 }
 
 pub(crate) trait DatagramStateBindingsContext<I: Ip, S>: RngContext {}
@@ -5075,6 +4874,7 @@ mod test {
             SocketMapAddrStateSpec,
         },
         testutil::TestIpExt,
+        uninstantiable::UninstantiableWrapper,
     };
 
     use super::*;
@@ -5470,11 +5270,8 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv4 {
-        type DualStackContext = UninstantiableContext<
-            Self,
-            FakeStateSpec,
-            Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
-        >;
+        type DualStackContext =
+            UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
         type NonDualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
         fn dual_stack_context(
             core_ctx: &mut Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
@@ -5485,11 +5282,8 @@ mod test {
 
     impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv6 {
         type DualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
-        type NonDualStackContext = UninstantiableContext<
-            Self,
-            FakeStateSpec,
-            Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
-        >;
+        type NonDualStackContext =
+            UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
         fn dual_stack_context(
             core_ctx: &mut Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
