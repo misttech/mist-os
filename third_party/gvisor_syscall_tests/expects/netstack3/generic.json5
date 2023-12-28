@@ -36,11 +36,11 @@
                 "IPUnboundSockets/IPUnboundSocketTest.ZeroTOS/*",
                 "IPUnboundSockets/IPUnboundSocketTest.ZeroTOSOptionSize/*",
 
-                // Expect failure for setting TTL on non-IPv4 sockets.
-                "IPUnboundSockets/IPUnboundSocketTest.ZeroTtl/[2-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.TtlDefault/[2-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.SetTtl/[2-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.ResetTtlToDefault/[2-7]",
+                // TODO(https://fxbug.dev/42095034): Support dualstack TCP sockets.
+                "IPUnboundSockets/IPUnboundSocketTest.ZeroTtl/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.TtlDefault/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.SetTtl/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.ResetTtlToDefault/[4-7]",
 
                 // Expect failure for TCP sockets.
                 "IPUnboundSockets/IPUnboundSocketTest.NullTOS/2",

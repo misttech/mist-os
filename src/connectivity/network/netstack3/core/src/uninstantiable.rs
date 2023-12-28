@@ -167,6 +167,13 @@ where
         self.uninstantiable_unreachable()
     }
 
+    fn to_other_send_options<'a>(
+        &self,
+        _state: &'a datagram::IpOptions<I, Self::WeakDeviceId, S>,
+    ) -> &'a datagram::SocketHopLimits<I::OtherVersion> {
+        self.uninstantiable_unreachable()
+    }
+
     type Converter = Uninstantiable;
     fn converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()

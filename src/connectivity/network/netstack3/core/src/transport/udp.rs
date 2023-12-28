@@ -43,7 +43,8 @@ use crate::{
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        IpTransportContext, MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
+        HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
+        TransportReceiveError,
     },
     socket::{
         address::{
@@ -61,7 +62,8 @@ use crate::{
             NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
             SetMulticastMembershipError, ShutdownType, SocketHopLimits,
             SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
-            SocketsState as DatagramSocketsState,
+            SocketsState as DatagramSocketsState, WrapOtherStackIpOptions,
+            WrapOtherStackIpOptionsMut,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
         NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, SocketAddrType,
@@ -527,9 +529,13 @@ where
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub(crate) struct DualStackSocketState {
-    // Match Linux's behavior by enabling dualstack operations by default.
+    /// Whether dualstack operations are enabled on this socket.
+    /// Match Linux's behavior by enabling dualstack operations by default.
     #[derivative(Default(value = "true"))]
     dual_stack_enabled: bool,
+    /// The IPv4 hop limits (e.g. TTL) to be used when sending packets in the
+    /// IPv4 stack.
+    hop_limits: SocketHopLimits<Ipv4>,
 }
 
 /// Serialization errors for Udp Packets.
@@ -1568,7 +1574,7 @@ pub(crate) trait SocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
     fn get_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut BC,
+        bindings_ctx: &BC,
         id: SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError>;
 
@@ -1595,18 +1601,30 @@ pub(crate) trait SocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         id: SocketId<I>,
         unicast_hop_limit: Option<NonZeroU8>,
-    );
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError>;
 
     fn set_udp_multicast_hop_limit(
         &mut self,
         bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_hop_limit: Option<NonZeroU8>,
-    );
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError>;
 
-    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8;
+    fn get_udp_unicast_hop_limit(
+        &mut self,
+        bindings_ctx: &BC,
+        id: SocketId<I>,
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
-    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8;
+    fn get_udp_multicast_hop_limit(
+        &mut self,
+        bindings_ctx: &BC,
+        id: SocketId<I>,
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
     fn get_udp_transparent(&mut self, id: SocketId<I>) -> bool;
 
@@ -1712,16 +1730,12 @@ impl<
             bindings_ctx,
             id,
             |other_stack| {
-                #[derive(GenericOverIp)]
-                #[generic_over_ip(I, Ip)]
-                struct WrapOtherStack<'a, I: IpExt>(
-                    &'a mut I::OtherStackIpOptions<DualStackSocketState>,
-                );
                 I::map_ip(
-                    (enabled, WrapOtherStack(other_stack)),
+                    (enabled, WrapOtherStackIpOptionsMut(other_stack)),
                     |(_enabled, _v4)| Err(SetDualStackEnabledError::NotCapable),
-                    |(enabled, WrapOtherStack(other_stack))| {
-                        let DualStackSocketState { dual_stack_enabled } = other_stack;
+                    |(enabled, WrapOtherStackIpOptionsMut(other_stack))| {
+                        let DualStackSocketState { dual_stack_enabled, hop_limits: _ } =
+                            other_stack;
                         *dual_stack_enabled = enabled;
                         Ok(())
                     },
@@ -1740,18 +1754,15 @@ impl<
 
     fn get_dual_stack_enabled(
         &mut self,
-        bindings_ctx: &mut BC,
+        bindings_ctx: &BC,
         id: SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError> {
         datagram::with_other_stack_ip_options(self, bindings_ctx, id, |other_stack| {
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct WrapOtherStack<'a, I: IpExt>(&'a I::OtherStackIpOptions<DualStackSocketState>);
             I::map_ip(
-                WrapOtherStack(other_stack),
+                WrapOtherStackIpOptions(other_stack),
                 |_v4| Err(NotDualStackCapableError),
-                |WrapOtherStack(other_stack)| {
-                    let DualStackSocketState { dual_stack_enabled } = other_stack;
+                |WrapOtherStackIpOptions(other_stack)| {
+                    let DualStackSocketState { dual_stack_enabled, hop_limits: _ } = other_stack;
                     Ok(*dual_stack_enabled)
                 },
             )
@@ -1799,13 +1810,30 @@ impl<
         bindings_ctx: &mut BC,
         id: SocketId<I>,
         unicast_hop_limit: Option<NonZeroU8>,
-    ) {
-        crate::socket::datagram::update_ip_hop_limit(
-            self,
-            bindings_ctx,
-            id,
-            SocketHopLimits::set_unicast(unicast_hop_limit),
-        )
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::update_ip_hop_limit(
+                self,
+                bindings_ctx,
+                id,
+                SocketHopLimits::set_unicast(unicast_hop_limit),
+            ));
+        }
+        datagram::with_other_stack_ip_options_mut(self, bindings_ctx, id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_unicast_hop_limit), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
+                    let DualStackSocketState {
+                        dual_stack_enabled: _,
+                        hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                    } = other_stack;
+                    *unicast = unicast_hop_limit;
+                    Ok(())
+                },
+            )
+        })
     }
 
     fn set_udp_multicast_hop_limit(
@@ -1813,21 +1841,96 @@ impl<
         bindings_ctx: &mut BC,
         id: SocketId<I>,
         multicast_hop_limit: Option<NonZeroU8>,
-    ) {
-        crate::socket::datagram::update_ip_hop_limit(
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::update_ip_hop_limit(
+                self,
+                bindings_ctx,
+                id,
+                SocketHopLimits::set_multicast(multicast_hop_limit),
+            ));
+        }
+        datagram::with_other_stack_ip_options_mut(self, bindings_ctx, id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_multicast_hop_limit), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
+                    let DualStackSocketState {
+                        dual_stack_enabled: _,
+                        hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                    } = other_stack;
+                    *multicast = multicast_hop_limit;
+                    Ok(())
+                },
+            )
+        })
+    }
+
+    fn get_udp_unicast_hop_limit(
+        &mut self,
+        bindings_ctx: &BC,
+        id: SocketId<I>,
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).unicast);
+        }
+        datagram::with_other_stack_ip_options_and_default_hop_limits(
             self,
             bindings_ctx,
             id,
-            SocketHopLimits::set_multicast(multicast_hop_limit),
-        )
+            |other_stack, default_hop_limits| {
+                I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
+                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                    |_v4| Err(NotDualStackCapableError),
+                    |(
+                        WrapOtherStackIpOptions(other_stack),
+                        IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
+                    )| {
+                        let DualStackSocketState {
+                            dual_stack_enabled: _,
+                            hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                        } = other_stack;
+                        Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
+                    },
+                )
+            },
+        )?
+        .map(|IpInvariant(unicast)| unicast)
     }
 
-    fn get_udp_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8 {
-        crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).unicast
-    }
-
-    fn get_udp_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: SocketId<I>) -> NonZeroU8 {
-        crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).multicast
+    fn get_udp_multicast_hop_limit(
+        &mut self,
+        bindings_ctx: &BC,
+        id: SocketId<I>,
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::get_ip_hop_limits(self, bindings_ctx, id).multicast);
+        }
+        datagram::with_other_stack_ip_options_and_default_hop_limits(
+            self,
+            bindings_ctx,
+            id,
+            |other_stack, default_hop_limits| {
+                I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
+                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                    |_v4| Err(NotDualStackCapableError),
+                    |(
+                        WrapOtherStackIpOptions(other_stack),
+                        IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
+                    )| {
+                        let DualStackSocketState {
+                            dual_stack_enabled: _,
+                            hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                        } = other_stack;
+                        Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
+                    },
+                )
+            },
+        )?
+        .map(|IpInvariant(multicast)| multicast)
     }
 
     fn get_udp_transparent(&mut self, id: SocketId<I>) -> bool {
@@ -2158,8 +2261,17 @@ impl<
         &self,
         state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, Udp>>,
     ) -> bool {
-        let DualStackSocketState { dual_stack_enabled } = state.as_ref().other_stack();
+        let DualStackSocketState { dual_stack_enabled, hop_limits: _ } =
+            state.as_ref().other_stack();
         *dual_stack_enabled
+    }
+
+    fn to_other_send_options<'a>(
+        &self,
+        state: &'a IpOptions<Ipv6, Self::WeakDeviceId, Udp>,
+    ) -> &'a SocketHopLimits<Ipv4> {
+        let DualStackSocketState { dual_stack_enabled: _, hop_limits } = state.other_stack();
+        hop_limits
     }
 
     type Converter = ();
@@ -2408,7 +2520,7 @@ pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
 /// Panics if `id` is not a valid `SocketId`.
 pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
+    bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> Result<bool, NotDualStackCapableError> {
     let mut core_ctx = Locked::new(core_ctx);
@@ -2564,32 +2676,38 @@ pub fn set_udp_multicast_membership<I: Ip, BC: crate::BindingsContext>(
 
 /// Sets the hop limit for packets sent by the socket to a unicast destination.
 ///
-/// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
-/// unicast address.
+/// Sets the IPv4 TTL when `ip_version` is [`IpVersion::V4`], and the IPv6 hop
+/// limits when `ip_version` is [`IpVersion::V6`].
+///
+/// Returns [`NotDualStackCapableError`] if called on an IPv4 Socket with an
+/// `ip_version` of [`IpVersion::V6`].
 pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
     unicast_hop_limit: Option<NonZeroU8>,
-) {
+    ip_version: IpVersion,
+) -> Result<(), NotDualStackCapableError> {
     let mut core_ctx = Locked::new(core_ctx);
     let id = id.clone();
     I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, unicast_hop_limit)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, unicast_hop_limit)), id)| {
+        (IpInvariant((&mut core_ctx, bindings_ctx, unicast_hop_limit, ip_version)), id),
+        |(IpInvariant((core_ctx, bindings_ctx, unicast_hop_limit, ip_version)), id)| {
             SocketHandler::<Ipv4, _>::set_udp_unicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
                 unicast_hop_limit,
+                ip_version,
             )
         },
-        |(IpInvariant((core_ctx, bindings_ctx, unicast_hop_limit)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx, unicast_hop_limit, ip_version)), id)| {
             SocketHandler::<Ipv6, _>::set_udp_unicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
                 unicast_hop_limit,
+                ip_version,
             )
         },
     )
@@ -2597,59 +2715,74 @@ pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
 
 /// Sets the hop limit for packets sent by the socket to a multicast destination.
 ///
-/// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
-/// unicast address.
+/// Sets the IPv4 TTL when `ip_version` is [`IpVersion::V4`], and the IPv6 hop
+/// limits when `ip_version` is [`IpVersion::V6`].
+///
+/// Returns [`NotDualStackCapableError`] if called on an IPv4 Socket with an
+/// `ip_version` of [`IpVersion::V6`].
 pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
     multicast_hop_limit: Option<NonZeroU8>,
-) {
+    ip_version: IpVersion,
+) -> Result<(), NotDualStackCapableError> {
     let mut core_ctx = Locked::new(core_ctx);
     let id = id.clone();
     I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, multicast_hop_limit)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, multicast_hop_limit)), id)| {
+        (IpInvariant((&mut core_ctx, bindings_ctx, multicast_hop_limit, ip_version)), id),
+        |(IpInvariant((core_ctx, bindings_ctx, multicast_hop_limit, ip_version)), id)| {
             SocketHandler::<Ipv4, _>::set_udp_multicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
                 multicast_hop_limit,
+                ip_version,
             )
         },
-        |(IpInvariant((core_ctx, bindings_ctx, multicast_hop_limit)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx, multicast_hop_limit, ip_version)), id)| {
             SocketHandler::<Ipv6, _>::set_udp_multicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
                 multicast_hop_limit,
+                ip_version,
             )
         },
     )
 }
 
 /// Gets the hop limit for packets sent by the socket to a unicast destination.
+///
+/// Gets the IPv4 TTL when `ip_version` is [`IpVersion::V4`], and the IPv6 hop
+/// limits when `ip_version` is [`IpVersion::V6`].
+///
+/// Returns [`NotDualStackCapableError`] if called on an IPv4 Socket with an
+/// `ip_version` of [`IpVersion::V6`].
 pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
-) -> NonZeroU8 {
+    ip_version: IpVersion,
+) -> Result<NonZeroU8, NotDualStackCapableError> {
     let mut core_ctx = Locked::new(core_ctx);
     let id = id.clone();
-    let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
+    let IpInvariant(hop_limit) = I::map_ip(
+        (IpInvariant((&mut core_ctx, bindings_ctx, ip_version)), id),
+        |(IpInvariant((core_ctx, bindings_ctx, ip_version)), id)| {
             IpInvariant(SocketHandler::<Ipv4, _>::get_udp_unicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
+                ip_version,
             ))
         },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx, ip_version)), id)| {
             IpInvariant(SocketHandler::<Ipv6, _>::get_udp_unicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
+                ip_version,
             ))
         },
     );
@@ -2658,29 +2791,35 @@ pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
 
 /// Gets the hop limit for packets sent by the socket to a multicast destination.
 ///
-/// Gets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
-/// unicast address.
+/// Gets the IPv4 TTL when `ip_version` is [`IpVersion::V4`], and the IPv6 hop
+/// limits when `ip_version` is [`IpVersion::V6`].
+///
+/// Returns [`NotDualStackCapableError`] if called on an IPv4 Socket with an
+/// `ip_version` of [`IpVersion::V6`].
 pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &BC,
     id: &SocketId<I>,
-) -> NonZeroU8 {
+    ip_version: IpVersion,
+) -> Result<NonZeroU8, NotDualStackCapableError> {
     let mut core_ctx = Locked::new(core_ctx);
     let id = id.clone();
-    let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
+    let IpInvariant(hop_limit) = I::map_ip(
+        (IpInvariant((&mut core_ctx, bindings_ctx, ip_version)), id),
+        |(IpInvariant((core_ctx, bindings_ctx, ip_version)), id)| {
             IpInvariant(SocketHandler::<Ipv4, _>::get_udp_multicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
+                ip_version,
             ))
         },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
+        |(IpInvariant((core_ctx, bindings_ctx, ip_version)), id)| {
             IpInvariant(SocketHandler::<Ipv6, _>::get_udp_multicast_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
+                ip_version,
             ))
         },
     );
@@ -6918,13 +7057,17 @@ mod tests {
             &mut bindings_ctx,
             listener,
             Some(UNICAST_HOPS),
-        );
+            I::VERSION,
+        )
+        .unwrap();
         SocketHandler::set_udp_multicast_hop_limit(
             &mut core_ctx,
             &mut bindings_ctx,
             listener,
             Some(MULTICAST_HOPS),
-        );
+            I::VERSION,
+        )
+        .unwrap();
 
         SocketHandler::listen_udp(&mut core_ctx, &mut bindings_ctx, listener, None, None)
             .expect("listen failed");
@@ -7108,7 +7251,7 @@ mod tests {
         assert_eq!(
             SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
                 &mut core_ctx,
-                &mut bindings_ctx,
+                &bindings_ctx,
                 listener
             ),
             Ok(true)
@@ -7964,7 +8107,7 @@ mod tests {
             assert_eq!(
                 SocketHandler::<Ipv4, _>::get_dual_stack_enabled(
                     &mut core_ctx,
-                    &mut bindings_ctx,
+                    &bindings_ctx,
                     socket,
                 ),
                 Err(NotDualStackCapableError)
@@ -7991,11 +8134,7 @@ mod tests {
         // Expect dual stack to be enabled by default.
         const ORIGINALLY_ENABLED: bool = true;
         assert_eq!(
-            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                socket,
-            ),
+            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(&mut core_ctx, &bindings_ctx, socket,),
             Ok(ORIGINALLY_ENABLED),
         );
 
@@ -8017,7 +8156,7 @@ mod tests {
             assert_eq!(
                 SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
                     &mut core_ctx,
-                    &mut bindings_ctx,
+                    &bindings_ctx,
                     socket,
                 ),
                 Ok(expect_enabled),

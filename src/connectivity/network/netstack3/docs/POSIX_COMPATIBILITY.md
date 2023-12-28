@@ -76,14 +76,18 @@ fixed-size portion of the socket's buffer.
 Note that like on other platforms, the value applied when setting these options
 is limited by system-defined minimums and maximums.
 
-### `IPV6_V6ONLY` on ICMPv6 sockets
+### Dualstack operations on ICMP Echo sockets
 
-ICMP echo sockets do not support dual stack operations. As a result Netstack3
-has chosen to disallow setting the `IPV6_V6ONLY` (returning `ENOPROTOOPT`), and
-unconditionally return `true` when getting the value of `IPV6_V6ONLY` for IPv6
-ICMP sockets. This behavior diverges from Linux, which allows one to set the
-`IPV6_V6ONLY` option on IPv6 ICMP sockets, though doing so does not affect the
-socket's behavior in anyway.
+ICMP echo sockets do not support dual stack operations. Despite this, Linux
+still allows one to set/get various dualstack socket options on Ipv6 ICMP
+sockets, though doing so does not affect the socket's behavior in anyway.
+Netstack3 has opted to disallow setting/getting these options on IPV6 ICMP
+sockets, to more accurately reflect that dualstack operations are not supported.
+These socket options include
+  * `IPV6_V6ONLY`: Attempting to set the value will result in `ENOPROTOOPT`,
+    while getting the value unconditionally returns true.
+  * `SO_IP_TTL` & `SO_IP_MULTICAST_TTL`: Attempting to set or get the value will
+    result in `ENOPROTOOPT`.
 
 ### UDP Destination Port 0
 Like Linux, Netstack3 allows UDP sockets to connect to a remote address with

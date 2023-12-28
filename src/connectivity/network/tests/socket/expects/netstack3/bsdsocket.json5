@@ -57,27 +57,20 @@
                 // IPPROTO_IP_IP_TTL
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IP_IP_TTL",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IP_IP_TTL",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IP_IP_TTL",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Stream_IPPROTO_IP_IP_TTL",
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Stream_IPPROTO_IP_IP_TTL",
-                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Datagram_IPPROTO_IP_IP_TTL",
                 "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv4_Stream_IPPROTO_IP_IP_TTL",
                 "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv6_Stream_IPPROTO_IP_IP_TTL",
-                "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv6_Datagram_IPPROTO_IP_IP_TTL",
 
                 // IPPROTO_IP_IP_MULTICAST_TTL
-                "DatagramIntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
-                "DatagramIntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
 
                 // IPPROTO_IP_IP_RECVTTL
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_RECVTTL",
@@ -235,7 +228,6 @@
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
 
                 // IP_TTL
-                "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv6_Datagram",
                 "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv*_Stream",
 
                 // IP_TOS + IPV6_TCLASS

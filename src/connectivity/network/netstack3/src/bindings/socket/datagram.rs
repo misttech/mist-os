@@ -316,7 +316,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_dual_stack_enabled<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+        ctx: &C,
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError>;
 
@@ -347,26 +347,30 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    );
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError>;
 
     fn set_multicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    );
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError>;
 
     fn get_unicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8;
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
     fn get_multicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8;
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError>;
 
     fn set_ip_transparent<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
@@ -530,7 +534,7 @@ impl<I: IpExt> TransportState<I> for Udp {
 
     fn get_dual_stack_enabled<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+        ctx: &C,
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError> {
         udp::get_udp_dual_stack_enabled(core_ctx, ctx, id)
@@ -567,8 +571,9 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    ) {
-        udp::set_udp_unicast_hop_limit(core_ctx, ctx, id, hop_limit)
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        udp::set_udp_unicast_hop_limit(core_ctx, ctx, id, hop_limit, ip_version)
     }
 
     fn set_multicast_hop_limit<C: BindingsContext>(
@@ -576,24 +581,27 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    ) {
-        udp::set_udp_multicast_hop_limit(core_ctx, ctx, id, hop_limit)
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        udp::set_udp_multicast_hop_limit(core_ctx, ctx, id, hop_limit, ip_version)
     }
 
     fn get_unicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8 {
-        udp::get_udp_unicast_hop_limit(core_ctx, ctx, id)
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        udp::get_udp_unicast_hop_limit(core_ctx, ctx, id, ip_version)
     }
 
     fn get_multicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8 {
-        udp::get_udp_multicast_hop_limit(core_ctx, ctx, id)
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        udp::get_udp_multicast_hop_limit(core_ctx, ctx, id, ip_version)
     }
 
     fn set_ip_transparent<C: BindingsContext>(
@@ -780,7 +788,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
 
     fn get_dual_stack_enabled<C: BindingsContext>(
         _core_ctx: &SyncCtx<C>,
-        _ctx: &mut C,
+        _ctx: &C,
         _id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError> {
         match I::VERSION {
@@ -827,8 +835,17 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    ) {
-        icmp::set_unicast_hop_limit(core_ctx, ctx, id, hop_limit)
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        // Disallow updates when the hop limit's version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting updates to
+        // the IPv4 TTL for IPv6 sockets more accurately reflects that ICMP
+        // sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(icmp::set_unicast_hop_limit(core_ctx, ctx, id, hop_limit))
     }
 
     fn set_multicast_hop_limit<C: BindingsContext>(
@@ -836,24 +853,51 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         ctx: &mut C,
         id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
-    ) {
-        icmp::set_multicast_hop_limit(core_ctx, ctx, id, hop_limit)
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        // Disallow updates when the hop limit's version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting updates to
+        // the IPv4 TTL for IPv6 sockets more accurately reflects that ICMP
+        // sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(icmp::set_multicast_hop_limit(core_ctx, ctx, id, hop_limit))
     }
 
     fn get_unicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8 {
-        icmp::get_unicast_hop_limit(core_ctx, ctx, id)
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        // Disallow fetching the hop limit when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting fetches of
+        // the IPv4 TTL for IPv6 sockets more accurately reflects that ICMP
+        // sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(icmp::get_unicast_hop_limit(core_ctx, ctx, id))
     }
 
     fn get_multicast_hop_limit<C: BindingsContext>(
         core_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> NonZeroU8 {
-        icmp::get_multicast_hop_limit(core_ctx, ctx, id)
+        ip_version: IpVersion,
+    ) -> Result<NonZeroU8, NotDualStackCapableError> {
+        // Disallow fetching the hop limit when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting fetches of
+        // the IPv4 TTL for IPv6 sockets more accurately reflects that ICMP
+        // sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(icmp::get_multicast_hop_limit(core_ctx, ctx, id))
     }
 
     fn set_ip_transparent<C: BindingsContext>(
@@ -2041,7 +2085,7 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        let (core_ctx, bindings_ctx) = ctx.contexts();
         T::get_dual_stack_enabled(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)
     }
 
@@ -2165,12 +2209,6 @@ where
         ip_version: IpVersion,
         hop_limit: fposix_socket::OptionalUint8,
     ) -> Result<(), fposix::Errno> {
-        // TODO(https://fxbug.dev/21198): Allow setting hop limits for
-        // dual-stack sockets.
-        if ip_version != I::VERSION {
-            return Err(fposix::Errno::Enoprotoopt);
-        }
-
         let hop_limit: Option<u8> = hop_limit.into_core();
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
@@ -2186,8 +2224,8 @@ where
                 },
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit);
-        Ok(())
+        T::set_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
+            .map_err(IntoErrno::into_errno)
     }
 
     fn set_multicast_hop_limit(
@@ -2195,12 +2233,6 @@ where
         ip_version: IpVersion,
         hop_limit: fposix_socket::OptionalUint8,
     ) -> Result<(), fposix::Errno> {
-        // TODO(https://fxbug.dev/21198): Allow setting hop limits for
-        // dual-stack sockets.
-        if ip_version != I::VERSION {
-            return Err(fposix::Errno::Enoprotoopt);
-        }
-
         let hop_limit: Option<u8> = hop_limit.into_core();
         // TODO(https://fxbug.dev/108323): Support setting a multicast hop limit
         // of 0.
@@ -2218,17 +2250,11 @@ where
                 },
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        T::set_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit);
-        Ok(())
+        T::set_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit, ip_version)
+            .map_err(IntoErrno::into_errno)
     }
 
     fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
-        // TODO(https://fxbug.dev/21198): Allow reading hop limits for
-        // dual-stack sockets.
-        if ip_version != I::VERSION {
-            return Err(fposix::Errno::Enoprotoopt);
-        }
-
         let Self {
             ctx,
             data:
@@ -2240,16 +2266,12 @@ where
                 },
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts();
-        Ok(T::get_unicast_hop_limit(core_ctx, bindings_ctx, id).get())
+        T::get_unicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
+            .map(NonZeroU8::get)
+            .map_err(IntoErrno::into_errno)
     }
 
     fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
-        // TODO(https://fxbug.dev/21198): Allow reading hop limits for
-        // dual-stack sockets.
-        if ip_version != I::VERSION {
-            return Err(fposix::Errno::Enoprotoopt);
-        }
-
         let Self {
             ctx,
             data:
@@ -2261,8 +2283,9 @@ where
                 },
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts();
-
-        Ok(T::get_multicast_hop_limit(core_ctx, bindings_ctx, id).get())
+        T::get_multicast_hop_limit(core_ctx, bindings_ctx, id, ip_version)
+            .map(NonZeroU8::get)
+            .map_err(IntoErrno::into_errno)
     }
 
     fn set_ip_transparent(self, value: bool) -> Result<(), T::SetIpTransparentError> {
@@ -3850,9 +3873,6 @@ mod tests {
 
     declare_tests!(set_get_hop_limit_multicast);
 
-    // TODO(https://fxbug.dev/21198): Change this when dual-stack socket support
-    // is added since dual-stack sockets should allow setting options for both
-    // IP versions.
     #[fixture::teardown(TestSetup::shutdown)]
     async fn set_hop_limit_wrong_type<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
@@ -3860,59 +3880,67 @@ mod tests {
         let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         const HOP_LIMIT: u8 = 200;
-        assert_matches!(
+        let (multicast_result, unicast_result) =
             match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.set_ipv6_multicast_hops(&Some(HOP_LIMIT).into_fidl()),
-                IpVersion::V6 => proxy.set_ip_multicast_ttl(&Some(HOP_LIMIT).into_fidl()),
-            }
-            .await
-            .unwrap(),
-            Err(_)
-        );
+                IpVersion::V4 => (
+                    proxy.set_ipv6_multicast_hops(&Some(HOP_LIMIT).into_fidl()).await.unwrap(),
+                    proxy.set_ipv6_unicast_hops(&Some(HOP_LIMIT).into_fidl()).await.unwrap(),
+                ),
+                IpVersion::V6 => (
+                    proxy.set_ip_multicast_ttl(&Some(HOP_LIMIT).into_fidl()).await.unwrap(),
+                    proxy.set_ip_ttl(&Some(HOP_LIMIT).into_fidl()).await.unwrap(),
+                ),
+            };
 
-        assert_matches!(
-            match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.set_ipv6_unicast_hops(&Some(HOP_LIMIT).into_fidl()),
-                IpVersion::V6 => proxy.set_ip_ttl(&Some(HOP_LIMIT).into_fidl()),
+        match (proto, <<A::AddrType as IpAddress>::Version as Ip>::VERSION) {
+            // UDPv6 is a dualstack capable protocol, so it allows setting the
+            // TTL of IPv6 sockets.
+            (fposix_socket::DatagramSocketProtocol::Udp, IpVersion::V6) => {
+                assert_matches!(multicast_result, Ok(_));
+                assert_matches!(unicast_result, Ok(_));
             }
-            .await
-            .unwrap(),
-            Err(_)
-        );
+            // All other [protocol, ip_version] are not dualstack capable.
+            (_, _) => {
+                assert_matches!(multicast_result, Err(_));
+                assert_matches!(unicast_result, Err(_));
+            }
+        }
 
         t
     }
 
     declare_tests!(set_hop_limit_wrong_type);
 
-    // TODO(https://fxbug.dev/21198): Change this when dual-stack socket support
-    // is added since dual-stack sockets should allow setting options for both
-    // IP versions.
     #[fixture::teardown(TestSetup::shutdown)]
     async fn get_hop_limit_wrong_type<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
         let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
-        assert_matches!(
+        let (multicast_result, unicast_result) =
             match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.get_ipv6_unicast_hops(),
-                IpVersion::V6 => proxy.get_ip_ttl(),
-            }
-            .await
-            .unwrap(),
-            Err(_)
-        );
+                IpVersion::V4 => (
+                    proxy.get_ipv6_multicast_hops().await.unwrap(),
+                    proxy.get_ipv6_unicast_hops().await.unwrap(),
+                ),
+                IpVersion::V6 => {
+                    (proxy.get_ip_multicast_ttl().await.unwrap(), proxy.get_ip_ttl().await.unwrap())
+                }
+            };
 
-        assert_matches!(
-            match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.get_ipv6_multicast_hops(),
-                IpVersion::V6 => proxy.get_ip_multicast_ttl(),
+        match (proto, <<A::AddrType as IpAddress>::Version as Ip>::VERSION) {
+            // UDPv6 is a dualstack capable protocol, so it allows getting the
+            // TTL of IPv6 sockets.
+            (fposix_socket::DatagramSocketProtocol::Udp, IpVersion::V6) => {
+                assert_matches!(multicast_result, Ok(_));
+                assert_matches!(unicast_result, Ok(_));
             }
-            .await
-            .unwrap(),
-            Err(_)
-        );
+            // All other [protocol, ip_version] are not dualstack capable.
+            (_, _) => {
+                assert_matches!(multicast_result, Err(_));
+                assert_matches!(unicast_result, Err(_));
+            }
+        }
 
         t
     }

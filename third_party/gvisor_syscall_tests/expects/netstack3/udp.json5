@@ -83,12 +83,6 @@
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceiveTTLOrHopLimit/*",
                 "AllUDPSockets/UDPSocketPairTest.TOSRecvMismatch/*",
 
-                // Expect failure for setting TTL on non-IPv4 sockets.
-                "AllUDPSockets/UDPSocketPairTest.MulticastTTLDefault/[0235]",
-                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLNegativeOne/[0235]",
-                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLChar/[0235]",
-                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLMax/[0235]",
-
                 // Netstack3 does not have complete support for multicast UDP sockets.
                 "AllUDPSockets/UDPSocketPairTest.MulticastLoopDefault/*",
                 "AllUDPSockets/UDPSocketPairTest.SetMulticastLoop/*",
