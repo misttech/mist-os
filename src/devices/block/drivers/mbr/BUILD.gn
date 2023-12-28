@@ -43,7 +43,6 @@ fuchsia_driver("mbr-driver") {
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//src/storage/gpt",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mbr",
     "//zircon/system/ulib/sync",

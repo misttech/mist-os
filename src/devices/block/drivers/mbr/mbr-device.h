@@ -19,7 +19,6 @@
 #include <fbl/macros.h>
 #include <fbl/string.h>
 #include <fbl/vector.h>
-#include <gpt/c/gpt.h>
 
 #include "mbr.h"
 
