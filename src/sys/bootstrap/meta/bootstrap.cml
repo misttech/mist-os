@@ -449,6 +449,7 @@
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.SmcResource",
             ],
             from: "parent",

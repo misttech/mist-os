@@ -44,7 +44,7 @@ TEST_F(EnvironmentTest, DISABLED_GetServiceList) {
   const fidl::WireResult result = client_->GetServiceList();
   ASSERT_OK(result.status());
   const fidl::WireResponse response = result.value();
-  ASSERT_EQ(response.services.count(), 10);
+  ASSERT_EQ(response.services.count(), 11);
 
   std::unordered_set<std::string> actual;
   for (const auto& service : response.services) {
@@ -56,6 +56,7 @@ TEST_F(EnvironmentTest, DISABLED_GetServiceList) {
       "/svc/fuchsia.kernel.SmcResource",        "/svc/fuchsia.logger.LogSink",
       "/svc/fuchsia.scheduler.ProfileProvider", "/svc/fuchsia.tracing.provider.Registry",
       "/svc/fuchsia.kernel.IommuResource",      "/svc/fuchsia.kernel.FramebufferResource",
+      "/svc/fuchsia.kernel.PowerResource",
   };
   ASSERT_EQ(actual, kExpectedServices);
 }

@@ -9,10 +9,12 @@
 
 #include <acpica/acpi.h>
 
+// TODO(fxb/317387259): change name to acpi_power_resource to be more
+// accurate.
 zx_handle_t acpi_root_resource;
 
 void poweroff(zx_device_t* device) {
-  acpi_root_resource = root_resource_handle;
+  acpi_root_resource = power_resource_handle;
   ACPI_STATUS status = AcpiEnterSleepStatePrep(5);
   if (status == AE_OK) {
     // AcpiEnterSleepState is usually called with interrupts disabled so that the interrupt state
@@ -23,12 +25,12 @@ void poweroff(zx_device_t* device) {
 }
 
 zx_status_t suspend_to_ram(zx_device_t* device) {
-  acpi_root_resource = root_resource_handle;
+  acpi_root_resource = power_resource_handle;
   zx_status_t status = ZX_OK;
 
   acpica_enable_noncontested_mode();
 
-  status = zx_system_powerctl(root_resource_handle,
+  status = zx_system_powerctl(power_resource_handle,
                               ZX_SYSTEM_POWERCTL_DISABLE_ALL_CPUS_BUT_PRIMARY, nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: Failed to shutdown CPUs: %d", status);
@@ -66,8 +68,7 @@ zx_status_t suspend_to_ram(zx_device_t* device) {
 
 cleanup:
   zx_status_t status2;
-  status2 =
-      zx_system_powerctl(root_resource_handle, ZX_SYSTEM_POWERCTL_ENABLE_ALL_CPUS, nullptr);
+  status2 = zx_system_powerctl(power_resource_handle, ZX_SYSTEM_POWERCTL_ENABLE_ALL_CPUS, nullptr);
   if (status2 != ZX_OK) {
     zxlogf(ERROR, "acpi: Re-enabling all cpus failed: %d", status2);
   }

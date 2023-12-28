@@ -33,6 +33,7 @@ using fuchsia_acpi_tables::wire::kMaxAcpiTableEntries;
 using fuchsia_acpi_tables::wire::TableInfo;
 
 zx_handle_t root_resource_handle;
+zx_handle_t power_resource_handle;
 
 namespace x86 {
 
@@ -102,6 +103,9 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   ZX_ASSERT(zx_handle_duplicate(get_root_resource(parent), ZX_RIGHT_SAME_RIGHTS,
                                 &root_resource_handle) == ZX_OK);
+
+  ZX_ASSERT(zx_handle_duplicate(get_power_resource(parent), ZX_RIGHT_SAME_RIGHTS,
+                                &power_resource_handle) == ZX_OK);
 
   fbl::AllocChecker ac;
   *out = fbl::make_unique_checked<X86>(&ac, parent, std::move(endpoints->client),

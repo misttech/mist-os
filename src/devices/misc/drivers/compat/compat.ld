@@ -20,6 +20,7 @@
     get_irq_resource;
     get_info_resource;
     get_smc_resource;
+    get_power_resource;
     load_firmware_from_driver;
     device_get_metadata;
     device_get_metadata_size;
