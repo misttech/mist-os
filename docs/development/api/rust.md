@@ -471,9 +471,9 @@ then submit it.
 
 ### Pending Topics
 
-Pending topics are tracked in the [Rust>Rubric][monorail] Monorail component.
+Pending topics are tracked in the [Rust][buganizer] Issue Tracker component.
 
-[monorail]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=component:Rust%3ERubric
+[buganizer]: https://issues.fuchsia.dev/issues?q=componentid:1368214%20status:open
 
 ## Relationship with upstream Rust API guidelines
 

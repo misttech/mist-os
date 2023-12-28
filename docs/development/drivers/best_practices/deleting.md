@@ -17,7 +17,7 @@ When deleting a driver, do the following:
    The following information must be provided:
 
    - `short_description`: A description of the deleted driver.
-   - `tracking_bug`: A Monorail issue that describes the reason for the
+   - `tracking_bug`: An Issue Tracker issue that describes the reason for the
      driver's deletion.
    - `gerrit_change_id`: The ID of the Gerrit change used to delete the
      driver.
