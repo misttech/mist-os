@@ -169,7 +169,9 @@ closed protocol Vmo {
     ///
     /// `ZX_ERR_WRONG_TYPE`  *handle* is not a VMO handle.
     ///
-    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_READ` right.
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_READ` right or
+    ///                           or [*buffer*, *buffer* + *buffer_size*) is
+    ///                           not writable.
     ///
     /// `ZX_ERR_INVALID_ARGS`  *buffer* is an invalid pointer or NULL.
     ///
@@ -257,7 +259,9 @@ closed protocol Vmo {
     ///
     /// `ZX_ERR_WRONG_TYPE`  *handle* is not a VMO handle.
     ///
-    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_WRITE` right.
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_WRITE` right
+    ///                           or [*buffer*, *buffer* + *buffer_size*) is
+    ///                           not readable.
     ///
     /// `ZX_ERR_INVALID_ARGS`  *buffer* is an invalid pointer or NULL.
     ///
