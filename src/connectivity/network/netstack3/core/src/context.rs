@@ -54,12 +54,12 @@ use crate::{
     Instant, TimerId,
 };
 
-/// A marker trait indicating that the implementor is not the [`FakeSyncCtx`]
+/// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
 /// type found in test environments.
 ///
 /// See [this issue] for details on why this is needed.
 ///
-/// [`FakeSyncCtx`]: testutil::FakeSyncCtx
+/// [`FakeCoreCtx`]: testutil::FakeCoreCtx
 /// [this issue]: https://github.com/rust-lang/rust/issues/97811
 pub(crate) trait NonTestCtxMarker {}
 
@@ -1215,7 +1215,7 @@ pub(crate) mod testutil {
         /// timers.
         ///
         /// If any timers are scheduled to fire in the given duration, future
-        /// use of this `FakeSyncCtx` may have surprising or buggy behavior.
+        /// use of this `FakeCoreCtx` may have surprising or buggy behavior.
         #[cfg(test)]
         pub(crate) fn sleep_skip_timers(&mut self, duration: Duration) {
             self.timers.instant.sleep(duration);
@@ -1334,7 +1334,7 @@ pub(crate) mod testutil {
             // always single-threaded and single-task, and we want to encourage
             // explicit cleanup.
             panic!(
-                "FakeNonSyncCtx can't create deferred reference notifiers for type {}: \
+                "FakeBindingsCtx can't create deferred reference notifiers for type {}: \
                 debug_references={debug_references:?}",
                 core::any::type_name::<T>()
             );
@@ -1414,12 +1414,12 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, NonSyncCtxState> =
-        crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, NonSyncCtxState>>;
+    pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> =
+        crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState>>;
 
     #[cfg(test)]
-    pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, NonSyncCtxState> =
-        FakeCtxWithCoreCtx<FakeCoreCtx<S, Meta, DeviceId>, TimerId, Event, NonSyncCtxState>;
+    pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, BindingsCtxState> =
+        FakeCtxWithCoreCtx<FakeCoreCtx<S, Meta, DeviceId>, TimerId, Event, BindingsCtxState>;
 
     #[cfg(test)]
     impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState> FakeNetworkContext
@@ -1546,7 +1546,7 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     impl<S, Meta, DeviceId> FakeCoreCtx<S, Meta, DeviceId> {
-        /// Constructs a `FakeSyncCtx` with the given state and default
+        /// Constructs a `FakeCoreCtx` with the given state and default
         /// `FakeTimerCtx`, and `FakeFrameCtx`.
         pub(crate) fn with_state(state: S) -> Self {
             FakeCoreCtx { state, frames: FakeFrameCtx::default(), _devices_marker: PhantomData }
@@ -1580,7 +1580,7 @@ pub(crate) mod testutil {
             self.frames.take_frames()
         }
 
-        /// Consumes the `FakeSyncCtx` and returns the inner state.
+        /// Consumes the `FakeCoreCtx` and returns the inner state.
         pub(crate) fn into_state(self) -> S {
             self.state
         }
@@ -1645,7 +1645,7 @@ pub(crate) mod testutil {
     #[cfg(test)]
     pub(crate) type PendingFrame<CtxId, Meta> = InstantAndData<PendingFrameData<CtxId, Meta>>;
 
-    /// A fake network, composed of many `FakeSyncCtx`s.
+    /// A fake network, composed of many `FakeCoreCtx`s.
     ///
     /// Provides a utility to have many contexts keyed by `CtxId` that can
     /// exchange frames.
@@ -1748,13 +1748,13 @@ pub(crate) mod testutil {
     {
         /// Creates a new `FakeNetwork`.
         ///
-        /// Creates a new `FakeNetwork` with the collection of `FakeSyncCtx`s in
+        /// Creates a new `FakeNetwork` with the collection of `FakeCoreCtx`s in
         /// `contexts`. `Ctx`s are named by type parameter `CtxId`.
         ///
         /// # Panics
         ///
-        /// Calls to `new` will panic if given a `FakeSyncCtx` with timer events.
-        /// `FakeSyncCtx`s given to `FakeNetwork` **must not** have any timer
+        /// Calls to `new` will panic if given a `FakeCoreCtx` with timer events.
+        /// `FakeCoreCtx`s given to `FakeNetwork` **must not** have any timer
         /// events already attached to them, because `FakeNetwork` maintains
         /// all the internal timers in dispatchers in sync to enable synchronous
         /// simulation steps.
@@ -1812,7 +1812,7 @@ pub(crate) mod testutil {
         /// held by this `FakeNetwork`. A single step consists of the following
         /// operations:
         ///
-        /// - All pending frames, kept in each `FakeSyncCtx`, are mapped to their
+        /// - All pending frames, kept in each `FakeCoreCtx`, are mapped to their
         ///   destination context/device pairs and moved to an internal
         ///   collection of pending frames.
         /// - The collection of pending timers and scheduled frames is inspected
@@ -2026,14 +2026,14 @@ pub(crate) mod testutil {
             f(self.context(context))
         }
 
-        /// Retrieves a `FakeSyncCtx` named `context`.
-        pub(crate) fn sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut CC {
+        /// Retrieves a `FakeCoreCtx` named `context`.
+        pub(crate) fn core_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut CC {
             let crate::testutil::ContextPair { core_ctx, bindings_ctx: _ } = self.context(context);
             core_ctx
         }
 
-        /// Retrieves a `FakeNonSyncCtx` named `context`.
-        pub(crate) fn non_sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut BC {
+        /// Retrieves a `FakeBindingsCtx` named `context`.
+        pub(crate) fn bindings_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut BC {
             let crate::testutil::ContextPair { core_ctx: _, bindings_ctx } = self.context(context);
             bindings_ctx
         }

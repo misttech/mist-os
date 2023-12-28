@@ -728,7 +728,7 @@ mod tests {
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -763,7 +763,7 @@ mod tests {
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -792,7 +792,7 @@ mod tests {
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -839,7 +839,7 @@ mod tests {
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -881,7 +881,7 @@ mod tests {
     #[test]
     fn test_mld_integration_delay_reset_timer() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
         // This seed was carefully chosen to produce a substantial duration
         // value below.
         bindings_ctx.seed_rng(123456);
@@ -923,7 +923,7 @@ mod tests {
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -970,7 +970,7 @@ mod tests {
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1006,7 +1006,7 @@ mod tests {
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
@@ -1069,7 +1069,7 @@ mod tests {
             };
 
             let new_ctx = || {
-                let mut ctx = FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                let mut ctx = FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
                 ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
@@ -1101,7 +1101,7 @@ mod tests {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1149,7 +1149,7 @@ mod tests {
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_sync_ctx(FakeCoreCtxImpl::default());
+                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
             bindings_ctx.seed_rng(seed);
             assert_eq!(core_ctx.take_frames(), []);
 

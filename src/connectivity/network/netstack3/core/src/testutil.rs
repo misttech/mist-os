@@ -118,7 +118,7 @@ pub struct ContextPair<CC, BT> {
 
 impl<CC, BC> ContextPair<CC, BC> {
     #[cfg(test)]
-    pub(crate) fn with_sync_ctx(core_ctx: CC) -> Self
+    pub(crate) fn with_core_ctx(core_ctx: CC) -> Self
     where
         BC: Default,
     {
@@ -1615,28 +1615,28 @@ mod tests {
         });
 
         // No timers fired before.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 0);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 0);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 0);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 0);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 1);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 2);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 2);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 2);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 2);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 2);
         // Both timers have fired at the same time.
-        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 3);
-        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 3);
+        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 3);
+        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 3);
 
         assert!(net.step(receive_frame, handle_timer).is_idle());
         // Check that current time on contexts tick together.
@@ -1678,8 +1678,8 @@ mod tests {
         });
 
         while !net.step(receive_frame, handle_timer).is_idle()
-            && net.sync_ctx(1).state.timer_counters.nop.get() < 1
-            || net.sync_ctx(2).state.timer_counters.nop.get() < 1
+            && net.core_ctx(1).state.timer_counters.nop.get() < 1
+            || net.core_ctx(2).state.timer_counters.nop.get() < 1
         {}
         // Assert that we stopped before all times were fired, meaning we can
         // step again.
@@ -1772,15 +1772,15 @@ mod tests {
             bob_echo_request: u64,
             alice_echo_response: u64,
         ) {
-            assert_eq!(net.sync_ctx("alice").state.timer_counters.nop.get(), alice_nop);
+            assert_eq!(net.core_ctx("alice").state.timer_counters.nop.get(), alice_nop);
             assert_eq!(
-                net.sync_ctx("alice").state.icmp_rx_counters::<Ipv4>().echo_reply.get(),
+                net.core_ctx("alice").state.icmp_rx_counters::<Ipv4>().echo_reply.get(),
                 alice_echo_response
             );
 
-            assert_eq!(net.sync_ctx("bob").state.timer_counters.nop.get(), bob_nop);
+            assert_eq!(net.core_ctx("bob").state.timer_counters.nop.get(), bob_nop);
             assert_eq!(
-                net.sync_ctx("bob").state.icmp_rx_counters::<Ipv4>().echo_request.get(),
+                net.core_ctx("bob").state.icmp_rx_counters::<Ipv4>().echo_request.get(),
                 bob_echo_request
             );
         }
@@ -1882,9 +1882,9 @@ mod tests {
         core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
 
         net.collect_frames();
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_empty(net.iter_pending_frames());
 
         // Bob and Calvin should get any packet sent by Alice.
@@ -1892,14 +1892,14 @@ mod tests {
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_a, ip_b, &alice_device_id.clone().into());
         });
-        assert_eq!(net.non_sync_ctx("alice").frames_sent().len(), 1);
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_eq!(net.bindings_ctx("alice").frames_sent().len(), 1);
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_eq!(net.iter_pending_frames().count(), 2);
         assert!(net
             .iter_pending_frames()
@@ -1915,14 +1915,14 @@ mod tests {
         net.with_context("bob", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_b, ip_a, &bob_device_id.clone().into());
         });
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_eq!(net.non_sync_ctx("bob").frames_sent().len(), 1);
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_eq!(net.bindings_ctx("bob").frames_sent().len(), 1);
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_eq!(net.iter_pending_frames().count(), 1);
         assert!(net.iter_pending_frames().any(
             |InstantAndData(_, x)| (x.dst_context == "alice") && (&x.meta == &alice_device_id)
@@ -1934,14 +1934,14 @@ mod tests {
         net.with_context("calvin", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
         });
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_eq!(net.non_sync_ctx("calvin").frames_sent().len(), 1);
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_eq!(net.bindings_ctx("calvin").frames_sent().len(), 1);
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
-        assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
+        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
+        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
+        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
         assert_empty(net.iter_pending_frames());
     }
 }

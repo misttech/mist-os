@@ -1055,7 +1055,7 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
         cb: F,
     ) {
         let Self { config: _, core_ctx } = self;
-        crate::device::integration::with_ip_device_state_and_sync_ctx(
+        crate::device::integration::with_ip_device_state_and_core_ctx(
             core_ctx,
             device_id,
             |mut state, core_ctx| {

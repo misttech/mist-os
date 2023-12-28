@@ -5002,7 +5002,7 @@ pub(crate) mod testutil {
         local_ip: IpAddr,
         remote_ip: SpecifiedAddr<IpAddr>,
         devices: impl IntoIterator<Item = D>,
-        sync_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> CC,
+        core_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> CC,
     ) -> FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> {
         // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
         fn unmap_ip(addr: IpAddr) -> IpAddr {
@@ -5029,7 +5029,7 @@ pub(crate) mod testutil {
         // If the given remote_ip is unspecified, we won't be able to
         // connect; abort the test.
         let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
-        FakeCtxWithCoreCtx::with_sync_ctx(sync_ctx_builder(
+        FakeCtxWithCoreCtx::with_core_ctx(core_ctx_builder(
             devices
                 .into_iter()
                 .map(|device| FakeDeviceConfig {

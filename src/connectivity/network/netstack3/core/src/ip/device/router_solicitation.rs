@@ -322,7 +322,7 @@ mod tests {
     #[test]
     fn stop_router_solicitation() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(1),
                 router_soliciations_remaining: None,
                 source_address: None,
@@ -382,7 +382,7 @@ mod tests {
         expected_sll_bytes: Option<&[u8]>,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
                 max_router_solicitations: NonZeroU8::new(max_router_solicitations),
                 router_soliciations_remaining: None,
                 source_address,

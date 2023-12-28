@@ -791,7 +791,7 @@ mod tests {
         seed: u128,
         a: Option<AddrSubnet<Ipv4Addr>>,
     ) -> FakeCtx {
-        let mut ctx = FakeCtx::with_sync_ctx(FakeCoreCtx::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::default());
         ctx.bindings_ctx.seed_rng(seed);
         ctx.core_ctx.get_mut().addr_subnet = a;
         ctx
@@ -1127,7 +1127,7 @@ mod tests {
             // Test that we do not perform IGMP when IGMP is disabled.
 
             let FakeCtx { mut core_ctx, mut bindings_ctx } =
-                FakeCtx::with_sync_ctx(FakeCoreCtx::default());
+                FakeCtx::with_core_ctx(FakeCoreCtx::default());
             bindings_ctx.seed_rng(seed);
             core_ctx.get_mut().igmp_enabled = false;
 

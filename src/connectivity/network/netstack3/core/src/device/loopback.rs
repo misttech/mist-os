@@ -462,7 +462,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_loopback_state_and_sync_ctx(
+        device::integration::with_loopback_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -551,7 +551,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        device::integration::with_loopback_state_and_sync_ctx(
+        device::integration::with_loopback_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {

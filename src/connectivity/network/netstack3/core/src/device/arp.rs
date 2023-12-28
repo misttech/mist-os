@@ -902,7 +902,7 @@ mod tests {
         // sender's address information, and we do not send a response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -931,7 +931,7 @@ mod tests {
         // sender's address information, and we do not send a response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -961,7 +961,7 @@ mod tests {
         // the device layer.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(
@@ -1010,7 +1010,7 @@ mod tests {
         // address information and send an ARP response.
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         send_arp_packet(
             &mut core_ctx,
@@ -1096,7 +1096,7 @@ mod tests {
             {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
-                    let mut ctx = FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+                    let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
                     let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
                     core_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
                     core_ctx.get_mut().proto_addr = Some(*proto_addr);
@@ -1263,7 +1263,7 @@ mod tests {
         expect_solicited: bool,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         // Trigger link resolution.
         assert_neighbor_unknown(

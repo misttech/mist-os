@@ -207,7 +207,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
+        device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -238,7 +238,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
+        device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -773,7 +773,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
+        device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -1272,7 +1272,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
+        device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -1318,7 +1318,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
+        device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
             |mut state, core_ctx| {
@@ -1983,7 +1983,7 @@ mod tests {
         // the MTU.
         fn test(size: usize, expect_frames_sent: usize) {
             let crate::context::testutil::FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
-                crate::context::testutil::FakeCtxWithCoreCtx::with_sync_ctx(
+                crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
                     FakeCoreCtx::with_inner_and_outer_state(
                         FakeEthernetCtx::new(
                             FAKE_CONFIG_V4.local_mac,

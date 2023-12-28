@@ -1874,7 +1874,7 @@ mod tests {
         enable_stable_addresses: bool,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -1908,7 +1908,7 @@ mod tests {
     #[test_case(1; "preferred")]
     fn generate_stable_address(preferred_lifetime_secs: u32) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -1974,7 +1974,7 @@ mod tests {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2010,7 +2010,7 @@ mod tests {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2181,7 +2181,7 @@ mod tests {
         }: RefreshStableAddressTimersTest,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
                 dad_transmits: None,
                 retrans_timer: DEFAULT_RETRANS_TIMER,
@@ -2386,7 +2386,7 @@ mod tests {
         }: DontGenerateTemporaryAddressTest,
     ) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration {
                     temporary_address_configuration: enable.then(|| {
                         TemporarySlaacAddressConfiguration {
@@ -2525,7 +2525,7 @@ mod tests {
         let regen_advance = regen_advance(temp_idgen_retries, retrans_timer, dad_transmits);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config: SlaacConfiguration {
                     temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
                         temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(

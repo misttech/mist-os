@@ -5101,12 +5101,12 @@ mod tests {
             },
         );
 
-        assert_eq!(net.sync_ctx(LOCAL_CTX_NAME).state.icmp_rx_counters::<I>().echo_reply.get(), 1);
+        assert_eq!(net.core_ctx(LOCAL_CTX_NAME).state.icmp_rx_counters::<I>().echo_reply.get(), 1);
         assert_eq!(
-            net.sync_ctx(ctx_name_receiving_req).state.icmp_rx_counters::<I>().echo_request.get(),
+            net.core_ctx(ctx_name_receiving_req).state.icmp_rx_counters::<I>().echo_request.get(),
             1
         );
-        let replies = net.non_sync_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);
+        let replies = net.bindings_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);
         let expected = Buf::new(echo_body, ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 *config.local_ip,
@@ -6141,7 +6141,7 @@ mod tests {
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {
-            FakeCtxWithCoreCtx::with_sync_ctx(Wrapped {
+            FakeCtxWithCoreCtx::with_core_ctx(Wrapped {
                 outer: Default::default(),
                 inner: Wrapped {
                     outer: FakeIcmpInnerCoreCtxState::with_errors_per_second(errors_per_second),
@@ -6154,7 +6154,7 @@ mod tests {
         run_test::<Ipv4, _, _>(with_errors_per_second_v4, send_icmpv4_dest_unreachable_helper);
 
         fn with_errors_per_second_v6(errors_per_second: u64) -> FakeIcmpCtx<Ipv6> {
-            FakeCtxWithCoreCtx::with_sync_ctx(Wrapped {
+            FakeCtxWithCoreCtx::with_core_ctx(Wrapped {
                 outer: Default::default(),
                 inner: Wrapped {
                     outer: FakeIcmpInnerCoreCtxState::with_errors_per_second(errors_per_second),

@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn queue_and_dequeue() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         for _ in 0..2 {
             for i in 0..MAX_RX_QUEUED_LEN {

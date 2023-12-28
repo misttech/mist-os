@@ -400,17 +400,17 @@ mod tests {
 
         let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
-            net.sync_ctx("remote").state.ndp_counters().rx_neighbor_solicitation.get(),
+            net.core_ctx("remote").state.ndp_counters().rx_neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
-        assert_eq!(net.non_sync_ctx("remote").frames_sent().len(), 1);
+        assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
 
         // Forward advertisement response back to local.
         let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
-            net.sync_ctx("local").state.ndp_counters().rx_neighbor_advertisement.get(),
+            net.core_ctx("local").state.ndp_counters().rx_neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -421,7 +421,7 @@ mod tests {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
         });
         let _: StepResult = net.step(receive_frame, handle_timer);
-        assert_eq!(net.sync_ctx("remote").state.icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
+        assert_eq!(net.core_ctx("remote").state.icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
 
         // TODO(brunodalbo): We should be able to verify that remote also sends
         //  back an echo reply, but we're having some trouble with IPv6 link
@@ -494,27 +494,27 @@ mod tests {
         });
 
         // Both devices should be in the solicited-node multicast group.
-        assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
-        assert!(is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
         let _: StepResult = net.step(receive_frame, handle_timer);
 
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
         with_assigned_ipv6_addr_subnets(
-            &mut Locked::new(&*net.sync_ctx("local")),
+            &mut Locked::new(&*net.core_ctx("local")),
             &local_device_id,
             |addrs| assert_empty(addrs),
         );
         with_assigned_ipv6_addr_subnets(
-            &mut Locked::new(&*net.sync_ctx("remote")),
+            &mut Locked::new(&*net.core_ctx("remote")),
             &remote_device_id,
             |addrs| assert_empty(addrs),
         );
 
         // Both devices should not be in the multicast group
-        assert!(!is_in_ip_multicast(&&*net.sync_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(&&*net.sync_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(!is_in_ip_multicast(&&*net.core_ctx("local"), &local_device_id, multicast_addr));
+        assert!(!is_in_ip_multicast(&&*net.core_ctx("remote"), &remote_device_id, multicast_addr));
     }
 
     fn dad_timer_id(
@@ -571,8 +571,8 @@ mod tests {
         });
 
         // Only local should be in the solicited node multicast group.
-        assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
+        assert!(!is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
         net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
             assert_eq!(
@@ -582,7 +582,7 @@ mod tests {
         });
 
         assert_eq!(
-            get_address_assigned(&&*net.sync_ctx("local"), &local_device_id, local_ip()),
+            get_address_assigned(&&*net.core_ctx("local"), &local_device_id, local_ip()),
             Some(true)
         );
 
@@ -590,14 +590,14 @@ mod tests {
             add_ip_addr_subnet(core_ctx, bindings_ctx, &remote_device_id, addr).unwrap();
         });
         // Local & remote should be in the multicast group.
-        assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
-        assert!(is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
         let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.sync_ctx("remote")),
+                &mut Locked::new(&*net.core_ctx("remote")),
                 &remote_device_id,
                 |addrs| addrs.count()
             ),
@@ -606,17 +606,17 @@ mod tests {
 
         // Let's make sure that only our local node still can use that address.
         assert_eq!(
-            get_address_assigned(&&*net.sync_ctx("local"), &local_device_id, local_ip()),
+            get_address_assigned(&&*net.core_ctx("local"), &local_device_id, local_ip()),
             Some(true)
         );
         assert_eq!(
-            get_address_assigned(&&*net.sync_ctx("remote"), &remote_device_id, local_ip()),
+            get_address_assigned(&&*net.core_ctx("remote"), &remote_device_id, local_ip()),
             None,
         );
 
         // Only local should be in the solicited node multicast group.
-        assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
+        assert!(!is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
     }
 
     #[test]
@@ -772,8 +772,8 @@ mod tests {
         });
         // The local host should have sent out 3 packets while the remote one
         // should only have sent out 1.
-        assert_eq!(net.non_sync_ctx("local").frames_sent().len(), 3);
-        assert_eq!(net.non_sync_ctx("remote").frames_sent().len(), 1);
+        assert_eq!(net.bindings_ctx("local").frames_sent().len(), 3);
+        assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
 
         let _: StepResult = net.step(receive_frame, handle_timer);
 
@@ -789,7 +789,7 @@ mod tests {
         // duplicate in the local network.
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.sync_ctx("local")),
+                &mut Locked::new(&*net.core_ctx("local")),
                 &local_device_id,
                 |a| a.count()
             ),
@@ -797,7 +797,7 @@ mod tests {
         );
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.sync_ctx("remote")),
+                &mut Locked::new(&*net.core_ctx("remote")),
                 &remote_device_id,
                 |a| a.count()
             ),

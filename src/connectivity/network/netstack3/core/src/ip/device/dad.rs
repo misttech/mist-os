@@ -543,7 +543,7 @@ mod tests {
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_start() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -566,7 +566,7 @@ mod tests {
     #[should_panic(expected = "expected address to exist")]
     fn panic_unknown_address_handle_timer() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -588,7 +588,7 @@ mod tests {
     #[should_panic(expected = "expected address to be tentative")]
     fn panic_non_tentative_address_handle_timer() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Assigned,
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn dad_disabled() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
@@ -678,7 +678,7 @@ mod tests {
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
@@ -731,7 +731,7 @@ mod tests {
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(2)) };
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },

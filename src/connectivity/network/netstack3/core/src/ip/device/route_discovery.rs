@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn new_route_no_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         RouteDiscoveryHandler::update_route(
             &mut core_ctx,
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn new_route_already_exists() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         // Fake the route already being present in the routing table.
         assert!(core_ctx.get_mut().route_table.route_table.insert(ROUTE1));
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn invalidated_route_not_found() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
 
@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn new_route_with_infinite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn update_route_from_infinite_to_finite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn invalidate_route_with_infinite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -564,7 +564,7 @@ mod tests {
     #[test]
     fn new_route_with_finite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(
             &mut core_ctx,
@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn update_route_from_finite_to_infinite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(
             &mut core_ctx,
@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn update_route_from_finite_to_finite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(
             &mut core_ctx,
@@ -627,7 +627,7 @@ mod tests {
     #[test]
     fn invalidate_route_with_finite_lifetime() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         discover_new_route(
             &mut core_ctx,
@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn invalidate_all_routes() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
         discover_new_route(
             &mut core_ctx,
             &mut bindings_ctx,

@@ -5257,7 +5257,7 @@ mod tests {
     {
         set_logger_for_test();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5313,7 +5313,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5360,7 +5360,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5389,7 +5389,7 @@ mod tests {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
                 Ipv6::FAKE_CONFIG.local_ip,
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
@@ -5420,7 +5420,7 @@ mod tests {
         let ll_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
                 Ipv6::FAKE_CONFIG.local_ip,
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
@@ -5453,8 +5453,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeNetwork::new(
             [
-                (LOCAL, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
-                (REMOTE, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -5541,8 +5541,8 @@ mod tests {
         let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeNetwork::new(
             [
-                (LOCAL, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
-                (REMOTE, TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -5764,7 +5764,7 @@ mod tests {
     {
         set_logger_for_test();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new_multiple_devices());
+            TcpCtx::with_core_ctx(TcpCoreCtx::new_multiple_devices());
 
         let sock_a = SocketHandler::<I, _>::create_socket(
             &mut core_ctx,
@@ -5819,7 +5819,7 @@ mod tests {
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                     FakeDeviceConfig {
                         device,
@@ -5862,7 +5862,7 @@ mod tests {
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                     FakeDeviceConfig {
                         device,
@@ -5909,7 +5909,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -5951,7 +5951,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6004,7 +6004,7 @@ mod tests {
             [
                 (
                     LOCAL,
-                    TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
+                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
                         server_ip,
                         client_ip,
                         Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6012,7 +6012,7 @@ mod tests {
                 ),
                 (
                     REMOTE,
-                    TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
+                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
                         client_ip,
                         server_ip,
                         Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6094,7 +6094,7 @@ mod tests {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<Ipv6>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
                 local_ip,
                 remote_ip,
                 Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
@@ -6365,7 +6365,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6387,7 +6387,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6779,7 +6779,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6829,7 +6829,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -6864,7 +6864,7 @@ mod tests {
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::<_>::with_devices_state(core::iter::once::<(
                     _,
                     _,
@@ -6920,7 +6920,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7056,7 +7056,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7126,7 +7126,7 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7249,7 +7249,7 @@ mod tests {
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
         let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_sync_ctx(TcpCoreCtx::new::<I>(
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
@@ -7807,7 +7807,7 @@ mod tests {
         // Verify that the client is connected to the IPv4 remote and has been
         // assigned an IPv4 local IP.
         let info = assert_matches!(
-            SocketHandler::get_info(net.sync_ctx(LOCAL), &client),
+            SocketHandler::get_info(net.core_ctx(LOCAL), &client),
             SocketInfo::Connection(info) => info
         );
         let (local_ip, remote_ip) = assert_matches!(

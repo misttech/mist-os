@@ -485,7 +485,7 @@ mod tests {
     #[test]
     fn noqueue() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         let body = Buf::new(vec![0], ..);
         assert_eq!(
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn fifo_queue_and_dequeue() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
             &mut core_ctx,
@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn device_not_ready() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
             &mut core_ctx,
@@ -686,7 +686,7 @@ mod tests {
     #[test_case(false; "device ready")]
     fn drain_before_noqueue(device_not_ready: bool) {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_sync_ctx(FakeCoreCtxImpl::default());
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         TransmitQueueApi::set_configuration(
             &mut core_ctx,
