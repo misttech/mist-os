@@ -384,10 +384,9 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
-    use fuchsia_sync::Mutex;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::AsHandleRef;
-    use futures::{FutureExt, SinkExt};
+    use futures::{lock::Mutex, FutureExt, SinkExt};
     use lazy_static::lazy_static;
     use moniker::ExtendedMoniker;
 
@@ -466,7 +465,7 @@ mod tests {
     #[async_trait]
     impl EventConsumer for TestEventConsumer {
         async fn handle(self: Arc<Self>, event: Event) {
-            self.event_sender.lock().send(event).await.unwrap();
+            self.event_sender.lock().await.send(event).await.unwrap();
         }
     }
 
