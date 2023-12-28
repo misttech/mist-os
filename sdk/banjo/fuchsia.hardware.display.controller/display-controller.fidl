@@ -45,7 +45,7 @@ type ConfigStamp = struct {
     value uint64;
 };
 
-/// A fallback structure to convey display information without an edid.
+/// A fallback structure to convey display information without an EDID.
 type DisplayParams = struct {
     width uint32;
     height uint32;
@@ -63,9 +63,9 @@ type CursorInfo = struct {
 };
 
 type Panel = strict resource union {
-    // The i2c bus to use to read this display's edid.
+    /// The i2c bus to use to read this display's EDID.
     1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
-    /// The display's parameters if an edid is not present.
+    /// The display's parameters if an EDID is not present.
     2: params DisplayParams;
 };
 
@@ -73,13 +73,13 @@ type Panel = strict resource union {
 type AddedDisplayArgs = resource struct {
     display_id uint64;
 
-    /// A flag indicating whether or not the display has a valid edid.
+    /// A flag indicating whether or not the display has a valid EDID.
     ///
     /// If true, the device should provide a fuchsia.hardware.i2cimpl.I2cImpl client in the `Panel`
     /// union. Note that the i2c device will be called from the on_displays_changed callback, so
     /// care should be taken to avoid deadlocks or double-locking.
     ///
-    /// If no edid is present, then the meaning of display_config's mode structure is
+    /// If no EDID is present, then the meaning of display_config's mode structure is
     /// undefined, and drivers should ignore it in check_configuration and apply_configuration.
     edid_present bool;
     panel Panel;
@@ -129,8 +129,9 @@ closed protocol DisplayControllerInterface {
     ///      configurations with a certain `config_stamp`; Only the application
     ///      status of the configuration with ID `display_id` is related.
     ///
-    /// The driver must call this function for all vsync events, even if the
-    /// display has no images displayed.
+    /// The driver must call this function as close as possible to the start of
+    /// every display's VSync period, even if the display has no images
+    /// displayed.
     strict OnDisplayVsync(struct {
         display_id uint64;
         timestamp zx.Time;
@@ -316,9 +317,6 @@ type ConfigCheckResult = strict enum : uint32 {
 ///
 /// Individual bit positions map to the values of the FIDL enum
 /// [`fuchsia.hardware.display/ClientCompositionOpcode`].
-//
-// TODO(fxbug.dev/130427): The type (bitfield) doesn't match the
-// corresponding type in FIDL which is an enum.
 type ClientCompositionOpcode = strict bits : uint32 {
     /// The client should convert the corresponding layer to a primary layer.
     USE_PRIMARY = 0x1;
@@ -447,27 +445,26 @@ closed protocol DisplayControllerImpl {
     /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the combination of
     /// display modes is not supported.
     ///
-    /// - response `client_composition_opcodes` are per-layer client operations
+    /// `client_composition_opcodes` are per-layer client operations
     /// to make the layer configuration supported by the display hardware. If
     /// the `config_check_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
     /// `client_composition_opcodes` are undefined and should be ignored by the
     /// client.
     ///
-    ///   `client_composition_opcodes` is an array with one element for each
-    ///   layer in
-    ///   each display_config element. The elements map to layers following a
-    ///   DFS traversal of a tree where the first-level children are the
-    ///   `display_config` elements, and the second-level children are each
-    ///   `DisplayConfig`'s layers.
+    /// `client_composition_opcodes` is an array with one element for each
+    /// layer in
+    /// each display_config element. The elements map to layers following a
+    /// DFS traversal of a tree where the first-level children are the
+    /// `display_config` elements, and the second-level children are each
+    /// `DisplayConfig`'s layers.
     ///
-    ///    The element ordering matches flattening the array obtained by mapping
-    ///    each display_config element to its `DisplayConfig.layers` value:
-    ///    [ display 0 layer 0, display 0 layer 1, ...,
-    ///      display 1 layer 0, display 1 layer 1, ...,
-    ///      display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
+    /// The element ordering matches flattening the array obtained by mapping
+    /// each display_config element to its `DisplayConfig.layers` value:
+    ///   [ display 0 layer 0, display 0 layer 1, ...,
+    ///     display 1 layer 0, display 1 layer 1, ...,
+    ///     display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
     ///
     /// The driver must not retain references to the configuration after this function returns.
-    /// TODO: Fix me...
     strict CheckConfiguration(struct {
         @inner_pointer
         display_config vector<DisplayConfig>:MAX;
@@ -478,7 +475,7 @@ closed protocol DisplayControllerImpl {
 
     /// Applies the configuration.
     ///
-    /// All configurations passed to this function will be derived from configurations which
+    /// All configurations passed to this function must be derived from configurations which
     /// have been successfully validated, with the only differences either being omitted layers
     /// or different image handles. To account for any layers which are not present, the driver
     /// must use the z_index values of the present layers to configure them as if the whole
@@ -487,7 +484,7 @@ closed protocol DisplayControllerImpl {
     /// Unlike with check_configuration, displays included in the configuration are not
     /// guaranteed to include any layers. Both omitted displays and displays with no layers
     /// can either be turned off or set to display a blank screen, but for displays with no
-    /// layers there is a strong preference to display a blank screen instead of turn them off.
+    /// layers there is a strong preference to display a blank screen instead of turning them off.
     /// In either case, the driver must drop all references to old images and invoke the vsync
     /// callback after doing so.
     ///
@@ -514,7 +511,7 @@ closed protocol DisplayControllerImpl {
         raw_eld vector<uint8>:MAX;
     }) -> ();
 
-    // Connects the handle to the sysmem service.
+    /// Connects the handle to the sysmem service.
     strict GetSysmemConnection(resource struct {
         sysmem_handle zx.Handle:CHANNEL;
     }) -> (struct {
@@ -533,11 +530,11 @@ closed protocol DisplayControllerImpl {
         s zx.Status;
     });
 
-    // Power off/on the display panel. Newly added displays are turned on by default.
-    //
-    // Displays that are turned off will not deliver VSync events.
-    // This may include the vsync event for the most recently applied
-    // config.
+    /// Power off/on the display panel. Newly added displays are turned on by default.
+    ///
+    /// Displays that are turned off will not deliver VSync events.
+    /// This may include the vsync event for the most recently applied
+    /// config.
     strict SetDisplayPower(struct {
         display_id uint64;
         power_on bool;
