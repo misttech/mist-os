@@ -13,13 +13,19 @@
 use core::{convert::Infallible as Never, marker::PhantomData};
 
 use explicit::UnreachableExt as _;
-use net_types::ip::Ip;
+use net_types::{ip::Ip, SpecifiedAddr};
+use packet::{BufferMut, Serializer};
 
 use crate::{
     convert::BidirectionalConverter,
     device::{self, Device, DeviceIdContext},
-    ip::TransportIpContext,
+    ip::{
+        socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
+        EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
+        TransportIpContext,
+    },
     socket::{
+        address::SocketIpAddr,
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSpec, DualStackDatagramBoundStateContext,
@@ -27,6 +33,7 @@ use crate::{
         },
         BoundSocketMap, MaybeDualStack, SocketMapAddrSpec, SocketMapStateSpec,
     },
+    transport::tcp::socket::{self as tcp_socket, TcpBindingsTypes},
 };
 
 /// An uninstantiable type.
@@ -245,6 +252,93 @@ where
         &mut self,
         _cb: F,
     ) -> O {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<
+        I: tcp_socket::DualStackIpExt,
+        D: device::WeakId,
+        BT: TcpBindingsTypes,
+        P: tcp_socket::TcpDemuxContext<I, D, BT>,
+    > tcp_socket::TcpDemuxContext<I, D, BT> for UninstantiableWrapper<P>
+{
+    fn with_demux<O, F: FnOnce(&tcp_socket::DemuxState<I, D, BT>) -> O>(&mut self, _cb: F) -> O {
+        self.uninstantiable_unreachable()
+    }
+    fn with_demux_mut<O, F: FnOnce(&mut tcp_socket::DemuxState<I, D, BT>) -> O>(
+        &mut self,
+        _cb: F,
+    ) -> O {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<I: IpLayerIpExt, C, P: DeviceIpSocketHandler<I, C>> DeviceIpSocketHandler<I, C>
+    for UninstantiableWrapper<P>
+{
+    fn get_mms<O: SendOptions<I>>(
+        &mut self,
+        _ctx: &mut C,
+        _ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
+    ) -> Result<Mms, MmsError> {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<I: IpExt, C, P: TransportIpContext<I, C>> TransportIpContext<I, C>
+    for UninstantiableWrapper<P>
+{
+    type DevicesWithAddrIter<'s> = P::DevicesWithAddrIter<'s> where P: 's;
+    fn get_devices_with_assigned_addr(
+        &mut self,
+        _addr: SpecifiedAddr<I::Addr>,
+    ) -> Self::DevicesWithAddrIter<'_> {
+        self.uninstantiable_unreachable()
+    }
+    fn get_default_hop_limits(&mut self, _device: Option<&Self::DeviceId>) -> HopLimits {
+        self.uninstantiable_unreachable()
+    }
+    fn confirm_reachable_with_destination(
+        &mut self,
+        _ctx: &mut C,
+        _dst: SpecifiedAddr<I::Addr>,
+        _device: Option<&Self::DeviceId>,
+    ) {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for UninstantiableWrapper<P> {
+    fn new_ip_socket<O>(
+        &mut self,
+        _ctx: &mut C,
+        _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+        _local_ip: Option<SocketIpAddr<I::Addr>>,
+        _remote_ip: SocketIpAddr<I::Addr>,
+        _proto: I::Proto,
+        _options: O,
+    ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)> {
+        self.uninstantiable_unreachable()
+    }
+    fn send_ip_packet<S, O>(
+        &mut self,
+        _ctx: &mut C,
+        _socket: &IpSock<I, Self::WeakDeviceId, O>,
+        _body: S,
+        _mtu: Option<u32>,
+    ) -> Result<(), (S, IpSockSendError)>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+        O: SendOptions<I>,
+    {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<P> tcp_socket::AsSingleStack<P> for UninstantiableWrapper<P> {
+    fn as_single_stack(&mut self) -> &mut P {
         self.uninstantiable_unreachable()
     }
 }

@@ -57,7 +57,7 @@ where
         Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>;
 
     type DualStackIpTransportAndDemuxCtx<'a> =
-        Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>;
+        UninstantiableWrapper<Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv4>>>;
 
     type SingleStackConverter = ();
     type DualStackConverter = Uninstantiable;
@@ -150,6 +150,11 @@ where
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>,
 {
+    // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
+    // the single stack ctx once the `AsSingleStack` bound has been dropped
+    // from [`TcpSyncCtx::DualStackIpTransportAndDemuxCtx`] (It's not
+    // possible for `Self` to implement
+    // `AsSingleStack<UninstantiableWrapper<Self>>`).
     type SingleStackIpTransportAndDemuxCtx<'a> =
         Locked<&'a SyncCtx<BC>, crate::lock_ordering::TcpSocketState<Ipv6>>;
 

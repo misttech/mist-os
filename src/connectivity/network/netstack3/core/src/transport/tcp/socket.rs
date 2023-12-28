@@ -4200,7 +4200,7 @@ mod tests {
             state::{TimeWait, MSL},
             ConnectionError, Mms, DEFAULT_FIN_WAIT2_TIMEOUT,
         },
-        uninstantiable::Uninstantiable,
+        uninstantiable::{Uninstantiable, UninstantiableWrapper},
         Instant as _,
     };
 
@@ -4572,6 +4572,11 @@ mod tests {
     impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketBindingsContext> TcpContext<Ipv6, BC>
         for TcpCoreCtx<D, BC>
     {
+        // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
+        // the single stack ctx once the `AsSingleStack` bound has been dropped
+        // from [`TcpSyncCtx::DualStackIpTransportAndDemuxCtx`] (It's not
+        // possible for `Self` to implement
+        // `AsSingleStack<UninstantiableWrapper<Self>>`).
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = Uninstantiable;
         type DualStackIpTransportAndDemuxCtx<'a> = Self;
@@ -4651,7 +4656,7 @@ mod tests {
     {
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = ();
-        type DualStackIpTransportAndDemuxCtx<'a> = Self;
+        type DualStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;
         type DualStackConverter = Uninstantiable;
         fn with_all_sockets_mut<
             O,
