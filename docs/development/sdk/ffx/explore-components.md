@@ -252,7 +252,7 @@ This is not supported directly from the command interpreter.
 ### How do I file a feature request for ffx component explore? {:#how-do-i-file-a-feature-request-for-ffx-compoent-explore}
 
 File all feature requests under the
-[`ComponentFramework > Tools`][cf-tools-monorail]{:.external} Monorail
+[`ComponentFramework > Tools`][cf-tools-buganizer]{:.external} Issue Tracker
 component.
 
 <!-- Reference links -->
@@ -263,4 +263,4 @@ component.
 [component-url]: /docs/concepts/components/v2/identifiers.md#component-urls
 [instance-id]: /docs/development/components/component_id_index.md
 [ffx-component-run]: /docs/development/sdk/ffx/start-a-component-during-development.md
-[cf-tools-monorail]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=ComponentFramework&components=ComponentFramework%3ETools
+[cf-tools-buganizer]: https://issues.fuchsia.dev/issues/new?component=1404287&template=0

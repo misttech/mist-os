@@ -272,8 +272,7 @@ The CTF team is responsible for providing developers with the infrastructure
 needed to run their tests.  If test developers do not see the functionality they
 need, they should partner with the CTF team to ensure that they can provide
 tests that can be run in CTF infrastructure.  Developers can reach out to the
-CTF team by [filing a bug in
-monorail](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Fuchsia+Compatibility+Test+Suite+%28CTF%29).
+CTF team by [filing a bug](https://issues.fuchsia.dev/issues/new?component=1478063&template=1911532).
 
 API review will also evolve to accommodate the requirement that CTF tests
 accompany changes.  For areas at Tier 2 or higher, modifications or additions to
