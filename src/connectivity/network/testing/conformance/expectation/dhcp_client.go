@@ -149,7 +149,7 @@ var dhcpClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{13, 4}:  Pass,
 	{13, 5}:  Pass,
 	{13, 6}:  Pass,
-	{13, 7}:  Inconclusive,
+	{13, 7}:  Pass,
 	{13, 8}:  Fail,
 	{13, 9}:  Inconclusive,
 	{13, 10}: Inconclusive,

@@ -20,8 +20,9 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                // TODO(b/42077866): Implement Rebinding state.
-                "client_rebinds_same_lease_to_other_server_ns[23]",
+                // TODO(https://fxbug.dev/42148833): Support sending to the
+                // all-ones broadcast address in netstack3.
+                "client_rebinds_same_lease_to_other_server_ns3",
             ],
         },
     ],

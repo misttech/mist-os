@@ -547,8 +547,13 @@ pub(crate) struct FieldsFromOfferToUseInRequest {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum IncomingResponseToRequest {
-    Ack(FieldsToRetainFromAck),
+// `ServerIdentifier`` is generic in order to allow for it to be optional for
+// DHCPACKs received while in RENEWING state (since we already know the
+// identifier of the server we're directly communicating with) but required in
+// REBINDING state (because we've broadcast the request and need to record
+// which server to send renewal requests to in the future).
+pub(crate) enum IncomingResponseToRequest<ServerIdentifier> {
+    Ack(FieldsToRetainFromAck<ServerIdentifier>),
     Nak(FieldsToRetainFromNak),
 }
 
@@ -570,18 +575,37 @@ pub(crate) enum IncomingResponseToRequestError {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct FieldsToRetainFromAck {
+pub(crate) struct FieldsToRetainFromAck<ServerIdentifier> {
     pub(crate) yiaddr: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
-    // Strictly according to RFC 2131, the Server Identifier MUST be included in
-    // the DHCPACK. However, we've observed DHCP servers in the field fail to
-    // set the Server Identifier, instead expecting the client to remember it
-    // from the DHCPOFFER (https://fxbug.dev/113194). Thus, we treat Server
-    // Identifier as optional for DHCPACK.
-    pub(crate) server_identifier: Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    pub(crate) server_identifier: ServerIdentifier,
     pub(crate) ip_address_lease_time_secs: NonZeroU32,
     pub(crate) renewal_time_value_secs: Option<u32>,
     pub(crate) rebinding_time_value_secs: Option<u32>,
     pub(crate) parameters: Vec<dhcp_protocol::DhcpOption>,
+}
+
+impl<ServerIdentifier> FieldsToRetainFromAck<ServerIdentifier> {
+    pub(crate) fn map_server_identifier<T, E>(
+        self,
+        f: impl FnOnce(ServerIdentifier) -> Result<T, E>,
+    ) -> Result<FieldsToRetainFromAck<T>, E> {
+        let Self {
+            yiaddr,
+            server_identifier,
+            ip_address_lease_time_secs,
+            renewal_time_value_secs,
+            rebinding_time_value_secs,
+            parameters,
+        } = self;
+        Ok(FieldsToRetainFromAck {
+            yiaddr,
+            server_identifier: f(server_identifier)?,
+            ip_address_lease_time_secs,
+            renewal_time_value_secs,
+            rebinding_time_value_secs,
+            parameters,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -599,7 +623,17 @@ pub(crate) struct FieldsToRetainFromNak {
 pub(crate) fn fields_to_retain_from_response_to_request(
     requested_parameters: &OptionCodeMap<OptionRequested>,
     message: dhcp_protocol::Message,
-) -> Result<IncomingResponseToRequest, IncomingResponseToRequestError> {
+) -> Result<
+    IncomingResponseToRequest<
+        // Strictly according to RFC 2131, the Server Identifier MUST be included in
+        // the DHCPACK. However, we've observed DHCP servers in the field fail to
+        // set the Server Identifier, instead expecting the client to remember it
+        // from the DHCPOFFER (https://fxbug.dev/113194). Thus, we treat Server
+        // Identifier as optional for DHCPACK.
+        Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    >,
+    IncomingResponseToRequestError,
+> {
     let CommonIncomingMessageFields {
         message_type,
         server_identifier,
@@ -1225,7 +1259,10 @@ mod test {
     )); "rejects duplicate option")]
     fn fields_to_retain_during_requesting(
         incoming_fields: VaryingReplyToRequestFields,
-    ) -> Result<IncomingResponseToRequest, IncomingResponseToRequestError> {
+    ) -> Result<
+        IncomingResponseToRequest<Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>>,
+        IncomingResponseToRequestError,
+    > {
         use super::fields_to_retain_from_response_to_request as fields;
         use dhcp_protocol::DhcpOption;
 
