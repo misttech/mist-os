@@ -526,83 +526,11 @@ void Osd::DefaultSetup() {
       .WriteTo(&vpu_mmio_);
 }
 
-void Osd::EnableScaling(bool enable) {
-  int hf_phase_step, vf_phase_step;
-  int src_w, src_h, dst_w, dst_h;
-  int bot_ini_phase;
-  int vsc_ini_rcv_num, vsc_ini_rpt_p0_num;
-  int hsc_ini_rcv_num, hsc_ini_rpt_p0_num;
-  int hf_bank_len = 4;
-  int vf_bank_len = 0;
-  uint32_t data32 = 0x0;
-
-  vf_bank_len = 4;
-  hsc_ini_rcv_num = hf_bank_len;
-  vsc_ini_rcv_num = vf_bank_len;
-  hsc_ini_rpt_p0_num = (hf_bank_len / 2 - 1) > 0 ? (hf_bank_len / 2 - 1) : 0;
-  vsc_ini_rpt_p0_num = (vf_bank_len / 2 - 1) > 0 ? (vf_bank_len / 2 - 1) : 0;
-  src_w = layer_image_size_.width;
-  src_h = layer_image_size_.height;
-  dst_w = display_contents_size_.width;
-  dst_h = display_contents_size_.height;
-
-  data32 = 0x0;
-  if (enable) {
-    /* enable osd scaler */
-    data32 |= 1 << 2; /* enable osd scaler */
-    data32 |= 1 << 3; /* enable osd scaler path */
-    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SC_CTRL0);
-  } else {
-    /* disable osd scaler path */
-    vpu_mmio_.Write32(0, VPU_VPP_OSD_SC_CTRL0);
-  }
-  hf_phase_step = (src_w << 18) / dst_w;
-  hf_phase_step = (hf_phase_step << 6);
-  vf_phase_step = (src_h << 20) / dst_h;
-  bot_ini_phase = 0;
-  vf_phase_step = (vf_phase_step << 4);
-
-  /* config osd scaler in/out hv size */
-  data32 = 0x0;
-  if (enable) {
-    data32 = (((src_h - 1) & 0x1fff) | ((src_w - 1) & 0x1fff) << 16);
-    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCI_WH_M1);
-    data32 = (((display_contents_size_.width - 1) & 0xfff));
-    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCO_H_START_END);
-    data32 = (((display_contents_size_.height - 1) & 0xfff));
-    vpu_mmio_.Write32(data32, VPU_VPP_OSD_SCO_V_START_END);
-  }
-  data32 = 0x0;
-  if (enable) {
-    data32 |=
-        (vf_bank_len & 0x7) | ((vsc_ini_rcv_num & 0xf) << 3) | ((vsc_ini_rpt_p0_num & 0x3) << 8);
-    data32 |= 1 << 24;
-  }
-  vpu_mmio_.Write32(data32, VPU_VPP_OSD_VSC_CTRL0);
-  data32 = 0x0;
-  if (enable) {
-    data32 |=
-        (hf_bank_len & 0x7) | ((hsc_ini_rcv_num & 0xf) << 3) | ((hsc_ini_rpt_p0_num & 0x3) << 8);
-    data32 |= 1 << 22;
-  }
-  vpu_mmio_.Write32(data32, VPU_VPP_OSD_HSC_CTRL0);
-  data32 = 0x0;
-  if (enable) {
-    data32 |= (bot_ini_phase & 0xffff) << 16;
-    vpu_mmio_.Write32(
-        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_HSC_PHASE_STEP), /*field_begin_bit=*/0,
-                        /*field_size_bits=*/28, /*field_value=*/hf_phase_step),
-        VPU_VPP_OSD_HSC_PHASE_STEP);
-    vpu_mmio_.Write32(
-        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_HSC_INI_PHASE), /*field_begin_bit=*/0,
-                        /*field_size_bits=*/16, /*field_value=*/0),
-        VPU_VPP_OSD_HSC_INI_PHASE);
-    vpu_mmio_.Write32(
-        SetFieldValue32(vpu_mmio_.Read32(VPU_VPP_OSD_VSC_PHASE_STEP), /*field_begin_bit=*/0,
-                        /*field_size_bits=*/28, /*field_value=*/vf_phase_step),
-        VPU_VPP_OSD_VSC_PHASE_STEP);
-    vpu_mmio_.Write32(data32, VPU_VPP_OSD_VSC_INI_PHASE);
-  }
+void Osd::DisableScaling() {
+  // Disable osd scaler path.
+  vpu_mmio_.Write32(0, VPU_VPP_OSD_SC_CTRL0);
+  vpu_mmio_.Write32(0, VPU_VPP_OSD_VSC_CTRL0);
+  vpu_mmio_.Write32(0, VPU_VPP_OSD_HSC_CTRL0);
 }
 
 void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
@@ -687,6 +615,11 @@ void Osd::HwInit() {
   ZX_DEBUG_ASSERT_MSG(layer_image_size_.IsValid(), "Invalid framebuffer size (%d x %d)",
                       layer_image_size_.width, layer_image_size_.height);
 
+  // TODO(fxbug.dev/317922128): Remove this assertion once we support
+  // framebuffer scaling.
+  ZX_DEBUG_ASSERT(layer_image_size_.width == display_contents_size_.width);
+  ZX_DEBUG_ASSERT(layer_image_size_.height == display_contents_size_.height);
+
   // Setup VPP horizontal width
   vpu_mmio_.Write32(display_contents_size_.width, VPP_POSTBLEND_H_SIZE);
 
@@ -726,7 +659,7 @@ void Osd::HwInit() {
 
   DefaultSetup();
 
-  EnableScaling(false);
+  DisableScaling();
 
   // Apply scale coefficients
   osd1_registers.scale_coef_idx.ReadFrom(&vpu_mmio_)

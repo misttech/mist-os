@@ -79,9 +79,10 @@ class Osd {
   Osd(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
       fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
   void DefaultSetup();
-  // this function sets up scaling based on framebuffer and actual display
-  // dimensions. The scaling IP and registers and undocumented.
-  void EnableScaling(bool enable);
+
+  // Disables framebuffer scaling.
+  // TODO(fxbug.dev/317922128): Add OSD scaler support.
+  void DisableScaling();
 
   zx_status_t ConfigAfbc();
   void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config);
