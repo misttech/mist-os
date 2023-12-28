@@ -20,6 +20,7 @@ use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_inspect::Inspector;
+use fuchsia_sync::Mutex;
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
@@ -443,18 +444,18 @@ pub fn copy_log_message(log_message: &LogMessage) -> LogMessage {
 
 /// A fake reader that returns enqueued responses on read.
 pub struct TestDebugLog {
-    read_responses: async_lock::Mutex<VecDeque<ReadResponse>>,
+    read_responses: Mutex<VecDeque<ReadResponse>>,
 }
 type ReadResponse = Result<zx::sys::zx_log_record_t, zx::Status>;
 
 #[async_trait]
 impl crate::logs::debuglog::DebugLog for TestDebugLog {
-    async fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
-        self.read_responses.lock().await.pop_front().expect("Got more read requests than enqueued")
+    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
+        self.read_responses.lock().pop_front().expect("Got more read requests than enqueued")
     }
 
     async fn ready_signal(&self) -> Result<(), zx::Status> {
-        if self.read_responses.lock().await.is_empty() {
+        if self.read_responses.lock().is_empty() {
             // ready signal should never complete if we have no logs left.
             futures::future::pending().await
         }
@@ -464,21 +465,21 @@ impl crate::logs::debuglog::DebugLog for TestDebugLog {
 
 impl Default for TestDebugLog {
     fn default() -> Self {
-        TestDebugLog { read_responses: async_lock::Mutex::new(VecDeque::new()) }
+        TestDebugLog { read_responses: Mutex::new(VecDeque::new()) }
     }
 }
 
 impl TestDebugLog {
-    pub async fn enqueue_read(&self, response: zx::sys::zx_log_record_t) {
-        self.read_responses.lock().await.push_back(Ok(response));
+    pub fn enqueue_read(&self, response: zx::sys::zx_log_record_t) {
+        self.read_responses.lock().push_back(Ok(response));
     }
 
-    pub async fn enqueue_read_entry(&self, entry: &TestDebugEntry) {
-        self.enqueue_read(entry.record).await;
+    pub fn enqueue_read_entry(&self, entry: &TestDebugEntry) {
+        self.enqueue_read(entry.record);
     }
 
-    pub async fn enqueue_read_fail(&self, error: zx::Status) {
-        self.read_responses.lock().await.push_back(Err(error))
+    pub fn enqueue_read_fail(&self, error: zx::Status) {
+        self.read_responses.lock().push_back(Err(error))
     }
 }
 

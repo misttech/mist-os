@@ -15,7 +15,7 @@ use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use futures::stream::{unfold, Stream, TryStreamExt};
+use futures::stream::{unfold, Stream};
 use lazy_static::lazy_static;
 use moniker::ExtendedMoniker;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ lazy_static! {
 pub trait DebugLog {
     /// Reads a single entry off the debug log into `buffer`.  Any existing
     /// contents in `buffer` are overwritten.
-    async fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status>;
+    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status>;
 
     /// Returns a future that completes when there is another log to read.
     async fn ready_signal(&self) -> Result<(), zx::Status>;
@@ -43,7 +43,7 @@ pub struct KernelDebugLog {
 
 #[async_trait]
 impl DebugLog for KernelDebugLog {
-    async fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
+    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
         self.debuglogger.read()
     }
 
@@ -73,24 +73,25 @@ impl<K: DebugLog> DebugLogBridge<K> {
         DebugLogBridge { debug_log }
     }
 
-    async fn read_log(&mut self) -> Result<StoredMessage, zx::Status> {
+    fn read_log(&mut self) -> Result<StoredMessage, zx::Status> {
         loop {
-            let record = self.debug_log.read().await?;
+            let record = self.debug_log.read()?;
             if let Some(bytes) = StoredMessage::debuglog(record) {
                 return Ok(bytes);
             }
         }
     }
 
-    pub async fn existing_logs(&mut self) -> Result<Vec<StoredMessage>, zx::Status> {
-        unfold(self, move |klogger| async move {
-            match klogger.read_log().await {
-                Err(zx::Status::SHOULD_WAIT) => None,
-                x => Some((x, klogger)),
+    pub fn existing_logs(&mut self) -> Result<Vec<StoredMessage>, zx::Status> {
+        let mut result = vec![];
+        loop {
+            match self.read_log() {
+                Err(zx::Status::SHOULD_WAIT) => break,
+                Err(err) => return Err(err),
+                Ok(log) => result.push(log),
             }
-        })
-        .try_collect::<Vec<_>>()
-        .await
+        }
+        Ok(result)
     }
 
     pub fn listen(self) -> impl Stream<Item = Result<StoredMessage, zx::Status>> {
@@ -102,7 +103,7 @@ impl<K: DebugLog> DebugLogBridge<K> {
                     }
                 }
                 is_readable = true;
-                match klogger.read_log().await {
+                match klogger.read_log() {
                     Err(zx::Status::SHOULD_WAIT) => {
                         is_readable = false;
                         continue;
@@ -257,18 +258,17 @@ mod tests {
         assert_eq!(convert_debuglog_to_log_message(&klog.record).unwrap().msg().unwrap(), "\x00��");
     }
 
-    #[fasync::run_until_stalled(test)]
-    async fn logger_existing_logs_test() {
+    #[fuchsia::test]
+    fn logger_existing_logs_test() {
         let debug_log = TestDebugLog::default();
         let klog = TestDebugEntry::new("test log".as_bytes());
-        debug_log.enqueue_read_entry(&klog).await;
-        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT).await;
+        debug_log.enqueue_read_entry(&klog);
+        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
         let mut log_bridge = DebugLogBridge::create(debug_log);
 
         assert_eq!(
             log_bridge
                 .existing_logs()
-                .await
                 .unwrap()
                 .into_iter()
                 .map(|m| m.parse(&KERNEL_IDENTITY).unwrap())
@@ -290,19 +290,19 @@ mod tests {
         let debug_log = TestDebugLog::default();
         // This is a malformed record because the message contains invalid UTF8.
         let malformed_klog = TestDebugEntry::new(b"\x80");
-        debug_log.enqueue_read_entry(&malformed_klog).await;
+        debug_log.enqueue_read_entry(&malformed_klog);
 
-        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT).await;
+        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
         let mut log_bridge = DebugLogBridge::create(debug_log);
-        assert!(!log_bridge.existing_logs().await.unwrap().is_empty());
+        assert!(!log_bridge.existing_logs().unwrap().is_empty());
     }
 
     #[fasync::run_until_stalled(test)]
     async fn logger_keep_listening_after_exhausting_initial_contents_test() {
         let debug_log = TestDebugLog::default();
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes())).await;
-        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT).await;
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("second test log".as_bytes())).await;
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes()));
+        debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("second test log".as_bytes()));
         let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream =
             Box::pin(log_bridge.listen()).map(|r| r.unwrap().parse(&KERNEL_IDENTITY));
@@ -315,9 +315,9 @@ mod tests {
         let debug_log = TestDebugLog::default();
         // This is a malformed record because the message contains invalid UTF8.
         let malformed_klog = TestDebugEntry::new(b"\x80");
-        debug_log.enqueue_read_entry(&malformed_klog).await;
+        debug_log.enqueue_read_entry(&malformed_klog);
 
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes())).await;
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes()));
         let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream = Box::pin(log_bridge.listen());
         let log_message =
@@ -328,18 +328,16 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn severity_parsed_from_log() {
         let debug_log = TestDebugLog::default();
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("ERROR: first log".as_bytes())).await;
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("ERROR: first log".as_bytes()));
         // We look for the string 'ERROR:' to label this as a Severity::Error.
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("first log error".as_bytes())).await;
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("WARNING: second log".as_bytes())).await;
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("INFO: third log".as_bytes())).await;
-        debug_log.enqueue_read_entry(&TestDebugEntry::new("fourth log".as_bytes())).await;
-        debug_log
-            .enqueue_read_entry(&TestDebugEntry::new_with_severity(
-                "ERROR: severity takes precedence over msg when not info".as_bytes(),
-                0x40, /* warn */
-            ))
-            .await;
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("first log error".as_bytes()));
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("WARNING: second log".as_bytes()));
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("INFO: third log".as_bytes()));
+        debug_log.enqueue_read_entry(&TestDebugEntry::new("fourth log".as_bytes()));
+        debug_log.enqueue_read_entry(&TestDebugEntry::new_with_severity(
+            "ERROR: severity takes precedence over msg when not info".as_bytes(),
+            0x40, /* warn */
+        ));
         // Create a string prefixed with multi-byte UTF-8 characters. This entry will be labeled as
         // Info rather than Error because the string "ERROR:" only appears after the
         // MAX_STRING_SEARCH_SIZE. It's crucial that we use multi-byte UTF-8 characters because we
@@ -348,7 +346,7 @@ mod tests {
         // character.
         let long_padding = (0..100).map(|_| "\u{10FF}").collect::<String>();
         let long_log = format!("{long_padding}ERROR: fifth log");
-        debug_log.enqueue_read_entry(&TestDebugEntry::new(long_log.as_bytes())).await;
+        debug_log.enqueue_read_entry(&TestDebugEntry::new(long_log.as_bytes()));
 
         let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream =

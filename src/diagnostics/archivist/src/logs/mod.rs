@@ -577,12 +577,12 @@ mod tests {
         let log3 = TestDebugEntry::new("log3".as_bytes());
 
         let klog_reader = TestDebugLog::default();
-        klog_reader.enqueue_read_entry(&log1).await;
-        klog_reader.enqueue_read_entry(&log2).await;
+        klog_reader.enqueue_read_entry(&log1);
+        klog_reader.enqueue_read_entry(&log2);
         // logs received after kernel indicates no logs should be read
-        klog_reader.enqueue_read_fail(zx::Status::SHOULD_WAIT).await;
-        klog_reader.enqueue_read_entry(&log3).await;
-        klog_reader.enqueue_read_fail(zx::Status::SHOULD_WAIT).await;
+        klog_reader.enqueue_read_fail(zx::Status::SHOULD_WAIT);
+        klog_reader.enqueue_read_entry(&log3);
+        klog_reader.enqueue_read_fail(zx::Status::SHOULD_WAIT);
 
         let expected_logs = vec![
             LogMessage {
