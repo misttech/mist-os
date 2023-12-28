@@ -21,9 +21,9 @@ to run Linux binaries, tests, or an interactive Android shell.
 
 Patches that improve Linux compatibility are welcome. If you want
 to report a bug or file a feature request, create an issue in the
-[Starnix][starnix-monorail-component] component in Monorail.
+[Starnix][starnix-buganizer-component] component in Issue Tracker.
 
 [glossary.runner]: /docs/glossary/README.md#runner
 [starnix-rfc]: /docs/contribute/governance/rfcs/0082_starnix.md
 [starnix-readme]: /src/starnix/kernel/README.md
-[starnix-monorail-component]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=component:Starnix
+[starnix-buganizer-component]: https://issues.fuchsia.dev/issues/new?component=1396624&template=1852875
