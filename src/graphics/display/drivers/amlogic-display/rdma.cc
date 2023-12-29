@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/time.h>
@@ -16,7 +17,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
-#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -27,17 +27,20 @@ namespace amlogic_display {
 // static
 zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
                                                            inspect::Node* video_input_unit_node) {
+  ZX_DEBUG_ASSERT(pdev != nullptr);
+
   fbl::AllocChecker ac;
   std::unique_ptr<RdmaEngine> rdma(new (&ac) RdmaEngine(video_input_unit_node));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  // Get BTI from parent
-  auto status = pdev->GetBti(0, &rdma->bti_);
-  if (status != ZX_OK) {
+
+  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, *pdev);
+  if (bti_result.is_error()) {
     zxlogf(ERROR, "Could not get BTI handle");
-    return zx::error(status);
+    return zx::error(bti_result.error_value());
   }
+  rdma->bti_ = std::move(bti_result).value();
 
   // Map RDMA Done Interrupt
   zx::result<zx::interrupt> rdma_done_result =
