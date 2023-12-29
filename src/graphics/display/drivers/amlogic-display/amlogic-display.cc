@@ -182,6 +182,11 @@ zx::result<> AmlogicDisplay::ResetDisplayEngine() {
 
   vpu_->PowerOff();
   vpu_->PowerOn();
+
+  // TODO(fxbug.dev/132904): Instead of enabling it ad-hoc here, make
+  // `Vpu::PowerOn()` idempotent and always enable the AFBC in `Vpu::PowerOn()`.
+  vpu_->AfbcPower(/*power_on=*/true);
+
   const ColorSpaceConversionMode color_conversion_mode = GetColorSpaceConversionMode(vout_->type());
   vpu_->SetupPostProcessorColorConversion(color_conversion_mode);
   // All the VPU registers are now reset. We need to claim the hardware
@@ -196,29 +201,6 @@ zx::result<> AmlogicDisplay::ResetDisplayEngine() {
 
   zxlogf(TRACE, "Display engine reset finished successfully.");
   return zx::ok();
-}
-
-zx_status_t AmlogicDisplay::DisplayInit() {
-  ZX_ASSERT(!fully_initialized());
-
-  // It's possible that the AFBC engine is not yet turned on by the previous
-  // driver when the driver takes it over, so we should ensure it's enabled.
-  //
-  // TODO(fxbug.dev/132904): Instead of enable it ad-hoc here, we should
-  // make `Vpu::PowerOn()` idempotent and always call it when initialize the
-  // driver.
-  vpu_->AfbcPower(true);
-
-  video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
-  zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
-      VideoInputUnit::Create(&pdev_, &video_input_unit_node_);
-  if (video_input_unit_create_result.is_error()) {
-    zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
-           video_input_unit_create_result.status_string());
-    return video_input_unit_create_result.status_value();
-  }
-  video_input_unit_ = std::move(video_input_unit_create_result).value();
-  return ZX_OK;
 }
 
 void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
@@ -554,14 +536,6 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
         }
         current_display_timing_ = display_timing;
       }
-    }
-
-    if (!fully_initialized()) {
-      if (zx_status_t status = DisplayInit(); status != ZX_OK) {
-        zxlogf(ERROR, "Display Hardware Initialization failed: %s", zx_status_get_string(status));
-        ZX_ASSERT(0);
-      }
-      set_fully_initialized();
     }
 
     // The only way a checked configuration could now be invalid is if display was
@@ -1294,6 +1268,16 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
+  video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
+  zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
+      VideoInputUnit::Create(&pdev_, &video_input_unit_node_);
+  if (video_input_unit_create_result.is_error()) {
+    zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
+           video_input_unit_create_result.status_string());
+    return video_input_unit_create_result.status_value();
+  }
+  video_input_unit_ = std::move(video_input_unit_create_result).value();
+
   fbl::AllocChecker ac;
   vpu_ = fbl::make_unique_checked<Vpu>(&ac);
   if (!ac.check()) {
@@ -1318,6 +1302,15 @@ zx_status_t AmlogicDisplay::Bind() {
       zxlogf(ERROR, "Failed to reset the display engine: %s", reset_result.status_string());
       return reset_result.status_value();
     }
+  } else {
+    // It's possible that the AFBC engine is not yet turned on by the
+    // previous driver when the driver takes it over so we should ensure it's
+    // enabled.
+    //
+    // TODO(fxbug.dev/132904): Instead of enabling it ad-hoc here, make
+    // `Vpu::PowerOn()` idempotent and always call it when initializing the
+    // driver.
+    vpu_->AfbcPower(true);
   }
 
   status = InitializeSysmemAllocator();
@@ -1362,6 +1355,7 @@ zx_status_t AmlogicDisplay::Bind() {
 
   cleanup.cancel();
 
+  set_fully_initialized();
   return ZX_OK;
 }
 

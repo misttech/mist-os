@@ -229,10 +229,6 @@ class AmlogicDisplay
   // hotplug is supported.
   zx_status_t SetupHotplugDisplayDetection();
 
-  // This function enables the display hardware. This function is disruptive and causes
-  // unexpected pixels to be visible on the screen.
-  zx_status_t DisplayInit() TA_REQ(display_mutex_);
-
   // Power cycles the display engine, resets all configurations and re-brings up
   // the video output module. This will cause all the previous display hardware
   // state to be lost.
