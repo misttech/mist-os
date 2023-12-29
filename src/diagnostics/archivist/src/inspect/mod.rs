@@ -774,15 +774,13 @@ mod tests {
 
                 for (cid, proxy) in id_and_directory_proxy {
                     let identity = Arc::new(ComponentIdentity::new(cid, TEST_URL));
-                    Arc::clone(&inspect_repo)
-                        .handle(Event {
-                            timestamp: zx::Time::get_monotonic(),
-                            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                                component: Arc::clone(&identity),
-                                directory: proxy,
-                            }),
-                        })
-                        .await;
+                    Arc::clone(&inspect_repo).handle(Event {
+                        timestamp: zx::Time::get_monotonic(),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: Arc::clone(&identity),
+                            directory: proxy,
+                        }),
+                    });
                 }
 
                 let inspector = Inspector::default();
@@ -930,15 +928,13 @@ mod tests {
 
         match inspect_service_method {
             InspectServiceMethod::DiagnosticsDir(directory) => {
-                Arc::clone(&inspect_repo)
-                    .handle(Event {
-                        timestamp: zx::Time::get_monotonic(),
-                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                            component: Arc::clone(&identity),
-                            directory,
-                        }),
-                    })
-                    .await;
+                Arc::clone(&inspect_repo).handle(Event {
+                    timestamp: zx::Time::get_monotonic(),
+                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                        component: Arc::clone(&identity),
+                        directory,
+                    }),
+                });
             }
             InspectServiceMethod::InspectSink(tree_client) => {
                 let (proxy, request_stream) =
@@ -952,15 +948,13 @@ mod tests {
 
                 let inspect_sink_server =
                     Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
-                Arc::clone(&inspect_sink_server)
-                    .handle(Event {
-                        timestamp: zx::Time::get_monotonic(),
-                        payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
-                            component: Arc::clone(&identity),
-                            request_stream,
-                        }),
-                    })
-                    .await;
+                Arc::clone(&inspect_sink_server).handle(Event {
+                    timestamp: zx::Time::get_monotonic(),
+                    payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                        component: Arc::clone(&identity),
+                        request_stream,
+                    }),
+                });
 
                 drop(proxy);
 

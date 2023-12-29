@@ -15,7 +15,6 @@ use crate::{
         multiplex::{Multiplexer, MultiplexerHandle},
     },
 };
-use async_trait::async_trait;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::{self, LogInterestSelector, Selector, StreamMode};
 use fuchsia_async as fasync;
@@ -200,9 +199,8 @@ impl LogsRepository {
     }
 }
 
-#[async_trait]
 impl EventConsumer for LogsRepository {
-    async fn handle(self: Arc<Self>, event: Event) {
+    fn handle(self: Arc<Self>, event: Event) {
         match event.payload {
             EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                 component,

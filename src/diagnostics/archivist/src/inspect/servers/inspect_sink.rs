@@ -11,7 +11,6 @@ use crate::{
     inspect::{container::InspectHandle, repository::InspectRepository},
 };
 use anyhow::Error;
-use async_trait::async_trait;
 use fidl_fuchsia_inspect as finspect;
 use fuchsia_async as fasync;
 use fuchsia_sync::{Mutex, RwLock};
@@ -97,9 +96,8 @@ impl InspectSinkServer {
     }
 }
 
-#[async_trait]
 impl EventConsumer for InspectSinkServer {
-    async fn handle(self: Arc<Self>, event: Event) {
+    fn handle(self: Arc<Self>, event: Event) {
         match event.payload {
             EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component,
@@ -157,7 +155,7 @@ mod tests {
     impl TestHarness {
         /// Construct an InspectSinkServer with a ComponentIdentity/InspectSinkProxy pair
         /// for each input ComponentIdentity.
-        async fn new(identity: Vec<Arc<ComponentIdentity>>) -> Self {
+        fn new(identity: Vec<Arc<ComponentIdentity>>) -> Self {
             let mut proxy_pairs = vec![];
             let repo = Arc::new(InspectRepository::default());
             let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo)));
@@ -165,15 +163,13 @@ mod tests {
                 let (proxy, request_stream) =
                     create_proxy_and_stream::<InspectSinkMarker>().unwrap();
 
-                Arc::clone(&server)
-                    .handle(Event {
-                        timestamp: zx::Time::get_monotonic(),
-                        payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
-                            component: Arc::clone(&id),
-                            request_stream,
-                        }),
-                    })
-                    .await;
+                Arc::clone(&server).handle(Event {
+                    timestamp: zx::Time::get_monotonic(),
+                    payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                        component: Arc::clone(&id),
+                        request_stream,
+                    }),
+                });
 
                 proxy_pairs.push((id, Some(proxy)));
             }
@@ -295,7 +291,7 @@ mod tests {
     async fn connect() {
         let identity: Arc<ComponentIdentity> = Arc::new(vec!["a", "b", "foo.cm"].into());
 
-        let mut test = TestHarness::new(vec![Arc::clone(&identity)]).await;
+        let mut test = TestHarness::new(vec![Arc::clone(&identity)]);
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
@@ -321,7 +317,7 @@ mod tests {
     async fn publish_multiple_times_on_the_same_connection() {
         let identity: Arc<ComponentIdentity> = Arc::new(vec!["a", "b", "foo.cm"].into());
 
-        let mut test = TestHarness::new(vec![Arc::clone(&identity)]).await;
+        let mut test = TestHarness::new(vec![Arc::clone(&identity)]);
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
@@ -364,7 +360,7 @@ mod tests {
     async fn tree_remains_after_inspect_sink_disconnects() {
         let identity: Arc<ComponentIdentity> = Arc::new(vec!["a", "b", "foo.cm"].into());
 
-        let mut test = TestHarness::new(vec![Arc::clone(&identity)]).await;
+        let mut test = TestHarness::new(vec![Arc::clone(&identity)]);
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
@@ -408,7 +404,7 @@ mod tests {
             Arc::new(vec!["a", "b", "foo2.cm"].into()),
         ];
 
-        let mut test = TestHarness::new(identities.clone()).await;
+        let mut test = TestHarness::new(identities.clone());
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
@@ -455,7 +451,7 @@ mod tests {
     async fn dropping_tree_removes_component_identity_from_repo() {
         let identity: Arc<ComponentIdentity> = Arc::new(vec!["a", "b", "foo.cm"].into());
 
-        let mut test = TestHarness::new(vec![Arc::clone(&identity)]).await;
+        let mut test = TestHarness::new(vec![Arc::clone(&identity)]);
 
         let tree = test.serve(
             Arc::clone(&identity),

@@ -71,7 +71,7 @@ mod tests {
         fifth_message.severity = fifth_packet.metadata.severity;
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![
             first_packet,
             second_packet,
@@ -157,10 +157,10 @@ mod tests {
             let mut message2 = message.clone();
             message2.severity = packet2.metadata.severity;
 
-            let mut foo_stream = $harness.create_stream_from_log_reader($log_reader1).await;
+            let mut foo_stream = $harness.create_stream_from_log_reader($log_reader1);
             foo_stream.write_packet(&packet);
 
-            let mut bar_stream = $harness.create_stream_from_log_reader($log_reader2).await;
+            let mut bar_stream = $harness.create_stream_from_log_reader($log_reader2);
             bar_stream.write_packet(&packet2);
             drop((foo_stream, bar_stream));
 
@@ -327,7 +327,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -359,7 +359,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -398,7 +398,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2, p3, p4, p5]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -433,7 +433,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2, p3]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -482,7 +482,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm1, lm2], Some(options)).await;
@@ -563,8 +563,7 @@ mod tests {
             },
         ];
         let mut harness = TestHarness::default();
-        let mut stream =
-            harness.create_structured_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(logs);
         drop(stream);
         harness.filter_test(expected_logs, None).await;

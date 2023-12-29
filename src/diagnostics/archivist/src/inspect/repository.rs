@@ -13,7 +13,6 @@ use crate::{
     },
     pipeline::Pipeline,
 };
-use async_trait::async_trait;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
 use fuchsia_async as fasync;
@@ -167,9 +166,8 @@ impl InspectRepository {
     }
 }
 
-#[async_trait]
 impl EventConsumer for InspectRepository {
-    async fn handle(self: Arc<Self>, event: Event) {
+    fn handle(self: Arc<Self>, event: Event) {
         match event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, directory }) => {
                 self.add_inspect_handle(component, directory);
@@ -282,7 +280,8 @@ mod tests {
     const TEST_URL: &str = "fuchsia-pkg://test";
 
     #[fuchsia::test]
-    async fn inspect_repo_disallows_duplicated_dirs() {
+    fn inspect_repo_disallows_duplicated_dirs() {
+        let _exec = fuchsia_async::LocalExecutor::new();
         let inspect_repo = Arc::new(InspectRepository::default());
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
@@ -290,28 +289,24 @@ mod tests {
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
-        Arc::clone(&inspect_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity),
-                    directory: proxy,
-                }),
-            })
-            .await;
+        Arc::clone(&inspect_repo).handle(Event {
+            timestamp: zx::Time::get_monotonic(),
+            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                component: Arc::clone(&identity),
+                directory: proxy,
+            }),
+        });
 
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
-        Arc::clone(&inspect_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity),
-                    directory: proxy,
-                }),
-            })
-            .await;
+        Arc::clone(&inspect_repo).handle(Event {
+            timestamp: zx::Time::get_monotonic(),
+            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                component: Arc::clone(&identity),
+                directory: proxy,
+            }),
+        });
 
         assert!(inspect_repo.inner.read().get(&identity).is_some());
     }
@@ -324,15 +319,13 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
-            Arc::clone(&data_repo)
-                .handle(Event {
-                    timestamp: zx::Time::get_monotonic(),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: Arc::clone(&identity),
-                        directory: proxy,
-                    }),
-                })
-                .await;
+            Arc::clone(&data_repo).handle(Event {
+                timestamp: zx::Time::get_monotonic(),
+                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                    component: Arc::clone(&identity),
+                    directory: proxy,
+                }),
+            });
             assert!(data_repo.inner.read().get(&identity).is_some());
         }
         drop(server_end);
@@ -352,15 +345,13 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
-            Arc::clone(&data_repo)
-                .handle(Event {
-                    timestamp: zx::Time::get_monotonic(),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: Arc::clone(&identity),
-                        directory: proxy,
-                    }),
-                })
-                .await;
+            Arc::clone(&data_repo).handle(Event {
+                timestamp: zx::Time::get_monotonic(),
+                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                    component: Arc::clone(&identity),
+                    directory: proxy,
+                }),
+            });
             assert!(data_repo.inner.read().get(&identity).is_some());
             assert!(pipeline.read().static_selectors_matchers().unwrap().get(&moniker).is_some())
         }
@@ -375,41 +366,38 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn data_repo_filters_inspect_by_selectors() {
+    fn data_repo_filters_inspect_by_selectors() {
+        let _exec = fuchsia_async::LocalExecutor::new();
         let data_repo = Arc::new(InspectRepository::default());
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
-        Arc::clone(&data_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity),
-                    directory: fuchsia_fs::directory::open_in_namespace(
-                        "/tmp",
-                        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                    )
-                    .expect("open root"),
-                }),
-            })
-            .await;
+        Arc::clone(&data_repo).handle(Event {
+            timestamp: zx::Time::get_monotonic(),
+            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                component: Arc::clone(&identity),
+                directory: fuchsia_fs::directory::open_in_namespace(
+                    "/tmp",
+                    fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                )
+                .expect("open root"),
+            }),
+        });
 
         let moniker2 = ExtendedMoniker::parse_str("./a/b/foo2").unwrap();
         let identity2 = Arc::new(ComponentIdentity::new(moniker2, TEST_URL));
 
-        Arc::clone(&data_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity2),
-                    directory: fuchsia_fs::directory::open_in_namespace(
-                        "/tmp",
-                        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                    )
-                    .expect("open root"),
-                }),
-            })
-            .await;
+        Arc::clone(&data_repo).handle(Event {
+            timestamp: zx::Time::get_monotonic(),
+            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                component: Arc::clone(&identity2),
+                directory: fuchsia_fs::directory::open_in_namespace(
+                    "/tmp",
+                    fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                )
+                .expect("open root"),
+            }),
+        });
 
         assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&None, None).len());
 

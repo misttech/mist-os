@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{events::types::*, identity::ComponentIdentity};
-use async_trait::async_trait;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use futures::{
@@ -118,7 +117,7 @@ impl EventRouter {
                             if let Some(consumer) = weak_consumer.upgrade() {
                                 active_consumers.push(weak_consumer);
                                 if let Some(e) = singleton_event.take() {
-                                    consumer.handle(e).await;
+                                    consumer.handle(e);
                                 };
                             }
                         }
@@ -360,11 +359,10 @@ pub struct ConsumerConfig<'a, T> {
 }
 
 /// Trait implemented by data types which receive events.
-#[async_trait]
 pub trait EventConsumer {
     /// Event consumers will receive a call on this method when an event they are interested on
     /// happens.
-    async fn handle(self: Arc<Self>, event: Event);
+    fn handle(self: Arc<Self>, event: Event);
 }
 
 /// Trait implemented by data types which emit events.
@@ -384,9 +382,10 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::AsHandleRef;
-    use futures::{lock::Mutex, FutureExt, SinkExt};
+    use futures::FutureExt;
     use lazy_static::lazy_static;
     use moniker::ExtendedMoniker;
 
@@ -452,20 +451,19 @@ mod tests {
     }
 
     struct TestEventConsumer {
-        event_sender: Mutex<mpsc::Sender<Event>>,
+        event_sender: Mutex<mpsc::UnboundedSender<Event>>,
     }
 
     impl TestEventConsumer {
-        fn new() -> (mpsc::Receiver<Event>, Arc<Self>) {
-            let (event_sender, event_receiver) = mpsc::channel(10);
+        fn new() -> (mpsc::UnboundedReceiver<Event>, Arc<Self>) {
+            let (event_sender, event_receiver) = mpsc::unbounded();
             (event_receiver, Arc::new(Self { event_sender: Mutex::new(event_sender) }))
         }
     }
 
-    #[async_trait]
     impl EventConsumer for TestEventConsumer {
-        async fn handle(self: Arc<Self>, event: Event) {
-            self.event_sender.lock().await.send(event).await.unwrap();
+        fn handle(self: Arc<Self>, event: Event) {
+            self.event_sender.lock().unbounded_send(event).unwrap();
         }
     }
 

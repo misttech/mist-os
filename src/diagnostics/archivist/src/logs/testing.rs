@@ -151,7 +151,7 @@ impl TestHarness {
         };
         let mut lm2 = copy_log_message(&lm1);
         let mut lm3 = copy_log_message(&lm1);
-        let mut stream = self.create_stream(Arc::new(ComponentIdentity::unknown())).await;
+        let mut stream = self.create_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packet(&p);
 
         p.metadata.severity = LogLevelFilter::Info.into_primitive().into();
@@ -173,39 +173,37 @@ impl TestHarness {
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
     /// `manager_test`.
-    pub async fn create_stream(
+    pub fn create_stream(
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<LogPacketWriter> {
         self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
-            .await
     }
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
     /// `manager_test`.
-    pub async fn create_stream_from_log_reader(
+    pub fn create_stream_from_log_reader(
         &mut self,
         log_reader: Arc<dyn LogReader>,
     ) -> TestStream<LogPacketWriter> {
-        self.make_stream(log_reader).await
+        self.make_stream(log_reader)
     }
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
     /// `manager_test`.
-    pub async fn create_structured_stream(
+    pub fn create_structured_stream(
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<StructuredMessageWriter> {
         self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
-            .await
     }
 
-    async fn make_stream<E, P>(&mut self, log_reader: Arc<dyn LogReader>) -> TestStream<E>
+    fn make_stream<E, P>(&mut self, log_reader: Arc<dyn LogReader>) -> TestStream<E>
     where
         E: LogWriter<Packet = P>,
     {
         let (log_sender, log_receiver) = mpsc::unbounded();
-        let _log_sink_proxy = log_reader.handle_request(log_sender).await;
+        let _log_sink_proxy = log_reader.handle_request(log_sender);
 
         fasync::Task::spawn(log_receiver.for_each_concurrent(None, |rx| rx)).detach();
 
@@ -268,9 +266,8 @@ impl LogWriter for StructuredMessageWriter {
 }
 
 /// A `LogReader` host a LogSink connection.
-#[async_trait]
 pub trait LogReader {
-    async fn handle_request(&self, sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy;
+    fn handle_request(&self, sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy;
 }
 
 // A LogReader that exercises the handle_log_sink code path.
@@ -285,9 +282,8 @@ impl DefaultLogReader {
     }
 }
 
-#[async_trait]
 impl LogReader for DefaultLogReader {
-    async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
+    fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
         let container = self.log_manager.get_log_container(Arc::clone(&self.identity));
@@ -340,9 +336,8 @@ impl EventStreamLogReader {
     }
 }
 
-#[async_trait]
 impl LogReader for EventStreamLogReader {
-    async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
+    fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (event_stream_proxy, mut event_stream) =
             fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
         let (log_sink_proxy, log_sink_server_end) =
