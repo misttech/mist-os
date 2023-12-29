@@ -125,6 +125,38 @@ def _fuchsia_sdk_repository_impl(ctx):
 
     _merge_rules_fuchsia(ctx)
 
+    # Run buildifier on all generated files, if the host tool is provided.
+    if ctx.attr.buildifier:
+        # First call with -lint=fix to automatically correct most issues.
+        ret = ctx.execute(
+            [
+                str(ctx.path(ctx.attr.buildifier)),
+                "-mode=fix",
+                "-lint=fix",
+                "-r",
+                ".",
+            ],
+            quiet = False,
+        )
+        if ret.return_code != 0:
+            fail("Error reformating Bazel SDK files!")
+
+        # Second call with -lint=warn to verify that there aren't any remaining
+        # issues that couldn't be fixed previously. This happens for warnings like
+        # module-docstring, or bzl-visibility which require manual fixes.
+        ret = ctx.execute(
+            [
+                str(ctx.path(ctx.attr.buildifier)),
+                "-mode=fix",
+                "-lint=warn",
+                "-r",
+                ".",
+            ],
+            quiet = False,
+        )
+        if ret.return_code != 0:
+            fail("Bazel formatting errors persist in Bazel SDK files!")
+
 fuchsia_sdk_repository = repository_rule(
     doc = """
 Loads a particular version of the Fuchsia IDK.
@@ -162,6 +194,10 @@ Loads a particular version of the Fuchsia IDK.
         ),
         "fuchsia_api_level_override": attr.string(
             doc = "API level override to use when building Fuchsia.",
+        ),
+        "buildifier": attr.label(
+            doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
+            allow_single_file = True,
         ),
         "_template": attr.label(
             default = "//fuchsia/workspace/sdk_templates:repository_template.BUILD",

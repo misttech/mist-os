@@ -48,6 +48,7 @@ load(
     "//fuchsia/private:fuchsia_component_manifest.bzl",
     _fuchsia_component_manifest = "fuchsia_component_manifest",
     _fuchsia_component_manifest_shard = "fuchsia_component_manifest_shard",
+    _fuchsia_component_manifest_shard_collection = "fuchsia_component_manifest_shard_collection",
 )
 load(
     "//fuchsia/private:fuchsia_cpu_select.bzl",
@@ -129,6 +130,7 @@ fuchsia_component = _fuchsia_component
 fuchsia_test_component = _fuchsia_test_component
 fuchsia_component_manifest = _fuchsia_component_manifest
 fuchsia_component_manifest_shard = _fuchsia_component_manifest_shard
+fuchsia_component_manifest_shard_collection = _fuchsia_component_manifest_shard_collection
 fuchsia_debug_symbols = _fuchsia_debug_symbols
 fuchsia_driver_component = _fuchsia_driver_component
 fuchsia_driver_bind_bytecode = _fuchsia_driver_bind_bytecode

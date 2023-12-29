@@ -739,6 +739,7 @@ def generate_sdk_constants(repo_ctx, manifests):
         target_cpus = target_cpu_names,
     )
     generated_content = "# AUTO-GENERATED - DO NOT EDIT!\n\n"
+    generated_content += "\"\"\"Fuchsia SDK constants.\"\"\"\n"
     generated_content += "# The following list of CPU names use Fuchsia conventions.\n"
     generated_content += "constants = %s\n" % constants
     generated_content += "\n"

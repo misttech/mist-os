@@ -213,6 +213,7 @@ fuchsia_sdk_repository(
     local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)
     fuchsia_api_level_override = "HEAD",
+    buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
 
 fuchsia_sdk_repository(
