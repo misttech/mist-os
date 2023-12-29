@@ -23,6 +23,7 @@ source_set("far") {
   ]
 
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fxl",
   ]
