@@ -24,6 +24,10 @@ impl Hash {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0[..]
     }
+
+    pub const fn from_array(arr: [u8; HASH_SIZE]) -> Self {
+        Self(arr)
+    }
 }
 
 impl str::FromStr for Hash {

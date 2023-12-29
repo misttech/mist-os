@@ -30,6 +30,9 @@ pub enum Error {
 
     #[error("update package")]
     UpdatePackage(#[from] UpdatePackage),
+
+    #[error("getting the asset reader")]
+    GetAssetReader(#[source] anyhow::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -45,6 +48,12 @@ pub enum UpdatePackage {
 
     #[error("extracting the 'packages' manifest")]
     ExtractPackagesManifest(#[source] update_package::ParsePackageError),
+
+    #[error("extracting the 'images' manifest")]
+    ExtractImagePackagesManifest(#[source] update_package::ImagePackagesError),
+
+    #[error("could not find any Fuchsia images in the images manifest")]
+    MissingFuchsiaImages,
 
     #[error("could not find system_image/0 in 'packages' manifest")]
     MissingSystemImage,

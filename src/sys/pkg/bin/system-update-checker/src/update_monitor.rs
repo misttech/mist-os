@@ -210,6 +210,11 @@ mod test {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig{
+            failure_persistence: None,
+            ..Default::default()
+        })]
+
         #[test]
         fn test_adding_temporary_callback_sends_current_state(
                 update_state: Option<State>,

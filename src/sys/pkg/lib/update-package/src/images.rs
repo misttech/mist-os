@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! The images and firmware that should be downloaded and written during the update.
+
 use {
     crate::{
         image::{Image, ImageClass, ImageType},
@@ -171,6 +173,7 @@ pub struct ImagePackagesManifest {
     firmware: Vec<FirmwareImageFormat>,
 }
 
+/// Metadata describing a firmware image.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FirmwareImageFormat {
@@ -180,6 +183,8 @@ pub struct FirmwareImageFormat {
     url: AbsoluteComponentUrl,
 }
 
+/// Metadata describing a Zbi or Vbmeta image, whether or not it is for recovery, and where to
+/// resolve it from.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyImageFormat {

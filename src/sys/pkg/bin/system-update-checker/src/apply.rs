@@ -454,6 +454,11 @@ mod test_apply_system_update_impl {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig{
+            failure_persistence: None,
+            ..Default::default()
+        })]
+
         #[test]
         fn test_options_passed_to_installer(initiator: Initiator) {
             let mut update_installer = ArgumentCapturingUpdateInstaller::default();

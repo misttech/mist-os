@@ -9,17 +9,18 @@ use {
         DEFAULT_UPDATE_PACKAGE_URL,
     },
     anyhow::{anyhow, Context as _},
+    fidl_fuchsia_mem as fmem,
     fidl_fuchsia_paver::{
-        Asset, BootManagerMarker, Configuration, DataSinkMarker, PaverMarker, PaverProxy,
+        self as fpaver, Asset, BootManagerMarker, DataSinkMarker, PaverMarker, PaverProxy,
     },
     fidl_fuchsia_pkg::{self as fpkg, PackageResolverMarker, PackageResolverProxyInterface},
-    fidl_fuchsia_space as fidl_space,
+    fidl_fuchsia_space as fspace,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_hash::Hash,
     fuchsia_zircon as zx,
-    std::{cmp::min, convert::TryInto as _, io},
+    sha2::Digest as _,
+    std::io,
     tracing::{error, info, warn},
-    update_package::{ImageType, UpdatePackage},
 };
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -37,7 +38,7 @@ pub async fn check_for_system_update(
         connect_to_protocol::<PackageResolverMarker>().map_err(Error::ConnectPackageResolver)?;
     let paver = connect_to_protocol::<PaverMarker>().map_err(Error::ConnectPaver)?;
     let space_manager =
-        connect_to_protocol::<fidl_space::ManagerMarker>().map_err(Error::ConnectSpaceManager)?;
+        connect_to_protocol::<fspace::ManagerMarker>().map_err(Error::ConnectSpaceManager)?;
 
     check_for_system_update_impl(
         DEFAULT_UPDATE_PACKAGE_URL,
@@ -75,7 +76,7 @@ async fn check_for_system_update_impl(
     paver: &PaverProxy,
     target_channel_manager: &dyn TargetChannelUpdater,
     last_known_update_package: Option<&Hash>,
-    space_manager: &fidl_space::ManagerProxy,
+    space_manager: &fspace::ManagerProxy,
 ) -> Result<SystemUpdateStatus, Error> {
     let update_pkg = latest_update_package(
         default_update_url,
@@ -108,25 +109,38 @@ async fn check_for_system_update_impl(
         return update_available;
     }
 
+    let images = update_package::ImagePackagesSlots::from(
+        update_pkg
+            .image_packages()
+            .await
+            .map_err(errors::UpdatePackage::ExtractImagePackagesManifest)?,
+    );
+    let images = images.fuchsia().ok_or(errors::UpdatePackage::MissingFuchsiaImages)?;
+
+    let (asset_reader, current_config) =
+        get_asset_reader(&paver).await.map_err(Error::GetAssetReader)?;
     // When present, checking vbmeta is sufficient, but vbmeta isn't supported on all devices.
-    for (image, asset) in [
-        (ImageType::FuchsiaVbmeta, Asset::VerifiedBootMetadata),
-        (ImageType::Zbi, Asset::Kernel),
-        (ImageType::ZbiSigned, Asset::Kernel),
-    ]
-    .iter()
+    for (asset, metadata) in
+        [(Asset::VerifiedBootMetadata, images.vbmeta()), (Asset::Kernel, Some(images.zbi()))]
     {
-        match is_image_up_to_date(&update_pkg, paver, *image, *asset).await {
+        let Some(metadata) = metadata else {
+            warn!(
+                "Update package did not contain metadata for {asset:?}. It may not be supported \
+                on this architecture, in which case this is expected."
+            );
+            continue;
+        };
+        match is_image_up_to_date(&asset_reader, current_config, asset, metadata).await {
             Ok(true) => {
-                info!("Image {:?} is up to date, system is up to date", image);
+                info!("Asset {:?} is up to date so system is up to date", asset);
                 return up_to_date;
             }
             Ok(false) => {
-                info!("Image {:?} is not latest, system is not up to date", image);
+                info!("Asset {:?} is not latest so system is not up to date", asset);
                 return update_available;
             }
             Err(err) => {
-                warn!("Failed to check if {} is up to date: {:#}", image.name(), anyhow!(err));
+                warn!("Failed to check if {:?} is up to date: {:#}", asset, anyhow!(err));
             }
         }
     }
@@ -143,7 +157,7 @@ fn current_system_image_merkle(file_system: &impl FileSystem) -> Result<Hash, Er
         .map_err(Error::ParseSystemMeta)
 }
 
-async fn gc(space_manager: &fidl_space::ManagerProxy) -> Result<(), anyhow::Error> {
+async fn gc(space_manager: &fspace::ManagerProxy) -> Result<(), anyhow::Error> {
     let () = space_manager
         .gc()
         .await
@@ -156,8 +170,8 @@ async fn latest_update_package(
     default_update_url: &str,
     package_resolver: &impl PackageResolverProxyInterface,
     channel_manager: &dyn TargetChannelUpdater,
-    space_manager: &fidl_space::ManagerProxy,
-) -> Result<UpdatePackage, errors::UpdatePackage> {
+    space_manager: &fspace::ManagerProxy,
+) -> Result<update_package::UpdatePackage, errors::UpdatePackage> {
     match latest_update_package_attempt(default_update_url, package_resolver, channel_manager).await
     {
         Ok(update_package) => return Ok(update_package),
@@ -186,7 +200,7 @@ async fn latest_update_package_attempt(
     default_update_url: &str,
     package_resolver: &impl PackageResolverProxyInterface,
     channel_manager: &dyn TargetChannelUpdater,
-) -> Result<UpdatePackage, errors::UpdatePackage> {
+) -> Result<update_package::UpdatePackage, errors::UpdatePackage> {
     let (dir_proxy, dir_server_end) =
         fidl::endpoints::create_proxy().map_err(errors::UpdatePackage::CreateDirectoryProxy)?;
     let update_package = channel_manager
@@ -197,11 +211,11 @@ async fn latest_update_package_attempt(
         .await
         .map_err(errors::UpdatePackage::ResolveFidl)?
         .map_err(|raw| errors::UpdatePackage::Resolve(raw.into()))?;
-    Ok(UpdatePackage::new(dir_proxy))
+    Ok(update_package::UpdatePackage::new(dir_proxy))
 }
 
 async fn latest_system_image_merkle(
-    update_package: &UpdatePackage,
+    update_package: &update_package::UpdatePackage,
 ) -> Result<Hash, errors::UpdatePackage> {
     let packages =
         update_package.packages().await.map_err(errors::UpdatePackage::ExtractPackagesManifest)?;
@@ -212,62 +226,58 @@ async fn latest_system_image_merkle(
     Ok(system_image.hash())
 }
 
-async fn is_image_up_to_date(
-    update_package: &UpdatePackage,
-    paver: &PaverProxy,
-    image_type: ImageType,
-    asset: Asset,
-) -> Result<bool, anyhow::Error> {
-    let latest_image =
-        update_package.open_image(&update_package::Image::new(image_type, None)).await?;
-
+async fn get_asset_reader(
+    paver: &fpaver::PaverProxy,
+) -> Result<(fpaver::DataSinkProxy, fpaver::Configuration), anyhow::Error> {
     let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
     let () = paver.find_boot_manager(server_end).context("connect to fuchsia.paver.BootManager")?;
     let configuration = match boot_manager.query_current_configuration().await {
-        Ok(response) => {
-            response.map_err(zx::Status::from_raw).context("querying current configuration")?
-        }
+        Ok(res) => res.map_err(zx::Status::from_raw).context("querying current configuration")?,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. }) => {
             warn!("device does not support ABR. Checking image in slot A");
-            Configuration::A
+            fpaver::Configuration::A
         }
         Err(err) => return Err(err).context("querying current configuration"),
     };
 
     let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>()?;
     let () = paver.find_data_sink(server_end).context("connect to fuchsia.paver.DataSink")?;
-
-    let current_image = data_sink
-        .read_asset(configuration, asset)
-        .await?
-        .map_err(|status| anyhow!("read_asset responded with {}", zx::Status::from_raw(status)))?;
-
-    compare_buffer(latest_image, current_image)
+    Ok((data_sink, configuration))
 }
 
-// Compare two buffers and return true if they are equal.
-// If they have different sizes, only compare up to the smaller size and ignoring the rest.
-// This is because when reading asset from paver, we might get extra data after the image.
-fn compare_buffer(
-    a: fidl_fuchsia_mem::Buffer,
-    b: fidl_fuchsia_mem::Buffer,
+async fn is_image_up_to_date(
+    asset_reader: &fpaver::DataSinkProxy,
+    current_config: fpaver::Configuration,
+    asset: fpaver::Asset,
+    latest: &update_package::ImageMetadata,
 ) -> Result<bool, anyhow::Error> {
-    let a_size = a.size.try_into()?;
-    let b_size = b.size.try_into()?;
-    let size = min(a_size, b_size);
-    let max_buffer_size = 32 * 1024;
-    let step_size = min(size, max_buffer_size);
-    let mut a_buf = vec![0u8; step_size];
-    let mut b_buf = vec![0u8; step_size];
-    for offset in (0..size).step_by(step_size) {
-        let current_step_size = min(step_size, size - offset);
-        a.vmo.read(&mut a_buf[..current_step_size], offset as u64)?;
-        b.vmo.read(&mut b_buf[..current_step_size], offset as u64)?;
-        if a_buf[..current_step_size] != b_buf[..current_step_size] {
-            return Ok(false);
-        }
+    let current_image = asset_reader
+        .read_asset(current_config, asset)
+        .await
+        .context("read_asset fidl error")?
+        .map_err(|s| anyhow!("read_asset responded with {}", zx::Status::from_raw(s)))?;
+    let current_hash = sha256_buffer(
+        &current_image,
+        // Caps at the size of the latest image because the paver sometimes returns extra data.
+        current_image.size.min(latest.size()),
+    )
+    .context("hashing current")?;
+    Ok(current_hash == latest.hash())
+}
+
+fn sha256_buffer(buffer: &fmem::Buffer, mut remaining: u64) -> Result<Hash, anyhow::Error> {
+    let mut hasher = sha2::Sha256::new();
+    let mut offset = 0;
+    let mut tmp = vec![0u8; 32 * 1024];
+    while remaining > 0 {
+        let chunk_len = remaining.min(tmp.len() as u64) as usize;
+        let chunk = &mut tmp[..chunk_len];
+        let () = buffer.vmo.read(chunk, offset).context("reading from image vmo")?;
+        let () = hasher.update(chunk);
+        offset += chunk_len as u64;
+        remaining -= chunk_len as u64;
     }
-    Ok(true)
+    Ok(Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
 }
 
 #[cfg(test)]
@@ -296,6 +306,16 @@ pub mod test_check_for_system_update_impl {
     const NEW_SYSTEM_IMAGE_MERKLE: &str =
         "1111111111111111111111111111111111111111111111111111111111111111";
     const TEST_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.test/update";
+    const ACTIVE_VBMETA_CONTENTS: [u8; 1] = [1];
+    const ACTIVE_VBMETA_HASH: Hash = Hash::from_array([3u8; 32]);
+    const NEW_VBMETA_HASH: Hash = Hash::from_array([4u8; 32]);
+    const ACTIVE_ZBI_CONTENTS: [u8; 1] = [0];
+    const ACTIVE_ZBI_HASH: Hash = Hash::from_array([
+        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
+        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+        0xb8, 0x55,
+    ]);
+    const NEW_ZBI_HASH: Hash = Hash::from_array([6u8; 32]);
 
     lazy_static! {
         static ref UPDATE_PACKAGE_MERKLE: Hash = [0x22; 32].into();
@@ -340,20 +360,19 @@ pub mod test_check_for_system_update_impl {
         expected_package_url: String,
         write_packages_json: bool,
         packages: Vec<String>,
-        images: HashMap<String, Vec<u8>>,
+        zbi: Option<Hash>,
+        vbmeta: Option<Hash>,
     }
 
     impl PackageResolverProxyTempDirBuilder {
-        const VBMETA_NAME: &'static str = "fuchsia.vbmeta";
-        const ZBI_NAME: &'static str = "zbi";
-        const ZBI_SIGNED_NAME: &'static str = "zbi.signed";
         fn new() -> PackageResolverProxyTempDirBuilder {
             Self {
                 temp_dir: tempfile::tempdir().expect("create temp dir"),
                 expected_package_url: TEST_UPDATE_PACKAGE_URL.to_owned(),
                 write_packages_json: false,
                 packages: Vec::new(),
-                images: HashMap::new(),
+                zbi: None,
+                vbmeta: None,
             }
         }
 
@@ -368,8 +387,13 @@ pub mod test_check_for_system_update_impl {
             self
         }
 
-        fn with_image(mut self, name: &str, value: impl AsRef<[u8]>) -> Self {
-            self.images.insert(name.to_owned(), value.as_ref().to_vec());
+        fn with_zbi(mut self, zbi: Hash) -> Self {
+            self.zbi = Some(zbi);
+            self
+        }
+
+        fn with_vbmeta(mut self, vbmeta: Hash) -> Self {
+            self.vbmeta = Some(vbmeta);
             self
         }
 
@@ -387,15 +411,34 @@ pub mod test_check_for_system_update_impl {
                     "content": self.packages
                 })
                 .to_string();
-                eprintln!("{packages_json}");
                 fs::write(self.temp_dir.path().join("packages.json"), packages_json)
                     .expect("write packages.json");
             }
 
-            for (name, image) in self.images.into_iter() {
-                fs::write(self.temp_dir.path().join(name.clone()), image)
-                    .unwrap_or_else(|_| panic!("write {name}"));
-            }
+            // The only image metadata used is the sha256 hashes.
+            let mut images = update_package::images::ImagePackagesManifest::builder();
+            images.fuchsia_package(
+                update_package::images::ImageMetadata::new(
+                    0,
+                    self.zbi.unwrap_or(ACTIVE_ZBI_HASH),
+                    "fuchsia-pkg://fuchsia.test/images?hash=0000000000000000000000000000000000000000000000000000000000000000#zbi".parse().unwrap(),
+                ),
+                self.vbmeta.map(|h| {
+                    update_package::images::ImageMetadata::new(
+                        0,
+                        h,
+                        "fuchsia-pkg://fuchsia.test/images?hash=0000000000000000000000000000000000000000000000000000000000000000#vbmeta".parse().unwrap(),
+                    )
+                }),
+            );
+            let images = images.build();
+
+            let () = fs::write(
+                self.temp_dir.path().join("images.json"),
+                serde_json::to_vec(&images).unwrap(),
+            )
+            .expect("writing images.json");
+
             PackageResolverProxyTempDir {
                 temp_dir: self.temp_dir,
                 expected_package_url: self.expected_package_url,
@@ -423,27 +466,19 @@ pub mod test_check_for_system_update_impl {
                 .build()
         }
 
-        fn new_with_vbmeta(vbmeta: impl AsRef<[u8]>) -> PackageResolverProxyTempDir {
+        fn new_with_vbmeta(vbmeta: Hash) -> PackageResolverProxyTempDir {
             PackageResolverProxyTempDirBuilder::new()
                 .with_packages_json()
                 .with_system_image_merkle(ACTIVE_SYSTEM_IMAGE_MERKLE)
-                .with_image(PackageResolverProxyTempDirBuilder::VBMETA_NAME, vbmeta)
+                .with_vbmeta(vbmeta)
                 .build()
         }
 
-        fn new_with_zbi(zbi: impl AsRef<[u8]>) -> PackageResolverProxyTempDir {
+        fn new_with_zbi(zbi: Hash) -> PackageResolverProxyTempDir {
             PackageResolverProxyTempDirBuilder::new()
                 .with_packages_json()
                 .with_system_image_merkle(ACTIVE_SYSTEM_IMAGE_MERKLE)
-                .with_image(PackageResolverProxyTempDirBuilder::ZBI_NAME, zbi)
-                .build()
-        }
-
-        fn new_with_zbi_signed(zbi: impl AsRef<[u8]>) -> PackageResolverProxyTempDir {
-            PackageResolverProxyTempDirBuilder::new()
-                .with_packages_json()
-                .with_system_image_merkle(ACTIVE_SYSTEM_IMAGE_MERKLE)
-                .with_image(PackageResolverProxyTempDirBuilder::ZBI_SIGNED_NAME, zbi)
+                .with_zbi(zbi)
                 .build()
         }
     }
@@ -491,9 +526,9 @@ pub mod test_check_for_system_update_impl {
         }
 
         /// Spawns a new task to serve the space manager protocol.
-        pub fn spawn_gc_service(self: &Arc<Self>) -> fidl_space::ManagerProxy {
+        pub fn spawn_gc_service(self: &Arc<Self>) -> fspace::ManagerProxy {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy_and_stream::<fidl_space::ManagerMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fspace::ManagerMarker>().unwrap();
 
             fasync::Task::spawn(Arc::clone(self).run_gc_service(server_end).unwrap_or_else(|e| {
                 panic!("error running space manager service: {:#}", anyhow!(e))
@@ -505,11 +540,11 @@ pub mod test_check_for_system_update_impl {
 
         async fn run_gc_service(
             self: Arc<Self>,
-            mut stream: fidl_space::ManagerRequestStream,
+            mut stream: fspace::ManagerRequestStream,
         ) -> Result<(), anyhow::Error> {
             while let Some(req) = stream.try_next().await? {
                 match req {
-                    fidl_space::ManagerRequest::Gc { responder } => {
+                    fspace::ManagerRequest::Gc { responder } => {
                         *self.call_count.lock() += 1;
                         responder.send(Ok(())).unwrap()
                     }
@@ -959,7 +994,7 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_up_to_date() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta([1]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta(ACTIVE_VBMETA_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .active_config(Configuration::A)
@@ -967,7 +1002,7 @@ pub mod test_check_for_system_update_impl {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
                         Asset::Kernel => panic!("shouldn't read kernel if vbmeta is the same!"),
-                        Asset::VerifiedBootMetadata => Ok(vec![1]),
+                        Asset::VerifiedBootMetadata => Ok(ACTIVE_VBMETA_CONTENTS.into()),
                     }
                 }))
                 .build(),
@@ -999,7 +1034,7 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_up_to_date_with_missing_vbmeta() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta([1]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta(ACTIVE_VBMETA_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .active_config(Configuration::A)
@@ -1144,7 +1179,7 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_vbmeta_only_update_available() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta([1]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta(NEW_VBMETA_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .active_config(Configuration::A)
@@ -1152,7 +1187,7 @@ pub mod test_check_for_system_update_impl {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
                         Asset::Kernel => panic!("not expecting to read kernel"),
-                        Asset::VerifiedBootMetadata => Ok(vec![0]),
+                        Asset::VerifiedBootMetadata => Ok(ACTIVE_VBMETA_CONTENTS.into()),
                     }
                 }))
                 .build(),
@@ -1188,14 +1223,14 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_zbi_only_update_available() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi([1]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_zbi(NEW_ZBI_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .active_config(Configuration::A)
                 .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
-                        Asset::Kernel => Ok(vec![0]),
+                        Asset::Kernel => Ok(ACTIVE_ZBI_CONTENTS.into()),
                         Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
                     }
                 }))
@@ -1232,14 +1267,14 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_zbi_did_not_require_update() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi([0]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_zbi(ACTIVE_ZBI_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .active_config(Configuration::A)
                 .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
-                        Asset::Kernel => Ok(vec![0]),
+                        Asset::Kernel => Ok(ACTIVE_ZBI_CONTENTS.into()),
                         Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
                     }
                 }))
@@ -1272,14 +1307,14 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_zbi_only_no_abr_update_available() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi([1]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_zbi(NEW_ZBI_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
-                        Asset::Kernel => Ok(vec![0]),
+                        Asset::Kernel => Ok(ACTIVE_ZBI_CONTENTS.into()),
                         Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
                     }
                 }))
@@ -1316,14 +1351,14 @@ pub mod test_check_for_system_update_impl {
     #[fasync::run_singlethreaded(test)]
     async fn test_zbi_no_abr_did_not_require_update() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi([0]);
+        let package_resolver = PackageResolverProxyTempDir::new_with_zbi(ACTIVE_ZBI_HASH);
         let mock_paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
                     assert_eq!(configuration, Configuration::A);
                     match asset {
-                        Asset::Kernel => Ok(vec![0]),
+                        Asset::Kernel => Ok(ACTIVE_ZBI_CONTENTS.into()),
                         Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
                     }
                 }))
@@ -1351,151 +1386,6 @@ pub mod test_check_for_system_update_impl {
                 .parse()
                 .expect("active system image string literal")
         );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_zbi_signed_only_update_available() {
-        let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi_signed([1]);
-        let mock_paver = Arc::new(
-            MockPaverServiceBuilder::new()
-                .active_config(Configuration::A)
-                .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
-                    assert_eq!(configuration, Configuration::A);
-                    match asset {
-                        Asset::Kernel => Ok(vec![0]),
-                        Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
-                    }
-                }))
-                .build(),
-        );
-        let paver = mock_paver.spawn_paver_service();
-        let mock_space_manager = Arc::new(MockSpaceManagerService::new());
-        let space_manager = mock_space_manager.spawn_gc_service();
-
-        let result = check_for_system_update_impl(
-            TEST_UPDATE_PACKAGE_URL,
-            &mut file_system,
-            &package_resolver,
-            &paver,
-            &FakeTargetChannelUpdater::new(),
-            None,
-            &space_manager,
-        )
-        .await;
-
-        assert_matches!(
-            result,
-            Ok(SystemUpdateStatus::UpdateAvailable { current_system_image, latest_system_image })
-            if
-                current_system_image == ACTIVE_SYSTEM_IMAGE_MERKLE
-                    .parse()
-                    .expect("active system image string literal") &&
-                latest_system_image == ACTIVE_SYSTEM_IMAGE_MERKLE
-                    .parse()
-                    .expect("new system image string literal")
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_zbi_signed_did_not_require_update() {
-        let mut file_system = FakeFileSystem::new_with_valid_system_meta();
-        let package_resolver = PackageResolverProxyTempDir::new_with_zbi_signed([0]);
-        let mock_paver = Arc::new(
-            MockPaverServiceBuilder::new()
-                .active_config(Configuration::A)
-                .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
-                    assert_eq!(configuration, Configuration::A);
-                    match asset {
-                        Asset::Kernel => Ok(vec![0]),
-                        Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
-                    }
-                }))
-                .build(),
-        );
-        let paver = mock_paver.spawn_paver_service();
-        let mock_space_manager = Arc::new(MockSpaceManagerService::new());
-        let space_manager = mock_space_manager.spawn_gc_service();
-
-        let result = check_for_system_update_impl(
-            TEST_UPDATE_PACKAGE_URL,
-            &mut file_system,
-            &package_resolver,
-            &paver,
-            &FakeTargetChannelUpdater::new(),
-            None,
-            &space_manager,
-        )
-        .await;
-
-        assert_matches!(
-            result,
-            Ok(SystemUpdateStatus::UpToDate { system_image, update_package: _ })
-                if system_image == ACTIVE_SYSTEM_IMAGE_MERKLE
-                .parse()
-                .expect("active system image string literal")
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_compare_buffer {
-    use {super::*, assert_matches::assert_matches, fidl_fuchsia_mem::Buffer, fuchsia_zircon::Vmo};
-
-    fn buffer(data: &[u8]) -> Buffer {
-        let size = data.len() as u64;
-        let vmo = Vmo::create(size).unwrap();
-        vmo.write(data, 0).unwrap();
-        Buffer { vmo, size }
-    }
-
-    #[test]
-    fn equal() {
-        let a = [1; 100];
-        assert_matches!(compare_buffer(buffer(&a), buffer(&a)), Ok(true));
-    }
-
-    #[test]
-    fn equal_different_size() {
-        let a = [1; 100];
-        let b = [1; 200];
-        assert_matches!(compare_buffer(buffer(&a), buffer(&b)), Ok(true));
-    }
-
-    #[test]
-    fn equal_large_buffer() {
-        let a = [1; 100000];
-        let b = [1; 100001];
-        assert_matches!(compare_buffer(buffer(&a), buffer(&b)), Ok(true));
-    }
-
-    #[test]
-    fn not_equal() {
-        let a = [1; 100];
-        let b = [0; 100];
-        assert_matches!(compare_buffer(buffer(&a), buffer(&b)), Ok(false));
-    }
-
-    #[test]
-    fn not_equal_different_size() {
-        let a = [1; 100];
-        let b = [0; 200];
-        assert_matches!(compare_buffer(buffer(&a), buffer(&b)), Ok(false));
-    }
-
-    #[test]
-    fn not_equal_large_buffer() {
-        let a = [1; 100000];
-        let mut b = [1; 100001];
-        b[99999] = 0;
-        assert_matches!(compare_buffer(buffer(&a), buffer(&b)), Ok(false));
-    }
-
-    #[test]
-    fn vmo_read_error() {
-        let a = Buffer { vmo: Vmo::create(100).unwrap(), size: 10000 };
-        let b = Buffer { vmo: Vmo::create(10000).unwrap(), size: 10000 };
-        assert_matches!(compare_buffer(a, b), Err(_));
     }
 }
 
@@ -1517,6 +1407,11 @@ mod test_real_file_system {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig{
+            failure_persistence: None,
+            ..Default::default()
+        })]
+
         #[test]
         fn test_read_to_string_preserves_contents(
             contents in ".{0, 65}",

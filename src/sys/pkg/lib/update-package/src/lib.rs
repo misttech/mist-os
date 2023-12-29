@@ -10,7 +10,7 @@ mod board;
 mod epoch;
 mod hash;
 mod image;
-mod images;
+pub mod images;
 mod name;
 mod packages;
 mod update_mode;
