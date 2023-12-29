@@ -27,7 +27,7 @@ fuchsia_microbenchmarks can be run the following ways:
     command:
 
     ```
-    fx test --e2e host_x64/microbenchmarks_test
+    fx test --e2e fuchsia_microbenchmarks_test
     ```
 
     This entry point is fairly slow because it runs the
