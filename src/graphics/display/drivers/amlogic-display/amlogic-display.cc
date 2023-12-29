@@ -209,25 +209,15 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   // driver.
   vpu_->AfbcPower(true);
 
-  // TODO(fxbug.dev/317922128): Use the unscaled layer source frame size
-  // instead.
-  PixelGridSize2D layer_image_size = {.width = static_cast<int>(vout_->fb_width()),
-                                      .height = static_cast<int>(vout_->fb_height())};
-  PixelGridSize2D display_contents_size = {.width = static_cast<int>(vout_->display_width()),
-                                           .height = static_cast<int>(vout_->display_height())};
-
   video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
   zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
-      VideoInputUnit::Create(&pdev_, layer_image_size, display_contents_size,
-                             &video_input_unit_node_);
+      VideoInputUnit::Create(&pdev_, &video_input_unit_node_);
   if (video_input_unit_create_result.is_error()) {
     zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
            video_input_unit_create_result.status_string());
     return video_input_unit_create_result.status_value();
   }
   video_input_unit_ = std::move(video_input_unit_create_result).value();
-
-  video_input_unit_->ConfigForSingleNonscaledLayer(layer_image_size, display_contents_size);
   return ZX_OK;
 }
 

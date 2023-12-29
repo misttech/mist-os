@@ -191,13 +191,8 @@ display::ConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
   return rdma_->GetLastConfigStampApplied();
 }
 
-VideoInputUnit::VideoInputUnit(PixelGridSize2D layer_image_size,
-                               PixelGridSize2D display_contents_size, fdf::MmioBuffer vpu_mmio,
-                               std::unique_ptr<RdmaEngine> rdma)
-    : vpu_mmio_(std::move(vpu_mmio)),
-      layer_image_size_(layer_image_size),
-      display_contents_size_(display_contents_size),
-      rdma_(std::move(rdma)) {}
+VideoInputUnit::VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
+    : vpu_mmio_(std::move(vpu_mmio)), rdma_(std::move(rdma)) {}
 
 void VideoInputUnit::DisableLayer(display::ConfigStamp config_stamp) {
   rdma_->StopRdma();
@@ -835,8 +830,7 @@ void VideoInputUnit::Release() {
 
 // static
 zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
-    ddk::PDevFidl* pdev, PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-    inspect::Node* video_input_unit_node) {
+    ddk::PDevFidl* pdev, inspect::Node* video_input_unit_node) {
   zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
@@ -850,8 +844,7 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
 
   fbl::AllocChecker ac;
   std::unique_ptr<VideoInputUnit> self(
-      new (&ac) VideoInputUnit(layer_image_size, display_contents_size,
-                               std::move(vpu_mmio_result).value(), std::move(rdma_result).value()));
+      new (&ac) VideoInputUnit(std::move(vpu_mmio_result).value(), std::move(rdma_result).value()));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }

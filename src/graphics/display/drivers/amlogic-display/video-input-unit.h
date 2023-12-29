@@ -42,19 +42,9 @@ namespace amlogic_display {
 class VideoInputUnit {
  public:
   static zx::result<std::unique_ptr<VideoInputUnit>> Create(ddk::PDevFidl* pdev,
-                                                            PixelGridSize2D layer_image_size,
-                                                            PixelGridSize2D display_contents_size,
                                                             inspect::Node* video_input_unit_node);
 
   VideoInputUnit(VideoInputUnit& other) = delete;
-
-  // Configures the video input unit hardware blocks so that the VIU displays a
-  // single layer of unscaled image (of size `layer_image_size`) on the display
-  // (of size `display_contents_size`).
-  //
-  // Both `layer_image_size` and `display_contents_size` must be valid.
-  void ConfigForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
-                                     PixelGridSize2D display_contents_size);
 
   // Disable the OSD layer and set the latest stamp to |config_stamp|.
   // If the driver disables (pauses) the layer because the client sets an empty
@@ -89,8 +79,15 @@ class VideoInputUnit {
   void SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  VideoInputUnit(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size,
-                 fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
+  VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
+
+  // Configures the video input unit hardware blocks so that the VIU displays a
+  // single layer of unscaled image (of size `layer_image_size`) on the display
+  // (of size `display_contents_size`).
+  //
+  // Both `layer_image_size` and `display_contents_size` must be valid.
+  void ConfigForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
+                                     PixelGridSize2D display_contents_size);
 
   // Sets up the OSD layers before they are scaled and blended.
   //
