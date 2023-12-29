@@ -499,7 +499,44 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
 			return fmt.Errorf("failed to make parent dirs of %q: %w", logfile, err)
 		}
-		chardev.Logfile = logfile
+		// Have the emulator write the serial output to a temp file, which we will
+		// read through a TimestampWriter into the actual designated log file.
+		tempLogfile := filepath.Join(os.TempDir(), "temp_logfile.txt")
+		chardev.Logfile = tempLogfile
+		f, err := os.Create(tempLogfile)
+		if err != nil {
+			return fmt.Errorf("failed to create %s", tempLogfile)
+		}
+		cleanupTempLogfile := func() {
+			if err := f.Close(); err != nil {
+				logger.Warningf(t.targetCtx, "failed to close %s", tempLogfile)
+			}
+			if err := os.Remove(tempLogfile); err != nil {
+				logger.Warningf(t.targetCtx, "failed to remove %s", tempLogfile)
+			}
+		}
+		g, err := os.Create(logfile)
+		if err != nil {
+			cleanupTempLogfile()
+			return fmt.Errorf("failed to create %s", logfile)
+		}
+		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g))
+		go func() {
+			for {
+				if t.targetCtx.Err() != nil {
+					logger.Debugf(t.targetCtx, "target context finished: %s", t.targetCtx.Err())
+					break
+				}
+				if _, err := io.Copy(serialWriter, f); err != nil {
+					logger.Errorf(t.targetCtx, "failed to copy serial: %s", err)
+					break
+				}
+			}
+			if err := g.Close(); err != nil {
+				logger.Warningf(t.targetCtx, "failed to close %s", logfile)
+			}
+			cleanupTempLogfile()
+		}()
 	}
 	qemuCmd.AddSerial(chardev)
 
@@ -575,7 +612,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 
 	cmd.Dir = workdir
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
 	if t.ptm != nil {
 		cmd.Stdin = t.ptm
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
@@ -683,7 +720,7 @@ func embedZBIWithKey(ctx context.Context, zbiImage *bootserver.Image, zbiTool st
 	}
 	logger.Debugf(ctx, "embedding %s with key %s", zbiImage.Name, authorizedKeysFile)
 	cmd := exec.CommandContext(ctx, absToolPath, "-o", zbiImage.Path, zbiImage.Path, "--entry", fmt.Sprintf("data/ssh/authorized_keys=%s", authorizedKeysFile))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -703,7 +740,7 @@ func extendFvmImage(ctx context.Context, fvmImage *bootserver.Image, fvmTool str
 	}
 	logger.Debugf(ctx, "extending fvm.blk to %d bytes", size)
 	cmd := exec.CommandContext(ctx, absToolPath, fvmImage.Path, "extend", "--length", strconv.Itoa(int(size)))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

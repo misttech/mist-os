@@ -9,6 +9,7 @@ import (
 	"context"
 	"io"
 	"math"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
@@ -87,7 +88,7 @@ func (w *LineWriter) Write(data []byte) (int, error) {
 	for _, line := range lines {
 		if bytes.HasSuffix(line, []byte("\n")) {
 			n, err := w.writer.Write(append(w.line, line...))
-			written += int(math.Max(0, float64(n-len(line))))
+			written += int(math.Max(0, float64(n-len(w.line))))
 			if err != nil {
 				return written, err
 			}
@@ -99,12 +100,41 @@ func (w *LineWriter) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
+// TimestampWriter is a wrapper around a writer that prepends its writes
+// with the current host timestamp. This will allow all botanist logs
+// (kernel/serial/syslog/test) to be reliably lined up when reading them.
+type TimestampWriter struct {
+	writer io.Writer
+	format string
+}
+
+func NewTimestampWriter(writer io.Writer) *TimestampWriter {
+	return &TimestampWriter{writer, "15:04:05.000000 "}
+}
+
+func (w *TimestampWriter) Write(data []byte) (int, error) {
+	return w.writer.Write(append([]byte(time.Now().Format(w.format)), data...))
+}
+
+// NewStdioWritersWithTimestamp returns the same writers as NewStdioWriters() but prepends
+// each line it writes with the host timestamp.
+func NewStdioWritersWithTimestamp(ctx context.Context) (io.Writer, io.Writer, func()) {
+	return newStdioWriters(ctx, NewTimestampWriter(streams.Stdout(ctx)), NewTimestampWriter(streams.Stderr(ctx)))
+}
+
 // NewStiodWriters returns a new LineWriter for the stdout and stderr associated
 // with the provided context. It also returns a function to flush out any
 // remaining data not written by Write because it didn't end with a newline.
+// This should be used instead of the WithTimestamp version when a timestamp
+// is not needed, for example, when used with a logger which already prepends
+// each log with a timestamp.
 func NewStdioWriters(ctx context.Context) (io.Writer, io.Writer, func()) {
-	stdoutWriter := NewLineWriter(streams.Stdout(ctx))
-	stderrWriter := NewLineWriter(streams.Stderr(ctx))
+	return newStdioWriters(ctx, streams.Stdout(ctx), streams.Stderr(ctx))
+}
+
+func newStdioWriters(ctx context.Context, stdout, stderr io.Writer) (io.Writer, io.Writer, func()) {
+	stdoutWriter := NewLineWriter(stdout)
+	stderrWriter := NewLineWriter(stderr)
 	flush := func() {
 		// Flush out the rest of the data stored by the writers.
 		if len(stdoutWriter.line) > 0 {

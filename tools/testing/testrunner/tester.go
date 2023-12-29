@@ -510,6 +510,8 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 // for testability
 type FFXInstance interface {
 	RunWithTarget(ctx context.Context, args ...string) error
+	Stdout() io.Writer
+	Stderr() io.Writer
 	SetStdoutStderr(stdout, stderr io.Writer)
 	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
@@ -590,8 +592,10 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 		},
 		Tags: test.Tags,
 	}}
+	origStdout := t.ffx.Stdout()
+	origStderr := t.ffx.Stderr()
 	t.ffx.SetStdoutStderr(stdout, stderr)
-	defer t.ffx.SetStdoutStderr(os.Stdout, os.Stderr)
+	defer t.ffx.SetStdoutStderr(origStdout, origStderr)
 
 	extraArgs := []string{"--filter-ansi"}
 	if t.experimentLevel == 3 {

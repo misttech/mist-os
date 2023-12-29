@@ -169,6 +169,14 @@ func (f *FFXInstance) SetTarget(target string) {
 	f.target = target
 }
 
+func (f *FFXInstance) Stdout() io.Writer {
+	return f.stdout
+}
+
+func (f *FFXInstance) Stderr() io.Writer {
+	return f.stderr
+}
+
 // SetStdoutStderr sets the stdout and stderr for the ffx commands to write to.
 func (f *FFXInstance) SetStdoutStderr(stdout, stderr io.Writer) {
 	f.stdout = stdout
