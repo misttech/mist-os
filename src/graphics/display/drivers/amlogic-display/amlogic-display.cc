@@ -227,7 +227,7 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   }
   video_input_unit_ = std::move(video_input_unit_create_result).value();
 
-  video_input_unit_->HwInit();
+  video_input_unit_->ConfigForSingleNonscaledLayer(layer_image_size, display_contents_size);
   return ZX_OK;
 }
 

@@ -48,7 +48,13 @@ class VideoInputUnit {
 
   VideoInputUnit(VideoInputUnit& other) = delete;
 
-  void HwInit();
+  // Configures the video input unit hardware blocks so that the VIU displays a
+  // single layer of unscaled image (of size `layer_image_size`) on the display
+  // (of size `display_contents_size`).
+  //
+  // Both `layer_image_size` and `display_contents_size` must be valid.
+  void ConfigForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
+                                     PixelGridSize2D display_contents_size);
 
   // Disable the OSD layer and set the latest stamp to |config_stamp|.
   // If the driver disables (pauses) the layer because the client sets an empty
@@ -92,14 +98,14 @@ class VideoInputUnit {
   // a display device of `display_contents_size`.
   //
   // TODO(fxbug.dev/42062952): Fully support multiple layers.
-  void SetupOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size);
+  void ConfigOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size);
 
   // Sets up the blending modules on the OSD layers and the Video Post
   // Processor (VPP) to display a single layer.
   //
   // It places the OSD1 layer (of size `layer_size`) on the top-left corner
   // of the display (of size `display_contents_size`).
-  void SetupSingleLayerBlending(PixelGridSize2D layer_size, PixelGridSize2D display_contents_size);
+  void ConfigSingleLayerBlending(PixelGridSize2D layer_size, PixelGridSize2D display_contents_size);
 
   // Disables framebuffer scaling.
   // TODO(fxbug.dev/317922128): Add OSD scaler support.
@@ -110,6 +116,9 @@ class VideoInputUnit {
   //
   // TODO(fxbug.dev/42062952): Fully support multiple layers.
   void ConfigAfbcDecoder(PixelGridSize2D layer_image_size);
+
+  bool ConfigNeededForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
+                                           PixelGridSize2D display_contents_size) const;
 
   void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config);
 

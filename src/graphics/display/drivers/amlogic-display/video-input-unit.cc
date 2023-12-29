@@ -313,13 +313,11 @@ void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
   PixelGridSize2D layer_image_size = {.width = display_timing.horizontal_active_px,
                                       .height = display_timing.vertical_active_lines};
 
-  if (display_contents_size_ != display_contents_size || layer_image_size_ != layer_image_size) {
+  if (ConfigNeededForSingleNonscaledLayer(layer_image_size, display_contents_size)) {
     zxlogf(INFO, "Mode change (%d x %d) to (%d x %d)", display_contents_size_.width,
            display_contents_size_.height, display_contents_size.width,
            display_contents_size.height);
-    display_contents_size_ = display_contents_size;
-    layer_image_size_ = layer_image_size;
-    HwInit();
+    ConfigForSingleNonscaledLayer(layer_image_size, display_contents_size);
   }
 
   auto cfg_w0 = osd1_registers.blk0_cfg_w0.FromValue(0);
@@ -465,8 +463,8 @@ void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
   rdma_->ExecRdmaTable(next_table_idx, config_stamp, info->is_afbc);
 }
 
-void VideoInputUnit::SetupOsdLayers(PixelGridSize2D layer_image_size,
-                                    PixelGridSize2D display_contents_size) {
+void VideoInputUnit::ConfigOsdLayers(PixelGridSize2D layer_image_size,
+                                     PixelGridSize2D display_contents_size) {
   // init osd fifo control and set DDR request priority to be urgent
   uint32_t reg_val = 1;
   reg_val |= 4 << 5;   // hold_fifo_lines
@@ -507,8 +505,8 @@ void VideoInputUnit::SetupOsdLayers(PixelGridSize2D layer_image_size,
   vpu_mmio_.Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 }
 
-void VideoInputUnit::SetupSingleLayerBlending(PixelGridSize2D layer_size,
-                                              PixelGridSize2D display_contents_size) {
+void VideoInputUnit::ConfigSingleLayerBlending(PixelGridSize2D layer_size,
+                                               PixelGridSize2D display_contents_size) {
   // TODO(fxbug.dev/317961333): The documentation below needs to be
   // re-organized. Move the descriptions of the blenders and the blender muxes
   // to the blender register definitions; at this function we should only keep
@@ -710,16 +708,22 @@ void VideoInputUnit::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   osd1_registers.blk1_cfg_w4.FromValue(0).set_frame_addr(1 << 24).WriteTo(&vpu_mmio_);
 }
 
-void VideoInputUnit::HwInit() {
-  ZX_DEBUG_ASSERT_MSG(display_contents_size_.IsValid(), "Invalid display size (%d x %d)",
-                      display_contents_size_.width, display_contents_size_.height);
-  ZX_DEBUG_ASSERT_MSG(layer_image_size_.IsValid(), "Invalid framebuffer size (%d x %d)",
-                      layer_image_size_.width, layer_image_size_.height);
+bool VideoInputUnit::ConfigNeededForSingleNonscaledLayer(
+    PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size) const {
+  return layer_image_size != layer_image_size_ || display_contents_size != display_contents_size_;
+}
+
+void VideoInputUnit::ConfigForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
+                                                   PixelGridSize2D display_contents_size) {
+  ZX_DEBUG_ASSERT_MSG(display_contents_size.IsValid(), "Invalid display size (%d x %d)",
+                      display_contents_size.width, display_contents_size.height);
+  ZX_DEBUG_ASSERT_MSG(layer_image_size.IsValid(), "Invalid framebuffer size (%d x %d)",
+                      layer_image_size.width, layer_image_size.height);
 
   // TODO(fxbug.dev/317922128): Remove this assertion once we support
   // framebuffer scaling.
-  ZX_DEBUG_ASSERT(layer_image_size_.width == display_contents_size_.width);
-  ZX_DEBUG_ASSERT(layer_image_size_.height == display_contents_size_.height);
+  ZX_DEBUG_ASSERT(layer_image_size.width == display_contents_size.width);
+  ZX_DEBUG_ASSERT(layer_image_size.height == display_contents_size.height);
 
   // init vpu fifo control register
   uint32_t reg_val = vpu_mmio_.Read32(VPP_OFIFO_SIZE);
@@ -727,10 +731,13 @@ void VideoInputUnit::HwInit() {
   reg_val |= (0xfff + 1);
   vpu_mmio_.Write32(reg_val, VPP_OFIFO_SIZE);
 
-  SetupOsdLayers(layer_image_size_, display_contents_size_);
+  ConfigOsdLayers(layer_image_size, display_contents_size);
   DisableScaling();
-  SetupSingleLayerBlending(/*layer_size=*/layer_image_size_, display_contents_size_);
-  ConfigAfbcDecoder(layer_image_size_);
+  ConfigSingleLayerBlending(/*layer_size=*/layer_image_size, display_contents_size);
+  ConfigAfbcDecoder(layer_image_size);
+
+  display_contents_size_ = display_contents_size;
+  layer_image_size_ = layer_image_size;
 }
 
 #define REG_OFFSET (0x20 << 2)
