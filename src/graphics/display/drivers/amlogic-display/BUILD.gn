@@ -37,6 +37,8 @@ source_set("common_srcs") {
     "amlogic-display.h",
     "board-resources.cc",
     "board-resources.h",
+    "capture.cc",
+    "capture.h",
     "clock-regs.cc",
     "clock-regs.h",
     "clock.cc",

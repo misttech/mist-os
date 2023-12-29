@@ -33,6 +33,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/drivers/amlogic-display/capture.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
@@ -169,6 +170,7 @@ class AmlogicDisplay
   void PopulatePanelType() TA_REQ(display_mutex_);
 
   void OnHotPlugStateChange(HotPlugDetectionState current_state);
+  void OnCaptureComplete();
 
   // TODO(fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
   // initialization procedure when the device manager binds the driver to the
@@ -219,13 +221,6 @@ class AmlogicDisplay
   // interrupt before this is called.
   zx_status_t StartVsyncInterruptHandlerThread();
 
-  // Starts the display capture interrupt handler thread.
-  //
-  // Must be called once and only once per driver binding procedure.
-  //  `GetCommonProtocolsAndResources()` must be called to acquire the display
-  // capture interrupt before this is called.
-  zx_status_t StartDisplayCaptureInterruptHandlerThread();
-
   // Acquires the hotplug display detection hardware resources (GPIO protocol
   // and interrupt for the hotplug detection GPIO pin) from parent nodes, and
   // starts the interrupt handler thread.
@@ -266,7 +261,6 @@ class AmlogicDisplay
 
   // Thread handles
   std::optional<thrd_t> vsync_thread_;
-  std::optional<thrd_t> capture_thread_;
 
   // Protocol handles used in by this driver
   ddk::PDevFidl pdev_;
@@ -276,7 +270,6 @@ class AmlogicDisplay
 
   // Interrupts
   zx::interrupt vsync_irq_;
-  zx::interrupt capture_finished_irq_;
 
   // Locks used by the display driver
   fbl::Mutex display_mutex_;  // general display state (i.e. display_id)
@@ -326,6 +319,7 @@ class AmlogicDisplay
   display::DisplayTiming current_display_timing_ TA_GUARDED(display_mutex_) = {};
 
   std::unique_ptr<HotPlugDetection> hot_plug_detection_;
+  std::unique_ptr<Capture> capture_;
 
   fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
 };

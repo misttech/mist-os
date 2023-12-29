@@ -40,6 +40,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+#include "src/graphics/display/drivers/amlogic-display/capture.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
@@ -663,20 +664,7 @@ void AmlogicDisplay::DdkRelease() {
     vpu_->PowerOff();
   }
 
-  if (capture_finished_irq_.is_valid()) {
-    zx_status_t status = capture_finished_irq_.destroy();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Capture finished IRQ destroy failed: %s", zx_status_get_string(status));
-    }
-  }
-  if (capture_thread_.has_value()) {
-    int status = thrd_join(*capture_thread_, nullptr);
-    if (status != thrd_success) {
-      zxlogf(ERROR, "Capture thread join failed: %s",
-             zx_status_get_string(thrd_status_to_zx_status(status)));
-    }
-  }
-
+  capture_.reset();
   hot_plug_detection_.reset();
   delete this;
 }
@@ -1041,34 +1029,6 @@ bool AmlogicDisplay::DisplayControllerImplIsCaptureCompleted() {
   return (current_capture_target_image_ == nullptr);
 }
 
-void AmlogicDisplay::CaptureThreadEntryPoint() {
-  while (true) {
-    zx::time timestamp;
-    zx_status_t status = capture_finished_irq_.wait(&timestamp);
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO,
-             "Capture finished (VD1_WR) interrupt wait is cancelled. "
-             "Stopping capture thread.");
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Capture finished (VD1_WR) interrupt wait failed: %s",
-             zx_status_get_string(status));
-      break;
-    }
-    if (!fully_initialized()) {
-      zxlogf(WARNING, "Capture interrupt fired before the display was initialized");
-      continue;
-    }
-    vpu_->CaptureDone();
-    fbl::AutoLock lock(&capture_mutex_);
-    if (capture_intf_.is_valid()) {
-      capture_intf_.OnCaptureComplete();
-    }
-    current_capture_target_image_ = nullptr;
-  }
-}
-
 void AmlogicDisplay::VSyncThreadEntryPoint() {
   while (true) {
     zx::time timestamp;
@@ -1092,6 +1052,20 @@ void AmlogicDisplay::VSyncThreadEntryPoint() {
                               &banjo_config_stamp);
     }
   }
+}
+
+void AmlogicDisplay::OnCaptureComplete() {
+  if (!fully_initialized()) {
+    zxlogf(WARNING, "Capture interrupt fired before the display was initialized");
+    return;
+  }
+
+  vpu_->CaptureDone();
+  fbl::AutoLock lock(&capture_mutex_);
+  if (capture_intf_.is_valid()) {
+    capture_intf_.OnCaptureComplete();
+  }
+  current_capture_target_image_ = nullptr;
 }
 
 void AmlogicDisplay::OnHotPlugStateChange(HotPlugDetectionState current_state) {
@@ -1226,7 +1200,6 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   ZX_ASSERT(!canvas_.is_valid());
   ZX_ASSERT(!bti_.is_valid());
   ZX_ASSERT(!vsync_irq_.is_valid());
-  ZX_ASSERT(!capture_finished_irq_.is_valid());
 
   zx_status_t status = ddk::PDevFidl::FromFragment(parent_, &pdev_);
   if (status != ZX_OK) {
@@ -1265,13 +1238,6 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
     return vsync_interrupt_result.error_value();
   }
   vsync_irq_ = std::move(vsync_interrupt_result).value();
-
-  zx::result<zx::interrupt> capture_interrupt_result =
-      GetInterrupt(InterruptResourceIndex::kVid1Write, pdev_);
-  if (capture_interrupt_result.is_error()) {
-    return capture_interrupt_result.error_value();
-  }
-  capture_finished_irq_ = std::move(capture_interrupt_result).value();
 
   return ZX_OK;
 }
@@ -1313,26 +1279,6 @@ zx_status_t AmlogicDisplay::StartVsyncInterruptHandlerThread() {
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to apply role: %s", zx_status_get_string(status));
   }
-  return ZX_OK;
-}
-
-zx_status_t AmlogicDisplay::StartDisplayCaptureInterruptHandlerThread() {
-  ZX_ASSERT(!capture_thread_.has_value());
-  thrd_t capture_thread;
-  int capture_thread_create_status = thrd_create_with_name(
-      &capture_thread,
-      [](void* arg) {
-        reinterpret_cast<AmlogicDisplay*>(arg)->CaptureThreadEntryPoint();
-        return 0;
-      },
-      this, "capture_thread");
-  if (capture_thread_create_status != thrd_success) {
-    zx_status_t status = thrd_status_to_zx_status(capture_thread_create_status);
-    zxlogf(ERROR, "Failed to create capture_thread: %s",
-           zx_status_get_string(capture_thread_create_status));
-    return status;
-  }
-  capture_thread_.emplace(capture_thread);
   return ZX_OK;
 }
 
@@ -1397,11 +1343,14 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  status = StartDisplayCaptureInterruptHandlerThread();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start Vsync interrupt handler threads: %s",
-           zx_status_get_string(status));
-    return status;
+  {
+    zx::result<std::unique_ptr<Capture>> capture_result =
+        Capture::Create(pdev_, fit::bind_member<&AmlogicDisplay::OnCaptureComplete>(this));
+    if (capture_result.is_error()) {
+      // Create() already logged the error.
+      return capture_result.error_value();
+    }
+    capture_ = std::move(capture_result).value();
   }
 
   if (vout_->supports_hpd()) {
