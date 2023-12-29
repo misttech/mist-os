@@ -307,13 +307,17 @@ pub mod test_check_for_system_update_impl {
         "1111111111111111111111111111111111111111111111111111111111111111";
     const TEST_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.test/update";
     const ACTIVE_VBMETA_CONTENTS: [u8; 1] = [1];
-    const ACTIVE_VBMETA_HASH: Hash = Hash::from_array([3u8; 32]);
+    const ACTIVE_VBMETA_HASH: Hash = Hash::from_array([
+        0x4b, 0xf5, 0x12, 0x2f, 0x34, 0x45, 0x54, 0xc5, 0x3b, 0xde, 0x2e, 0xbb, 0x8c, 0xd2, 0xb7,
+        0xe3, 0xd1, 0x60, 0x0a, 0xd6, 0x31, 0xc3, 0x85, 0xa5, 0xd7, 0xcc, 0xe2, 0x3c, 0x77, 0x85,
+        0x45, 0x9a,
+    ]);
     const NEW_VBMETA_HASH: Hash = Hash::from_array([4u8; 32]);
     const ACTIVE_ZBI_CONTENTS: [u8; 1] = [0];
     const ACTIVE_ZBI_HASH: Hash = Hash::from_array([
-        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
-        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
-        0xb8, 0x55,
+        0x6e, 0x34, 0x0b, 0x9c, 0xff, 0xb3, 0x7a, 0x98, 0x9c, 0xa5, 0x44, 0xe6, 0xbb, 0x78, 0x0a,
+        0x2c, 0x78, 0x90, 0x1d, 0x3f, 0xb3, 0x37, 0x38, 0x76, 0x85, 0x11, 0xa3, 0x06, 0x17, 0xaf,
+        0xa0, 0x1d,
     ]);
     const NEW_ZBI_HASH: Hash = Hash::from_array([6u8; 32]);
 
@@ -415,17 +419,19 @@ pub mod test_check_for_system_update_impl {
                     .expect("write packages.json");
             }
 
-            // The only image metadata used is the sha256 hashes.
+            // is_image_up_to_date only reads the first latest_image.len() bytes from the
+            // active_image VMO.
+            // The URLs are unused.
             let mut images = update_package::images::ImagePackagesManifest::builder();
             images.fuchsia_package(
                 update_package::images::ImageMetadata::new(
-                    0,
+                    ACTIVE_ZBI_CONTENTS.len().try_into().unwrap(),
                     self.zbi.unwrap_or(ACTIVE_ZBI_HASH),
                     "fuchsia-pkg://fuchsia.test/images?hash=0000000000000000000000000000000000000000000000000000000000000000#zbi".parse().unwrap(),
                 ),
                 self.vbmeta.map(|h| {
                     update_package::images::ImageMetadata::new(
-                        0,
+                        ACTIVE_VBMETA_CONTENTS.len().try_into().unwrap(),
                         h,
                         "fuchsia-pkg://fuchsia.test/images?hash=0000000000000000000000000000000000000000000000000000000000000000#vbmeta".parse().unwrap(),
                     )
@@ -992,7 +998,7 @@ pub mod test_check_for_system_update_impl {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_up_to_date() {
+    async fn test_same_update_package_up_to_date() {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
         let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta(ACTIVE_VBMETA_HASH);
         let mock_paver = Arc::new(
@@ -1149,7 +1155,18 @@ pub mod test_check_for_system_update_impl {
         let mut file_system = FakeFileSystem::new_with_valid_system_meta();
         let package_resolver =
             PackageResolverProxyTempDir::new_with_latest_system_image(ACTIVE_SYSTEM_IMAGE_MERKLE);
-        let mock_paver = Arc::new(MockPaverServiceBuilder::new().build());
+        let mock_paver = Arc::new(
+            MockPaverServiceBuilder::new()
+                .active_config(Configuration::A)
+                .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
+                    assert_eq!(configuration, Configuration::A);
+                    match asset {
+                        Asset::Kernel => Ok(ACTIVE_ZBI_CONTENTS.into()),
+                        Asset::VerifiedBootMetadata => panic!("no vbmeta available"),
+                    }
+                }))
+                .build(),
+        );
         let paver = mock_paver.spawn_paver_service();
         let mock_space_manager = Arc::new(MockSpaceManagerService::new());
         let space_manager = mock_space_manager.spawn_gc_service();
@@ -1261,6 +1278,46 @@ pub mod test_check_for_system_update_impl {
                 latest_system_image == ACTIVE_SYSTEM_IMAGE_MERKLE
                     .parse()
                     .expect("new system image string literal")
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_vbmeta_did_not_require_update() {
+        let mut file_system = FakeFileSystem::new_with_valid_system_meta();
+        let package_resolver = PackageResolverProxyTempDir::new_with_vbmeta(ACTIVE_VBMETA_HASH);
+        let mock_paver = Arc::new(
+            MockPaverServiceBuilder::new()
+                .active_config(Configuration::A)
+                .insert_hook(mock_paver::hooks::read_asset(|configuration, asset| {
+                    assert_eq!(configuration, Configuration::A);
+                    match asset {
+                        Asset::Kernel => panic!("not expecting to read kernel"),
+                        Asset::VerifiedBootMetadata => Ok(ACTIVE_VBMETA_CONTENTS.into()),
+                    }
+                }))
+                .build(),
+        );
+        let paver = mock_paver.spawn_paver_service();
+        let mock_space_manager = Arc::new(MockSpaceManagerService::new());
+        let space_manager = mock_space_manager.spawn_gc_service();
+
+        let result = check_for_system_update_impl(
+            TEST_UPDATE_PACKAGE_URL,
+            &mut file_system,
+            &package_resolver,
+            &paver,
+            &FakeTargetChannelUpdater::new(),
+            None,
+            &space_manager,
+        )
+        .await;
+
+        assert_matches!(
+            result,
+            Ok(SystemUpdateStatus::UpToDate { system_image, update_package: _ })
+                if system_image == ACTIVE_SYSTEM_IMAGE_MERKLE
+                .parse()
+                .expect("active system image string literal")
         );
     }
 
