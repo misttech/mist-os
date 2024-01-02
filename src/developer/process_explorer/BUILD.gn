@@ -33,7 +33,7 @@ source_set("lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer_cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 }
 

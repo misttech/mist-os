@@ -10,7 +10,7 @@ source_set("test_settings") {
     "test_settings.h",
   ]
 
-  public_deps = [ "//src/lib/fxl" ]
+  public_deps = [ "//src/lib/fxl:fxl_cli" ]
 }
 
 # Generic main entry point target for GTest executables.
@@ -21,7 +21,7 @@ source_set("gtest_main") {
 
   deps = [
     ":test_settings",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 
   public_deps = [ "//third_party/googletest:gtest" ]
