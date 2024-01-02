@@ -17,23 +17,14 @@
 #include <fbl/alloc_checker.h>
 
 #include "i2c-child.h"
-#include "i2cimpl-adapter.h"
 
 namespace i2c {
 
 zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
-  std::unique_ptr<TransportAdapter> i2c = std::make_unique<BanjoTransportAdapter>(parent);
-  if (!i2c->is_valid()) {
-    zxlogf(DEBUG, "Could not connect I2cImpl Banjo protocol, trying FIDL");
-
-    auto client_end = DdkConnectRuntimeProtocol<fuchsia_hardware_i2cimpl::Service::Device>(parent);
-    if (client_end.is_error()) {
-      zxlogf(ERROR, "DdkConnectFidlProtocol() error: %s",
-             zx_status_get_string(client_end.error_value()));
-      return client_end.error_value();
-    }
-
-    i2c.reset(new FidlTransportAdapter{std::move(*client_end)});
+  zx::result i2c = DdkConnectRuntimeProtocol<fuchsia_hardware_i2cimpl::Service::Device>(parent);
+  if (i2c.is_error()) {
+    zxlogf(ERROR, "DdkConnectFidlProtocol() error: %s", zx_status_get_string(i2c.error_value()));
+    return i2c.error_value();
   }
 
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
@@ -48,14 +39,23 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  uint64_t max_transfer_size = 0;
-  if (zx_status_t status = i2c->GetMaxTransferSize(&max_transfer_size); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get max transfer size: %s", zx_status_get_string(status));
-    return status;
+  fdf::Arena arena('I2CI');
+  fdf::WireUnownedResult max_transfer_size =
+      fdf::WireCall(i2c.value()).buffer(arena)->GetMaxTransferSize();
+  if (!max_transfer_size.ok()) {
+    zxlogf(ERROR, "Failed to send GetMaxTransferSize request: %s",
+           max_transfer_size.status_string());
+    return max_transfer_size.status();
+  }
+  if (max_transfer_size->is_error()) {
+    zxlogf(ERROR, "Failed to get max transfer size: %s",
+           zx_status_get_string(max_transfer_size->error_value()));
+    return max_transfer_size->error_value();
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, max_transfer_size, std::move(i2c)));
+  std::unique_ptr<I2cDevice> device(
+      new (&ac) I2cDevice(parent, max_transfer_size->value()->size, std::move(i2c.value())));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -84,43 +84,60 @@ void I2cDevice::Transact(const uint16_t address, TransferRequestView request,
     return;
   }
 
-  uint8_t* read_buffer = read_buffer_.data();
-  size_t read_ops = 0;
-
   for (size_t i = 0; i < transactions.count(); ++i) {
+    auto& impl_op = impl_ops_[i];
+    const auto& transaction = transactions[i];
+
     // Same address for all ops, since there is one address per channel.
-    impl_ops_[i].address = address;
-    impl_ops_[i].stop = transactions[i].has_stop() && transactions[i].stop();
-    impl_ops_[i].is_read = transactions[i].data_transfer().is_read_size();
+    impl_op.address = address;
+    impl_op.stop = transaction.has_stop() && transaction.stop();
 
-    if (impl_ops_[i].is_read) {
-      impl_ops_[i].data_buffer = read_buffer;
-      impl_ops_[i].data_size = transactions[i].data_transfer().read_size();
+    auto& data_transfer = transaction.data_transfer();
+    if (data_transfer.is_read_size()) {
+      impl_op.type =
+          fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithReadSize(data_transfer.read_size());
 
-      // Create a VectorView pointing to the read buffer ahead of time so that we don't have to loop
-      // again to create the reply vector.
-      read_vectors_[read_ops++] =
-          fidl::VectorView<uint8_t>::FromExternal(impl_ops_[i].data_buffer, impl_ops_[i].data_size);
-      read_buffer += impl_ops_[i].data_size;
+      if (impl_op.type.read_size() > max_transfer_) {
+        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+      }
     } else {
-      impl_ops_[i].data_buffer = transactions[i].data_transfer().write_data().data();
-      impl_ops_[i].data_size = transactions[i].data_transfer().write_data().count();
-    }
-
-    if (impl_ops_[i].data_size == 0 || impl_ops_[i].data_size > max_transfer_) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
+      impl_op.type = fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithWriteData(
+          fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&data_transfer.write_data()));
+      if (impl_op.type.write_data().empty()) {
+        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+      }
     }
   }
   impl_ops_[transactions.count() - 1].stop = true;
 
-  zx_status_t status = i2c_->Transact(impl_ops_, transactions.count());
-  if (status == ZX_OK) {
-    completer.ReplySuccess(
-        fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_.data(), read_ops));
-  } else {
-    completer.ReplyError(status);
+  fdf::Arena arena('I2CI');
+  fdf::WireUnownedResult result = i2c_.buffer(arena)->Transact(
+      fidl::VectorView<fuchsia_hardware_i2cimpl::wire::I2cImplOp>::FromExternal(
+          impl_ops_.data(), transactions.count()));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Transfer request: %s", result.status_string());
+    completer.ReplyError(result.status());
+    return;
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to perform transfer: %s", zx_status_get_string(result->error_value()));
+    completer.ReplyError(result->error_value());
+    return;
+  }
+
+  read_vectors_.clear();
+  size_t read_buffer_offset = 0;
+  for (const auto& read : result.value()->read) {
+    auto dst = read_buffer_.data() + read_buffer_offset;
+    auto len = read.data.count();
+    memcpy(dst, read.data.data(), len);
+    read_vectors_.emplace_back(fidl::VectorView<uint8_t>::FromExternal(dst, len));
+    read_buffer_offset += len;
+  }
+
+  completer.ReplySuccess(fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_));
 }
 
 zx_status_t I2cDevice::Init(const fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata& metadata) {
