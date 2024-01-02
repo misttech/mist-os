@@ -709,8 +709,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       }
     }
 
-    EXPECT_EQ(num_pixels_different, 0U)
-        << "Capture Compare number of pixels different: " << num_pixels_different;
+    if (num_pixels_different != 0U) {
+      FX_LOGS(ERROR) << "Capture Compare number of pixels different: " << num_pixels_different;
+    }
     return num_pixels_different == 0U;
   }
 #endif  // FAKE_DISPLAY
