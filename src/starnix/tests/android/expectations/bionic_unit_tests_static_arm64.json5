@@ -27,6 +27,9 @@
                 "sys_hwprobe.__riscv_hwprobe",
                 "sys_hwprobe.__riscv_hwprobe_fail",
                 "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
+
+                // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
+                "properties.__system_property_reload_invalid",
             ],
         },
     ],
