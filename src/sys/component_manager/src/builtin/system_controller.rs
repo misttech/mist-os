@@ -3,15 +3,25 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{actions::ShutdownType, model::Model},
+    crate::model::{
+        actions::ShutdownType,
+        component::{ComponentInstance, InstanceState},
+        model::Model,
+    },
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_sys2::*,
     fuchsia_async::{self as fasync},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    std::{sync::Weak, time::Duration},
+    std::{
+        collections::VecDeque,
+        sync::{Arc, Weak},
+        time::Duration,
+    },
     tracing::*,
 };
+
+const SHUTDOWN_WATCHDOG_INTERVAL: zx::Duration = zx::Duration::from_seconds(15);
 
 pub struct SystemController {
     model: Weak<Model>,
@@ -48,6 +58,10 @@ impl SystemController {
                     info!("Component manager is shutting down the system");
                     let root =
                         self.model.upgrade().ok_or(format_err!("model is dropped"))?.root().clone();
+
+                    // Kick off a background task to log when shutdown is taking too long.
+                    fuchsia_async::Task::spawn(shutdown_watchdog(root.clone())).detach();
+
                     root.shutdown(ShutdownType::System)
                         .await
                         .context("got error waiting for shutdown action to complete")?;
@@ -62,6 +76,35 @@ impl SystemController {
         }
         Ok(())
     }
+}
+
+async fn shutdown_watchdog(root: Arc<ComponentInstance>) {
+    let mut interval = fuchsia_async::Interval::new(SHUTDOWN_WATCHDOG_INTERVAL);
+    while let Some(_) = interval.next().await {
+        info!(
+            "Shutdown not yet complete, pending components:\n{}",
+            get_all_remaining_monikers(&root).await.join("\n\t")
+        );
+    }
+}
+
+async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String> {
+    let mut monikers = vec![];
+    let mut queue = VecDeque::new();
+    queue.push_back(root.clone());
+
+    while let Some(next) = queue.pop_front() {
+        if let InstanceState::Resolved(resolved_state) = &*next.lock_state().await {
+            queue.extend(resolved_state.children().map(|(_, i)| i.clone()));
+
+            let execution_state = next.lock_execution().await;
+            if execution_state.is_started() && !execution_state.is_shut_down() {
+                monikers.push(next.moniker.to_string());
+            }
+        }
+    }
+
+    monikers
 }
 
 #[cfg(test)]
