@@ -54,7 +54,8 @@ pub async fn report_bug(err: &impl std::fmt::Display) {
 #[tracing::instrument]
 pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     let mut return_args_info = false;
-    let cmd = match ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help) {
+    let mut return_help: Option<Error> = None;
+    let cmd = match ffx::FfxCommandLine::from_env() {
         Ok(c) => c,
         Err(Error::Help { command, output, code }) => {
             // Check for machine json output and  help
@@ -67,7 +68,8 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
                 return_args_info = true;
                 c
             } else {
-                return Err(Error::Help { command, output, code });
+                return_help = Some(Error::Help { command, output, code });
+                c
             }
         }
 
@@ -99,6 +101,18 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         println!("{}", output.bug_context("Error serializing args")?);
         return Ok(ExitStatus::from_raw(0));
     }
+    match return_help {
+        Some(Error::Help { command, output, code }) => {
+            let mut commands: String = Default::default();
+            tools
+                .print_command_list(&mut commands)
+                .await
+                .bug_context("Error getting command list")?;
+            let full_output = format!("{output}\n{commands}");
+            return Err(Error::Help { command, output: full_output, code });
+        }
+        _ => (),
+    };
 
     let tool = match tools.try_from_args(&cmd).await {
         Ok(t) => t,

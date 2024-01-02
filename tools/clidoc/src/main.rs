@@ -373,7 +373,7 @@ fn write_formatted_output(cmd_path: &PathBuf, output_path: &PathBuf) -> Result<(
 
     writeln!(output_writer, "{}", HEADER)?;
 
-    // Write ouput for cmd and all of its subcommands.
+    // Write output for cmd and all of its subcommands.
     recurse_cmd_output(&cmd_name, &cmd_path, output_writer, &cmd_sequence)
 }
 
