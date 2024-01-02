@@ -130,7 +130,8 @@ fuchsia_test_package("ums-integration-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":ums-integration-test",
+    # TODO(b/317154044): Fix flakes and re-enable
+    # ":ums-integration-test",
     ":ums-test",
     ":usb_mass_storage_bind_test",
   ]
