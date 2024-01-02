@@ -12,7 +12,7 @@ executable("bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/sys/pkg/lib/far/cpp:far",
   ]
 }
