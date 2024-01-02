@@ -30,7 +30,6 @@ fuchsia_driver("dwmac-driver") {
     ":dwmac_bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet.mac:fuchsia.hardware.ethernet.mac_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
