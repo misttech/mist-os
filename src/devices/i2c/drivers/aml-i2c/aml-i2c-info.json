@@ -1,5 +1,5 @@
 {
-    "short_description": "AMLogic I2C DFv1 driver",
+    "short_description": "AMLogic I2C driver",
     "manufacturer": "AMLogic",
     "families": [],
     "models": [

@@ -128,9 +128,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/ti-tca6408a.cm" ]
     },
     {
-      package_target = "//src/devices/i2c/drivers/aml-i2c:package-dfv2"
+      package_target = "//src/devices/i2c/drivers/aml-i2c:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-i2c-dfv2.cm" ]
+      driver_components = [ "meta/aml-i2c.cm" ]
     },
     {
       package_target = "//src/devices/mcu/drivers/vim3-mcu:package"
