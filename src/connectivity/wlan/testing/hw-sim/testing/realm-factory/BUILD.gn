@@ -9,10 +9,12 @@ rustc_binary("bin") {
   testonly = true
   edition = "2021"
   name = "realm-factory-main"
+  with_unit_tests = true
   sources = [ "src/main.rs" ]
   deps = [
     "../fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -24,6 +26,11 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
+  ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:test-case",
   ]
 }
 
@@ -56,4 +63,13 @@ fuchsia_package("realm-factory") {
     "//src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_driver",
     "//src/devices/misc/drivers/test-parent",
   ]
+}
+
+fuchsia_unittest_package("realm-factory-tests") {
+  deps = [ ":bin_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

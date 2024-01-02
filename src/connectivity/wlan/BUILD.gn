@@ -82,6 +82,7 @@ group("tests") {
     "lib/wep_deprecated:wep-deprecated-tests",
     "testing/hw-sim:wlan-hw-sim-lib-tests",
     "testing/hw-sim/test:wlan-hw-sim-component-tests",
+    "testing/hw-sim/testing/realm-factory:realm-factory-tests",
     "testing/wlan-service-util:wlan-service-util-tests",
     "testing/wlantap-client",
     "testing/wlantap-driver:tests",

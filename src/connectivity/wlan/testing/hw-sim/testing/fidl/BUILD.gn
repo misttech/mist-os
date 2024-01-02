@@ -5,8 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("test.wlan.realm") {
+  sdk_category = "internal"
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.driver.test",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.testing.harness",
   ]

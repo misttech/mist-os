@@ -3,20 +3,20 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Error, Result},
+    anyhow::{bail, format_err, Error, Result},
     fidl::endpoints::ControlHandle,
     fidl::endpoints::ServerEnd,
-    fidl_test_wlan_realm as fidl_realm,
+    fidl_fuchsia_testing_harness::OperationError,
     fidl_test_wlan_realm::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
     },
-    fuchsia_driver_test::DriverTestRealmBuilder,
+    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon_status as zx_status,
     futures::{StreamExt, TryStreamExt},
-    tracing::info,
+    tracing::{error, info, warn},
 };
 
 #[fuchsia::main]
@@ -38,12 +38,19 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     unimplemented!();
                 }
                 RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
-                    let realm = create_realm(options).await?;
-                    let request_stream = realm_server.into_stream()?;
-                    task_group.spawn(async move {
-                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                    });
-                    responder.send(Ok(()))?;
+                    match create_realm(options).await {
+                        Ok(realm) => {
+                            let request_stream = realm_server.into_stream()?;
+                            task_group.spawn(async move {
+                                realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                            });
+                            responder.send(Ok(()))?;
+                        }
+                        Err(e) => {
+                            error!("Failed to create realm: {:?}", e);
+                            responder.send(Err(OperationError::Failed))?;
+                        }
+                    }
                 }
             }
         }
@@ -59,37 +66,82 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     }
 }
 
-async fn create_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInstance, Error> {
-    info!("building the realm using options {:#?}", options);
+async fn create_realm(mut options: RealmOptions) -> Result<RealmInstance, Error> {
+    if let Some(topology) = options.topology {
+        info!("Building the realm using topology {:#?}", topology);
+        let builder = RealmBuilder::new().await?;
+        match topology {
+            Topology::DriversOnly(config, ..) => {
+                builder.driver_test_realm_setup().await?;
+                let realm = builder.build().await?;
+                let driver_config = config.driver_config.ok_or(format_err!(
+                    "DriversOnly topology requires driver_config, but none found"
+                ))?;
+                start_and_connect_to_driver_test_realm(&realm, driver_config).await?;
+                Ok(realm)
+            }
+            TopologyUnknown!() => bail!("Unknown topology"),
+        }
+    } else if let Some(wlan_config) = options.wlan_config {
+        // TODO(b/317255344): Remove this branch when no CTF tests depend on the deprecated API.
+        warn!("Building the realm using deprecated wlan_config {:#?}", wlan_config);
+        let mut params = RealmBuilderParams::new();
+        if let Some(ref name) = wlan_config.name {
+            params = params.realm_name(name);
+        }
+        let builder = RealmBuilder::with_params(params).await?;
 
-    let wlan_config =
-        options.wlan_config.unwrap_or(fidl_realm::WlanConfig { ..Default::default() });
+        builder.driver_test_realm_setup().await?;
+        create_wlan_components(&builder, wlan_config).await?;
+        let realm = builder.build().await?;
 
-    let mut params = RealmBuilderParams::new();
-    if let Some(ref name) = wlan_config.name {
-        params = params.realm_name(name);
+        let devfs = options.devfs_server_end.take().unwrap();
+        realm.root.get_exposed_dir().open(
+            fidl_fuchsia_io::OpenFlags::DIRECTORY,
+            fidl_fuchsia_io::ModeType::empty(),
+            "dev-topological",
+            ServerEnd::new(devfs.into_channel()),
+        )?;
+
+        Ok(realm)
+    } else {
+        error!("RealmOptions must include either topology or wlan_config: {:#?}", options);
+        bail!("RealmOptions missing topology and wlan_config");
     }
-    let builder = RealmBuilder::with_params(params).await?;
+}
 
-    builder.driver_test_realm_setup().await?;
-    create_wlan_components(&builder, wlan_config).await?;
-    let realm = builder.build().await?;
+/// Starts and connects to the driver test realm based on |driver_config|.
+async fn start_and_connect_to_driver_test_realm(
+    realm: &RealmInstance,
+    driver_config: DriverConfig,
+) -> Result<()> {
+    let start_args = driver_config
+        .driver_test_realm_start_args
+        .ok_or(format_err!("DriverConfig requires driver_test_realm_start_args, but none found"))?;
 
-    let devfs = options.devfs_server_end.take().unwrap();
+    realm.driver_test_realm_start(start_args).await?;
+
+    let dev_topological =
+        driver_config.dev_topological.ok_or(format_err!("DriverConfig missing dev_topological"))?;
     realm.root.get_exposed_dir().open(
         fidl_fuchsia_io::OpenFlags::DIRECTORY,
         fidl_fuchsia_io::ModeType::empty(),
         "dev-topological",
-        ServerEnd::new(devfs.into_channel()),
+        ServerEnd::new(dev_topological.into_channel()),
     )?;
 
-    Ok(realm)
+    let dev_class = driver_config.dev_class.ok_or(format_err!("DriverConfig missing dev_class"))?;
+    realm.root.get_exposed_dir().open(
+        fidl_fuchsia_io::OpenFlags::DIRECTORY,
+        fidl_fuchsia_io::ModeType::empty(),
+        "dev-class",
+        ServerEnd::new(dev_class.into_channel()),
+    )?;
+
+    Ok(())
 }
 
-async fn create_wlan_components(
-    builder: &RealmBuilder,
-    config: fidl_realm::WlanConfig,
-) -> Result<(), Error> {
+async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> Result<(), Error> {
     // Create child components.
     let archivist = builder
         .add_child("archivist", "#meta/archivist-for-embedding.cm", ChildOptions::new())
@@ -245,4 +297,75 @@ async fn create_wlan_components(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*, fidl::endpoints::create_endpoints, fidl_fuchsia_driver_test::RealmArgs,
+        test_case::test_case,
+    };
+
+    // RealmOptions without specific topology or wlan_config are invalid
+    #[test_case(RealmOptions { ..Default::default() })]
+    #[test_case(RealmOptions { topology: None, wlan_config: None, ..Default::default() })]
+    #[fuchsia::test]
+    async fn reject_invalid_realm_options(opts: RealmOptions) {
+        assert!(create_realm(opts).await.is_err());
+    }
+
+    // DriversOnly topology with missing or unspecified fields is invalid
+    #[test_case(DriversOnly { ..Default::default() })]
+    #[test_case(
+        DriversOnly {
+            driver_config: None,
+            ..Default::default()
+        }
+    )]
+    #[test_case(
+        DriversOnly {
+            driver_config: Some(DriverConfig { ..Default::default() }),
+            ..Default::default()
+        }
+    )]
+    #[test_case(
+        DriversOnly {
+            driver_config: Some(
+                DriverConfig {
+                    dev_topological: None,
+                    dev_class: None,
+                    driver_test_realm_start_args: Some(RealmArgs { ..Default::default() }),
+                    ..Default::default()
+                }
+            ),
+            ..Default::default()
+        }
+    )]
+    #[fuchsia::test]
+    async fn reject_invalid_drivers_only_topology(drivers_only: DriversOnly) {
+        let opts = RealmOptions {
+            topology: Some(Topology::DriversOnly(drivers_only)),
+            ..Default::default()
+        };
+        assert!(create_realm(opts).await.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn accept_valid_drivers_only_config() {
+        let (_dev_topological_client, dev_topological) = create_endpoints();
+        let (_dev_class_client, dev_class) = create_endpoints();
+        let opts = RealmOptions {
+            topology: Some(Topology::DriversOnly(DriversOnly {
+                driver_config: Some(DriverConfig {
+                    dev_topological: Some(dev_topological),
+                    dev_class: Some(dev_class),
+                    driver_test_realm_start_args: Some(RealmArgs { ..Default::default() }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+        assert!(create_realm(opts).await.is_ok());
+    }
 }
