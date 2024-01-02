@@ -32,7 +32,7 @@ executable("bin") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fostr",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/inet",
     "//src/lib/line_input",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
