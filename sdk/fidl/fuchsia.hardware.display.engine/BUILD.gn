@@ -1,0 +1,22 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.hardware.display.engine") {
+  sources = [
+    "engine.fidl",
+    "overview.fidl",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.display.types",
+    "//sdk/fidl/fuchsia.images2",
+    "//zircon/vdso/zx",
+
+    # TODO(fxbug.dev/72629): Update when fuchsia.hardware.i2c
+    # is relocated from //sdk/banjo to //sdk/fidl.
+    "//sdk/banjo/fuchsia.hardware.i2cimpl",
+  ]
+  contains_drivers = true
+}

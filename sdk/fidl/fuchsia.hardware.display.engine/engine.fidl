@@ -1,0 +1,362 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.display.engine;
+
+using fuchsia.hardware.display.types;
+using fuchsia.hardware.i2cimpl;
+using fuchsia.images2;
+using zx;
+
+/// A structure containing information about an image.
+type Image = struct {
+    /// The width and height of the image in pixels.
+    width uint32;
+    height uint32;
+
+    /// The type conveys information about what is providing the pixel data. If this is not
+    /// IMAGE_TYPE_SIMPLE, it is up to the driver and buffer producer to agree on the meaning
+    /// of the value through some mechanism outside the scope of this API.
+    type uint32;
+
+    /// A driver-defined handle to the image. Each handle must be unique.
+    handle uint64;
+};
+
+const INVALID_ID uint64 = 0;
+
+/// A fallback structure to convey display information without an EDID.
+type DisplayParams = struct {
+    width uint32;
+    height uint32;
+    refresh_rate_e2 uint32;
+};
+
+type ColorConversion = strict bits : uint32 {
+    /// If set, use the 0 vector for the color conversion preoffset
+    PREOFFSET = 0x1;
+    /// If set, use the identity matrix for the color conversion coefficients
+    COEFFICIENTS = 0x2;
+    /// If set, use the 0 vector for the color conversion postoffset
+    POSTOFFSET = 0x4;
+};
+
+/// Constants for display_config's mode_flags field
+type ModeFlag = strict bits : uint32 {
+    VSYNC_POSITIVE = 0x1;
+    HSYNC_POSITIVE = 0x2;
+    INTERLACED = 0x4;
+    ALTERNATING_VBLANK = 0x8;
+    DOUBLE_CLOCKED = 0x10;
+};
+
+/// The video parameters which specify the display mode.
+/// TODO(fxbug.dev/42085013): Replace this type with something more similar
+/// to //src/graphics/display/lib/api-types-cpp/display-timing.h.
+type DisplayMode = struct {
+    pixel_clock_khz uint32;
+    h_addressable uint32;
+    h_front_porch uint32;
+    h_sync_pulse uint32;
+    h_blanking uint32;
+    v_addressable uint32;
+    v_front_porch uint32;
+    v_sync_pulse uint32;
+    v_blanking uint32;
+    /// A bitmask of MODE_FLAG_* values
+    flags uint32;
+};
+
+type DisplayConfig = struct {
+    /// the display id to which the configuration applies
+    display_id uint64;
+
+    mode DisplayMode;
+
+    /// Bitmask of flags defined in the ColorConversion enum.
+    cc_flags uint32;
+    /// Color conversion is applied to each pixel according to the formula:
+    ///
+    /// (cc_coefficients * (pixel + cc_preoffsets)) + cc_postoffsets
+    ///
+    /// where pixel is a column vector consisting of the pixel's 3 components.
+    cc_preoffsets array<float32, 3>;
+    cc_coefficients array<array<float32, 3>, 3>;
+    cc_postoffsets array<float32, 3>;
+
+    layer vector<fuchsia.hardware.display.types.Layer>:MAX;
+};
+
+type Panel = flexible resource union {
+    /// The i2c bus to use to read this display's EDID.
+    1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
+    /// The display's parameters if an EDID is not present.
+    2: params DisplayParams;
+};
+
+/// A structure containing information a connected display.
+type AddedDisplayArgs = resource struct {
+    display_id uint64;
+
+    /// A flag indicating whether or not the display has a valid EDID.
+    ///
+    /// If true, the device should provide a fuchsia.hardware.i2cimpl.I2cImpl
+    /// client in the `Panel` union.
+    ///
+    /// If no EDID is present, then the meaning of display_config's mode
+    /// structure is undefined, and drivers should ignore it in
+    /// `CheckConfiguration` and `ApplyConfiguration`.
+    ///
+    /// TODO(b/316607344): Remove edid_present when Banjo variant is gone.
+    edid_present bool;
+    panel Panel;
+
+    /// A list of pixel formats supported by the display. The first entry is the
+    /// preferred pixel format.
+    pixel_formats vector<fuchsia.images2.PixelFormat>:MAX;
+
+    /// A list of cursor configurations most likely to be accepted by the
+    /// driver.
+    ///
+    /// The driver may reject some of these configurations in some
+    /// circumstances, and it may accept other configurations, but at least one
+    /// of these configurations should be valid at most times.
+    cursor_configs vector<fuchsia.hardware.display.types.CursorInfo>:MAX;
+};
+
+/// This protocol is `open` while under development.
+/// TODO(b/316631158): We should make it `closed` once the API is stabilized.
+@discoverable
+@transport("Driver")
+open protocol Engine {
+    /// Import a sysmem buffer collection token.
+    ///
+    /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
+    flexible ImportBufferCollection(resource struct {
+        collection_id uint64;
+        // TODO(fxbug.dev/89649): This is a client end channel of FIDL protocol
+        // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
+        // replaced with FIDL client end once banjo to FIDL migration finishes.
+        collection_token zx.Handle:CHANNEL;
+    }) -> () error zx.Status;
+
+    /// Release an imported buffer collection.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` isn't successfully imported.
+    flexible ReleaseBufferCollection(struct {
+        collection_id uint64;
+    }) -> () error zx.Status;
+
+    /// Imports an image from a imported BufferCollection into the driver and
+    /// returns its unique ID.
+    ///
+    /// Returns ZX_OK if the image is imported succesfully.
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
+    flexible ImportImage(struct {
+        image Image;
+        collection_id uint64;
+        index uint32;
+    }) -> (struct {
+        image_id uint64;
+    }) error zx.Status;
+
+    /// Import BufferCollection backed VMO pointed to by `index`.
+    /// Importing the VMO usually involves pinning the VMO and updating display
+    /// controller hardware registers with the physical address of the VMO to be
+    /// used for capture.
+    ///
+    /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
+    flexible ImportImageForCapture(struct {
+        collection_id uint64;
+        index uint32;
+    }) -> (struct {
+        capture_image_id uint64;
+    }) error zx.Status;
+
+    /// Releases any driver state associated with the given image. The client
+    /// is expected to not release any images passed to `apply_config`
+    /// until a vsync occurs with a more recent image.
+    flexible ReleaseImage(struct {
+        image_id uint64;
+    }) -> ();
+
+    /// Validates the given configuration.
+    ///
+    /// The configuration may not include all displays. Omitted displays should
+    /// be treated as whichever of off or displaying a blank screen results in
+    /// a more permissive validation.
+    ///
+    /// All displays in a configuration will have at least one layer. The
+    /// layers will be arranged in increasing z-order, and their z_index fields
+    /// will be set consecutively.
+    ///
+    /// Whether or not the driver can accept the configuration cannot depend on
+    /// the particular image handles, as it must always be possible to present
+    /// a new image in place of another image with a matching configuration. It
+    /// also cannot depend on the cursor position, as that can be updated
+    /// without another call to `CheckConfiguration`.
+    ///
+    /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the
+    /// combination of display modes is not supported.
+    ///
+    /// `client_composition_opcodes` are per-layer client operations
+    /// to make the layer configuration supported by the display hardware. If
+    /// the `config_check_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
+    /// `client_composition_opcodes` are undefined and should be ignored by the
+    /// client.
+    ///
+    /// `client_composition_opcodes` is an array with one element for each
+    /// layer in
+    /// each display_config element. The elements map to layers following a
+    /// DFS traversal of a tree where the first-level children are the
+    /// `display_config` elements, and the second-level children are each
+    /// `DisplayConfig`'s layers.
+    ///
+    /// The element ordering matches flattening the array obtained by mapping
+    /// each display_config element to its `DisplayConfig.layers` value:
+    ///   [ display 0 layer 0, display 0 layer 1, ...,
+    ///     display 1 layer 0, display 1 layer 1, ...,
+    ///     display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
+    flexible CheckConfiguration(struct {
+        display_config vector<DisplayConfig>:MAX;
+    }) -> (struct {
+        config_check_result fuchsia.hardware.display.types.ConfigResult;
+        client_composition_opcodes
+                vector<fuchsia.hardware.display.types.ClientCompositionOpcode>:MAX;
+    });
+
+    /// Applies the configuration.
+    ///
+    /// All configurations passed to this function must be derived from
+    /// configurations which have been successfully validated, with the only
+    /// differences either being omitted layers or different image handles. To
+    /// account for any layers which are not present, the driver must use the
+    /// z_index values of the present layers to configure them as if the whole
+    /// configuration was present.
+    ///
+    /// Unlike with `CheckConfiguration`, displays included in the configuration
+    /// are not guaranteed to include any layers. Both omitted displays and
+    /// displays with no layers can either be turned off or set to display a
+    /// blank screen, but for displays with no layers there is a strong
+    /// preference to display a blank screen instead of turning them off. In
+    /// either case, the driver must drop all references to old images and
+    /// invoke the vsync callback after doing so.
+    flexible ApplyConfiguration(struct {
+        display_config vector<DisplayConfig>:MAX;
+
+        /// Identifies the configuration to be applied. Must be a valid value.
+        /// Must be strictly increasing across calls.
+        config_stamp fuchsia.hardware.display.types.ConfigStamp;
+    }) -> ();
+
+    /// Set ELD (EDID Like Data, audio info in EDID) for one display.
+    ///
+    /// This method is called independently from the CheckConfiguration and
+    /// ApplyConfiguration methods. The display_id may be unconfigured at the
+    /// time this method is called. raw_eld is the ELD raw data formatted
+    /// according to the HDA specification version 1.0a section 7.3.3.34.1.
+    /// https://www.intel.com/content/dam/www/public/us/en/documents/product-specifications/high-definition-audio-specification.pdf
+    flexible SetEld(struct {
+        display_id uint64;
+        raw_eld vector<uint8>:MAX;
+    }) -> ();
+
+    /// Connects the handle to the sysmem service.
+    flexible GetSysmemConnection(resource struct {
+        sysmem_handle zx.Handle:CHANNEL;
+    }) -> () error zx.Status;
+
+    /// Set sysmem buffer collection contraints needed to ensure an image can be
+    /// imported with `config` on the imported BufferCollecition with
+    /// `collection_id`.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    flexible SetBufferCollectionConstraints(struct {
+        config Image;
+        collection_id uint64;
+    }) -> () error zx.Status;
+
+    /// Power off/on the display panel. Newly added displays are turned on by
+    /// default.
+    ///
+    /// Displays that are turned off will not deliver VSync events.
+    /// This may include the vsync event for the most recently applied
+    /// config.
+    flexible SetDisplayPower(struct {
+        display_id uint64;
+        power_on bool;
+    }) -> () error zx.Status;
+
+    /// Starts capture into the resource mapped by `capture_image_id `(non-blocking)
+    /// Only one active capture is allowed at a time.
+    /// A valid image must be displayed during capture. Otherwise unexpected
+    /// hardware behavior might occur.
+    ///
+    /// Drivers should not leave display hardware in this unexpected state.
+    /// Drivers are expected to stop and/or abort capture if no valid image is
+    /// being displayed.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
+    /// supported.
+    flexible StartCapture(struct {
+        capture_image_id uint64;
+    }) -> () error zx.Status;
+
+    /// Releases resources allocated by `capture_image_id`.
+    /// Releasing resources from an active capture is not allowed and will cause
+    /// unexpected behavior.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
+    /// supported.
+    flexible ReleaseCapture(struct {
+        capture_image_id uint64;
+    }) -> () error zx.Status;
+
+    /// Returns true if display capture is supported and the previous capture is
+    /// completed. False otherwise.
+    flexible IsCaptureCompleted() -> (struct {
+        is_capture_completed bool;
+    });
+
+    flexible -> OnCaptureComplete();
+
+    /// Called when displays are added or removed.
+    ///
+    /// The driver must be done accessing any images which were on the removed
+    /// displays.
+    ///
+    /// The driver should emit this event if any displays are present.
+    flexible -> OnDisplaysChanged(resource struct {
+        added_displays vector<AddedDisplayArgs>:MAX;
+        removed_display_ids vector<uint64>:MAX;
+    });
+
+    /// Events which are invoked when display vsync occurs.
+    ///
+    /// Arguments
+    /// - `timestamp`
+    ///      The ZX_CLOCK_MONOTONIC timestamp at which the vsync occurred.
+    /// - `config_stamp`
+    ///      The config stamp of the latest configuration that is currently
+    ///      fully applied to all the layers of the display with `display_id`.
+    ///        If none of the configurations are currently fully applied to
+    ///      this display, a null value will be passed to the driver.
+    ///        Note that an `ApplyConfiguration()` call may contain multiple
+    ///      configurations with a certain `config_stamp`; Only the application
+    ///      status of the configuration with ID `display_id` is related.
+    ///
+    /// The driver must emit this event as close as possible to the start of
+    /// every display's VSync period, even if the display has no images
+    /// displayed.
+    flexible -> OnDisplayVsync(struct {
+        display_id uint64;
+        timestamp zx.Time;
+        config_stamp box<fuchsia.hardware.display.types.ConfigStamp>;
+    });
+};
