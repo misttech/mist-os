@@ -18,9 +18,16 @@ type Image = struct {
     /// IMAGE_TYPE_SIMPLE, it is up to the driver and buffer producer to agree on the meaning
     /// of the value through some mechanism outside the scope of this API.
     type uint32;
+};
 
-    /// A driver-defined handle to the image. Each handle must be unique.
-    handle uint64;
+/// Type of the internal value in [`ImageId`].
+alias ImageIdValue = uint64;
+
+/// Unique identifier for an image exposed to display drivers.
+///
+/// [`INVALID_ID`] represents an invalid value.
+type ImageId = struct {
+    value ImageIdValue;
 };
 
 const INVALID_ID uint64 = 0;
@@ -159,7 +166,7 @@ open protocol Engine {
         collection_id uint64;
         index uint32;
     }) -> (struct {
-        image_id uint64;
+        image_id ImageId;
     }) error zx.Status;
 
     /// Import BufferCollection backed VMO pointed to by `index`.
@@ -176,14 +183,14 @@ open protocol Engine {
         collection_id uint64;
         index uint32;
     }) -> (struct {
-        capture_image_id uint64;
+        capture_image_id ImageId;
     }) error zx.Status;
 
     /// Releases any driver state associated with the given image. The client
     /// is expected to not release any images passed to `apply_config`
     /// until a vsync occurs with a more recent image.
     flexible ReleaseImage(struct {
-        image_id uint64;
+        image_id ImageId;
     }) -> ();
 
     /// Validates the given configuration.
@@ -305,7 +312,7 @@ open protocol Engine {
     /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
     /// supported.
     flexible StartCapture(struct {
-        capture_image_id uint64;
+        capture_image_id ImageId;
     }) -> () error zx.Status;
 
     /// Releases resources allocated by `capture_image_id`.
@@ -315,7 +322,7 @@ open protocol Engine {
     /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
     /// supported.
     flexible ReleaseCapture(struct {
-        capture_image_id uint64;
+        capture_image_id ImageId;
     }) -> () error zx.Status;
 
     /// Returns true if display capture is supported and the previous capture is
