@@ -11,7 +11,8 @@ driver_bind_rules("i2c_bind") {
   rules = "i2c.bind"
   bind_output = "i2c.bindbc"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
+  deps =
+      [ "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_bindlib" ]
 }
 
 fuchsia_driver("i2c-driver") {

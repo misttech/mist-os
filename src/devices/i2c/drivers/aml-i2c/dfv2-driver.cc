@@ -9,7 +9,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
-#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2cimpl/cpp/bind.h>
 
 namespace {
 
@@ -23,8 +23,7 @@ Dfv2Driver::Dfv2Driver(fdf::DriverStartArgs start_args,
                        fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
       device_server_(incoming(), outgoing(), node_name(), kChildNodeName, std::nullopt,
-                     compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}),
-                     CreateBanjoConfig()) {}
+                     compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}), std::nullopt) {}
 
 zx::result<aml_i2c_delay_values> GetDelay(
     fidl::WireSyncClient<fuchsia_driver_compat::Device>& compat_client) {
@@ -79,12 +78,16 @@ zx_status_t Dfv2Driver::CreateAmlI2cChildNode() {
   fidl::Arena arena;
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] =
-      fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_I2C_IMPL));
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_i2cimpl::SERVICE,
+                                    bind_fuchsia_hardware_i2cimpl::SERVICE_DRIVERTRANSPORT);
+
+  std::vector<fuchsia_component_decl::wire::Offer> offers = device_server_.CreateOffers(arena);
+  offers.push_back(
+      fdf::MakeOffer<fuchsia_hardware_i2cimpl::Service>(arena, component::kDefaultInstance));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, kChildNodeName)
-                        .offers(device_server_.CreateOffers(arena))
+                        .offers(offers)
                         .properties(properties)
                         .Build();
   fidl::WireResult result =
@@ -115,12 +118,12 @@ zx::result<> Dfv2Driver::Start() {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to compat service: %s", result.status_string());
-    return result.take_error();
+  zx::result compat_result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
+  if (compat_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to compat service: %s", compat_result.status_string());
+    return compat_result.take_error();
   }
-  auto compat_client = fidl::WireSyncClient(std::move(result.value()));
+  auto compat_client = fidl::WireSyncClient(std::move(compat_result.value()));
 
   zx::result pdev_result =
       incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
@@ -147,21 +150,21 @@ zx::result<> Dfv2Driver::Start() {
   }
   aml_i2c_ = std::move(aml_i2c.value());
 
+  {
+    zx::result result = outgoing()->AddService<fuchsia_hardware_i2cimpl::Service>(
+        aml_i2c_->GetI2cImplInstanceHandler(fdf::Dispatcher::GetCurrent()->get()));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add I2C impl service to outgoing: %s", result.status_string());
+      return result.take_error();
+    }
+  }
+
   zx_status_t status = CreateAmlI2cChildNode();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to create aml-i2c child node: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();
-}
-
-compat::DeviceServer::BanjoConfig Dfv2Driver::CreateBanjoConfig() {
-  compat::DeviceServer::BanjoConfig config{.default_proto_id = ZX_PROTOCOL_I2C_IMPL};
-  config.callbacks[ZX_PROTOCOL_I2C_IMPL] = [this]() {
-    ZX_ASSERT(aml_i2c_.get() != nullptr);
-    return compat::DeviceServer::GenericProtocol{.ops = aml_i2c_->get_ops(), .ctx = aml_i2c_.get()};
-  };
-  return config;
 }
 
 }  // namespace aml_i2c

@@ -12,6 +12,8 @@
 
 #include <soc/aml-common/aml-i2c.h>
 
+#include "zircon/status.h"
+
 namespace aml_i2c {
 
 zx::result<aml_i2c_delay_values> GetDelay(zx_device_t* parent) {
@@ -31,6 +33,29 @@ zx::result<aml_i2c_delay_values> GetDelay(zx_device_t* parent) {
   }
 
   return zx::ok(delay);
+}
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Dfv1Driver::ServeI2cImpl() {
+  zx::result result = outgoing_.AddService<fuchsia_hardware_i2cimpl::Service>(
+      aml_i2c_->GetI2cImplInstanceHandler(fdf::Dispatcher::GetCurrent()->get()));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory: %s", result.status_string());
+    return result.take_error();
+  }
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
+    return endpoints.take_error();
+  }
+
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+    return result.take_error();
+  }
+
+  return zx::ok(std::move(endpoints.value().client));
 }
 
 zx_status_t Dfv1Driver::Bind(void* ctx, zx_device_t* parent) {
@@ -53,13 +78,19 @@ zx_status_t Dfv1Driver::Bind(void* ctx, zx_device_t* parent) {
   }
 
   auto driver = std::make_unique<Dfv1Driver>(parent, std::move(aml_i2c.value()));
+  zx::result outgoing_client = driver->ServeI2cImpl();
+  if (outgoing_client.is_error()) {
+    zxlogf(ERROR, "Failed to server i2c impl fidl protocol: %s", outgoing_client.status_string());
+    return outgoing_client.status_value();
+  }
 
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_I2C_IMPL},
+  std::array offers = {
+      fuchsia_hardware_i2cimpl::Service::Name,
   };
-  zx_status_t status =
-      driver->DdkAdd(ddk::DeviceAddArgs("aml-i2c").set_props(props).forward_metadata(
-          parent, DEVICE_METADATA_I2C_CHANNELS));
+  zx_status_t status = driver->DdkAdd(ddk::DeviceAddArgs("aml-i2c")
+                                          .set_runtime_service_offers(offers)
+                                          .set_outgoing_dir(outgoing_client->TakeChannel())
+                                          .forward_metadata(parent, DEVICE_METADATA_I2C_CHANNELS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "device_add failed");
     return status;
@@ -78,17 +109,6 @@ Dfv1Driver::Dfv1Driver(zx_device_t* parent, std::unique_ptr<AmlI2c> aml_i2c)
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
   }
-}
-
-zx_status_t Dfv1Driver::DdkGetProtocol(uint32_t proto_id, void* out) {
-  if (proto_id != ZX_PROTOCOL_I2C_IMPL) {
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
-  }
-
-  i2c_impl_protocol_t* proto = static_cast<i2c_impl_protocol_t*>(out);
-  proto->ops = static_cast<const i2c_impl_protocol_ops_t*>(aml_i2c_->get_ops());
-  proto->ctx = aml_i2c_.get();
-  return ZX_OK;
 }
 
 }  // namespace aml_i2c
