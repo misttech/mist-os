@@ -9,13 +9,18 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   crate_source_root = "src/main.rs"
-  crate_sources = [ crate_source_root ]
+  crate_sources = [
+    "src/ffx_doc.rs",
+    crate_source_root,
+  ]
 
   crate_deps = [
+    "//src/developer/ffx/command:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:flate2",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tar",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
@@ -42,6 +47,7 @@ if (is_host) {
   # the markdown file is the expected output.
   host_test_data("clidoc_test_scripts") {
     sources = [
+      "src/testdata/ffx",
       "src/testdata/tool_with_subcommands.md",
       "src/testdata/tool_with_subcommands.sh",
     ]
