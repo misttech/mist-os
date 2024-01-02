@@ -8,7 +8,6 @@ fuchsia_library_fuzzer("fx-log-fuzzer") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/syslog/cpp:backend",
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zircon-internal",
   ]
