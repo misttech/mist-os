@@ -21,7 +21,7 @@ executable("blobfs-compression") {
   deps = [
     ":common",
     "//src/lib/digest",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/storage/blobfs/compression/configs",
   ]
 
