@@ -1,14 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <fuchsia/ultrasound/cpp/fidl.h>
-#include <fuchsia/virtualaudio/cpp/fidl.h>
 #include <zircon/device/audio.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
-
-#include <memory>
-#include <vector>
 
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"

@@ -5,8 +5,6 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <fuchsia/media/tuning/cpp/fidl.h>
 
-#include <cmath>
-
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
 namespace media::audio::test {
@@ -20,6 +18,7 @@ class AudioTunerTest : public HermeticAudioTest {
     HermeticAudioTest::TearDown();
   }
 
+ private:
   fuchsia::media::AudioRendererPtr audio_renderer_;
   fuchsia::media::AudioCapturerPtr audio_capturer_;
 };

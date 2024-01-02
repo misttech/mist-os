@@ -5,7 +5,6 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/zx/clock.h>
-#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls.h>
 

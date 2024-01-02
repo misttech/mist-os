@@ -7,12 +7,8 @@
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/media/audio/audio_core/shared/audio_admin.h"
-#include "src/media/audio/audio_core/shared/reporter.h"
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
-#include "src/media/audio/lib/clock/utils.h"
-#include "src/media/audio/lib/processing/gain.h"
 
 namespace media::audio {
 
@@ -205,8 +201,8 @@ void AudioCapturer::RealizeVolume(VolumeCommand volume_command) {
 
     std::stringstream stream;
     stream << static_cast<const void*>(this) << " (link " << static_cast<const void*>(&link) << ") "
-           << StreamUsage::WithCaptureUsage(usage_).ToString() << " Gain(" << gain_db << "db) = "
-           << "Vol(" << volume_command.volume << ") + GainAdjustment("
+           << StreamUsage::WithCaptureUsage(usage_).ToString() << " Gain(" << gain_db
+           << "db) = " << "Vol(" << volume_command.volume << ") + GainAdjustment("
            << volume_command.gain_db_adjustment << "db) + StreamGain(" << stream_gain_db_ << "db)";
     std::string log_string = stream.str();
 

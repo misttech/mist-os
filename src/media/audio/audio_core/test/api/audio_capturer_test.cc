@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 #include <fuchsia/media/cpp/fidl.h>
-#include <lib/fzl/vmo-mapper.h>
 #include <lib/media/audio/cpp/types.h>
 #include <lib/zx/clock.h>
-#include <zircon/device/audio.h>
 
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
@@ -85,7 +83,7 @@ class AudioCapturerClockTestOldAPI : public AudioCapturerTestOldAPI {
   // period is 10ms, our mix thread will not become idle until it finishes the entire mix job.
   // Capture mix jobs can be as long as 50ms (see kMaxTimePerCapture in base_capturer.cc).
   void WaitBeforeClockRelatedDisconnect() {
-    usleep(75 * 1000);  // 1.5 x 50ms.
+    usleep(150 * 1000);  // 3 x 50ms.
 
     audio_capturer_->GetReferenceClock([](zx::clock) {});
   }
@@ -121,7 +119,7 @@ class AudioCapturerClockTestOldAPI : public AudioCapturerTestOldAPI {
 // Also capture StreamPacket flags
 
 // DiscardAllPackets waits to deliver its completion callback until all packets have returned.
-TEST_F(AudioCapturerTestOldAPI, DiscardAll_ReturnsAfterAllPackets) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllReturnsAfterAllPackets) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -135,7 +133,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAll_ReturnsAfterAllPackets) {
   ExpectCallbacks();
 }
 
-TEST_F(AudioCapturerTestOldAPI, DiscardAll_WithNoVmoShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllWithNoVmoShouldDisconnect) {
   SetFormat();
 
   audio_capturer_->DiscardAllPackets(AddUnexpectedCallback("DiscardAllPackets"));
@@ -143,7 +141,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAll_WithNoVmoShouldDisconnect) {
 }
 
 // DiscardAllPackets should fail, if async capture is active
-TEST_F(AudioCapturerTestOldAPI, DiscardAll_DuringAsyncCaptureShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllDuringAsyncCaptureShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -156,7 +154,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAll_DuringAsyncCaptureShouldDisconnect) {
 }
 
 // DiscardAllPackets should fail, if async capture is in the process of stopping
-TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAll_AsyncCaptureStoppingShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAllAsyncCaptureStoppingShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -170,7 +168,7 @@ TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAll_AsyncCaptureStoppingShouldDi
 }
 
 // DiscardAllPackets should succeed, if async capture is completely stopped
-TEST_F(AudioCapturerTestOldAPI, DiscardAll_AfterAsyncCapture) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllAfterAsyncCapture) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -186,7 +184,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAll_AfterAsyncCapture) {
 }
 
 // TODO(mpuryear): DiscardAllPacketsNoReply() post-stop
-TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReply_WithNoVmoShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReplyWithNoVmoShouldDisconnect) {
   SetFormat();
 
   audio_capturer_->DiscardAllPacketsNoReply();
@@ -194,7 +192,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReply_WithNoVmoShouldDisconnect) {
 }
 
 // DiscardAllPacketsNoReply should fail, if async capture is active
-TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReply_DuringAsyncCaptureShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReplyDuringAsyncCaptureShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -207,7 +205,7 @@ TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReply_DuringAsyncCaptureShouldDiscon
 }
 
 // DiscardAllPacketsNoReply should fail, if async capture is in the process of stopping
-TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAllNoReply_AsyncCaptureStoppingShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAllNoReplyAsyncCaptureStoppingShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -221,7 +219,7 @@ TEST_F(AudioCapturerTestOldAPI, DISABLED_DiscardAllNoReply_AsyncCaptureStoppingS
 }
 
 // DiscardAllPacketsNoReply should succeed, if async capture is completely stopped
-TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReply_AfterAsyncCapture) {
+TEST_F(AudioCapturerTestOldAPI, DiscardAllNoReplyAfterAsyncCapture) {
   SetFormat();
   SetUpPayloadBuffer();
 
@@ -278,13 +276,13 @@ TEST_F(AudioCapturerTestOldAPI, StopAsyncWithAllPacketsInFlight) {
 // Also when already started, before format set, before packets submitted
 // Also negative testing: 0/tiny/huge num frames (bigger than packet)
 
-TEST_F(AudioCapturerTestOldAPI, Stop_WhenStoppedShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, StopWhenStoppedShouldDisconnect) {
   audio_capturer_->StopAsyncCapture(AddUnexpectedCallback("StopAsyncCapture"));
   ExpectDisconnect(audio_capturer_);
 }
 // Also test before format set, before packets submitted
 
-TEST_F(AudioCapturerTestOldAPI, StopNoReply_WhenStoppedShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, StopNoReplyWhenStoppedShouldDisconnect) {
   audio_capturer_->StopAsyncCaptureNoReply();
   ExpectDisconnect(audio_capturer_);
 }
@@ -321,7 +319,7 @@ TEST_F(AudioCapturerTestOldAPI, BindGainControl) {
 }
 
 // Setting a payload buffer should fail, if format has not yet been set (even if it was retrieved).
-TEST_F(AudioCapturerTestOldAPI, AddPayloadBuffer_BeforeSetFormatShouldDisconnect) {
+TEST_F(AudioCapturerTestOldAPI, AddPayloadBufferBeforeSetFormatShouldDisconnect) {
   // Give time for Disconnect to occur, if it must.
   audio_capturer_->GetStreamType(AddCallback("GetStreamType"));
   ExpectCallbacks();

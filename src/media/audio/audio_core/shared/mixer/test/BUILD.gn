@@ -64,10 +64,6 @@ fuchsia_test_package("audio_fidelity_tests") {
   test_specs = {
     environments = [ emu_env ]
 
-    log_settings = {
-      max_severity = "INFO"
-    }
-
     parallel = 4
   }
 

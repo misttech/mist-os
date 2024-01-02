@@ -11,12 +11,9 @@
 
 #include <string>
 
-#include "src/media/audio/audio_core/shared/audio_admin.h"
 #include "src/media/audio/audio_core/shared/logging_flags.h"
-#include "src/media/audio/audio_core/shared/reporter.h"
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/shared/stream_volume_manager.h"
-#include "src/media/audio/lib/clock/utils.h"
 
 namespace media::audio {
 

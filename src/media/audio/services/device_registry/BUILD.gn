@@ -31,12 +31,6 @@ fuchsia_package("device_registry") {
 
 fuchsia_unittest_package("audio_services_device_registry_unittests") {
   deps = [ ":device_registry_unittests_bin" ]
-
-  test_specs = {
-    log_settings = {
-      max_severity = "INFO"
-    }
-  }
 }
 
 fuchsia_unittest_package("audio_services_device_registry_warning_unittests") {
