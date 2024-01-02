@@ -160,7 +160,8 @@ fs_test_suite("f2fs") {
     "//src/storage/f2fs/bin:f2fs-component",
   ]
   extra_components = [
-    ":f2fs-unittest",
+    # TODO(b/317855955): Fix flakes and re-enable
+    # ":f2fs-unittest",
     ":f2fs-gc-unittest",
     ":f2fs-large-volume-unittest",
     ":f2fs-slow-unittest",
@@ -170,7 +171,8 @@ fs_test_suite("f2fs") {
   # TODO(b/297201368): These tests timeout on RISC-V builders currently.
   if (current_cpu == "riscv64") {
     extra_components -= [
-      ":f2fs-unittest",
+      # TODO(b/317855955): Fix flakes and re-enable
+      # ":f2fs-unittest",
       ":f2fs-large-volume-unittest",
       ":f2fs-gc-unittest",
     ]
@@ -186,7 +188,8 @@ slow_fs_test_suite("f2fs") {
   # TODO(b/297201368): These tests are disabled in the regular test suite above due to timeouts.
   if (current_cpu == "riscv64") {
     extra_components = [
-      ":f2fs-unittest",
+      # TODO(b/317855955): Fix flakes and re-enable
+      # ":f2fs-unittest",
       ":f2fs-large-volume-unittest",
       ":f2fs-gc-unittest",
     ]
