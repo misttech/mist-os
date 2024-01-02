@@ -4,11 +4,28 @@
 
 if [[ -n "${ZSH_VERSION:-}" ]]; then
   devshell_lib_dir=${${(%):-%x}:a:h}
+  FUCHSIA_DIR="$(dirname "$(dirname "$(dirname "${devshell_lib_dir}")")")"
 else
-  devshell_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+  # NOTE: Replace use of dirname with BASH substitutions to save 20ms of
+  # startup time for all fx commands.
+  #
+  # Equivalent to "$(dirname ${BASH_SOURCE[0]"}) but 350x faster.
+  # Exception: BASH_SOURCE[0] will be the script name when invoked directly
+  # from Bash (e.g. cd tools/devshell/lib && bash vars.sh). In this case
+  # the substitution will not change anything, so provide fallback case.
+  devshell_lib_dir="${BASH_SOURCE[0]%/*}"
+  if [[ "${devshell_lib_dir}" == "${BASH_SOURCE[0]}" ]]; then
+    devshell_lib_dir="."
+  fi
+  # Get absolute path.
+  devshell_lib_dir="$(cd "${devshell_lib_dir}" >/dev/null 2>&1 && pwd)"
+  # Compute absolute path to $devshell_lib_dir/../../..
+  FUCHSIA_DIR="${devshell_lib_dir}"
+  FUCHSIA_DIR="${FUCHSIA_DIR%/*}"
+  FUCHSIA_DIR="${FUCHSIA_DIR%/*}"
+  FUCHSIA_DIR="${FUCHSIA_DIR%/*}"
 fi
 
-FUCHSIA_DIR="$(dirname "$(dirname "$(dirname "${devshell_lib_dir}")")")"
 export FUCHSIA_DIR
 export FUCHSIA_OUT_DIR="${FUCHSIA_OUT_DIR:-${FUCHSIA_DIR}/out}"
 source "${devshell_lib_dir}/platform.sh"
