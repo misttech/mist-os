@@ -20,7 +20,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 }
 
