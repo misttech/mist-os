@@ -76,7 +76,7 @@ executable("constructor_helper_proc") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/files",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/testing/fidl:placeholders_hlcpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
