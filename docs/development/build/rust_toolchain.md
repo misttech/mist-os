@@ -56,6 +56,8 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    fuchsia/sdk/core/${platform} latest
    @Subdir sysroot/linux
    fuchsia/third_party/sysroot/linux git_revision:db18eec0b4f14b6b16174aa2b91e016663157376
+   @Subdir sysroot/focal
+   fuchsia/third_party/sysroot/focal latest
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
@@ -104,8 +106,8 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --clang-prefix=$DEV_ROOT/clang \
          --sdk-dir=$DEV_ROOT/sdk \
          --stage0=$DEV_ROOT/stage0 \
-         --linux-amd64-sysroot=$DEV_ROOT/sysroot/linux \
-         --linux-arm64-sysroot=$DEV_ROOT/sysroot/linux \
+         --linux-sysroot=$DEV_ROOT/sysroot/linux \
+         --linux-riscv64-sysroot=$DEV_ROOT/sysroot/focal \
       | tee fuchsia-env.sh
    ```
 
