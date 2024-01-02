@@ -65,7 +65,7 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/ui/flatland-frame-scheduling:simple_present",
     "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/utils:utils",

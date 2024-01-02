@@ -24,7 +24,7 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/syslog/cpp:backend",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
   public_deps = [
     "//sdk/lib/fit-promise",

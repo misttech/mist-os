@@ -17,7 +17,7 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp:backend",
     "//src/camera/bin/camera-gym/controller_error:lib",
     "//src/camera/bin/camera-gym/fidl:controller_hlcpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//third_party/re2",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -33,7 +33,7 @@ executable("bin") {
     ":lib",
     "//sdk/lib/sys/cpp",
     "//src/camera/bin/camera-gym/controller_parser:lib",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
