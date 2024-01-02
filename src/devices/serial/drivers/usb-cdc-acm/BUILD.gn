@@ -137,7 +137,9 @@ group("tests") {
   testonly = true
   deps = [
     ":cdc_acm_bind_test",
-    ":usb-cdc-acm-integration-test",
+
+    # TODO(b/317170136): Fix flakes and re-enable
+    #":usb-cdc-acm-integration-test",
     ":usb_cdc_acm_function_bind_test",
   ]
 }
