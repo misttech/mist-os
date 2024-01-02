@@ -6,7 +6,9 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/range.h>
+#include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/reboot.h>
 #include <lib/zbi-format/zbi.h>
@@ -16,15 +18,19 @@
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 #include <zircon/assert.h>
+#include <zircon/limits.h>
 
 #include <efi/types.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
+#include <ktl/type_traits.h>
 #include <ktl/variant.h>
 #include <phys/allocation.h>
+#include <phys/arch/arch-handoff.h>
 #include <phys/handoff.h>
 #include <phys/main.h>
+#include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
 
 #include "handoff-entropy.h"
@@ -65,7 +71,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
                    zbitl::AsBytes(uart.config()));
     }
   };
-  ktl::visit(append_uart_item, gBootOptions->serial);
+  uart::internal::Visit(append_uart_item, gBootOptions->serial);
   EntropyHandoff entropy;
 
   zbitl::View view(zbi);
@@ -102,6 +108,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
             reinterpret_cast<const zbi_mem_range_t*>(payload.data()),
             payload.size_bytes() / sizeof(zbi_mem_range_t),
         };
+        size_t extra_mem_config_ranges = 0;
 
         ktl::optional<zbi_mem_range_t> test_ram_reserve;
         if (gBootOptions->test_ram_reserve && gBootOptions->test_ram_reserve->paddr) {
@@ -110,20 +117,55 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
               .length = gBootOptions->test_ram_reserve->size,
               .type = ZBI_MEM_TYPE_RESERVED,
           };
+          extra_mem_config_ranges++;
+        }
+
+        // TODO(fxbug.dev/136068): Clean up when zircon initializes in virtual address mode.
+        //
+        // Peripheral ranges are only meaningful in ARM64 where accesses cannot be performed
+        // through the physmap at the time of writing.
+        ktl::optional<zbi_mem_range_t> uart_periph_range;
+        // TODO(fxbug.dev/136068): Clean this up.
+        if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
+          // TODO(fxbug.dev/129541): Use length provided by the driver, not
+          // assume it is just one page. This works in practice but is not
+          // entirely correct.
+          uart::internal::Visit(
+              [&uart_periph_range, &extra_mem_config_ranges](const auto& uart) {
+                using dcfg_type = ktl::decay_t<decltype(uart.config())>;
+                if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
+                  uart_periph_range = {
+                      .paddr = uart.config().mmio_phys,
+                      .length = ZX_PAGE_SIZE,
+                      .type = ZBI_MEM_TYPE_PERIPHERAL,
+                  };
+                  extra_mem_config_ranges++;
+                }
+              },
+              gBootOptions->serial);
         }
 
         ktl::span handoff_mem_config =
-            New(handoff()->mem_config, ac, mem_config.size() + (test_ram_reserve ? 1 : 0));
+            New(handoff()->mem_config, ac, mem_config.size() + extra_mem_config_ranges);
         ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff",
                       mem_config.size_bytes());
 
         ktl::copy(mem_config.begin(), mem_config.end(), handoff_mem_config.begin());
+
+        ktl::span extra_ranges = handoff_mem_config.subspan(mem_config.size());
+        size_t current_range = 0;
+
+        if (uart_periph_range) {
+          extra_ranges[current_range++] = *uart_periph_range;
+        }
+
         if (test_ram_reserve) {
           // TODO(mcgrathr): Note this will persist into the mexec handoff from
           // the kernel and be elided from the next kernel.  But that will be
           // fixed shortly when mexec handoff is handled directly here instead.
-          handoff_mem_config.back() = *test_ram_reserve;
+          extra_ranges[current_range++] = *test_ram_reserve;
         }
+        // ZX_DEBUG_ASSERT(current_range == extra_mem_config_ranges);
         break;
       }
 

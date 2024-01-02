@@ -33,4 +33,7 @@ struct ArchPhysHandoff {
 // uses as the virtual address of the kernel load image.
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff00000000;  // -4GB
 
+// Whether a peripheral range for the UART needs to be synthesized.
+inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
+
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
