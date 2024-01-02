@@ -10,7 +10,7 @@ def _buildifier(ctx):
         f
         for f in ctx.scm.affected_files()
         if (
-               f.endswith((".star", ".bzl", ".bazel", ".bzlmod")) or
+               f.endswith((".star", ".bzl", ".bazel", ".bzlmod", ".BUILD", ".WORKSPACE")) or
                f.split("/")[-1] in ("/BUILD", "/WORKSPACE")
            ) and
            not f.startswith("third_party/")

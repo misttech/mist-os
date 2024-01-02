@@ -856,7 +856,7 @@ build_config = _build_config
             "fuchsia",
             "workspace",
             "clang_templates",
-            "crosstool_template.BUILD",
+            "crosstool.BUILD.template",
         ),
     ]
 

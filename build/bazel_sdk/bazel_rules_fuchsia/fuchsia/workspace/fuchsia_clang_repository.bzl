@@ -70,7 +70,7 @@ def _fuchsia_clang_repository_impl(ctx):
     ctx.path("BUILD.bazel")
     ctx.path("cc_toolchain_config.bzl")
 
-    crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool_template.BUILD")
+    crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool.BUILD.template")
     toolchain_config_template = Label("//fuchsia/workspace/clang_templates:cc_toolchain_config_template.bzl")
     cc_features_file = Label("//fuchsia/workspace/clang_templates:cc_features.bzl")
     defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
