@@ -380,7 +380,7 @@ impl KeyboardBinding {
             }
         };
 
-        let device_info = descriptor.device_info.ok_or({
+        let device_info = descriptor.device_info.ok_or_else(|| {
             input_device_status.health_node.set_unhealthy("Empty device_info in descriptor");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
