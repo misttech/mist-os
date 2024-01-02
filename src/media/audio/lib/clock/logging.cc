@@ -16,8 +16,9 @@ namespace {
 constexpr bool kLogClockAdjustment = true;
 // Within LogClockAdjustment, whether to include PID coefficients in the log.
 constexpr bool kLogClockAdjustmentWithPidCoefficients = false;
-// Within LogCLockAdjustment, log every kLogClockAdjustmentStride or if the position error
-// exceeds kLogClockAdjustmentPositionErrorThreshold.
+// Within LogClockAdjustment(), log if position error >= kLogClockAdjustmentPositionErrorThreshold,
+// or if clock-rate-change >= kLogClockAdjustmentRateChangeThresholdPpm, or if it has been
+// kLogClockAdjustmentStride calls since the last time we logged.
 constexpr int64_t kLogClockAdjustmentStride = 1009;  // prime, to avoid periodicity
 constexpr zx::duration kLogClockAdjustmentPositionErrorThreshold = zx::nsec(500);
 constexpr int64_t kLogClockAdjustmentRateChangeThresholdPpm = 500;
@@ -26,37 +27,33 @@ constexpr int64_t kLogClockAdjustmentRateChangeThresholdPpm = 500;
 void LogClockAdjustment(const Clock& clock, std::optional<int32_t> last_rate_ppm,
                         int32_t next_rate_ppm, zx::duration pos_error,
                         const ::media::audio::clock::PidControl& pid) {
-  if constexpr (!kLogClockAdjustment) {
-    return;
-  }
+  if constexpr (kLogClockAdjustment) {
+    static std::atomic<int64_t> log_count(0);
 
-  static std::atomic<int64_t> log_count(0);
-
-  // If absolute error or rate change is large enough, then log now but reset our stride.
-  bool always_log = false;
-  if (std::abs(pos_error.to_nsecs()) >= kLogClockAdjustmentPositionErrorThreshold.to_nsecs() ||
-      (last_rate_ppm &&
-       std::abs(*last_rate_ppm - next_rate_ppm) >= kLogClockAdjustmentRateChangeThresholdPpm)) {
-    log_count.store(1);
-    always_log = true;
-  }
-
-  if (always_log || log_count.fetch_add(1) % kLogClockAdjustmentStride == 0) {
-    std::stringstream os;
-    os << (&clock) << " " << clock.name();
-    if (!last_rate_ppm) {
-      os << " set to (ppm)               " << std::setw(5) << next_rate_ppm;
-    } else if (next_rate_ppm != *last_rate_ppm) {
-      os << " change from (ppm) " << std::setw(5) << *last_rate_ppm << " to " << std::setw(5)
-         << next_rate_ppm;
-    } else {
-      os << " adjust_ppm remains (ppm)   " << std::setw(5) << *last_rate_ppm;
+    // If absolute error or rate change is large enough, then log now but reset our stride.
+    if (std::abs(pos_error.to_nsecs()) >= kLogClockAdjustmentPositionErrorThreshold.to_nsecs() ||
+        (last_rate_ppm &&
+         std::abs(*last_rate_ppm - next_rate_ppm) >= kLogClockAdjustmentRateChangeThresholdPpm)) {
+      log_count.store(0);
     }
-    if constexpr (kLogClockAdjustmentWithPidCoefficients) {
-      os << "; PID " << pid;
+
+    if (log_count.fetch_add(1) % kLogClockAdjustmentStride == 0) {
+      std::stringstream os;
+      os << (&clock) << " " << clock.name();
+      if (!last_rate_ppm) {
+        os << " set to (ppm)               " << std::setw(5) << next_rate_ppm;
+      } else if (next_rate_ppm != *last_rate_ppm) {
+        os << " change from (ppm) " << std::setw(5) << *last_rate_ppm << " to " << std::setw(5)
+           << next_rate_ppm;
+      } else {
+        os << " adjust_ppm remains (ppm)   " << std::setw(5) << *last_rate_ppm;
+      }
+      if constexpr (kLogClockAdjustmentWithPidCoefficients) {
+        os << "; PID " << pid;
+      }
+      os << "; src_pos_err " << pos_error.to_nsecs() << " ns";
+      FX_LOGS(INFO) << os.str();
     }
-    os << "; src_pos_err " << pos_error.to_nsecs() << " ns";
-    FX_LOGS(INFO) << os.str();
   }
 }
 
