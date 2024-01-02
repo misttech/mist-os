@@ -27,7 +27,7 @@ namespace flatland {
 
 namespace {
 
-using fhd_Transform = fuchsia::hardware::display::Transform;
+using fhd_Transform = fuchsia::hardware::display::types::Transform;
 
 // Debugging color used to highlight images that have gone through the GPU rendering path.
 const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
@@ -51,15 +51,15 @@ uint32_t BufferCollectionPixelFormatToImageType(const fuchsia::sysmem::PixelForm
   return fuchsia::hardware::display::types::TYPE_SIMPLE;
 }
 
-fuchsia::hardware::display::AlphaMode GetAlphaMode(
+fuchsia::hardware::display::types::AlphaMode GetAlphaMode(
     const fuchsia::ui::composition::BlendMode& blend_mode) {
-  fuchsia::hardware::display::AlphaMode alpha_mode;
+  fuchsia::hardware::display::types::AlphaMode alpha_mode;
   switch (blend_mode) {
     case fuchsia::ui::composition::BlendMode::SRC:
-      alpha_mode = fuchsia::hardware::display::AlphaMode::DISABLE;
+      alpha_mode = fuchsia::hardware::display::types::AlphaMode::DISABLE;
       break;
     case fuchsia::ui::composition::BlendMode::SRC_OVER:
-      alpha_mode = fuchsia::hardware::display::AlphaMode::PREMULTIPLIED;
+      alpha_mode = fuchsia::hardware::display::types::AlphaMode::PREMULTIPLIED;
       break;
   }
   return alpha_mode;
@@ -225,7 +225,7 @@ DisplayCompositor::~DisplayCompositor() {
   // Destroy all of the display layers.
   DiscardConfig();
   for (const auto& [_, data] : display_engine_data_map_) {
-    for (const fuchsia::hardware::display::LayerId& layer : data.layers) {
+    for (const fuchsia::hardware::display::types::LayerId& layer : data.layers) {
       (*display_coordinator_)->DestroyLayer(layer);
     }
     for (const auto& event_data : data.frame_event_datas) {
@@ -445,9 +445,9 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
   image_event_map_.erase(image_id);
 }
 
-fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
+fuchsia::hardware::display::types::LayerId DisplayCompositor::CreateDisplayLayer() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  fuchsia::hardware::display::LayerId layer_id;
+  fuchsia::hardware::display::types::LayerId layer_id;
   zx_status_t create_layer_status;
   const zx_status_t transport_status =
       (*display_coordinator_)->CreateLayer(&create_layer_status, &layer_id);
@@ -460,7 +460,7 @@ fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
 
 void DisplayCompositor::SetDisplayLayers(
     const fuchsia::hardware::display::types::DisplayId display_id,
-    const std::vector<fuchsia::hardware::display::LayerId>& layers) {
+    const std::vector<fuchsia::hardware::display::types::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
@@ -475,7 +475,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
 
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
-  const std::vector<fuchsia::hardware::display::LayerId>& layers =
+  const std::vector<fuchsia::hardware::display::types::LayerId>& layers =
       display_engine_data_map_.at(data.display_id.value).layers;
   if (layers.size() < num_images) {
     return false;
@@ -498,7 +498,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   }
 
   // We only set as many layers as needed for the images we have.
-  SetDisplayLayers(data.display_id, std::vector<fuchsia::hardware::display::LayerId>(
+  SetDisplayLayers(data.display_id, std::vector<fuchsia::hardware::display::types::LayerId>(
                                         layers.begin(), layers.begin() + num_images));
 
   for (uint32_t i = 0; i < num_images; i++) {
@@ -532,7 +532,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   return true;
 }
 
-void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerId layer_id,
+void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::types::LayerId layer_id,
                                         const ImageRect rectangle,
                                         const allocation::ImageMetadata image) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
@@ -569,7 +569,7 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerI
 #endif
 }
 
-void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerId layer_id,
+void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::types::LayerId layer_id,
                                         const ImageRect rectangle,
                                         const allocation::ImageMetadata image,
                                         const scenic_impl::DisplayEventId wait_id,
@@ -597,7 +597,7 @@ bool DisplayCompositor::CheckConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::CheckConfig");
   fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
+  std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
   (*display_coordinator_)->CheckConfig(/*discard*/ false, &result, &ops);
   return result == fuchsia::hardware::display::types::ConfigResult::OK;
 }
@@ -607,7 +607,7 @@ void DisplayCompositor::DiscardConfig() {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::DiscardConfig");
   pending_images_in_config_.clear();
   fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
+  std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
   (*display_coordinator_)->CheckConfig(/*discard*/ true, &result, &ops);
 }
 

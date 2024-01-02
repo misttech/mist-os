@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/transform.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 
 #include <gtest/gtest.h>
 
@@ -13,35 +13,39 @@ namespace display {
 namespace {
 
 TEST(Transform, FidlConversion) {
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kIdentity),
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kIdentity),
             Transform::kIdentity);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kReflectX),
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kReflectX),
             Transform::kReflectX);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kReflectY),
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kReflectY),
             Transform::kReflectY);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kRot90), Transform::kRot90);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kRot180), Transform::kRot180);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kRot270), Transform::kRot270);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kRot90ReflectX),
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kRot90),
+            Transform::kRot90);
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kRot180),
+            Transform::kRot180);
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kRot270),
+            Transform::kRot270);
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kRot90ReflectX),
             Transform::kRot90ReflectX);
-  EXPECT_EQ(ToTransform(fuchsia_hardware_display::wire::Transform::kRot90ReflectY),
+  EXPECT_EQ(ToTransform(fuchsia_hardware_display_types::wire::Transform::kRot90ReflectY),
             Transform::kRot90ReflectY);
 
   EXPECT_EQ(ToFidlTransform(Transform::kIdentity),
-            fuchsia_hardware_display::wire::Transform::kIdentity);
+            fuchsia_hardware_display_types::wire::Transform::kIdentity);
   EXPECT_EQ(ToFidlTransform(Transform::kReflectX),
-            fuchsia_hardware_display::wire::Transform::kReflectX);
+            fuchsia_hardware_display_types::wire::Transform::kReflectX);
   EXPECT_EQ(ToFidlTransform(Transform::kReflectY),
-            fuchsia_hardware_display::wire::Transform::kReflectY);
-  EXPECT_EQ(ToFidlTransform(Transform::kRot90), fuchsia_hardware_display::wire::Transform::kRot90);
+            fuchsia_hardware_display_types::wire::Transform::kReflectY);
+  EXPECT_EQ(ToFidlTransform(Transform::kRot90),
+            fuchsia_hardware_display_types::wire::Transform::kRot90);
   EXPECT_EQ(ToFidlTransform(Transform::kRot180),
-            fuchsia_hardware_display::wire::Transform::kRot180);
+            fuchsia_hardware_display_types::wire::Transform::kRot180);
   EXPECT_EQ(ToFidlTransform(Transform::kRot270),
-            fuchsia_hardware_display::wire::Transform::kRot270);
+            fuchsia_hardware_display_types::wire::Transform::kRot270);
   EXPECT_EQ(ToFidlTransform(Transform::kRot90ReflectX),
-            fuchsia_hardware_display::wire::Transform::kRot90ReflectX);
+            fuchsia_hardware_display_types::wire::Transform::kRot90ReflectX);
   EXPECT_EQ(ToFidlTransform(Transform::kRot90ReflectY),
-            fuchsia_hardware_display::wire::Transform::kRot90ReflectY);
+            fuchsia_hardware_display_types::wire::Transform::kRot90ReflectY);
 }
 
 TEST(Transform, BanjoConversion) {

@@ -6,7 +6,7 @@
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_TYPES_H_
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -41,8 +41,8 @@ struct RenderData {
 // of the image and the dst frame represents the position in screen space that
 // the layer will be placed.
 struct DisplaySrcDstFrames {
-  fuchsia::hardware::display::Frame src;
-  fuchsia::hardware::display::Frame dst;
+  fuchsia::hardware::display::types::Frame src;
+  fuchsia::hardware::display::types::Frame dst;
 
   // When setting an image on a layer in the display, you have to specify the "source"
   // and "destination", where the source represents the pixel offsets and dimensions to
@@ -56,7 +56,7 @@ struct DisplaySrcDstFrames {
 
 // Converts a flatland |Orientation| and |ImageFlip| value to the appropriate hardware display
 // transform enum.
-fuchsia::hardware::display::Transform GetDisplayTransformFromOrientationAndFlip(
+fuchsia::hardware::display::types::Transform GetDisplayTransformFromOrientationAndFlip(
     fuchsia::ui::composition::Orientation orientation,
     fuchsia::ui::composition::ImageFlip image_flip);
 

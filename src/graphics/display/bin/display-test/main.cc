@@ -208,14 +208,14 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   if (layer_change) {
     current_layers->swap(new_layers);
 
-    std::vector<fhd::wire::LayerId> current_layers_fidl_id;
+    std::vector<fhdt::wire::LayerId> current_layers_fidl_id;
     current_layers_fidl_id.reserve(current_layers->size());
     for (const display::LayerId& layer_id : *current_layers) {
       current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
     }
     if (!dc->SetDisplayLayers(
                ToFidlDisplayId(display.id()),
-               fidl::VectorView<fhd::wire::LayerId>::FromExternal(current_layers_fidl_id))
+               fidl::VectorView<fhdt::wire::LayerId>::FromExternal(current_layers_fidl_id))
              .ok()) {
       printf("Failed to set layers\n");
       return false;

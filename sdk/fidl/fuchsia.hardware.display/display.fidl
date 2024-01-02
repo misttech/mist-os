@@ -47,7 +47,7 @@ type Mode = struct {
 type Info = struct {
     /// Uniquely identifies the display in a Controller connection.
     ///
-    /// See [`fuchsia.hardware.types.DisplayId`].
+    /// See [`fuchsia.hardware.display.types/DisplayId`].
     id fuchsia.hardware.display.types.DisplayId;
 
     /// Operational modes supported by the described display device.

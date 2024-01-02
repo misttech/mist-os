@@ -41,7 +41,7 @@ FIDL generated code:
 - FIDL uses unsigned numeric types for non-negative quantities. This library
   uses signed types for values that may be involved in arithmetic operations,
   so we can lean on UBSan for overflow detection. For a concrete example,
-  compare `display::Frame` with its associated `fuchsia.hardware.display/Frame`
+  compare `display::Frame` with its associated `fuchsia.hardware.display.types/Frame`
   FIDL type.
 
 - No comparison or arithmetics operators. As a minimum bar, this library

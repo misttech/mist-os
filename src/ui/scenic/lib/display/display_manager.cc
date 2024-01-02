@@ -72,7 +72,10 @@ void DisplayManager::OnDisplaysChanged(
       if (i_can_haz_display_mode_.has_value()) {
         if (*i_can_haz_display_mode_ < display.modes.size()) {
           mode_idx = *i_can_haz_display_mode_;
-          (*default_display_coordinator_)->SetDisplayMode(display.id, display.modes[mode_idx]);
+          (*default_display_coordinator_)
+              ->SetDisplayMode(
+                  fuchsia::hardware::display::types::DisplayId{.value = display.id.value},
+                  display.modes[mode_idx]);
           (*default_display_coordinator_)->ApplyConfig();
         } else {
           FX_LOGS(ERROR) << "Requested display mode=" << *i_can_haz_display_mode_

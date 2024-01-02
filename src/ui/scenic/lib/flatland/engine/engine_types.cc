@@ -10,20 +10,20 @@ namespace {
 
 using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
-using fhd_Transform = fuchsia::hardware::display::Transform;
+using fhd_Transform = fuchsia::hardware::display::types::Transform;
 
 }  // namespace
 namespace flatland {
 
 DisplaySrcDstFrames DisplaySrcDstFrames::New(ImageRect rectangle, allocation::ImageMetadata image) {
-  fuchsia::hardware::display::Frame src_frame = {
+  fuchsia::hardware::display::types::Frame src_frame = {
       .x_pos = static_cast<uint32_t>(rectangle.texel_uvs[0].x),
       .y_pos = static_cast<uint32_t>(rectangle.texel_uvs[0].y),
       .width = static_cast<uint32_t>(rectangle.texel_uvs[2].x - rectangle.texel_uvs[0].x),
       .height = static_cast<uint32_t>(rectangle.texel_uvs[2].y - rectangle.texel_uvs[0].y),
   };
 
-  fuchsia::hardware::display::Frame dst_frame = {
+  fuchsia::hardware::display::types::Frame dst_frame = {
       .x_pos = static_cast<uint32_t>(rectangle.origin.x),
       .y_pos = static_cast<uint32_t>(rectangle.origin.y),
       .width = static_cast<uint32_t>(rectangle.extent.x),
@@ -32,7 +32,7 @@ DisplaySrcDstFrames DisplaySrcDstFrames::New(ImageRect rectangle, allocation::Im
   return {.src = src_frame, .dst = dst_frame};
 }
 
-fuchsia::hardware::display::Transform GetDisplayTransformFromOrientationAndFlip(
+fuchsia::hardware::display::types::Transform GetDisplayTransformFromOrientationAndFlip(
     Orientation orientation, ImageFlip image_flip) {
   // For flatland, image flips occur before any parent Transform geometric attributes (such as
   // rotation). However, for the display controller, the reflection specified in the Transform is

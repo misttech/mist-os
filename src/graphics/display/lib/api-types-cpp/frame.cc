@@ -4,13 +4,14 @@
 
 #include "src/graphics/display/lib/api-types-cpp/frame.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <zircon/assert.h>
 
 #include <limits>
 
 namespace display {
 
-Frame ToFrame(const fuchsia_hardware_display::wire::Frame& frame_fidl) {
+Frame ToFrame(const fuchsia_hardware_display_types::wire::Frame& frame_fidl) {
   ZX_DEBUG_ASSERT(frame_fidl.x_pos <= std::numeric_limits<int32_t>::max());
   ZX_DEBUG_ASSERT(frame_fidl.y_pos <= std::numeric_limits<int32_t>::max());
   ZX_DEBUG_ASSERT(frame_fidl.width <= std::numeric_limits<int32_t>::max());
@@ -36,12 +37,12 @@ Frame ToFrame(const frame_t& frame_banjo) {
   };
 }
 
-fuchsia_hardware_display::wire::Frame ToFidlFrame(const Frame& frame) {
+fuchsia_hardware_display_types::wire::Frame ToFidlFrame(const Frame& frame) {
   ZX_DEBUG_ASSERT(frame.x_pos >= 0);
   ZX_DEBUG_ASSERT(frame.y_pos >= 0);
   ZX_DEBUG_ASSERT(frame.width >= 0);
   ZX_DEBUG_ASSERT(frame.height >= 0);
-  return fuchsia_hardware_display::wire::Frame{
+  return fuchsia_hardware_display_types::wire::Frame{
       .x_pos = static_cast<uint32_t>(frame.x_pos),
       .y_pos = static_cast<uint32_t>(frame.y_pos),
       .width = static_cast<uint32_t>(frame.width),

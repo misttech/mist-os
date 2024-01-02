@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
@@ -20,7 +19,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
-namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display {
@@ -259,15 +257,16 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageConfig image_config) {
   config_change_ = true;
 }
 
-void Layer::SetPrimaryPosition(fhd::wire::Transform transform, fhd::wire::Frame src_frame,
-                               fhd::wire::Frame dest_frame) {
+void Layer::SetPrimaryPosition(fhdt::wire::Transform transform, fhdt::wire::Frame src_frame,
+                               fhdt::wire::Frame dest_frame) {
   primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
 
-  static_assert(sizeof(fhd::wire::Frame) == sizeof(frame_t), "Struct mismatch");
-  static_assert(offsetof(fhd::wire::Frame, x_pos) == offsetof(frame_t, x_pos), "Struct mismatch");
-  static_assert(offsetof(fhd::wire::Frame, y_pos) == offsetof(frame_t, y_pos), "Struct mismatch");
-  static_assert(offsetof(fhd::wire::Frame, width) == offsetof(frame_t, width), "Struct mismatch");
-  static_assert(offsetof(fhd::wire::Frame, height) == offsetof(frame_t, height), "Struct mismatch");
+  static_assert(sizeof(fhdt::wire::Frame) == sizeof(frame_t), "Struct mismatch");
+  static_assert(offsetof(fhdt::wire::Frame, x_pos) == offsetof(frame_t, x_pos), "Struct mismatch");
+  static_assert(offsetof(fhdt::wire::Frame, y_pos) == offsetof(frame_t, y_pos), "Struct mismatch");
+  static_assert(offsetof(fhdt::wire::Frame, width) == offsetof(frame_t, width), "Struct mismatch");
+  static_assert(offsetof(fhdt::wire::Frame, height) == offsetof(frame_t, height),
+                "Struct mismatch");
 
   memcpy(&primary_layer->src_frame, &src_frame, sizeof(frame_t));
   memcpy(&primary_layer->dest_frame, &dest_frame, sizeof(frame_t));
@@ -276,14 +275,14 @@ void Layer::SetPrimaryPosition(fhd::wire::Transform transform, fhd::wire::Frame 
   config_change_ = true;
 }
 
-void Layer::SetPrimaryAlpha(fhd::wire::AlphaMode mode, float val) {
+void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
   primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
 
-  static_assert(static_cast<alpha_t>(fhd::wire::AlphaMode::kDisable) == ALPHA_DISABLE,
+  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kDisable) == ALPHA_DISABLE,
                 "Bad constant");
-  static_assert(static_cast<alpha_t>(fhd::wire::AlphaMode::kPremultiplied) == ALPHA_PREMULTIPLIED,
+  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kPremultiplied) == ALPHA_PREMULTIPLIED,
                 "Bad constant");
-  static_assert(static_cast<alpha_t>(fhd::wire::AlphaMode::kHwMultiply) == ALPHA_HW_MULTIPLY,
+  static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kHwMultiply) == ALPHA_HW_MULTIPLY,
                 "Bad constant");
 
   primary_layer->alpha_mode = static_cast<alpha_t>(mode);

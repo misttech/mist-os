@@ -25,8 +25,8 @@ typedef struct custom_layer {
 
   bool done;
 
-  fuchsia_hardware_display::wire::Frame src;
-  fuchsia_hardware_display::wire::Frame dest;
+  fuchsia_hardware_display_types::wire::Frame src;
+  fuchsia_hardware_display_types::wire::Frame dest;
 
   image_import_t import_info[2];
 } custom_layer_t;
@@ -177,9 +177,9 @@ class PrimaryLayer : public VirtualLayer {
   uint32_t fgcolor_;
   uint32_t bgcolor_;
 
-  fuchsia_hardware_display::wire::Frame src_frame_ = {};
-  fuchsia_hardware_display::wire::Frame dest_frame_ = {};
-  typedef fuchsia_hardware_display::wire::Transform Transform;
+  fuchsia_hardware_display_types::wire::Frame src_frame_ = {};
+  fuchsia_hardware_display_types::wire::Frame dest_frame_ = {};
+  typedef fuchsia_hardware_display_types::wire::Transform Transform;
   Transform rotation_ = Transform::kIdentity;
   bool layer_flipping_ = false;
   bool pan_src_ = false;

@@ -74,10 +74,10 @@ class DisplayTest : public gtest::RealLoopFixture {
     gtest::RealLoopFixture::TearDown();
   }
 
-  fuchsia::hardware::display::LayerId InitializeDisplayLayer(
+  fuchsia::hardware::display::types::LayerId InitializeDisplayLayer(
       fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       scenic_impl::display::Display* display) {
-    fuchsia::hardware::display::LayerId layer_id;
+    fuchsia::hardware::display::types::LayerId layer_id;
     zx_status_t create_layer_status;
     zx_status_t transport_status =
         display_coordinator->CreateLayer(&create_layer_status, &layer_id);
@@ -224,7 +224,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto display = display_manager_->default_display();
   ASSERT_TRUE(display);
 
-  fuchsia::hardware::display::LayerId layer_id =
+  fuchsia::hardware::display::types::LayerId layer_id =
       InitializeDisplayLayer(*display_coordinator.get(), display);
   ASSERT_NE(layer_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
 
@@ -300,7 +300,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Apply the config.
   fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
+  std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
   (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
   EXPECT_EQ(result, fuchsia::hardware::display::types::ConfigResult::OK);
   status = (*display_coordinator.get())->ApplyConfig();

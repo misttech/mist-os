@@ -471,7 +471,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
     TearDown();
     return;
   }
-  if (request->transform > fhd::wire::Transform::kRot90ReflectY) {
+  if (request->transform > fhdt::wire::Transform::kRot90ReflectY) {
     zxlogf(ERROR, "Invalid transform %hhu", static_cast<uint8_t>(request->transform));
     TearDown();
     return;
@@ -495,7 +495,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
     return;
   }
 
-  if (request->mode > fhd::wire::AlphaMode::kHwMultiply ||
+  if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
       (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
     zxlogf(ERROR, "Invalid args %hhu %f", static_cast<uint8_t>(request->mode), request->val);
     TearDown();
@@ -621,7 +621,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
 
 void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
   fhdt::wire::ConfigResult res;
-  std::vector<fhd::wire::ClientCompositionOp> ops;
+  std::vector<fhdt::wire::ClientCompositionOp> ops;
 
   pending_config_valid_ = CheckConfig(&res, &ops);
 
@@ -629,7 +629,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
     DiscardConfig();
   }
 
-  completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
+  completer.Reply(res, ::fidl::VectorView<fhdt::wire::ClientCompositionOp>::FromExternal(ops));
 }
 
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
@@ -862,7 +862,7 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
 }
 
 bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
-                         std::vector<fhd::wire::ClientCompositionOp>* ops) {
+                         std::vector<fhdt::wire::ClientCompositionOp>* ops) {
   if (res && ops) {
     *res = fhdt::wire::ConfigResult::kOk;
     ops->clear();
@@ -1027,10 +1027,10 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
-          ops->emplace_back(fhd::wire::ClientCompositionOp{
+          ops->emplace_back(fhdt::wire::ClientCompositionOp{
               .display_id = ToFidlDisplayId(display_config.id),
               .layer_id = ToFidlLayerId(layer_id),
-              .opcode = static_cast<fhd::wire::ClientCompositionOpcode>(i),
+              .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
           });
         }
       }
@@ -1821,28 +1821,29 @@ ClientProxy::~ClientProxy() {
 // the long term, these two types should be unified.
 namespace {
 
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientUsePrimary)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUsePrimary)) ==
                   CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientMergeBase)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeBase)) ==
                   CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientMergeSrc)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeSrc)) ==
                   CLIENT_COMPOSITION_OPCODE_MERGE_SRC,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientFrameScale)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientFrameScale)) ==
                   CLIENT_COMPOSITION_OPCODE_FRAME_SCALE,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientSrcFrame)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientSrcFrame)) ==
                   CLIENT_COMPOSITION_OPCODE_SRC_FRAME,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientTransform)) ==
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientTransform)) ==
                   CLIENT_COMPOSITION_OPCODE_TRANSFORM,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientColorConversion)) ==
-                  CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientAlpha)) ==
+static_assert(
+    (1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientColorConversion)) ==
+        CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION,
+    "Const mismatch");
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientAlpha)) ==
                   CLIENT_COMPOSITION_OPCODE_ALPHA,
               "Const mismatch");
 

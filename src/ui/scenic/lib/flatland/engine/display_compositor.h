@@ -155,7 +155,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     fuchsia::hardware::display::types::ConfigResult result;
     // If the config is invalid, this vector will list all the operations
     // that need to be performed to make the config valid again.
-    std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
+    std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
   };
 
   struct FrameEventData {
@@ -172,7 +172,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct DisplayEngineData {
     // The hardware layers we've created to use on this display.
-    std::vector<fuchsia::hardware::display::LayerId> layers;
+    std::vector<fuchsia::hardware::display::types::LayerId> layers;
 
     // The number of vmos we are using in the case of software composition
     // (1 for each render target).
@@ -213,7 +213,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
   // to reference that layer in the display coordinator API.
-  fuchsia::hardware::display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia::hardware::display::types::LayerId CreateDisplayLayer()
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
   fuchsia::sysmem::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
@@ -238,15 +239,15 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Sets the provided layers onto the display referenced by the given display_id.
   void SetDisplayLayers(fuchsia::hardware::display::types::DisplayId display_id,
-                        const std::vector<fuchsia::hardware::display::LayerId>& layers)
+                        const std::vector<fuchsia::hardware::display::types::LayerId>& layers)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerColor(fuchsia::hardware::display::types::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerImage(fuchsia::hardware::display::types::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
                        scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 

@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/alpha-mode.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 
 #include <gtest/gtest.h>
 
@@ -13,18 +13,19 @@ namespace display {
 namespace {
 
 TEST(AlphaMode, FidlConversion) {
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display::wire::AlphaMode::kDisable), AlphaMode::kDisable);
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display::wire::AlphaMode::kPremultiplied),
+  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kDisable),
+            AlphaMode::kDisable);
+  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied),
             AlphaMode::kPremultiplied);
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display::wire::AlphaMode::kHwMultiply),
+  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kHwMultiply),
             AlphaMode::kHwMultiply);
 
   EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kDisable),
-            fuchsia_hardware_display::wire::AlphaMode::kDisable);
+            fuchsia_hardware_display_types::wire::AlphaMode::kDisable);
   EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kPremultiplied),
-            fuchsia_hardware_display::wire::AlphaMode::kPremultiplied);
+            fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied);
   EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kHwMultiply),
-            fuchsia_hardware_display::wire::AlphaMode::kHwMultiply);
+            fuchsia_hardware_display_types::wire::AlphaMode::kHwMultiply);
 }
 
 TEST(AlphaMode, BanjoConversion) {

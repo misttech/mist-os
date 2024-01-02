@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+
 #include <cstdint>
 
 #include <gtest/gtest.h>
@@ -51,10 +53,10 @@ TEST(LayerIdTest, ToFidlLayerId) {
             ToFidlLayerId(kInvalidLayerId).value);
 }
 TEST(LayerIdTest, ToLayerIdWithFidlValue) {
-  EXPECT_EQ(kOne, ToLayerId(fuchsia_hardware_display::wire::LayerId{1}));
-  EXPECT_EQ(kTwo, ToLayerId(fuchsia_hardware_display::wire::LayerId{2}));
-  EXPECT_EQ(kLargeId, ToLayerId(fuchsia_hardware_display::wire::LayerId{kLargeIdValue}));
-  EXPECT_EQ(kInvalidLayerId, ToLayerId(fuchsia_hardware_display::wire::LayerId{
+  EXPECT_EQ(kOne, ToLayerId(fuchsia_hardware_display_types::wire::LayerId{1}));
+  EXPECT_EQ(kTwo, ToLayerId(fuchsia_hardware_display_types::wire::LayerId{2}));
+  EXPECT_EQ(kLargeId, ToLayerId(fuchsia_hardware_display_types::wire::LayerId{kLargeIdValue}));
+  EXPECT_EQ(kInvalidLayerId, ToLayerId(fuchsia_hardware_display_types::wire::LayerId{
                                  fuchsia_hardware_display_types::wire::kInvalidDispId}));
 }
 

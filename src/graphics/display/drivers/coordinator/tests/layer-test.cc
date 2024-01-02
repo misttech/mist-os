@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/defer.h>
 
@@ -22,7 +21,6 @@
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display {
@@ -66,10 +64,10 @@ TEST_F(LayerTest, PrimaryBasic) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhdt::wire::kTypeSimple};
-  fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
-  layer.SetPrimaryAlpha(fhd::wire::AlphaMode::kDisable, 0);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
   layer.SetImage(image, kInvalidEventId, kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
@@ -88,10 +86,10 @@ TEST_F(LayerTest, CleanUpImage) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhdt::wire::kTypeSimple};
-  fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
-  layer.SetPrimaryAlpha(fhd::wire::AlphaMode::kDisable, 0);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
   layer.SetImage(displayed_image, kInvalidEventId, kInvalidEventId);
@@ -161,10 +159,10 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhdt::wire::kTypeSimple};
-  fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
-  layer.SetPrimaryAlpha(fhd::wire::AlphaMode::kDisable, 0);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up images, which doesn't change the current config.
   {
@@ -208,10 +206,10 @@ TEST_F(LayerTest, CleanUpAllImages) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhdt::wire::kTypeSimple};
-  fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
-  layer.SetPrimaryAlpha(fhd::wire::AlphaMode::kDisable, 0);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
   layer.SetImage(displayed_image, kInvalidEventId, kInvalidEventId);
@@ -258,10 +256,10 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhdt::wire::kTypeSimple};
-  fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
-  layer.SetPrimaryAlpha(fhd::wire::AlphaMode::kDisable, 0);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up all images, which doesn't change the current config.
   {

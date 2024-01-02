@@ -6,6 +6,7 @@
 #define SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_DISPLAY_H_
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -59,7 +60,8 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   uint32_t height_ = 0;
   fuchsia::hardware::display::types::DisplayId display_id_ = {
       .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-  fuchsia::hardware::display::LayerId layer_id_{fuchsia::hardware::display::types::INVALID_DISP_ID};
+  fuchsia::hardware::display::types::LayerId layer_id_{
+      fuchsia::hardware::display::types::INVALID_DISP_ID};
   fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;

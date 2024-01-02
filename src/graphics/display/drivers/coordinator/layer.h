@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <zircon/types.h>
 
@@ -99,10 +98,10 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   bool AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_index);
 
   void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageConfig image_config);
-  void SetPrimaryPosition(fuchsia_hardware_display::wire::Transform transform,
-                          fuchsia_hardware_display::wire::Frame src_frame,
-                          fuchsia_hardware_display::wire::Frame dest_frame);
-  void SetPrimaryAlpha(fuchsia_hardware_display::wire::AlphaMode mode, float val);
+  void SetPrimaryPosition(fuchsia_hardware_display_types::wire::Transform transform,
+                          fuchsia_hardware_display_types::wire::Frame src_frame,
+                          fuchsia_hardware_display_types::wire::Frame dest_frame);
+  void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
   void SetCursorConfig(fuchsia_hardware_display_types::wire::ImageConfig image_config);
   void SetCursorPosition(int32_t x, int32_t y);
   void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,

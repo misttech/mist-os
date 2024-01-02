@@ -1,11 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.display;
+library fuchsia.hardware.display.types;
 
-using fuchsia.hardware.display.types;
-
-/// Type of the internal value in [`fuchsia.hardware.display/LayerId`].
+/// Type of the internal value in [`fuchsia.hardware.display.types/LayerId`].
 alias LayerIdValue = uint64;
 
 /// Identifies a layer resource owned by a Display Coordinator client.
@@ -43,17 +41,17 @@ type Transform = strict enum : uint8 {
 };
 
 type AlphaMode = strict enum : uint8 {
-    // Alpha is disabled for the plane (default).
+    /// Alpha is disabled for the plane (default).
     DISABLE = 0;
-    // Plane alpha is premultiplied.
+    /// Plane alpha is premultiplied.
     PREMULTIPLIED = 1;
-    // Hardware should multiply the alpha and color channels when blending.
+    /// Hardware should multiply the alpha and color channels when blending.
     HW_MULTIPLY = 2;
 };
 
 type Frame = struct {
-    // (x_pos, y_pos) specifies the position of the upper-left corner
-    // of the frame.
+    /// (x_pos, y_pos) specifies the position of the upper-left corner
+    /// of the frame.
     x_pos uint32;
     y_pos uint32;
     width uint32;
@@ -61,37 +59,37 @@ type Frame = struct {
 };
 
 type ClientCompositionOpcode = strict enum : uint8 {
-    // The client should convert the corresponding layer to a primary layer.
+    /// The client should convert the corresponding layer to a primary layer.
     CLIENT_USE_PRIMARY = 0;
-    // The client should compose all layers with CLIENT_MERGE_BASE and CLIENT_MERGE_SRC
-    // into a new, single primary layer at the CLIENT_MERGE_BASE layer's z-order. The
-    // driver must accept a fullscreen layer with the default pixel format, but may
-    // accept other layer parameters.
-    //
-    // CLIENT_MERGE_BASE will only be set on one layer per display.
+    /// The client should compose all layers with CLIENT_MERGE_BASE and CLIENT_MERGE_SRC
+    /// into a new, single primary layer at the CLIENT_MERGE_BASE layer's z-order. The
+    /// driver must accept a fullscreen layer with the default pixel format, but may
+    /// accept other layer parameters.
+    ///
+    /// CLIENT_MERGE_BASE will only be set on one layer per display.
     CLIENT_MERGE_BASE = 1;
-    // See CLIENT_MERGE_BASE.
+    /// See CLIENT_MERGE_BASE.
     CLIENT_MERGE_SRC = 2;
-    // The client should provide a new image produced by scaling the source image
-    // such that the dimensions of the new image's src_frame and dest_frame are
-    // equal to the dimensions of the current image's dest_frame.
+    /// The client should provide a new image produced by scaling the source image
+    /// such that the dimensions of the new image's src_frame and dest_frame are
+    /// equal to the dimensions of the current image's dest_frame.
     CLIENT_FRAME_SCALE = 3;
-    // The client should provide a new image produced by clipping the source image
-    // to the region specified by src_frame.
+    /// The client should provide a new image produced by clipping the source image
+    /// to the region specified by src_frame.
     CLIENT_SRC_FRAME = 4;
-    // The client should provide a new image produced by applying the desired
-    // transformation, so that TRANSFORM_IDENTITY can be specified.
+    /// The client should provide a new image produced by applying the desired
+    /// transformation, so that TRANSFORM_IDENTITY can be specified.
     CLIENT_TRANSFORM = 5;
-    // The client should apply the color conversion itself.
+    /// The client should apply the color conversion itself.
     CLIENT_COLOR_CONVERSION = 6;
-    // The client should apply the alpha itself.
+    /// The client should apply the alpha itself.
     CLIENT_ALPHA = 7;
 };
 
 type ClientCompositionOp = struct {
     /// display_id and layer_id uniquely identify the subject of the
     /// opcode.
-    display_id fuchsia.hardware.display.types.DisplayId;
+    display_id DisplayId;
 
     /// Invalid for issues that aren't scoped to a specific layer, such as
     /// unsupported color conversion tables.

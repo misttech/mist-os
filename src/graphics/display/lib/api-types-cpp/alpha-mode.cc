@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/alpha-mode.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <zircon/assert.h>
 
@@ -13,7 +13,7 @@
 
 namespace display {
 
-AlphaMode ToAlphaMode(fuchsia_hardware_display::wire::AlphaMode alpha_mode_fidl) {
+AlphaMode ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode alpha_mode_fidl) {
   return alpha_mode_fidl;
 }
 
@@ -31,7 +31,7 @@ AlphaMode ToAlphaMode(alpha_t alpha_banjo) {
   }
 }
 
-fuchsia_hardware_display::wire::AlphaMode ToFidlAlphaMode(AlphaMode alpha_mode) {
+fuchsia_hardware_display_types::wire::AlphaMode ToFidlAlphaMode(AlphaMode alpha_mode) {
   return alpha_mode;
 }
 

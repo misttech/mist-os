@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/frame.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 
 #include <gtest/gtest.h>
 
@@ -13,7 +13,7 @@ namespace display {
 namespace {
 
 TEST(Frame, FidlConversion) {
-  fuchsia_hardware_display::wire::Frame fidl_from = {
+  fuchsia_hardware_display_types::wire::Frame fidl_from = {
       .x_pos = 1,
       .y_pos = 2,
       .width = 3,
@@ -26,7 +26,7 @@ TEST(Frame, FidlConversion) {
   EXPECT_EQ(frame.width, 3);
   EXPECT_EQ(frame.height, 4);
 
-  fuchsia_hardware_display::wire::Frame fidl_to = ToFidlFrame(frame);
+  fuchsia_hardware_display_types::wire::Frame fidl_to = ToFidlFrame(frame);
   EXPECT_EQ(fidl_to.x_pos, 1u);
   EXPECT_EQ(fidl_to.y_pos, 2u);
   EXPECT_EQ(fidl_to.width, 3u);

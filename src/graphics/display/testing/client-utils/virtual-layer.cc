@@ -57,8 +57,8 @@ static uint32_t get_fg_color() {
 }
 
 // Checks if two rectangles intersect, and if so, returns their intersection.
-static bool compute_intersection(const fhd::wire::Frame& a, const fhd::wire::Frame& b,
-                                 fhd::wire::Frame* intersection) {
+static bool compute_intersection(const fhdt::wire::Frame& a, const fhdt::wire::Frame& b,
+                                 fhdt::wire::Frame* intersection) {
   uint32_t left = std::max(a.x_pos, b.x_pos);
   uint32_t right = std::min(a.x_pos + a.width, b.x_pos + b.width);
   uint32_t top = std::max(a.y_pos, b.y_pos);
@@ -183,7 +183,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     fhdt::wire::ImageConfig image_config;
     images_[0]->GetConfig(&image_config);
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
@@ -192,7 +192,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     auto set_alpha_result = dc->SetLayerPrimaryAlpha(
         fidl_layer_id,
-        alpha_enable_ ? fhd::wire::AlphaMode::kHwMultiply : fhd::wire::AlphaMode::kDisable,
+        alpha_enable_ ? fhdt::wire::AlphaMode::kHwMultiply : fhdt::wire::AlphaMode::kDisable,
         alpha_val_);
     if (!set_alpha_result.ok()) {
       printf("Setting layer alpha config failed\n");
@@ -252,7 +252,7 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
     }
   }
 
-  fhd::wire::Frame display = {};
+  fhdt::wire::Frame display = {};
   for (unsigned i = 0; i < displays_.size(); i++) {
     display.height = displays_[i]->mode().vertical_resolution;
     display.width = displays_[i]->mode().horizontal_resolution;
@@ -334,7 +334,7 @@ void PrimaryLayer::Render(int32_t frame_num) {
 
 void PrimaryLayer::SetLayerPositions(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   for (auto& layer : layers_) {
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     ZX_ASSERT(dc->SetLayerPrimaryPosition(fidl_layer_id, rotation_, layer.src, layer.dest).ok());
   }
 }
@@ -343,7 +343,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
                                   bool alt_image) {
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     const fhdt::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
@@ -408,7 +408,7 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     image_config.width = info.width;
     image_config.type = fhdt::wire::kTypeSimple;
 
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerCursorConfig(fidl_layer_id, image_config);
     if (!result.ok()) {
       printf("Setting layer config failed\n");
@@ -431,7 +431,7 @@ void CursorLayer::StepLayout(int32_t frame_num) {
 void CursorLayer::SendLayout(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   uint32_t display_start = 0;
   for (unsigned i = 0; i < displays_.size(); i++) {
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layers_[i].id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layers_[i].id);
     ZX_ASSERT(dc->SetLayerCursorPosition(fidl_layer_id, x_pos_ - display_start, y_pos_).ok());
     display_start += displays_[i]->mode().horizontal_resolution;
   }
@@ -458,7 +458,7 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     uint8_t data[kColorLayerBytesPerPixel];
     *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
 
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerColorConfig(
         fidl_layer_id, kColorLayerFormat,
         ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));

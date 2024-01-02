@@ -316,7 +316,7 @@ type ConfigCheckResult = strict enum : uint32 {
 /// single Layer.
 ///
 /// Individual bit positions map to the values of the FIDL enum
-/// [`fuchsia.hardware.display/ClientCompositionOpcode`].
+/// [`fuchsia.hardware.display.types/ClientCompositionOpcode`].
 type ClientCompositionOpcode = strict bits : uint32 {
     /// The client should convert the corresponding layer to a primary layer.
     USE_PRIMARY = 0x1;

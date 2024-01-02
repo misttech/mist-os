@@ -355,7 +355,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
   bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res,
-                   std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
+                   std::vector<fuchsia_hardware_display_types::wire::ClientCompositionOp>* ops);
 
   // The state of the FIDL binding. See comments on
   // |DisplayControllerBindingState|.

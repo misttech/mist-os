@@ -28,12 +28,13 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, ImportEvent, (zx::event, fuchsia::hardware::display::EventId));
 
   MOCK_METHOD(void, SetLayerColorConfig,
-              (fuchsia::hardware::display::LayerId, fuchsia::images2::PixelFormat,
+              (fuchsia::hardware::display::types::LayerId, fuchsia::images2::PixelFormat,
                std::vector<uint8_t>));
 
   MOCK_METHOD(void, SetLayerImage,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::ImageId,
-               fuchsia::hardware::display::EventId, fuchsia::hardware::display::EventId));
+              (fuchsia::hardware::display::types::LayerId,
+               fuchsia::hardware::display::types::ImageId, fuchsia::hardware::display::EventId,
+               fuchsia::hardware::display::EventId));
 
   MOCK_METHOD(void, ApplyConfig, ());
 
@@ -60,23 +61,25 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::types::ImageId));
 
   MOCK_METHOD(void, SetLayerPrimaryConfig,
-              (fuchsia::hardware::display::LayerId,
+              (fuchsia::hardware::display::types::LayerId,
                fuchsia::hardware::display::types::ImageConfig));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::Transform,
-               fuchsia::hardware::display::Frame, fuchsia::hardware::display::Frame));
+              (fuchsia::hardware::display::types::LayerId,
+               fuchsia::hardware::display::types::Transform,
+               fuchsia::hardware::display::types::Frame, fuchsia::hardware::display::types::Frame));
 
   MOCK_METHOD(void, SetLayerPrimaryAlpha,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::AlphaMode, float));
+              (fuchsia::hardware::display::types::LayerId,
+               fuchsia::hardware::display::types::AlphaMode, float));
 
   MOCK_METHOD(void, CreateLayer, (CreateLayerCallback));
 
-  MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::LayerId));
+  MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::types::LayerId));
 
   MOCK_METHOD(void, SetDisplayLayers,
               (fuchsia::hardware::display::types::DisplayId,
-               ::std::vector<fuchsia::hardware::display::LayerId>));
+               ::std::vector<fuchsia::hardware::display::types::LayerId>));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
               (fuchsia::hardware::display::types::DisplayId, (std::array<float, 3>),

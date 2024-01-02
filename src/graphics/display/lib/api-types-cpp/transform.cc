@@ -4,8 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/transform.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <zircon/assert.h>
 
 #include <limits>
@@ -13,7 +12,7 @@
 
 namespace display {
 
-Transform ToTransform(fuchsia_hardware_display::wire::Transform transform_fidl) {
+Transform ToTransform(fuchsia_hardware_display_types::wire::Transform transform_fidl) {
   return transform_fidl;
 }
 
@@ -42,7 +41,9 @@ Transform ToTransform(frame_transform_t frame_transform_banjo) {
   }
 }
 
-fuchsia_hardware_display::wire::Transform ToFidlTransform(Transform transform) { return transform; }
+fuchsia_hardware_display_types::wire::Transform ToFidlTransform(Transform transform) {
+  return transform;
+}
 
 frame_transform_t ToBanjoFrameTransform(Transform transform) {
   switch (transform) {
