@@ -72,13 +72,9 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
-  shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
-      {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
-       gDevicetreeBoot.fdt.size_bytes()});
   shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
-  shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
-      {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
-       gDevicetreeBoot.fdt.size_bytes()});
+  shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(ktl::as_bytes(gDevicetreeBoot.fdt.fdt()));
+
   shim.Get<PlatformIdItem>().set_payload(kQemuPlatformId);
   shim.Get<BoardInfoItem>().set_payload(kQemuBoardInfo);
 
