@@ -23,6 +23,7 @@ fuchsia_test_component("audio-core-stress-tests-component") {
   component_name = "audio-core-stress-tests"
   manifest = "meta/audio-core-stress-tests.cml"
   deps = [ ":audio-core-stress-tests-bin" ]
+  test_type = "system"
 }
 
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
