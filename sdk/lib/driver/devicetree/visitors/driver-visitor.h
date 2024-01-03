@@ -55,7 +55,9 @@ class DriverVisitor : public Visitor {
     reference_parsers_.emplace_back(reference_parser);
   }
 
-  virtual zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) = 0;
+  virtual zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) {
+    return zx::ok();
+  }
 
   virtual zx::result<> DriverFinalizeNode(Node& node) { return zx::ok(); }
 

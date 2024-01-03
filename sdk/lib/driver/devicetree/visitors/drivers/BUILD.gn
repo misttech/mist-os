@@ -6,6 +6,7 @@ group("tests") {
   deps = [
     "gpio-controllers:tests",
     "interrupt-controllers:tests",
+    "registers:tests",
   ]
   testonly = true
 }
