@@ -5,8 +5,8 @@
 //! An event that can be signaled and waited on by multiple consumers.
 
 use {
+    fuchsia_sync::Mutex,
     futures::future::{FusedFuture, Future},
-    parking_lot::Mutex,
     slab::Slab,
     std::{
         fmt,

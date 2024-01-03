@@ -5,7 +5,7 @@
 use {
     crate::hanging_get::error::HangingGetServerError,
     core::hash::Hash,
-    parking_lot::Mutex,
+    fuchsia_sync::Mutex,
     std::{collections::HashMap, sync::Arc},
 };
 

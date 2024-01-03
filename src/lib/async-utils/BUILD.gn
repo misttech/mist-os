@@ -11,11 +11,11 @@ rustc_library("async-utils") {
   with_unit_tests = true
   deps = [
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:slab",
