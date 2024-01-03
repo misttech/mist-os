@@ -12,6 +12,7 @@
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
@@ -364,6 +365,14 @@ zx_status_t RdmaEngine::SetupRdma() {
 
   ResetRdmaTable();
 
+  auto start_thread = [](void* arg) { return static_cast<RdmaEngine*>(arg)->RdmaIrqThread(); };
+  status = thrd_status_to_zx_status(
+      thrd_create_with_name(&rdma_irq_thread_, start_thread, this, "rdma_irq_thread"));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not create rdma_thread");
+    return status;
+  }
+
   return ZX_OK;
 }
 
@@ -480,6 +489,7 @@ void RdmaEngine::DumpRdmaState() {
 void RdmaEngine::Release() {
   rdma_irq_.destroy();
   rdma_pmt_.unpin();
+  thrd_join(rdma_irq_thread_, nullptr);
 }
 
 }  // namespace amlogic_display

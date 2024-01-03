@@ -126,10 +126,7 @@ class VideoInputUnit {
   PixelGridSize2D layer_image_size_ = kInvalidPixelGridSize2D;
   PixelGridSize2D display_contents_size_ = kInvalidPixelGridSize2D;
 
-  // All current metrics have been moved to RdmaEngine.
-  // inspect::Node* inspect_node_;
   std::unique_ptr<RdmaEngine> rdma_;
-  thrd_t rdma_irq_thread_;
 };
 
 }  // namespace amlogic_display

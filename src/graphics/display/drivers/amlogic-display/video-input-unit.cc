@@ -825,7 +825,6 @@ void VideoInputUnit::DumpNonRdmaRegisters() {
 void VideoInputUnit::Release() {
   DisableLayer();
   rdma_->Release();
-  thrd_join(rdma_irq_thread_, nullptr);
 }
 
 // static
@@ -852,16 +851,6 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
   zx_status_t status = self->rdma_->SetupRdma();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not setup RDMA");
-    return zx::error(status);
-  }
-
-  // TODO(rlb): consider moving thread creation into RdmaEngine with appropriate
-  // facilities for controlling the thread from test code.
-  auto start_thread = [](void* arg) { return static_cast<RdmaEngine*>(arg)->RdmaIrqThread(); };
-  status = thrd_status_to_zx_status(thrd_create_with_name(&self->rdma_irq_thread_, start_thread,
-                                                          self->rdma_.get(), "rdma_irq_thread"));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not create rdma_thread");
     return zx::error(status);
   }
 

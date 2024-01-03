@@ -216,6 +216,7 @@ class RdmaEngine {
 
   // RDMA IRQ handle and thread used for diagnostic purposes.
   zx::interrupt rdma_irq_;
+  thrd_t rdma_irq_thread_;
 
   fbl::Mutex rdma_lock_;
 
