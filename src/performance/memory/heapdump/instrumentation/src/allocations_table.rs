@@ -59,6 +59,25 @@ impl AllocationsTable {
             .expect("out of space")
     }
 
+    pub fn update_allocation(
+        &mut self,
+        address: u64,
+        size: u64,
+        thread_info_key: ResourceKey,
+        stack_trace_key: ResourceKey,
+        timestamp: i64,
+    ) -> u64 {
+        if let Some(old_size) = self
+            .writer
+            .replace_allocation(address, size, thread_info_key, stack_trace_key, timestamp)
+            .expect("out of space")
+        {
+            old_size
+        } else {
+            panic!("Block 0x{:x} was not allocated", address);
+        }
+    }
+
     pub fn forget_allocation(&mut self, address: u64) -> u64 {
         if let Some(size) = self.writer.erase_allocation(address) {
             size

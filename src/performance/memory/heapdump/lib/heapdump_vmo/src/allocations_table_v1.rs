@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use static_assertions::const_assert;
+use std::collections::HashSet;
 use std::mem::{align_of, size_of};
 use std::sync::atomic::{
     AtomicU32,
@@ -196,6 +197,101 @@ impl AllocationsTableWriter {
         None
     }
 
+    /// Atomically updates metadata for the given address in the hash table.
+    ///
+    /// Returns Ok(Some(old_size)) if it has been updated, Ok(None) if no entry with the given
+    /// address exists, or an error if no free nodes are available.
+    pub fn replace_allocation(
+        &mut self,
+        address: u64,
+        size: u64,
+        thread_info_key: ResourceKey,
+        stack_trace_key: ResourceKey,
+        timestamp: i64,
+    ) -> Result<Option<u64>, crate::Error> {
+        // Updates are implemented as an atomic insertion of a new node at the head followed by an
+        // atomic deletion of the old node. Therefore, while an update is in progress, two nodes
+        // with the same address may exist. `AllocationsTableReader`` is aware of this, and it
+        // only returns the first one (i.e. the newer one) in such a case.
+        // Note: the body of this function has been split in two parts to test reads of the
+        // intermediate state.
+
+        // Check preconditions and insert the new node.
+        let Some((new_node, old_node, old_size)) = self.replace_allocation_begin(
+            address,
+            size,
+            thread_info_key,
+            stack_trace_key,
+            timestamp,
+        )?
+        else {
+            return Ok(None);
+        };
+
+        // Remove the old node.
+        self.replace_allocation_end(new_node, old_node);
+        Ok(Some(old_size))
+    }
+
+    /// First part of `replace_allocation`. Locates the old node and inserts the new one at the head
+    fn replace_allocation_begin(
+        &mut self,
+        address: u64,
+        size: u64,
+        thread_info_key: ResourceKey,
+        stack_trace_key: ResourceKey,
+        timestamp: i64,
+    ) -> Result<Option<(NodeIndex, NodeIndex, u64)>, crate::Error> {
+        let bucket_index = Self::compute_bucket_index(address);
+        let old_head = self.bucket_head_at(bucket_index).load(Relaxed);
+
+        // Search the existing entry with the requested address.
+        let (old_index, old_size) = 'search: {
+            let mut curr_index = old_head;
+            while curr_index != NODE_INVALID {
+                let curr_data = self.node_at(curr_index);
+                if curr_data.address == address {
+                    break 'search (curr_index, curr_data.size); // Found.
+                }
+                curr_index = curr_data.next.load(Relaxed);
+            }
+
+            return Ok(None); // Not found.
+        };
+
+        // Insert a new entry at the head of the list.
+        let new_index = self.pop_free_node()?;
+        *self.node_at(new_index) = Node {
+            address,
+            size,
+            timestamp,
+            thread_info_key,
+            stack_trace_key,
+            next: AtomicNodeIndex::new(old_head),
+        };
+        self.bucket_head_at(bucket_index).store(new_index, SeqCst);
+        Ok(Some((new_index, old_index, old_size)))
+    }
+
+    // Second part of `replace_allocation`. Removes the old node.
+    fn replace_allocation_end(&mut self, new_node: NodeIndex, old_node: NodeIndex) {
+        let tail = self.node_at(old_node).next.load(Relaxed);
+
+        // Note: `replace_allocation_begin` always inserts the new node at the head; therefore, the
+        // old node will always be one of its successors.
+        let mut scan_node = new_node;
+        loop {
+            assert_ne!(scan_node, NODE_INVALID, "the old node must be a successor of new node");
+            let scan_data = self.node_at(scan_node);
+            if scan_data.next.load(Relaxed) == old_node {
+                scan_data.next.store(tail, SeqCst);
+                self.push_free_node(old_node);
+                return;
+            }
+            scan_node = scan_data.next.load(Relaxed);
+        }
+    }
+
     /// Inserts a node into the free list.
     fn push_free_node(&mut self, index: NodeIndex) {
         let current_head = self.free_list_head;
@@ -248,22 +344,27 @@ impl AllocationsTableReader {
 
     fn iterate_bucket(&self, head: NodeIndex) -> impl Iterator<Item = Result<&Node, crate::Error>> {
         let mut curr_index = head;
+        let mut seen_addresses = HashSet::new();
         std::iter::from_fn(move || {
-            if curr_index != NODE_INVALID {
-                let result = if (curr_index as usize) < self.max_num_nodes {
+            while curr_index != NODE_INVALID {
+                if (curr_index as usize) < self.max_num_nodes {
                     // The nodes are stored consecutively immediately after the bucket heads.
                     let byte_offset =
                         size_of::<BucketHeads>() + curr_index as usize * size_of::<Node>();
                     let curr_data = self.storage.get_object::<Node>(byte_offset).unwrap();
                     curr_index = curr_data.next.load(Relaxed);
-                    Ok(curr_data)
+
+                    // Only return the first occurrence of each address. This ensures that only the
+                    // newer record is returned if an update is in progress.
+                    if seen_addresses.insert(curr_data.address) {
+                        return Some(Ok(curr_data));
+                    }
                 } else {
-                    Err(crate::Error::InvalidInput)
+                    return Some(Err(crate::Error::InvalidInput));
                 };
-                Some(result)
-            } else {
-                None
             }
+
+            None
         })
     }
 }
@@ -271,6 +372,7 @@ impl AllocationsTableReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use std::{alloc::Layout, collections::HashMap};
 
     // Some tests below use this constant to ensure that each bucket is been used at least 10 times.
@@ -541,5 +643,67 @@ mod tests {
         let contains_error = reader.iter().any(|e| e.is_err());
 
         assert!(contains_error);
+    }
+
+    #[test]
+    fn test_replace() {
+        let storage = TestStorage::new(NUM_NODES);
+        let mut writer = storage.create_writer();
+
+        let result = writer.insert_allocation(
+            0x1234,
+            0x1111,
+            THREAD_INFO_RESOURCE_KEY_1,
+            STACK_TRACE_RESOURCE_KEY_1,
+            0,
+        );
+        assert_eq!(result, Ok(true));
+
+        // Verify initial contents.
+        let reader = storage.create_reader();
+        let mut iter = reader.iter();
+        assert_matches!(iter.next(), Some(Ok(Node { address: 0x1234, size: 0x1111, .. })));
+        assert_matches!(iter.next(), None);
+
+        let result = writer.replace_allocation_begin(
+            0x1234,
+            0x2222,
+            THREAD_INFO_RESOURCE_KEY_2,
+            STACK_TRACE_RESOURCE_KEY_2,
+            0,
+        );
+        let Ok(Some((new_node, old_node, old_size))) = result else {
+            panic!("Update begin is supposed to succeed in this test, got {:?} instead", result)
+        };
+        assert_eq!(old_size, 0x1111);
+
+        // Verify that intermediate contents already reflect the update.
+        let reader = storage.create_reader();
+        let mut iter = reader.iter();
+        assert_matches!(iter.next(), Some(Ok(Node { address: 0x1234, size: 0x2222, .. })));
+        assert_matches!(iter.next(), None);
+
+        writer.replace_allocation_end(new_node, old_node);
+
+        // Verify that final contents reflect the update.
+        let reader = storage.create_reader();
+        let mut iter = reader.iter();
+        assert_matches!(iter.next(), Some(Ok(Node { address: 0x1234, size: 0x2222, .. })));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_cannot_replace_nonexisting() {
+        let storage = TestStorage::new(NUM_NODES);
+        let mut writer = storage.create_writer();
+
+        let result = writer.replace_allocation(
+            0x1234,
+            0x5678,
+            THREAD_INFO_RESOURCE_KEY_1,
+            STACK_TRACE_RESOURCE_KEY_1,
+            0,
+        );
+        assert_eq!(result, Ok(None));
     }
 }
