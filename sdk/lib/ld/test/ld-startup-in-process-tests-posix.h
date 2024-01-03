@@ -28,7 +28,12 @@ namespace ld::testing {
 // auxiliary vector (auxv) that carries values important for bootstrapping.
 class LdStartupInProcessTests : public elfldltl::testing::LoadTests<>, public LdLoadTestsBase {
  public:
-  void Init(std::initializer_list<std::string_view> args = {});
+  static constexpr bool kCanCollectLog = false;
+
+  static constexpr std::string_view kTestExecutableSuffix = kTestExecutableInProcessSuffix;
+
+  void Init(std::initializer_list<std::string_view> args = {},
+            std::initializer_list<std::string_view> env = {});
 
   void Load(std::string_view executable_name);
 

@@ -15,11 +15,14 @@
 namespace ld {
 namespace {
 
+constexpr size_t kBufferSize = ZX_LOG_RECORD_DATA_MAX;
+
 constexpr zx_signals_t kSocketWait = ZX_SOCKET_WRITABLE | ZX_SOCKET_PEER_CLOSED;
 
 void DebuglogWrite(StartupData& startup, std::string_view str) {
-  size_t chars = str.size() - (str.back() == '\n' ? 1 : 0);
-  startup.debuglog.write(0, str.data(), chars);
+  if (size_t chars = str.size() - (str.back() == '\n' ? 1 : 0); chars > 0) {
+    startup.debuglog.write(0, str.data(), chars);
+  }
 }
 
 zx::result<size_t> SocketWrite(StartupData& startup, std::string_view str) {
@@ -53,37 +56,42 @@ int SocketWriteAll(StartupData& startup, std::string_view str) {
 
 }  // namespace
 
-constexpr size_t kBufferSize = ZX_LOG_RECORD_DATA_MAX;
+// The formatted message from elfldltl::PrintfDiagnosticsReport should be a
+// single line with no newline, but we tell Printf to add one (see below).
+// If the whole line fits in the buffer, then this callback will only be made
+// once.
+int StartupData::Log(std::string_view str) {
+  assert(!str.empty());
+
+  // If we have a debuglog handle, use that.  It's packet-oriented with each
+  // message expected to be a single line without newlines.  So remove the
+  // newline that was added.  If the line was too long, it will look like two
+  // separate log lines.
+  if (debuglog) {
+    DebuglogWrite(*this, str);
+  }
+
+  if (log_socket) {
+    // We might instead (or also?) have a socket, where the messages are
+    // easier to capture at the other end.  This is a stream-oriented socket
+    // (aka an fdio pipe), where newlines are expected.
+    return SocketWriteAll(*this, str);
+  }
+
+  // If there's no socket, always report full success if anything got out.
+  return debuglog ? static_cast<int>(str.size()) : -1;
+}
 
 void DiagnosticsReport::Printf(const char* format, va_list args) const {
-  // The formatted message from elfldltl::PrintfDiagnosticsReport should be a
-  // single line with no newline, but we tell Printf to add one (see below).
-  // If the whole line fits in the buffer, then this callback will only be made
-  // once.
-  auto to_log = [&startup = startup_](std::string_view str) -> int {
-    assert(!str.empty());
-
-    // If we have a debuglog handle, use that.  It's packet-oriented with each
-    // message expected to be a single line without newlines.  So remove the
-    // newline that was added.  If the line was too long, it will look like two
-    // separate log lines.
-    if (startup.debuglog) {
-      DebuglogWrite(startup, str);
-    }
-
-    if (startup.log_socket) {
-      // We might instead (or also?) have a socket, where the messages are
-      // easier to capture at the other end.  This is a stream-oriented socket
-      // (aka an fdio pipe), where newlines are expected.
-      return SocketWriteAll(startup, str);
-    }
-
-    // If there's no socket, always report full success if anything got out.
-    return startup.debuglog ? static_cast<int>(str.size()) : -1;
-  };
-
   __llvm_libc::printf_core::Printf<kBufferSize, __llvm_libc::printf_core::PrintfNewline::kYes>(
-      to_log, format, args);
+      startup_.LogClosure(), format, args);
+}
+
+template <>
+void DiagnosticsReport::ReportModuleLoaded<StartupModule>(const StartupModule& module) const {
+  if (startup_.ld_debug) {
+    SymbolizerContext<kBufferSize>(startup_.LogClosure(), module);
+  }
 }
 
 }  // namespace ld

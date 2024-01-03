@@ -113,18 +113,20 @@ class SpawnPlan {
     }
   }
 
-  pid_t Launch(const std::string& executable, const std::vector<std::string>& argv) {
+  pid_t Launch(const std::string& executable, const std::vector<std::string>& argv,
+               const std::vector<std::string>& envp) {
     fflush(nullptr);  // Flush buffers before fork duplicates them.
     pid_t pid = fork();
     if (pid == 0) {
-      Child(executable, argv);
+      Child(executable, argv, envp);
     }
     EXPECT_GT(pid, 0) << "fork: " << strerror(errno);
     return pid;
   }
 
  private:
-  [[noreturn]] void Child(const std::string& executable, const std::vector<std::string>& argv) {
+  [[noreturn]] void Child(const std::string& executable, const std::vector<std::string>& argv,
+                          const std::vector<std::string>& envp) {
     // Child side.  Install state before exec.
     if (fchdir_ >= 0) {
       EXPECT_EQ(fchdir(fchdir_), 0) << "fchdir: " << strerror(errno);
@@ -137,7 +139,7 @@ class SpawnPlan {
     };
 
     if (!::testing::Test::HasFailure()) {
-      EXPECT_EQ(execve(executable.c_str(), ArgvPtrs(argv).data(), nullptr), 0)
+      EXPECT_EQ(execve(executable.c_str(), ArgvPtrs(argv).data(), ArgvPtrs(envp).data()), 0)
           << "execve: " << executable << ": " << strerror(errno);
     }
     fflush(nullptr);
@@ -152,8 +154,10 @@ class SpawnPlan {
 
 }  // namespace
 
-void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> args) {
+void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> args,
+                                      std::initializer_list<std::string_view> env) {
   argv_ = std::vector<std::string>{args.begin(), args.end()};
+  envp_ = std::vector<std::string>{env.begin(), env.end()};
 }
 
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
@@ -188,7 +192,7 @@ int64_t LdStartupSpawnProcessTests::Run() {
   }
 
   // Launch the child.
-  pid_ = spawn.Launch(executable_, argv_);
+  pid_ = spawn.Launch(executable_, argv_, envp_);
   if (HasFailure()) {
     return -1;
   }

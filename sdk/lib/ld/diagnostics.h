@@ -6,6 +6,7 @@
 #define LIB_LD_DIAGNOSTICS_H_
 
 #include <lib/elfldltl/diagnostics.h>
+#include <lib/symbolizer-markup/writer.h>
 
 #include <cassert>
 #include <cstdarg>
@@ -61,9 +62,43 @@ class DiagnosticsReport {
     return true;
   }
 
+  template <class LoadModule>
+  void ReportModuleLoaded(const LoadModule& module) const;
+
  private:
   void Printf(const char* format, ...) const;
   void Printf(const char* format, va_list args) const;
+
+  template <size_t BufferSize, typename Log, class Module>
+  static void SymbolizerContext(Log&& log, const Module& module) {
+    char buffer[BufferSize];
+    size_t pos = 0;
+    auto line_buffered_log = [&buffer, &pos, &log](std::string_view str) {
+      while (!str.empty()) {
+        size_t n = str.copy(&buffer[pos], sizeof(buffer) - pos);
+        str.remove_prefix(n);
+        pos += n;
+        if (pos == sizeof(buffer) || buffer[pos - 1] == '\n') {
+          log(std::string_view{buffer, pos});
+          pos = 0;
+        }
+      }
+    };
+
+    std::string_view name = module.name().str();
+    if (name.empty()) {
+      name = "<application>";
+    }
+
+    symbolizer_markup::Writer writer(line_buffered_log);
+    module.load_info().SymbolizerContext(writer, module.module().symbolizer_modid, name,
+                                         module.module().build_id, module.module().vaddr_start);
+
+    // Since writer.Newline() is always called last, the last call to
+    // line_buffered_log will always have been with a trailing newline so the
+    // buffer will have been flushed.
+    assert(pos == 0);
+  }
 
   StartupData& startup_;
   std::string_view module_;

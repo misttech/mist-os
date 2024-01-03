@@ -42,7 +42,8 @@ void* GetVdso() {
 const std::string kLdStartupName =
     std::string("test/lib/") + std::string(kLibprefix) + std::string(ld::abi::kInterp);
 
-void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args) {
+void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
+                                   std::initializer_list<std::string_view> env) {
   zx_vaddr_t test_base;
   ASSERT_EQ(zx::vmar::root_self()->allocate(
                 ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE, 0, kVmarSize,
@@ -55,7 +56,8 @@ void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args)
                               .AddInProcessTestHandles()
                               .AddAllocationVmar(test_vmar_.borrow())
                               .AddFd(STDERR_FILENO, std::move(log_fd))
-                              .SetArgs(args));
+                              .SetArgs(args)
+                              .SetEnv(env));
 }
 
 void LdStartupInProcessTests::Load(std::string_view executable_name) {
@@ -76,7 +78,8 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   ASSERT_NO_FATAL_FAILURE(procargs_.AddSelfVmar(std::move(load_image_vmar)));
 
   // Send the executable VMO.
-  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(InProcessTestExecutable(executable_name)));
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(
+      std::string(executable_name) + std::string(kTestExecutableInProcessSuffix)));
 
   // If a mock loader service has been set up by calls to Needed() et al, send
   // the client end over.

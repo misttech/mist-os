@@ -61,46 +61,22 @@ foreach(label, in_process_executables) {
   ]
 }
 
-if (is_fuchsia) {
-  if (toolchain_environment == "user.basic") {
-    group("modules") {
-      testonly = true
+# This is used to roll up all the test binaries with appropriate variant
+# selection for metadata collection purposes.  It's used both to get the test
+# binaries populated in the Fuchsia package (via resource() equivalents) or
+# host subdirectory (via host_test_data() equivalents), and to examine those
+# binaries in the ..:gen-load-test-modules-info target.
+group("modules") {
+  testonly = true
 
-      deps = executables + modules
-    }
-  }
-} else if (current_toolchain != shlib_toolchain) {
-  if (is_linux) {
-    assert(toolchain_environment == "linux",
-           "$current_toolchain is $toolchain_environment")
-  }
+  deps = executables + modules
 
-  host_test_data("modules") {
-    deps = []
-    sources = []
-    outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
-
-    foreach(label, executables) {
-      name = get_label_info(label, "name")
-
-      deps += [ label ]
-      sources += [ "$root_out_dir/$name" ]
-    }
-
-    shlib_out_dir = get_label_info(".($shlib_toolchain)", "root_out_dir")
-
-    foreach(label, shlibs) {
-      name = get_label_info(label, "name")
-
-      deps += [ "$label($shlib_toolchain)" ]
-      sources += [ "$shlib_out_dir/lib$name.so" ]
-    }
-
-    foreach(label, modules) {
-      name = get_label_info(label, "name")
-
-      deps += [ "$label($shlib_toolchain)" ]
-      sources += [ "$shlib_out_dir/$name.so" ]
+  if (!is_fuchsia) {
+    # On Fuchsia, the binary targets themselves are resource() equivalents.
+    # On host, extra `.host-test-data` targets are defined below.
+    data_deps = []
+    foreach(test, deps) {
+      data_deps += [ "$test.host-test-data" ]
     }
   }
 }
@@ -117,23 +93,31 @@ config("semantic-interposition") {
 }
 
 template("test_executable") {
+  executable_target = target_name
+
   suffices = [ "" ]
   if (defined(invoker.can_be_in_process) && invoker.can_be_in_process) {
     suffices += [ ".in-process" ]
   }
+
   foreach(suffix, suffices) {
-    executable(target_name + suffix) {
+    executable(executable_target + suffix) {
       visibility = [ ":*" ]
       testonly = true
 
       deps = []
+      data_deps = []
       forward_variables_from(invoker,
                              "*",
                              [
                                "configs",
+                               "shlib_deps",
                                "testonly",
                              ])
       deps += [ ":test-executable$suffix" ]
+      if (defined(invoker.shlib_deps)) {
+        deps += invoker.shlib_deps
+      }
       if (defined(invoker.configs)) {
         configs += invoker.configs
       }
@@ -143,6 +127,36 @@ template("test_executable") {
       disable_syslog_backend = true
 
       exclude_toolchain_tags = [ "instrumentation-runtime" ]
+
+      if (!is_fuchsia && defined(invoker.shlib_deps)) {
+        # On Fuchsia, the indirect deps are all reached as resource()
+        # equivalents implicitly.  On host, the shlib_deps binaries must both
+        # be copied into the right test-data directory and roll up as
+        # host_test_data() equivalents.  This is evaluated after variant
+        # selection so it reaches the right variant $shlib_toolchain where
+        # test_shared_library() defines the `.host-test-data` target.
+        foreach(shlib, invoker.shlib_deps) {
+          data_deps += [ "$shlib.host-test-data($shlib_toolchain)" ]
+        }
+      }
+    }
+
+    if (!is_fuchsia && current_toolchain != shlib_toolchain) {
+      # On Fuchsia, the test executable is reached as a resource() equivalent
+      # implicitly.  On host, it must both be copied into the right test-data
+      # directory and roll up as an host_test_data() equivalent.  The variant
+      # selection is done by the executable() target, but we are in the right
+      # environment that produces a copy() target into the base toolchain's
+      # $root_out_dir.  This host_test_data() will copy again from there.
+      if (is_linux) {
+        assert(toolchain_environment == "linux",
+               "$current_toolchain is $toolchain_environment")
+      }
+      host_test_data("$executable_target$suffix.host-test-data") {
+        deps = [ ":$executable_target$suffix" ]
+        sources = [ "$root_out_dir/$executable_target$suffix" ]
+        outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+      }
     }
   }
 }
@@ -235,7 +249,9 @@ config("nostdlibs") {
 }
 
 template("test_shared_library") {
-  shared_library(target_name) {
+  shlib_target_name = target_name
+
+  shared_library(shlib_target_name) {
     visibility = [ ":*" ]
 
     # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
@@ -243,6 +259,7 @@ template("test_shared_library") {
 
     deps = []
     public_deps = []
+    shlib_deps = []
     ldflags = []
     forward_variables_from(invoker,
                            "*",
@@ -252,7 +269,7 @@ template("test_shared_library") {
                            ])
 
     public_deps += [ "//sdk/lib/ld:standalone" ]
-    deps += [ ":test-module.deps" ]
+    deps += [ ":test-module.deps" ] + shlib_deps
 
     if (is_linux) {
       configs -= [ "//build/config/linux:implicit-host-libs" ]
@@ -267,6 +284,30 @@ template("test_shared_library") {
       configs -= invoker.remove_configs
     }
   }
+
+  if (!is_fuchsia && current_toolchain == shlib_toolchain) {
+    # host_test_data() generates this copy() target with this metadata, but it
+    # adds extra deps that don't work here and are only in host_test_data() for
+    # issues with non-shlib variant binaries that don't apply here.
+    copy("$shlib_target_name.host-test-data") {
+      visibility = [ ":*" ]
+      testonly = true
+
+      deps = [ ":$shlib_target_name" ]
+      sources = [ "$root_out_dir/lib$shlib_target_name.so" ]
+      outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+      metadata = {
+        test_runtime_deps = process_file_template(sources, outputs)
+      }
+
+      data_deps = []
+      if (defined(invoker.shlib_deps)) {
+        foreach(shlib, invoker.shlib_deps) {
+          data_deps += [ "$shlib.host-test-data" ]
+        }
+      }
+    }
+  }
 }
 
 template("test_dep") {
@@ -275,10 +316,11 @@ template("test_dep") {
     test_deps = []
     forward_variables_from(invoker, "*")
 
+    shlib_deps = []
     decls = ""
     syms = ""
     foreach(dep, test_deps) {
-      deps += [ ":ld-dep-$dep" ]
+      shlib_deps += [ ":ld-dep-$dep" ]
       decls += "extern \"C\" int64_t $dep();"
       syms += "$dep, "
     }
@@ -346,21 +388,21 @@ test_dep("a") {
 test_executable("basic-dep") {
   can_be_in_process = true
   sources = [ "basic-dep.cc" ]
-  deps = [ ":ld-dep-a" ]
+  shlib_deps = [ ":ld-dep-a" ]
 }
 
 test_executable("indirect-deps") {
   can_be_in_process = true
   sources = [ "basic-dep.cc" ]
-  deps = [ ":indirect-deps-a" ]
+  shlib_deps = [ ":indirect-deps-a" ]
 }
 
 test_shared_library("indirect-deps-a") {
   sources = [ "indirect-deps-a.cc" ]
-  deps = [
+  deps = [ "//zircon/system/public" ]
+  shlib_deps = [
     ":indirect-deps-b",
     ":indirect-deps-c",
-    "//zircon/system/public",
   ]
 }
 
@@ -383,10 +425,8 @@ test_executable("passive-abi-basic") {
 test_executable("symbolic-namespace") {
   can_be_in_process = true
   sources = [ "symbolic-namespace.cc" ]
-  deps = [
-    ":ld-dep-a",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":ld-dep-a" ]
 }
 
 # These show the dependency graph of the test and the expected return value of each dependency's
@@ -436,11 +476,11 @@ test_executable("many-deps") {
   can_be_in_process = true
   sources = [ "many-deps.cc" ]
 
-  deps = [
+  deps = [ "../.." ]
+  shlib_deps = [
     ":ld-dep-a",
     ":ld-dep-b",
     ":ld-dep-f",
-    "../..",
   ]
 }
 
@@ -462,10 +502,8 @@ test_executable("tls-exec-only") {
 test_executable("tls-shlib-only") {
   can_be_in_process = true
   sources = [ "tls-shlib-only.cc" ]
-  deps = [
-    ":tls-dep",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-dep" ]
 }
 
 test_shared_library("tls-dep") {
@@ -497,19 +535,15 @@ test_shared_library("tls-desc-dep") {
 test_executable("tls-exec-shlib") {
   can_be_in_process = true
   sources = [ "tls-exec-shlib.cc" ]
-  deps = [
-    ":tls-dep",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-dep" ]
 }
 
 test_executable("tls-ie") {
   can_be_in_process = true
   sources = [ "tls-ie.cc" ]
-  deps = [
-    ":tls-ie-dep",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-ie-dep" ]
 }
 
 ifs_shared_library("tls-ie-dep-weak") {
@@ -541,10 +575,8 @@ test_executable("tls-gd") {
   can_be_in_process = true
   sources = [ "tls-gd.cc" ]
   configs = [ "//build/config:no-tlsdesc" ]
-  deps = [
-    ":tls-dep",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-dep" ]
 }
 
 # This is the same as tls-gd, but using TLSDESC.
@@ -552,15 +584,20 @@ test_executable("tls-desc") {
   can_be_in_process = true
   sources = [ "tls-gd.cc" ]
   configs = [ "//build/config:tlsdesc" ]
-  deps = [
-    ":tls-desc-dep",
-    "../..",
-  ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-desc-dep" ]
 }
 
 test_executable("missing-sym") {
   sources = [ "missing-sym.cc" ]
+
+  # Note this isn't shlib_deps because there's no corresponding .host-test-data
+  # subtarget, so instead we have explicit data_deps on the real runtime dep.
+  # For Fuchsia this is implicit via the data_deps in ifs_shared_library().
   deps = [ ":missing-sym-dep-a" ]
+  if (!is_fuchsia) {
+    data_deps = [ ":ld-dep-a.host-test-data($shlib_toolchain)" ]
+  }
 }
 
 ifs_shared_library("missing-sym-dep-a") {
@@ -572,6 +609,8 @@ ifs_shared_library("missing-sym-dep-a") {
 
 test_executable("missing-dep") {
   sources = [ "missing-dep.cc" ]
+
+  # Note this isn't shlib_deps because there's no corresponding test data.
   deps = [ ":missing-dep-dep" ]
 }
 

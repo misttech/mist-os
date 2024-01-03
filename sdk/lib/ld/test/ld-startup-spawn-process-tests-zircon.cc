@@ -51,14 +51,15 @@ class SpawnPlan {
     AddHandle(PA_LDSVC_LOADER, zx::handle{client_end.release()});
   }
 
-  zx::process Launch(zx::vmo executable_vmo, const std::vector<std::string>& argv) {
+  zx::process Launch(zx::vmo executable_vmo, const std::vector<std::string>& argv,
+                     const std::vector<std::string>& envp) {
     EXPECT_TRUE(executable_vmo);
     zx::process process;
     char error[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
     zx_status_t status =
         fdio_spawn_vmo(zx::job::default_job()->get(), FDIO_SPAWN_CLONE_UTC_CLOCK,
-                       executable_vmo.release(), ArgvPtrs(argv).data(), nullptr, actions_.size(),
-                       actions_.data(), process.reset_and_get_address(), error);
+                       executable_vmo.release(), ArgvPtrs(argv).data(), ArgvPtrs(envp).data(),
+                       actions_.size(), actions_.data(), process.reset_and_get_address(), error);
     actions_.clear();  // That consumed the fds and handles even if it failed.
     EXPECT_EQ(status, ZX_OK) << error << ": " << zx_status_get_string(status);
     return process;
@@ -129,8 +130,10 @@ std::string FindInterp(zx::unowned_vmo vmo) {
 
 LdStartupSpawnProcessTests::~LdStartupSpawnProcessTests() = default;
 
-void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> args) {
+void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> args,
+                                      std::initializer_list<std::string_view> env) {
   argv_ = std::vector<std::string>{args.begin(), args.end()};
+  envp_ = std::vector<std::string>{env.begin(), env.end()};
 }
 
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
@@ -166,7 +169,7 @@ int64_t LdStartupSpawnProcessTests::Run() {
   }
 
   // Launch the child and save the process handle.
-  set_process(spawn.Launch(std::move(executable_), argv_));
+  set_process(spawn.Launch(std::move(executable_), argv_, envp_));
   if (HasFailure()) {
     return -1;
   }

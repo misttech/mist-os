@@ -35,7 +35,8 @@ LdRemoteProcessTests::LdRemoteProcessTests() = default;
 
 LdRemoteProcessTests::~LdRemoteProcessTests() = default;
 
-void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args) {
+void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args,
+                                std::initializer_list<std::string_view> env) {
   mock_loader_ = std::make_unique<MockLoader>();
 
   std::string_view name = process_name();

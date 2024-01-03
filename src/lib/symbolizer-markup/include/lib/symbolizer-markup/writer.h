@@ -68,7 +68,7 @@ class Writer {
  public:
   static_assert(std::is_invocable_v<Sink, std::string_view>);
 
-  explicit Writer(Sink&& sink) : sink_(std::forward<Sink>(sink)) {}
+  explicit Writer(Sink sink) : sink_(std::move(sink)) {}
 
   //
   // Colorization.

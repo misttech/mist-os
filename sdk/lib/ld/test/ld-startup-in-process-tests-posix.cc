@@ -109,9 +109,10 @@ struct LdStartupInProcessTests::AuxvBlock {
   const ld::Auxv null = {static_cast<uintptr_t>(ld::AuxvTag::kNull)};
 };
 
-void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args) {
+void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
+                                   std::initializer_list<std::string_view> env) {
   ASSERT_NO_FATAL_FAILURE(AllocateStack());
-  ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
+  ASSERT_NO_FATAL_FAILURE(PopulateStack(args, env));
 }
 
 void LdStartupInProcessTests::Load(std::string_view executable_name) {
@@ -131,7 +132,8 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   loader_ = std::move(result->loader);
 
   // Now load the executable.
-  ASSERT_NO_FATAL_FAILURE(Load(InProcessTestExecutable(executable_name), result));
+  ASSERT_NO_FATAL_FAILURE(
+      Load(std::string(executable_name) + std::string(kTestExecutableInProcessSuffix), result));
 
   // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
   cpp20::span phdrs = result->phdrs.get();

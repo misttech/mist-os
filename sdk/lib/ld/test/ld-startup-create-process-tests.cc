@@ -11,7 +11,8 @@
 
 namespace ld::testing {
 
-void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_view> args) {
+void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_view> args,
+                                           std::initializer_list<std::string_view> env) {
   std::string_view name = process_name();
   zx::process process;
   ASSERT_EQ(zx::process::create(*zx::job::default_job(), name.data(),
@@ -30,7 +31,8 @@ void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_vie
                               .AddThread(thread_.borrow())
                               .AddAllocationVmar(root_vmar_.borrow())
                               .AddFd(STDERR_FILENO, std::move(log_fd))
-                              .SetArgs(args));
+                              .SetArgs(args)
+                              .SetEnv(env));
 }
 
 void LdStartupCreateProcessTestsBase::FinishLoad(std::string_view executable_name) {

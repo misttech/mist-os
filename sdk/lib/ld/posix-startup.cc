@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <lib/elfldltl/mmap-loader.h>
 #include <lib/elfldltl/posix.h>
 #include <lib/ld/memory.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/posix.h>
 #include <sys/mman.h>
@@ -20,18 +20,17 @@
 #include "bootstrap.h"
 #include "diagnostics.h"
 #include "posix.h"
-#include "startup-load.h"
 
 namespace ld {
 namespace {
+
+constexpr std::string_view kLdDebugPrefix = "LD_DEBUG=";
 
 // This is defined in assembly, and doesn't actually use the C calling
 // convention.  It calls StartLd.
 extern "C" [[noreturn]] void _start();
 
 using UniqueFdFile = elfldltl::UniqueFdFile<Diagnostics>;
-
-using StartupModule = StartupLoadModule<elfldltl::MmapLoader>;
 
 using Module = abi::Abi<>::Module;
 
@@ -85,7 +84,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // Allocate the StartupModule for the main executable.
   StartupModule* main_executable = StartupModule::New(diag, scratch, {}, startup.page_size);
   fbl::AllocChecker ac;
-  main_executable->NewModule(abi::Abi<>::kExecutableName, initial_exec, ac);
+  main_executable->NewModule(abi::Abi<>::kExecutableName, 0, initial_exec, ac);
   CheckAlloc(diag, ac, "passive ABI module");
   Module& module = main_executable->module();
 
@@ -126,6 +125,17 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // so set its memory() to match.  This means that destruction would munmap
   // the executable image, but the object will never be destroyed anyway.
   main_executable->memory() = ModuleMemory{module};
+
+  // A second phdr scan is needed to decode notes now that they can be
+  // accessed in memory.
+  std::optional<elfldltl::ElfNote> build_id;
+  elfldltl::DecodePhdrs(
+      diag, phdrs,
+      elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, main_executable->memory(),
+                                       elfldltl::ObserveBuildIdNote(build_id)));
+  if (build_id) {
+    module.build_id = build_id->desc;
+  }
 
   if (phdr_info->tls_phdr) {
     main_executable->SetTls(diag, main_executable->memory(), 1, *phdr_info->tls_phdr);
@@ -197,6 +207,15 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
   BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
   CompleteBootstrapModule(self_module.module, startup.page_size);
+
+  // Check for the LD_DEBUG environment variable.
+  for (char** ep = startup.envp; *ep; ++ep) {
+    std::string_view str = *ep;
+    if (str.size() > kLdDebugPrefix.size() && cpp20::starts_with(str, kLdDebugPrefix)) {
+      startup.ld_debug = true;
+      break;
+    }
+  }
 
   // Now that things are bootstrapped, set up the main diagnostics object.
   auto diag = MakeDiagnostics(startup);

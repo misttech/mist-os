@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
 #include <lib/elfldltl/zircon.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
@@ -21,15 +20,12 @@
 #include "allocator.h"
 #include "bootstrap.h"
 #include "diagnostics.h"
-#include "startup-load.h"
 #include "zircon.h"
 
 namespace ld {
 namespace {
 
 using VmoFile = elfldltl::VmoFile<Diagnostics>;
-
-using StartupModule = StartupLoadModule<elfldltl::LocalVmarLoader>;
 
 using SystemPageAllocator = trivial_allocator::ZirconVmar;
 
@@ -65,7 +61,7 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
     elfldltl::UnownedVmoFile file{vmo.borrow(), diag};
     Elf::size_type max_tls_modid = 0;
     static_cast<StartupLoadResult&>(result) =
-        result.module->Load(diag, initial_exec, file, max_tls_modid);
+        result.module->Load(diag, initial_exec, file, 0, max_tls_modid);
     assert(max_tls_modid <= 1);
   }
   return result;

@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ld/abi.h>
+#include <lib/stdcompat/string_view.h>
+#include <unistd.h>
+
+#include <cinttypes>
+#include <string>
+
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
@@ -15,6 +22,8 @@
 #endif
 
 namespace {
+
+using namespace std::literals;
 
 template <class Fixture>
 using LdLoadTests = Fixture;
@@ -51,6 +60,15 @@ using FailTypes = TestTypes<>;
 
 TYPED_TEST_SUITE(LdLoadTests, LoadTypes);
 TYPED_TEST_SUITE(LdLoadFailureTests, FailTypes);
+
+// The Fuchsia test executables (via modules/zircon-test-start.cc) link
+// directly to the vDSO, so it appears before other modules.
+template <class TestFixture>
+#ifdef __Fuchsia__
+constexpr std::string_view kTestExecutableNeedsVdso = "libzircon.so"sv;
+#else
+constexpr std::string_view kTestExecutableNeedsVdso = {};
+#endif
 
 TYPED_TEST(LdLoadTests, Basic) {
   constexpr int64_t kReturnValue = 17;
@@ -330,6 +348,201 @@ TYPED_TEST(LdLoadTests, TlsDescAccess) {
   }
 
   EXPECT_EQ(return_value, kReturnValue);
+}
+
+std::vector<std::string> SplitLogLines(std::string_view log) {
+  std::vector<std::string> log_lines;
+  while (!log.empty()) {
+    size_t n = log.find('\n');
+    EXPECT_NE(n, std::string_view::npos) << "last log line unterminated: " << log;
+    if (n == std::string_view::npos) {
+      break;
+    }
+    log_lines.emplace_back(log.substr(0, n));
+    log.remove_prefix(n + 1);
+  }
+  return log_lines;
+}
+
+struct TestModule {
+  std::string_view name, build_id;
+  std::vector<elfldltl::Elf<>::Phdr> phdrs;
+};
+
+struct TestModuleNameCmp {
+  using is_transparent = std::true_type;
+
+  bool operator()(const TestModule& module1, const TestModule& module2) const {
+    return module1.name < module2.name;
+  }
+
+  bool operator()(const TestModule& module, std::string_view name) const {
+    return module.name < name;
+  }
+
+  bool operator()(std::string_view name, const TestModule& module) const {
+    return name < module.name;
+  }
+};
+
+const std::set<TestModule, TestModuleNameCmp> kTestModules{{
+#include "load-test-modules.inc"
+}};
+
+const TestModule& GetTestModule(std::string_view name) {
+  auto it = kTestModules.find(name);
+  EXPECT_NE(it, kTestModules.end()) << name << " not found in kTestModules!";
+  if (it == kTestModules.end()) {
+    // Just return something rather than crashing.
+    it = kTestModules.begin();
+  }
+  return *it;
+}
+
+std::string TestModuleMarkup(const TestModule& module, size_t idx,
+                             std::optional<std::string_view> name = std::nullopt) {
+  return std::string("{{{module:") + std::to_string(idx) + ":" +
+         std::string(name.value_or(module.name)) + ":elf:" + std::string(module.build_id) + "}}}";
+}
+
+TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
+  if constexpr (!TestFixture::kCanCollectLog) {
+    GTEST_SKIP() << "test requires log capture";
+  }
+
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init({}, {"LD_DEBUG=1"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({
+      "libindirect-deps-a.so",
+      "libindirect-deps-b.so",
+      "libindirect-deps-c.so",
+  }));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("indirect-deps"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  // Collect the log and slice it into lines.
+  std::vector<std::string> log_lines = SplitLogLines(this->CollectLog());
+
+  // There should be at least one module line and one mmap line per module.
+  EXPECT_GE(log_lines.size(), 2u * 5u);
+
+  cpp20::span log_lines_left{log_lines};
+  auto next_line = [left = cpp20::span{log_lines}]() mutable -> std::optional<std::string_view> {
+    if (left.empty()) {
+      return std::nullopt;
+    }
+    std::string_view line = left.front();
+    left = left.subspan(1);
+    return line;
+  };
+
+  auto expect_mmap = [page_size = static_cast<size_t>(sysconf(_SC_PAGE_SIZE)), &next_line](
+                         const TestModule& module, size_t idx) {
+    for (const auto& phdr : module.phdrs) {
+      const uint64_t vaddr = phdr.vaddr & -page_size;
+      const uint64_t memsz = ((phdr.vaddr + phdr.memsz + page_size - 1) & -page_size) - vaddr;
+      std::string flags;
+      if (phdr.flags & elfldltl::Elf<>::Phdr::kRead) {
+        flags += 'r';
+      }
+      if (phdr.flags & elfldltl::Elf<>::Phdr::kWrite) {
+        flags += 'w';
+      }
+      if (phdr.flags & elfldltl::Elf<>::Phdr::kExecute) {
+        flags += 'x';
+      }
+      uint64_t mmap_memsz, mmap_file_vaddr;
+      size_t mmap_modid;
+      char mmap_flags[5];
+      std::optional<std::string_view> line = next_line();
+      ASSERT_TRUE(line) << "missing mmap line for " << module.name << " after "
+                        << &phdr - module.phdrs.data() << " phdrs";
+      ASSERT_EQ(sscanf(std::string(*line).c_str(),
+                       "{{{mmap:%*x:%" PRIx64 ":load:%zi:%4[^:]:%" PRIx64 " }}}", &mmap_memsz,
+                       &mmap_modid, mmap_flags, &mmap_file_vaddr),
+                4)
+          << *line << " for " << module.name;
+      EXPECT_EQ(mmap_modid, idx) << *line << " for " << module.name;
+      EXPECT_EQ(mmap_file_vaddr, vaddr) << *line << " for " << module.name;
+      EXPECT_EQ(mmap_memsz, memsz) << *line << " for " << module.name;
+      EXPECT_EQ(std::string(mmap_flags), flags) << *line << " for " << module.name;
+    }
+  };
+
+  auto expect_module = [&expect_mmap, &next_line](
+                           std::string_view name, size_t idx,
+
+                           std::optional<std::string_view> modname = std::nullopt,
+                           bool skip_mmap = false) {
+    const TestModule& module = GetTestModule(name);
+    std::optional<std::string_view> line = next_line();
+
+    // If skip_mmap is true, we just saw a module line for a module whose
+    // segment details we don't know, so just expect to see some number of mmap
+    // lines for it before the next module we're looking for.
+    while (skip_mmap && line && cpp20::starts_with(*line, "{{{mmap:")) {
+      line = next_line();
+    }
+
+    EXPECT_THAT(line, ::testing::Optional(::testing::StrEq(TestModuleMarkup(module, idx, modname))))
+        << "Expected " << name << " (" << modname.value_or("<nullopt>") << ") at ID " << idx
+        << " but got: " << line.value_or("<EOF>"sv);
+    expect_mmap(module, idx);
+  };
+
+  expect_module("indirect-deps"s + std::string(TestFixture::kTestExecutableSuffix), 0,
+                "<application>");
+
+  size_t idx = 1;
+  if constexpr (!kTestExecutableNeedsVdso<TestFixture>.empty()) {
+    // The vDSO will be the first dependency.  We don't know its build ID,
+    // so just check the name.
+    std::optional<std::string_view> line = next_line();
+    EXPECT_THAT(
+        line, ::testing::Optional(::testing::StartsWith(
+                  "{{{module:1:"s + std::string(kTestExecutableNeedsVdso<TestFixture>) + ":elf:")))
+        << line.value_or("<EOF>"sv);
+    ++idx;
+  }
+
+  expect_module("libindirect-deps-a.so", idx++, std::nullopt,
+                // If we expected the vDSO module line, we expect mmap lines
+                // for it too, though we don't know what they'll say.
+                !kTestExecutableNeedsVdso<TestFixture>.empty());
+
+  expect_module("libindirect-deps-b.so", idx++);
+
+  expect_module("libindirect-deps-c.so", idx++);
+
+  // None of these modules link against ld.so itself, and on non-Fuchsia none
+  // links against the vDSO.  But those appear at the end of the list anyway.
+  const TestModule& ld_module = GetTestModule(ld::abi::Abi<>::kSoname.str());
+  std::optional<std::string_view> module_line = next_line();
+  ASSERT_THAT(module_line, ::testing::Optional(
+                               ::testing::StartsWith("{{{module:"s + std::to_string(idx) + ":")));
+  if (kTestExecutableNeedsVdso<TestFixture>.empty() &&
+      !cpp20::starts_with(*module_line, "{{{module:"s + std::to_string(idx) + ":ld.so.1")) {
+    // This must be the vDSO.  The ld.so module will be after it.  We don't
+    // know what the vDSO's mmap lines should look like, so just skip them all.
+    ++idx;
+    std::optional<std::string_view> line;
+    do {
+      line = next_line();
+    } while (line && cpp20::starts_with(*line, "{{{mmap:"));
+    module_line = line;
+  }
+
+  // Finally the ld.so module will appear.
+  EXPECT_EQ(*module_line, TestModuleMarkup(ld_module, idx, ld::abi::Abi<>::kSoname.str()));
+  expect_mmap(ld_module, idx);
+
+  // There should be no more log lines after that.
+  std::optional<std::string_view> tail = next_line();
+  EXPECT_EQ(tail, std::nullopt) << *tail;
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingSymbol) {

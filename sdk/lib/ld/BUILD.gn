@@ -82,7 +82,7 @@ template("verify_ld_abi") {
     verify_target += ".variant"
     variant_target("group") {
       visibility = [ "./*" ]
-      target_type = invoker.variant_target
+      variant_selector_target_type = invoker.variant_target
       target_name = variant_selection_target
       variant_shared_redirection = true
       data_deps = [ ":$verify_target" ]
@@ -207,48 +207,69 @@ config("standalone.config") {
 
 source_set("posix-header") {
   public = [ "posix.h" ]
+  public_deps = [
+    ":startup-load",
+    "//src/lib/elfldltl",
+  ]
 }
 
-source_set("zircon-header") {
+source_set("zircon") {
   public = [ "zircon.h" ]
-  public_deps = [ ":diagnostics" ]
+  public_deps = [
+    ":diagnostics",
+    ":startup-load",
+    "//sdk/lib/stdcompat",
+    "//src/lib/elfldltl",
+  ]
+  sources = [
+    "ldsvc.cc",
+    "procargs.cc",
+  ]
+  deps = [
+    "//zircon/system/ulib/ldmsg",
+    "//zircon/system/ulib/processargs",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
+}
+
+source_set("startup-load") {
+  public = [ "startup-load.h" ]
+  public_deps = [
+    ":abi",
+    ":allocator",
+    ":bootstrap",
+    ":diagnostics",
+    ":headers",
+    "//src/lib/elfldltl",
+    "//zircon/system/ulib/fbl",
+  ]
 }
 
 shared_library("ld-startup") {
   configs += [ ":abi-soname" ]
 
-  sources = [ "startup-load.h" ]
+  sources = []
   deps = [
-    ":abi",
-    ":allocator",
-    ":bootstrap",
-    ":diagnostics",
     ":standalone",
+    ":startup-load",
     ":tlsdesc",
-    "//src/lib/elfldltl",
-    "//zircon/system/ulib/fbl",
   ]
-
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 
   if (is_fuchsia) {
     sources += [
-      "ldsvc.cc",
-      "procargs.cc",
       "zircon-startup.S",
       "zircon-startup.cc",
     ]
     deps += [
+      ":zircon",
       ":zircon-diagnostics",
-      ":zircon-header",
       "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
       "//zircon/kernel/lib/arch",
-      "//zircon/system/ulib/ldmsg",
-      "//zircon/system/ulib/processargs",
-      "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
     ]
   } else {
@@ -289,7 +310,10 @@ shared_library("ld-startup") {
 source_set("diagnostics") {
   visibility = [ ":*" ]
   public = [ "diagnostics.h" ]
-  public_deps = [ "//src/lib/elfldltl" ]
+  public_deps = [
+    "//src/lib/elfldltl",
+    "//src/lib/symbolizer-markup",
+  ]
   sources = [ "diagnostics.cc" ]
 }
 
@@ -309,7 +333,8 @@ source_set("zircon-diagnostics") {
   sources = [ "zircon-diagnostics.cc" ]
   deps = [
     ":diagnostics",
-    ":zircon-header",
+    ":zircon",
+    "//src/lib/symbolizer-markup",
     "//zircon/system/ulib/c/stdio/printf_core:wrapper",
     "//zircon/system/ulib/zx",
   ]

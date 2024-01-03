@@ -23,6 +23,14 @@ void LdLoadTestsBase::ExpectLog(std::string_view expected_log) {
   EXPECT_EQ(log, expected_log);
 }
 
+std::string LdLoadTestsBase::CollectLog() {
+  if (!log_) {
+    ADD_FAILURE() << "CollectLog() called without successful InitLog()";
+    return {};
+  }
+  return std::move(*std::exchange(log_, {})).Finish();
+}
+
 LdLoadTestsBase::~LdLoadTestsBase() {
   // The log should have been collected by ExpectLog.  If the test is bailing
   // out early anyway, then don't confuse things with more failures.

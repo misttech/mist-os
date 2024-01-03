@@ -29,6 +29,13 @@ void DiagnosticsReport::Printf(const char* format, va_list args) const {
       StderrWrite, format, args);
 }
 
+template <>
+void DiagnosticsReport::ReportModuleLoaded<StartupModule>(const StartupModule& module) const {
+  if (startup_.ld_debug) {
+    SymbolizerContext<kBufferSize>(StderrWrite, module);
+  }
+}
+
 }  // namespace ld
 
 // TODO(mcgrathr): The llvm-libc implementation would be almost fine, but needs

@@ -23,6 +23,8 @@ namespace ld::testing {
 
 class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessTestsBase {
  public:
+  static constexpr bool kCanCollectLog = false;
+
   LdRemoteProcessTests();
   ~LdRemoteProcessTests();
 
@@ -30,7 +32,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   static constexpr bool kHasRelro = false;
   static constexpr bool kHasTls = false;
 
-  void Init(std::initializer_list<std::string_view> args = {});
+  void Init(std::initializer_list<std::string_view> args = {},
+            std::initializer_list<std::string_view> env = {});
 
   void Needed(std::initializer_list<std::string_view> names);
 

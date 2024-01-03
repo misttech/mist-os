@@ -27,7 +27,8 @@ namespace ld::testing {
 // really.  So all the methods before Run() just collect details of what to do.
 class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadZirconProcessTestsBase {
  public:
-  void Init(std::initializer_list<std::string_view> args = {});
+  void Init(std::initializer_list<std::string_view> args = {},
+            std::initializer_list<std::string_view> env = {});
 
   void Load(std::string_view executable_name);
 
@@ -36,7 +37,7 @@ class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadZirconPr
   ~LdStartupSpawnProcessTests();
 
  private:
-  std::vector<std::string> argv_;
+  std::vector<std::string> argv_, envp_;
   zx::vmo executable_;
 };
 

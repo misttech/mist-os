@@ -77,7 +77,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   // loading. Return a `DecodeResult` containing information about this
   // module's dependencies.
   template <class Diagnostics>
-  std::optional<DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo) {
+  std::optional<DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid) {
     if (!InitMappedVmo(diag, std::move(vmo))) [[unlikely]] {
       return std::nullopt;
     }
@@ -107,7 +107,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
 
     // After successfully decoding the phdrs, we may now instantiate the module
     // and set its fields.
-    EmplaceModule(name());
+    EmplaceModule(name(), modid);
 
     module().symbols_visible = true;
 
@@ -192,7 +192,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     // Decode the main executable first and save its decoded information to
     // include in the result returned to the caller.
     auto exec = std::make_unique<RemoteLoadModule>(abi::Abi<>::kExecutableName);
-    auto exec_decode_result = exec->Decode(diag, std::move(main_executable_vmo));
+    auto exec_decode_result = exec->Decode(diag, std::move(main_executable_vmo), 0);
     if (!exec_decode_result) [[unlikely]] {
       return std::nullopt;
     }
@@ -296,14 +296,16 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   static bool DecodeDeps(Diagnostics& diag, List& modules, std::vector<Soname>& needed,
                          GetDepVmo&& get_dep_vmo) {
     // Note, this assumes that ModuleList iterators are not invalidated after
-    // push_back(), done by `EnqueueDeps`. This is true of Lists. No assumptions
-    // are made on the validity of the end() iterator, so it is checked at every
-    // iteration.
+    // push_back(), done by `EnqueueDeps`.  This is true of
+    // fbl::DoublyLinkedList.  No assumptions are made on the validity of the
+    // end() iterator, so it is checked at every iteration.
+    uint32_t symbolizer_modid = 0;
     for (auto it = modules.begin(); it != modules.end(); it++) {
       if (it->HasModule()) {
         // Only the main executable should already be decoded before this loop
         // reaches it. Assert here and proceed to EnqueueDeps.
         assert(it == modules.begin());
+        assert(symbolizer_modid == 0);
       } else {
         auto vmo = get_dep_vmo(it->name());
         if (!vmo) [[unlikely]] {
@@ -314,7 +316,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
           }
           continue;
         }
-        auto result = it->Decode(diag, std::move(vmo));
+        auto result = it->Decode(diag, std::move(vmo), ++symbolizer_modid);
         if (!result) [[unlikely]] {
           return false;
         }

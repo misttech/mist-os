@@ -28,7 +28,8 @@ namespace ld::testing {
 // process mechanics, while the templated subclass does the loading.
 class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
  public:
-  void Init(std::initializer_list<std::string_view> args = {});
+  void Init(std::initializer_list<std::string_view> args = {},
+            std::initializer_list<std::string_view> env = {});
 
   int64_t Run();
 

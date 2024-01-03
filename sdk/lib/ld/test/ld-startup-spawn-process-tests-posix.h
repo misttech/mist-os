@@ -30,7 +30,8 @@ class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBas
   static constexpr int64_t kRunFailureForTrap = 128 + SIGILL;
   static constexpr int64_t kRunFailureForBadPointer = 128 + SIGSEGV;
 
-  void Init(std::initializer_list<std::string_view> args = {});
+  void Init(std::initializer_list<std::string_view> args = {},
+            std::initializer_list<std::string_view> env = {});
 
   void Load(std::string_view executable_name);
 
@@ -40,7 +41,7 @@ class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBas
 
  private:
   std::string executable_;
-  std::vector<std::string> argv_;
+  std::vector<std::string> argv_, envp_;
   pid_t pid_ = -1;
 };
 

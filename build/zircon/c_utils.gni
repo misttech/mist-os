@@ -79,8 +79,14 @@ template("toolchain_utils_action") {
 
     # Select the set of tools to use for the current toolchain.  GNU binutils
     # doesn't have all tools LLVM does, so sometimes use LLVM even if is_gcc.
-    if (is_gcc &&
-        _clang_only_utils + [ util ] - [ util ] == _clang_only_utils) {
+    # For some tools, only the LLVM version has certain features, so for
+    # explicit "llvm-foo" in $utils, use the LLVM version regardless.
+    util_no_llvm = string_replace(util, "llvm-", "", 1)
+    if (util_no_llvm != util) {
+      util = util_no_llvm
+      use_utils = _clang_utils
+    } else if (is_gcc &&
+               _clang_only_utils + [ util ] - [ util ] == _clang_only_utils) {
       use_utils = _gcc_utils
     } else {
       use_utils = _clang_utils
@@ -156,7 +162,7 @@ template("toolchain_utils_action") {
 #
 # Parameters
 #
-#   deps, outputs, testonly, visibility
+#   deps, metadata, outputs, testonly, visibility
 #     See generated_file().  $deps determines the contents as described below.
 #
 # This produces a generated_file() target with $outputs as given.  The
@@ -175,6 +181,7 @@ template("link_output_rspfile") {
                            [
                              "applicable_licenses",
                              "deps",
+                             "metadata",
                              "outputs",
                              "testonly",
                              "visibility",

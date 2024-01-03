@@ -119,21 +119,23 @@ class LoadModule {
   // constructs Module{...}).
   template <typename... Args, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<Inline>>
-  constexpr void EmplaceModule(Soname name, Args&&... args) {
+  constexpr void EmplaceModule(Soname name, uint32_t modid, Args&&... args) {
     assert(!module_);
     module_.emplace(std::forward<Args>(args)...);
     module_->link_map.name = name.c_str();
+    module_->symbolizer_modid = modid;
   }
 
   // In an instantiation with InlineModule=false, NewModule(a..., c...) does
   // new (a...) Module{c...}.  The last argument in a... must be a
   // fbl::AllocChecker that indicates whether `new` succeeded.
-  template <typename... NewArgs, bool Inline = InlineModule == LoadModuleInline::kYes,
+  template <typename... Args, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<!Inline>>
-  constexpr void NewModule(elfldltl::Soname<> name, NewArgs&&... new_args) {
+  constexpr void NewModule(Soname name, uint32_t modid, Args&&... args) {
     assert(!module_);
-    module_ = new (std::forward<NewArgs>(new_args)...) Module;
+    module_ = new (std::forward<Args>(args)...) Module;
     module_->link_map.name = name.c_str();
+    module_->symbolizer_modid = modid;
   }
 
   LoadInfo& load_info() { return load_info_; }

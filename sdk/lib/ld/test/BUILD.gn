@@ -6,6 +6,7 @@ import("//build/components/fuchsia_unittest_package.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/test.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//build/zircon/c_utils.gni")
 
 is_elf = current_os != "mac" && current_os != "win"
 
@@ -75,6 +76,7 @@ source_set("load-tests") {
     "load-tests.cc",
   ]
   deps = [
+    ":load-test-modules-info",
     "..:abi-headers",
     "..:headers",
     "..:posix-header",
@@ -141,9 +143,17 @@ if (!is_fuchsia) {
     test_tc = "(//build/toolchain:linux_$current_cpu)"
   }
 
-  group("load-test-data") {
+  # This acts as a group() target for aggregating the deps, but also collects
+  # the host_test_data() metadata (just as test_spec() will do later) so that
+  # gen-load-test-modules-info can read the file list.
+  generated_file("load-test-data") {
     testonly = true
     deps = [ "modules$test_tc" ]
+    outputs = [ "$target_gen_dir/$target_name.json" ]
+    output_conversion = "json"
+    rebase = root_build_dir
+    data_keys = [ "test_runtime_deps" ]
+    walk_keys = [ "test_runtime_deps_barrier" ]
   }
 
   # This is reached via data_deps from the test_executable() targets in
@@ -212,4 +222,36 @@ if (!is_fuchsia) {
     # or more tests.
     data_deps = [ "..:ld-startup.verify-abi" ]
   }
+}
+
+# The load-test-data target above produces a JSON file listing test binaries.
+# It's in the distribution_entries schema for Fuchsia and the test_runtime_deps
+# schema for host.  The script handles either schema in --module-list-file.
+toolchain_utils_action("gen-load-test-modules-info") {
+  visibility = [ ":load-test-modules-info" ]
+  testonly = true
+  script = "gen-load-test-modules-info.py"
+  utils = [ "llvm-readelf" ]
+  deps = [ ":load-test-data" ]
+  sources = get_target_outputs(deps[0])
+  outputs = [ "$target_gen_dir/load-test-modules.inc" ]
+  depfile = "$target_gen_dir/load-test-modules.d"
+  args = [
+    "--output=" + rebase_path(outputs[0], root_build_dir),
+    "--depfile=" + rebase_path(depfile, root_build_dir),
+    "--module-list-file=" + rebase_path(sources[0], root_build_dir),
+  ]
+}
+
+source_set("load-test-modules-info") {
+  visibility = [ ":load-tests" ]
+  testonly = true
+  public = [ "$target_gen_dir/load-test-modules.inc" ]
+  public_configs = [ ":load-test-modules-info.config" ]
+  public_deps = [ ":gen-load-test-modules-info" ]
+}
+
+config("load-test-modules-info.config") {
+  visibility = [ ":load-test-modules-info" ]
+  include_dirs = [ target_gen_dir ]
 }

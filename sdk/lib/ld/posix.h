@@ -5,11 +5,17 @@
 #ifndef LIB_LD_POSIX_H_
 #define LIB_LD_POSIX_H_
 
+#include <lib/elfldltl/mmap-loader.h>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
+#include "startup-load.h"
+
 namespace ld {
+
+using StartupModule = StartupLoadModule<elfldltl::MmapLoader>;
 
 // The auxiliary vector on the stack is a sequence of tag, value pairs.
 using Auxv = std::array<uintptr_t, 2>;
@@ -52,6 +58,8 @@ struct StartupData {
   char** envp = nullptr;
 
   size_t page_size = 0;
+
+  bool ld_debug = false;
 };
 
 }  // namespace ld

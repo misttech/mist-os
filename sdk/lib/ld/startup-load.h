@@ -140,7 +140,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // into the link_map list before the next Load call allocates the next one.
   template <class Allocator, class File>
   [[nodiscard]] StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
-                                       Elf::size_type& max_tls_modid) {
+                                       uint32_t symbolizer_modid, Elf::size_type& max_tls_modid) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
     ModuleDiagnostics module_diag(diag, this->name().str());
@@ -176,7 +176,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // start filling it in with pointers into the loaded image.
 
     fbl::AllocChecker ac;
-    this->NewModule(this->name(), allocator, ac);
+    this->NewModule(this->name(), symbolizer_modid, allocator, ac);
     CheckAlloc(diag, ac, "passive ABI module");
 
     // All modules allocated by StartupModule are part of the initial exec set
@@ -294,9 +294,14 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
  private:
-  void Preload(Module& module, cpp20::span<const Dyn> dynamic) {
+  void Preload(Diagnostics& diag, Module& module, cpp20::span<const Dyn> dynamic) {
     set_module(module);
     dynamic_ = dynamic;
+
+    // Scan the phdrs to populate the LoadInfo just so it can be used for
+    // things like symbolizer markup.
+    elfldltl::DecodePhdrs(diag, module.phdrs.get(),
+                          load_info().GetPhdrObserver(loader_.page_size()));
   }
 
   bool IsLoaded() const { return HasModule(); }
@@ -308,7 +313,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     List preloaded_modules;
     for (const auto& [module, dyn] : modules) {
       StartupLoadModule* m = New(diag, allocator, module.soname, loader_args...);
-      m->Preload(module, dyn);
+      m->Preload(diag, module, dyn);
       preloaded_modules.push_back(m);
     }
     return preloaded_modules;
@@ -368,16 +373,18 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // push_back(), done by `EnqueueDeps`. This is true of lists and
     // StaticVector. No assumptions are made on the validity of the end()
     // iterator, so it is checked at every iteration.
+    uint32_t symbolizer_modid = 0;
     for (auto it = modules.begin(); it != modules.end(); it++) {
       const bool was_already_loaded = it->IsLoaded();
-      if (!was_already_loaded) {
-        if (auto file = get_dep_file(it->name())) {
-          needed_count = it->Load(diag, initial_exec, *file, max_tls_modid).needed_count;
-          assert(it->IsLoaded());
-        } else {
-          diag.MissingDependency(it->name().str());
-          return;
-        }
+      if (was_already_loaded) {
+        it->module().symbolizer_modid = symbolizer_modid++;
+      } else if (auto file = get_dep_file(it->name())) {
+        needed_count =
+            it->Load(diag, initial_exec, *file, symbolizer_modid++, max_tls_modid).needed_count;
+        assert(it->IsLoaded());
+      } else {
+        diag.MissingDependency(it->name().str());
+        return;
       }
       // The main executable is always first in the list, so its prev is
       // already correct and adding the second module will set its next.
@@ -403,6 +410,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   static void CommitModules(Diagnostics& diag, List modules) {
     while (!modules.is_empty()) {
       auto* module = modules.pop_front();
+      diag.report().ReportModuleLoaded(*module);
       std::move(*module).Commit();
       // The `operator delete` this calls does nothing since the scratch
       // allocator doesn't support deallocation per se since the scratch
@@ -414,18 +422,22 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   static void PopulateAbiLoadedModules(List& modules, List preloaded_modules) {
     // We want to add the remaining modules to the list. Their symbols aren't
     // visible for symbolic resolution, but the program can still use their
-    // functions even with no relocations resolving to their
-    // symbols. Therefore, we need to add these modules to the global module
-    // list so they can still be seen by dl_iterate_phdr for unwinding
-    // purposes.  For example, TLSDESC implementation code lives in the dynamic
-    // linker and will be called as part of the TLS implementation without ever
-    // having a DT_NEEDED on ld.so. On systems other than Fuchsia it may also
-    // be possible to get code from the vDSO without an explicit DT_NEEDED,
-    // which is common on Linux.
-    auto curr = std::prev(modules.end());
+    // functions even with no relocations resolving to their symbols.
+    // Therefore, we need to add these modules to the global module list so
+    // they can still be seen by dl_iterate_phdr for unwinding purposes.  For
+    // example, TLSDESC implementation code lives in the dynamic linker and
+    // will be called as part of the TLS implementation without ever having a
+    // DT_NEEDED on ld.so. On systems other than Fuchsia it may also be
+    // possible to get code from the vDSO without an explicit DT_NEEDED, which
+    // is common on Linux.
+    auto last = std::prev(modules.end());
     modules.splice(modules.end(), preloaded_modules);
-    for (auto next = std::next(curr), end = modules.end(); next != end; curr = next, next++) {
-      next->AddToPassiveAbi(curr, false);
+    for (auto next = std::next(last), end = modules.end(); next != end; last = next, next++) {
+      // Assign increasing symbolizer module IDs to the preloaded module now,
+      // so the ID order matches the list order.  Its module() is still mutable
+      // since it's in .bss rather than coming from the InitialExecAllocator.
+      next->module().symbolizer_modid = last->module().symbolizer_modid + 1;
+      next->AddToPassiveAbi(last, false);
     }
 
     ld::mutable_abi.loaded_modules = &modules.begin()->module();
