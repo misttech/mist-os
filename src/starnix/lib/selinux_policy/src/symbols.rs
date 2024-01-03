@@ -3,33 +3,62 @@
 // found in the LICENSE file.
 
 use super::{
-    error::ParseError, extensible_bitmap::ExtensibleBitmap, Array, Counted, Parse, ParseSlice,
-    Validate,
+    array_type, array_type_validate_deref_both, array_type_validate_deref_data,
+    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
+    error::ParseError, extensible_bitmap::ExtensibleBitmap, parser::ParseStrategy, Array, Counted,
+    Parse, ParseSlice, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
-use std::{fmt::Debug, ops::Deref as _};
-use zerocopy::{
-    little_endian as le, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use std::{fmt::Debug, ops::Deref};
+use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
+
+/// The `type` field value for a [`Constraint`] that contains an [`ExtensibleBitmap`] and
+/// [`TypeSet`].
+const CONSTRAINT_TYPE_HAS_EXTENSIBLE_BITMAP_AND_TYPE_SET: u32 = 5;
 
 /// [`SymbolList`] is an [`Array`] of items with the count of items determined by [`Metadata`] as
 /// [`Counted`].
-pub(crate) type SymbolList<B, T> = Array<B, Ref<B, Metadata>, T>;
+#[derive(Debug, PartialEq)]
+pub(crate) struct SymbolList<PS: ParseStrategy, T>(Array<PS, PS::Output<Metadata>, Vec<T>>);
 
-impl<B: ByteSlice + Debug + PartialEq, T: Debug + ParseSlice<B> + PartialEq + Validate> Validate
-    for SymbolList<B, T>
+impl<PS: ParseStrategy, T> Deref for SymbolList<PS, T> {
+    type Target = Array<PS, PS::Output<Metadata>, Vec<T>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<PS: ParseStrategy, T> Parse<PS> for SymbolList<PS, T>
+where
+    Array<PS, PS::Output<Metadata>, Vec<T>>: Parse<PS>,
 {
-    type Error = ParseError;
+    type Error = <Array<PS, PS::Output<Metadata>, Vec<T>> as Parse<PS>>::Error;
+
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+        let (array, tail) = Array::<PS, PS::Output<Metadata>, Vec<T>>::parse(bytes)?;
+        Ok((Self(array), tail))
+    }
+}
+
+impl<PS: ParseStrategy, T> Validate for SymbolList<PS, T>
+where
+    [T]: Validate,
+{
+    type Error = anyhow::Error;
 
     /// [`SymbolList`] has no internal constraints beyond those imposed by [`Array`].
     fn validate(&self) -> Result<(), Self::Error> {
+        PS::deref(&self.metadata).validate().map_err(Into::<anyhow::Error>::into)?;
+        self.data.as_slice().validate().map_err(Into::<anyhow::Error>::into)?;
+
         Ok(())
     }
 }
 
 /// Binary metadata prefix to [`SymbolList`] objects.
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct Metadata {
     /// The number of primary names referred to in the associated [`SymbolList`].
@@ -53,7 +82,7 @@ impl Counted for Metadata {
 }
 
 impl Validate for Metadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound on `primary_names_count` or `count`?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -61,10 +90,8 @@ impl Validate for Metadata {
     }
 }
 
-pub(crate) type CommonSymbols<B> = Vec<CommonSymbol<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for CommonSymbols<B> {
-    type Error = <CommonSymbol<B> as Parse<B>>::Error;
+impl<PS: ParseStrategy> Validate for [CommonSymbol<PS>] {
+    type Error = <CommonSymbol<PS> as Validate>::Error;
 
     /// [`CommonSymbols`] have no internal constraints beyond those imposed by individual
     /// [`CommonSymbol`] objects.
@@ -73,11 +100,18 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for CommonSymbols<B> {
     }
 }
 
-/// [`CommonSymbol`] is an [`Array`] of items parsed via [`Permissions`] with the count of items
-/// determined by [`CommonSymbolMetadata`] as [`Counted`].
-pub(crate) type CommonSymbol<B> = Array<B, CommonSymbolMetadata<B>, Permissions<B>>;
+array_type!(CommonSymbol, PS, CommonSymbolMetadata<PS>, Permissions<PS>);
 
-impl<B: ByteSlice + Debug + PartialEq> Counted for CommonSymbol<B> {
+array_type_validate_deref_none_data_vec!(CommonSymbol);
+
+impl<PS: ParseStrategy> Counted for CommonSymbol<PS>
+where
+    CommonSymbolMetadata<PS>: Parse<PS> + Validate,
+    Array<PS, PS::Output<CommonSymbolStaticMetadata>, PS::Slice<u8>>: Parse<PS>,
+    Array<PS, PS::Output<PermissionMetadata>, PS::Slice<u8>>: Parse<PS>,
+    Array<PS, CommonSymbolMetadata<PS>, Vec<Permission<PS>>>: Parse<PS>,
+    Vec<Permission<PS>>: ParseSlice<PS>,
+{
     /// The count of items in the associated [`Permissions`] is exposed via
     /// `CommonSymbolMetadata::count()`.
     fn count(&self) -> u32 {
@@ -85,39 +119,46 @@ impl<B: ByteSlice + Debug + PartialEq> Counted for CommonSymbol<B> {
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for CommonSymbol<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<CommonSymbolMetadata<PS>, Permission<PS>>
+    for CommonSymbol<PS>
+{
+    type Error = anyhow::Error;
 
     /// [`CommonSymbol`] have no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a CommonSymbolMetadata<PS>,
+        _data: &'a [Permission<PS>],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-/// [`CommonSymbolMetadata`] is an [`Array`] of items parsed via `Ref<B, [u8]>` with the count of
-/// itemsdetermined by [`CommonSymbolStaticMetadata`] as [`Counted`].
-pub(crate) type CommonSymbolMetadata<B> =
-    Array<B, Ref<B, CommonSymbolStaticMetadata>, Ref<B, [u8]>>;
+array_type!(CommonSymbolMetadata, PS, PS::Output<CommonSymbolStaticMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Counted for CommonSymbolMetadata<B> {
+array_type_validate_deref_both!(CommonSymbolMetadata);
+
+impl<PS: ParseStrategy> Counted for CommonSymbolMetadata<PS> {
     /// The count of items in the associated [`Permissions`] is stored in the associated
     /// `CommonSymbolStaticMetadata::count` field.
     fn count(&self) -> u32 {
-        self.metadata.deref().count.get()
+        PS::deref(&self.metadata).count.get()
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for CommonSymbolMetadata<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<CommonSymbolStaticMetadata, u8> for CommonSymbolMetadata<PS> {
+    type Error = anyhow::Error;
 
     /// Array of [`u8`] sized by [`CommonSymbolStaticMetadata`] requires no additional validation.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a CommonSymbolStaticMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 /// Static (that is, fixed-sized) metadata for a common symbol.
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct CommonSymbolStaticMetadata {
     /// The length of the `[u8]` key stored in the associated [`CommonSymbolMetadata`].
@@ -132,7 +173,7 @@ pub(crate) struct CommonSymbolStaticMetadata {
 }
 
 impl Validate for CommonSymbolStaticMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound on `length`?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -148,10 +189,10 @@ impl Counted for CommonSymbolStaticMetadata {
 }
 
 /// [`Permissions`] is a dynamically allocated slice (that is, [`Vec`]) of [`Permission`].
-pub(crate) type Permissions<B> = Vec<Permission<B>>;
+pub(crate) type Permissions<PS> = Vec<Permission<PS>>;
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Permissions<B> {
-    type Error = <Permission<B> as Parse<B>>::Error;
+impl<PS: ParseStrategy> Validate for Permissions<PS> {
+    type Error = anyhow::Error;
 
     /// [`Permissions`] have no internal constraints beyond those imposed by individual
     /// [`Permission`] objects.
@@ -160,20 +201,23 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Permissions<B> {
     }
 }
 
-/// [`Permission`] is an [`Array`] of items parsed via `Ref<B, [u8]>` with the count of items
-/// determined by a `Ref<B, PermissionMetadata>` as [`Counted`].
-pub(crate) type Permission<B> = Array<B, Ref<B, PermissionMetadata>, Ref<B, [u8]>>;
+array_type!(Permission, PS, PS::Output<PermissionMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Permission<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(Permission);
+
+impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS> {
+    type Error = anyhow::Error;
 
     /// [`Permission`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a PermissionMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct PermissionMetadata {
     /// The length of the `[u8]` in the associated [`Permission`].
@@ -189,7 +233,7 @@ impl Counted for PermissionMetadata {
 }
 
 impl Validate for PermissionMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound on `length`?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -197,10 +241,10 @@ impl Validate for PermissionMetadata {
     }
 }
 
-pub(crate) type ConstraintsList<B> = Vec<PermissionAndConstraints<B>>;
+pub(crate) type ConstraintsList<PS> = Vec<PermissionAndConstraints<PS>>;
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ConstraintsList<B> {
-    type Error = <PermissionAndConstraints<B> as Parse<B>>::Error;
+impl<PS: ParseStrategy> Validate for ConstraintsList<PS> {
+    type Error = anyhow::Error;
 
     /// [`ConstraintsList`] have no internal constraints beyond those imposed by individual
     /// [`PermissionAndConstraints`] objects.
@@ -210,53 +254,57 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ConstraintsList<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct PermissionAndConstraints<B: ByteSlice + Debug + PartialEq> {
-    permission_bitset: Ref<B, le::U32>,
-    constraints: ConstraintList<B>,
+pub(crate) struct PermissionAndConstraints<PS: ParseStrategy>
+where
+    ConstraintList<PS>: Debug + PartialEq,
+{
+    permission_bitset: PS::Output<le::U32>,
+    constraints: ConstraintList<PS>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for PermissionAndConstraints<B> {
+impl<PS: ParseStrategy> Parse<PS> for PermissionAndConstraints<PS>
+where
+    ConstraintList<PS>: Debug + PartialEq + Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (permission_bitset, tail) = Ref::<B, le::U32>::new_unaligned_from_prefix(tail).ok_or(
+        let (permission_bitset, tail) = PS::parse::<le::U32>(tail).ok_or(
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "PermissionBitset",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             }),
         )?;
-        let (constraints, tail) =
-            ConstraintList::parse(tail).context("parsing constraint list in constraints list")?;
+        let (constraints, tail) = ConstraintList::parse(tail)
+            .map_err(|error| error.into() as anyhow::Error)
+            .context("parsing constraint list in constraints list")?;
 
         Ok((Self { permission_bitset, constraints }, tail))
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for PermissionAndConstraints<B> {
-    type Error = ParseError;
+array_type!(ConstraintList, PS, PS::Output<ConstraintCount>, Constraints<PS>);
 
-    /// TODO: Should there be internal validation between `permission_bitset` and `constraints`?
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
+array_type_validate_deref_metadata_data_vec!(ConstraintList);
 
-pub(crate) type ConstraintList<B> = Array<B, Ref<B, ConstraintCount>, Constraints<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for ConstraintList<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<ConstraintCount, Constraint<PS>> for ConstraintList<PS> {
+    type Error = anyhow::Error;
 
     /// [`ConstraintList`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    /// [`Permission`] has no internal constraints beyond those imposed by [`Array`].
+    fn validate_array<'a>(
+        _metadata: &'a ConstraintCount,
+        _data: &'a [Constraint<PS>],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConstraintCount(le::U32);
 
@@ -267,7 +315,7 @@ impl Counted for ConstraintCount {
 }
 
 impl Validate for ConstraintCount {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound on constraint count?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -275,10 +323,10 @@ impl Validate for ConstraintCount {
     }
 }
 
-pub(crate) type Constraints<B> = Vec<Constraint<B>>;
+pub(crate) type Constraints<PS> = Vec<Constraint<PS>>;
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Constraints<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for Constraints<PS> {
+    type Error = anyhow::Error;
 
     /// [`Permissions`] have no internal constraints beyond those imposed by individual
     /// [`Permission`] objects.
@@ -288,35 +336,29 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Constraints<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Constraint<B: ByteSlice + Debug + PartialEq> {
-    metadata: Ref<B, ConstraintMetadata>,
-    names: Option<ExtensibleBitmap<B>>,
-    names_type_set: Option<TypeSet<B>>,
+pub(crate) struct Constraint<PS: ParseStrategy> {
+    metadata: PS::Output<ConstraintMetadata>,
+    names: Option<ExtensibleBitmap<PS>>,
+    names_type_set: Option<TypeSet<PS>>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Constraint<B> {
-    type Error = ParseError;
-
-    /// TODO: Verify expected internal relationships between `metadata`, `names`, and
-    /// `names_type_set`.
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Constraint<B> {
+impl<PS: ParseStrategy> Parse<PS> for Constraint<PS>
+where
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) =
-            Ref::<B, ConstraintMetadata>::parse(tail).context("parsing constraint metadata")?;
+            PS::parse::<ConstraintMetadata>(tail).context("parsing constraint metadata")?;
 
-        let (names, names_type_set, tail) = match metadata.deref().constraint_type.get() {
-            5 => {
-                let (names, tail) =
-                    ExtensibleBitmap::parse(tail).context("parsing constraint names")?;
+        let (names, names_type_set, tail) = match PS::deref(&metadata).constraint_type.get() {
+            CONSTRAINT_TYPE_HAS_EXTENSIBLE_BITMAP_AND_TYPE_SET => {
+                let (names, tail) = ExtensibleBitmap::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing constraint names")?;
                 let (names_type_set, tail) =
                     TypeSet::parse(tail).context("parsing constraint names type set")?;
                 (Some(names), Some(names_type_set), tail)
@@ -328,7 +370,7 @@ impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Constraint<B> {
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConstraintMetadata {
     constraint_type: le::U32,
@@ -337,7 +379,7 @@ pub(crate) struct ConstraintMetadata {
 }
 
 impl Validate for ConstraintMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Verify meaningful encoding of `constraint_type`, `attribute`, `operands`.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -346,41 +388,44 @@ impl Validate for ConstraintMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct TypeSet<B: ByteSlice + Debug + PartialEq> {
-    types: ExtensibleBitmap<B>,
-    negative_set: ExtensibleBitmap<B>,
-    flags: Ref<B, le::U32>,
+pub(crate) struct TypeSet<PS: ParseStrategy> {
+    types: ExtensibleBitmap<PS>,
+    negative_set: ExtensibleBitmap<PS>,
+    flags: PS::Output<le::U32>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for TypeSet<B> {
+impl<PS: ParseStrategy> Parse<PS> for TypeSet<PS>
+where
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (types, tail) = ExtensibleBitmap::parse(tail).context("parsing type set types")?;
+        let (types, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing type set types")?;
 
-        let (negative_set, tail) =
-            ExtensibleBitmap::parse(tail).context("parsing type set negative set")?;
+        let (negative_set, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing type set negative set")?;
 
         let num_bytes = tail.len();
-        let (flags, tail) =
-            Ref::<B, le::U32>::new_unaligned_from_prefix(tail).ok_or(
-                Into::<anyhow::Error>::into(ParseError::MissingData {
-                    type_name: "TypeSetFlags",
-                    type_size: std::mem::size_of::<le::U32>(),
-                    num_bytes,
-                }),
-            )?;
+        let (flags, tail) = PS::parse::<le::U32>(tail).ok_or(Into::<anyhow::Error>::into(
+            ParseError::MissingData {
+                type_name: "TypeSetFlags",
+                type_size: std::mem::size_of::<le::U32>(),
+                num_bytes,
+            },
+        ))?;
 
         Ok((Self { types, negative_set, flags }, tail))
     }
 }
 
-pub(crate) type Classes<B> = Vec<Class<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Classes<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [Class<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`Class`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -389,42 +434,38 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Classes<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Class<B: ByteSlice + Debug + PartialEq> {
-    constraints: ClassConstraints<B>,
-    validate_transitions: ClassValidateTransitions<B>,
-    defaults: Ref<B, ClassDefaults>,
+pub(crate) struct Class<PS: ParseStrategy> {
+    constraints: ClassConstraints<PS>,
+    validate_transitions: ClassValidateTransitions<PS>,
+    defaults: PS::Output<ClassDefaults>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Class<B> {
+impl<PS: ParseStrategy> Parse<PS> for Class<PS>
+where
+    ClassConstraints<PS>: Parse<PS>,
+    ClassValidateTransitions<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (constraints, tail) =
-            ClassConstraints::parse(tail).context("parsing class constraints")?;
+        let (constraints, tail) = ClassConstraints::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing class constraints")?;
 
-        let (validate_transitions, tail) =
-            ClassValidateTransitions::parse(tail).context("parsing class validate transitions")?;
+        let (validate_transitions, tail) = ClassValidateTransitions::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing class validate transitions")?;
 
         let (defaults, tail) =
-            Ref::<B, ClassDefaults>::parse(tail).context("parsing class defaults")?;
+            PS::parse::<ClassDefaults>(tail).context("parsing class defaults")?;
 
         Ok((Self { constraints, validate_transitions, defaults }, tail))
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Class<B> {
-    type Error = ParseError;
-
-    /// TODO: Add validation of consistency between `constraints`, `validate_transitions`, and
-    /// `defaults`.
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassDefaults {
     default_user: le::U32,
@@ -433,28 +474,30 @@ pub(crate) struct ClassDefaults {
     default_type: le::U32,
 }
 
-impl Validate for ClassDefaults {
-    type Error = ParseError;
+array_type!(
+    ClassValidateTransitions,
+    PS,
+    PS::Output<ClassValidateTransitionsCount>,
+    Constraints<PS>
+);
 
-    /// Default values may be arbitrary [`u32`] values.
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
+array_type_validate_deref_metadata_data_vec!(ClassValidateTransitions);
 
-pub(crate) type ClassValidateTransitions<B> =
-    Array<B, Ref<B, ClassValidateTransitionsCount>, Constraints<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for ClassValidateTransitions<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<ClassValidateTransitionsCount, Constraint<PS>>
+    for ClassValidateTransitions<PS>
+{
+    type Error = anyhow::Error;
 
     /// [`ClassValidateTransitions`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a ClassValidateTransitionsCount,
+        _data: &'a [Constraint<PS>],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassValidateTransitionsCount(le::U32);
 
@@ -465,7 +508,7 @@ impl Counted for ClassValidateTransitionsCount {
 }
 
 impl Validate for ClassValidateTransitionsCount {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound on class validate transitions count?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -473,72 +516,108 @@ impl Validate for ClassValidateTransitionsCount {
     }
 }
 
-pub(crate) type ClassConstraints<B> = Array<B, ClassPermissions<B>, ConstraintsList<B>>;
+array_type!(ClassConstraints, PS, ClassPermissions<PS>, ConstraintsList<PS>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ClassConstraints<B> {
-    type Error = ParseError;
+array_type_validate_deref_none_data_vec!(ClassConstraints);
+
+impl<PS: ParseStrategy> ValidateArray<ClassPermissions<PS>, PermissionAndConstraints<PS>>
+    for ClassConstraints<PS>
+{
+    type Error = anyhow::Error;
 
     /// [`ClassConstraints`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a ClassPermissions<PS>,
+        _data: &'a [PermissionAndConstraints<PS>],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-pub(crate) type ClassPermissions<B> = Array<B, ClassCommonKey<B>, Permissions<B>>;
+array_type!(ClassPermissions, PS, ClassCommonKey<PS>, Permissions<PS>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ClassPermissions<B> {
-    type Error = ParseError;
+array_type_validate_deref_none_data_vec!(ClassPermissions);
+
+impl<PS: ParseStrategy> ValidateArray<ClassCommonKey<PS>, Permission<PS>> for ClassPermissions<PS> {
+    type Error = anyhow::Error;
 
     /// [`ClassPermissions`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a ClassCommonKey<PS>,
+        _data: &'a [Permission<PS>],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Counted for ClassPermissions<B> {
+impl<PS: ParseStrategy> Counted for ClassPermissions<PS>
+where
+    ClassCommonKey<PS>: Parse<PS>,
+    Array<PS, ClassKey<PS>, PS::Slice<u8>>: Parse<PS>,
+    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
+    ClassKey<PS>: Parse<PS>,
+    Vec<Permission<PS>>: ParseSlice<PS>,
+    Array<PS, PS::Output<PermissionMetadata>, PS::Slice<u8>>: Parse<PS>,
+    Array<PS, ClassCommonKey<PS>, Vec<Permission<PS>>>: Parse<PS>,
+{
     /// [`ClassPermissions`] acts as counted metadata for [`ClassConstraints`].
     fn count(&self) -> u32 {
-        self.metadata.metadata.metadata.deref().constraint_count.get()
+        PS::deref(&self.metadata.metadata.metadata).constraint_count.get()
     }
 }
 
-pub(crate) type ClassCommonKey<B> = Array<B, ClassKey<B>, Ref<B, [u8]>>;
+array_type!(ClassCommonKey, PS, ClassKey<PS>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ClassCommonKey<B> {
-    type Error = ParseError;
+array_type_validate_deref_data!(ClassCommonKey);
+
+impl<PS: ParseStrategy> ValidateArray<ClassKey<PS>, u8> for ClassCommonKey<PS> {
+    type Error = anyhow::Error;
 
     /// [`ClassCommonKey`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(_metadata: &'a ClassKey<PS>, _data: &'a [u8]) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Counted for ClassCommonKey<B> {
+impl<PS: ParseStrategy> Counted for ClassCommonKey<PS>
+where
+    Array<PS, ClassKey<PS>, PS::Slice<u8>>: Parse<PS>,
+    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
+    ClassKey<PS>: Parse<PS>,
+{
     /// [`ClassCommonKey`] acts as counted metadata for [`ClassPermissions`].
     fn count(&self) -> u32 {
-        self.metadata.metadata.deref().elements_count.get()
+        PS::deref(&self.metadata.metadata).elements_count.get()
     }
 }
 
-pub(crate) type ClassKey<B> = Array<B, Ref<B, ClassMetadata>, Ref<B, [u8]>>;
+array_type!(ClassKey, PS, PS::Output<ClassMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ClassKey<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(ClassKey);
+
+impl<PS: ParseStrategy> ValidateArray<ClassMetadata, u8> for ClassKey<PS> {
+    type Error = anyhow::Error;
 
     /// [`ClassKey`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a ClassMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Counted for ClassKey<B> {
+impl<PS: ParseStrategy> Counted for ClassKey<PS>
+where
+    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
+{
     /// [`ClassKey`] acts as counted metadata for [`ClassCommonKey`].
     fn count(&self) -> u32 {
-        self.metadata.deref().common_key_length.get()
+        PS::deref(&self.metadata).common_key_length.get()
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ClassMetadata {
     key_length: le::U32,
@@ -556,7 +635,7 @@ impl Counted for ClassMetadata {
 }
 
 impl Validate for ClassMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be an upper bound `u32` values in [`ClassMetadata`]?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -564,10 +643,8 @@ impl Validate for ClassMetadata {
     }
 }
 
-pub(crate) type Roles<B> = Vec<Role<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Roles<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [Role<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`Role`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -576,51 +653,55 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Roles<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Role<B: ByteSlice + Debug + PartialEq> {
-    metadata: RoleMetadata<B>,
-    role_dominates: ExtensibleBitmap<B>,
-    role_types: ExtensibleBitmap<B>,
+pub(crate) struct Role<PS: ParseStrategy> {
+    metadata: RoleMetadata<PS>,
+    role_dominates: ExtensibleBitmap<PS>,
+    role_types: ExtensibleBitmap<PS>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Role<B> {
+impl<PS: ParseStrategy> Parse<PS> for Role<PS>
+where
+    RoleMetadata<PS>: Parse<PS>,
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) = RoleMetadata::parse(tail).context("parsing role metadata")?;
+        let (metadata, tail) = RoleMetadata::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing role metadata")?;
 
-        let (role_dominates, tail) =
-            ExtensibleBitmap::parse(tail).context("parsing role dominates")?;
+        let (role_dominates, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing role dominates")?;
 
-        let (role_types, tail) = ExtensibleBitmap::parse(tail).context("parsing role types")?;
+        let (role_types, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing role types")?;
 
         Ok((Self { metadata, role_dominates, role_types }, tail))
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Role<B> {
-    type Error = ParseError;
+array_type!(RoleMetadata, PS, PS::Output<RoleStaticMetadata>, PS::Slice<u8>);
 
-    /// TODO: Should there be internal validation checks between `metadata`, `role_dominates`, and
-    /// `role_types`?
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
+array_type_validate_deref_both!(RoleMetadata);
 
-pub(crate) type RoleMetadata<B> = Array<B, Ref<B, RoleStaticMetadata>, Ref<B, [u8]>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for RoleMetadata<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<RoleStaticMetadata, u8> for RoleMetadata<PS> {
+    type Error = anyhow::Error;
 
     /// [`RoleMetadata`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a RoleStaticMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct RoleStaticMetadata {
     length: le::U32,
@@ -636,7 +717,7 @@ impl Counted for RoleStaticMetadata {
 }
 
 impl Validate for RoleStaticMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Should there be any constraints on `length`, `value`, or `bounds`?
     fn validate(&self) -> Result<(), Self::Error> {
@@ -644,10 +725,8 @@ impl Validate for RoleStaticMetadata {
     }
 }
 
-pub(crate) type Types<B> = Vec<Type<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Types<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [Type<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`Type`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -655,18 +734,20 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Types<B> {
     }
 }
 
-pub(crate) type Type<B> = Array<B, Ref<B, TypeMetadata>, Ref<B, [u8]>>;
+array_type!(Type, PS, PS::Output<TypeMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Type<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(Type);
+
+impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate that `self.data.deref()` is an ascii string that contains a valid type name.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(_metadata: &'a TypeMetadata, _data: &'a [u8]) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct TypeMetadata {
     length: le::U32,
@@ -682,7 +763,7 @@ impl Counted for TypeMetadata {
 }
 
 impl Validate for TypeMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate [`TypeMetadata`] internals.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -690,10 +771,8 @@ impl Validate for TypeMetadata {
     }
 }
 
-pub(crate) type Users<B> = Vec<User<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Users<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [User<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`User`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -702,22 +781,30 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Users<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct User<B: ByteSlice + Debug + PartialEq> {
-    user_data: UserData<B>,
-    roles: ExtensibleBitmap<B>,
-    expanded_range: MlsRange<B>,
-    default_level: MLSLevel<B>,
+pub(crate) struct User<PS: ParseStrategy> {
+    user_data: UserData<PS>,
+    roles: ExtensibleBitmap<PS>,
+    expanded_range: MlsRange<PS>,
+    default_level: MLSLevel<PS>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for User<B> {
+impl<PS: ParseStrategy> Parse<PS> for User<PS>
+where
+    UserData<PS>: Parse<PS>,
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (user_data, tail) = UserData::parse(tail).context("parsing user data")?;
+        let (user_data, tail) = UserData::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing user data")?;
 
-        let (roles, tail) = ExtensibleBitmap::parse(tail).context("parsing user roles")?;
+        let (roles, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing user roles")?;
 
         let (expanded_range, tail) =
             MlsRange::parse(tail).context("parsing user expanded range")?;
@@ -728,27 +815,20 @@ impl<B: ByteSlice + Debug + PartialEq> Parse<B> for User<B> {
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for User<B> {
-    type Error = ParseError;
+array_type!(UserData, PS, PS::Output<UserMetadata>, PS::Slice<u8>);
 
-    /// TODO: Validate internal consistency of [`User`].
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
+array_type_validate_deref_both!(UserData);
 
-pub(crate) type UserData<B> = Array<B, Ref<B, UserMetadata>, Ref<B, [u8]>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for UserData<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> ValidateArray<UserMetadata, u8> for UserData<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`UserMetadata`] in `self.metadata` and `[u8]` key in `self.data`.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(_metadata: &'a UserMetadata, _data: &'a [u8]) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct UserMetadata {
     length: le::U32,
@@ -763,7 +843,7 @@ impl Counted for UserMetadata {
 }
 
 impl Validate for UserMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate [`UserMetadata`] internals.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -772,56 +852,62 @@ impl Validate for UserMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct MlsRange<B: ByteSlice + Debug + PartialEq> {
-    count: Ref<B, le::U32>,
-    sensitivity_low: Ref<B, le::U32>,
-    sensitivity_high: Option<Ref<B, le::U32>>,
-    low_categories: ExtensibleBitmap<B>,
-    high_categories: Option<ExtensibleBitmap<B>>,
+pub(crate) struct MlsRange<PS: ParseStrategy> {
+    count: PS::Output<le::U32>,
+    sensitivity_low: PS::Output<le::U32>,
+    sensitivity_high: Option<PS::Output<le::U32>>,
+    low_categories: ExtensibleBitmap<PS>,
+    high_categories: Option<ExtensibleBitmap<PS>>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for MlsRange<B> {
+impl<PS: ParseStrategy> Parse<PS> for MlsRange<PS>
+where
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (count, tail) =
-            Ref::<B, le::U32>::new_unaligned_from_prefix(tail).ok_or(ParseError::MissingData {
-                type_name: "MLSRangeCount",
-                type_size: std::mem::size_of::<le::U32>(),
-                num_bytes,
-            })?;
+        let (count, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            type_name: "MLSRangeCount",
+            type_size: std::mem::size_of::<le::U32>(),
+            num_bytes,
+        })?;
 
         let num_bytes = tail.len();
         let (sensitivity_low, tail) =
-            Ref::<B, le::U32>::new_unaligned_from_prefix(tail).ok_or(ParseError::MissingData {
+            PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "MLSRangeSensitivityLow",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })?;
 
-        let (sensitivity_high, low_categories, high_categories, tail) = if count.deref().get() > 1 {
-            let num_bytes = tail.len();
-            let (sensitivity_high, tail) = Ref::<B, le::U32>::new_unaligned_from_prefix(tail)
-                .ok_or(ParseError::MissingData {
-                    type_name: "MLSRangeSensitivityHigh",
-                    type_size: std::mem::size_of::<le::U32>(),
-                    num_bytes,
-                })?;
-            let (low_categories, tail) =
-                ExtensibleBitmap::parse(tail).context("parsing mls range low categories")?;
-            let (high_categories, tail) =
-                ExtensibleBitmap::parse(tail).context("parsing mls range high categories")?;
+        let (sensitivity_high, low_categories, high_categories, tail) =
+            if PS::deref(&count).get() > 1 {
+                let num_bytes = tail.len();
+                let (sensitivity_high, tail) =
+                    PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                        type_name: "MLSRangeSensitivityHigh",
+                        type_size: std::mem::size_of::<le::U32>(),
+                        num_bytes,
+                    })?;
+                let (low_categories, tail) = ExtensibleBitmap::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing mls range low categories")?;
+                let (high_categories, tail) = ExtensibleBitmap::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing mls range high categories")?;
 
-            (Some(sensitivity_high), low_categories, Some(high_categories), tail)
-        } else {
-            let (low_categories, tail) =
-                ExtensibleBitmap::parse(tail).context("parsing mls range low categories")?;
+                (Some(sensitivity_high), low_categories, Some(high_categories), tail)
+            } else {
+                let (low_categories, tail) = ExtensibleBitmap::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing mls range low categories")?;
 
-            (None, low_categories, None, tail)
-        };
+                (None, low_categories, None, tail)
+            };
 
         Ok((
             Self { count, sensitivity_low, sensitivity_high, low_categories, high_categories },
@@ -830,23 +916,7 @@ impl<B: ByteSlice + Debug + PartialEq> Parse<B> for MlsRange<B> {
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for MlsRange<B> {
-    type Error = anyhow::Error;
-
-    /// TODO: Validate [`MLSRange`] internal consistency in addition to delegating to extensible
-    /// bitmap metadata.
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.low_categories.validate().context("validating mls range low categories")?;
-
-        if let Some(high_categories) = &self.high_categories {
-            high_categories.validate().context("validating mls range high categories")?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct MLSRangeMetadata {
     count: le::U32,
@@ -855,7 +925,7 @@ pub(crate) struct MLSRangeMetadata {
 }
 
 impl Validate for MLSRangeMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate [`MLSRangeMetadata`] internals.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -864,46 +934,37 @@ impl Validate for MLSRangeMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct MLSLevel<B: ByteSlice + Debug + PartialEq> {
-    sensitivity: Ref<B, le::U32>,
-    categories: ExtensibleBitmap<B>,
+pub(crate) struct MLSLevel<PS: ParseStrategy> {
+    sensitivity: PS::Output<le::U32>,
+    categories: ExtensibleBitmap<PS>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for MLSLevel<B> {
+impl<PS: ParseStrategy> Parse<PS> for MLSLevel<PS>
+where
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (sensitivity, tail) =
-            Ref::<B, le::U32>::new_unaligned_from_prefix(tail).ok_or(ParseError::MissingData {
-                type_name: "MLSLevelSensitivity",
-                type_size: std::mem::size_of::<le::U32>(),
-                num_bytes,
-            })?;
+        let (sensitivity, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            type_name: "MLSLevelSensitivity",
+            type_size: std::mem::size_of::<le::U32>(),
+            num_bytes,
+        })?;
 
-        let (categories, tail) =
-            ExtensibleBitmap::parse(tail).context("parsing mls level categories")?;
-        categories.validate().context("validating mls level categories")?;
+        let (categories, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing mls level categories")?;
 
         Ok((Self { sensitivity, categories }, tail))
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for MLSLevel<B> {
+impl<PS: ParseStrategy> Validate for [ConditionalBoolean<PS>] {
     type Error = anyhow::Error;
-
-    /// TODO: Validate `self.sensitivity` and its relationship to `self.categories`.
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.categories.validate().context("validating mls level categories")
-    }
-}
-
-pub(crate) type ConditionalBooleans<B> = Vec<ConditionalBoolean<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for ConditionalBooleans<B> {
-    type Error = ParseError;
 
     /// TODO: Validate consistency of sequence of [`ConditionalBoolean`].
     fn validate(&self) -> Result<(), Self::Error> {
@@ -911,18 +972,23 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for ConditionalBooleans<B> {
     }
 }
 
-pub(crate) type ConditionalBoolean<B> = Array<B, Ref<B, ConditionalBooleanMetadata>, Ref<B, [u8]>>;
+array_type!(ConditionalBoolean, PS, PS::Output<ConditionalBooleanMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for ConditionalBoolean<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(ConditionalBoolean);
+
+impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for ConditionalBoolean<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`ConditionalBooleanMetadata`] and `[u8]` key.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a ConditionalBooleanMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConditionalBooleanMetadata {
     value: le::U32,
@@ -931,7 +997,7 @@ pub(crate) struct ConditionalBooleanMetadata {
 }
 
 impl Counted for ConditionalBooleanMetadata {
-    /// [`ConditionalBooleanMetadata`] used as `M` in of `Array<B, Ref<B, M>, Ref<B, [u8]>>` with
+    /// [`ConditionalBooleanMetadata`] used as `M` in of `Array<PS, PS::Output<M>, PS::Slice<u8>>` with
     /// `self.length` denoting size of inner `[u8]`.
     fn count(&self) -> u32 {
         self.length.get()
@@ -939,7 +1005,7 @@ impl Counted for ConditionalBooleanMetadata {
 }
 
 impl Validate for ConditionalBooleanMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency of [`ConditionalBooleanMetadata`].
     fn validate(&self) -> Result<(), Self::Error> {
@@ -947,10 +1013,8 @@ impl Validate for ConditionalBooleanMetadata {
     }
 }
 
-pub(crate) type Sensitivities<B> = Vec<Sensitivity<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Sensitivities<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Sensitivity`].
     fn validate(&self) -> Result<(), Self::Error> {
@@ -959,28 +1023,35 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Sensitivities<B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Sensitivity<B: ByteSlice + Debug + PartialEq> {
-    metadata: SensitivityMetadata<B>,
-    level: MLSLevel<B>,
+pub(crate) struct Sensitivity<PS: ParseStrategy> {
+    metadata: SensitivityMetadata<PS>,
+    level: MLSLevel<PS>,
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Parse<B> for Sensitivity<B> {
+impl<PS: ParseStrategy> Parse<PS> for Sensitivity<PS>
+where
+    SensitivityMetadata<PS>: Parse<PS>,
+    MLSLevel<PS>: Parse<PS>,
+{
     type Error = anyhow::Error;
 
-    fn parse(bytes: B) -> Result<(Self, B), Self::Error> {
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) =
-            SensitivityMetadata::parse(tail).context("parsing sensitivity metadata")?;
+        let (metadata, tail) = SensitivityMetadata::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing sensitivity metadata")?;
 
-        let (level, tail) = MLSLevel::parse(tail).context("parsing sensitivity mls level")?;
+        let (level, tail) = MLSLevel::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing sensitivity mls level")?;
 
         Ok((Self { metadata, level }, tail))
     }
 }
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Sensitivity<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for Sensitivity<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency of `self.metadata` and `self.level`.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -988,18 +1059,23 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Sensitivity<B> {
     }
 }
 
-pub(crate) type SensitivityMetadata<B> = Array<B, Ref<B, SensitivityStaticMetadata>, Ref<B, [u8]>>;
+array_type!(SensitivityMetadata, PS, PS::Output<SensitivityStaticMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for SensitivityMetadata<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(SensitivityMetadata);
+
+impl<PS: ParseStrategy> ValidateArray<SensitivityStaticMetadata, u8> for SensitivityMetadata<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`SensitivityMetadata`] and `[u8]` key.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a SensitivityStaticMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct SensitivityStaticMetadata {
     length: le::U32,
@@ -1007,7 +1083,7 @@ pub(crate) struct SensitivityStaticMetadata {
 }
 
 impl Counted for SensitivityStaticMetadata {
-    /// [`SensitivityStaticMetadata`] used as `M` in of `Array<B, Ref<B, M>, Ref<B, [u8]>>` with
+    /// [`SensitivityStaticMetadata`] used as `M` in of `Array<PS, PS::Output<M>, PS::Slice<u8>>` with
     /// `self.length` denoting size of inner `[u8]`.
     fn count(&self) -> u32 {
         self.length.get()
@@ -1015,7 +1091,7 @@ impl Counted for SensitivityStaticMetadata {
 }
 
 impl Validate for SensitivityStaticMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency of [`SensitivityStaticMetadata`].
     fn validate(&self) -> Result<(), Self::Error> {
@@ -1023,10 +1099,8 @@ impl Validate for SensitivityStaticMetadata {
     }
 }
 
-pub(crate) type Categories<B> = Vec<Category<B>>;
-
-impl<B: ByteSlice + Debug + PartialEq> Validate for Categories<B> {
-    type Error = ParseError;
+impl<PS: ParseStrategy> Validate for [Category<PS>] {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Category`].
     fn validate(&self) -> Result<(), Self::Error> {
@@ -1034,18 +1108,23 @@ impl<B: ByteSlice + Debug + PartialEq> Validate for Categories<B> {
     }
 }
 
-pub(crate) type Category<B> = Array<B, Ref<B, CategoryMetadata>, Ref<B, [u8]>>;
+array_type!(Category, PS, PS::Output<CategoryMetadata>, PS::Slice<u8>);
 
-impl<B: ByteSlice + Debug + PartialEq> Validate for Category<B> {
-    type Error = ParseError;
+array_type_validate_deref_both!(Category);
+
+impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
+    type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`CategoryMetadata`] and `[u8]` key.
-    fn validate(&self) -> Result<(), Self::Error> {
+    fn validate_array<'a>(
+        _metadata: &'a CategoryMetadata,
+        _data: &'a [u8],
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-#[derive(AsBytes, Debug, FromZeros, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct CategoryMetadata {
     length: le::U32,
@@ -1054,7 +1133,7 @@ pub(crate) struct CategoryMetadata {
 }
 
 impl Counted for CategoryMetadata {
-    /// [`CategoryMetadata`] used as `M` in of `Array<B, Ref<B, M>, Ref<B, [u8]>>` with
+    /// [`CategoryMetadata`] used as `M` in of `Array<PS, PS::Output<M>, PS::Slice<u8>>` with
     /// `self.length` denoting size of inner `[u8]`.
     fn count(&self) -> u32 {
         self.length.get()
@@ -1062,7 +1141,7 @@ impl Counted for CategoryMetadata {
 }
 
 impl Validate for CategoryMetadata {
-    type Error = ParseError;
+    type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency of [`CategoryMetadata`].
     fn validate(&self) -> Result<(), Self::Error> {

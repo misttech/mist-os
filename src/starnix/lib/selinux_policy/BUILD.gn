@@ -23,6 +23,7 @@ rustc_library("selinux_policy") {
     "src/extensible_bitmap.rs",
     "src/lib.rs",
     "src/metadata.rs",
+    "src/parser.rs",
     "src/symbols.rs",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]

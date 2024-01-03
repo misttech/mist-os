@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux_policy::{metadata::HandleUnknown, Policy};
+use selinux_policy::{metadata::HandleUnknown, parser::ByValue, Policy};
 
 use serde::Deserialize;
-use std::io::Read as _;
+use std::io::{Cursor, Read as _};
 
 const TESTDATA_DIR: &str = env!("TESTDATA_DIR");
 const POLICIES_SUBDIR: &str = "policies";
@@ -58,7 +58,10 @@ fn known_policies() {
         let mut policy_bytes = vec![];
         policy_file.read_to_end(&mut policy_bytes).expect("read policy file");
 
-        let policy = Policy::parse(policy_bytes.as_slice()).expect("parse policy");
+        let by_value = ByValue::new(Cursor::new(policy_bytes));
+
+        let policy = Policy::parse(by_value).expect("parse policy");
+        policy.validate().expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
         assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
