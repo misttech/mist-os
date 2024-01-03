@@ -312,6 +312,10 @@ zx_status_t RdmaEngine::SetupRdma() {
   zx_vaddr_t rdma_virtual_address = 0;
   status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, rdma_vmo_, 0,
                                       kRdmaRegionSize, &rdma_virtual_address);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not map RDMA VMO: %s", zx_status_get_string(status));
+    return status;
+  }
   const cpp20::span<uint8_t> rdma_region(reinterpret_cast<uint8_t*>(rdma_virtual_address),
                                          kRdmaRegionSize);
 
