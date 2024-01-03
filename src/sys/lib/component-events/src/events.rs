@@ -120,7 +120,7 @@ pub trait Event: TryFrom<fcomponent::Event, Error = anyhow::Error> {
     fn is_err(&self) -> bool;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Ord, PartialOrd)]
+#[derive(Copy, Debug, PartialEq, Eq, Clone, Ord, PartialOrd)]
 /// Simplifies the exit status represented by an Event. All stop status values
 /// that indicate failure are crushed into `Crash`.
 pub enum ExitStatus {
