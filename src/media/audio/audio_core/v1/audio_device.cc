@@ -107,7 +107,8 @@ void AudioDevice::SetSoftwareGainInfo(const fuchsia::media::AudioGainInfo& info)
   if (is_output()) {
     // See discussion on fxrev.dev/641221.
     if (muted || info.gain_db != 0) {
-      FX_LOGS(ERROR) << "Software gain not supported for output devices";
+      FX_LOGS(WARNING) << "Software gain not supported for output devices: cannot SetGain("
+                       << info.gain_db << " db, " << (muted ? "" : "non-") << "mute)";
     }
   } else {
     // For inputs, change the gain of all links where it is the source.
