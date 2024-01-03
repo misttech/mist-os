@@ -217,14 +217,14 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
-  if (!release_after_dispatcher_shutdown_ && ShouldCallRelease()) {
+  if (ShouldCallRelease()) {
     // Call the parent's pre-release.
     if (HasOp((*parent_)->ops_, &zx_protocol_device_t::child_pre_release)) {
       (*parent_)->ops_->child_pre_release((*parent_)->compat_symbol_.context,
                                           compat_symbol_.context);
     }
 
-    if (HasOp(ops_, &zx_protocol_device_t::release)) {
+    if (!release_after_dispatcher_shutdown_ && HasOp(ops_, &zx_protocol_device_t::release)) {
       ops_->release(compat_symbol_.context);
     }
   }
@@ -727,7 +727,7 @@ void Device::UnbindAndRelease() {
       UnbindOp().then([device = shared_from_this()](fpromise::result<void>& init) {
         if (device->parent_.value()->parent_ == std::nullopt &&
             device->parent_.value()->children_.size() == 1) {
-          // We are the last remaining child. We should break the reference cycle and delay
+          // We are the last remaining child. We should delay
           // calling the driver's release hook until the driver destructs, so the hook
           // is only invoked after the the dispatcher is shutdown.
           device->release_after_dispatcher_shutdown_ = true;
@@ -735,19 +735,11 @@ void Device::UnbindAndRelease() {
             auto op = std::make_unique<DelayedReleaseOp>(device);
             device->parent_.value()->AddDelayedChildReleaseOp(std::move(op));
           }
-          // Make sure the device otherwise destructs as normal.
-          device->parent_.value()->children_.remove(device);
-          device->parent_.reset();
-
-          auto completers = std::move(device->remove_completers_);
-          for (auto& completer : completers) {
-            completer.complete_ok();
-          }
-        } else {
-          // Our device should be destructed at the end of this callback when the reference to the
-          // shared pointer is removed.
-          device->parent_.value()->children_.remove(device);
+          // The device will otherwise destruct as normal.
         }
+        // Our device should be destructed at the end of this callback when the reference to the
+        // shared pointer is removed.
+        device->parent_.value()->children_.remove(device);
       }));
 }
 
