@@ -61,7 +61,12 @@ type Shard struct {
 	// images.json used to boot a target. The key should be an ImageOverrideType
 	// and the value should be the label of the image to override with as defined
 	// in images.json.
+	// TODO(b/313662173): Remove once it is no longer used.
 	ImageOverrides build.ImageOverrides `json:"image_overrides,omitempty"`
+
+	// ProductBundle is the name of the product bundle describing the system
+	// against which the test should be run.
+	ProductBundle string `json:"product_bundle,omitempty"`
 }
 
 // TargetCPU returns the CPU architecture of the target this shard will run against.
@@ -254,6 +259,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					Name:           name,
 					Tests:          []Test{test},
 					ImageOverrides: spec.ImageOverrides,
+					ProductBundle:  spec.ProductBundle,
 					Env:            e,
 				})
 			} else {

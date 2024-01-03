@@ -23,7 +23,12 @@ type TestSpec struct {
 	// images.json used to boot a target. The key should be an ImageOverrideType
 	// and the value should be the label of the image to override with as defined
 	// in images.json.
+	// TODO(b/313662173): Remove once it is no longer used.
 	ImageOverrides ImageOverrides `json:"image_overrides,omitempty"`
+
+	// ProductBundle is the name of the product bundle describing the system
+	// against which the test should be run.
+	ProductBundle string `json:"product_bundle,omitempty"`
 }
 
 // Test encapsulates details about a particular test.

@@ -233,7 +233,7 @@ func (t *QEMU) UseProductBundles() bool {
 
 // Start starts the QEMU target.
 // TODO(fxbug.dev/95938): Add logic to use PB with ffx emu
-func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) (err error) {
+func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}
@@ -255,48 +255,55 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
-	if t.UseFFXExperimental(ffxEmuExperimentLevel) && pbPath != "" {
-		if err := t.ffx.ConfigSet(ctx, "ffx_product_get_image_path", "true"); err != nil {
-			return err
-		}
-	}
+	useProductBundle := t.UseFFX() && pbPath != ""
 
 	// If a QEMU kernel override was specified, use that; else, unless we want
 	// to boot via a UEFI disk image (which does not require one), then we
 	// surely want a QEMU kernel, so use the default.
-	var qemuKernel *bootserver.Image
-	if t.imageOverrides.QEMUKernel != "" {
-		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
-	} else if t.imageOverrides.EFIDisk == "" {
-		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
+	var qemuKernel, efiDisk *bootserver.Image
+	if useProductBundle {
+		qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel", "")
+		if err != nil {
+			return err
+		}
+		if qemuKernel == nil {
+			efiDisk, err = t.ffx.GetImageFromPB(ctx, pbPath, "", "", "firmware_fat")
+			if err != nil {
+				return err
+			}
+			if efiDisk == nil {
+				qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
+			}
+		}
+	} else {
+		if t.imageOverrides.QEMUKernel != "" {
+			qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
+		} else if t.imageOverrides.EFIDisk != "" {
+			efiDisk = getImage(images, t.imageOverrides.EFIDisk, build.ImageTypeFAT)
+		} else {
 			qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
-		} else {
-			qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel")
-			if err != nil {
-				return fmt.Errorf("could not find qemu kernel from Product Bundle: %q: %w", pbPath, err)
-			}
 		}
 	}
 
-	// If a ZBI override is specified, use that; else if no overrides were
-	// specified, then we surely want a ZBI, so use the default.
 	var zbi *bootserver.Image
-	if t.imageOverrides.ZBI != "" {
-		zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
-	} else if t.imageOverrides.IsEmpty() {
-		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
-			zbi = getImageByName(images, "zbi_zircon-a")
-		} else {
-			zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi")
-			if err != nil {
-				return fmt.Errorf("could not find zbi from Product Bundle: %q: %w", pbPath, err)
-			}
+	if useProductBundle {
+		zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
+		if err != nil {
+			return err
 		}
-	}
-
-	var efiDisk *bootserver.Image
-	if t.imageOverrides.EFIDisk != "" {
-		efiDisk = getImage(images, t.imageOverrides.EFIDisk, build.ImageTypeFAT)
+		// The zbi image may not exist as part of the
+		// product bundle for a boot test, which is ok.
+		if zbi == nil && !isBootTest {
+			return fmt.Errorf("failed to find zbi from product bundle")
+		}
+	} else {
+		// If a ZBI override is specified, use that; else if no overrides were
+		// specified, then we surely want a ZBI, so use the default.
+		if t.imageOverrides.ZBI != "" {
+			zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
+		} else if t.imageOverrides.IsEmpty() {
+			zbi = getImageByName(images, "zbi_zircon-a")
+		}
 	}
 
 	// The QEMU command needs to be invoked within an empty directory, as QEMU
@@ -314,41 +321,36 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 
 	var fvmImage *bootserver.Image
 	var fxfsImage *bootserver.Image
-	if t.imageOverrides.IsEmpty() {
-		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
+	if useProductBundle {
+		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
+		if err != nil {
+			return err
+		}
+		fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
+		if err != nil {
+			return err
+		}
+	} else {
+		if t.imageOverrides.IsEmpty() {
 			fvmImage = getImageByName(images, "blk_storage-full")
-		} else {
-			fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm")
-			if err != nil {
-				// The fvm image may not exist as part of the product bundle, which is ok.
-				fvmImage = nil
-			}
-		}
-		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
-		} else {
-			fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs")
-			if err != nil {
-				// The fxfs image may not exist as part of the product bundle, which is ok.
-				fxfsImage = nil
+		} else if t.imageOverrides.FVM != "" {
+			// TODO(ihuh): Figure out proper way to identify fvm instead of
+			// hardcoding the name extension.
+			for _, img := range images {
+				if img.Label == t.imageOverrides.FVM &&
+					img.Type == build.ImageTypeBlk &&
+					filepath.Ext(img.Name) == ".fvm" {
+					fvmImage = &img
+					break
+				}
 			}
-		}
-	} else if t.imageOverrides.FVM != "" {
-		// TODO(ihuh): Figure out proper way to identify fvm instead of
-		// hardcoding the name extension.
-		for _, img := range images {
-			if img.Label == t.imageOverrides.FVM &&
-				img.Type == build.ImageTypeBlk &&
-				filepath.Ext(img.Name) == ".fvm" {
-				fvmImage = &img
-				break
-			}
-		}
-	} else if t.imageOverrides.Fxfs != "" {
-		for _, img := range images {
-			if img.Label == t.imageOverrides.Fxfs && img.Type == build.ImageTypeFxfsBlk {
-				fxfsImage = &img
-				break
+		} else if t.imageOverrides.Fxfs != "" {
+			for _, img := range images {
+				if img.Label == t.imageOverrides.Fxfs && img.Type == build.ImageTypeFxfsBlk {
+					fxfsImage = &img
+					break
+				}
 			}
 		}
 	}
@@ -617,7 +619,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		cmd.Stdin = t.ptm
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
 		cmd.Stderr = io.MultiWriter(t.ptm, stderr)
-		if !t.imageOverrides.IsEmpty() {
+		if isBootTest {
 			// TODO(fxbug.dev/135386): Don't write to stdout for
 			// boot tests to rule out whether the issue in the bug
 			// is due to a race between writing to stdout from the

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -97,6 +98,16 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 		}
 		for _, a := range artifacts {
 			imageDeps = append(imageDeps, filepath.Join(pbPath, a))
+		}
+		bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
+		if err != nil {
+			return err
+		}
+		for _, a := range bootloaderArtifacts {
+			parts := strings.SplitN(a, ":", 2)
+			if parts[0] == "firmware_fat" {
+				imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
+			}
 		}
 	}
 

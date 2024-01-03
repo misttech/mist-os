@@ -200,13 +200,10 @@ func SplitOutMultipliers(
 			}
 			numNewShards := min(len(multipliedTests), maxMultipliedShards)
 
-			multShard := &Shard{
-				Name:           prefix + shard.Name,
-				Tests:          multipliedTests,
-				Env:            shard.Env,
-				ImageOverrides: shard.ImageOverrides,
-			}
-			newShards := shardByTime(multShard, testDurations, numNewShards)
+			multShard := *shard
+			multShard.Name = prefix + shard.Name
+			multShard.Tests = multipliedTests
+			newShards := shardByTime(&multShard, testDurations, numNewShards)
 
 			for _, newShard := range newShards {
 				// Give priority to the tests that had a total_runs specified and
@@ -350,12 +347,10 @@ func PartitionShards(shards []*Shard, partitionFunc func(Test) bool, prefix stri
 			}
 		}
 		if len(matching) > 0 {
-			matchingShards = append(matchingShards, &Shard{
-				Name:           prefix + shard.Name,
-				Tests:          matching,
-				Env:            shard.Env,
-				ImageOverrides: shard.ImageOverrides,
-			})
+			newShard := *shard
+			newShard.Name = prefix + shard.Name
+			newShard.Tests = matching
+			matchingShards = append(matchingShards, &newShard)
 		}
 		if len(nonmatching) > 0 {
 			shard.Tests = nonmatching
@@ -381,13 +376,9 @@ func MarkShardsSkipped(shards []*Shard) ([]*Shard, error) {
 				Tags:    test.Tags,
 			})
 		}
-		newShards = append(newShards, &Shard{
-			Name:           shard.Name,
-			Tests:          shard.Tests,
-			Env:            shard.Env,
-			ImageOverrides: shard.ImageOverrides,
-			Summary:        summary,
-		})
+		newShard := *shard
+		newShard.Summary = summary
+		newShards = append(newShards, &newShard)
 	}
 	return newShards, nil
 }
@@ -680,13 +671,11 @@ func shardByTime(shard *Shard, testDurations TestDurationsMap, numNewShards int)
 		if numNewShards > 1 {
 			name = fmt.Sprintf("%s-(%d)", shard.Name, i+1)
 		}
-		newShards = append(newShards, &Shard{
-			Name:           name,
-			Tests:          subshard.tests,
-			Env:            shard.Env,
-			ImageOverrides: shard.ImageOverrides,
-			TimeoutSecs:    int(computeShardTimeout(subshard).Seconds()),
-		})
+		newShard := *shard
+		newShard.Name = name
+		newShard.Tests = subshard.tests
+		newShard.TimeoutSecs = int(computeShardTimeout(subshard).Seconds())
+		newShards = append(newShards, &newShard)
 	}
 	return newShards
 }

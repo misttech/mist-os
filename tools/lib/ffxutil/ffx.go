@@ -354,10 +354,21 @@ func (f *FFXInstance) GetPBArtifacts(ctx context.Context, pbPath string, artifac
 }
 
 // GetImageFromPB returns an image from a product bundle.
-func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string) (*bootserver.Image, error) {
-	relImagePath, err := f.RunAndGetOutput(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)
+func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*bootserver.Image, error) {
+	args := []string{"--config", "ffx_product_get_image_path=true", "product", "get-image-path", pbPath, "-r"}
+	if slot != "" && imageType != "" && bootloader == "" {
+		args = append(args, "--slot", slot, "--image-type", imageType)
+	} else if bootloader != "" && slot == "" && imageType == "" {
+		args = append(args, "--bootloader", bootloader)
+	} else {
+		return nil, fmt.Errorf("either slot and image type should be provided or bootloader "+
+			"should be provided, not both: slot: %s, imageType: %s, bootloader: %s", slot, imageType, bootloader)
+	}
+	relImagePath, err := f.RunAndGetOutput(ctx, args...)
 	if err != nil {
-		return nil, err
+		// An error is returned if the image cannot be found in the product bundle
+		// which is ok.
+		return nil, nil
 	}
 
 	imagePath := filepath.Join(pbPath, relImagePath)

@@ -227,7 +227,7 @@ func (t *Device) mustLoadThroughZedboot() bool {
 }
 
 // Start starts the device target.
-func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) error {
+func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) error {
 	serialSocketPath := t.SerialSocketPath()
 
 	// Set up log listener and dump kernel output to stdout.
@@ -379,21 +379,56 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			}
 			t.tftp = tftpClient
 		}
-		var imgs []bootserver.Image
-		for _, img := range images {
-			if t.imageOverrides.IsEmpty() {
-				imgs = append(imgs, img)
-			} else {
-				if img.Label == t.imageOverrides.ZBI {
-					img.Args = append(img.Args, "--boot")
-					imgs = append(imgs, img)
-				} else if img.Label == t.imageOverrides.FVM && filepath.Ext(img.Name) == ".fvm" {
-					img.Args = append(img.Args, "--fvm")
-					imgs = append(imgs, img)
+		// For boot tests, we need to add the appropriate boot args to the
+		// specified custom images instead of the default images, so we'll pass
+		// in only the custom images to bootserver.Boot() to exclude the default
+		// images which already have boot args attached to them.
+		var finalImgs []bootserver.Image
+		if t.imageOverrides.IsEmpty() && pbPath != "" {
+			// pbPath should only be provided if ffx is enabled.
+			// TODO(ihuh): Parse from the product bundle manifest
+			// even when ffx is not enabled.
+			if !t.UseFFX() {
+				return fmt.Errorf("product bundles are not supported without ffx")
+			}
+			var zbi, fvm *bootserver.Image
+			if isBootTest {
+				// Only get images from product bundle for boot tests when
+				// loading through zedboot. Regular tests should just use
+				// the images from images.json as is.
+				zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
+				if err != nil {
+					return err
+				}
+				if zbi != nil {
+					zbi.Args = []string{"--boot"}
+					finalImgs = append(finalImgs, *zbi)
+				}
+				fvm, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
+				if err != nil {
+					return err
+				}
+				if fvm != nil {
+					fvm.Args = []string{"--fvm"}
+					finalImgs = append(finalImgs, *fvm)
 				}
 			}
 		}
-		if err := bootserver.Boot(ctx, t.Tftp(), imgs, args, authorizedKeys); err != nil {
+		if len(finalImgs) == 0 {
+			for _, img := range images {
+				if !t.imageOverrides.IsEmpty() {
+					if img.Label == t.imageOverrides.ZBI {
+						img.Args = append(img.Args, "--boot")
+					} else if img.Label == t.imageOverrides.FVM && filepath.Ext(img.Name) == ".fvm" {
+						img.Args = append(img.Args, "--fvm")
+					} else {
+						continue
+					}
+				}
+				finalImgs = append(finalImgs, img)
+			}
+		}
+		if err := bootserver.Boot(ctx, t.Tftp(), finalImgs, args, authorizedKeys); err != nil {
 			return err
 		}
 	}

@@ -99,7 +99,7 @@ type FuchsiaTarget interface {
 	SSHKey() string
 
 	// Start starts the target.
-	Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) error
+	Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) error
 
 	// StartSerialServer starts the serial server for the target iff one
 	// does not exist.
@@ -655,7 +655,7 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 				pbPath = build.GetPbPathByName(productBundles, opts.ProductBundleName)
 			}
 
-			return t.Start(startCtx, imgs, opts.ZirconArgs, pbPath)
+			return t.Start(startCtx, imgs, opts.ZirconArgs, pbPath, opts.IsBootTest)
 		})
 	}
 	return eg.Wait()

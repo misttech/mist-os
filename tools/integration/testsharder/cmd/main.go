@@ -321,8 +321,12 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 				if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Images(), m.Tools(), flags.pave); err != nil {
 					return err
 				}
-				if flags.productBundleName != "" && s.ImageOverrides.IsEmpty() {
-					pbPath = build.GetPbPathByName(m.ProductBundles(), flags.productBundleName)
+				productBundle := flags.productBundleName
+				if s.ProductBundle != "" {
+					productBundle = s.ProductBundle
+				}
+				if productBundle != "" {
+					pbPath = build.GetPbPathByName(m.ProductBundles(), productBundle)
 					platform, err := hostplatform.Name()
 					if err != nil {
 						return err
