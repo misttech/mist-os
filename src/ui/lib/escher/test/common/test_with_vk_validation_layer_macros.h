@@ -19,25 +19,25 @@
 //
 // These macros suppress the after-test validation check by removing all debug reports (or all
 // debug reports with specific flag bits).
-#define SUPPRESS_VK_VALIDATION_DEBUG_REPORTS()             \
+#define REMOVE_VK_VALIDATION_DEBUG_UTILS_MESSAGES()             \
   do {                                                     \
     CHECK_IS_TEST_WITH_VK_VALIDATION_LAYER_DEFAULT();      \
-    vk_debug_report_collector().SuppressAllDebugReports(); \
+    vk_debug_utils_message_collector().RemoveAllDebugUtilsMessages(); \
   } while (0)
-#define SUPPRESS_VK_VALIDATION_ERRORS()                                                           \
+#define REMOVE_VK_VALIDATION_ERRORS()                                                           \
   do {                                                                                            \
     CHECK_IS_TEST_WITH_VK_VALIDATION_LAYER_DEFAULT();                                             \
-    vk_debug_report_collector().SuppressDebugReportsWithFlag(vk::DebugReportFlagBitsEXT::eError); \
+    vk_debug_utils_message_collector().RemoveDebugUtilsMessagesWithFlag(vk::DebugUtilsMessageSeverityFlagBitsEXT::eError, vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance); \
   } while (0)
-#define SUPPRESS_VK_VALIDATION_WARNINGS()                                                           \
+#define REMOVE_VK_VALIDATION_WARNINGS()                                                           \
   do {                                                                                              \
     CHECK_IS_TEST_WITH_VK_VALIDATION_LAYER_DEFAULT();                                               \
-    vk_debug_report_collector().SuppressDebugReportsWithFlag(vk::DebugReportFlagBitsEXT::eWarning); \
+    vk_debug_utils_message_collector().RemoveDebugUtilsMessagesWithFlag(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning, vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation); \
   } while (0)
-#define SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS()                                                          \
+#define REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS()                                                          \
   do {                                                                                                         \
     CHECK_IS_TEST_WITH_VK_VALIDATION_LAYER_DEFAULT();                                                          \
-    vk_debug_report_collector().SuppressDebugReportsWithFlag(vk::DebugReportFlagBitsEXT::ePerformanceWarning); \
+    vk_debug_utils_message_collector().RemoveDebugUtilsMessagesWithFlag(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning, vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance); \
   } while (0)
 
 // Vulkan validation message check macros.

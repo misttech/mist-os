@@ -15,10 +15,10 @@ namespace utils {
 
 escher::EscherUniquePtr CreateEscher(sys::ComponentContext* app_context);
 
-VkBool32 HandleDebugReport(VkDebugReportFlagsEXT flags_in,
-                           VkDebugReportObjectTypeEXT object_type_in, uint64_t object,
-                           size_t location, int32_t message_code, const char* pLayerPrefix,
-                           const char* pMessage, void* pUserData);
+VkBool32 HandleDebugUtilsMessage(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                 VkDebugUtilsMessageTypeFlagsEXT message_types,
+                                 const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+                                 void* user_data);
 
 }  // namespace utils
 

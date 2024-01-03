@@ -128,16 +128,16 @@ class DemoHarness {
   double ComputeFps();
 
   // Vulkan validation reporting.
-  VkBool32 HandleDebugReport(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
-                             uint64_t object, size_t location, int32_t messageCode,
-                             const char* pLayerPrefix, const char* pMessage);
-  static VkBool32 RedirectDebugReport(VkDebugReportFlagsEXT flags,
-                                      VkDebugReportObjectTypeEXT objectType, uint64_t object,
-                                      size_t location, int32_t messageCode,
-                                      const char* pLayerPrefix, const char* pMessage,
-                                      void* pUserData) {
-    return reinterpret_cast<DemoHarness*>(pUserData)->HandleDebugReport(
-        flags, objectType, object, location, messageCode, pLayerPrefix, pMessage);
+  VkBool32 HandleDebugUtilsMessage(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                   VkDebugUtilsMessageTypeFlagsEXT message_types,
+                                   const VkDebugUtilsMessengerCallbackDataEXT* callback_data);
+
+  static VkBool32 RedirectDebugUtilsMessage(
+      VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+      VkDebugUtilsMessageTypeFlagsEXT message_types,
+      const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
+    return reinterpret_cast<DemoHarness*>(user_data)->HandleDebugUtilsMessage(
+        message_severity, message_types, callback_data);
   }
 
   // Tracking frames in flight.

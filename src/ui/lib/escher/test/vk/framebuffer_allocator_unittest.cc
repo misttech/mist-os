@@ -143,7 +143,7 @@ VK_TEST_F(FramebufferAllocatorTest, Basic) {
   // TODO(fxbug.dev/36827) Now Vulkan validation layer has a performance warning:
   //   [ UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout ]
   //   Layout for color attachment is GENERAL but should be COLOR_ATTACHMENT_OPTIMAL.
-  SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS();
+  REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS();
 }
 
 // Specificially test that we can create render-passes/framebuffers with no depth attachment.
@@ -180,7 +180,7 @@ VK_TEST_F(FramebufferAllocatorTest, BasicNoDepth) {
   // TODO(fxbug.dev/36827) Now Vulkan validation layer has a performance warning:
   //   [ UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout ]
   //   Layout for color attachment is GENERAL but should be COLOR_ATTACHMENT_OPTIMAL.
-  SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS();
+  REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS();
 }
 
 // Test that we can create render-passes/framebuffers with no color attachment, only a depth
@@ -261,7 +261,7 @@ VK_TEST_F(FramebufferAllocatorTest, CacheReclamation) {
   // TODO(fxbug.dev/36827) Now Vulkan validation layer has a performance warning:
   //   [ UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout ]
   //   Layout for color attachment is GENERAL but should be COLOR_ATTACHMENT_OPTIMAL.
-  SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS();
+  REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS();
 }
 
 VK_TEST_F(FramebufferAllocatorTest, LazyRenderPassCreation) {
@@ -340,7 +340,7 @@ VK_TEST_F(FramebufferAllocatorTest, LazyRenderPassCreation) {
   // TODO(fxbug.dev/36827) Now Vulkan validation layer has a performance warning:
   //   [ UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout ]
   //   Layout for color attachment is GENERAL but should be COLOR_ATTACHMENT_OPTIMAL.
-  SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS();
+  REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS();
 }
 
 }  // anonymous namespace

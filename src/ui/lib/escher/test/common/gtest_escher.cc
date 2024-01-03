@@ -66,7 +66,7 @@ static void LoadShadersFromDisk(HackFilesystemPtr fs) {
 VulkanInstance::Params GetDefaultVulkanInstanceParams() {
   VulkanInstance::Params instance_params(
       {{},
-       {VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME},
+       {VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME},
        false});
   auto validation_layer_name = VulkanInstance::GetValidationLayerName();
   if (validation_layer_name) {

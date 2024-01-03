@@ -47,28 +47,29 @@ const uint32_t kYuvSize = 64;
 class ShaderProgramTest : public ::testing::Test, public VulkanTester {
  protected:
   ShaderProgramTest()
-      : vk_debug_report_callback_registry_(
+      : vk_debug_utils_message_callback_registry_(
             VK_TESTS_SUPPRESSED()
                 ? nullptr
                 : test::EscherEnvironment::GetGlobalTestEnvironment()->GetVulkanInstance(),
-            std::make_optional<VulkanInstance::DebugReportCallback>(
-                test::impl::VkDebugReportCollector::HandleDebugReport, &vk_debug_report_collector_),
+            std::make_optional<VulkanInstance::DebugUtilsMessengerCallback>(
+                test::impl::VkDebugUtilsMessageCollector::HandleDebugUtilsMessage,
+                &vk_debug_utils_message_collector_),
             {}),
-        vk_debug_report_collector_() {}
+        vk_debug_utils_message_collector_() {}
   const MeshPtr& ring_mesh1() const { return ring_mesh1_; }
   const MeshPtr& ring_mesh2() const { return ring_mesh2_; }
   const MeshPtr& sphere_mesh() const { return sphere_mesh_; }
 
-  test::impl::VkDebugReportCallbackRegistry& vk_debug_report_callback_registry() {
-    return vk_debug_report_callback_registry_;
+  test::impl::VkDebugUtilsMessengerCallbackRegistry& vk_debug_utils_message_callback_registry() {
+    return vk_debug_utils_message_callback_registry_;
   }
-  test::impl::VkDebugReportCollector& vk_debug_report_collector() {
-    return vk_debug_report_collector_;
+  test::impl::VkDebugUtilsMessageCollector& vk_debug_utils_message_collector() {
+    return vk_debug_utils_message_collector_;
   }
 
  private:
   void SetUp() override {
-    vk_debug_report_callback_registry().RegisterDebugReportCallbacks();
+    vk_debug_utils_message_callback_registry().RegisterDebugUtilsMessengerCallbacks();
     auto escher = test::GetEscher();
     EXPECT_TRUE(escher->Cleanup());
 
@@ -107,15 +108,15 @@ class ShaderProgramTest : public ::testing::Test, public VulkanTester {
     escher->shader_program_factory()->Clear();
 
     EXPECT_VULKAN_VALIDATION_OK();
-    vk_debug_report_callback_registry().DeregisterDebugReportCallbacks();
+    vk_debug_utils_message_callback_registry().DeregisterDebugUtilsMessengerCallbacks();
   }
 
   MeshPtr ring_mesh1_;
   MeshPtr ring_mesh2_;
   MeshPtr sphere_mesh_;
 
-  test::impl::VkDebugReportCallbackRegistry vk_debug_report_callback_registry_;
-  test::impl::VkDebugReportCollector vk_debug_report_collector_;
+  test::impl::VkDebugUtilsMessengerCallbackRegistry vk_debug_utils_message_callback_registry_;
+  test::impl::VkDebugUtilsMessageCollector vk_debug_utils_message_collector_;
 };
 
 // Test to make sure that the shader data constants located in

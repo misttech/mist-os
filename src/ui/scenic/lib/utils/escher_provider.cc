@@ -8,6 +8,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/vfs/cpp/pseudo_file.h>
 
+#include <sstream>
+
 #include <vulkan/vulkan.h>
 
 #include "src/ui/lib/escher/fs/hack_filesystem.h"
@@ -24,7 +26,7 @@ escher::EscherUniquePtr CreateEscher(sys::ComponentContext* app_context) {
   escher::VulkanInstance::Params instance_params(
       {{},
        {
-           VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+           VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
            VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
@@ -35,7 +37,7 @@ escher::EscherUniquePtr CreateEscher(sys::ComponentContext* app_context) {
 #if defined(SCENIC_ENABLE_VULKAN_VALIDATION)
   instance_params.layer_names.insert("VK_LAYER_KHRONOS_validation");
 #endif
-  instance_params.initial_debug_report_callbacks.push_back(HandleDebugReport);
+  instance_params.initial_debug_utils_message_callbacks.push_back(HandleDebugUtilsMessage);
   auto vulkan_instance = escher::VulkanInstance::New(std::move(instance_params));
   if (!vulkan_instance)
     return nullptr;
@@ -108,54 +110,51 @@ escher::EscherUniquePtr CreateEscher(sys::ComponentContext* app_context) {
       });
 }
 
-VkBool32 HandleDebugReport(VkDebugReportFlagsEXT flags_in,
-                           VkDebugReportObjectTypeEXT object_type_in, uint64_t object,
-                           size_t location, int32_t message_code, const char* pLayerPrefix,
-                           const char* pMessage, void* pUserData) {
-  vk::DebugReportFlagsEXT flags(static_cast<vk::DebugReportFlagBitsEXT>(flags_in));
-  vk::DebugReportObjectTypeEXT object_type(
-      static_cast<vk::DebugReportObjectTypeEXT>(object_type_in));
+VkBool32 HandleDebugUtilsMessage(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                 VkDebugUtilsMessageTypeFlagsEXT message_types,
+                                 const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+                                 void* user_data) {
+  vk::DebugUtilsMessageSeverityFlagsEXT severity(message_severity);
+  vk::ObjectType object_type = callback_data->objectCount == 0
+                                   ? vk::ObjectType::eUnknown
+                                   : vk::ObjectType(callback_data->pObjects[0].objectType);
+  uint64_t object_handle =
+      callback_data->objectCount == 0 ? 0ull : callback_data->pObjects[0].objectHandle;
+  int32_t message_id = callback_data->messageIdNumber;
 
-// Macro to facilitate matching messages.  Example usage:
-//  if (VK_MATCH_REPORT(DescriptorSet, 0, "VUID-VkWriteDescriptorSet-descriptorType-01403")) {
-//    FX_LOGS(INFO) << "ignoring descriptor set problem: " << pMessage << "\n\n";
-//    return false;
-//  }
-#define VK_MATCH_REPORT(OTYPE, CODE, X)                                                 \
-  ((object_type == vk::DebugReportObjectTypeEXT::e##OTYPE) && (message_code == CODE) && \
-   (0 == strncmp(pMessage + 3, X, strlen(X) - 1)))
-
-#define VK_DEBUG_REPORT_MESSAGE                                                                \
-  pMessage << " (layer: " << pLayerPrefix << "  code: " << message_code                        \
-           << "  object-type: " << vk::to_string(object_type) << "  object: " << object << ")" \
-           << std::endl;
+  std::string message = (std::ostringstream()
+                         << callback_data->pMessage << " (layer: " << callback_data->pMessageIdName
+                         << "  id: " << message_id << "  object-type: "
+                         << vk::to_string(object_type) << "  object: " << object_handle << ")")
+                            .str();
 
   bool fatal = false;
-  if (flags == vk::DebugReportFlagBitsEXT::eInformation) {
-    FX_LOGS(INFO) << "## Vulkan Information: " << VK_DEBUG_REPORT_MESSAGE;
-  } else if (flags == vk::DebugReportFlagBitsEXT::eWarning) {
-    FX_LOGS(WARNING) << "## Vulkan Warning: " << VK_DEBUG_REPORT_MESSAGE;
-  } else if (flags == vk::DebugReportFlagBitsEXT::ePerformanceWarning) {
-    FX_LOGS(WARNING) << "## Vulkan Performance Warning: " << VK_DEBUG_REPORT_MESSAGE;
-  } else if (flags == vk::DebugReportFlagBitsEXT::eError) {
+  if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+    FX_LOGS(INFO) << "## Vulkan Information: " << message;
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+    if (message_types & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+      FX_LOGS(WARNING) << "## Vulkan Performance Warning: " << message;
+    } else {
+      FX_LOGS(WARNING) << "## Vulkan Warning: " << message;
+    }
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
     // Treat all errors as fatal.
     fatal = true;
-    FX_LOGS(ERROR) << "## Vulkan Error: " << VK_DEBUG_REPORT_MESSAGE;
-  } else if (flags == vk::DebugReportFlagBitsEXT::eDebug) {
-    FX_LOGS(INFO) << "## Vulkan Debug: " << VK_DEBUG_REPORT_MESSAGE;
+    FX_LOGS(ERROR) << "## Vulkan Error: " << message;
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+    FX_LOGS(INFO) << "## Vulkan Debug: " << message;
   } else {
     // This should never happen, unless a new value has been added to
-    // vk::DebugReportFlagBitsEXT.  In that case, add a new if-clause above.
+    // vk::DebugUtilsMessageSeverityFlagBitsEXT.  In that case, add a new if-clause above.
     fatal = true;
-    FX_LOGS(ERROR) << "## Vulkan Unknown Message Type (flags: " << vk::to_string(flags) << "): ";
+    FX_LOGS(ERROR) << "## Vulkan Unknown Message Severity (flags: " << vk::to_string(severity)
+                   << "): ";
   }
 
   // Crash immediately on fatal errors.
   FX_CHECK(!fatal);
 
   return false;
-
-#undef VK_DEBUG_REPORT_MESSAGE
 }
 
 }  // namespace utils

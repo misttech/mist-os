@@ -51,10 +51,10 @@ template("gtest_escher_library") {
       "test_with_vk_validation_layer.h",
       "test_with_vk_validation_layer_macros.h",
       "test_with_vk_validation_layer_macros_internal.h",
-      "vk/vk_debug_report_callback_registry.cc",
-      "vk/vk_debug_report_callback_registry.h",
-      "vk/vk_debug_report_collector.cc",
-      "vk/vk_debug_report_collector.h",
+      "vk/vk_debug_utils_message_callback_registry.cc",
+      "vk/vk_debug_utils_message_callback_registry.h",
+      "vk/vk_debug_utils_message_collector.cc",
+      "vk/vk_debug_utils_message_collector.h",
     ]
     public_deps = [ ":gtest_vulkan" ]
 

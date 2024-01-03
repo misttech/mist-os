@@ -18,10 +18,10 @@ namespace escher {
 class VulkanInstance;
 using VulkanInstancePtr = fxl::RefPtr<VulkanInstance>;
 
-using VkDebugReportCallbackFn =
-    std::function<VkBool32(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
-                           uint64_t object, size_t location, int32_t messageCode,
-                           const char* pLayerPrefix, const char* pMessage, void* pUserData)>;
+using VkDebugUtilsMessengerCallbackFn = std::function<VkBool32(
+    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+    VkDebugUtilsMessageTypeFlagsEXT message_types,
+    const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)>;
 
 // Convenient wrapper for creating and managing the lifecycle of a VkInstance
 // that is suitable for use by Escher.
@@ -34,7 +34,7 @@ class VulkanInstance : public fxl::RefCountedThreadSafe<VulkanInstance> {
     bool requires_surface = true;
     // These callbacks cannot be removed and must live at least as long as the VulkanInstance. They
     // can catch errors with instance initialization.
-    std::list<VkDebugReportCallbackFn> initial_debug_report_callbacks;
+    std::list<VkDebugUtilsMessengerCallbackFn> initial_debug_utils_message_callbacks;
   };
 
   // Contains dynamically-obtained addresses of instance-specific functions.
@@ -44,22 +44,22 @@ class VulkanInstance : public fxl::RefCountedThreadSafe<VulkanInstance> {
 
     constexpr static int getVkHeaderVersion() { return VK_HEADER_VERSION; }
 
-    PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = nullptr;
-    PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT = nullptr;
+    PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR = nullptr;
   };
 
   // Contains debug report callback function and the user data pointer the
   // callback function binds to.
-  struct DebugReportCallback {
-    VkDebugReportCallbackFn function = nullptr;
+  struct DebugUtilsMessengerCallback {
+    VkDebugUtilsMessengerCallbackFn function = nullptr;
     void* user_data = nullptr;
 
-    DebugReportCallback(VkDebugReportCallbackFn function_, void* user_data_)
+    DebugUtilsMessengerCallback(VkDebugUtilsMessengerCallbackFn function_, void* user_data_)
         : function(std::move(function_)), user_data(user_data_) {}
   };
-  using DebugReportCallbackList = std::list<DebugReportCallback>;
-  using DebugReportCallbackHandle = DebugReportCallbackList::iterator;
+  using DebugUtilsMessengerList = std::list<DebugUtilsMessengerCallback>;
+  using DebugUtilsMessengerCallbackHandle = DebugUtilsMessengerList::iterator;
 
   // Constructor.
   static fxl::RefPtr<VulkanInstance> New(Params params);
@@ -81,15 +81,13 @@ class VulkanInstance : public fxl::RefCountedThreadSafe<VulkanInstance> {
   static bool ValidateExtensions(const std::set<std::string>& required_extension_names,
                                  const std::set<std::string>& required_layer_names);
 
-  // Register debug report callback |function| to list of callbacks, which will
-  // be invoked by |DebugReportCallbackEntrance| when validation error occurs.
+  // Add debug report callback to registry. Registered callbacks are invoked
+  // by |DebugUtilsMessengerCallbackEntrance| when validation error occurs.
   // The returned handle will be required when deregistering the callback.
-  DebugReportCallbackHandle RegisterDebugReportCallback(VkDebugReportCallbackFn function,
-                                                        void* user_data = nullptr);
+  DebugUtilsMessengerCallbackHandle RegisterDebugUtilsMessengerCallback(
+      VkDebugUtilsMessengerCallbackFn function, void* user_data = nullptr);
 
-  // Remove debug report callback pointed by |handle| from |callbacks_|, the list
-  // of callback functions.
-  void DeregisterDebugReportCallback(const DebugReportCallbackHandle& handle);
+  void DeregisterDebugUtilsMessengerCallback(const DebugUtilsMessengerCallbackHandle& callback);
 
   vk::Instance vk_instance() const { return instance_; }
 
@@ -110,22 +108,22 @@ class VulkanInstance : public fxl::RefCountedThreadSafe<VulkanInstance> {
   // The "entrance" handler for all Vulkan instances. When validation error
   // occurs, this function will invoke all debug report callback functions
   // stored in vector |callbacks_|. This function always return VK_FALSE.
-  static VkBool32 DebugReportCallbackEntrance(VkDebugReportFlagsEXT flags,
-                                              VkDebugReportObjectTypeEXT objectType,
-                                              uint64_t object, size_t location, int32_t messageCode,
-                                              const char* pLayerPrefix, const char* pMessage,
-                                              void* pUserData);
+  static VkBool32 DebugUtilsMessengerCallbackEntrance(
+      VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+      VkDebugUtilsMessageTypeFlagsEXT message_types,
+      const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
+  constexpr static int getVkHeaderVersion() { return VK_HEADER_VERSION; }
 
-  bool HasDebugReportExt() const {
+  bool HasDebugUtilsExt() const {
     return std::find(params_.extension_names.begin(), params_.extension_names.end(),
-                     VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != params_.extension_names.end();
+                     VK_EXT_DEBUG_UTILS_EXTENSION_NAME) != params_.extension_names.end();
   }
 
   vk::Instance instance_;
   Params params_;
   ProcAddrs proc_addrs_;
-  std::list<DebugReportCallback> callbacks_;
-  vk::DebugReportCallbackEXT vk_callback_entrance_handle_;
+  std::list<DebugUtilsMessengerCallback> callbacks_;
+  vk::DebugUtilsMessengerEXT vk_callback_entrance_handle_;
   uint32_t api_version_;
 };
 

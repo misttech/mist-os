@@ -30,7 +30,7 @@ using ::testing::_;
 const vk::DeviceSize kMaxUnusedMemory = 4u * 1024 * 1024;
 
 VulkanDeviceQueuesPtr CreateVulkanDeviceQueues(bool use_protected_memory) {
-  VulkanInstance::Params instance_params({{}, {VK_EXT_DEBUG_REPORT_EXTENSION_NAME}, false});
+  VulkanInstance::Params instance_params({{}, {VK_EXT_DEBUG_UTILS_EXTENSION_NAME}, false});
 
   auto validation_layer_name = VulkanInstance::GetValidationLayerName();
   if (validation_layer_name) {
@@ -41,13 +41,17 @@ VulkanDeviceQueuesPtr CreateVulkanDeviceQueues(bool use_protected_memory) {
   // This test doesn't use the global Escher environment so TestWithVkValidationLayer won't work.
   // We set up a custom debug callback function to fail the test when there is errors / warnings /
   // performance warnings.
-  vulkan_instance->RegisterDebugReportCallback(
-      [](VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object,
-         size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage,
-         void* pUserData) -> VkBool32 {
-        ADD_FAILURE() << "Debug report: " << vk::to_string(vk::DebugReportFlagsEXT(flags))
-                      << " Object: " << object << " Location: " << location
-                      << " Message code: " << messageCode << " Message: " << pMessage;
+  vulkan_instance->RegisterDebugUtilsMessengerCallback(
+      [](VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+         VkDebugUtilsMessageTypeFlagsEXT message_types,
+         const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) -> VkBool32 {
+        uint64_t object =
+            callback_data->objectCount == 0 ? 0ull : callback_data->pObjects[0].objectHandle;
+        ADD_FAILURE() << "Debug report: "
+                      << vk::to_string(vk::DebugUtilsMessageSeverityFlagsEXT(message_severity))
+                      << " Object: " << object << " Layer: " << callback_data->pMessageIdName
+                      << " Message code: " << callback_data->messageIdNumber
+                      << " Message: " << callback_data->pMessage;
         return VK_FALSE;
       });
 

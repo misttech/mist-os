@@ -2,36 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/lib/escher/test/common/vk/vk_debug_report_callback_registry.h"
+#include "src/ui/lib/escher/test/common/vk/vk_debug_utils_message_callback_registry.h"
+
+#include <lib/syslog/cpp/macros.h>
 
 #include "src/ui/lib/escher/test/common/gtest_vulkan.h"
 
 namespace escher::test {
 namespace impl {
 
-void VkDebugReportCallbackRegistry::RegisterDebugReportCallbacks() {
+void VkDebugUtilsMessengerCallbackRegistry::RegisterDebugUtilsMessengerCallbacks() {
   if (!VK_TESTS_SUPPRESSED()) {
     FX_CHECK(instance_ && optional_callback_handles_.size() == 0 && !main_callback_handle_);
     if (main_callback_) {
-      main_callback_handle_ = instance_->RegisterDebugReportCallback(
+      main_callback_handle_ = instance_->RegisterDebugUtilsMessengerCallback(
           std::move(main_callback_->function), main_callback_->user_data);
     }
     for (auto& callback : optional_callbacks_) {
-      optional_callback_handles_.push_back(
-          instance_->RegisterDebugReportCallback(std::move(callback.function), callback.user_data));
+      optional_callback_handles_.push_back(instance_->RegisterDebugUtilsMessengerCallback(
+          std::move(callback.function), callback.user_data));
     }
   }
 }
 
-void VkDebugReportCallbackRegistry::DeregisterDebugReportCallbacks() {
+void VkDebugUtilsMessengerCallbackRegistry::DeregisterDebugUtilsMessengerCallbacks() {
   if (!VK_TESTS_SUPPRESSED()) {
     FX_CHECK(instance_ && optional_callback_handles_.size() == optional_callbacks_.size());
     if (main_callback_handle_) {
-      instance_->DeregisterDebugReportCallback(*main_callback_handle_);
+      instance_->DeregisterDebugUtilsMessengerCallback(*main_callback_handle_);
       main_callback_handle_ = std::nullopt;
     }
     for (const auto& callback_handle : optional_callback_handles_) {
-      instance_->DeregisterDebugReportCallback(callback_handle);
+      instance_->DeregisterDebugUtilsMessengerCallback(callback_handle);
     }
     optional_callback_handles_.clear();
   }

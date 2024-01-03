@@ -68,9 +68,9 @@ VK_TEST(ValidationLayer, ValidationLayerIsSupported) {
   ASSERT_TRUE(*validation_layer_name == "VK_LAYER_KHRONOS_validation");
 
   VulkanInstance::Params instance_params{
-      {*validation_layer_name},              // layer_names
-      {VK_EXT_DEBUG_REPORT_EXTENSION_NAME},  // extension_names
-      false                                  // requires_surface
+      {*validation_layer_name},             // layer_names
+      {VK_EXT_DEBUG_UTILS_EXTENSION_NAME},  // extension_names
+      false                                 // requires_surface
   };
   VulkanInstancePtr vulkan_instance = VulkanInstance::New(instance_params);
   ASSERT_TRUE(vulkan_instance);
@@ -104,23 +104,24 @@ VK_TEST_F(ValidationLayerDefaultHandler, HandlerTest) {
   EXPECT_VULKAN_VALIDATION_ERRORS_EQ(1);
 
   // Suppress the debug reports check in |TearDown()|.
-  SUPPRESS_VK_VALIDATION_DEBUG_REPORTS();
+  REMOVE_VK_VALIDATION_DEBUG_UTILS_MESSAGES();
 }
 
 class ValidationLayerWithCustomHandler : public TestWithVkValidationLayer {
  public:
   ValidationLayerWithCustomHandler()
       : TestWithVkValidationLayer(
-            {{[this](VkDebugReportFlagsEXT flags_in, VkDebugReportObjectTypeEXT object_type_in,
-                     uint64_t object, size_t location, int32_t message_code,
-                     const char* pLayerPrefix, const char* pMessage, void* pUserData) -> bool {
-                if (VK_DEBUG_REPORT_ERROR_BIT_EXT & flags_in) {
+            {{[this](VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                     VkDebugUtilsMessageTypeFlagsEXT message_types,
+                     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+                     void* user_data) -> bool {
+                if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity) {
                   ++count_errors_;
                 }
                 return false;
               },
               nullptr}}) {}
-  int GetCountErrors() const { return count_errors_; }
+  int count_errors() const { return count_errors_; }
 
  private:
   int count_errors_ = 0;
@@ -137,7 +138,7 @@ VK_TEST_F(ValidationLayerWithCustomHandler, HandlerTest) {
     EXPECT_VK_SUCCESS(device.waitIdle());
   }
   EXPECT_VULKAN_VALIDATION_ERRORS_EQ(1);
-  EXPECT_EQ(GetCountErrors(), 1);
+  EXPECT_EQ(count_errors(), 1);
 
   // In this case the createImage() command is valid. We should not see any Vulkan validation
   // errors nor warnings here.
@@ -150,10 +151,10 @@ VK_TEST_F(ValidationLayerWithCustomHandler, HandlerTest) {
   }
   // no new errors occurred.
   EXPECT_VULKAN_VALIDATION_ERRORS_EQ(1);
-  EXPECT_EQ(GetCountErrors(), 1);
+  EXPECT_EQ(count_errors(), 1);
 
   // Suppress the debug reports check in |TearDown()|.
-  SUPPRESS_VK_VALIDATION_DEBUG_REPORTS();
+  REMOVE_VK_VALIDATION_DEBUG_UTILS_MESSAGES();
 }
 
 }  // namespace test

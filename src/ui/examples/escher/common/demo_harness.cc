@@ -83,12 +83,12 @@ void DemoHarness::CreateInstance(InstanceParams params) {
   AppendPlatformSpecificInstanceExtensionNames(&params);
 
   // We need this extension for getting debug callbacks.
-  params.extension_names.insert("VK_EXT_debug_report");
+  params.extension_names.insert("VK_EXT_debug_utils");
 
   instance_ = escher::VulkanInstance::New(std::move(params));
   FX_CHECK(instance_);
 
-  instance_->RegisterDebugReportCallback(RedirectDebugReport, this);
+  instance_->RegisterDebugUtilsMessengerCallback(RedirectDebugUtilsMessage, this);
 }
 
 void DemoHarness::CreateDeviceAndQueue(escher::VulkanDeviceQueues::Params params) {
@@ -331,50 +331,47 @@ void DemoHarness::DestroyDevice() {
 
 void DemoHarness::DestroyInstance() { instance_ = nullptr; }
 
-VkBool32 DemoHarness::HandleDebugReport(VkDebugReportFlagsEXT flags_in,
-                                        VkDebugReportObjectTypeEXT object_type_in, uint64_t object,
-                                        size_t location, int32_t message_code,
-                                        const char* pLayerPrefix, const char* pMessage) {
-  vk::DebugReportFlagsEXT flags(static_cast<vk::DebugReportFlagBitsEXT>(flags_in));
-  vk::DebugReportObjectTypeEXT object_type(
-      static_cast<vk::DebugReportObjectTypeEXT>(object_type_in));
+VkBool32 DemoHarness::HandleDebugUtilsMessage(
+    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+    VkDebugUtilsMessageTypeFlagsEXT message_types,
+    const VkDebugUtilsMessengerCallbackDataEXT* callback_data) {
+  vk::DebugUtilsMessageSeverityFlagsEXT severity(message_severity);
+  vk::ObjectType object_type = callback_data->objectCount == 0
+                                   ? vk::ObjectType::eUnknown
+                                   : vk::ObjectType(callback_data->pObjects[0].objectType);
+  uint64_t object_handle =
+      callback_data->objectCount == 0 ? 0ull : callback_data->pObjects[0].objectHandle;
 
   bool fatal = false;
 
-// Macro to facilitate matching messages.  Example usage:
-//  if (MATCH_REPORT(DescriptorSet, 0, "VUID-VkWriteDescriptorSet-descriptorType-01403")) {
-//    FX_LOGS(INFO) << "ignoring descriptor set problem: " << pMessage << "\n\n";
-//    return false;
-//  }
-#define MATCH_REPORT(OTYPE, CODE, X)                                                    \
-  ((object_type == vk::DebugReportObjectTypeEXT::e##OTYPE) && (message_code == CODE) && \
-   (0 == strncmp(pMessage + 3, X, strlen(X) - 1)))
-
-  if (flags == vk::DebugReportFlagBitsEXT::eInformation) {
+  if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
     // Paranoid check that there aren't multiple flags.
-    FX_DCHECK(flags == vk::DebugReportFlagBitsEXT::eInformation);
+    FX_DCHECK(severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo);
 
     std::cerr << "## Vulkan Information: ";
-  } else if (flags == vk::DebugReportFlagBitsEXT::eWarning) {
-    std::cerr << "## Vulkan Warning: ";
-  } else if (flags == vk::DebugReportFlagBitsEXT::ePerformanceWarning) {
-    std::cerr << "## Vulkan Performance Warning: ";
-  } else if (flags == vk::DebugReportFlagBitsEXT::eError) {
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+    if (message_types & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+      std::cerr << "## Vulkan Performance Warning: ";
+    } else {
+      std::cerr << "## Vulkan Warning: ";
+    }
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
     // Treat all errors as fatal.
     fatal = true;
     std::cerr << "## Vulkan Error: ";
-  } else if (flags == vk::DebugReportFlagBitsEXT::eDebug) {
+  } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
     std::cerr << "## Vulkan Debug: ";
   } else {
     // This should never happen, unless a new value has been added to
-    // vk::DebugReportFlagBitsEXT.  In that case, add a new if-clause above.
+    // vk::DebugUtilsMessageSeverityFlagBitsEXT.  In that case, add a new if-clause above.
     fatal = true;
-    std::cerr << "## Vulkan Unknown Message Type (flags: " << vk::to_string(flags) << "): ";
+    std::cerr << "## Vulkan Unknown Message Type (flags: " << vk::to_string(severity) << "): ";
   }
 
-  std::cerr << pMessage << " (layer: " << pLayerPrefix << "  code: " << message_code
-            << "  object-type: " << vk::to_string(object_type) << "  object: " << object
-            << "  location: " << location << ")" << std::endl;
+  std::cerr << callback_data->pMessage << " (layer: " << callback_data->pMessageIdName
+            << "  code: " << callback_data->messageIdNumber
+            << "  object-type: " << vk::to_string(object_type) << "  object: " << object_handle
+            << ")" << std::endl;
 
   // Crash immediately on fatal errors.
   FX_CHECK(!fatal);

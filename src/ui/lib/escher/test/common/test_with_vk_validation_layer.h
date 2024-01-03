@@ -6,8 +6,8 @@
 #define SRC_UI_LIB_ESCHER_TEST_COMMON_TEST_WITH_VK_VALIDATION_LAYER_H_
 
 #include "src/ui/lib/escher/test/common/test_with_vk_validation_layer_macros.h"
-#include "src/ui/lib/escher/test/common/vk/vk_debug_report_callback_registry.h"
-#include "src/ui/lib/escher/test/common/vk/vk_debug_report_collector.h"
+#include "src/ui/lib/escher/test/common/vk/vk_debug_utils_message_callback_registry.h"
+#include "src/ui/lib/escher/test/common/vk/vk_debug_utils_message_collector.h"
 
 namespace escher::test {
 
@@ -39,15 +39,15 @@ namespace escher::test {
 //
 //    To suppress the after-test validation check, run the following macro in the end of the test
 //    body:
-//      SUPPRESS_VK_VALIDATION_DEBUG_REPORTS()
+//      REMOVE_VK_VALIDATION_DEBUG_UTILS_MESSAGES()
 //
 //    or macro with specified message flags:
-//      SUPPRESS_VK_VALIDATION_ERRORS()
-//      SUPPRESS_VK_VALIDATION_WARNINGS()
-//      SUPPRESS_VK_VALIDATION_PERFORMANCE_WARNINGS()
+//      REMOVE_VK_VALIDATION_ERRORS()
+//      REMOVE_VK_VALIDATION_WARNINGS()
+//      REMOVE_VK_VALIDATION_PERFORMANCE_WARNINGS()
 //
-//    All the above macros can be only used when test fixture has |vk_debug_report_collector()|,
-//    like this class and classes derived from this class.
+//    All the above macros can be only used when test fixture has
+//    |vk_debug_utils_message_collector()|, like this class and classes derived from this class.
 //
 // 3) Besides, one can also use the following macros to check Vulkan validation messages:
 //
@@ -74,18 +74,20 @@ namespace escher::test {
 //        ASSERT_NO_VULKAN_VALIDATION_WARNINGS(1);
 //      }
 //
-//    All the above macros can be only used when test fixture has |vk_debug_report_collector()|,
-//    like this class and classes derived from this class.
+//    All the above macros can be only used when test fixture has
+//    |vk_debug_utils_message_collector()|, like this class and classes derived from this class.
 //
-// 4) Since this class has a |VkDebugReportCallbackRegistry| instance, it can also support optional
+// 4) Since this class has a |VkDebugUtilsMessengerCallbackRegistry| instance, it can also support
+// optional
 //    debug report callback functions by deriving this class and setting up extra callback
 //    functions in its constructor.
 //
 class TestWithVkValidationLayer : public ::testing::Test {
  protected:
   TestWithVkValidationLayer()
-      : TestWithVkValidationLayer(std::vector<VulkanInstance::DebugReportCallback>{}) {}
-  TestWithVkValidationLayer(std::vector<VulkanInstance::DebugReportCallback> optional_callbacks);
+      : TestWithVkValidationLayer(std::vector<VulkanInstance::DebugUtilsMessengerCallback>{}) {}
+  explicit TestWithVkValidationLayer(
+      std::vector<VulkanInstance::DebugUtilsMessengerCallback> optional_callbacks);
 
   // |SetUp()| method of this class inherits from its parent class |::testing::Test|.
   //
@@ -111,14 +113,17 @@ class TestWithVkValidationLayer : public ::testing::Test {
   // }
   void TearDown() override;
 
-  impl::VkDebugReportCallbackRegistry& vk_debug_report_callback_registry() {
-    return vk_debug_report_callback_registry_;
+  impl::VkDebugUtilsMessengerCallbackRegistry& vk_debug_utils_message_callback_registry() {
+    return *vk_debug_utils_message_callback_registry_;
   }
-  impl::VkDebugReportCollector& vk_debug_report_collector() { return vk_debug_report_collector_; }
+  impl::VkDebugUtilsMessageCollector& vk_debug_utils_message_collector() {
+    return vk_debug_utils_message_collector_;
+  }
 
  private:
-  impl::VkDebugReportCallbackRegistry vk_debug_report_callback_registry_;
-  impl::VkDebugReportCollector vk_debug_report_collector_;
+  impl::VkDebugUtilsMessageCollector vk_debug_utils_message_collector_;
+  std::unique_ptr<impl::VkDebugUtilsMessengerCallbackRegistry>
+      vk_debug_utils_message_callback_registry_;
 };
 
 }  // namespace escher::test
