@@ -16,13 +16,13 @@ use explicit::{PollExt as _, ResultExt as _};
 use fidl_fuchsia_hardware_network as netdev;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{
     future::{poll_fn, Future},
     ready,
     task::{Context, Poll},
 };
-use parking_lot::Mutex;
 
 use crate::error::{Error, Result};
 pub use buffer::Buffer;

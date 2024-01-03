@@ -4,7 +4,7 @@
 
 //! Fuchsia netdevice buffer pool.
 
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::VecDeque;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::{ManuallyDrop, MaybeUninit};
