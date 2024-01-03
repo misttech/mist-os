@@ -58,7 +58,7 @@ source_set("base_deps") {
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/ui/scenic/lib/flatland",
     "//src/ui/scenic/lib/scenic",
     "//src/ui/scenic/lib/scenic/util",
