@@ -94,7 +94,14 @@ pub async fn get_all_route_segments(
                 let mut component_segments = get_segments(&instance.moniker, decl, &query);
                 segments.append(&mut component_segments)
             }
-            Err(GetDeclarationError::InstanceNotResolved(_)) => continue,
+            // If the instance is not yet resolved, then we can't get its resolved declaration. If
+            // the component doesn't exist, then it's been destroyed since the `get_all_instances`
+            // call and we can't get its resolved declaration. Both of these things are expected,
+            // so ignore these errors.
+            Err(
+                GetDeclarationError::InstanceNotResolved(_)
+                | GetDeclarationError::InstanceNotFound(_),
+            ) => continue,
             Err(err) => {
                 return Err(FindInstancesError::GetDeclarationError {
                     moniker: instance.moniker.clone(),
