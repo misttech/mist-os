@@ -81,7 +81,7 @@ struct PowerYak {
     size: rc::Rc<lock::Mutex<IValue<String>>>,
     ty: cell::RefCell<IDebug<Horse>>,
     counter: Box<UintProperty>,
-    last_words: parking_lot::RwLock<StringProperty>,
+    last_words: fuchsia_sync::RwLock<StringProperty>,
     // TODO(fxbug.dev/69493): Remove this or explain why it's here.
     #[allow(dead_code)]
     inspect_node: Node,
@@ -149,7 +149,7 @@ impl AutoYak {
 struct AutoYakWrapper {
     // Attaches the inner field to parent[name]
     #[inspect(forward)]
-    inner: parking_lot::Mutex<AutoYak>,
+    inner: fuchsia_sync::Mutex<AutoYak>,
 
     // `wrapper_data` is ignored, because we have forwarded to inner.
     _wrapper_data: IValue<String>,

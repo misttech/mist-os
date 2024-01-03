@@ -138,6 +138,30 @@ where
     }
 }
 
+impl<T> Inspect for &fuchsia_sync::Mutex<T>
+where
+    for<'a> &'a mut T: Inspect,
+{
+    fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        match self.try_lock() {
+            Some(mut inner) => inner.iattach(parent, name),
+            None => Err("could not get exclusive access to fuchsia_sync::Mutex".into()),
+        }
+    }
+}
+
+impl<T> Inspect for &fuchsia_sync::RwLock<T>
+where
+    for<'a> &'a mut T: Inspect,
+{
+    fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        match self.try_write() {
+            Some(mut inner) => inner.iattach(parent, name),
+            None => Err("could not get exclusive access to fuchsia_sync::RwLock".into()),
+        }
+    }
+}
+
 impl<T> Inspect for &lock::Mutex<T>
 where
     for<'a> &'a mut T: Inspect,
