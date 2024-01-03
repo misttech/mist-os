@@ -62,6 +62,10 @@ func parseTrfTest(lines [][]byte) []runtests.TestCaseResult {
 			currentTestName = ""
 			continue
 		}
+		if m := trfTestExpectationPattern.FindStringSubmatch(line); m != nil {
+			expectations[m[2]] = m[3]
+			continue
+		}
 		// We make the assumption that the stderr message always follows a match to trfTestCaseStderr.
 		// And we only capture the first [linesToCapture] line after a match to trfTestCaseStderr is found.
 		if m := trfTestCaseStderr.FindStringSubmatch(line); m != nil {
@@ -86,9 +90,6 @@ func parseTrfTest(lines [][]byte) []runtests.TestCaseResult {
 				currentTestName = ""
 			}
 			continue
-		}
-		if m := trfTestExpectationPattern.FindStringSubmatch(line); m != nil {
-			expectations[m[2]] = m[3]
 		}
 	}
 

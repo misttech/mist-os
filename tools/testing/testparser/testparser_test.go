@@ -194,7 +194,9 @@ Expected: is OK and has a value that is equal to 0
 [stderr - fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm]
 Check failed: strcmp(buf, "/foo") == 0
 libc: Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 9 (chroot_test), pid 9 (<unknown>)
+[01447.782299][expectation-comparer] INFO: ChrootTest.ProcMemSelfFdsNoEscapeProcOpen failure is expected, so it will be reported to the test runner as having passed.
 [PASSED]	ChrootTest.Success
+[01447.649121][expectation-comparer] INFO: ChrootTest.ProcMemSelfMapsNoEscapeProcOpen skip is expected.
 [PASSED]	ChrootTest.ProcMemSelfFdsNoEscapeProcOpen
 [01447.596892][runners:chroot_test.cm_Z3b2DH8][starnix] INFO: start_component: fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm
 arguments: Some([])
@@ -206,9 +208,7 @@ manifest: Some(Dictionary { entries: Some([DictionaryEntry { key: "binary", valu
 	Success
 	ProcMemSelfFdsNoEscapeProcOpen
 	ProcMemSelfMapsNoEscapeProcOpen
-[01447.649121][expectation-comparer] INFO: ChrootTest.ProcMemSelfMapsNoEscapeProcOpen skip is expected.
 [01447.780791][expectation-comparer] INFO: ChrootTest.Success success is expected.
-[01447.782299][expectation-comparer] INFO: ChrootTest.ProcMemSelfFdsNoEscapeProcOpen failure is expected, so it will be reported to the test runner as having passed.
 
 2 out of 2 attempted tests passed, 1 tests skipped...
 fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm completed with result: PASSED
