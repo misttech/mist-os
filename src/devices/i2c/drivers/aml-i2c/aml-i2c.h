@@ -6,6 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -47,7 +48,8 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
   zx_status_t Write(cpp20::span<uint8_t> src, bool stop) const;
 
   zx_status_t StartIrqThread();
-  zx_status_t IrqThread() const;
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
 
   const fdf::MmioBuffer& regs_iobuff() const;
 
@@ -61,6 +63,7 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
   // Only needed in order to set the role name for the code that waits for irq's.
   std::optional<fdf::Dispatcher> irq_dispatcher_;
   std::optional<fdf::PrepareStopCompleter> completer_;
+  async::IrqMethod<AmlI2c, &AmlI2c::HandleIrq> irq_handler_{this};
 };
 
 }  // namespace aml_i2c

@@ -112,23 +112,21 @@ void AmlI2c::SetTargetAddr(uint16_t addr) const {
   TargetAddr::Get().ReadFrom(&regs_iobuff()).set_target_address(addr).WriteTo(&regs_iobuff());
 }
 
-zx_status_t AmlI2c::IrqThread() const {
-  while (true) {
-    zx_status_t status = irq_.wait(nullptr);
-    if (status == ZX_ERR_CANCELED) {
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(DEBUG, "interrupt error: %s", zx_status_get_string(status));
-      continue;
-    }
-    if (Control::Get().ReadFrom(&regs_iobuff()).error()) {
-      event_.signal(0, kErrorSignal);
-    } else {
-      event_.signal(0, kTxnCompleteSignal);
-    }
+void AmlI2c::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                       const zx_packet_interrupt_t* interrupt) {
+  if (status == ZX_ERR_CANCELED) {
+    return;
   }
-  return ZX_OK;
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
+    return;
+  }
+  irq_.ack();
+  if (Control::Get().ReadFrom(&regs_iobuff()).error()) {
+    event_.signal(0, kErrorSignal);
+  } else {
+    event_.signal(0, kTxnCompleteSignal);
+  }
 }
 
 #if 0
@@ -271,7 +269,7 @@ zx_status_t AmlI2c::Read(cpp20::span<uint8_t> dst, const bool stop) const {
 zx_status_t AmlI2c::StartIrqThread() {
   const char* kRoleName = "fuchsia.devices.i2c.drivers.aml-i2c.interrupt";
   zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, kRoleName,
+      {}, kRoleName,
       [this](fdf_dispatcher_t*) {
         if (completer_.has_value()) {
           (*std::move(completer_))(zx::ok());
@@ -284,12 +282,8 @@ zx_status_t AmlI2c::StartIrqThread() {
   }
   irq_dispatcher_.emplace(std::move(dispatcher.value()));
 
-  async::PostTask(irq_dispatcher_->async_dispatcher(), [this]() {
-    zx_status_t status = IrqThread();
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Irq thread failed: %s", zx_status_get_string(status));
-    }
-  });
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(irq_dispatcher_->async_dispatcher());
 
   return ZX_OK;
 }
@@ -451,7 +445,6 @@ void AmlI2c::PrepareStop(fdf::PrepareStopCompleter completer) {
     completer(zx::ok());
     return;
   }
-  irq_.destroy();
   irq_dispatcher_->ShutdownAsync();
   completer_.emplace(std::move(completer));
 }
