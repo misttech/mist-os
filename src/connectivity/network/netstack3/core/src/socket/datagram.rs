@@ -944,8 +944,6 @@ pub(crate) trait DualStackIpExt: super::DualStackIpExt {
     /// `S::SocketId<Ipv6>`.
     ///
     /// [`EitherIpSocket<S>]`: [EitherIpSocket]
-    // TODO(https://fxbug.dev/21198): Extract the necessary GAT from
-    // DatagramSocketSpec into its own trait and use that as the bound here.
     type DualStackBoundSocketId<S: DatagramSocketSpec>: Clone + Debug + Eq;
 
     /// The IP options type for the other stack that will be held for a socket.
