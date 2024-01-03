@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config.gni")
 import("//build/packages/prebuilt_package_with_flavors.gni")
 import("//src/chromium/build_args.gni")
 
@@ -124,24 +123,5 @@ template("generate_fuchsia_web_package_flavors") {
         production_safe = false
       },
     ]
-  }
-}
-
-# Generates a config for Chromium packages. See //build/config.gni for
-# documentation of the parameters below.
-template("generate_config") {
-  config_data("${target_name}_config") {
-    forward_variables_from(invoker,
-                           [
-                             "for_pkg",
-                             "outputs",
-                             "sources",
-                             "testonly",
-                             "visibility",
-                           ])
-    if (!defined(visibility)) {
-      visibility = []
-    }
-    visibility += [ ":${invoker.target_name}" ]
   }
 }
