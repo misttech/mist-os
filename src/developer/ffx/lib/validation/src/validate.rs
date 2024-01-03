@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{any::TypeId, borrow::Cow, collections::HashMap, ops::ControlFlow};
+use std::{any::TypeId, borrow::Cow, collections::HashMap, fmt::Display, ops::ControlFlow};
 
 use crate::schema::*;
 
@@ -11,8 +11,10 @@ pub fn validate(schema: Walk, value: &serde_json::Value) -> Result<(), Vec<Valid
     let mut validation = Validation::new(value);
 
     if schema(&mut validation).is_continue() {
-        // Validation failed
-        eprintln!("{:#?}", validation.error);
+        eprintln!("Validation failed:");
+        for error in &validation.error {
+            eprintln!("{error}");
+        }
         Err(validation.error)
     } else {
         Ok(())
@@ -25,6 +27,15 @@ pub enum FieldId {
     Name(Cow<'static, str>),
     // Tuple struct/enum fields
     Index(u32),
+}
+
+impl Display for FieldId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Name(key) => write!(f, ".{key}"),
+            Self::Index(i) => write!(f, "[{i}]"),
+        }
+    }
 }
 
 impl From<&'static str> for FieldId {
@@ -65,6 +76,28 @@ pub enum ValidationErrorMessage {
 pub struct ValidationError {
     messages: Vec<ValidationErrorMessage>,
     fields: HashMap<FieldId, Vec<ValidationError>>,
+}
+
+impl Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut stack = vec![(self, None, None)];
+        while let Some((this, outer_field, mut field_iter)) = stack.pop() {
+            for message in &this.messages {
+                writeln!(f, "{0:>1$}{message}", "", stack.len() * 2)?;
+            }
+
+            let iter = field_iter.get_or_insert(
+                this.fields.iter().flat_map(|(key, errs)| errs.iter().map(move |err| (key, err))),
+            );
+
+            if let Some((key, err)) = iter.next() {
+                writeln!(f, "{0:>1$}{key}:", "", stack.len() * 2)?;
+                stack.push((this, outer_field, field_iter));
+                stack.push((err, Some(key), None));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ValidationError {
