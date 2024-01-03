@@ -109,14 +109,14 @@ def _dependencies_test_impl(ctx):
 
     asserts.equals(
         env,
-        sorted(get_component_manifests(target_under_test)),
         sorted(ctx.attr.expected_components),
+        sorted(get_component_manifests(target_under_test)),
     )
 
     asserts.equals(
         env,
-        sorted(get_driver_component_manifests(target_under_test)),
         sorted(ctx.attr.expected_drivers),
+        sorted(get_driver_component_manifests(target_under_test)),
     )
 
     return analysistest.end(env)
@@ -142,6 +142,12 @@ def _test_package_deps():
             is_driver = True,
         )
 
+    fuchsia_component(
+        name = "component_with_cml",
+        tags = ["manual"],
+        manifest = "meta/foo.cml",
+    )
+
     fuchsia_package(
         name = "single_component",
         tags = ["manual"],
@@ -162,6 +168,8 @@ def _test_package_deps():
             ":component_2",
             ":driver_1",
             ":driver_2",
+            # test that we can pass in a plain cml file
+            ":component_with_cml",
         ],
     )
 
@@ -184,6 +192,7 @@ def _test_package_deps():
         expected_components = [
             "meta/component_1.cm",
             "meta/component_2.cm",
+            "meta/foo.cm",
             "meta/driver_1.cm",
             "meta/driver_2.cm",
         ],

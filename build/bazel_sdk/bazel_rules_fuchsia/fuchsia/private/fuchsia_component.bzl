@@ -4,8 +4,20 @@
 
 # buildifier: disable=module-docstring
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
+load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
+
+def _manifest_target(name, manifest_in):
+    if manifest_in.endswith(".cml"):
+        # We need to compile the cml file
+        manifest_target = name + "_" + manifest_in
+        fuchsia_component_manifest(
+            name = manifest_target,
+            src = manifest_in,
+        )
+        return ":{}".format(manifest_target)
+    return manifest_in
 
 def fuchsia_component(name, manifest, deps = None, **kwargs):
     """Creates a Fuchsia component that can be added to a package.
@@ -16,9 +28,11 @@ def fuchsia_component(name, manifest, deps = None, **kwargs):
         deps: A list of targets that this component depends on.
         **kwargs: Extra attributes to forward to the build rule.
     """
+    manifest_target = _manifest_target(name, manifest)
+
     _fuchsia_component(
         name = name,
-        manifest = manifest,
+        manifest = manifest_target,
         deps = deps,
         is_driver = False,
         **kwargs
@@ -33,9 +47,11 @@ def fuchsia_test_component(name, manifest, deps = None, **kwargs):
         deps: A list of targets that this component depends on.
         **kwargs: Extra attributes to forward to the build rule.
     """
+    manifest_target = _manifest_target(name, manifest)
+
     _fuchsia_component_test(
         name = name,
-        manifest = manifest,
+        manifest = manifest_target,
         deps = deps,
         is_driver = False,
         **kwargs
@@ -55,10 +71,11 @@ def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = [
         deps: A list of targets that this component depends on.
         **kwargs: Extra attributes to forward to the build rule.
     """
+    manifest_target = _manifest_target(name, manifest)
 
     _fuchsia_component(
         name = name,
-        manifest = manifest,
+        manifest = manifest_target,
         deps = deps + [
             bind_bytecode,
             driver_lib,
@@ -118,12 +135,21 @@ number of dependencies which will be included in the final package.
             doc = "A list of targets that this component depends on",
         ),
         "manifest": attr.label(
-            doc = "The component manifest file",
-            allow_single_file = [".cm"],
+            doc = """The component manifest file
+
+            This attribute can be a fuchsia_component_manifest target or a cml
+            file. If a cml file is provided it will be compiled into a cm file.
+            If component_name is provided the cm file will inherit that name,
+            otherwise it will keep the same basename.
+
+            If you need to have more control over the compilation of the .cm file
+            we suggest you create a fuchsia_component_manifest target.
+            """,
+            allow_single_file = [".cm", ".cml"],
             mandatory = True,
         ),
         "component_name": attr.string(
-            doc = "The name of the package, defaults to the target name",
+            doc = "The name of the component, defaults to the target name",
         ),
         "is_driver": attr.bool(
             doc = "True if this is a driver component",
