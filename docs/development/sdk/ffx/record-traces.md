@@ -219,6 +219,40 @@ Do the following:
 2. Click **Open trace file** on the navigation bar.
 3. Select your `trace.fxt` file from the host machine.
 
+## Symbolize FIDL traces {:#symbolize-fidl-traces}
+
+If a trace is collected with the `kernel:ipc` category included, the `.fxt`
+trace file will include a number of Channel message events corresponding to FIDL
+calls made in the duration of the trace. These channel messages will only
+contain the ordinal associated with the FIDL call, which is a SHA-256 hash of
+the method being called.
+
+The Fuchsia build directory contains files with names ending in `.fidl.json`.
+These files contain the information needed to translate the ordinals to the
+corresponding FIDL methods and are generated during a Fuchsia build. As long as
+a Fuchsia build directory is available, these files can be used to symbolize the
+oridinals in the trace file to the corresponding FIDL methods
+
+To translate all the ordinals in a trace file, use the following command:
+
+```posix-terminal
+ffx trace symbolize --fxt <FXT-FILE> [--outfile <OUTFILE>] [--ir-path <ir-path...>]
+```
+
+Replace `FXT-FILE` with the path to the trace file. By default, the traces in the
+original trace file are overwritten after symbolization. Specifying the `OUTFILE`
+argument will result in the traces being written to the specified file instead.
+
+The `ir-path` argument can be used to provide specific IR files to be used for
+the symbolization. This allows symbolization to be performed using the provided
+IR files even in the absence of the Fuchsia build directory.
+
+It is also possible to symbolize individual ordinals using the command:
+
+```posix-terminal
+ffx trace symbolize [--ordinal <ordinal>] [--ir-path <ir-path...>]
+```
+
 ## View trace categories {:#view-trace-categories}
 
 The `ffx trace start` command allows you to select categories which
