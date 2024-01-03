@@ -4,7 +4,7 @@
 
 use crate::writer::types::InspectType;
 use derivative::Derivative;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 
 type InspectTypeList = Vec<Box<dyn InspectType>>;
 

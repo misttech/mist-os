@@ -14,8 +14,8 @@ use {
     archivist_accessor::ArchiveAccessor,
     async_trait::async_trait,
     fidl_fuchsia_diagnostics as diagnostics, fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::StreamExt,
-    parking_lot::Mutex,
     std::collections::BTreeSet,
     std::sync::{
         atomic::{AtomicUsize, Ordering},

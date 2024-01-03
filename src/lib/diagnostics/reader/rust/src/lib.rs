@@ -23,7 +23,7 @@ use std::{
 };
 use thiserror::Error;
 
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};

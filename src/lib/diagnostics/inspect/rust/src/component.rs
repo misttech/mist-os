@@ -34,9 +34,9 @@
 //! ```
 
 use super::{health, stats, Inspector, InspectorConfig, LazyNode};
+use fuchsia_sync::Mutex;
 use inspect_format::constants;
 use lazy_static::lazy_static;
-use parking_lot::Mutex;
 use std::sync::Arc;
 
 lazy_static! {

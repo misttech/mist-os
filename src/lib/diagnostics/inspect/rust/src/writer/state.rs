@@ -6,13 +6,13 @@ use {
     crate::writer::{error::Error, heap::Heap, Inspector, StringReference},
     anyhow,
     derivative::Derivative,
+    fuchsia_sync::{Mutex, MutexGuard},
     futures::future::BoxFuture,
     inspect_format::{
         constants, utils, BlockAccessorExt, BlockAccessorMutExt, BlockContainer, BlockIndex,
         BlockType, Container, Error as FormatError,
         {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
     },
-    parking_lot::{Mutex, MutexGuard},
     std::{
         collections::HashMap,
         sync::{

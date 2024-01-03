@@ -4,8 +4,8 @@
 
 use crate::fetcher::{FetchCommand, Fetcher};
 use fuchsia_async::{self as fasync, TaskGroup};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
-use parking_lot::Mutex;
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
 use std::{collections::HashMap, sync::Arc};
 
