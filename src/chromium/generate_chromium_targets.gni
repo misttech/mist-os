@@ -82,9 +82,6 @@ template("generate_fuchsia_web_targets") {
   group("web_context_provider_for_test") {
     # No new tests relying on WebEngine should be added in tree.
     visibility += [
-      # TODO(crbug.com/1443083): Remove the following line once
-      # ":chromium_web_engine_tests" no longer depend on the system WebEngine.
-      ":*",
       "//src/chromium/web_runner_tests/*",
       "//src/testing/system-validation:*",
       "//src/ui/a11y/lib/semantics/tests:*",
@@ -256,14 +253,7 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
-      deps = [
-        ":chromium_test_base_deps",
-
-        # Currently, `web_engine_integration_tests` uses an absolute URL for
-        # `web_instance.cm`, so these tests require that `web_engine` in the
-        # Product. TODO(crbug.com/1443083): Update based on outcome of the bug.
-        ":web_context_provider_for_test",
-      ]
+      deps = [ ":chromium_test_base_deps" ]
     }
 
     icu_tzdata_config_data("tzdata_for_base_unittests") {
