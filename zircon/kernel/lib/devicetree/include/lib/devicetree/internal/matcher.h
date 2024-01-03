@@ -35,6 +35,9 @@ DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnSubtreeSignature, OnSubtree,
 DECLARE_HAS_MEMBER_FN(HasOnScan, OnScan);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnScanSignature, OnScan, ScanState (C::*)());
 
+DECLARE_HAS_MEMBER_FN(HasOnDone, OnDone);
+DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnDoneSignature, OnDone, void (C::*)());
+
 DECLARE_HAS_MEMBER_FN(HasOnError, OnError);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnErrorSignature, OnError, void (C::*)(std::string_view));
 
@@ -174,6 +177,8 @@ class AliasMatcher {
   ScanState OnScan();
 
   ScanState OnSubtree(const NodePath& path);
+
+  void OnDone() {}
 
   void OnError(std::string_view error);
 };

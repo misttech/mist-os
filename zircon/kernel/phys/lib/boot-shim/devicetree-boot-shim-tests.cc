@@ -50,9 +50,6 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
       case devicetree::NodePath::Comparison::kEqual: {
         count_++;
         if (count_ == max_count_) {
-          value_ = cmdline_name_ + std::to_string(count_);
-          set_payload_(value_);
-
           return devicetree::ScanState::kDone;
         }
         return devicetree::ScanState::kDoneWithSubtree;
@@ -71,6 +68,11 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
 
   devicetree::ScanState OnScan() {
     return value_.empty() ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
+  }
+
+  void OnDone() {
+    value_ = cmdline_name_ + std::to_string(count_);
+    set_payload_(value_);
   }
 
   void OnError(std::string_view err) { std::cout << " Matcher error " << err << std::endl; }

@@ -25,9 +25,11 @@ using devicetree::testing::LoadedDtb;
 struct InvalidMatcher {};
 
 using devicetree::internal::HasMaxScansMember;
+using devicetree::internal::HasOnDone_v;
 using devicetree::internal::HasOnError_v;
 using devicetree::internal::HasOnNode_v;
 using devicetree::internal::HasOnScan_v;
+using devicetree::internal::OnDoneSignature_v;
 using devicetree::internal::OnErrorSignature_v;
 using devicetree::internal::OnNodeSignature_v;
 using devicetree::internal::OnScanSignature_v;
@@ -38,6 +40,8 @@ static_assert(!HasOnScan_v<InvalidMatcher>);
 static_assert(!OnScanSignature_v<InvalidMatcher>);
 static_assert(!HasOnNode_v<InvalidMatcher>);
 static_assert(!OnNodeSignature_v<InvalidMatcher>);
+static_assert(!HasOnDone_v<InvalidMatcher>);
+static_assert(!OnDoneSignature_v<InvalidMatcher>);
 static_assert(!HasMaxScansMember<InvalidMatcher>::value);
 
 struct ValidMatcher {
@@ -46,6 +50,7 @@ struct ValidMatcher {
                                const devicetree::PropertyDecoder& decoder);
   void OnError(std::string_view v);
   devicetree::ScanState OnScan();
+  void OnDone();
 };
 
 static_assert(HasOnError_v<ValidMatcher>);
@@ -54,6 +59,8 @@ static_assert(HasOnScan_v<ValidMatcher>);
 static_assert(OnScanSignature_v<ValidMatcher>);
 static_assert(HasOnNode_v<ValidMatcher>);
 static_assert(OnNodeSignature_v<ValidMatcher>);
+static_assert(HasOnDone_v<ValidMatcher>);
+static_assert(OnDoneSignature_v<ValidMatcher>);
 static_assert(HasMaxScansMember<ValidMatcher>::value);
 
 // Helper matcher for tests.
@@ -111,6 +118,8 @@ struct SingleNodeMatcher {
     return walk_result;
   }
 
+  void OnDone() { on_done = true; }
+
   void OnError(std::string_view error) { this->error = error; }
 
   std::string error;
@@ -118,6 +127,7 @@ struct SingleNodeMatcher {
   devicetree::ScanState node_match_result = devicetree::ScanState::kDone;
   devicetree::ScanState walk_result = devicetree::ScanState::kDone;
   bool found = false;
+  bool on_done = false;
   int visit_count = 0;
   size_t walk_count = 0;
   size_t on_subtree_count = 0;
@@ -185,6 +195,7 @@ TEST_F(MatchTest, EarlyCompletion) {
   EXPECT_EQ(matcher.walk_count, 0);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 1);
+  EXPECT_TRUE(matcher.on_done);
 }
 
 TEST_F(MatchTest, NoShortCircuitingAliasesNode) {
@@ -212,6 +223,7 @@ TEST_F(MatchTest, NoShortCircuitingAliasesNode) {
   EXPECT_EQ(matcher.walk_count, 0);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 1);
+  EXPECT_TRUE(matcher.on_done);
 }
 
 TEST_F(MatchTest, MultipleWalksForCompletion) {
@@ -238,6 +250,7 @@ TEST_F(MatchTest, MultipleWalksForCompletion) {
   EXPECT_EQ(matcher.walk_count, 1);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 2);
+  EXPECT_TRUE(matcher.on_done);
 }
 
 TEST_F(MatchTest, OnScanCompetion) {
@@ -261,6 +274,7 @@ TEST_F(MatchTest, OnScanCompetion) {
   EXPECT_EQ(matcher.walk_count, 1);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 1);
+  EXPECT_TRUE(matcher.on_done);
 }
 
 TEST_F(MatchTest, OnErrorReturnsFalse) {
@@ -286,6 +300,7 @@ TEST_F(MatchTest, OnErrorReturnsFalse) {
   EXPECT_EQ(matcher.walk_count, 2);
   EXPECT_FALSE(matcher.error.empty());
   EXPECT_EQ(seen, 2);
+  EXPECT_FALSE(matcher.on_done);
 }
 
 TEST_F(MatchTest, MultipleMatchersEarlyCompletion) {
@@ -310,6 +325,7 @@ TEST_F(MatchTest, MultipleMatchersEarlyCompletion) {
   EXPECT_EQ(matcher_1.on_subtree_count, 0);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
+  EXPECT_TRUE(matcher_1.on_done);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 6);
@@ -317,6 +333,7 @@ TEST_F(MatchTest, MultipleMatchersEarlyCompletion) {
   EXPECT_EQ(matcher_2.on_subtree_count, 0);
   EXPECT_TRUE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 1);
+  EXPECT_TRUE(matcher_2.on_done);
 }
 
 TEST_F(MatchTest, MultipleMatchersOnScanCompletion) {
@@ -346,6 +363,7 @@ TEST_F(MatchTest, MultipleMatchersOnScanCompletion) {
   EXPECT_EQ(matcher_1.on_subtree_count, 4);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
+  EXPECT_TRUE(matcher_1.on_done);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 7);
@@ -354,6 +372,7 @@ TEST_F(MatchTest, MultipleMatchersOnScanCompletion) {
   EXPECT_EQ(matcher_2.on_subtree_count, 5);
   EXPECT_TRUE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 1);
+  EXPECT_TRUE(matcher_2.on_done);
 }
 
 TEST_F(MatchTest, MultipleMatchersOnErrorIsFalse) {
@@ -380,6 +399,7 @@ TEST_F(MatchTest, MultipleMatchersOnErrorIsFalse) {
   EXPECT_EQ(matcher_1.on_subtree_count, 0);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
+  EXPECT_TRUE(matcher_1.on_done);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 14);
@@ -387,6 +407,7 @@ TEST_F(MatchTest, MultipleMatchersOnErrorIsFalse) {
   EXPECT_EQ(matcher_2.on_subtree_count, 10);
   EXPECT_FALSE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 2);
+  EXPECT_FALSE(matcher_2.on_done);
 }
 
 TEST_F(MatchTest, OnSubtreeCalledWhenActive) {
@@ -417,6 +438,7 @@ TEST_F(MatchTest, OnSubtreeCalledWhenActive) {
   EXPECT_EQ(matcher_1.on_subtree_count, 3);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
+  EXPECT_TRUE(matcher_1.on_done);
 }
 
 TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
@@ -449,6 +471,7 @@ TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
   EXPECT_EQ(matcher_1.on_subtree_count, 3);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
+  EXPECT_TRUE(matcher_1.on_done);
 }
 
 }  // namespace

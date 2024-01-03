@@ -68,6 +68,8 @@ class DevicetreeItemBase {
 
   devicetree::ScanState OnScan() { return devicetree::ScanState::kActive; }
 
+  void OnDone() {}
+
   template <typename Shim>
   void Init(const Shim& shim) {
     static_assert(devicetree::kIsMatcher<T>);

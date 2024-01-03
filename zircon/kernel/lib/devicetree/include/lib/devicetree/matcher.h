@@ -46,10 +46,14 @@ namespace devicetree {
 //   // prefer the latter.
 //   ScanState OnSubtree(const NodePath& path);
 //
-//   // When multiple tree scans are performed, |Matcher::OnScam| is called
+//   // When multiple tree scans are performed, |Matcher::OnScan| is called
 //   // at the end of each scan, meaning all nodes of the tree where a matcher has shown interes
 //   // have been visited.
 //   ScanState OnScan();
+//
+//   // Called if the matcher returns kDone, at the end of the matching process. May be used to
+//   // finalize decoded state.
+//   void OnDone();
 //
 //   // Called whenever an error happens.
 //   void OnError(std::string_view error);
@@ -78,6 +82,8 @@ namespace devicetree {
 //   ScanState OnScan() {
 //     return ScanState::kDone;
 //   }
+//
+//   void OnDone() {}
 //
 //   void OnError(std::string_view err) {
 //     std::cout << " Foo Matcher had an error: " << err << std::endl;
@@ -177,6 +183,17 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
         matchers...);
   };
 
+  // Call OnDone on ever matcher, when appropriate.
+  auto on_done = [](auto& visit_state, auto&... matchers) {
+    ForEachMatcher(
+        [&visit_state](auto& matcher, size_t index) {
+          if (visit_state[index].state() == ScanState::kDone) {
+            matcher.OnDone();
+          }
+        },
+        matchers...);
+  };
+
   // Verify that matchers fulfill their scan contract, that is every matcher visit state must be
   // |kDone| after finishing the current devicetree scan. Return value:
   enum class ScanResult {
@@ -222,6 +239,7 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
 
     // If result == 1 then no errors found, but not all matchers are done.
     if (auto res = all_matchers_done(i, matchers...); res != ScanResult::kMatchersPending) {
+      on_done(visit_state, matchers...);
       return res == ScanResult::kMatchersDone;
     }
 
