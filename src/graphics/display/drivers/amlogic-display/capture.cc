@@ -8,7 +8,6 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
-#include <threads.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -18,6 +17,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
 
 namespace amlogic_display {
 
@@ -50,7 +50,11 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(ddk::PDevFidl& platform_dev
 Capture::Capture(zx::interrupt capture_finished_interrupt,
                  OnCaptureCompleteHandler on_capture_complete)
     : capture_finished_irq_(std::move(capture_finished_interrupt)),
-      on_capture_complete_(std::move(on_capture_complete)) {}
+      on_capture_complete_(std::move(on_capture_complete)),
+      irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
+      irq_handler_loop_(&irq_handler_loop_config_) {
+  irq_handler_.set_object(capture_finished_irq_.get());
+}
 
 Capture::~Capture() {
   // In order to shut down the interrupt handler and join the thread, the
@@ -62,46 +66,48 @@ Capture::~Capture() {
     }
   }
 
-  if (interrupt_thread_.has_value()) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_join(*interrupt_thread_, nullptr));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Capture done interrupt thread join failed: %s", zx_status_get_string(status));
-    }
-  }
+  irq_handler_loop_.Shutdown();
 }
 
 zx::result<> Capture::Init() {
-  thrd_t interrupt_thread;
-  zx_status_t status = thrd_status_to_zx_status(thrd_create_with_name(
-      &interrupt_thread,
-      [](void* arg) { return reinterpret_cast<Capture*>(arg)->InterruptThreadEntryPoint(); },
-      /*arg=*/this,
-      /*name=*/"capture-interrupt-thread"));
+  zx_status_t status = irq_handler_loop_.StartThread("capture-interrupt-thread");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create interrupt thread: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to start a thread for the capture interrupt handler loop: %s",
+           zx_status_get_string(status));
     return zx::error(status);
   }
-  interrupt_thread_.emplace(interrupt_thread);
+
+  status = irq_handler_.Begin(irq_handler_loop_.dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to bind the capture interrupt handler to the async loop: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
   return zx::ok();
 }
 
-int Capture::InterruptThreadEntryPoint() {
-  while (true) {
-    zx::time timestamp;
-    zx_status_t status = capture_finished_irq_.wait(&timestamp);
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Capture finished interrupt wait is cancelled. Stopping interrupt thread.");
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Capture finished interrupt wait failed: %s", zx_status_get_string(status));
-      break;
-    }
-
-    OnCaptureComplete();
+void Capture::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                               zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  if (status == ZX_ERR_CANCELED) {
+    zxlogf(INFO, "Capture finished interrupt wait is cancelled.");
+    return;
+  }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Capture finished interrupt wait failed: %s", zx_status_get_string(status));
+    // A failed async interrupt wait doesn't remove the interrupt from the
+    // async loop, so we have to manually cancel it.
+    irq->Cancel();
+    return;
   }
 
-  return 0;
+  OnCaptureComplete();
+
+  // For interrupts bound to ports (including those bound to async loops), the
+  // interrupt must be re-armed using zx_interrupt_ack() for each incoming
+  // interrupt request. This is best done after the interrupt has been fully
+  // processed.
+  zx::unowned_interrupt(irq->object())->ack();
 }
 
 void Capture::OnCaptureComplete() { on_capture_complete_(); }

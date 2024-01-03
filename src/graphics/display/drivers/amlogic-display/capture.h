@@ -5,10 +5,11 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CAPTURE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CAPTURE_H_
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
-#include <threads.h>
 
 #include <memory>
 #include <optional>
@@ -47,21 +48,23 @@ class Capture {
   zx::result<> Init();
 
  private:
-  // Initial routine / entry point for the IRQ handling thread.
-  int InterruptThreadEntryPoint();
-
   void OnCaptureComplete();
+
+  void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt);
 
   const zx::interrupt capture_finished_irq_;
 
   // Guaranteed to have a target.
   const OnCaptureCompleteHandler on_capture_complete_;
 
-  // nullopt if the IRQ thread is not running.
-  //
-  // Constant between Init() and instance destruction. Only accessed on the
-  // threads used for class initialization and destruction.
-  std::optional<thrd_t> interrupt_thread_;
+  const async_loop_config_t irq_handler_loop_config_;
+
+  // The `irq_handler_loop_` and the `irq_handler_` are constant between Init()
+  // and instance destruction. Only accessed on the threads used for class
+  // initialization and destruction.
+  async::Loop irq_handler_loop_;
+  async::IrqMethod<Capture, &Capture::InterruptHandler> irq_handler_{this};
 };
 
 }  // namespace amlogic_display

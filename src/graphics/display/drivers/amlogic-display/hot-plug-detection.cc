@@ -24,17 +24,9 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+
 namespace amlogic_display {
-
-namespace {
-
-async_loop_config_t CreateIrqHandlerAsyncLoopConfig() {
-  async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
-  config.irq_support = true;
-  return config;
-}
-
-}  // namespace
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(

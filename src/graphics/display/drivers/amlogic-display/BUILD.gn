@@ -59,6 +59,8 @@ source_set("common_srcs") {
     "hot-plug-detection.cc",
     "hot-plug-detection.h",
     "initcodes-inl.h",
+    "irq-handler-loop-util.cc",
+    "irq-handler-loop-util.h",
     "lcd.cc",
     "lcd.h",
     "mipi-phy.cc",
