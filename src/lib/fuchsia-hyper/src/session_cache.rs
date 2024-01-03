@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
+    fuchsia_sync::Mutex,
     lru_cache::LruCache,
-    parking_lot::Mutex,
     rustls::{
         internal::msgs::{
             codec::{Codec, Reader},
