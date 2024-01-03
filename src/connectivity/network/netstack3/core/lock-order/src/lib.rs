@@ -172,6 +172,7 @@
 
 pub mod lock;
 pub mod relation;
+pub mod wrap;
 
 use core::{marker::PhantomData, ops::Deref};
 

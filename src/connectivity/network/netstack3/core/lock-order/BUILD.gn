@@ -14,6 +14,7 @@ rustc_library("lock-order") {
     "src/lib.rs",
     "src/lock.rs",
     "src/relation.rs",
+    "src/wrap.rs",
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
