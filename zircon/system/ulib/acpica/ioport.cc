@@ -49,7 +49,7 @@ static zx_status_t add_port_permissions(uint16_t address, uint8_t width_bytes) {
 
   LTRACEF("Adding permissions to [%#x, %#x]\n", address, address + width_bytes);
 
-  return zx_ioports_request(root_resource_handle, address, width_bytes);
+  return zx_ioports_request(ioport_resource_handle, address, width_bytes);
 }
 
 /**
