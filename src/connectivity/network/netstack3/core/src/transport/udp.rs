@@ -5196,11 +5196,6 @@ mod tests {
 
         // Start with `socket` bound to a device.
         let socket = SocketHandler::create_udp(core_ctx);
-        // TODO(https://fxbug.dev/21198): Test against dual-stack sockets.
-        if I::VERSION == net_types::ip::IpVersion::V6 {
-            SocketHandler::set_dual_stack_enabled(core_ctx, &mut bindings_ctx, socket, false)
-                .expect("disabling dual stack should succeed")
-        }
         SocketHandler::set_device(core_ctx, &mut bindings_ctx, socket, Some(&MultipleDevicesId::A))
             .unwrap();
         SocketHandler::listen_udp(core_ctx, &mut bindings_ctx, socket, None, Some(LOCAL_PORT))
@@ -5234,11 +5229,6 @@ mod tests {
 
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
             let socket = SocketHandler::<I, _>::create_udp(core_ctx);
-            // TODO(https://fxbug.dev/21198): Test against dual-stack sockets.
-            if I::VERSION == net_types::ip::IpVersion::V6 {
-                SocketHandler::set_dual_stack_enabled(core_ctx, &mut bindings_ctx, socket, false)
-                    .expect("disabling dual stack should succeed")
-            }
             SocketHandler::set_device(core_ctx, &mut bindings_ctx, socket, Some(&device)).unwrap();
             SocketHandler::listen_udp(core_ctx, &mut bindings_ctx, socket, None, Some(LOCAL_PORT))
                 .expect("listen should succeed");
@@ -8005,9 +7995,7 @@ mod tests {
             .into();
         crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
         let socket = create_udp::<I, _>(core_ctx);
-        // TODO(https://fxbug.dev/21198): Test against dual-stack sockets.
-        let local_ip = ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into();
-        listen_udp(core_ctx, bindings_ctx, &socket, Some(local_ip), Some(LOCAL_PORT)).unwrap();
+        listen_udp(core_ctx, bindings_ctx, &socket, None, Some(LOCAL_PORT)).unwrap();
         if bind_to_device {
             set_udp_device(
                 core_ctx,
