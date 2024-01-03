@@ -625,7 +625,6 @@ impl IntoErrno for udp::SendToError {
             Self::Zone(err) => err.into_errno(),
             Self::Mtu => Errno::Emsgsize,
             Self::RemotePortUnset => Errno::Einval,
-            // TODO(https://fxbug.dev/21198): Verify the errnos with syscall tests.
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
             Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
         }
