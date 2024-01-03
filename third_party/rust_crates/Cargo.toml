@@ -442,6 +442,9 @@ rustflags = []
 [gn.package.async-trait."0.1.71"]
 rustflags = []
 
+[gn.package.bitflags."1.3.2"]
+visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
+
 [gn.package.camino."1.1.1"]
 rustflags = [
   "--cfg=path_buf_capacity",
