@@ -261,15 +261,16 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
     phandle_val = phandle->AsUint32();
   }
 
+  // We do not record any pathological CPUs with missing or malformed "reg"
+  // properties. Rather, we log an error and continue with recording other
+  // non-problematic CPUs in the hope that the kernel can still boot.
   if (!reg) {
     OnError("CPU node missing 'reg' property.");
-    return devicetree::ScanState::kDone;
+    return devicetree::ScanState::kActive;
   }
-
-  auto reg_val = reg->AsReg(decoder);
-  if (!reg_val) {
+  if (!reg->AsReg(decoder)) {
     OnError("Failed to decode CPU node 'reg' property.");
-    return devicetree::ScanState::kDone;
+    return devicetree::ScanState::kActive;
   }
 
   // Properties are not copy or move assignable, so we must initialize in place.
@@ -277,7 +278,12 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
       .phandle = phandle_val,
       .properties = decoder.properties(),
   };
-  cpu_entry_index_++;
+  // Committing the CPU entry is equivalent at this point to incrementing the
+  // index. Gate that on checking the integrity of the architecture-specific
+  // processor information.
+  if (arch_info_checker_(cpu_entries_[cpu_entry_index_])) {
+    cpu_entry_index_++;
+  }
   return devicetree::ScanState::kActive;
 }
 

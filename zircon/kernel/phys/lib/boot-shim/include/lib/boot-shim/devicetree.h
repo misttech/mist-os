@@ -567,15 +567,24 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
     devicetree::Properties properties;
   };
 
-  // Callback used for setting up/updating processor information, that is dependent in
-  // architecture specific information.
+  // Callback used during matching for checking architecture-specific processor
+  // information. The returned boolean indicates whether matching should
+  // record the current CPU, false indicating that crucial information was
+  // missing or malformed. For finer-grained reporting, the expectation is that
+  // `this` can be captured to leverage the devicetree item's logging
+  // facilities.
+  using CheckArchCpuInfo = fit::inline_function<bool(const CpuEntry& entry)>;
+
+  // Callback used during AppendItems() for setting architecture-specific
+  // processor information.
   using SetArchCpuInfo =
       fit::inline_function<void(zbi_topology_processor_t&, const CpuEntry& entry)>;
 
   template <typename Shim>
-  void Init(const Shim& shim, SetArchCpuInfo arch_info_setter) {
+  void Init(const Shim& shim, CheckArchCpuInfo arch_info_checker, SetArchCpuInfo arch_info_setter) {
     DevicetreeItemBase<DevictreeCpuTopologyItem, 2>::Init(shim);
     allocator_ = &shim.allocator();
+    arch_info_checker_ = std::move(arch_info_checker);
     arch_info_setter_ = std::move(arch_info_setter);
   }
 
@@ -671,6 +680,7 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   // Allocation is environment specific, so we delegate that to a lambda.
   mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;
 
+  CheckArchCpuInfo arch_info_checker_;
   SetArchCpuInfo arch_info_setter_;
   bool found_cpus_ = false;
 };
@@ -680,13 +690,16 @@ class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
   template <typename Shim>
   void Init(Shim& shim) {
     DevictreeCpuTopologyItem::Init(
-        shim, [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
+        shim,  //
+        [](const CpuEntry&) {
+          // TODO(fxbug.dev/124336): Skip if "riscv,isa" is missing.
+          return true;
+        },
+        [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
           node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64;
           devicetree::PropertyDecoder decoder(cpu_entry.properties);
           auto reg = decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsUint32>("reg");
-          if (!reg) {
-            return;
-          }
+          ZX_DEBUG_ASSERT(reg);  // Validated in the arch info checker.
           node.architecture_info.riscv64.hart_id = *reg;
           if (*reg == boot_hart_id_) {
             node.flags |= ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
@@ -706,21 +719,44 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
   template <typename Shim>
   void Init(Shim& shim) {
     DevictreeCpuTopologyItem::Init(
-        shim, [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
-          node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64;
+        shim,  //
+        [this](const CpuEntry& cpu_entry) {
           devicetree::PropertyDecoder decoder(cpu_entry.properties);
-
           auto reg_prop = decoder.FindProperty("reg");
           if (!reg_prop) {
             OnError("Could not find 'reg' property in 'cpu' node.");
-            return;
+            return false;
           }
-
           auto reg = devicetree::RegProperty::Create(1, 0, reg_prop->AsBytes());
           if (!reg) {
             OnError("Could not parse 'reg' property in 'cpu' node.");
-            return;
+            return false;
           }
+          if (reg->size() == 0 || reg->size() > 2) {
+            OnError("'reg' property in 'cpu' node contains an unexpected number of cells.");
+            return false;
+          }
+          if (!(*reg)[0].address()) {
+            OnError("Could not parse first cell of 'reg' property in 'cpu' node.");
+            return false;
+          }
+          if (reg->size() == 2 && !(*reg)[1].address()) {
+            OnError("Could not parse second cell of 'reg' property in 'cpu' node.");
+            return false;
+          }
+          return true;
+        },
+        [](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
+          node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64;
+          devicetree::PropertyDecoder decoder(cpu_entry.properties);
+
+          // Validations of debug asserts below were made in the arch info
+          // checker.
+          auto reg_prop = decoder.FindProperty("reg");
+          ZX_DEBUG_ASSERT(reg_prop);
+          auto reg = devicetree::RegProperty::Create(1, 0, reg_prop->AsBytes());
+          ZX_DEBUG_ASSERT(reg);
+          ZX_DEBUG_ASSERT(reg->size() == 1 || reg->size() == 2);
 
           auto set_affs = [&node](uint64_t cell) {
             // AFF 0
@@ -742,16 +778,8 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
             }
           };
 
-          if (reg->size() == 0 || reg->size() > 2) {
-            OnError("'reg' property in 'cpu' node contains an unexpected number of cells.");
-            return;
-          }
-
           auto cell_0 = (*reg)[0].address();
-          if (!cell_0) {
-            OnError("Could not parse first cell of 'reg' property in 'cpu' node.");
-            return;
-          }
+          ZX_DEBUG_ASSERT(cell_0);  // Validated in the arch info checker.
 
           node.architecture_info.arm64.gic_id =
               static_cast<uint8_t>(node.logical_ids[node.logical_id_count - 1]);
@@ -769,10 +797,8 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
           // The first reg cell bits [7:0] must be set to  bits [39:32] of MPIDR_EL1.
           // The second reg cell bits [23:0] must be set to bits [23:0] of MPIDR_EL1.
           auto cell_1 = (*reg)[1].address();
-          if (!cell_1) {
-            OnError("Could not parse second cell of 'reg' property in 'cpu' node.");
-            return;
-          }
+          ZX_DEBUG_ASSERT(cell_1);  // Validated in the arch info checker.
+
           set_affs(*cell_1);
           node.architecture_info.arm64.cluster_3_id = *cell_0 & 0xFF;
           set_boot_cpu();
