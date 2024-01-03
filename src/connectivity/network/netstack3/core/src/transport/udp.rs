@@ -11,7 +11,7 @@ use core::{
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
-use lock_order::{lock::UnlockedAccess, Locked};
+use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 
 use dense_map::EntryKey;
 use derivative::Derivative;
@@ -70,7 +70,7 @@ use crate::{
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
-    trace_duration, transport, SyncCtx,
+    trace_duration, transport, CoreCtx, StackState, SyncCtx,
 };
 
 /// A builder for UDP layer state.
@@ -187,19 +187,17 @@ pub struct UdpCountersInner {
 }
 
 impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = UdpCounters<I>;
     type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.udp_counters()
+        self.udp_counters()
     }
 }
 
-impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>>
-    for Locked<&SyncCtx<BC>, L>
-{
+impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
     }
@@ -2082,7 +2080,7 @@ pub fn send_udp<I: Ip, B: BufferMut, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     body: B,
 ) -> Result<(), Either<SendError, ExpectedConnError>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut core_ctx, bindings_ctx, body)), id.clone()),
@@ -2118,7 +2116,7 @@ pub fn send_udp_to<I: Ip, B: BufferMut, BC: crate::BindingsContext>(
     remote_port: UdpRemotePort,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
 
     // Match Linux's behavior and verify the remote port is set.
@@ -2369,7 +2367,7 @@ impl<I: IpExt, BC: UdpStateBindingsContext<I, D::Strong>, D: WeakId>
 ///
 /// `create_udp` creates a new UDP socket and returns an identifier for it.
 pub fn create_udp<I: Ip, BC: crate::BindingsContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         IpInvariant(&mut core_ctx),
         |IpInvariant(core_ctx)| SocketHandler::<Ipv4, _>::create_udp(core_ctx),
@@ -2406,7 +2404,7 @@ pub fn connect<I: Ip, BC: crate::BindingsContext>(
     remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     remote_port: UdpRemotePort,
 ) -> Result<(), ConnectError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut core_ctx, bindings_ctx, remote_port)), id, remote_ip),
@@ -2437,7 +2435,7 @@ pub fn set_udp_device<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     device_id: Option<&DeviceId<BC>>,
 ) -> Result<(), SocketError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut core_ctx, bindings_ctx, device_id)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx, device_id)), id)| {
@@ -2462,7 +2460,7 @@ pub fn get_udp_bound_device<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> Option<WeakDeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<BC>>>>(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
@@ -2494,7 +2492,7 @@ pub fn set_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     enabled: bool,
 ) -> Result<(), SetDualStackEnabledError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, enabled)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx, enabled)), id)| {
@@ -2523,7 +2521,7 @@ pub fn get_udp_dual_stack_enabled<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> Result<bool, NotDualStackCapableError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     let IpInvariant(enabled) = I::map_ip::<_, IpInvariant<Result<bool, NotDualStackCapableError>>>(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
@@ -2560,7 +2558,7 @@ pub fn set_udp_posix_reuse_port<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     reuse_port: bool,
 ) -> Result<(), ExpectedUnboundError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, reuse_port)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx, reuse_port)), id)| {
@@ -2592,7 +2590,7 @@ pub fn get_udp_posix_reuse_port<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> bool {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     let IpInvariant(reuse_port) = I::map_ip::<_, IpInvariant<bool>>(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
@@ -2629,7 +2627,7 @@ pub fn set_udp_multicast_membership<I: Ip, BC: crate::BindingsContext>(
     interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<BC>>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     I::map_ip::<_, Result<_, _>>(
         (
@@ -2688,7 +2686,7 @@ pub fn set_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     unicast_hop_limit: Option<NonZeroU8>,
     ip_version: IpVersion,
 ) -> Result<(), NotDualStackCapableError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, unicast_hop_limit, ip_version)), id),
@@ -2727,7 +2725,7 @@ pub fn set_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     multicast_hop_limit: Option<NonZeroU8>,
     ip_version: IpVersion,
 ) -> Result<(), NotDualStackCapableError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, multicast_hop_limit, ip_version)), id),
@@ -2765,7 +2763,7 @@ pub fn get_udp_unicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     ip_version: IpVersion,
 ) -> Result<NonZeroU8, NotDualStackCapableError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     let IpInvariant(hop_limit) = I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, ip_version)), id),
@@ -2802,7 +2800,7 @@ pub fn get_udp_multicast_hop_limit<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     ip_version: IpVersion,
 ) -> Result<NonZeroU8, NotDualStackCapableError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let id = id.clone();
     let IpInvariant(hop_limit) = I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, ip_version)), id),
@@ -2832,7 +2830,7 @@ pub fn get_udp_transparent<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
 ) -> bool {
     I::map_ip(
-        (IpInvariant(&mut Locked::new(core_ctx)), id.clone()),
+        (IpInvariant(&mut CoreCtx::new_deprecated(core_ctx)), id.clone()),
         |(IpInvariant(core_ctx), id)| core_ctx.get_udp_transparent(id.clone()),
         |(IpInvariant(core_ctx), id)| core_ctx.get_udp_transparent(id.clone()),
     )
@@ -2845,7 +2843,7 @@ pub fn set_udp_transparent<I: Ip, BC: crate::BindingsContext>(
     value: bool,
 ) {
     I::map_ip::<_, ()>(
-        (IpInvariant(&mut Locked::new(core_ctx)), id.clone(), value),
+        (IpInvariant(&mut CoreCtx::new_deprecated(core_ctx)), id.clone(), value),
         |(IpInvariant(core_ctx), id, value)| {
             SocketHandler::set_udp_transparent(core_ctx, id, value)
         },
@@ -2872,7 +2870,7 @@ pub fn disconnect_udp_connected<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
 ) -> Result<(), ExpectedConnError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -2899,7 +2897,7 @@ pub fn shutdown<I: Ip, BC: crate::BindingsContext>(
     id: &SocketId<I>,
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, which)), id.clone()),
@@ -2925,7 +2923,7 @@ pub fn get_shutdown<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &BC,
     id: &SocketId<I>,
 ) -> Option<ShutdownType> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id.clone()),
@@ -2971,7 +2969,7 @@ pub fn get_udp_info<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     id: &SocketId<I>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -2993,7 +2991,7 @@ pub fn close<I: Ip, BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     id: SocketId<I>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id.clone()),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -3032,7 +3030,7 @@ pub fn listen_udp<I: Ip, BC: crate::BindingsContext>(
     addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
     port: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut core_ctx, bindings_ctx, port)), id.clone(), addr),
         |(IpInvariant((core_ctx, bindings_ctx, port)), id, addr)| {

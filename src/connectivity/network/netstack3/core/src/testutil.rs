@@ -84,7 +84,7 @@ use crate::{
         },
         udp::{self, UdpBindingsContext},
     },
-    SyncCtx,
+    CoreCtx, SyncCtx,
 };
 
 /// NDP test utilities.
@@ -1381,7 +1381,7 @@ pub fn add_route<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
-    let mut core_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     match entry {
         crate::ip::types::AddableEntryEither::V4(entry) => {
             crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
@@ -1408,7 +1408,7 @@ pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
-    let mut core_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     match subnet {
         SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
@@ -1430,7 +1430,7 @@ pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
 ) {
-    let mut core_ctx = lock_order::Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
         &mut core_ctx,
         bindings_ctx,
@@ -1501,7 +1501,7 @@ impl Default for MonotonicIdentifier {
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;
-    use lock_order::Locked;
+
     use packet::{Buf, Serializer};
     use packet_formats::{
         icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode},
@@ -1518,6 +1518,7 @@ mod tests {
         },
         socket::address::SocketIpAddr,
         time::TimerIdInner,
+        UnlockedCoreCtx,
     };
 
     #[test]
@@ -1539,7 +1540,7 @@ mod tests {
 
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut Locked::new(&*core_ctx),
+                &mut CoreCtx::new_deprecated(&*core_ctx),
                 bindings_ctx,
                 None, // device
                 None, // local_ip
@@ -1710,7 +1711,7 @@ mod tests {
         // Alice sends Bob a ping.
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut Locked::new(&*core_ctx),
+                &mut CoreCtx::new_deprecated(&*core_ctx),
                 bindings_ctx,
                 None, // device
                 None, // local_ip
@@ -1808,7 +1809,7 @@ mod tests {
         device: &DeviceId<FakeBindingsCtx>,
     ) where
         A::Version: TestIpExt,
-        Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
+        UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpLayerHandler<A::Version, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let meta = SendIpPacketMeta {
@@ -1821,7 +1822,7 @@ mod tests {
             mtu: None,
         };
         IpLayerHandler::<A::Version, _>::send_ip_packet_from_device(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             meta,
             Buf::new(vec![1, 2, 3, 4], ..),
@@ -1832,7 +1833,7 @@ mod tests {
     #[ip_test]
     fn test_send_to_many<I: Ip + TestIpExt>()
     where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpLayerHandler<
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpLayerHandler<
             I,
             FakeBindingsCtx,
             DeviceId = DeviceId<FakeBindingsCtx>,

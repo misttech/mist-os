@@ -14,7 +14,7 @@ use core::{
 use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
-use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
+use lock_order::{lock::UnlockedAccess, relation::LockBefore, wrap::prelude::*};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
@@ -80,7 +80,7 @@ use crate::{
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::{Mutex, RwLock},
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx, StackState, SyncCtx,
 };
 
 /// The IP packet hop limit for all NDP packets.
@@ -246,49 +246,49 @@ pub struct NdpCounters {
 }
 
 impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = IcmpTxCounters<I>;
     type Guard<'l> = &'l IcmpTxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.icmp_tx_counters()
+        self.icmp_tx_counters()
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpTxCounters<I>> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpTxCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IcmpTxCounters<I>>())
     }
 }
 
 impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = IcmpRxCounters<I>;
     type Guard<'l> = &'l IcmpRxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.icmp_rx_counters()
+        self.icmp_rx_counters()
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpRxCounters<I>> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpRxCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IcmpRxCounters<I>>())
     }
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::NdpCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::NdpCounters> for StackState<BC> {
     type Data = NdpCounters;
     type Guard<'l> = &'l NdpCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.ndp_counters()
+        self.ndp_counters()
     }
 }
 
-impl<BC: BindingsContext, L> CounterContext<NdpCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<NdpCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::NdpCounters>())
     }
@@ -1238,13 +1238,13 @@ pub(crate) trait InnerIcmpv4Context<BC: IcmpBindingsContext<Ipv4, Self::DeviceId
 }
 
 impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = bool;
     type Guard<'l> = &'l bool where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.state.ipv4.icmp.send_timestamp_reply
+        &self.ipv4.icmp.send_timestamp_reply
     }
 }
 
@@ -1253,7 +1253,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > InnerIcmpv4Context<BC> for Locked<&SyncCtx<BC>, L>
+    > InnerIcmpv4Context<BC> for CoreCtx<'_, BC, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
         *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()
@@ -3736,7 +3736,7 @@ impl<
 /// Creates a new unbound ICMP socket.
 pub fn new_socket<I: Ip, BC: BindingsContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
     net_types::map_ip_twice!(I, IpInvariant(core_ctx), |IpInvariant(core_ctx)| {
-        SocketHandler::<I, BC>::create(&mut Locked::new(core_ctx))
+        SocketHandler::<I, BC>::create(&mut CoreCtx::new_deprecated(core_ctx))
     },)
 }
 
@@ -3755,7 +3755,7 @@ pub fn connect<I: Ip, BC: BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip),
         |(IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip)| {
             IpInvariant(SocketHandler::<I, BC>::connect(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
                 remote_ip,
@@ -3782,7 +3782,7 @@ pub fn bind<I: Ip, BC: BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip),
         |(IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip)| {
             IpInvariant(SocketHandler::<I, _>::bind(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
                 local_ip,
@@ -3806,7 +3806,7 @@ pub fn send<I: Ip, B: BufferMut, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx, body)),
         id,
     )| {
-        SocketHandler::<I, BC>::send(&mut Locked::new(core_ctx), bindings_ctx, id, body)
+        SocketHandler::<I, BC>::send(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id, body)
     })
 }
 
@@ -3828,7 +3828,7 @@ pub fn send_to<I: Ip, B: BufferMut, BC: BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id)),
         |(IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id))| {
             IpInvariant(SocketHandler::<I, BC>::send_to(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
                 remote_ip,
@@ -3880,7 +3880,7 @@ pub fn get_info<I: Ip, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::get_info(&mut Locked::new(core_ctx), bindings_ctx, id)
+        SocketHandler::<I, BC>::get_info(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3900,7 +3900,7 @@ pub fn set_device<I: Ip, BC: crate::BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx, device_id)), id),
         |(IpInvariant((core_ctx, bindings_ctx, device_id)), id)| {
             IpInvariant(SocketHandler::<I, _>::set_device(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
                 device_id,
@@ -3921,7 +3921,7 @@ pub fn get_bound_device<I: Ip, BC: crate::BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, _>::get_bound_device(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
             ))
@@ -3940,7 +3940,7 @@ pub fn disconnect<I: Ip, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::disconnect(&mut Locked::new(core_ctx), bindings_ctx, id)
+        SocketHandler::<I, BC>::disconnect(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -3956,7 +3956,7 @@ pub fn shutdown<I: Ip, BC: BindingsContext>(
         id,
     )| {
         SocketHandler::<I, BC>::shutdown(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             shutdown_type,
@@ -3974,7 +3974,11 @@ pub fn get_shutdown<I: Ip, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::get_shutdown(&mut Locked::new(core_ctx), bindings_ctx, id)
+        SocketHandler::<I, BC>::get_shutdown(
+            &mut CoreCtx::new_deprecated(core_ctx),
+            bindings_ctx,
+            id,
+        )
     })
 }
 
@@ -3988,7 +3992,7 @@ pub fn close<I: Ip, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx)),
         id,
     )| {
-        SocketHandler::<I, BC>::close(&mut Locked::new(core_ctx), bindings_ctx, id)
+        SocketHandler::<I, BC>::close(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
     })
 }
 
@@ -4004,7 +4008,7 @@ pub fn set_unicast_hop_limit<I: Ip, BC: BindingsContext>(
         id,
     )| {
         SocketHandler::<I, BC>::set_unicast_hop_limit(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             hop_limit,
@@ -4024,7 +4028,7 @@ pub fn set_multicast_hop_limit<I: Ip, BC: BindingsContext>(
         id,
     )| {
         SocketHandler::<I, BC>::set_multicast_hop_limit(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             hop_limit,
@@ -4043,7 +4047,7 @@ pub fn get_unicast_hop_limit<I: Ip, BC: BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, BC>::get_unicast_hop_limit(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
             ))
@@ -4063,7 +4067,7 @@ pub fn get_multicast_hop_limit<I: Ip, BC: BindingsContext>(
         (IpInvariant((core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
             IpInvariant(SocketHandler::<I, BC>::get_multicast_hop_limit(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 id,
             ))
@@ -4255,7 +4259,7 @@ mod tests {
     impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpInnerCoreCtx<I> {}
     impl IcmpStateContext for FakeBufferCoreCtx {}
     impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpCoreCtx<I> {}
-    impl IcmpStateContext for SyncCtx<crate::testutil::FakeBindingsCtx> {}
+    impl IcmpStateContext for StackState<crate::testutil::FakeBindingsCtx> {}
 
     impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>>
         for FakeIcmpInnerCoreCtx<I>

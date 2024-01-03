@@ -59,7 +59,7 @@ use crate::{
             GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
         },
     },
-    Instant,
+    CoreCtx, Instant,
 };
 
 use self::state::Ipv6NetworkLearnedParameters;
@@ -1779,7 +1779,7 @@ impl<'a, BC: crate::BindingsContext>
         core_ctx: &crate::SyncCtx<BC>,
         bindings_ctx: &mut BC,
     ) -> Ipv4DeviceConfigurationUpdate {
-        self.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx)
+        self.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx)
     }
 }
 
@@ -1944,7 +1944,7 @@ impl<'a, BC: crate::BindingsContext>
         core_ctx: &crate::SyncCtx<BC>,
         bindings_ctx: &mut BC,
     ) -> Ipv6DeviceConfigurationUpdate {
-        self.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx)
+        self.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx)
     }
 }
 
@@ -2348,7 +2348,6 @@ mod tests {
     use ip_test_macro::ip_test;
     use test_case::test_case;
 
-    use lock_order::Locked;
     use net_declare::{net_ip_v4, net_ip_v6, net_mac};
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
@@ -2412,7 +2411,7 @@ mod tests {
         let addr = SpecifiedAddr::new(net_ip_v4!("192.0.2.1")).expect("addr should be unspecified");
         let mac = net_mac!("01:23:45:67:89:ab");
         NudHandler::<Ipv4, _, _>::set_static_neighbor(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &ethernet_device_id,
             addr,
@@ -2429,7 +2428,7 @@ mod tests {
         );
         assert_matches!(
             NudHandler::<Ipv4, _, _>::resolve_link_addr(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &ethernet_device_id,
                 &addr,
@@ -2456,14 +2455,14 @@ mod tests {
 
         // Assert that static ARP entries are flushed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv4, _, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             ethernet_device_id,
             addr,
         );
 
         let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
         add_ipv4_addr_subnet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ipv4_addr_subnet.clone(),
@@ -2501,7 +2500,7 @@ mod tests {
 
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
         set_ipv4_addr_properties(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ipv4_addr_subnet.addr(),
@@ -2519,7 +2518,7 @@ mod tests {
 
         // Verify that a redundant "set properties" does not generate any events.
         set_ipv4_addr_properties(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ipv4_addr_subnet.addr(),
@@ -2559,7 +2558,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut Locked::new(*core_ctx),
+                &mut CoreCtx::new_deprecated(*core_ctx),
                 device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
@@ -2676,7 +2675,7 @@ mod tests {
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
         assert_matches!(
             set_ipv6_addr_properties(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device_id,
                 ll_addr.addr().into(),
@@ -2689,7 +2688,7 @@ mod tests {
             SpecifiedAddr::new(net_ip_v6!("2001:db8::1")).expect("addr should be unspecified");
         let mac = net_mac!("01:23:45:67:89:ab");
         NudHandler::<Ipv6, _, _>::set_static_neighbor(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &ethernet_device_id,
             addr,
@@ -2706,7 +2705,7 @@ mod tests {
         );
         assert_matches!(
             NudHandler::<Ipv6, _, _>::resolve_link_addr(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &ethernet_device_id,
                 &addr,
@@ -2743,7 +2742,7 @@ mod tests {
         );
 
         IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &device_id,
             |addrs, _core_ctx| {
                 assert_empty(addrs);
@@ -2752,20 +2751,20 @@ mod tests {
 
         // Assert that static NDP entry was removed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             ethernet_device_id,
             addr,
         );
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
         join_ip_multicast::<Ipv6, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             multicast_addr,
         );
         add_ipv6_addr_subnet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ll_addr.to_witness(),
@@ -2774,7 +2773,7 @@ mod tests {
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
@@ -2809,7 +2808,7 @@ mod tests {
         );
 
         set_ipv6_addr_properties(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ll_addr.addr().into(),
@@ -2827,7 +2826,7 @@ mod tests {
 
         // Verify that a redundant "set properties" does not generate any events.
         set_ipv6_addr_properties(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             ll_addr.addr().into(),
@@ -2859,7 +2858,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
@@ -2870,7 +2869,7 @@ mod tests {
         );
 
         leave_ip_multicast::<Ipv6, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             multicast_addr,
@@ -2953,7 +2952,7 @@ mod tests {
 
         let assigned_addr = AddrSubnet::new(net_ip_v6!("fe80::1"), 64).unwrap();
         add_ipv6_addr_subnet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
             assigned_addr,
@@ -2975,7 +2974,7 @@ mod tests {
         // removed.
         assert_eq!(
             Ipv6DeviceHandler::remove_duplicate_tentative_address(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device_id,
                 assigned_addr.ipv6_unicast_addr()
@@ -2994,7 +2993,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
@@ -3340,7 +3339,7 @@ mod tests {
         };
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut Locked::new(&core_ctx),
+                &mut CoreCtx::new_deprecated(&core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()

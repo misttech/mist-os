@@ -10,7 +10,7 @@ use core::{
 };
 
 use derivative::Derivative;
-use lock_order::{lock::UnlockedAccess, Locked};
+use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -67,7 +67,7 @@ use crate::{
     sync::{PrimaryRc, RwLock},
     trace_duration,
     work_queue::WorkQueueReport,
-    BindingsContext, Instant, SyncCtx,
+    BindingsContext, CoreCtx, Instant, StackState, SyncCtx,
 };
 
 /// A device.
@@ -135,8 +135,7 @@ impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
     }
 }
 
-impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I>
-    for Locked<&SyncCtx<BC>, L>
+impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I> for CoreCtx<'_, BC, L>
 where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {
@@ -161,7 +160,7 @@ pub fn get_routing_metric<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device_id: &DeviceId<BC>,
 ) -> RawMetric {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     match device_id {
         DeviceId::Ethernet(id) => ethernet::get_routing_metric(&mut core_ctx, id),
         DeviceId::Loopback(id) => loopback::get_routing_metric(&mut core_ctx, id),
@@ -192,7 +191,7 @@ pub(crate) fn snapshot_device_ids<T, BC: BindingsContext, F: FnMut(DeviceId<BC>)
     core_ctx: &SyncCtx<BC>,
     filter_map: F,
 ) -> impl IntoIterator<Item = T> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let devices = core_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
     let Devices { ethernet, loopback } = &*devices;
     DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
@@ -211,7 +210,7 @@ where
         // Loopback devices do not have neighbors.
         DeviceId::Loopback(_) => None,
     });
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     for device in device_ids {
         let id = device.clone();
         integration::with_ethernet_state(&mut core_ctx, &id, |mut device_state| {
@@ -320,7 +319,7 @@ impl_timer_context!(
 
 /// Handle a timer event firing in the device layer.
 pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
+    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     DeviceLayerTimerId(id): DeviceLayerTimerId<BC>,
 ) {
@@ -467,16 +466,16 @@ pub struct CommonDeviceCounters {
     pub recv_unsupported_ethertype: Counter,
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {
     type Data = DeviceCounters;
     type Guard<'l> = &'l DeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.device_counters()
+        self.device_counters()
     }
 }
 
-impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
     }
@@ -673,7 +672,7 @@ pub fn set_tx_queue_configuration<BC: BindingsContext>(
     device: &DeviceId<BC>,
     config: TransmitQueueConfiguration,
 ) {
-    let core_ctx = &mut Locked::new(core_ctx);
+    let core_ctx = &mut CoreCtx::new_deprecated(core_ctx);
     match device {
         DeviceId::Ethernet(id) => TransmitQueueApi::<_, _, EthernetLinkDevice>::set_configuration(
             core_ctx,
@@ -696,7 +695,7 @@ pub fn transmit_queued_tx_frames<BC: BindingsContext>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
 ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
-    let core_ctx = &mut Locked::new(core_ctx);
+    let core_ctx = &mut CoreCtx::new_deprecated(core_ctx);
     match device {
         DeviceId::Ethernet(id) => {
             TransmitQueueApi::<_, _, EthernetLinkDevice>::transmit_queued_frames(
@@ -725,7 +724,7 @@ pub fn handle_queued_rx_packets<BC: BindingsContext>(
     device: &LoopbackDeviceId<BC>,
 ) -> WorkQueueReport {
     ReceiveQueueApi::<_, _, LoopbackDevice>::handle_queued_rx_frames(
-        &mut Locked::new(core_ctx),
+        &mut CoreCtx::new_deprecated(core_ctx),
         bindings_ctx,
         device,
     )
@@ -774,7 +773,7 @@ where
     // for the device that would otherwise hold references to defunct device
     // state.
     let debug_references = {
-        let mut core_ctx = Locked::new(core_ctx);
+        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
         let device = device.clone().into();
 
@@ -912,7 +911,12 @@ pub fn receive_frame<B: BufferMut, BC: BindingsContext>(
 ) {
     trace_duration!(bindings_ctx, "device::receive_frame");
     core_ctx.state.device_counters().ethernet.common.recv_frame.increment();
-    self::ethernet::receive_frame(&mut Locked::new(core_ctx), bindings_ctx, device, buffer)
+    self::ethernet::receive_frame(
+        &mut CoreCtx::new_deprecated(core_ctx),
+        bindings_ctx,
+        device,
+        buffer,
+    )
 }
 
 /// Set the promiscuous mode flag on `device`.
@@ -926,7 +930,7 @@ pub(crate) fn set_promiscuous_mode<BC: BindingsContext>(
 ) -> Result<(), NotSupportedError> {
     match device {
         DeviceId::Ethernet(id) => Ok(self::ethernet::set_promiscuous_mode(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             enabled,
@@ -940,7 +944,7 @@ pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Vec<AddrSubnetEither> {
-    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut Locked::new(core_ctx), device)
+    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut CoreCtx::new_deprecated(core_ctx), device)
 }
 
 /// Adds an IP address and associated subnet to this device.
@@ -959,7 +963,7 @@ pub fn add_ip_addr_subnet<BC: BindingsContext>(
         addr_sub_and_config,
         device
     );
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     match addr_sub_and_config {
         AddrSubnetAndManualConfigEither::V4(addr_sub, config) => {
@@ -996,7 +1000,7 @@ pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
         next_valid_until,
         address
     );
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     match address.into() {
         IpAddr::V4(address) => crate::ip::device::set_ipv4_addr_properties(
@@ -1023,7 +1027,7 @@ pub fn del_ip_addr<BC: BindingsContext>(
     device: &DeviceId<BC>,
     addr: impl Into<SpecifiedAddr<IpAddr>>,
 ) -> Result<(), error::NotFoundError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let addr = addr.into();
     trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
     match addr.into() {
@@ -1105,7 +1109,7 @@ pub(crate) fn insert_static_arp_table_entry<BC: BindingsContext>(
 ) -> Result<(), NotSupportedError> {
     match device {
         DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_arp_table_entry(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             addr,
@@ -1129,7 +1133,7 @@ pub(crate) fn insert_static_ndp_table_entry<BC: BindingsContext>(
 ) -> Result<(), NotSupportedError> {
     match device {
         DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_ndp_table_entry(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             id,
             addr,
@@ -1158,7 +1162,7 @@ pub fn remove_neighbor_table_entry<I: Ip, BC: BindingsContext>(
                     .ok_or(NeighborRemovalError::IpAddressInvalid)
                     .and_then(|addr| {
                         NudHandler::<Ipv4, EthernetLinkDevice, _>::delete_neighbor(
-                            &mut Locked::new(core_ctx),
+                            &mut CoreCtx::new_deprecated(core_ctx),
                             bindings_ctx,
                             device,
                             addr,
@@ -1174,7 +1178,7 @@ pub fn remove_neighbor_table_entry<I: Ip, BC: BindingsContext>(
                     .ok_or(NeighborRemovalError::IpAddressInvalid)
                     .and_then(|addr| {
                         NudHandler::<Ipv6, EthernetLinkDevice, _>::delete_neighbor(
-                            &mut Locked::new(core_ctx),
+                            &mut CoreCtx::new_deprecated(core_ctx),
                             bindings_ctx,
                             device,
                             addr,
@@ -1201,7 +1205,7 @@ pub fn flush_neighbor_table<I: Ip, BC: BindingsContext>(
         IpInvariant((core_ctx, bindings_ctx)),
         |IpInvariant((core_ctx, bindings_ctx))| {
             NudHandler::<Ipv4, EthernetLinkDevice, _>::flush(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
             );
@@ -1209,7 +1213,7 @@ pub fn flush_neighbor_table<I: Ip, BC: BindingsContext>(
         },
         |IpInvariant((core_ctx, bindings_ctx))| {
             NudHandler::<Ipv6, EthernetLinkDevice, _>::flush(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
             );
@@ -1224,7 +1228,10 @@ pub fn get_ipv4_configuration_and_flags<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Ipv4DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv4_configuration_and_flags(&mut Locked::new(core_ctx), device)
+    crate::ip::device::get_ipv4_configuration_and_flags(
+        &mut CoreCtx::new_deprecated(core_ctx),
+        device,
+    )
 }
 
 /// Gets the IPv6 configuration and flags for a `device`.
@@ -1232,7 +1239,10 @@ pub fn get_ipv6_configuration_and_flags<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     device: &DeviceId<BC>,
 ) -> Ipv6DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv6_configuration_and_flags(&mut Locked::new(core_ctx), device)
+    crate::ip::device::get_ipv6_configuration_and_flags(
+        &mut CoreCtx::new_deprecated(core_ctx),
+        device,
+    )
 }
 
 /// Updates the IPv4 configuration for a device.
@@ -1411,7 +1421,7 @@ pub(crate) mod testutil {
         core_ctx: &SyncCtx<BC>,
         device: &DeviceId<BC>,
     ) -> bool {
-        let mut core_ctx = Locked::new(core_ctx);
+        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
         match I::VERSION {
             IpVersion::V4 => {
                 crate::ip::device::is_ip_forwarding_enabled::<Ipv4, _, _>(&mut core_ctx, device)
@@ -1459,7 +1469,7 @@ pub(crate) mod testutil {
         config: Ipv4DeviceConfigurationUpdate,
     ) -> Result<Ipv4DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
         let pending = crate::device::new_ipv4_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx))
+        Ok(pending.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx))
     }
 
     /// A shortcut to update IPv6 configuration in a single call.
@@ -1470,7 +1480,7 @@ pub(crate) mod testutil {
         config: Ipv6DeviceConfigurationUpdate,
     ) -> Result<Ipv6DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
         let pending = crate::device::new_ipv6_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut lock_order::Locked::new(core_ctx), bindings_ctx))
+        Ok(pending.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx))
     }
 }
 

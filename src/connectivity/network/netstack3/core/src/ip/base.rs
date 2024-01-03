@@ -19,7 +19,7 @@ use lock_order::lock::UnlockedAccess;
 use lock_order::{
     lock::{LockFor, RwLockFor},
     relation::LockBefore,
-    Locked,
+    wrap::prelude::*,
 };
 #[cfg(test)]
 use net_types::ip::IpVersion;
@@ -77,7 +77,7 @@ use crate::{
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     uninstantiable::UninstantiableWrapper,
-    BindingsContext, BindingsTypes, Instant, SyncCtx,
+    BindingsContext, BindingsTypes, CoreCtx, Instant, StackState, SyncCtx,
 };
 
 /// Default IPv4 TTL.
@@ -863,25 +863,25 @@ impl<
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IpCounters<I>> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, I: Ip, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
     }
 }
 
-impl<BC: BindingsContext, L> CounterContext<Ipv4Counters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<Ipv4Counters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateCounters>())
     }
 }
 
-impl<BC: BindingsContext, L> CounterContext<Ipv6Counters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<Ipv6Counters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv6StateCounters>())
     }
 }
 
-impl<I, BC, L> IpStateContext<I, BC> for Locked<&SyncCtx<BC>, L>
+impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
@@ -890,12 +890,12 @@ where
     // These bounds ensure that we can fulfill all the traits for the associated
     // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
     // have implementations that are generic on Ip.
-    for<'a> Locked<&'a SyncCtx<BC>, crate::lock_ordering::IpStateRoutingTable<I>>:
+    for<'a> CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>:
         DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
             + IpForwardingDeviceContext<I>
             + IpDeviceStateContext<I, BC>,
 {
-    type IpDeviceIdCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IpStateRoutingTable<I>>;
+    type IpDeviceIdCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>;
 
     fn with_ip_routing_table<
         O,
@@ -972,7 +972,7 @@ impl<
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
-    IpTransportDispatchContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
+    IpTransportDispatchContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
@@ -1026,7 +1026,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<I
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
-    IpTransportDispatchContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
+    IpTransportDispatchContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
     fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
@@ -1199,7 +1199,7 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDev
     }
 }
 
-impl<I, BT> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for SyncCtx<BT>
+impl<I, BT> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for StackState<BT>
 where
     I: Ip,
     BT: BindingsTypes,
@@ -1214,14 +1214,14 @@ where
 
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.inner.fragment_cache.lock()),
-            |()| Wrap(self.state.ipv6.inner.fragment_cache.lock()),
+            |()| Wrap(self.ipv4.inner.fragment_cache.lock()),
+            |()| Wrap(self.ipv6.inner.fragment_cache.lock()),
         );
         guard
     }
 }
 
-impl<I, BT> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for SyncCtx<BT>
+impl<I, BT> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for StackState<BT>
 where
     I: Ip,
     BT: BindingsTypes,
@@ -1236,15 +1236,15 @@ where
 
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.inner.pmtu_cache.lock()),
-            |()| Wrap(self.state.ipv6.inner.pmtu_cache.lock()),
+            |()| Wrap(self.ipv4.inner.pmtu_cache.lock()),
+            |()| Wrap(self.ipv6.inner.pmtu_cache.lock()),
         );
         guard
     }
 }
 
 impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
-    for SyncCtx<BT>
+    for StackState<BT>
 {
     type Data = ForwardingTable<I, DeviceId<BT>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<I, DeviceId<BT>>>
@@ -1261,8 +1261,8 @@ impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTab
 
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.inner.table.read()),
-            |()| Wrap(self.state.ipv6.inner.table.read()),
+            |()| Wrap(self.ipv4.inner.table.read()),
+            |()| Wrap(self.ipv6.inner.table.read()),
         );
         guard
     }
@@ -1276,14 +1276,14 @@ impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTab
 
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.inner.table.write()),
-            |()| Wrap(self.state.ipv6.inner.table.write()),
+            |()| Wrap(self.ipv4.inner.table.write()),
+            |()| Wrap(self.ipv6.inner.table.write()),
         );
         guard
     }
 }
 
-impl<I, BT> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for SyncCtx<BT>
+impl<I, BT> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for StackState<BT>
 where
     I: IpExt,
     BT: BindingsTypes,
@@ -1300,8 +1300,8 @@ where
         );
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()),
-            |()| Wrap(self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()),
+            |()| Wrap(self.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()),
+            |()| Wrap(self.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()),
         );
         guard
     }
@@ -1313,14 +1313,14 @@ where
         );
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()),
-            |()| Wrap(self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()),
+            |()| Wrap(self.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()),
+            |()| Wrap(self.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()),
         );
         guard
     }
 }
 
-impl<I, BT> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for SyncCtx<BT>
+impl<I, BT> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for StackState<BT>
 where
     I: crate::socket::datagram::DualStackIpExt,
     BT: BindingsTypes,
@@ -1337,8 +1337,8 @@ where
         );
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.icmp.inner.sockets.state.read()),
-            |()| Wrap(self.state.ipv6.icmp.inner.sockets.state.read()),
+            |()| Wrap(self.ipv4.icmp.inner.sockets.state.read()),
+            |()| Wrap(self.ipv6.icmp.inner.sockets.state.read()),
         );
         guard
     }
@@ -1350,14 +1350,14 @@ where
         );
         let Wrap(guard) = I::map_ip(
             (),
-            |()| Wrap(self.state.ipv4.icmp.inner.sockets.state.write()),
-            |()| Wrap(self.state.ipv6.icmp.inner.sockets.state.write()),
+            |()| Wrap(self.ipv4.icmp.inner.sockets.state.write()),
+            |()| Wrap(self.ipv6.icmp.inner.sockets.state.write()),
         );
         guard
     }
 }
 
-impl<I, BT> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for SyncCtx<BT>
+impl<I, BT> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for StackState<BT>
 where
     I: Ip,
     BT: BindingsTypes,
@@ -1369,21 +1369,21 @@ where
     fn lock(&self) -> Self::Guard<'_> {
         let IpInvariant(guard) = I::map_ip(
             (),
-            |()| IpInvariant(self.state.ipv4.icmp.as_ref().error_send_bucket.lock()),
-            |()| IpInvariant(self.state.ipv6.icmp.as_ref().error_send_bucket.lock()),
+            |()| IpInvariant(self.ipv4.icmp.as_ref().error_send_bucket.lock()),
+            |()| IpInvariant(self.ipv6.icmp.as_ref().error_send_bucket.lock()),
         );
         guard
     }
 }
 
 impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = AtomicU16;
     type Guard<'l> = &'l AtomicU16 where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.state.ipv4.next_packet_id
+        &self.ipv4.next_packet_id
     }
 }
 
@@ -1463,31 +1463,35 @@ pub struct Ipv6Counters {
 }
 
 impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
-    for SyncCtx<BC>
+    for StackState<BC>
 {
     type Data = IpCounters<I>;
     type Guard<'l> = &'l IpCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.ip_counters()
+        self.ip_counters()
     }
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters>
+    for StackState<BC>
+{
     type Data = Ipv4Counters;
     type Guard<'l> = &'l Ipv4Counters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.ipv4().counters()
+        self.ipv4().counters()
     }
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters>
+    for StackState<BC>
+{
     type Data = Ipv6Counters;
     type Guard<'l> = &'l Ipv6Counters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.ipv6().counters()
+        self.ipv6().counters()
     }
 }
 
@@ -1560,7 +1564,7 @@ impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeo
 
 /// Handle a timer event firing in the IP layer.
 pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
+    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     id: IpLayerTimerId,
 ) {
@@ -1941,7 +1945,7 @@ pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
     frame_dst: FrameDestination,
     buffer: B,
 ) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     match I::VERSION {
         IpVersion::V4 => {
             receive_ipv4_packet(&mut core_ctx, bindings_ctx, device, frame_dst, buffer)
@@ -2779,7 +2783,7 @@ pub fn get_all_routes<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
 ) -> Vec<types::EntryEither<DeviceId<BC>>> {
     {
-        let mut core_ctx = Locked::new(core_ctx);
+        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
         IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut core_ctx, |core_ctx, ipv4| {
             IpStateContext::<Ipv6, _>::with_ip_routing_table(core_ctx, |_, ipv6| {
                 ipv4.iter_table()
@@ -2934,9 +2938,9 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > InnerIcmpContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
+    > InnerIcmpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
+    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
     type DualStackContext = UninstantiableWrapper<Self>;
     fn receive_icmp_error(
         &mut self,
@@ -3033,9 +3037,9 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
-    > InnerIcmpContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
+    > InnerIcmpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
+    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
     type DualStackContext = UninstantiableWrapper<Self>;
     fn receive_icmp_error(
         &mut self,
@@ -3127,16 +3131,16 @@ impl<
     }
 }
 
-impl<L, BC: BindingsContext> icmp::IcmpStateContext for Locked<&SyncCtx<BC>, L> {}
+impl<L, BC: BindingsContext> icmp::IcmpStateContext for CoreCtx<'_, BC, L> {}
 
 impl<
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
-    > icmp::StateContext<Ipv6, BC> for Locked<&SyncCtx<BC>, L>
+    > icmp::StateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
+    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
 
     fn with_sockets_state<
         O,
@@ -3178,9 +3182,9 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > icmp::StateContext<Ipv4, BC> for Locked<&SyncCtx<BC>, L>
+    > icmp::StateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
+    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
 
     fn with_sockets_state<
         O,
@@ -3225,7 +3229,7 @@ pub fn resolve_route<I: Ip, BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     destination: I::Addr,
 ) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
-    let core_ctx = Locked::new(core_ctx);
+    let core_ctx = CoreCtx::new_deprecated(core_ctx);
     let destination = SpecifiedAddr::new(destination);
     I::map_ip(
         (IpInvariant(core_ctx), destination),
@@ -3407,7 +3411,7 @@ pub(crate) mod testutil {
         device: &DeviceId<FakeBindingsCtx>,
         addr: MulticastAddr<A>,
     ) -> bool {
-        let mut core_ctx = Locked::new(core_ctx);
+        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
         match addr.into() {
             IpAddr::V4(addr) => {
                 match IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
@@ -3525,6 +3529,7 @@ mod tests {
             FakeCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
+        UnlockedCoreCtx,
     };
 
     // Some helper functions
@@ -4794,13 +4799,13 @@ mod tests {
         // it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device,
                 multicast_addr,
@@ -4814,13 +4819,13 @@ mod tests {
         // dispatch it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &device,
                 multicast_addr,
@@ -5018,7 +5023,7 @@ mod tests {
         // Receive packet addressed to us.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 v4_config.local_ip
@@ -5027,7 +5032,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip
@@ -5038,7 +5043,7 @@ mod tests {
         // Receive packet addressed to the IPv4 subnet broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
@@ -5049,7 +5054,7 @@ mod tests {
         // Receive packet addressed to the IPv4 limited broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 Ipv4::LIMITED_BROADCAST_ADDRESS
@@ -5059,14 +5064,14 @@ mod tests {
 
         // Receive packet addressed to a multicast address we're subscribed to.
         crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &v4_dev,
             Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
         );
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
@@ -5077,7 +5082,7 @@ mod tests {
         // Receive packet addressed to the all-nodes multicast address.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
@@ -5088,7 +5093,7 @@ mod tests {
         // Receive packet addressed to a multicast address we're subscribed to.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip.to_solicited_node_address().into_specified(),
@@ -5134,7 +5139,7 @@ mod tests {
             let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
             assert_eq!(
                 receive_ipv6_packet_action(
-                    &mut Locked::new(core_ctx),
+                    &mut CoreCtx::new_deprecated(core_ctx),
                     &mut bindings_ctx,
                     &device,
                     tentative.into_specified()
@@ -5147,7 +5152,7 @@ mod tests {
         // disabled on the inbound interface.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -5156,7 +5161,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -5172,7 +5177,7 @@ mod tests {
             .expect("error setting routing enabled");
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -5183,7 +5188,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -5199,7 +5204,7 @@ mod tests {
         *core_ctx.state.ipv6.inner.table.write() = Default::default();
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -5208,7 +5213,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -5308,13 +5313,13 @@ mod tests {
         dest_ip: SpecifiedAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, Device>, ResolveRouteError>
     where
-        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let egress_device = egress_device.map(|d| &device_ids[d.index()]);
 
         IpSocketContext::<I, _>::lookup_route(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             bindings_ctx,
             egress_device,
             local_ip,
@@ -5398,7 +5403,7 @@ mod tests {
         dest_ip: SpecifiedAddr<I::Addr>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
-        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();
@@ -5454,7 +5459,7 @@ mod tests {
         egress_device: Option<Device>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
-        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, crate::lock_ordering::Unlocked>:
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();

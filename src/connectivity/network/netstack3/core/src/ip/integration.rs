@@ -4,7 +4,7 @@
 
 //! The integrations for protocols built on top of IP.
 
-use lock_order::{relation::LockBefore, Locked};
+use lock_order::{relation::LockBefore, wrap::prelude::*};
 use net_types::{
     ip::{Ip, Ipv4, Ipv6},
     MulticastAddr,
@@ -17,10 +17,10 @@ use crate::{
         reassembly::{FragmentStateContext, IpPacketFragmentCache},
         MulticastMembershipHandler,
     },
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx,
 };
 
-impl<I, BC, L> FragmentStateContext<I, BC::Instant> for Locked<&SyncCtx<BC>, L>
+impl<I, BC, L> FragmentStateContext<I, BC::Instant> for CoreCtx<'_, BC, L>
 where
     I: Ip,
     BC: BindingsContext,
@@ -36,7 +36,7 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
-    PmtuStateContext<Ipv4, BC::Instant> for Locked<&SyncCtx<BC>, L>
+    PmtuStateContext<Ipv4, BC::Instant> for CoreCtx<'_, BC, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, BC::Instant>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv4>>();
@@ -45,7 +45,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<I
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
-    PmtuStateContext<Ipv6, BC::Instant> for Locked<&SyncCtx<BC>, L>
+    PmtuStateContext<Ipv6, BC::Instant> for CoreCtx<'_, BC, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, BC::Instant>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv6>>();
@@ -57,7 +57,7 @@ impl<
         I: Ip + IpDeviceIpExt,
         BC: BindingsContext + IpDeviceBindingsContext<I, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
-    > MulticastMembershipHandler<I, BC> for Locked<&SyncCtx<BC>, L>
+    > MulticastMembershipHandler<I, BC> for CoreCtx<'_, BC, L>
 where
     Self: device::IpDeviceConfigurationContext<I, BC>,
 {

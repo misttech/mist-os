@@ -9,7 +9,7 @@ use core::{fmt::Debug, num::NonZeroU32};
 use lock_order::{
     lock::{LockFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
-    Locked,
+    wrap::prelude::*,
 };
 
 use const_unwrap::const_unwrap_option;
@@ -71,7 +71,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
-    BindingsContext, Instant, SyncCtx,
+    BindingsContext, CoreCtx, Instant, SyncCtx,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -127,7 +127,7 @@ pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
     ) -> O;
 }
 
-impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for CoreCtx<'_, BC, L> {
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
         &mut self,
         device_id: &EthernetDeviceId<BC>,
@@ -140,7 +140,7 @@ impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for Locked<&
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>>
-    EthernetIpLinkDeviceDynamicStateContext<BC> for Locked<&SyncCtx<BC>, L>
+    EthernetIpLinkDeviceDynamicStateContext<BC> for CoreCtx<'_, BC, L>
 {
     fn with_ethernet_state<
         O,
@@ -188,13 +188,13 @@ pub(crate) struct CoreCtxWithDeviceId<
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    NudContext<Ipv6, EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
+    NudContext<Ipv6, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     type ConfigCtx<'a> =
-        CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv6Nud>>;
+        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv6Nud>>;
 
     type SenderCtx<'a> =
-        CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv6Nud>>;
+        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv6Nud>>;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
@@ -308,7 +308,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
 }
 
 impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceLearnedParams>>
-    NudConfigContext<Ipv6> for CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
+    NudConfigContext<Ipv6> for CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, L>>
 {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         let Self { device_id, core_ctx } = self;
@@ -418,8 +418,7 @@ where
 }
 
 impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    NudSenderContext<Ipv6, EthernetLinkDevice, BC>
-    for CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
+    NudSenderContext<Ipv6, EthernetLinkDevice, BC> for CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, L>>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
@@ -717,7 +716,7 @@ impl<BC: BindingsContext> TransmitQueueBindingsContext<EthernetLinkDevice, Ether
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueCommon<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitQueueCommon<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
@@ -729,7 +728,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitQueueContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     fn with_transmit_queue_mut<
         O,
@@ -761,9 +760,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
-    TransmitDequeueContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitDequeueContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetTxDequeue>;
+    type TransmitQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::EthernetTxDequeue>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,
@@ -1253,13 +1252,13 @@ impl<
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ArpContext<EthernetLinkDevice, BC> for Locked<&SyncCtx<BC>, L>
+    ArpContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     type ConfigCtx<'a> =
-        CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv4Arp>>;
+        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv4Arp>>;
 
     type ArpSenderCtx<'a> =
-        CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, crate::lock_ordering::EthernetIpv4Arp>>;
+        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv4Arp>>;
 
     fn with_arp_state_mut_and_sender_ctx<
         O,
@@ -1334,7 +1333,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 }
 
 impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>> ArpConfigContext
-    for CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
+    for CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, L>>
 {
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
         let Self { device_id, core_ctx } = self;
@@ -1346,8 +1345,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4
 }
 
 impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    ArpSenderContext<EthernetLinkDevice, BC>
-    for CoreCtxWithDeviceId<'a, Locked<&'a SyncCtx<BC>, L>>
+    ArpSenderContext<EthernetLinkDevice, BC> for CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, L>>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
@@ -1472,7 +1470,7 @@ pub fn resolve_ethernet_link_addr<I: Ip, BC: BindingsContext>(
         EthernetLinkDevice,
     >>::Observer,
 > {
-    let core_ctx = Locked::new(core_ctx);
+    let core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(result) = I::map_ip(
         (IpInvariant((core_ctx, bindings_ctx, device)), dst),
         |(IpInvariant((mut core_ctx, bindings_ctx, device)), dst)| {
@@ -1961,14 +1959,14 @@ mod tests {
         match addr.into() {
             IpAddr::V4(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
-                    &mut Locked::new(core_ctx),
+                    &mut CoreCtx::new_deprecated(core_ctx),
                     device,
                     |mut addrs, _core_ctx| addrs.any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                    &mut Locked::new(core_ctx),
+                    &mut CoreCtx::new_deprecated(core_ctx),
                     device,
                     |mut addrs, _core_ctx| addrs.any(|a| a.addr() == addr),
                 )
@@ -2559,13 +2557,13 @@ mod tests {
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
                 multicast_addr,
@@ -2581,13 +2579,13 @@ mod tests {
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 device,
                 multicast_addr,

@@ -4,13 +4,12 @@
 
 //! Device link layer configuration types.
 
-use lock_order::Locked;
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     device::{id::Id as _, DeviceId},
     ip::device::nud::{NudUserConfig, NudUserConfigUpdate},
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx, SyncCtx,
 };
 
 /// Device ARP configuration.
@@ -105,7 +104,7 @@ where
             DeviceId::Ethernet(eth) => eth,
         };
         crate::device::integration::with_ethernet_state(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             eth,
             |mut state| {
                 let arp = arp.map(|ArpConfigurationUpdate { nud }| {
@@ -155,7 +154,7 @@ pub fn get_device_configuration<BC: BindingsContext>(
     match device_id {
         DeviceId::Loopback(_) => DeviceConfiguration { arp: None, ndp: None },
         DeviceId::Ethernet(eth) => crate::device::integration::with_ethernet_state(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             eth,
             |mut state| {
                 let arp = Some(ArpConfiguration {

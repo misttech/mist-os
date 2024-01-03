@@ -1772,7 +1772,7 @@ mod tests {
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use lock_order::Locked;
+
     use net_types::{
         ip::{
             AddrSubnet, GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Mtu,
@@ -1803,6 +1803,7 @@ mod tests {
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
+        CoreCtx, UnlockedCoreCtx,
     };
 
     enum AddressType {
@@ -1861,17 +1862,16 @@ mod tests {
         core_ctx: &FakeCoreCtx,
         bindings_ctx: &mut FakeBindingsCtx,
     ) where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
-            DeviceIpDeviceConfigurationContext<
-                I,
-                FakeBindingsCtx,
-                DeviceId = DeviceId<FakeBindingsCtx>,
-            >,
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIpDeviceConfigurationContext<
+            I,
+            FakeBindingsCtx,
+            DeviceId = DeviceId<FakeBindingsCtx>,
+        >,
         FakeBindingsCtx:
             IpDeviceBindingsContext<I, DeviceId<FakeBindingsCtx>, Instant = FakeInstant>,
     {
         let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             |devices, _ctx| devices.collect::<Vec<_>>(),
         );
         for device in devices {
@@ -1880,7 +1880,7 @@ mod tests {
             struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
             let WrapVecAddrSubnet(subnets) = I::map_ip(
-                IpInvariant((&mut Locked::new(core_ctx), &device)),
+                IpInvariant((&mut CoreCtx::new_deprecated(core_ctx), &device)),
                 |IpInvariant((core_ctx, device))| {
                     crate::ip::device::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                         WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
@@ -1971,14 +1971,13 @@ mod tests {
         }; "new remote to local")]
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>:
-            IpSocketHandler<I, FakeBindingsCtx>
-                + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>
-                + DeviceIpDeviceConfigurationContext<
-                    I,
-                    FakeBindingsCtx,
-                    DeviceId = DeviceId<FakeBindingsCtx>,
-                >,
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
+            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>
+            + DeviceIpDeviceConfigurationContext<
+                I,
+                FakeBindingsCtx,
+                DeviceId = DeviceId<FakeBindingsCtx>,
+            >,
         FakeBindingsCtx: TimerContext<I::Timer<DeviceId<FakeBindingsCtx>>>
             + EventContext<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>,
     {
@@ -2039,7 +2038,7 @@ mod tests {
         let get_expected_result = |template| expected_result.map(|()| template);
         let weak_local_device = local_device
             .as_ref()
-            .map(|d| DeviceIdContext::downgrade_device_id(&Locked::new(core_ctx), d));
+            .map(|d| DeviceIdContext::downgrade_device_id(&CoreCtx::new_deprecated(core_ctx), d));
         let template = IpSock {
             definition: IpSockDefinition {
                 remote_ip: SocketIpAddr::new_from_specified_or_panic(to_ip),
@@ -2051,7 +2050,7 @@ mod tests {
         };
 
         let res = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             weak_local_device.as_ref().map(EitherDeviceId::Weak),
             from_ip.map(SocketIpAddr::new_from_specified_or_panic),
@@ -2066,7 +2065,7 @@ mod tests {
         const SPECIFIED_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(1));
         assert_eq!(
             IpSocketHandler::new_ip_socket(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 weak_local_device.as_ref().map(EitherDeviceId::Weak),
                 from_ip.map(SocketIpAddr::new_from_specified_or_panic),
@@ -2094,7 +2093,7 @@ mod tests {
         from_addr_type: AddressType,
         to_addr_type: AddressType,
     ) where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         set_logger_for_test();
@@ -2165,7 +2164,7 @@ mod tests {
         };
 
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             None,
             from_ip.map(SocketIpAddr::new_from_specified_or_panic),
@@ -2190,7 +2189,7 @@ mod tests {
         // Send an echo packet on the socket and validate that the packet is
         // delivered locally.
         IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             buffer.into_inner().buffer_view().as_ref().into_serializer(),
@@ -2208,7 +2207,7 @@ mod tests {
     #[ip_test]
     fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
             + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
             + IpStateContext<I, FakeBindingsCtx>,
         FakeBindingsCtx: EventContext<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>,
@@ -2228,7 +2227,7 @@ mod tests {
         let core_ctx = &core_ctx;
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             None,
             None,
@@ -2238,7 +2237,8 @@ mod tests {
         )
         .unwrap();
 
-        let curr_id = crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut Locked::new(core_ctx));
+        let curr_id =
+            crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut CoreCtx::new_deprecated(core_ctx));
 
         let check_frame =
             move |frame: &[u8], packet_count| match [local_ip.get(), remote_ip.get()].into() {
@@ -2278,7 +2278,7 @@ mod tests {
         // Send a packet on the socket and make sure that the right contents
         // are sent.
         IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             (&[0u8][..]).into_serializer(),
@@ -2299,7 +2299,7 @@ mod tests {
         let small_body = [0; 1];
         let small_body_serializer = (&small_body).into_serializer();
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             small_body_serializer,
@@ -2311,7 +2311,7 @@ mod tests {
         // Send a packet on the socket while imposing an MTU which will not
         // allow a packet to be sent.
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             small_body_serializer,
@@ -2323,7 +2323,7 @@ mod tests {
         // Try sending a packet which will be larger than the device's MTU,
         // and make sure it fails.
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
@@ -2333,13 +2333,13 @@ mod tests {
 
         // Make sure that sending on an unroutable socket fails.
         crate::ip::forwarding::testutil::del_routes_to_subnet::<I, _, _>(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             subnet,
         )
         .unwrap();
         let res = IpSocketHandler::<I, _>::send_ip_packet(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &sock,
             small_body_serializer,
@@ -2351,7 +2351,7 @@ mod tests {
     #[ip_test]
     fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
             + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
             + IpStateContext<I, FakeBindingsCtx>,
     {
@@ -2408,7 +2408,7 @@ mod tests {
 
         let mut send_to = |destination_ip| {
             let sock = IpSocketHandler::<I, _>::new_ip_socket(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 None,
                 None,
@@ -2419,7 +2419,7 @@ mod tests {
             .unwrap();
 
             IpSocketHandler::<I, _>::send_ip_packet(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &sock,
                 (&[0u8][..]).into_serializer(),
@@ -2484,7 +2484,7 @@ mod tests {
     #[test_case(false; "dont remove device")]
     fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
     where
-        for<'a> Locked<&'a FakeCoreCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeBindingsCtx>
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
             + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
             + IpStateContext<I, FakeBindingsCtx>
             + DeviceIpSocketHandler<I, FakeBindingsCtx>,
@@ -2525,7 +2525,7 @@ mod tests {
         .unwrap();
 
         let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             None,
             None,
@@ -2546,14 +2546,21 @@ mod tests {
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(
-                IpDeviceContext::<I, _>::get_mtu(&mut Locked::new(core_ctx), &device_id),
+                IpDeviceContext::<I, _>::get_mtu(
+                    &mut CoreCtx::new_deprecated(core_ctx),
+                    &device_id,
+                ),
                 0, /* no ip options/ext hdrs used */
             )
             .unwrap())
         };
 
         assert_eq!(
-            DeviceIpSocketHandler::get_mms(&mut Locked::new(core_ctx), &mut bindings_ctx, &ip_sock),
+            DeviceIpSocketHandler::get_mms(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut bindings_ctx,
+                &ip_sock
+            ),
             expected,
         );
     }

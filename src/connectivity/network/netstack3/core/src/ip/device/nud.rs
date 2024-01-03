@@ -2599,7 +2599,7 @@ mod tests {
     use core::num::{NonZeroU16, NonZeroU8, NonZeroUsize};
 
     use ip_test_macro::ip_test;
-    use lock_order::Locked;
+
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
         ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -2652,7 +2652,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
-        SyncCtx,
+        CoreCtx, SyncCtx, UnlockedCoreCtx,
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
@@ -4527,12 +4527,12 @@ mod tests {
             NeighborState<EthernetLinkDevice, BC::Instant, BC::Notifier>,
         >,
     ) where
-        Locked<&'a SyncCtx<BC>, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, BC>
+        CoreCtx<'a, BC, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, BC>
             + DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
         <BC as LinkResolutionContext<EthernetLinkDevice>>::Notifier: PartialEq,
     {
         NudContext::<I, EthernetLinkDevice, _>::with_nud_state_mut(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             device_id,
             |NudState { neighbors, last_gc: _ }, _config| assert_eq!(*neighbors, expected),
         )
@@ -5370,7 +5370,7 @@ mod tests {
         let pending_frames = VecDeque::from([Buf::new(body.to_vec(), ..)]);
         assert_matches!(
             NudHandler::<Ipv6, EthernetLinkDevice, _>::send_ip_packet_to_neighbor(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 &eth_device_id,
                 neighbor_ip.into_specified(),
@@ -5403,7 +5403,7 @@ mod tests {
         );
 
         let max_multicast_solicit = NudContext::<Ipv6, EthernetLinkDevice, _>::with_nud_state_mut(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &link_device_id,
             |_, nud_config| {
                 // NB: Because we're using the real core context here and it
@@ -5555,11 +5555,10 @@ mod tests {
         I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
     >()
     where
-        for<'a> Locked<&'a SyncCtx<testutil::FakeBindingsCtx>, lock_order::Unlocked>:
-            DeviceIdContext<
-                    EthernetLinkDevice,
-                    DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-                > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+        for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
+                EthernetLinkDevice,
+                DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
@@ -5577,7 +5576,7 @@ mod tests {
         ] {
             net.with_context(ctx, |testutil::FakeCtx { core_ctx, bindings_ctx }| {
                 NudHandler::handle_neighbor_update(
-                    &mut Locked::new(core_ctx),
+                    &mut CoreCtx::new_deprecated(core_ctx),
                     bindings_ctx,
                     &device,
                     neighbor,
@@ -5585,7 +5584,7 @@ mod tests {
                     DynamicNeighborUpdateSource::Probe,
                 );
                 super::testutil::assert_dynamic_neighbor_state(
-                    &mut Locked::new(core_ctx),
+                    &mut CoreCtx::new_deprecated(core_ctx),
                     device.clone(),
                     neighbor,
                     DynamicNeighborState::Stale(Stale { link_address: link_addr.get() }),
@@ -5611,7 +5610,7 @@ mod tests {
         // transitioned to REACHABLE.
         net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
             super::testutil::assert_dynamic_neighbor_state(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 local_device.clone(),
                 remote_ip,
                 DynamicNeighborState::Reachable(Reachable {
@@ -5638,11 +5637,10 @@ mod tests {
     #[ip_test]
     fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt>()
     where
-        for<'a> Locked<&'a SyncCtx<testutil::FakeBindingsCtx>, lock_order::Unlocked>:
-            DeviceIdContext<
-                    EthernetLinkDevice,
-                    DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-                > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+        for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
+                EthernetLinkDevice,
+                DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
@@ -5661,7 +5659,7 @@ mod tests {
         net.run_until_idle(crate::device::testutil::receive_frame, testutil::handle_timer);
         net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx: _ }| {
             super::testutil::assert_dynamic_neighbor_state(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 local_device.clone(),
                 remote_ip,
                 DynamicNeighborState::Stale(Stale { link_address: remote_mac.get() }),
@@ -5687,7 +5685,7 @@ mod tests {
         // to REACHABLE.
         net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
             super::testutil::assert_dynamic_neighbor_state(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 local_device.clone(),
                 remote_ip,
                 DynamicNeighborState::Reachable(Reachable {

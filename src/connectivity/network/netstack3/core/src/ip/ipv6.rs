@@ -202,7 +202,6 @@ fn handle_destination_options_ext_hdr<
 mod tests {
     use alloc::vec;
 
-    use lock_order::Locked;
     use packet::{
         serialize::{Buf, Serializer},
         ParseBuffer,
@@ -216,6 +215,7 @@ mod tests {
     use crate::{
         device::DeviceId,
         testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
+        CoreCtx,
     };
 
     #[test]
@@ -238,7 +238,7 @@ mod tests {
 
         assert_eq!(
             handle_extension_headers(
-                &mut Locked::new(&core_ctx),
+                &mut CoreCtx::new_deprecated(&core_ctx),
                 &device_id,
                 frame_dst,
                 &packet,

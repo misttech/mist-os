@@ -7,7 +7,6 @@
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use lock_order::Locked;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv6, Subnet},
     SpecifiedAddr,
@@ -23,7 +22,7 @@ use crate::{
         },
         IpExt, IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
     },
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -61,7 +60,7 @@ pub fn select_device_for_gateway<BC: BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     gateway: SpecifiedAddr<IpAddr>,
 ) -> Option<DeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     match gateway.into() {
         IpAddr::V4(gateway) => {
             select_device_for_gateway_inner::<Ipv4, _, _>(&mut core_ctx, gateway)
@@ -109,7 +108,7 @@ pub fn set_routes<I: Ip, BC: BindingsContext>(
         I,
         (IpInvariant((core_ctx, bindings_ctx)), Wrap(entries)),
         |(IpInvariant((core_ctx, _bindings_ctx)), Wrap(mut entries))| {
-            let mut core_ctx = Locked::new(core_ctx);
+            let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
             // Make sure to sort the entries _before_ taking the routing table lock.
             entries.sort_unstable_by(|a, b| {
                 OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
@@ -173,7 +172,7 @@ where
     BC: BindingsContext + 'a,
     V: RoutesVisitor<'a, BC>,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(r) = I::map_ip(
         IpInvariant((&mut core_ctx, cb)),
         |IpInvariant((core_ctx, cb))| {

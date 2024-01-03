@@ -12,7 +12,7 @@ use derivative::Derivative;
 use lock_order::{
     lock::{LockFor, RwLockFor},
     relation::LockBefore,
-    Locked,
+    wrap::prelude::*,
 };
 use net_types::ethernet::Mac;
 use packet::{BufferMut, ParsablePacket as _, Serializer};
@@ -25,7 +25,7 @@ use crate::{
     context::SendFrameContext,
     device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
-    SyncCtx,
+    CoreCtx, StackState, SyncCtx,
 };
 
 /// A selector for frames based on link-layer protocol number.
@@ -656,7 +656,7 @@ pub fn create<BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     external_state: BC::SocketState,
 ) -> SocketId<BC> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     SocketId(DeviceSocketApi::create(&mut core_ctx, external_state))
 }
 
@@ -666,7 +666,7 @@ pub fn set_device<BC: crate::BindingsContext>(
     SocketId(id): &SocketId<BC>,
     device: TargetDevice<&DeviceId<BC>>,
 ) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::set_device(&mut core_ctx, id, device)
 }
 
@@ -677,7 +677,7 @@ pub fn set_device_and_protocol<BC: crate::BindingsContext>(
     device: TargetDevice<&DeviceId<BC>>,
     protocol: Protocol,
 ) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::set_device_and_protocol(&mut core_ctx, id, device, protocol)
 }
 
@@ -686,7 +686,7 @@ pub fn get_info<BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     SocketId(id): &SocketId<BC>,
 ) -> SocketInfo<WeakDeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::get_info(&mut core_ctx, id)
 }
 
@@ -697,7 +697,7 @@ pub fn get_info<BC: crate::BindingsContext>(
 /// If the provided [`SocketId`] is not the last instance for a socket, this
 /// method will panic.
 pub fn remove<BC: crate::BindingsContext>(core_ctx: &SyncCtx<BC>, SocketId(id): SocketId<BC>) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::remove(&mut core_ctx, id)
 }
 
@@ -709,7 +709,7 @@ pub fn send_frame<BC: crate::BindingsContext, B: BufferMut>(
     params: SendFrameParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendFrameError)> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::send_frame(&mut core_ctx, bindings_ctx, id, params, body)
 }
 
@@ -721,7 +721,7 @@ pub fn send_datagram<BC: crate::BindingsContext, B: BufferMut>(
     params: SendDatagramParams<DeviceId<BC>>,
     body: B,
 ) -> Result<(), (B, SendDatagramError)> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     DeviceSocketApi::send_datagram(&mut core_ctx, bindings_ctx, id, params, body)
 }
 
@@ -917,14 +917,14 @@ where
     }
 }
 
-impl<BC: crate::BindingsContext, L> DeviceSocketContextTypes for Locked<&SyncCtx<BC>, L> {
+impl<BC: crate::BindingsContext, L> DeviceSocketContextTypes for CoreCtx<'_, BC, L> {
     type SocketId = StrongId<BC::SocketState, WeakDeviceId<BC>>;
 }
 
 impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    DeviceSocketContext<BC> for Locked<&SyncCtx<BC>, L>
+    DeviceSocketContext<BC> for CoreCtx<'_, BC, L>
 {
-    type SocketTablesCoreCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::AnyDeviceSockets>;
+    type SocketTablesCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::AnyDeviceSockets>;
 
     fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId {
         let mut sockets = self.lock();
@@ -977,9 +977,9 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSo
 }
 
 impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
-    SocketStateAccessor<BC> for Locked<&SyncCtx<BC>, L>
+    SocketStateAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCoreCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::DeviceSocketState>;
+    type SocketStateCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::DeviceSocketState>;
 
     fn with_socket_state<
         F: FnOnce(
@@ -1015,9 +1015,9 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
 }
 
 impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
-    DeviceSocketAccessor<BC> for Locked<&SyncCtx<BC>, L>
+    DeviceSocketAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    type DeviceSocketCoreCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::DeviceSockets>;
+    type DeviceSocketCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::DeviceSockets>;
 
     fn with_device_sockets<
         F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
@@ -1080,7 +1080,9 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
     }
 }
 
-impl<BC: crate::BindingsContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets> for SyncCtx<BC> {
+impl<BC: crate::BindingsContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets>
+    for StackState<BC>
+{
     type Data = AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>>
         where Self: 'l;
@@ -1088,20 +1090,22 @@ impl<BC: crate::BindingsContext> RwLockFor<crate::lock_ordering::AnyDeviceSocket
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.device.shared_sockets.any_device_sockets.read()
+        self.device.shared_sockets.any_device_sockets.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.device.shared_sockets.any_device_sockets.write()
+        self.device.shared_sockets.any_device_sockets.write()
     }
 }
 
-impl<BC: crate::BindingsContext> LockFor<crate::lock_ordering::AllDeviceSockets> for SyncCtx<BC> {
+impl<BC: crate::BindingsContext> LockFor<crate::lock_ordering::AllDeviceSockets>
+    for StackState<BC>
+{
     type Data = AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        self.state.device.shared_sockets.all_sockets.lock()
+        self.device.shared_sockets.all_sockets.lock()
     }
 }
 

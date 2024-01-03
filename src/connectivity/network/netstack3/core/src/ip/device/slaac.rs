@@ -15,7 +15,7 @@ use core::{
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
-use lock_order::{lock::UnlockedAccess, Locked};
+use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     UnicastAddr, Witness as _,
@@ -35,7 +35,7 @@ use crate::{
     device::{AnyDevice, DeviceIdContext, Id},
     error::{ExistsError, NotFoundError},
     ip::device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-    BindingsContext, Instant, SyncCtx,
+    BindingsContext, CoreCtx, Instant, StackState,
 };
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
@@ -204,16 +204,16 @@ pub(crate) struct SlaacCounters {
     pub(crate) generated_slaac_addr_exists: Counter,
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for SyncCtx<BC> {
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BC> {
     type Data = SlaacCounters;
     type Guard<'l> = &'l SlaacCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.state.slaac_counters()
+        &self.slaac_counters()
     }
 }
 
-impl<BC: BindingsContext, L> CounterContext<SlaacCounters> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> CounterContext<SlaacCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
@@ -1658,7 +1658,7 @@ mod tests {
     use core::convert::TryFrom as _;
 
     use assert_matches::assert_matches;
-    use lock_order::Locked;
+
     use net_declare::net::ip_v6;
     use net_types::{ethernet::Mac, ip::Ipv6, LinkLocalAddress as _};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
@@ -2840,10 +2840,11 @@ mod tests {
         let stable_addr_sub =
             calculate_addr_sub(SUBNET, local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC));
 
-        let addrs =
-            with_assigned_ipv6_addr_subnets(&mut Locked::new(core_ctx), &device_id, |addrs| {
-                addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
-            });
+        let addrs = with_assigned_ipv6_addr_subnets(
+            &mut CoreCtx::new_deprecated(core_ctx),
+            &device_id,
+            |addrs| addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>(),
+        );
         let (stable_addr_sub, temp_addr_sub) = assert_matches!(
             addrs[..],
             [a1, a2] => {
@@ -2925,10 +2926,11 @@ mod tests {
 
         // Disabling IP should remove all the SLAAC addresses.
         set_ip_enabled(&mut core_ctx, &mut bindings_ctx, false /* enabled */);
-        let addrs =
-            with_assigned_ipv6_addr_subnets(&mut Locked::new(core_ctx), &device_id, |addrs| {
-                addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
-            });
+        let addrs = with_assigned_ipv6_addr_subnets(
+            &mut CoreCtx::new_deprecated(core_ctx),
+            &device_id,
+            |addrs| addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>(),
+        );
         assert_matches!(addrs[..], []);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
     }

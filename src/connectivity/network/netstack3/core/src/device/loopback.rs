@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use lock_order::{
     lock::{LockFor, RwLockFor},
     relation::LockBefore,
-    Locked,
+    wrap::prelude::*,
 };
 use net_types::{
     ethernet::Mac,
@@ -49,7 +49,7 @@ use crate::{
         DeviceSendFrameError, FrameDestination,
     },
     ip::types::RawMetric,
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx,
 };
 
 /// The MAC address corresponding to the loopback interface.
@@ -86,7 +86,7 @@ impl DeviceStateSpec for LoopbackDevice {
     const DEBUG_TYPE: &'static str = "Loopback";
 }
 
-impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for Locked<&SyncCtx<BC>, L> {
+impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BC, L> {
     type DeviceId = LoopbackDeviceId<BC>;
     type WeakDeviceId = LoopbackWeakDeviceId<BC>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -187,7 +187,7 @@ impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceSockets>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    SendFrameContext<BC, DeviceSocketMetadata<LoopbackDeviceId<BC>>> for Locked<&SyncCtx<BC>, L>
+    SendFrameContext<BC, DeviceSocketMetadata<LoopbackDeviceId<BC>>> for CoreCtx<'_, BC, L>
 {
     fn send_frame<S>(
         &mut self,
@@ -215,7 +215,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 }
 
 pub(super) fn send_ip_frame<BC, A, S, L>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, L>,
+    core_ctx: &mut CoreCtx<'_, BC, L>,
     bindings_ctx: &mut BC,
     device_id: &LoopbackDeviceId<BC>,
     _local_addr: SpecifiedAddr<A>,
@@ -240,7 +240,7 @@ where
 }
 
 fn send_as_ethernet_frame_to_dst<BC, S, L>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, L>,
+    core_ctx: &mut CoreCtx<'_, BC, L>,
     bindings_ctx: &mut BC,
     device_id: &LoopbackDeviceId<BC>,
     packet: S,
@@ -271,7 +271,7 @@ where
 }
 
 fn send_ethernet_frame<L, S, BC>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, L>,
+    core_ctx: &mut CoreCtx<'_, BC, L>,
     bindings_ctx: &mut BC,
     device_id: &LoopbackDeviceId<BC>,
     frame: S,
@@ -318,7 +318,7 @@ where
 
 /// Get the routing metric associated with this device.
 pub(super) fn get_routing_metric<BC: BindingsContext, L>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, L>,
+    core_ctx: &mut CoreCtx<'_, BC, L>,
     device_id: &LoopbackDeviceId<BC>,
 ) -> RawMetric {
     device::integration::with_loopback_state(core_ctx, device_id, |mut state| {
@@ -328,7 +328,7 @@ pub(super) fn get_routing_metric<BC: BindingsContext, L>(
 
 /// Gets the MTU associated with this device.
 pub(super) fn get_mtu<BC: BindingsContext, L>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, L>,
+    core_ctx: &mut CoreCtx<'_, BC, L>,
     device_id: &LoopbackDeviceId<BC>,
 ) -> Mtu {
     device::integration::with_loopback_state(core_ctx, device_id, |mut state| {
@@ -343,14 +343,14 @@ impl<BC: BindingsContext> ReceiveQueueBindingsContext<LoopbackDevice, LoopbackDe
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
-    ReceiveQueueTypes<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    ReceiveQueueTypes<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
     type Meta = ();
     type Buffer = Buf<Vec<u8>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
-    ReceiveQueueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    ReceiveQueueContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
     fn with_receive_queue_mut<
         O,
@@ -368,7 +368,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
 }
 
 impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
-    for Locked<&SyncCtx<BC>, crate::lock_ordering::LoopbackRxDequeue>
+    for CoreCtx<'_, BC, crate::lock_ordering::LoopbackRxDequeue>
 {
     fn handle_frame(
         &mut self,
@@ -450,9 +450,9 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
-    ReceiveDequeContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    ReceiveDequeContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type ReceiveQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::LoopbackRxDequeue>;
+    type ReceiveQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackRxDequeue>;
 
     fn with_dequed_frames_and_rx_queue_ctx<
         O,
@@ -483,7 +483,7 @@ impl<BC: BindingsContext> TransmitQueueBindingsContext<LoopbackDevice, LoopbackD
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    TransmitQueueCommon<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitQueueCommon<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
@@ -495,7 +495,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    TransmitQueueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitQueueContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
     fn with_transmit_queue_mut<
         O,
@@ -539,9 +539,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
-    TransmitDequeueContext<LoopbackDevice, BC> for Locked<&SyncCtx<BC>, L>
+    TransmitDequeueContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<BC>, crate::lock_ordering::LoopbackTxDequeue>;
+    type TransmitQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackTxDequeue>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,
@@ -569,7 +569,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use lock_order::{Locked, Unlocked};
+
     use net_types::ip::{AddrSubnet, AddrSubnetEither, Ip, Ipv4, Ipv6, Mtu};
     use packet::ParseBuffer;
 
@@ -580,7 +580,7 @@ mod tests {
         testutil::{
             Ctx, FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
-        SyncCtx,
+        CoreCtx, UnlockedCoreCtx,
     };
 
     use super::*;
@@ -597,11 +597,17 @@ mod tests {
         crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
 
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(core_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &device
+            ),
             MTU
         );
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(core_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &device
+            ),
             MTU
         );
     }
@@ -609,7 +615,7 @@ mod tests {
     #[ip_test]
     fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpDeviceIpExt>()
     where
-        for<'a> Locked<&'a SyncCtx<FakeBindingsCtx>, Unlocked>:
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpDeviceStateContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
         let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
@@ -621,7 +627,7 @@ mod tests {
 
         let get_addrs = || {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &device,
                 |addrs, _core_ctx| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
             )
@@ -676,13 +682,19 @@ mod tests {
         const BODY: &[u8] = b"IP body".as_slice();
 
         let body = Buf::new(Vec::from(BODY), ..);
-        send_ip_frame(&mut Locked::new(core_ctx), &mut bindings_ctx, &device, local_addr, body)
-            .expect("can send");
+        send_ip_frame(
+            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut bindings_ctx,
+            &device,
+            local_addr,
+            body,
+        )
+        .expect("can send");
 
         // There is no transmit queue so the frames will immediately go into the
         // receive queue.
         let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &device,
             |queue_state| queue_state.take_frames().map(|((), frame)| frame).collect::<Vec<_>>(),
         );

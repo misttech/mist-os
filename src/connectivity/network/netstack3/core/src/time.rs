@@ -6,7 +6,7 @@
 
 use core::fmt::Debug;
 use derivative::Derivative;
-use lock_order::Locked;
+
 use tracing::trace;
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
         IpLayerTimerId,
     },
     transport::{self, TransportLayerTimerId},
-    BindingsContext, SyncCtx,
+    BindingsContext, CoreCtx, SyncCtx,
 };
 
 /// The identifier for any timer event.
@@ -128,7 +128,7 @@ pub fn handle_timer<BC: BindingsContext>(
     id: TimerId<BC>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
 
     match id {
         TimerId(TimerIdInner::DeviceLayer(x)) => {
@@ -165,21 +165,20 @@ pub(crate) struct TimerCounters {
 
 #[cfg(test)]
 impl<BC: BindingsContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
-    for SyncCtx<BC>
+    for crate::StackState<BC>
 {
     type Data = TimerCounters;
     type Guard<'l> = &'l TimerCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.state.timer_counters
+        &self.timer_counters
     }
 }
 
 #[cfg(test)]
-impl<BC: BindingsContext, L> crate::context::CounterContext<TimerCounters>
-    for Locked<&SyncCtx<BC>, L>
-{
+impl<BC: BindingsContext, L> crate::context::CounterContext<TimerCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
+        use lock_order::wrap::prelude::*;
         cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())
     }
 }

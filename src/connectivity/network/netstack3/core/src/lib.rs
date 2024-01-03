@@ -241,9 +241,10 @@ pub mod types {
 }
 
 pub use context::{
-    BindingsContext, BindingsTypes, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext,
+    BindingsContext, BindingsTypes, CoreCtx, EventContext, InstantBindingsTypes, InstantContext,
+    ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
+pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 
 pub(crate) use trace::trace_duration;

@@ -29,7 +29,6 @@ use core::{
     num::{NonZeroU16, NonZeroUsize},
     ops::{Deref, DerefMut, RangeInclusive},
 };
-use lock_order::Locked;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
@@ -180,7 +179,7 @@ use crate::{
         state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
         BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions,
     },
-    SyncCtx,
+    CoreCtx, SyncCtx,
 };
 
 pub use accept_queue::ListenerNotifier;
@@ -3319,7 +3318,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         IpInvariant((&mut core_ctx, bindings_ctx, socket_extra)),
         |IpInvariant((core_ctx, bindings_ctx, socket_extra))| {
@@ -3359,7 +3358,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, device)), id),
         |(IpInvariant((core_ctx, bindings_ctx, device)), id)| {
@@ -3388,7 +3387,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, port)), id, local_ip),
         |(IpInvariant((core_ctx, bindings_ctx, port)), id, local_ip)| {
@@ -3410,7 +3409,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, backlog)), id),
         |(IpInvariant((core_ctx, backlog)), id)| SocketHandler::listen(core_ctx, id, backlog),
@@ -3470,7 +3469,7 @@ pub fn accept<I: DualStackIpExt, BC>(
 where
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -3545,7 +3544,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, remote_port)), id, remote_ip),
         |(IpInvariant((core_ctx, bindings_ctx, remote_port)), id, remote_ip)| {
@@ -3723,7 +3722,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, shutdown)), id),
         |(IpInvariant((core_ctx, bindings_ctx, shutdown)), id)| {
@@ -3744,7 +3743,7 @@ pub fn close<I, BC>(
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -3766,7 +3765,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, reuse)), id),
         |(IpInvariant((core_ctx, reuse)), id)| SocketHandler::set_reuseaddr(core_ctx, id, reuse),
@@ -3780,7 +3779,7 @@ where
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant(&mut core_ctx), id),
         |(IpInvariant(core_ctx), id)| SocketHandler::reuseaddr(core_ctx, id),
@@ -3811,7 +3810,7 @@ where
         + InfoVisitor<Ipv4, device::WeakDeviceId<BC>>
         + InfoVisitor<Ipv6, device::WeakDeviceId<BC>>,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(r) = I::map_ip(
         IpInvariant((&mut core_ctx, cb)),
         |IpInvariant((core_ctx, cb))| {
@@ -3922,7 +3921,7 @@ pub fn get_info<I: DualStackIpExt, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant(&mut core_ctx), id),
         |(IpInvariant(core_ctx), id)| SocketHandler::get_info(core_ctx, id),
@@ -3942,7 +3941,7 @@ pub fn with_socket_options_mut<
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     f: F,
 ) -> R {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(r) = I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, f)), id),
         |(IpInvariant((core_ctx, bindings_ctx, f)), id)| {
@@ -3966,7 +3965,7 @@ pub fn with_socket_options<
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     f: F,
 ) -> R {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(r) = I::map_ip(
         (IpInvariant((&mut core_ctx, f)), id),
         |(IpInvariant((core_ctx, f)), id)| {
@@ -3986,7 +3985,7 @@ pub fn set_send_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     size: usize,
 ) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, size)), id),
         |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
@@ -4004,7 +4003,7 @@ pub fn send_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<usize> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(size) = I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -4024,7 +4023,7 @@ pub fn set_receive_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
     size: usize,
 ) {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx, size)), id),
         |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
@@ -4043,7 +4042,7 @@ pub fn receive_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
     bindings_ctx: &mut BC,
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<usize> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(size) = I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), id),
         |(IpInvariant((core_ctx, bindings_ctx)), id)| {
@@ -4061,7 +4060,7 @@ pub fn get_socket_error<I: DualStackIpExt, BC: crate::BindingsContext>(
     core_ctx: &SyncCtx<BC>,
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
 ) -> Option<ConnectionError> {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let IpInvariant(err) = I::map_ip(
         (IpInvariant(&mut core_ctx), id),
         |(IpInvariant(core_ctx), id)| IpInvariant(SocketHandler::get_socket_error(core_ctx, id)),
@@ -4083,7 +4082,7 @@ pub fn do_send<I, BC>(
     I: DualStackIpExt,
     BC: crate::BindingsContext,
 {
-    let mut core_ctx = Locked::new(core_ctx);
+    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     I::map_ip(
         (IpInvariant((&mut core_ctx, bindings_ctx)), conn_id),
         |(IpInvariant((core_ctx, bindings_ctx)), conn_id)| {

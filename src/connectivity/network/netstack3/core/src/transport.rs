@@ -60,7 +60,7 @@ pub mod tcp;
 pub mod udp;
 
 use derivative::Derivative;
-use lock_order::{lock::RwLockFor, Locked};
+use lock_order::lock::RwLockFor;
 use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv6},
     ScopeableAddress, SpecifiedAddr, ZonedAddr,
@@ -75,7 +75,7 @@ use crate::{
         tcp::TcpState,
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
-    BindingsContext, BindingsTypes, SyncCtx,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 /// A builder for transport layer state.
@@ -124,55 +124,59 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for StackState<BC> {
     type Data = udp::BoundSockets<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.transport.udpv4.sockets.bound.read()
+        self.transport.udpv4.sockets.bound.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.transport.udpv4.sockets.bound.write()
+        self.transport.udpv4.sockets.bound.write()
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for StackState<BC> {
     type Data = udp::BoundSockets<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.transport.udpv6.sockets.bound.read()
+        self.transport.udpv6.sockets.bound.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.transport.udpv6.sockets.bound.write()
+        self.transport.udpv6.sockets.bound.write()
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>>
+    for StackState<BC>
+{
     type Data = udp::SocketsState<Ipv4, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.transport.udpv4.sockets.sockets_state.read()
+        self.transport.udpv4.sockets.sockets_state.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.transport.udpv4.sockets.sockets_state.write()
+        self.transport.udpv4.sockets.sockets_state.write()
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for SyncCtx<BC> {
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>>
+    for StackState<BC>
+{
     type Data = udp::SocketsState<Ipv6, WeakDeviceId<BC>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.transport.udpv6.sockets.sockets_state.read()
+        self.transport.udpv6.sockets.sockets_state.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.transport.udpv6.sockets.sockets_state.write()
+        self.transport.udpv6.sockets.sockets_state.write()
     }
 }
 
@@ -191,7 +195,7 @@ pub(crate) enum TransportLayerTimerId<BC: crate::BindingsContext> {
 
 /// Handle a timer event firing in the transport layer.
 pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut Locked<&SyncCtx<BC>, crate::lock_ordering::Unlocked>,
+    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
     bindings_ctx: &mut BC,
     id: TransportLayerTimerId<BC>,
 ) {

@@ -110,7 +110,7 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
-    use lock_order::Locked;
+
     use net_declare::net::{mac, subnet_v6};
     use net_types::{
         ethernet::Mac,
@@ -182,7 +182,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        BindingsContext, Instant, SyncCtx, TimerId,
+        BindingsContext, CoreCtx, Instant, SyncCtx, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -203,7 +203,7 @@ mod tests {
         device_id: &DeviceId<BC>,
     ) -> Vec<GlobalIpv6Addr<BC::Instant>> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             device_id,
             |addrs, core_ctx| {
                 addrs
@@ -377,7 +377,7 @@ mod tests {
             assert_empty(bindings_ctx.frames_sent().iter());
 
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut Locked::new(&*core_ctx),
+                &mut CoreCtx::new_deprecated(&*core_ctx),
                 bindings_ctx,
                 SendIpPacketMeta {
                     device: &local_device_id,
@@ -502,12 +502,12 @@ mod tests {
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
         with_assigned_ipv6_addr_subnets(
-            &mut Locked::new(&*net.core_ctx("local")),
+            &mut CoreCtx::new_deprecated(&*net.core_ctx("local")),
             &local_device_id,
             |addrs| assert_empty(addrs),
         );
         with_assigned_ipv6_addr_subnets(
-            &mut Locked::new(&*net.core_ctx("remote")),
+            &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
             &remote_device_id,
             |addrs| assert_empty(addrs),
         );
@@ -597,7 +597,7 @@ mod tests {
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.core_ctx("remote")),
+                &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
                 &remote_device_id,
                 |addrs| addrs.count()
             ),
@@ -789,7 +789,7 @@ mod tests {
         // duplicate in the local network.
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.core_ctx("local")),
+                &mut CoreCtx::new_deprecated(&*net.core_ctx("local")),
                 &local_device_id,
                 |a| a.count()
             ),
@@ -797,7 +797,7 @@ mod tests {
         );
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut Locked::new(&*net.core_ctx("remote")),
+                &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
                 &remote_device_id,
                 |a| a.count()
             ),
@@ -811,7 +811,7 @@ mod tests {
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<bool> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             device,
             |mut addrs, core_ctx| {
                 addrs.find_map(|addr_id| {
@@ -1186,9 +1186,12 @@ mod tests {
                 FrameDestination::Multicast,
                 icmpv6_packet_buf,
             );
-            assert_eq!(get_ipv6_hop_limit(&mut Locked::new(core_ctx), device_id).get(), hop_limit);
+            assert_eq!(
+                get_ipv6_hop_limit(&mut CoreCtx::new_deprecated(core_ctx), device_id).get(),
+                hop_limit
+            );
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut Locked::new(core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 SendIpPacketMeta {
                     device: device_id,
@@ -1276,7 +1279,10 @@ mod tests {
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(core_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &device
+            ),
             hw_mtu
         );
 
@@ -1297,7 +1303,10 @@ mod tests {
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 2);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(core_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &device
+            ),
             hw_mtu
         );
 
@@ -1318,7 +1327,10 @@ mod tests {
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 3);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(core_ctx), &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
+                &mut CoreCtx::new_deprecated(core_ctx),
+                &device
+            ),
             Ipv6::MINIMUM_LINK_MTU,
         );
     }
@@ -2369,7 +2381,7 @@ mod tests {
         // Set the retransmit timer between neighbor solicitations to be greater
         // than the preferred lifetime of the prefix.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device,
             const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(10)),
@@ -3325,7 +3337,7 @@ mod tests {
         // REGEN_ADVANCE to be large, which increases the window between when an
         // address is regenerated and when it becomes deprecated.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut Locked::new(core_ctx),
+            &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device,
             NonZeroDuration::new(max_preferred_lifetime / 4).unwrap(),
