@@ -19,7 +19,7 @@
 // attributes are allowed on expressions
 // (https://github.com/rust-lang/rust/issues/15701).
 // FIXME(http://b/318154202): We can remove after we've rolled the rust compiler.
-#![allow(unknown_lints)]
+#![allow(unknown_lints, renamed_and_removed_lints)]
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::blocks_in_conditions)]
 #![deny(missing_docs, unreachable_patterns)]
