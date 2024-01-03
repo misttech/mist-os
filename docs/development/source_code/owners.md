@@ -17,9 +17,9 @@ contain a `*` allowing anyone to provide such a `+2`.
 
 ## Tools
 
-Gerrit has a "find owners" button that will list all the owners for all the
+Gerrit has a "suggest owners" button that will list all the owners for all the
 files modified in a given change. More information on this is available on the
-[Gerrit find-owners plugin][find-owners] page.
+[Gerrit code-owners plugin][code-owners] page.
 
 ## Format
 
@@ -59,6 +59,5 @@ request owners override. This process should be used sparingly and
 review by local owners is preferred whenever it does not present and
 undue burden on developers.
 
-
-[find-owners]: https://gerrit.googlesource.com/plugins/find-owners/+/HEAD/src/main/resources/Documentation/about.md
-[owners-syntax]: https://gerrit.googlesource.com/plugins/find-owners/+/HEAD/src/main/resources/Documentation/syntax.md
+[code-owners]: https://android-review.googlesource.com/plugins/code-owners/Documentation/index.html
+[owners-syntax]: https://android-review.googlesource.com/plugins/code-owners/Documentation/backend-find-owners.html#syntax
