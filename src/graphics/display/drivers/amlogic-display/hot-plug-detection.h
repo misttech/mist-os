@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HOT_PLUG_DETECTION_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
@@ -88,8 +90,8 @@ class HotPlugDetection {
 
   zx::result<HotPlugDetectionState> ReadPinGpioState();
 
-  // Initial routine / entry point for the IRQ handling thread.
-  int InterruptThreadEntryPoint();
+  void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt);
 
   const fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> pin_gpio_;
   const zx::interrupt pin_gpio_irq_;
@@ -97,11 +99,10 @@ class HotPlugDetection {
   // Guaranteed to have a target.
   const OnStateChangeHandler on_state_change_;
 
-  // nullopt if the IRQ thread is not running.
-  //
-  // Constant between Init() and instance destruction. Only accessed on the
-  // threads used for class initialization and destruction.
-  std::optional<thrd_t> hpd_thread_;
+  const async_loop_config_t irq_handler_loop_config_;
+  async::Loop irq_handler_loop_;
+  async::IrqMethod<HotPlugDetection, &HotPlugDetection::InterruptHandler> pin_gpio_irq_handler_{
+      this};
 
   // Protects the state that may be accessed on multiple threads.
   fbl::Mutex mutex_;

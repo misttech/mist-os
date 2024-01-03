@@ -5,9 +5,11 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/async-loop/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -23,6 +25,16 @@
 #include <fbl/auto_lock.h>
 
 namespace amlogic_display {
+
+namespace {
+
+async_loop_config_t CreateIrqHandlerAsyncLoopConfig() {
+  async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
+  config.irq_support = true;
+  return config;
+}
+
+}  // namespace
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
@@ -76,8 +88,11 @@ HotPlugDetection::HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> 
                                    HotPlugDetection::OnStateChangeHandler on_state_change)
     : pin_gpio_(std::move(pin_gpio)),
       pin_gpio_irq_(std::move(pin_gpio_interrupt)),
-      on_state_change_(std::move(on_state_change)) {
+      on_state_change_(std::move(on_state_change)),
+      irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
+      irq_handler_loop_(&irq_handler_loop_config_) {
   ZX_DEBUG_ASSERT(on_state_change_);
+  pin_gpio_irq_handler_.set_object(pin_gpio_irq_.get());
 }
 
 HotPlugDetection::~HotPlugDetection() {
@@ -90,14 +105,9 @@ HotPlugDetection::~HotPlugDetection() {
     }
   }
 
-  if (hpd_thread_.has_value()) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_join(*hpd_thread_, nullptr));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "GPIO interrupt thread join failed: %s", zx_status_get_string(status));
-    }
-  }
+  irq_handler_loop_.Shutdown();
 
-  // After the interrupt handler thread is joined, the interrupt is unused
+  // After the interrupt handler loop is shut down, the interrupt is unused
   // and we can safely release the interrupt.
   if (pin_gpio_.is_valid()) {
     fidl::WireResult release_result = pin_gpio_->ReleaseInterrupt();
@@ -135,19 +145,19 @@ zx::result<> HotPlugDetection::Init() {
     return config_in_response.take_error();
   }
 
-  thrd_t interrupt_thread;
-  zx_status_t status = thrd_status_to_zx_status(thrd_create_with_name(
-      &interrupt_thread,
-      [](void* arg) {
-        return reinterpret_cast<HotPlugDetection*>(arg)->InterruptThreadEntryPoint();
-      },
-      /*arg=*/this,
-      /*name=*/"hot-plug-detection-interrupt-thread"));
+  zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_loop_.dispatcher());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create interrupt thread: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to bind the GPIO IRQ to the loop dispatcher: %s",
+           zx_status_get_string(status));
     return zx::error(status);
   }
-  hpd_thread_.emplace(interrupt_thread);
+
+  status = irq_handler_loop_.StartThread("hot-plug-detection-interrupt-thread");
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to start a thread for the hotplug detection loop: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
   return zx::ok();
 }
 
@@ -191,26 +201,32 @@ zx::result<> HotPlugDetection::UpdateState() {
   return polarity_change_result;
 }
 
-int HotPlugDetection::InterruptThreadEntryPoint() {
-  while (true) {
-    zx_status_t status = pin_gpio_irq_.wait(nullptr);
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Hotplug interrupt wait is cancelled. Stopping hotplug thread.");
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Hotplug interrupt wait failed: %s", zx_status_get_string(status));
-      break;
-    }
-
-    // Undocumented magic. Probably a very simple approximation of debouncing.
-    usleep(500000);
-
-    [[maybe_unused]] zx::result<> result = UpdateState();
-    // UpdateState() already logged the error.
+void HotPlugDetection::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                                        zx_status_t status,
+                                        const zx_packet_interrupt_t* interrupt) {
+  if (status == ZX_ERR_CANCELED) {
+    zxlogf(INFO, "Hotplug interrupt wait is cancelled.");
+    return;
+  }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Hotplug interrupt wait failed: %s", zx_status_get_string(status));
+    // A failed async interrupt wait doesn't remove the interrupt from the
+    // async loop, so we have to manually cancel it.
+    irq->Cancel();
+    return;
   }
 
-  return 0;
+  // Undocumented magic. Probably a very simple approximation of debouncing.
+  usleep(500000);
+
+  [[maybe_unused]] zx::result<> result = UpdateState();
+  // UpdateState() already logged the error.
+
+  // For interrupts bound to ports (including those bound to async loops), the
+  // interrupt must be re-armed using zx_interrupt_ack() for each incoming
+  // interrupt request. This is best done after the interrupt has been fully
+  // processed.
+  zx::unowned_interrupt(irq->object())->ack();
 }
 
 zx::result<HotPlugDetectionState> HotPlugDetection::ReadPinGpioState() {
