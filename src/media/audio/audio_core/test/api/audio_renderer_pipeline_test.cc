@@ -1410,7 +1410,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
                                     },
                                 .effects_v1 = {
                                     {
-                                        .lib_name = "inversion_filter.so",
+                                        .lib_name = "audio-core-api-test-effects.so",
                                         .effect_name = "inversion_filter",
                                         .instance_name = "inverter",
                                         .effect_config = "{ \"enabled\": false}",
