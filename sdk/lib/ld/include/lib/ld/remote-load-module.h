@@ -14,12 +14,12 @@
 #include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/segment-with-vmo.h>
 #include <lib/elfldltl/soname.h>
+#include <lib/fit/result.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 
 #include <algorithm>
-
-#include <fbl/intrusive_double_list.h>
+#include <vector>
 
 namespace ld {
 
@@ -29,15 +29,14 @@ using RemoteLoadModuleBase =
                LoadModuleInline::kYes, LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
 
 template <class Elf = elfldltl::Elf<>>
-struct RemoteLoadModule : public RemoteLoadModuleBase,
-                          fbl::DoublyLinkedListable<std::unique_ptr<RemoteLoadModule<Elf>>> {
+class RemoteLoadModule : public RemoteLoadModuleBase {
  public:
   using typename RemoteLoadModuleBase::Phdr;
   using typename RemoteLoadModuleBase::size_type;
   using typename RemoteLoadModuleBase::Soname;
   using Ehdr = typename Elf::Ehdr;
   using TlsDescGot = typename Elf::TlsDescGot;
-  using List = fbl::DoublyLinkedList<std::unique_ptr<RemoteLoadModule>>;
+  using List = std::vector<RemoteLoadModule>;
   using LoadInfo =
       elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container,
                          elfldltl::PhdrLoadPolicy::kBasic, elfldltl::SegmentWithVmo::NoCopy>;
@@ -64,29 +63,33 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     ExecInfo main_exec;  // Decoded information for the main executable.
   };
 
-  RemoteLoadModule() = delete;
+  RemoteLoadModule() = default;
 
-  RemoteLoadModule(RemoteLoadModule&&) = delete;
+  RemoteLoadModule(RemoteLoadModule&&) = default;
 
   explicit RemoteLoadModule(const Soname& name) : RemoteLoadModuleBase{name} {}
 
   // Initialize the module from the provided VMO, representing either the
-  // binary or shared library to be loaded. Create the data structures that make
-  // make the VMO readable, and scan and decode its phdrs to set and return
-  // relevant information about the module to make it ready for relocation and
-  // loading. Return a `DecodeResult` containing information about this
-  // module's dependencies.
+  // binary or shared library to be loaded.  Create the data structures that
+  // make make the VMO readable, and scan and decode its phdrs to set and
+  // return relevant information about the module to make it ready for
+  // relocation and loading.  Return a `DecodeResult` containing information
+  // about this module's dependencies.  In error cases, the error_value() is
+  // the return value from the Diagnostics object.
   template <class Diagnostics>
-  std::optional<DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid) {
-    if (!InitMappedVmo(diag, std::move(vmo))) [[unlikely]] {
-      return std::nullopt;
+  fit::result<bool, DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid) {
+    if (auto result = InitMappedVmo(diag, std::move(vmo)); result.is_error()) [[unlikely]] {
+      return result.take_error();
     }
 
-    // Read the file header and program headers into stack buffers.
+    // Get direct pointers to the file header and the program headers inside
+    // the mapped file image.
     auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
         diag, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{});
     if (!headers) [[unlikely]] {
-      return std::nullopt;
+      // TODO(mcgrathr): LoadHeadersFromFile doesn't propagate Diagnostics
+      // return value on failure.
+      return fit::error{true};
     }
 
     // Decode phdrs to fill LoadInfo, BuildId, etc.
@@ -100,7 +103,8 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
                               elfldltl::Elf<>{}, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{},
                               elfldltl::ObserveBuildIdNote(build_id, true)));
     if (!result) [[unlikely]] {
-      return std::nullopt;
+      // DecodeModulePhdrs only fails if Diagnostics said to give up.
+      return fit::error{false};
     }
 
     auto [dyn_phdr, tls_phdr, stack_size] = *result;
@@ -118,7 +122,8 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     // Fix up segments to be compatible with AlignedRemoteVmarLoader.
     if (!elfldltl::SegmentWithVmo::AlignSegments(diag, load_info(), vmo_.borrow(),
                                                  Loader::page_size())) {
-      return std::nullopt;
+      // AlignSegments only fails if Diagnostics said to give up.
+      return fit::error{false};
     }
 
     auto memory = metadata_memory();
@@ -126,17 +131,15 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
     if (!needed) {
-      return std::nullopt;
+      // TODO(mcgrathr): DecodeDynamic doesn't propagate Diagnostics
+      // return value on failure.
+      return fit::error{true};
     }
 
-    return DecodeResult{
-        .needed = std::move(*needed),
-        .exec_info =
-            {
-                .relative_entry = ehdr.entry,
-                .stack_size = stack_size,
-            },
-    };
+    return fit::ok(DecodeResult{
+        .needed = *std::move(needed),
+        .exec_info = {.relative_entry = ehdr.entry, .stack_size = stack_size},
+    });
   }
 
   // Decode dynamic sections and store the metadata collected from observers.
@@ -191,19 +194,16 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
                                                           GetDepVmo&& get_dep_vmo) {
     // Decode the main executable first and save its decoded information to
     // include in the result returned to the caller.
-    auto exec = std::make_unique<RemoteLoadModule>(abi::Abi<>::kExecutableName);
-    auto exec_decode_result = exec->Decode(diag, std::move(main_executable_vmo), 0);
-    if (!exec_decode_result) [[unlikely]] {
+    RemoteLoadModule exec{abi::Abi<>::kExecutableName};
+    auto exec_decode_result = exec.Decode(diag, std::move(main_executable_vmo), 0);
+    if (exec_decode_result.is_error()) [[unlikely]] {
       return std::nullopt;
     }
 
     // The main executable will always be the first entry of the modules list.
-    List modules;
-    modules.push_back(std::move(exec));
-
-    auto decode_deps_result =
-        DecodeDeps(diag, modules, exec_decode_result->needed, std::forward<GetDepVmo>(get_dep_vmo));
-    if (!decode_deps_result) [[unlikely]] {
+    List modules = DecodeDeps(diag, std::move(exec), exec_decode_result->needed,
+                              std::forward<GetDepVmo>(get_dep_vmo));
+    if (modules.empty()) [[unlikely]] {
       return std::nullopt;
     }
 
@@ -282,50 +282,77 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     return std::all_of(modules.begin(), modules.end(), std::forward<T>(callback));
   }
 
-  static void EnqueueDeps(List& modules, const std::vector<Soname>& needed) {
-    for (auto soname : needed) {
-      if (std::find(modules.begin(), modules.end(), soname) == modules.end()) {
-        modules.push_back(std::make_unique<RemoteLoadModule>(soname));
-      }
-    }
-  }
-
-  // Decode every dependency module, enqueuing new dependencies to the modules
-  // list to be decoded as well.
+  // Decode every transitive dependency module, yielding list in load order
+  // starting with the main executable.  On failure this returns an empty List.
+  // Otherwise the returned List::front() is always just main_exec moved into
+  // place but the list may be longer.  If the Diagnostics object said to keep
+  // going after an error, the returned list may be partial and the individual
+  // entries may be partially decoded.  They should not be presumed complete,
+  // such as calling module(), unless no errors were reported via Diagnostics.
   template <class Diagnostics, typename GetDepVmo>
-  static bool DecodeDeps(Diagnostics& diag, List& modules, std::vector<Soname>& needed,
-                         GetDepVmo&& get_dep_vmo) {
-    // Note, this assumes that ModuleList iterators are not invalidated after
-    // push_back(), done by `EnqueueDeps`.  This is true of
-    // fbl::DoublyLinkedList.  No assumptions are made on the validity of the
-    // end() iterator, so it is checked at every iteration.
-    uint32_t symbolizer_modid = 0;
-    for (auto it = modules.begin(); it != modules.end(); it++) {
-      if (it->HasModule()) {
-        // Only the main executable should already be decoded before this loop
-        // reaches it. Assert here and proceed to EnqueueDeps.
-        assert(it == modules.begin());
-        assert(symbolizer_modid == 0);
-      } else {
-        auto vmo = get_dep_vmo(it->name());
+  static List DecodeDeps(Diagnostics& diag, RemoteLoadModule main_exec,
+                         const std::vector<Soname>& main_exec_needed, GetDepVmo&& get_dep_vmo) {
+    // The list grows with enqueued DT_NEEDED dependencies of earlier elements.
+    List modules;
+    auto enqueue_deps = [&modules](const std::vector<Soname>& needed) {
+      for (const Soname& soname : needed) {
+        if (std::find(modules.begin(), modules.end(), soname) == modules.end()) {
+          modules.emplace_back(soname);
+        }
+      }
+    };
+
+    // Start the list with the main executable, which already has module ID 0.
+    // Each module's ID will be the same as its index in the list.
+    assert(main_exec.HasModule());
+    assert(main_exec.module().symbolizer_modid == 0);
+    modules.emplace_back(std::move(main_exec));
+
+    // First enqueue the executable's direct dependencies.
+    enqueue_deps(main_exec_needed);
+
+    // Now iterate over the queue remaining after the main executable itself,
+    // adding indirect dependencies onto the end of the queue until the loop
+    // has reached them all.  The total number of iterations is not known until
+    // the loop terminates, every transitive dependency having been decoded.
+    for (size_t idx = 1; idx < modules.size(); ++idx) {
+      fit::result<bool, DecodeResult> decode_result = fit::error{false};
+
+      {
+        // The EnqueueDeps call below will extend the List (vector) and make
+        // this reference invalid, so make it go out of scope before then.
+        RemoteLoadModule& mod = modules[idx];
+
+        // Only the main executable should already be decoded before this loop.
+        assert(!mod.HasModule());
+
+        auto vmo = get_dep_vmo(mod.name());
         if (!vmo) [[unlikely]] {
           // If the dep is not found, report the missing dependency, and defer
           // to the diagnostics policy on whether to continue processing.
-          if (!diag.MissingDependency(it->name().str())) {
-            return false;
+          if (!diag.MissingDependency(mod.name().str())) {
+            return {};
           }
           continue;
         }
-        auto result = it->Decode(diag, std::move(vmo), ++symbolizer_modid);
-        if (!result) [[unlikely]] {
-          return false;
-        }
-        needed = result->needed;
+
+        decode_result = mod.Decode(diag, std::move(vmo),
+                                   // List index becomes symbolizer module ID.
+                                   static_cast<uint32_t>(idx));
       }
 
-      it->EnqueueDeps(modules, needed);
+      if (decode_result.is_error()) [[unlikely]] {
+        if (decode_result.error_value()) {
+          // Keep going to decode others, leaving this one undecoded.
+          continue;
+        }
+        return {};
+      }
+
+      enqueue_deps(decode_result->needed);
     }
-    return true;
+
+    return modules;
   }
 
   // Create and return a memory-adaptor object that serves as a wrapper
@@ -334,14 +361,13 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   MetadataMemory metadata_memory() { return MetadataMemory{load_info(), mapped_vmo_}; }
 
   template <class Diagnostics>
-  bool InitMappedVmo(Diagnostics& diag, zx::vmo vmo) {
+  fit::result<bool> InitMappedVmo(Diagnostics& diag, zx::vmo vmo) {
     if (auto status = mapped_vmo_.Init(vmo.borrow()); status.is_error()) {
-      diag.SystemError("cannot map VMO file for ", name(), " : ",
-                       elfldltl::ZirconError{status.status_value()});
-      return false;
+      return fit::error{diag.SystemError("cannot map VMO file for ", name(), " : ",
+                                         elfldltl::ZirconError{status.status_value()})};
     }
     vmo_ = std::move(vmo);
-    return true;
+    return fit::ok();
   }
 
   Loader loader_;

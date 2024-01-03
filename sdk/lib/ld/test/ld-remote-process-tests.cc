@@ -102,7 +102,7 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   set_stack_size(decode_result->main_exec.stack_size);
 
   auto& modules = decode_result->modules;
-  ASSERT_FALSE(modules.is_empty());
+  ASSERT_FALSE(modules.empty());
   EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
   EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
   EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
