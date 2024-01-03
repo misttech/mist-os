@@ -56,6 +56,12 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 			};
+
+			reset: register-controller@1000 {
+				compatible = "fuchsia,registers";
+				reg = <0x0 0x1000 0x0 0x100>;
+				#register-cells = <4>;
+			};
 		};
 	};
 };

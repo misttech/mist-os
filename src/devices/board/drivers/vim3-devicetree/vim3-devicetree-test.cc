@@ -43,7 +43,8 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
       "sys/platform/clock-controller-ff63c000",
-      "sys/platform/fuchsia,contiguous",
+      "sys/platform/fuchsia-contiguous",
+      "sys/platform/register-controller-1000",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

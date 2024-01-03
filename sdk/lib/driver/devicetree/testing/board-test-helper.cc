@@ -241,6 +241,7 @@ zx::result<> BoardTestHelper::WaitOnDevices(const std::vector<std::string>& devi
       FX_LOGS(ERROR) << "Failed to wait for " << path << " : " << wait_result.status_string();
       return wait_result.take_error();
     }
+    FX_LOGS(INFO) << "Found " << path;
   }
   return zx::ok();
 }

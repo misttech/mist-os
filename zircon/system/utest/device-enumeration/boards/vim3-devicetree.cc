@@ -12,9 +12,12 @@ namespace {
 TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt",
-      "sys/platform/00:00:32",
-      "sys/platform/00:00:32:1",
-      "sys/platform/00:00:32:4/sysmem",
+      "sys/platform/dt-root",
+      "sys/platform/interrupt-controller-ffc01000",
+      "sys/platform/i2c-5000",
+      "sys/platform/i2c-1c000",
+      "sys/platform/clock-controller-ff63c000",
+      "sys/platform/fuchsia-contiguous/sysmem",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

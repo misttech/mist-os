@@ -40,8 +40,9 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;
-  // '@' is not a valid character in Node names as per driver framework.
+  // '@' and ',' are not a valid character in Node names as per driver framework.
   std::replace(name_.begin(), name_.end(), '@', '-');
+  std::replace(name_.begin(), name_.end(), ',', '-');
   pbus_node_.name() = name_;
 
   for (auto property : properties) {
