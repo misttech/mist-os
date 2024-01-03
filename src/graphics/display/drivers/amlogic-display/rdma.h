@@ -226,20 +226,16 @@ class RdmaEngine {
   bool rdma_active_ TA_GUARDED(rdma_lock_) = false;
   display::ConfigStamp latest_applied_config_ TA_GUARDED(rdma_lock_) = display::kInvalidConfigStamp;
 
-  RdmaChannelContainer rdma_chnl_container_[kNumberOfTables];
+  RdmaChannelContainer rdma_channels_[kNumberOfTables];
 
   // use a single vmo for all channels
   zx::vmo rdma_vmo_;
   zx::pmt rdma_pmt_;
-  zx_paddr_t rdma_phys_;
-  uint8_t* rdma_vbuf_;
 
   // Container that holds AFBC specific trigger register
-  RdmaChannelContainer afbc_rdma_chnl_container_;
+  RdmaChannelContainer afbc_rdma_channel_;
   zx::vmo afbc_rdma_vmo_;
-  zx_handle_t afbc_rdma_pmt_;
-  zx_paddr_t afbc_rdma_phys_;
-  uint8_t* afbc_rdma_vbuf_;
+  zx::pmt afbc_rdma_pmt_;
 
   inspect::UintProperty rdma_allocation_failures_;
   inspect::UintProperty rdma_irq_count_;

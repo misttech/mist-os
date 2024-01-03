@@ -159,10 +159,10 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     // Write the start and end address of the table. End address is the last address that
     // the RDMA engine reads from.
     start_index_used_ = static_cast<uint8_t>(last_table_index + 1);
-    vpu_mmio_.Write32(static_cast<uint32_t>(rdma_chnl_container_[start_index_used_].phys_offset),
+    vpu_mmio_.Write32(static_cast<uint32_t>(rdma_channels_[start_index_used_].phys_offset),
                       VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
     vpu_mmio_.Write32(
-        static_cast<uint32_t>(rdma_chnl_container_[start_index_used_].phys_offset + kTableSize - 4),
+        static_cast<uint32_t>(rdma_channels_[start_index_used_].phys_offset + kTableSize - 4),
         VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
     uint32_t regVal = vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO);
     regVal |= RDMA_ACCESS_AUTO_INT_EN(kRdmaChannel);  // VSYNC interrupt source
@@ -199,8 +199,8 @@ int RdmaEngine::GetNextAvailableRdmaTableIndex() {
 }
 
 void RdmaEngine::ResetRdmaTable() {
-  for (auto& i : rdma_chnl_container_) {
-    auto* rdma_table = reinterpret_cast<RdmaTable*>(i.virt_offset);
+  for (const RdmaChannelContainer& rdma_channel : rdma_channels_) {
+    auto* rdma_table = reinterpret_cast<RdmaTable*>(rdma_channel.virt_offset);
     rdma_table[IDX_BLK0_CFG_W0].reg = (VPU_VIU_OSD1_BLK0_CFG_W0 >> 2);
     rdma_table[IDX_CTRL_STAT].reg = (VPU_VIU_OSD1_CTRL_STAT >> 2);
     rdma_table[IDX_CTRL_STAT2].reg = (VPU_VIU_OSD1_CTRL_STAT2 >> 2);
@@ -223,20 +223,20 @@ void RdmaEngine::ResetRdmaTable() {
     rdma_table[IDX_RDMA_CFG_STAMP_HIGH].reg = (VPP_DUMMY_DATA1 >> 2);
     rdma_table[IDX_RDMA_CFG_STAMP_LOW].reg = (VPP_OSD_SC_DUMMY_DATA >> 2);
   }
-  auto* afbc_rdma_table = reinterpret_cast<RdmaTable*>(afbc_rdma_chnl_container_.virt_offset);
+  auto* afbc_rdma_table = reinterpret_cast<RdmaTable*>(afbc_rdma_channel_.virt_offset);
   afbc_rdma_table->reg = (VPU_MAFBC_COMMAND >> 2);
 }
 
 void RdmaEngine::SetRdmaTableValue(uint32_t table_index, uint32_t idx, uint32_t val) {
   ZX_DEBUG_ASSERT(idx < IDX_MAX);
   ZX_DEBUG_ASSERT(table_index < kNumberOfTables);
-  auto* rdma_table = reinterpret_cast<RdmaTable*>(rdma_chnl_container_[table_index].virt_offset);
+  auto* rdma_table = reinterpret_cast<RdmaTable*>(rdma_channels_[table_index].virt_offset);
   rdma_table[idx].val = val;
 }
 
 void RdmaEngine::FlushRdmaTable(uint32_t table_index) {
   zx_status_t status =
-      zx_cache_flush(rdma_chnl_container_[table_index].virt_offset, IDX_MAX * sizeof(RdmaTable),
+      zx_cache_flush(rdma_channels_[table_index].virt_offset, IDX_MAX * sizeof(RdmaTable),
                      ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not clean cache: %s", zx_status_get_string(status));
@@ -254,7 +254,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp con
     end_index_used_ = static_cast<uint8_t>(next_table_idx);
     rdma_usage_table_[next_table_idx] = config_stamp.value();
     vpu_mmio_.Write32(
-        static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset + kTableSize - 4),
+        static_cast<uint32_t>(rdma_channels_[next_table_idx].phys_offset + kTableSize - 4),
         VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
     return;
   }
@@ -262,10 +262,10 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp con
   start_index_used_ = static_cast<uint8_t>(next_table_idx);
   end_index_used_ = start_index_used_;
 
-  vpu_mmio_.Write32(static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset),
+  vpu_mmio_.Write32(static_cast<uint32_t>(rdma_channels_[next_table_idx].phys_offset),
                     VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
   vpu_mmio_.Write32(
-      static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset + kTableSize - 4),
+      static_cast<uint32_t>(rdma_channels_[next_table_idx].phys_offset + kTableSize - 4),
       VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
 
   // Enable Auto mode: Non-Increment, VSync Interrupt Driven, Write
@@ -301,51 +301,57 @@ zx_status_t RdmaEngine::SetupRdma() {
     return status;
   }
 
+  zx_paddr_t rdma_physical_address = 0;
   status = bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, rdma_vmo_, 0, kRdmaRegionSize,
-                    &rdma_phys_, 1, &rdma_pmt_);
+                    &rdma_physical_address, 1, &rdma_pmt_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create RDMA VMO: %s", zx_status_get_string(status));
     return status;
   }
 
+  zx_vaddr_t rdma_virtual_address = 0;
   status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, rdma_vmo_, 0,
-                                      kRdmaRegionSize, reinterpret_cast<zx_vaddr_t*>(&rdma_vbuf_));
+                                      kRdmaRegionSize, &rdma_virtual_address);
+  const cpp20::span<uint8_t> rdma_region(reinterpret_cast<uint8_t*>(rdma_virtual_address),
+                                         kRdmaRegionSize);
 
   // At this point, we have a table initialized.
   // Initialize each rdma channel container
   fbl::AutoLock l(&rdma_lock_);
   for (uint32_t i = 0; i < kNumberOfTables; i++) {
-    rdma_chnl_container_[i].phys_offset = rdma_phys_ + (i * kTableSize);
-    rdma_chnl_container_[i].virt_offset = rdma_vbuf_ + (i * kTableSize);
+    rdma_channels_[i].phys_offset = rdma_physical_address + (i * kTableSize);
+    const cpp20::span<uint8_t> rdma_table_subregion =
+        rdma_region.subspan(i * kTableSize, kTableSize);
+    rdma_channels_[i].virt_offset = rdma_table_subregion.data();
     rdma_usage_table_[i] = kRdmaTableReady;
   }
 
   // Allocate RDMA Table for AFBC engine
-  status = zx_vmo_create_contiguous(bti_.get(), kAfbcRdmaRegionSize, 0,
-                                    afbc_rdma_vmo_.reset_and_get_address());
+  status = zx::vmo::create_contiguous(bti_, kAfbcRdmaRegionSize, 0, &afbc_rdma_vmo_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create afbc RDMA VMO: %s", zx_status_get_string(status));
     return status;
   }
 
-  status = zx_bti_pin(bti_.get(), ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, afbc_rdma_vmo_.get(), 0,
-                      kAfbcRdmaRegionSize, &afbc_rdma_phys_, 1, &afbc_rdma_pmt_);
+  zx_paddr_t afbc_rdma_physical_address = 0;
+  status = bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, afbc_rdma_vmo_, 0, kAfbcRdmaRegionSize,
+                    &afbc_rdma_physical_address, 1, &afbc_rdma_pmt_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not pin afbc RDMA VMO: %s", zx_status_get_string(status));
     return status;
   }
 
-  status =
-      zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, afbc_rdma_vmo_.get(),
-                  0, kAfbcRdmaRegionSize, reinterpret_cast<zx_vaddr_t*>(&afbc_rdma_vbuf_));
+  zx_vaddr_t afbc_rdma_virtual_address = 0;
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, afbc_rdma_vmo_, 0,
+                                      kAfbcRdmaRegionSize, &afbc_rdma_virtual_address);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map afbc vmar: %s", zx_status_get_string(status));
     return status;
   }
 
   // Initialize AFBC rdma channel container
-  afbc_rdma_chnl_container_.phys_offset = afbc_rdma_phys_;
-  afbc_rdma_chnl_container_.virt_offset = afbc_rdma_vbuf_;
+  afbc_rdma_channel_.phys_offset = afbc_rdma_physical_address;
+  afbc_rdma_channel_.virt_offset = reinterpret_cast<uint8_t*>(afbc_rdma_virtual_address);
 
   // Setup RDMA_CTRL:
   // Default: no reset, no clock gating, burst size 4x16B for read and write
@@ -358,12 +364,12 @@ zx_status_t RdmaEngine::SetupRdma() {
 }
 
 void RdmaEngine::SetAfbcRdmaTableValue(uint32_t val) const {
-  auto* afbc_rdma_table = reinterpret_cast<RdmaTable*>(afbc_rdma_chnl_container_.virt_offset);
+  RdmaTable* afbc_rdma_table = reinterpret_cast<RdmaTable*>(afbc_rdma_channel_.virt_offset);
   afbc_rdma_table->val = val;
 }
 
 void RdmaEngine::FlushAfbcRdmaTable() const {
-  zx_status_t status = zx_cache_flush(afbc_rdma_chnl_container_.virt_offset, sizeof(RdmaTable),
+  zx_status_t status = zx_cache_flush(afbc_rdma_channel_.virt_offset, sizeof(RdmaTable),
                                       ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not clean cache: %s", zx_status_get_string(status));
@@ -371,11 +377,10 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
   }
   // Write the start and end address of the table.  End address is the last address that the
   // RDMA engine reads from.
-  vpu_mmio_.Write32(static_cast<uint32_t>(afbc_rdma_chnl_container_.phys_offset),
+  vpu_mmio_.Write32(static_cast<uint32_t>(afbc_rdma_channel_.phys_offset),
                     VPU_RDMA_AHB_START_ADDR(kAfbcRdmaChannel));
-  vpu_mmio_.Write32(
-      static_cast<uint32_t>(afbc_rdma_chnl_container_.phys_offset + kAfbcTableSize - 4),
-      VPU_RDMA_AHB_END_ADDR(kAfbcRdmaChannel));
+  vpu_mmio_.Write32(static_cast<uint32_t>(afbc_rdma_channel_.phys_offset + kAfbcTableSize - 4),
+                    VPU_RDMA_AHB_END_ADDR(kAfbcRdmaChannel));
 }
 
 // TODO(fxbug.dev/57633): stop all channels for safer reloads.
@@ -459,8 +464,8 @@ void RdmaEngine::DumpRdmaState() {
   DumpRdmaRegisters();
 
   zxlogf(INFO, "RDMA Table Content:");
-  for (auto& i : rdma_usage_table_) {
-    zxlogf(INFO, "[0x%lx]", i);
+  for (uint64_t table_entry : rdma_usage_table_) {
+    zxlogf(INFO, "[0x%" PRIx64 "]", table_entry);
   }
 
   zxlogf(INFO, "start_index = %ld, end_index = %ld", start_index_used_, end_index_used_);
