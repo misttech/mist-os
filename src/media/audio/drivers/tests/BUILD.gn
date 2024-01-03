@@ -62,6 +62,7 @@ executable("audio_driver_tests_bin") {
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/lib/test:test_fixture",
