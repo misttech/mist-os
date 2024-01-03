@@ -30,25 +30,12 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
                                                            inspect::Node* video_input_unit_node) {
   ZX_DEBUG_ASSERT(pdev != nullptr);
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
-  if (vpu_mmio_result.is_error()) {
-    return vpu_mmio_result.take_error();
-  }
-  fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
-
-  fbl::AllocChecker alloc_checker;
-  auto rdma = fbl::make_unique_checked<RdmaEngine>(&alloc_checker, std::move(vpu_mmio),
-                                                   video_input_unit_node);
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
   zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, *pdev);
   if (bti_result.is_error()) {
     zxlogf(ERROR, "Could not get BTI handle");
     return zx::error(bti_result.error_value());
   }
-  rdma->bti_ = std::move(bti_result).value();
+  zx::bti dma_bti = std::move(bti_result).value();
 
   // Map RDMA Done Interrupt
   zx::result<zx::interrupt> rdma_done_result =
@@ -56,12 +43,30 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
   if (rdma_done_result.is_error()) {
     return rdma_done_result.take_error();
   }
-  rdma->rdma_irq_ = std::move(rdma_done_result).value();
+  zx::interrupt rdma_done_interrupt = std::move(rdma_done_result).value();
+
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.take_error();
+  }
+  fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
+
+  fbl::AllocChecker alloc_checker;
+  auto rdma =
+      fbl::make_unique_checked<RdmaEngine>(&alloc_checker, std::move(vpu_mmio), std::move(dma_bti),
+                                           std::move(rdma_done_interrupt), video_input_unit_node);
+  if (!alloc_checker.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   return zx::ok(std::move(rdma));
 }
 
-RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, inspect::Node* inspect_node)
+RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt rdma_done_interrupt,
+                       inspect::Node* inspect_node)
     : vpu_mmio_(std::move(vpu_mmio)),
+      bti_(std::move(dma_bti)),
+      rdma_irq_(std::move(rdma_done_interrupt)),
       rdma_allocation_failures_(inspect_node->CreateUint("rdma_allocation_failures", 0)),
       rdma_irq_count_(inspect_node->CreateUint("rdma_irq_count", 0)),
       rdma_begin_count_(inspect_node->CreateUint("rdma_begin_count", 0)),

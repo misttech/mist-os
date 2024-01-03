@@ -154,6 +154,9 @@ struct RdmaChannelContainer {
  */
 class RdmaEngine {
  public:
+  // Factory method intended for production use.
+  //
+  // `video_input_unit_node` must outlive the RdmaEngine instance.
   static zx::result<std::unique_ptr<RdmaEngine>> Create(ddk::PDevFidl* pdev,
                                                         inspect::Node* video_input_unit_node);
 
@@ -162,8 +165,15 @@ class RdmaEngine {
   // `vpu_mmio` is the region documented as "VPU" in Section 8.1 "Memory Map"
   // of the AMLogic A311D datasheet. It must be valid.
   //
+  // `dma_bti` maps to the DMA BTI board resource. It must be valid.
+  //
+  // `rdma_done_interrupt` is the interrupt documented as "rdma_done_int" in
+  // Section 8.10.2 "Interrupt Source" of the AMLogic A311D datasheet. It must
+  // be valid.
+  //
   // `node` must outlive the RdmaEngine.
-  RdmaEngine(fdf::MmioBuffer vpu_mmio, inspect::Node* node);
+  RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt rdma_done_interrupt,
+             inspect::Node* node);
 
   // This must be called before any other methods.
   zx_status_t SetupRdma();
