@@ -8,7 +8,7 @@ use {
     packet_encoding::{decodable_enum, Decodable, Encodable},
     std::{convert::TryFrom, result},
     thiserror::Error,
-    tracing::{info, warn},
+    tracing::{debug, info, warn},
 };
 
 mod browsing;
@@ -733,7 +733,14 @@ impl AdvancedDecodable for MediaAttributeEntries {
 
             // Check that we have enough message length.
             if buf.len() < (next_idx + val_len) {
-                return Err(Error::InvalidMessageLength);
+                debug!(
+                    "Ignoring last attribute, not enough message ({} < {}): {:?}",
+                    buf.len() - next_idx,
+                    val_len,
+                    attribute_id_or
+                );
+                next_idx = buf.len();
+                break;
             }
             // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
             // charset ID folder names to utf8 names.
@@ -886,10 +893,14 @@ mod tests {
             0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x06, 't' as u8, 'e' as u8, 's' as u8,
             't' as u8,
         ];
-        let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
+        let (a, _decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], false).expect("partial success");
+        // Final entry with the wrong length is removed.
+        assert_eq!(MediaAttributeEntries { ..Default::default() }, a);
         let (a, decoded_len) =
             MediaAttributeEntries::try_decode(&buf[..], true).expect("should succeed");
         assert_eq!(buf.len(), decoded_len);
+        // Entry with the wrong length is retrieved if it is the only entry.
         assert_eq!(
             MediaAttributeEntries { title: Some("test".to_string()), ..Default::default() },
             a
@@ -900,14 +911,6 @@ mod tests {
     fn get_item_attributes_command_decode_fail() {
         // Invalid number of attributes.
         let buf = vec![0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x01, 'a' as u8];
-        let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
-        let _ = MediaAttributeEntries::try_decode(&buf[..], true).expect_err("should have failed");
-
-        // Entry with mis-calculated value length.
-        let buf = vec![
-            0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x0a, 't' as u8, 'e' as u8, 's' as u8,
-            't' as u8,
-        ];
         let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
         let _ = MediaAttributeEntries::try_decode(&buf[..], true).expect_err("should have failed");
     }

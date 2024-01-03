@@ -1881,8 +1881,14 @@ pub(crate) mod tests {
         let mut buf = vec![0; response.encoded_len()];
         response.encode(&mut buf[..]).expect("should have succeeded");
 
+        send_avctp_response_raw(pdu_id, buf, command)
+    }
+
+    /// Helper function to reply to the command with an AVCTP response buffer.
+    #[track_caller]
+    pub(crate) fn send_avctp_response_raw(pdu_id: PduId, body: Vec<u8>, command: &AvctpCommand) {
         // Send the response back to the remote peer.
-        let response_packet = BrowsePreamble::new(u8::from(&pdu_id), buf);
+        let response_packet = BrowsePreamble::new(u8::from(&pdu_id), body);
         let mut response_buf = vec![0; response_packet.encoded_len()];
         response_packet.encode(&mut response_buf[..]).expect("Encoding should work");
 

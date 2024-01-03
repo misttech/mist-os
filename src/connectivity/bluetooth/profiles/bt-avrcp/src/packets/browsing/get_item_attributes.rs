@@ -27,6 +27,16 @@ impl GetItemAttributesCommand {
     /// 1 byte for scope, 8 for uid, 2 for uid counter, 1 for number of attributes.
     const MIN_PACKET_SIZE: usize = 12;
 
+    #[cfg(test)]
+    pub fn uid(&self) -> u64 {
+        self.uid
+    }
+
+    #[cfg(test)]
+    pub fn uid_counter(&self) -> u16 {
+        self.uid_counter
+    }
+
     pub fn from_now_playing_list(
         uid: u64,
         uid_counter: u16,
@@ -333,17 +343,14 @@ mod tests {
             resp
         );
 
-        // Success response with incorrect len.
+        // Success response with incorrect len. Incorrect len item is removed.
         let buf = vec![
             0x04, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x06, 't' as u8, 'e' as u8,
             's' as u8, 't' as u8,
         ];
         let resp = GetItemAttributesResponse::decode(&buf).expect("should be ok");
         assert_eq!(
-            GetItemAttributesResponse::Success(MediaAttributeEntries {
-                title: Some("test".to_string()),
-                ..Default::default()
-            }),
+            GetItemAttributesResponse::Success(MediaAttributeEntries { ..Default::default() }),
             resp
         );
     }
@@ -370,18 +377,37 @@ mod tests {
         ];
         let _ = GetItemAttributesResponse::decode(&buf).expect_err("should have failed");
 
-        // Success response with incorrect attribute value len.
         let buf = vec![
             0x04, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x02, 't' as u8, 'e' as u8,
             's' as u8, 't' as u8,
         ];
         let _ = GetItemAttributesResponse::decode(&buf).expect_err("should have failed");
+    }
 
-        // Success response with incorrect attribute value len.
+    #[fuchsia::test]
+    fn test_get_item_attributes_response_decode_variant_missing_fcs() {
         let buf = vec![
-            0x04, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x07, 't' as u8, 'e' as u8,
-            's' as u8, 't' as u8,
+            0x04, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6a, 0x00, 0x06, 0x47, 0x6c, 0x6f, 0x72,
+            0x69, 0x61, 0x00, 0x00, 0x00, 0x02, 0x00, 0x6a, 0x00, 0x0b, 0x45, 0x61, 0x72, 0x6c,
+            0x79, 0x20, 0x44, 0x6f, 0x6f, 0x72, 0x73, 0x00, 0x00, 0x00, 0x03, 0x00, 0x6a, 0x00,
+            0x0f, 0x47, 0x6c, 0x6f, 0x72, 0x69, 0x61, 0x20, 0x2d, 0x20, 0x53, 0x69, 0x6e, 0x67,
+            0x6c, 0x65, 0x00, 0x00, 0x00, 0x06, 0x00, 0x6a, 0x00, 0x04, 0x52, 0x6f, 0x63, 0x6b,
+            0x00, 0x00, 0x00, 0x07, 0x00, 0x6a, 0x00, 0x06, 0x32, 0x37, 0x37, 0x39,
         ];
-        let _ = GetItemAttributesResponse::decode(&buf).expect_err("should have failed");
+
+        let resp = GetItemAttributesResponse::decode(&buf).expect("should be ok");
+        assert_eq!(
+            GetItemAttributesResponse::Success(MediaAttributeEntries {
+                title: Some("Gloria".to_string()),
+                artist_name: Some("Early Doors".to_string()),
+                album_name: Some("Gloria - Single".to_string()),
+                genre: Some("Rock".to_string()),
+                // This attribute is short so we ignore it, because the last two
+                // bytes are missing (missing FCS bits in the L2CAP packet)
+                // playing_time: Some("277966".to_string()),
+                ..Default::default()
+            }),
+            resp
+        );
     }
 }

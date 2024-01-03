@@ -702,6 +702,49 @@ pub mod tests {
     }
 
     #[fuchsia::test]
+    fn test_get_item_attributes() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (controller, remote_avc_peer, remote_avctp_peer) = set_up();
+        let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
+        let mut avc_cmd_stream = remote_avc_peer.take_command_stream();
+        expect_outgoing_commands(&mut exec, &mut avc_cmd_stream, &mut avctp_cmd_stream);
+
+        set_browsed_player(&mut exec, &controller, &mut avctp_cmd_stream);
+
+        let get_item_attributes_fut = controller.get_item_attributes(0xc0decafe);
+        pin_mut!(get_item_attributes_fut);
+
+        let res = exec.run_until_stalled(&mut get_item_attributes_fut);
+        let futures::task::Poll::Pending = res else {
+            panic!("Expected pending and got {res:?}");
+        };
+        let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
+        // Ensure command params are correct.
+        let params = decode_avctp_command(&command, PduId::GetItemAttributes);
+        let cmd =
+            GetItemAttributesCommand::decode(&params).expect("should have received valid command");
+        assert_eq!(cmd.uid_counter(), UID_COUNTER);
+        assert_eq!(cmd.uid(), 0xc0decafe);
+        // Create mock response.
+        let resp = vec![
+            0x04, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6a, 0x00, 0x06, 0x47, 0x6c, 0x6f, 0x72,
+            0x69, 0x61, 0x00, 0x00, 0x00, 0x02, 0x00, 0x6a, 0x00, 0x0b, 0x45, 0x61, 0x72, 0x6c,
+            0x79, 0x20, 0x44, 0x6f, 0x6f, 0x72, 0x73, 0x00, 0x00, 0x00, 0x03, 0x00, 0x6a, 0x00,
+            0x0f, 0x47, 0x6c, 0x6f, 0x72, 0x69, 0x61, 0x20, 0x2d, 0x20, 0x53, 0x69, 0x6e, 0x67,
+            0x6c, 0x65, 0x00, 0x00, 0x00, 0x06, 0x00, 0x6a, 0x00, 0x04, 0x52, 0x6f, 0x63, 0x6b,
+            0x00, 0x00, 0x00, 0x07, 0x00, 0x6a, 0x00, 0x06, 0x32, 0x37, 0x37, 0x39, 0x36, 0x36,
+        ];
+
+        send_avctp_response_raw(PduId::GetItemAttributes, resp, &command);
+
+        assert_matches!(
+            exec.run_until_stalled(&mut get_item_attributes_fut).expect("result ready"),
+            Ok(_media_attributes)
+        );
+    }
+
+    #[fuchsia::test]
     fn test_play_item() {
         let mut exec = fasync::TestExecutor::new();
 
