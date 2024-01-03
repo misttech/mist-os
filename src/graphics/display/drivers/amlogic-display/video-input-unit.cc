@@ -849,7 +849,7 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx_status_t status = self->rdma_->SetupRdma(&(self->vpu_mmio_));
+  zx_status_t status = self->rdma_->SetupRdma();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not setup RDMA");
     return zx::error(status);

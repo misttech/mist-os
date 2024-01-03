@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/time.h>
@@ -29,9 +30,16 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
                                                            inspect::Node* video_input_unit_node) {
   ZX_DEBUG_ASSERT(pdev != nullptr);
 
-  fbl::AllocChecker ac;
-  std::unique_ptr<RdmaEngine> rdma(new (&ac) RdmaEngine(video_input_unit_node));
-  if (!ac.check()) {
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
+  if (vpu_mmio_result.is_error()) {
+    return vpu_mmio_result.take_error();
+  }
+  fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
+
+  fbl::AllocChecker alloc_checker;
+  auto rdma = fbl::make_unique_checked<RdmaEngine>(&alloc_checker, std::move(vpu_mmio),
+                                                   video_input_unit_node);
+  if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -52,8 +60,8 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
   return zx::ok(std::move(rdma));
 }
 
-RdmaEngine::RdmaEngine(inspect::Node* inspect_node)
-    : vpu_mmio_(nullptr),
+RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, inspect::Node* inspect_node)
+    : vpu_mmio_(std::move(vpu_mmio)),
       rdma_allocation_failures_(inspect_node->CreateUint("rdma_allocation_failures", 0)),
       rdma_irq_count_(inspect_node->CreateUint("rdma_irq_count", 0)),
       rdma_begin_count_(inspect_node->CreateUint("rdma_begin_count", 0)),
@@ -67,7 +75,7 @@ void RdmaEngine::TryResolvePendingRdma() {
   ZX_DEBUG_ASSERT(rdma_active_);
 
   zx::time now = zx::clock::get_monotonic();
-  auto rdma_status = RdmaStatusReg::Get().ReadFrom(vpu_mmio_);
+  auto rdma_status = RdmaStatusReg::Get().ReadFrom(&vpu_mmio_);
   if (!rdma_status.ChannelDone(kRdmaChannel)) {
     // The configs scheduled to apply on the previous vsync have not been processed by the RDMA
     // engine yet. Log some statistics on how often this situation occurs.
@@ -82,16 +90,16 @@ void RdmaEngine::TryResolvePendingRdma() {
   // If RDMA for AFBC just completed, simply clear the interrupt. We keep RDMA enabled to
   // automatically get triggered on every vsync. FlipOnVsync is responsible for enabling/disabling
   // AFBC-related RDMA based on configs.
-  if (rdma_status.ChannelDone(kAfbcRdmaChannel, vpu_mmio_)) {
-    RdmaCtrlReg::ClearInterrupt(kAfbcRdmaChannel, vpu_mmio_);
+  if (rdma_status.ChannelDone(kAfbcRdmaChannel, &vpu_mmio_)) {
+    RdmaCtrlReg::ClearInterrupt(kAfbcRdmaChannel, &vpu_mmio_);
   }
 
   if (rdma_status.ChannelDone(kRdmaChannel)) {
-    RdmaCtrlReg::ClearInterrupt(kRdmaChannel, vpu_mmio_);
+    RdmaCtrlReg::ClearInterrupt(kRdmaChannel, &vpu_mmio_);
 
-    uint32_t regVal = vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO);
+    uint32_t regVal = vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO);
     regVal &= ~RDMA_ACCESS_AUTO_INT_EN(kRdmaChannel);  // Remove VSYNC interrupt source
-    vpu_mmio_->Write32(regVal, VPU_RDMA_ACCESS_AUTO);
+    vpu_mmio_.Write32(regVal, VPU_RDMA_ACCESS_AUTO);
 
     // Read and store the last applied image handle and drive the RDMA state machine forward.
     ProcessRdmaUsageTable();
@@ -110,8 +118,8 @@ void RdmaEngine::ProcessRdmaUsageTable() {
   ZX_DEBUG_ASSERT(rdma_active_);
 
   // Find out how far did the RDMA write
-  uint64_t val = (static_cast<uint64_t>(vpu_mmio_->Read32(VPP_DUMMY_DATA1)) << 32) |
-                 (vpu_mmio_->Read32(VPP_OSD_SC_DUMMY_DATA));
+  uint64_t val = (static_cast<uint64_t>(vpu_mmio_.Read32(VPP_DUMMY_DATA1)) << 32) |
+                 (vpu_mmio_.Read32(VPP_OSD_SC_DUMMY_DATA));
   size_t last_table_index = -1;
   // FIXME: or search until end_index_used_. Either way, end_index_used_ will
   // always be less than kNumberOfTables. So no penalty
@@ -146,15 +154,15 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     // Write the start and end address of the table. End address is the last address that
     // the RDMA engine reads from.
     start_index_used_ = static_cast<uint8_t>(last_table_index + 1);
-    vpu_mmio_->Write32(static_cast<uint32_t>(rdma_chnl_container_[start_index_used_].phys_offset),
-                       VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
-    vpu_mmio_->Write32(
+    vpu_mmio_.Write32(static_cast<uint32_t>(rdma_chnl_container_[start_index_used_].phys_offset),
+                      VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
+    vpu_mmio_.Write32(
         static_cast<uint32_t>(rdma_chnl_container_[start_index_used_].phys_offset + kTableSize - 4),
         VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
-    uint32_t regVal = vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO);
+    uint32_t regVal = vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO);
     regVal |= RDMA_ACCESS_AUTO_INT_EN(kRdmaChannel);  // VSYNC interrupt source
     regVal |= RDMA_ACCESS_AUTO_WRITE(kRdmaChannel);   // Write
-    vpu_mmio_->Write32(regVal, VPU_RDMA_ACCESS_AUTO);
+    vpu_mmio_.Write32(regVal, VPU_RDMA_ACCESS_AUTO);
     rdma_active_ = true;
     rdma_begin_count_.Add(1);
   }
@@ -240,7 +248,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp con
   if (rdma_active_) {
     end_index_used_ = static_cast<uint8_t>(next_table_idx);
     rdma_usage_table_[next_table_idx] = config_stamp.value();
-    vpu_mmio_->Write32(
+    vpu_mmio_.Write32(
         static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset + kTableSize - 4),
         VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
     return;
@@ -249,32 +257,31 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp con
   start_index_used_ = static_cast<uint8_t>(next_table_idx);
   end_index_used_ = start_index_used_;
 
-  vpu_mmio_->Write32(static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset),
-                     VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
-  vpu_mmio_->Write32(
+  vpu_mmio_.Write32(static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset),
+                    VPU_RDMA_AHB_START_ADDR(kRdmaChannel));
+  vpu_mmio_.Write32(
       static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset + kTableSize - 4),
       VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
 
   // Enable Auto mode: Non-Increment, VSync Interrupt Driven, Write
-  uint32_t regVal = vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO);
+  uint32_t regVal = vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO);
   regVal |= RDMA_ACCESS_AUTO_INT_EN(kRdmaChannel);  // VSYNC interrupt source
   regVal |= RDMA_ACCESS_AUTO_WRITE(kRdmaChannel);   // Write
-  vpu_mmio_->Write32(regVal, VPU_RDMA_ACCESS_AUTO);
+  vpu_mmio_.Write32(regVal, VPU_RDMA_ACCESS_AUTO);
   rdma_usage_table_[next_table_idx] = config_stamp.value();
   rdma_active_ = true;
   rdma_begin_count_.Add(1);
   if (use_afbc) {
     // Enable Auto mode: Non-Increment, VSync Interrupt Driven, Write
-    RdmaAccessAuto2Reg::Get().FromValue(0).set_chn7_auto_write(1).WriteTo(&(*vpu_mmio_));
-    RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(1).WriteTo(&(*vpu_mmio_));
+    RdmaAccessAuto2Reg::Get().FromValue(0).set_chn7_auto_write(1).WriteTo(&vpu_mmio_);
+    RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(1).WriteTo(&vpu_mmio_);
   } else {
     // Remove interrupt source
-    RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(0).WriteTo(&(*vpu_mmio_));
+    RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(0).WriteTo(&vpu_mmio_);
   }
 }
 
-zx_status_t RdmaEngine::SetupRdma(fdf::MmioBuffer* vpu_mmio) {
-  vpu_mmio_ = vpu_mmio;
+zx_status_t RdmaEngine::SetupRdma() {
   zx_status_t status = ZX_OK;
   zxlogf(INFO, "Setting up Display RDMA");
 
@@ -338,7 +345,7 @@ zx_status_t RdmaEngine::SetupRdma(fdf::MmioBuffer* vpu_mmio) {
   // Setup RDMA_CTRL:
   // Default: no reset, no clock gating, burst size 4x16B for read and write
   // DDR Read/Write request urgent
-  RdmaCtrlReg::Get().FromValue(0).set_write_urgent(1).set_read_urgent(1).WriteTo(vpu_mmio_);
+  RdmaCtrlReg::Get().FromValue(0).set_write_urgent(1).set_read_urgent(1).WriteTo(&vpu_mmio_);
 
   ResetRdmaTable();
 
@@ -359,9 +366,9 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
   }
   // Write the start and end address of the table.  End address is the last address that the
   // RDMA engine reads from.
-  vpu_mmio_->Write32(static_cast<uint32_t>(afbc_rdma_chnl_container_.phys_offset),
-                     VPU_RDMA_AHB_START_ADDR(kAfbcRdmaChannel));
-  vpu_mmio_->Write32(
+  vpu_mmio_.Write32(static_cast<uint32_t>(afbc_rdma_chnl_container_.phys_offset),
+                    VPU_RDMA_AHB_START_ADDR(kAfbcRdmaChannel));
+  vpu_mmio_.Write32(
       static_cast<uint32_t>(afbc_rdma_chnl_container_.phys_offset + kAfbcTableSize - 4),
       VPU_RDMA_AHB_END_ADDR(kAfbcRdmaChannel));
 }
@@ -373,31 +380,31 @@ void RdmaEngine::StopRdma() {
   fbl::AutoLock l(&rdma_lock_);
 
   // Grab a copy of active DMA channels before clearing it
-  const uint32_t aa = RdmaAccessAutoReg::Get().ReadFrom(vpu_mmio_).reg_value();
-  const uint32_t aa3 = RdmaAccessAuto3Reg::Get().ReadFrom(vpu_mmio_).reg_value();
+  const uint32_t aa = RdmaAccessAutoReg::Get().ReadFrom(&vpu_mmio_).reg_value();
+  const uint32_t aa3 = RdmaAccessAuto3Reg::Get().ReadFrom(&vpu_mmio_).reg_value();
 
   // Disable triggering for channels 0-2.
   RdmaAccessAutoReg::Get()
-      .ReadFrom(vpu_mmio_)
+      .ReadFrom(&vpu_mmio_)
       .set_chn1_intr(0)
       .set_chn2_intr(0)
       .set_chn3_intr(0)
-      .WriteTo(vpu_mmio_);
+      .WriteTo(&vpu_mmio_);
   // Also disable 7, the dedicated AFBC channel.
-  RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(0).WriteTo(vpu_mmio_);
+  RdmaAccessAuto3Reg::Get().FromValue(0).set_chn7_intr(0).WriteTo(&vpu_mmio_);
 
   // Wait for all active copies to complete
   constexpr size_t kMaxRdmaWaits = 5;
   uint32_t expected = RdmaStatusReg::DoneFromAccessAuto(aa, 0, aa3);
   for (size_t i = 0; i < kMaxRdmaWaits; i++) {
-    if (RdmaStatusReg::Get().ReadFrom(vpu_mmio_).done() == expected) {
+    if (RdmaStatusReg::Get().ReadFrom(&vpu_mmio_).done() == expected) {
       break;
     }
     zx::nanosleep(zx::deadline_after(zx::usec(5)));
   }
 
   // Clear interrupt status
-  RdmaCtrlReg::Get().ReadFrom(vpu_mmio_).set_clear_done(0xFF).WriteTo(vpu_mmio_);
+  RdmaCtrlReg::Get().ReadFrom(&vpu_mmio_).set_clear_done(0xFF).WriteTo(&vpu_mmio_);
   rdma_active_ = false;
   for (auto& i : rdma_usage_table_) {
     i = kRdmaTableReady;
@@ -411,33 +418,32 @@ void RdmaEngine::ResetConfigStamp(display::ConfigStamp config_stamp) {
 
 void RdmaEngine::DumpRdmaRegisters() {
   zxlogf(INFO, "Dumping all RDMA related Registers");
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_MAN = 0x%x",
-         vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_MAN));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_MAN = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_MAN));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_1 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_1));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_1 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_1));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_2 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_2));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_2 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_2));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_3 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_3));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_3 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_3));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_4 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_4));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_4 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_4));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_5 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_5));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_5 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_5));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_6 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_6));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_6 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_6));
-  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_7 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_START_ADDR_7));
-  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_7 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_AHB_END_ADDR_7));
-  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO = 0x%x", vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO));
-  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO2 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO2));
-  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO3 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_ACCESS_AUTO3));
-  zxlogf(INFO, "VPU_RDMA_ACCESS_MAN = 0x%x", vpu_mmio_->Read32(VPU_RDMA_ACCESS_MAN));
-  zxlogf(INFO, "VPU_RDMA_CTRL = 0x%x", vpu_mmio_->Read32(VPU_RDMA_CTRL));
-  zxlogf(INFO, "VPU_RDMA_STATUS = 0x%x", vpu_mmio_->Read32(VPU_RDMA_STATUS));
-  zxlogf(INFO, "VPU_RDMA_STATUS2 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_STATUS2));
-  zxlogf(INFO, "VPU_RDMA_STATUS3 = 0x%x", vpu_mmio_->Read32(VPU_RDMA_STATUS3));
-  zxlogf(INFO, "Scratch Reg High: 0x%x", vpu_mmio_->Read32(VPP_DUMMY_DATA1));
-  zxlogf(INFO, "Scratch Reg Low: 0x%x", vpu_mmio_->Read32(VPP_OSD_SC_DUMMY_DATA));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_MAN = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_MAN));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_MAN = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_MAN));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_1 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_1));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_1 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_1));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_2));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_2));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_3));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_3));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_4 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_4));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_4 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_4));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_5 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_5));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_5 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_5));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_6 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_6));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_6 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_6));
+  zxlogf(INFO, "VPU_RDMA_AHB_START_ADDR_7 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_7));
+  zxlogf(INFO, "VPU_RDMA_AHB_END_ADDR_7 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_7));
+  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO));
+  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO2));
+  zxlogf(INFO, "VPU_RDMA_ACCESS_AUTO3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO3));
+  zxlogf(INFO, "VPU_RDMA_ACCESS_MAN = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_MAN));
+  zxlogf(INFO, "VPU_RDMA_CTRL = 0x%x", vpu_mmio_.Read32(VPU_RDMA_CTRL));
+  zxlogf(INFO, "VPU_RDMA_STATUS = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS));
+  zxlogf(INFO, "VPU_RDMA_STATUS2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS2));
+  zxlogf(INFO, "VPU_RDMA_STATUS3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS3));
+  zxlogf(INFO, "Scratch Reg High: 0x%x", vpu_mmio_.Read32(VPP_DUMMY_DATA1));
+  zxlogf(INFO, "Scratch Reg Low: 0x%x", vpu_mmio_.Read32(VPP_OSD_SC_DUMMY_DATA));
 }
 
 void RdmaEngine::DumpRdmaState() {

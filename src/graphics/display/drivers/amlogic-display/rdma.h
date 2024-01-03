@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
@@ -155,10 +156,17 @@ class RdmaEngine {
  public:
   static zx::result<std::unique_ptr<RdmaEngine>> Create(ddk::PDevFidl* pdev,
                                                         inspect::Node* video_input_unit_node);
-  // This must be called before any other methods. Not included in the ctor
-  // because ddk::PDevFidl provides std::optional<fdf::MmioBuffer> which means that
-  // move semantics will invalidate pointers.
-  zx_status_t SetupRdma(fdf::MmioBuffer* vpu_mmio);
+
+  // Production code should prefer the `Create()` factory method.
+  //
+  // `vpu_mmio` is the region documented as "VPU" in Section 8.1 "Memory Map"
+  // of the AMLogic A311D datasheet. It must be valid.
+  //
+  // `node` must outlive the RdmaEngine.
+  RdmaEngine(fdf::MmioBuffer vpu_mmio, inspect::Node* node);
+
+  // This must be called before any other methods.
+  zx_status_t SetupRdma();
 
   // Drop all hardware resources prior to destruction.
   void Release();
@@ -193,10 +201,7 @@ class RdmaEngine {
   void DumpRdmaState() __TA_REQUIRES(rdma_lock_);
 
  private:
-  // All arguments must outlive the RdmaEngine.
-  explicit RdmaEngine(inspect::Node* node);
-
-  fdf::MmioBuffer* vpu_mmio_;
+  fdf::MmioBuffer vpu_mmio_;
   zx::bti bti_;
 
   // RDMA IRQ handle and thread used for diagnostic purposes.
