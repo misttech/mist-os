@@ -251,6 +251,7 @@ clang_toolchain_spec = {
     "cflags",
     "ldflags",
   ]
+  target_tuple = current_target_tuple
 }
 
 # Rust toolchain spec for use with toolchain_runtime_deps().
@@ -261,6 +262,13 @@ rustc_toolchain_spec = {
   version_string = rustc_version_string
   version_description = rustc_version_description
   flag_vars = [ "rustflags" ]
+
+  # TODO(http://fxbug.dev/310271984): Move to canonical triple.
+  target_tuple = current_target_tuple
+  if (target_tuple == "x86_64-unknown-fuchsia" ||
+      target_tuple == "aarch64-unknown-fuchsia") {
+    target_tuple = string_replace(target_tuple, "-unknown-fuchsia", "-fuchsia")
+  }
 }
 
 # Provide deps required by toolchain-provided runtime libraries.
@@ -331,18 +339,18 @@ template("toolchain_runtime_deps") {
           forward_variables_from(config, toolchain_spec.flag_vars)
         }
         if (config_flags == match_flags &&
-            config.target + [ current_target_tuple ] -
-            [ current_target_tuple ] != config.target) {
+            config.target + [ toolchain_spec.target_tuple ] -
+            [ toolchain_spec.target_tuple ] != config.target) {
           assert(
               match == false,
-              "${toolchain_spec.runtime_file} has multiple matches for" + " --target=${current_target_tuple}: matched $match_flags in both $match and $config;" + " from toolchain_runtime_deps($target_name) $invoker")
+              "${toolchain_spec.runtime_file} has multiple matches for" + " --target=${toolchain_spec.target_tuple}: matched $match_flags in both $match and $config;" + " from toolchain_runtime_deps($target_name) $invoker")
           match = config
         }
       }
 
       assert(match != false,
              "${toolchain_spec.runtime_file} has no match for" +
-                 " --target=${current_target_tuple} + $invoker")
+                 " --target=${toolchain_spec.target_tuple} + $invoker")
 
       metadata = {
         binaries = []
