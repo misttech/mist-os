@@ -7,11 +7,11 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{
     channel::oneshot, pin_mut, select, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
 };
-use parking_lot::Mutex;
 use std::{collections::BTreeMap, future::Future, sync::Arc};
 use tracing::{error, warn};
 

@@ -11,9 +11,9 @@ use {
         Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref,
         Route,
     },
+    fuchsia_sync::Mutex,
     futures::{channel::oneshot, prelude::*},
     mock_reboot::MockRebootService,
-    parking_lot::Mutex,
     std::sync::Arc,
 };
 
