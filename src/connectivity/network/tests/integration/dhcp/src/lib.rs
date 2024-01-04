@@ -9,6 +9,7 @@ use std::{cell::RefCell, collections::HashSet, time::Duration};
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_ext::{self as fnet_ext, FromExt as _, IntoExt as _};
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
@@ -283,6 +284,7 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
         fidl_ip_v4_with_prefix!("192.0.2.1/24");
     const DHCPV4_SERVER_PORT: u16 = 67;
     const DHCPV4_CLIENT_PORT: u16 = 68;
+    const SHORT_LEASE_LENGTH_SECS: u32 = 20;
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
@@ -311,7 +313,26 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
                     network: &network,
                 }],
                 settings: Settings {
-                    parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters(),
+                    parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG
+                        .dhcp_parameters()
+                        .into_iter()
+                        .chain(std::iter::once(fnet_dhcp::Parameter::Lease(
+                            fnet_dhcp::LeaseLength {
+                                // Specify a shorter lease length so that the
+                                // client attempts to renew the lease within the
+                                // test timeout.
+                                default: {
+                                    assert!(
+                                        zx::Duration::from_seconds(SHORT_LEASE_LENGTH_SECS.into())
+                                            < ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+                                    );
+                                    Some(SHORT_LEASE_LENGTH_SECS)
+                                },
+                                max: Some(SHORT_LEASE_LENGTH_SECS),
+                                ..Default::default()
+                            },
+                        )))
+                        .collect::<Vec<_>>(),
                     options: &mut [],
                 },
             }],
