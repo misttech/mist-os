@@ -557,7 +557,7 @@ zx_status_t sys_pci_cfg_pio_rw(zx_handle_t handle, uint8_t bus, uint8_t dev, uin
                                uint32_t write) {
 #if ARCH_X86
   uint32_t val_;
-  zx_status_t status = validate_resource(handle, ZX_RSRC_KIND_ROOT);
+  zx_status_t status = validate_resource(handle, ZX_RSRC_KIND_IOPORT);
   if (status != ZX_OK) {
     return status;
   }

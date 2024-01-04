@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/hardware/pciroot/c/banjo.h>
+#include <lib/pci/pio.h>
 #include <limits.h>
 
 #include <acpica/acpi.h>
-
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <lib/pci/pio.h>
 
 #include "zircon/system/ulib/acpica/osfuchsia.h"
 
@@ -82,7 +81,7 @@ static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Re
               : st = pci_pio_read32(addr, offset, reinterpret_cast<uint32_t*>(Value));
   }
 #else
-  st = zx_pci_cfg_pio_rw(root_resource_handle, bus, dev, func, offset,
+  st = zx_pci_cfg_pio_rw(ioport_resource_handle, bus, dev, func, offset,
                          reinterpret_cast<uint32_t*>(Value), static_cast<uint8_t>(Width), Write);
 
 #endif  // ENABLE_USER_PCI
