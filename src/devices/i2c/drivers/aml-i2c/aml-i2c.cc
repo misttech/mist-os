@@ -271,9 +271,13 @@ zx_status_t AmlI2c::StartIrqThread() {
   zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, kRoleName,
       [this](fdf_dispatcher_t*) {
-        if (completer_.has_value()) {
-          (*std::move(completer_))(zx::ok());
-        }
+        async::PostTask(driver_dispatcher()->async_dispatcher(), [this]() {
+          if (completer_.has_value()) {
+            (*std::move(completer_))(zx::ok());
+          } else {
+            FDF_LOG(ERROR, "Irq thread dispatcher prematurely shutdown.");
+          }
+        });
       },
       kRoleName);
   if (dispatcher.is_error()) {
@@ -445,8 +449,8 @@ void AmlI2c::PrepareStop(fdf::PrepareStopCompleter completer) {
     completer(zx::ok());
     return;
   }
-  irq_dispatcher_->ShutdownAsync();
   completer_.emplace(std::move(completer));
+  irq_dispatcher_->ShutdownAsync();
 }
 
 zx_status_t AmlI2c::ServeI2cImpl() {

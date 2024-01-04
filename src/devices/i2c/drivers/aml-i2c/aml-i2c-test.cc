@@ -213,8 +213,10 @@ class AmlI2cTest : public zxtest::Test {
   };
 
   void TearDown() override {
-    ASSERT_OK(runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlI2c>::PrepareStop)));
+    if (driver_started_) {
+      ASSERT_OK(runtime_.RunToCompletion(
+          dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlI2c>::PrepareStop)));
+    }
   }
 
   void InitDriver(std::optional<aml_i2c_delay_values> metadata = std::nullopt,
@@ -228,14 +230,15 @@ class AmlI2cTest : public zxtest::Test {
     // Start driver.
     auto result = runtime_.RunToCompletion(dut_.SyncCall(
         &fdf_testing::DriverUnderTest<AmlI2c>::Start, std::move(init_result.start_args)));
+    driver_started_ = false;
     if (start_should_succeed) {
       ASSERT_OK(result.status_value());
       dut_.SyncCall([](fdf_testing::DriverUnderTest<AmlI2c>* dut) {
         (*dut)->SetTimeout(zx::duration(ZX_TIME_INFINITE));
       });
+      ConnectToI2cImpl(init_result.outgoing_directory_client);
+      driver_started_ = true;
     }
-
-    ConnectToI2cImpl(init_result.outgoing_directory_client);
   }
 
   // `InitDriver` must be called before using this method.
@@ -296,6 +299,7 @@ class AmlI2cTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<aml_i2c::AmlI2c>> dut_{
       driver_dispatcher_->async_dispatcher(), std::in_place};
+  bool driver_started_ = false;
 };
 
 TEST_F(AmlI2cTest, SmallWrite) {
