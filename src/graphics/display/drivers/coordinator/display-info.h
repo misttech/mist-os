@@ -28,6 +28,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {
@@ -68,7 +69,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
   struct Edid {
     edid::Edid base;
-    fbl::Vector<edid::timing_params_t> timings;
+    fbl::Vector<display::DisplayTiming> timings;
     fbl::Vector<audio_types_audio_stream_format_range_t> audio;
   };
 

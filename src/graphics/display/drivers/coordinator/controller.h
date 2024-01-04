@@ -42,6 +42,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
@@ -77,7 +78,7 @@ class Controller : public DeviceType,
 
   ~Controller() override;
 
-  static void PopulateDisplayMode(const edid::timing_params_t& params, display_mode_t* mode);
+  static void PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode);
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -102,7 +103,7 @@ class Controller : public DeviceType,
   void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.
-  bool GetPanelConfig(DisplayId display_id, const fbl::Vector<edid::timing_params_t>** timings,
+  bool GetPanelConfig(DisplayId display_id, const fbl::Vector<display::DisplayTiming>** timings,
                       const display_params_t** params) __TA_REQUIRES(mtx());
 
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)

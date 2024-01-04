@@ -43,6 +43,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 
 namespace fidl_display = fuchsia_hardware_display;
@@ -63,23 +64,8 @@ constexpr zx::duration kVsyncMonitorInterval = kVsyncStallThreshold / 2;
 
 namespace display {
 
-void Controller::PopulateDisplayMode(const edid::timing_params_t& params, display_mode_t* mode) {
-  mode->pixel_clock_khz = params.pixel_freq_khz;
-  mode->h_addressable = params.horizontal_addressable;
-  mode->h_front_porch = params.horizontal_front_porch;
-  mode->h_sync_pulse = params.horizontal_sync_pulse;
-  mode->h_blanking = params.horizontal_blanking;
-  mode->v_addressable = params.vertical_addressable;
-  mode->v_front_porch = params.vertical_front_porch;
-  mode->v_sync_pulse = params.vertical_sync_pulse;
-  mode->v_blanking = params.vertical_blanking;
-  mode->flags = params.flags;
-
-  static_assert(MODE_FLAG_VSYNC_POSITIVE == edid::timing_params::kPositiveVsync, "");
-  static_assert(MODE_FLAG_HSYNC_POSITIVE == edid::timing_params::kPositiveHsync, "");
-  static_assert(MODE_FLAG_INTERLACED == edid::timing_params::kInterlaced, "");
-  static_assert(MODE_FLAG_ALTERNATING_VBLANK == edid::timing_params::kAlternatingVblank, "");
-  static_assert(MODE_FLAG_DOUBLE_CLOCKED == edid::timing_params::kDoubleClocked, "");
+void Controller::PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode) {
+  *mode = display::ToBanjoDisplayMode(timing);
 }
 
 void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
@@ -98,14 +84,17 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   test_config.layer_count = 1;
   test_config.layer_list = test_layers;
 
-  for (auto timing = edid::timing_iterator(&info->edid->base); timing.is_valid(); ++timing) {
-    uint32_t width = timing->horizontal_addressable;
-    uint32_t height = timing->vertical_addressable;
+  for (auto edid_timing = edid::timing_iterator(&info->edid->base); edid_timing.is_valid();
+       ++edid_timing) {
+    display::DisplayTiming timing = ToDisplayTiming(*edid_timing);
+    int32_t width = timing.horizontal_active_px;
+    int32_t height = timing.vertical_active_lines;
     bool duplicate = false;
-    for (auto& existing_timing : info->edid->timings) {
-      if (existing_timing.vertical_refresh_e2 == timing->vertical_refresh_e2 &&
-          existing_timing.horizontal_addressable == width &&
-          existing_timing.vertical_addressable == height) {
+    for (const display::DisplayTiming& existing_timing : info->edid->timings) {
+      if (existing_timing.vertical_field_refresh_rate_millihertz() ==
+              timing.vertical_field_refresh_rate_millihertz() &&
+          existing_timing.horizontal_active_px == width &&
+          existing_timing.vertical_active_lines == height) {
         duplicate = true;
         break;
       }
@@ -119,7 +108,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     test_layer.cfg.primary.src_frame.height = height;
     test_layer.cfg.primary.dest_frame.width = width;
     test_layer.cfg.primary.dest_frame.height = height;
-    PopulateDisplayMode(*timing, &test_config.mode);
+    test_config.mode = display::ToBanjoDisplayMode(timing);
 
     uint32_t display_cfg_result;
     client_composition_opcode_t layer_result = 0;
@@ -129,7 +118,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
                                                     &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
-      info->edid->timings.push_back(*timing, &ac);
+      info->edid->timings.push_back(timing, &ac);
       if (!ac.check()) {
         zxlogf(WARNING, "Edid skip allocation failed");
         break;
@@ -662,7 +651,7 @@ void Controller::OnClientDead(ClientProxy* client) {
 }
 
 bool Controller::GetPanelConfig(DisplayId display_id,
-                                const fbl::Vector<edid::timing_params_t>** timings,
+                                const fbl::Vector<display::DisplayTiming>** timings,
                                 const display_params_t** params) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {

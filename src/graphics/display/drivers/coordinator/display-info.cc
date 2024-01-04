@@ -15,6 +15,7 @@
 #include "src/devices/lib/audio/audio.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace display {
 
@@ -46,18 +47,20 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   }
 
   size_t i = 0;
-  for (const auto& t : edid->timings) {
+  for (const display::DisplayTiming& t : edid->timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
-    child.CreateDouble("vsync-hz", static_cast<double>(t.vertical_refresh_e2) / 100.0, &properties);
-    child.CreateUint("pixel-clock-khz", t.pixel_freq_khz, &properties);
-    child.CreateUint("horizontal-pixels", t.horizontal_addressable, &properties);
-    child.CreateUint("horizontal-blanking", t.horizontal_blanking, &properties);
-    child.CreateUint("horizontal-sync-offset", t.horizontal_front_porch, &properties);
-    child.CreateUint("horizontal-sync-pulse", t.horizontal_sync_pulse, &properties);
-    child.CreateUint("vertical-pixels", t.vertical_addressable, &properties);
-    child.CreateUint("vertical-blanking", t.vertical_blanking, &properties);
-    child.CreateUint("vertical-sync-offset", t.vertical_front_porch, &properties);
-    child.CreateUint("vertical-sync-pulse", t.vertical_sync_pulse, &properties);
+    child.CreateDouble("vsync-hz",
+                       static_cast<double>(t.vertical_field_refresh_rate_millihertz()) / 1000.0,
+                       &properties);
+    child.CreateInt("pixel-clock-khz", t.pixel_clock_frequency_khz, &properties);
+    child.CreateInt("horizontal-pixels", t.horizontal_active_px, &properties);
+    child.CreateInt("horizontal-blanking", t.horizontal_blank_px(), &properties);
+    child.CreateInt("horizontal-sync-offset", t.horizontal_front_porch_px, &properties);
+    child.CreateInt("horizontal-sync-pulse", t.horizontal_sync_width_px, &properties);
+    child.CreateInt("vertical-pixels", t.vertical_active_lines, &properties);
+    child.CreateInt("vertical-blanking", t.vertical_blank_lines(), &properties);
+    child.CreateInt("vertical-sync-offset", t.vertical_front_porch_lines, &properties);
+    child.CreateInt("vertical-sync-pulse", t.vertical_sync_width_lines, &properties);
     properties.emplace(std::move(child));
   }
 }

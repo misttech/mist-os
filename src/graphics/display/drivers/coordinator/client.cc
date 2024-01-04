@@ -50,6 +50,7 @@
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
@@ -345,15 +346,19 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   }
 
   fbl::AutoLock lock(controller_->mtx());
-  const fbl::Vector<edid::timing_params_t>* edid_timings;
+  const fbl::Vector<display::DisplayTiming>* edid_timings;
   const display_params_t* params;
   controller_->GetPanelConfig(display_id, &edid_timings, &params);
 
   if (edid_timings) {
-    for (auto timing : *edid_timings) {
-      if (timing.horizontal_addressable == request->mode.horizontal_resolution &&
-          timing.vertical_addressable == request->mode.vertical_resolution &&
-          timing.vertical_refresh_e2 == request->mode.refresh_rate_e2) {
+    for (const display::DisplayTiming& timing : *edid_timings) {
+      const int vertical_field_refresh_rate_centihertz =
+          (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
+      if (timing.horizontal_active_px ==
+              static_cast<int32_t>(request->mode.horizontal_resolution) &&
+          timing.vertical_active_lines == static_cast<int32_t>(request->mode.vertical_resolution) &&
+          vertical_field_refresh_rate_centihertz ==
+              static_cast<int32_t>(request->mode.refresh_rate_e2)) {
         Controller::PopulateDisplayMode(timing, &config->pending_.mode);
         pending_config_valid_ = false;
         config->display_config_change_ = true;
@@ -1154,7 +1159,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
     config->cursor_infos_ = std::move(get_cursor_infos_result.value());
 
-    const fbl::Vector<edid::timing_params_t>* edid_timings;
+    const fbl::Vector<display::DisplayTiming>* edid_timings;
     const display_params_t* params;
     if (!controller_->GetPanelConfig(config->id, &edid_timings, &params)) {
       // This can only happen if the display was already disconnected.
@@ -1201,17 +1206,18 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fhd::wire::Info info;
     info.id = ToFidlDisplayId(config->id);
 
-    const fbl::Vector<edid::timing_params>* edid_timings;
+    const fbl::Vector<display::DisplayTiming>* edid_timings;
     const display_params_t* params;
     controller_->GetPanelConfig(config->id, &edid_timings, &params);
     std::vector<fhd::wire::Mode> modes;
     if (edid_timings) {
       modes.reserve(edid_timings->size());
-      for (auto timing : *edid_timings) {
+      for (const display::DisplayTiming& timing : *edid_timings) {
         modes.emplace_back(fhd::wire::Mode{
-            .horizontal_resolution = timing.horizontal_addressable,
-            .vertical_resolution = timing.vertical_addressable,
-            .refresh_rate_e2 = timing.vertical_refresh_e2,
+            .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
+            .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
+            .refresh_rate_e2 =
+                static_cast<uint32_t>((timing.vertical_field_refresh_rate_millihertz() + 5) / 10),
         });
       }
     } else {
