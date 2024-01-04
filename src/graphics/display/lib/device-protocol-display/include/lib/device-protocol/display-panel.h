@@ -14,7 +14,7 @@
 #define PANEL_G101B158_FT UINT8_C(0x03)
 // 0x04 was for PANEL_ILI9881C
 // 0x05 was for PANEL_ST7701S
-#define PANEL_TV080WXM_FT UINT8_C(0x06)
+// 0x06 was for PANEL_TV080WXM_FT
 #define PANEL_TV101WXM_FT_9365 UINT8_C(0x07)
 #define PANEL_TV070WSM_FT_9365 UINT8_C(0x08)
 #define PANEL_KD070D82_FT UINT8_C(0x09)
@@ -90,22 +90,6 @@ const display_setting_t kDisplaySettingTV101WXM_FT = {
     .hsync_pol = 0,
     .vsync_width = 4,
     .vsync_bp = 20,
-    .vsync_pol = 0,
-};
-const display_setting_t kDisplaySettingTV080WXM_FT = {
-    .lane_num = 4,
-    .bit_rate_max = 498,
-    .clock_factor = 6,
-    .lcd_clock = 77967360,
-    .h_active = 800,
-    .v_active = 1280,
-    .h_period = 864,
-    .v_period = 1504,
-    .hsync_width = 14,
-    .hsync_bp = 25,
-    .hsync_pol = 0,
-    .vsync_width = 8,
-    .vsync_bp = 32,
     .vsync_pol = 0,
 };
 const display_setting_t kDisplaySettingKD070D82_FT = {

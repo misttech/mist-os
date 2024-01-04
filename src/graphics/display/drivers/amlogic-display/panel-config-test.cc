@@ -38,12 +38,6 @@ TEST(PanelConfig, G101b158Ft) {
   EXPECT_STREQ(config_g101b158_ft->name, "G101B158_FT");
 }
 
-TEST(PanelConfig, Tv080wxmFt) {
-  const PanelConfig* config_tv080wxm_ft = GetPanelConfig(PANEL_TV080WXM_FT);
-  ASSERT_NE(config_tv080wxm_ft, nullptr);
-  EXPECT_STREQ(config_tv080wxm_ft->name, "TV080WXM_FT");
-}
-
 TEST(PanelConfig, Tv101wxmFt9365) {
   const PanelConfig* config_tv101wxm_ft_9365 = GetPanelConfig(PANEL_TV101WXM_FT_9365);
   ASSERT_NE(config_tv101wxm_ft_9365, nullptr);
@@ -80,12 +74,15 @@ TEST(PanelConfig, Mtf050fhdi03) {
   EXPECT_STREQ(config_mtf050fhdi_03->name, "MTF050FHDI_03");
 }
 
-TEST(PanelConfig, Ins) {
+TEST(PanelConfig, InvalidPanels) {
   const PanelConfig* config_0x04 = GetPanelConfig(0x04);
   EXPECT_EQ(config_0x04, nullptr);
 
   const PanelConfig* config_0x05 = GetPanelConfig(0x05);
   EXPECT_EQ(config_0x05, nullptr);
+
+  const PanelConfig* config_0x06 = GetPanelConfig(0x06);
+  EXPECT_EQ(config_0x06, nullptr);
 
   const PanelConfig* config_overly_large = GetPanelConfig(0x0d);
   EXPECT_EQ(config_overly_large, nullptr);

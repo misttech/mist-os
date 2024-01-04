@@ -1291,10 +1291,6 @@ constexpr uint8_t lcd_init_sequence_TV101WXM_FT[] = {
     0xff, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_TV080WXM_FT[] = {
-    0xff, 120, 0xfe, 1, 0x11, 0xff, 120, 0xfe, 1, 0x29,
-};
-
 constexpr uint8_t lcd_init_sequence_TV101WXM_FT_9365[] = {
     0xff, 120,
 

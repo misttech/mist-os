@@ -51,8 +51,6 @@ zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
       return zx::ok(kDisplaySettingTV101WXM_FT);
     case PANEL_G101B158_FT:
       return zx::ok(kDisplaySettingG101B158_FT);
-    case PANEL_TV080WXM_FT:
-      return zx::ok(kDisplaySettingTV080WXM_FT);
     case PANEL_TV070WSM_ST7703I:
       return zx::ok(kDisplaySettingTV070WSM_ST7703I);
     case PANEL_MTF050FHDI_03:
