@@ -88,11 +88,13 @@ impl RamdiskClientBuilder {
             RamdiskSource::Vmo { vmo } => ramdisk_controller
                 .create_from_vmo_with_params(vmo, block_size, type_guid.as_ref())
                 .await?
-                .map_err(zx::Status::from_raw)?,
+                .map_err(zx::Status::from_raw)
+                .context("creating ramdisk from vmo")?,
             RamdiskSource::Size { block_count } => ramdisk_controller
                 .create(block_size, block_count, type_guid.as_ref())
                 .await?
-                .map_err(zx::Status::from_raw)?,
+                .map_err(zx::Status::from_raw)
+                .with_context(|| format!("creating ramdisk with {} blocks", block_count))?,
         };
         let name = name.ok_or_else(|| anyhow!("Failed to get instance name"))?;
         RamdiskClient::new(dev_root, &name).await
@@ -130,7 +132,10 @@ impl RamdiskClient {
         let block_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
             &block_dir,
             "device_controller",
-        )?;
+        )
+        .with_context(|| {
+            format!("opening block controller at {}/device_controller", &block_path)
+        })?;
 
         Ok(RamdiskClient {
             block_dir: Some(block_dir),
