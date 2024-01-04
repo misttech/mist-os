@@ -4,8 +4,8 @@
 
 use crate::datatypes::{HttpsSample, Phase};
 use crate::diagnostics::{Diagnostics, Event};
+use fuchsia_sync::Mutex;
 use httpdate_hyper::HttpsDateErrorType;
-use parking_lot::Mutex;
 
 /// A fake `Diagnostics` implementation useful for verifying unittests.
 pub struct FakeDiagnostics {

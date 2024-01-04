@@ -333,8 +333,8 @@ impl PullSource for PullSourceImpl {
 
 #[cfg(test)]
 use {
+    fuchsia_sync::Mutex,
     futures::{stream, StreamExt},
-    parking_lot::Mutex,
 };
 
 /// A time source that immediately produces a collections of events supplied at construction.

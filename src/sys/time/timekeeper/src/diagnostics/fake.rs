@@ -4,8 +4,8 @@
 
 use {
     crate::diagnostics::{Diagnostics, Event, ANY_DURATION, ANY_TIME},
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
-    parking_lot::Mutex,
 };
 
 /// A fake `Diagnostics` implementation useful for verifying unittest.

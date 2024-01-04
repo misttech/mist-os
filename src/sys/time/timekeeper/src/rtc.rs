@@ -18,7 +18,7 @@ use {
     tracing::error,
 };
 #[cfg(test)]
-use {parking_lot::Mutex, std::sync::Arc};
+use {fuchsia_sync::Mutex, std::sync::Arc};
 
 lazy_static! {
     /// The absolute path at which RTC devices are exposed.

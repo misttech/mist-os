@@ -4,7 +4,7 @@
 
 use anyhow::Context;
 use fidl_test_time_realm;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use {
     chrono::{Datelike, TimeZone, Timelike},
     fidl::endpoints::ServerEnd,

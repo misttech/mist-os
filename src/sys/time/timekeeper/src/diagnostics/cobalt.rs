@@ -22,9 +22,9 @@ use {
     fuchsia_async as fasync,
     fuchsia_cobalt_builders::MetricEventExt,
     fuchsia_component::client::connect_to_protocol,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{future, FutureExt as _},
-    parking_lot::Mutex,
     std::sync::Arc,
     time_metrics_registry::{
         RealTimeClockEventsMigratedMetricDimensionEventType as RtcEvent,

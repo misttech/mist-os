@@ -19,9 +19,9 @@ use {
     },
     fuchsia_cobalt_builders::MetricEventExt,
     fuchsia_component::client::connect_to_protocol,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{future, Future, FutureExt as _},
-    parking_lot::Mutex,
     time_metrics_registry::{
         HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase,
         HTTPSDATE_BOUND_SIZE_MIGRATED_METRIC_ID, HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_FLOOR,

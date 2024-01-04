@@ -9,9 +9,9 @@ use fuchsia_inspect::{
     ArrayProperty, IntArrayProperty, IntProperty, Node, NumericProperty, Property, StringProperty,
     UintProperty,
 };
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use httpdate_hyper::HttpsDateErrorType;
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use tracing::error;
 

@@ -16,11 +16,11 @@ use {
     fuchsia_inspect::{
         Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
     },
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::FutureExt,
     inspect_writable::{InspectWritable, InspectWritableNode},
     lazy_static::lazy_static,
-    parking_lot::Mutex,
     std::{collections::HashMap, sync::Arc},
     tracing::warn,
 };
