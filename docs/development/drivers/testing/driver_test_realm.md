@@ -163,7 +163,7 @@ drivers visible to DriverTestRealm.
 
 Here's what the test setup would look like. Notice that you have to call
 `fuchsia.driver.test/Realm:Start` before your test framework is run. The
-arguments to `Start` can be setup to configure the DriverManger implementation.
+arguments to `Start` can be setup to configure the DriverManager implementation.
 
 * {C++}
 

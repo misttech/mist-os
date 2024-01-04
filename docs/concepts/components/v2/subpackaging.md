@@ -36,7 +36,7 @@ data as standard [directory capabilities], the components use
 [capability routing] to restrict access to specific package subdirectories,
 thereby upholding the Principle of Least Privilege.
 
-### Package dependendencies mirror Component dependencies
+### Package dependencies mirror Component dependencies
 
 A Fuchsia system is defined by a hierarchy of components. Starting with the
 first component (the root of the hierarchy), components add capabilities to the

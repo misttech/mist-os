@@ -234,7 +234,7 @@ or `ProcessStopper`, the unqualified verb phrase should be used, i.e.
 `JobCreator.Create` or `ProcessStopper.Stop`.
 
 Protocols that are single method but intend to evolve to multi-method overtime
-do not necessarily need to follow this naming convention, i.e if there is a
+do not necessarily need to follow this naming convention, i.e. if there is a
 known extension of the protocol for which the recommended naming is not
 appropriate, then choosing another name early on might be preferred. When in
 doubt, following the default advice should be preferred.

@@ -102,7 +102,7 @@ In VS Code, do the following:
 
 1. Click the **fuchsia-emulator** icon at the bottom of VS Code.
 
-   ![Connected](/docs/get-started/sdk/images/get-started-vscode-connected-to-fuchsia-emulator.png "The fuchsia-emualtor icon at the bottom of VS Code"){: .screenshot}
+   ![Connected](/docs/get-started/sdk/images/get-started-vscode-connected-to-fuchsia-emulator.png "The fuchsia-emulator icon at the bottom of VS Code"){: .screenshot}
 
    This opens the Command Palette at the top of VS Code.
 

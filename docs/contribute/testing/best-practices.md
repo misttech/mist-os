@@ -192,7 +192,7 @@ Further reading:
 - [Just Say No to More End-to-End Tests](https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html){:.external}
 - [Test Flakiness - One of the main challenges of automated testing](https://testing.googleblog.com/2020/12/test-flakiness-one-of-main-challenges.html){:.external}
 - [Test Flakiness - One of the main challenges of automated testing (Part II)](https://testing.googleblog.com/2021/03/test-flakiness-one-of-main-challenges.html){:.external}
-- [Avoiding Flakey Tests](https://testing.googleblog.com/2008/04/tott-avoiding-flakey-tests.html){:.external}
+- [Avoiding Flaky Tests](https://testing.googleblog.com/2008/04/tott-avoiding-flaky-tests.html){:.external}
 - [Where do our flaky tests come from?](https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html){:.external}
 
 [test-scope]: /docs/contribute/testing/scope.md

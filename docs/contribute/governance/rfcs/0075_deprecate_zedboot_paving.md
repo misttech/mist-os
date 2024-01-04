@@ -77,7 +77,7 @@ Some of the issues with Zedboot based provisioning are as follows:
 
 Simplifying the provisioning process around 'fastboot' has advantages to the
 developer workflow, consolidates provisioning across all Fuchsia devices, and
-unblocks changes in low-level areas of the platform such as the the storage
+unblocks changes in low-level areas of the platform such as the storage
 layer.
 
 ## Background

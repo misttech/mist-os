@@ -301,7 +301,7 @@ the SDK and IDK:
 
 1. FIDL libraries - You are required to add any FIDL libraries you are dependent
    on to the SDK when you add a subtool to the SDK. (For details, see
-   [Promoting an API to partner_internal][prmoting-an-api-to-partner-internal].)
+   [Promoting an API to partner_internal][promoting-an-api-to-partner-internal].)
 
 2. Golden files - Used to check compatibility of command line arguments.
 
@@ -346,5 +346,5 @@ the SDK and IDK. This documentation will be updated once design criteria gets pu
 <!-- Reference links -->
 
 [ffx-target-update]: /src/developer/ffx/plugins/target/update/src/lib.rs
-[prmoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
+[promoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
 [sdk-gn-file]: /sdk/BUILD.gn

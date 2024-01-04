@@ -183,7 +183,7 @@ errors during development.
 
 #### Mark excessive unhandled interrupts as spurious and disable the interrupt
 
-Similiar to Linux, we could simply set a threshold for sequential spurious
+Similar to Linux, we could simply set a threshold for sequential spurious
 interrupts and if reached we could disable or ignore that interrupt line
 until a reboot. One major problem with this approach is that when Linux
 handles a shared interrupt it calls the handler chain via the hard IRQ

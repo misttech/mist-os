@@ -253,7 +253,7 @@ public:
     explicit UsbXhci(zx_device_t* parent)
         : UsbXhciType(parent), pci_(parent), pdev_(parent) {}
 ...
-prviate:
+private:
     ddk::PciProtocolClient pci_;
 ...
 };

@@ -122,7 +122,7 @@ object it controls:
 *  [Create a child node](#node_creation) with specific node properties and
    capabilities.
 *  [Drop the node](#node_removal), which causes the driver manager to clean up
-   the node and its descendents in the node topology.
+   the node and its descendants in the node topology.
 
 ### Node creation
 

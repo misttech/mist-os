@@ -286,7 +286,7 @@ quarters.
 ## Prior art and references
 
 - [Stash source code][src_stash_dir]
-- [`data` storage cabability][docs_data]
+- [`data` storage capability][docs_data]
 
 [bug_stash_isolation]: https://fxbug.dev/47602
 [bug_scenic]: https://fxbug.dev/91585

@@ -34,7 +34,7 @@ and syntactic sugar to improve the ergonomics of writing documentation.
 
 Arbitrary attributes are an already supported component of the FIDL language.
 Standardizing on the `Doc` attribute is for the tooling that generates the
-formated documentation. Using an attribute as the basis of the documentation
+formatted documentation. Using an attribute as the basis of the documentation
 tooling also allows for additional options to be added to the formatted output
 without breaking changes.
 

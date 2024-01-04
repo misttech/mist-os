@@ -199,7 +199,7 @@ number of libraries with less specific names.
 
 To expand on the second goal of grouping of FIDL declarations into FIDL
 libraries, we expect to evolve FIDL to provide visibility rules altering whether
-elements may be used by importing libraries ("child libraries"), e.g `public` or
+elements may be used by importing libraries ("child libraries"), e.g. `public` or
 `private` modifiers.
 
 The `internal` library component name is intended to be treated specially, and

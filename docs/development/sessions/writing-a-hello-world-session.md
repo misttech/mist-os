@@ -84,13 +84,13 @@ There are similar macros for `error` and `warn`.
 ## Writing the `BUILD.gn` {#writing-the-build-gn}
 
 The last file to modify is the `BUILD.gn`. This tells the compiler how to build
-the the session component.
+the session component.
 
 ### Rust binary {#rust-binary}
 
 The next section describes the actual Rust binary. It tells the compiler what
 the name of the binary should be, that it includes unit tests, what dependencies
-it has, and where it's source is located. For this example, the default set of
+it has, and where its source is located. For this example, the default set of
 dependencies are sufficient:
 
 ```gn

@@ -148,7 +148,7 @@ pointers of the thread.
 0x1605a5d1480 0x0000000000000000 ◁ rdx, r14
 ```
 
-In the notes colum, left-pointing arrows indicate which registers point to that stack location,
+In the notes column, left-pointing arrows indicate which registers point to that stack location,
 while right-pointing arrows indicate where the value of the stack entry points to if it is
 interpreted as an address.
 

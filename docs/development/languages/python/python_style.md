@@ -16,7 +16,7 @@ below for details.
 Scripts invoked by the build (GN or Ninja) are executed with Python 3.8.
 
 The build system ensures that all python scripts are executed by the
-interpreter that is intalled as part of a Fuchsia source checkout.
+interpreter that is installed as part of a Fuchsia source checkout.
 
 ### Other scripts
 

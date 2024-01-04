@@ -239,7 +239,7 @@ prevent timing attacks but it can limit their effectiveness.
 
 Another defense is to limit `zx_info_task_runtime_t` access to special developer
 builds. However, this would significantly limit the usefulness of this feature:
-often we have trouble reproducing performance bugs in developement environments.
+often we have trouble reproducing performance bugs in development environments.
 We require a solution that can be enabled in production builds.
 
 To avoid this side channel entirely, we'd need to separate metric _reporting_

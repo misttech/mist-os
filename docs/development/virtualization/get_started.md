@@ -24,7 +24,7 @@ While arbitrary Linux guests may run on Fuchsia, the following guest
 configurations are tested in CI on Fuchsia:
 
 * Zircon Guest - A minimal fuchsia system that boots to a zircon virtcon.
-* Debian Guest - An Debian bullseye guest.
+* Debian Guest - A Debian bullseye guest.
 * Termina Guest - A linux guest that contains additional features for Vulkan and
   window manager integration, based on the [Termina VM][ref.termina]{:.external}
   from ChromeOS.

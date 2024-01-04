@@ -233,7 +233,7 @@ that assumption in mind, state it in a comment in the `Cargo.toml`.
 
 Some crates are not safe to use in every possible context, such as on particular
 platforms. If there are any contexts where the crate is not safe to use, then we
-must modify the build to prevent the crate from being used in in them.
+must modify the build to prevent the crate from being used in them.
 Otherwise, the crate cannot be imported.
 
 ##### What would happen if the maintainer abandons the crate?

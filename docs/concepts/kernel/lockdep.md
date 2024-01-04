@@ -361,7 +361,7 @@ The lock validator detects and reports two broad classes of violations:
 When a violation is detected at the point of lock acquisition the validator
 produces a message like the following in the kernel log:
 
-{# Disable variable substition to avoid {{ being interpreted by the template engine #}
+{# Disable variable substitution to avoid {{ being interpreted by the template engine #}
 {% verbatim %}
 
 ```
@@ -382,7 +382,7 @@ produces a message like the following in the kernel log:
 [00002.668] 01032:01039> {{{bt:4:0xffffffff100edae0}}}
 ```
 
-{# Re-enable variable substition #}
+{# Re-enable variable substitution #}
 {% endverbatim %}
 
 The error is informational and non-fatal. The first line identifies the thread

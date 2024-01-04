@@ -112,11 +112,11 @@ of bits.
 
 It is RECOMMENDED to support the following operators over generated values:
 
-* bitwise and, i.e `&`
-* bitwise or, i.e `|`
-* bitwise exclusive-or, i.e `^`
-* bitwise not, i.e `~`
-* bitwise difference, i.e all the bits present in one operand, except the bits
+* bitwise and, i.e. `&`
+* bitwise or, i.e. `|`
+* bitwise exclusive-or, i.e. `^`
+* bitwise not, i.e. `~`
+* bitwise difference, i.e. all the bits present in one operand, except the bits
   present in the other operand. This is usually represented by the `-` operator.
 
 An invariant of FIDL bitwise operations is that they should not introduce
@@ -153,8 +153,8 @@ value1 = value1 & ~value2
 Bindings SHOULD NOT support other operators which could result in invalid
 bits value (or risk a non-obvious translation of their meaning), e.g.:
 
-* bitwise shifts, i.e `<<` or `>>`
-* bitwise unsigned shift, i.e `>>>`
+* bitwise shifts, i.e. `<<` or `>>`
+* bitwise unsigned shift, i.e. `>>>`
 
 For cases where the generated code includes a type wrapping the underlying
 numeric bits value, it SHOULD be possible to convert between the raw value and
@@ -287,7 +287,7 @@ operations:
 
 Bindings MAY provide constructors for tables that only require specifying values
 for fields that have a value. For example, in Rust this can be accomplished
-using the `::EMTPY` constant along with struct update syntax. Supporting
+using the `::EMPTY` constant along with struct update syntax. Supporting
 construction this ways allows users to write code that is robust against
 addition of new fields to the table.
 

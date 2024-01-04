@@ -477,7 +477,7 @@ The following example shows how tables are laid out according to their fields.
 *   Each element is associated with a user specified ordinal.
 *   Ordinals are sequential. Unlike tables, gaps in ordinals do not incur a wire
     format space cost.
-*   Absent optional unions are represented with a `0` ordinal, and an zero envelope.
+*   Absent optional unions are represented with a `0` ordinal, and a zero envelope.
 *   Empty unions are not allowed.
 
 unions are denoted by their declared name (e.g. `Value`) and optionality:

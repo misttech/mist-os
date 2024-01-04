@@ -92,7 +92,7 @@ are some potential use cases to help illustrate how this may be used:
 * _System assembly_ is the process of composing a Fuchsia [system image] from a
   set of packages and other compiled artifacts. The system image can then be
   used to deliver Fuchsia through a different means (OTA, flashing, paving,
-  etc). The package ABI revision can be used by the the assembler to reject
+  etc). The package ABI revision can be used by the assembler to reject
   integrating a package if the system does not support the required package ABI.
 * Similarly, petals or application developers can use the package ABI revision
   to understand if all of their components in a complex tree can run on their
@@ -338,7 +338,7 @@ The meta.far could directly embed the ABI revision, by either:
       index would require a breaking change to the FAR format. In order to make
       this change, we would have to first implement support for reading the new
       FAR format without using it, then create a stepping stone release, and
-      finally then migrate to the the format.
+      finally then migrate to the format.
     * It would be more difficult for consumers to read the ABI revision. The
       package resolver does not directly expose the meta.far to users as a file,
       so it would need to add an API to expose this information.

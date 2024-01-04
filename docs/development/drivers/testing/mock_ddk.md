@@ -237,7 +237,7 @@ parent->SetMetadata(kFakeMetadataType, kSource, sizeof(kSource));
 
 ### Load Firmware
 
-Load firmware is an deprecated function, but is included for
+Load firmware is a deprecated function, but is included for
 the drivers that still need it:
 
 ```c++

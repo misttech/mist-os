@@ -205,7 +205,7 @@ RFC, for instance by allowing optional primitives natively through boxing.
 
 Note: From the FIDL language perspective, i.e. the FIDL language specification,
 a `string` can be viewed purely as a new type of a bytes vector, along with the
-UTF-8 well formedness constraint, i.e loosely `vector<uint8>:UTF-8`. We expect
+UTF-8 well formedness constraint, i.e. loosely `vector<uint8>:UTF-8`. We expect
 bindings to understand this special named type, and to map it to an ergonomic
 version in the target language, e.g. `std::string` in C++ bindings, `string` in
 Go, or `char*` in low level C-family bindings. This is not dissimilar to mapping
@@ -660,7 +660,7 @@ the initially proposed syntax in [RFC-0052][rfc-0052].
 ### Optionality
 
 Certain types are inherently capable of being optional: `vectors`, `strings`,
-`envelopes`, and layouts using such constructs i.e `table` which is a vector (of
+`envelopes`, and layouts using such constructs i.e. `table` which is a vector (of
 envelopes) and a `union` which is a tag plus an envelope. As a result, whether
 these types are optional or not is a constraint, and can be evolved into
 (becoming nullable, by relaxing the constraint), or evolved out of (becoming
@@ -1198,7 +1198,7 @@ enum, it could be replaced later by another 'better' general purpose
 
 [envelopes]: /docs/contribute/governance/rfcs/0047_tables.md#envelopes
 [rfc-0028]: /docs/contribute/governance/rfcs/0028_handle_rights.md
-[rfc-0038]: /docs/contribute/governance/rfcs/0038_seperating_layout_from_constraints.md
+[rfc-0038]: /docs/contribute/governance/rfcs/0038_separating_layout_from_constraints.md
 [rfc-0039]: /docs/contribute/governance/rfcs/0039_types_come_second.md
 [rfc-0044]: /docs/contribute/governance/rfcs/0044_extensible_method_arguments.md
 [rfc-0052]: /docs/contribute/governance/rfcs/0052_type_aliasing_named_types.md

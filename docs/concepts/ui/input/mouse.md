@@ -40,7 +40,7 @@ report to the host, such as motion, button press, or scrolling.
 
 On the host side, Fuchsia's input driver stack reads the mouse's HID reports and
 translates them into a FIDL
-[`MouseInputReport`](https://fuchsia/dev/reference/fidl/fuchsia.input.report#MouseInputReport).
+[`MouseInputReport`](/reference/fidl/fuchsia.input.report#MouseInputReport).
 This translation improves ergonomics for the upper layers of the Fuchsia
 platform: the components in the upper layers can process events in FIDL, instead
 of HID-specific data formats.
@@ -61,7 +61,7 @@ implementing policy decisions.
 
 Physical mouse motion is typically interpreted as cursor motion, and this motion
 data is sent to the Scenic component via a sensitive
-[pointer injector](https://fuchsia/dev/reference/fidl/fuchsia.ui.pointerinjector#Device) API.
+[pointer injector](/reference/fidl/fuchsia.ui.pointerinjector#Device) API.
 Button events and scroll wheel events also travel on the same injector channel.
 
 The Input Pipeline implements the following centralized policy decisions:
@@ -89,7 +89,7 @@ the view tree to determine which UI client should receive mouse events.
 
 When a mouse target is identified, Scenic dispatches mouse events to that UI
 client over the
-[`MouseSource`](https://fuchsia/dev/reference/fidl/fuchsia.ui.pointer#MouseSource) API. UI
+[`MouseSource`](/reference/fidl/fuchsia.ui.pointer#MouseSource) API. UI
 clients listen for mouse events with a
 [hanging-get](/docs/development/api/fidl.md#hanging-get) FIDL pattern.
 

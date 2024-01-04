@@ -35,7 +35,7 @@ data structure that describes why the kernel woke up the thread.
 
 Typically, each thread has a single port object in which it sleeps, which a
 significant amount of code written in your language will need to interact with.
-Rather than expose the port directly, language mantainers usually provide
+Rather than expose the port directly, language maintainers usually provide
 a library that abstracts over a port and provides asynchronous wait operations.
 
 Most asynchronous wait operations bottom out in

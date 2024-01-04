@@ -89,7 +89,7 @@ Please also see [this guide][run_fuchsia_tests] about running Fuchsia tests.
 This is a sign that your CL is breaking a part of the platform surface area.
 Please verify that there are no projects in downstream repositories that rely
 on the APIs and ABIs modified by your CL. If so, you will need to make a
-soft transition. The general worklow is as follows:
+soft transition. The general workflow is as follows:
 
 1. Submit a CL that introduces the new behavior in your change and verify that
    the tip-of-tree version of the CTF test passes.

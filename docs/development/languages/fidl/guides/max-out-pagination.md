@@ -151,9 +151,9 @@ Packing][lostart].
 
 Now that you have sized all the pieces of a command, you add the total size:
 
-* Header of `fuchsia.ui.scenic.Command`: 24 bytes, i.e `sizeof(fidl_xunion_t)`
+* Header of `fuchsia.ui.scenic.Command`: 24 bytes, i.e. `sizeof(fidl_xunion_t)`
 * Content with variant `input`:
-  * Header of `fuchsia.ui.input.Command`: 24 bytes, i.e `sizeof(fidl_xunion_t)`
+  * Header of `fuchsia.ui.input.Command`: 24 bytes, i.e. `sizeof(fidl_xunion_t)`
   * Content with variant `set_hard_keyboard_delivery`:
     * Struct `SendPointerInputCmd`: 52 bytes
     * Padding to align to 8 bytes: 4 bytes

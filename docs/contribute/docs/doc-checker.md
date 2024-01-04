@@ -130,7 +130,7 @@ These checks enforce the table of contents structure described in
   * `section: <toc entry>` - _(optional)_ Indented toc entry defining a
    collapsible section, usually defined via `include` another _toc.yaml file.
   * `skip_translation: true` - _(optional)_ Prevents human and machine
-   translation of all link titles in this entry and any descendents.
+   translation of all link titles in this entry and any descendants.
   * `status: <string>` - _(optional)_  Used with `heading` or `title` and
    cannot be used with `break` or `include`. Applies a predefined status. The
    status must be one of:

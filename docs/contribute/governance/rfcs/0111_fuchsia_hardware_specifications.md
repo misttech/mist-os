@@ -21,7 +21,7 @@ categorized as either **Supported** or **Experimental** hardware. Within the
 Supported hardware and Experimental hardware categories, there are
 Required and Recommended specifications.
 
-Note: This RFC establishes the _current_ and _intial_ set of technical
+Note: This RFC establishes the _current_ and _initial_ set of technical
 specifications for a given hardware platform to be compatible with Fuchsia.
 Hardware categories as well as their respective Recommended and Required
 specifications are subject to change and could be modified as the Fuchsia
@@ -175,7 +175,7 @@ The following are the base hardware specifications for Fuchsia.
 Base specifications are further divided into two categories: Required and
 Recommended.
 
-Note: This section of the RFC establishes the _current_ and _intial_ set of
+Note: This section of the RFC establishes the _current_ and _initial_ set of
 technical specifications for Base hardware. The Base hardware category as well
 as its related Recommended and Required specifications are subject to change and could be modified
 as the Fuchsia project progresses.
@@ -453,7 +453,7 @@ Supported hardware, see [Specification Summary](#hardware-platform-summary).
 Supported hardware specifications are further divided into two
 categories: Required and Recommended.
 
-Note: This section of the RFC establishes the _current_ and _intial_ set of
+Note: This section of the RFC establishes the _current_ and _initial_ set of
 technical specifications for Supported hardware. The Supported hardware
 category as well as its related Recommended and Required specifications are
 subject to change and could be modified as the Fuchsia project progresses.

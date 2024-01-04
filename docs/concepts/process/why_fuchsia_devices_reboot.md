@@ -138,7 +138,7 @@ and the crash server.
 Reboots that at are the result of an error in a specific component have crash
 signatures that attribute that component as the cause of the reboot. They follow
 a general pattern of combining the reboot reason and the component deemed
-responsible for the reboot, a.k.a the culprit.
+responsible for the reboot, a.k.a. the culprit.
 
 Reboot reason                | **FIDL**                     | **Cobalt event**           | **Crash signature**
 :--------------------------- | :--------------------------- | :------------------------- | :------------------

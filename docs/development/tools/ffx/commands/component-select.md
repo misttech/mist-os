@@ -9,7 +9,7 @@ component topology.
 
 In the special case of a query that uniquely matches a single service, RCS can
 connect to that service and pass a handle to it to the host for FFX to use.
-This is how the the [plugin system][ffx-plugins] is able to create FIDL
+This is how the [plugin system][ffx-plugins] is able to create FIDL
 proxies using the component selector mapping.
 
 To query for services on a target, write a [selector][fidl-selector] to

@@ -497,10 +497,10 @@
   reviewed: '2019-03-14'
 
 - name: 'RFC-0038'
-  title: 'Seperating layout from constraints'
+  title: 'Separating layout from constraints'
   short_description: 'We propose a syntax change to convey differences between layout from constraints.'
   authors: ['pascallouis@google.com']
-  file: '0038_seperating_layout_from_constraints.md'
+  file: '0038_separating_layout_from_constraints.md'
   area: ['FIDL']
   issue: ['']
   gerrit_change_id: ['']

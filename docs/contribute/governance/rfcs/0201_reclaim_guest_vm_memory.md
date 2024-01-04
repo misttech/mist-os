@@ -18,7 +18,7 @@ Allow the host to reclaim memory used by the guest.
 ## Motivation
 
 Running a memory hungry application in the guest and starting a memory hungry
-application in the the host may cause OOM even if guest memory is no longer in
+application in the host may cause OOM even if guest memory is no longer in
 use.
 
 The reasons for this are twofold.
@@ -240,7 +240,7 @@ testing telemetry.
 
 ## Performance
 
-Implementing memory reclaim would improve the the host memory performance when
+Implementing memory reclaim would improve the host memory performance when
 user is running memory hungry applications in the guest. The host would have
 more memory available to work with instead of resorting to memory compression
 and other CPU expensive ways to get memory while guest has available memory to

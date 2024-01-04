@@ -109,7 +109,7 @@ short non doc comment before it or at the top of the function's body explaining
 what this test is exercising. We use non-doc comments because we expect the
 target audience to be readers of the code, and not of the public API.
 
-Tests should always be in a module named `tests` or one of its descendents.
+Tests should always be in a module named `tests` or one of its descendants.
 Crates that contain only integration tests do not need a `tests` module, e.g.
 [network/tests/integration], [network/tests/fidl].
 

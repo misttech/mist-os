@@ -173,7 +173,7 @@ moves both the Zircon and Driver handlers into the test environment:
 ### Call CreateStartArgsAndServe
 
 The fifth step in setting up the testing framework is to call the
-[CreateStartArgsAndServe method on the the TestNode class](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/testing/cpp/test_node.cc).
+[CreateStartArgsAndServe method on the TestNode class](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/testing/cpp/test_node.cc).
 Calling this method returns three objects:
 driver `start_args` table, `outgoing_directory_client`,
 and `incoming_directory_server`:

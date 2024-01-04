@@ -144,7 +144,7 @@ again.
 ## Legacy APIs
 
 Archivist serves the `fuchsia.logger.Log` protocol that allows clients to read logs in a text
-format. This API is superceded by `fuchsia.diagnostics.ArchiveAccessor` and will be deleted in the
+format. This API is superseded by `fuchsia.diagnostics.ArchiveAccessor` and will be deleted in the
 future.
 
 Note: Prefer `Log.ListenSafe` and `Log.DumpLogsSafe` to avoid channel overflow issues. Deletion of

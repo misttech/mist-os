@@ -170,7 +170,7 @@ When 0, heartbeat detection is disabled.
 **Default:** `0xbb8`
 
 The maximum age of a secondary CPU's last heartbeat before it is considered to
-be locked up.  This value should be larger than the heartbeat peroid, but small
+be locked up.  This value should be larger than the heartbeat period, but small
 enough so as to not miss short-lived lockup events.  3000 is a reasonable value.
 
 See also [lockup detector](/zircon/kernel/lib/lockup_detector/README.md).

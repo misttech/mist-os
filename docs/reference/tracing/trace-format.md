@@ -861,7 +861,7 @@ _header word_
 
 - `[0 .. 3]`: record type (8)
 - `[4 .. 15]`: record size (inclusive of this word) as a multiple of 8 bytes
-- `[16 .. 59]`: sceduling record type specific data
+- `[16 .. 59]`: scheduling record type specific data
 - `[60 .. 63]`: scheduling record type
 
 #### Context Switch Record (scheduling event record type = 1)

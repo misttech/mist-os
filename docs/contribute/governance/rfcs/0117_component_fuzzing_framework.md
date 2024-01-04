@@ -198,7 +198,7 @@ The test runner framework is then modified as follows:
 1. The `fuzz_test_runner` creates a channel pair for the
   [`fuchsia.fuzzer.Controller`][108] protocol. It installs one end as a startup
   handle in the `fuzzer_engine` and uses [`fuchsia.fuzzer.manager.Harness`][108]
-  to pass the other to the the `fuzz_manager`.
+  to pass the other to the `fuzz_manager`.
 
 ### Fuzzer engine
 

@@ -444,7 +444,7 @@ functionality.
 ### Futexes
 
 Futexes work differently on Fuchsia and Linux. On Fuchsia, futexes are keyed off
-virtual addreses whereas Linux provides the option to key futexes off physical
+virtual addresses whereas Linux provides the option to key futexes off physical
 addresses. Additionally, Linux futexes offer a wide variety of options and
 operations that are not available on Fuchsia futexes.
 

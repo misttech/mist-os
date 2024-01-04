@@ -135,7 +135,7 @@ Testing is implemented in two phases:
 1. **Unit tests** ingest syscall addresses extracted from the zircon image and check for the existence (and non-existence) of various syscalls under several conditions (e.g., single syscall, multiple syscalls, multiple communicating threads, thread crash, etc.)
 1. **Integration tests** run on a VM because kernel symbol information is not available to userspace programs. The VM exports coverage data to the host environment where the sancov code coverage tool is used to verify that PCs belong to the expected kernel functions.
 
-Alongside the initial implementation, the plan is to land unit tests and tests that ensure new syscalls return `ZX_ERR_NOT_SUPPROTED` in non-sancov build variants.
+Alongside the initial implementation, the plan is to land unit tests and tests that ensure new syscalls return `ZX_ERR_NOT_SUPPORTED` in non-sancov build variants.
 
 ## Documentation
 

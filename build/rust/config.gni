@@ -43,7 +43,7 @@ declare_args() {
   # e.g., clang_version_description = read_file("$_rustc_lib_dir/VERSION")
   rustc_version_description = ""
 
-  # Sets the default LTO type for rustc bulids.
+  # Sets the default LTO type for rustc builds.
   rust_lto = ""
 
   # Sets the fuchsia toolchain target triple suffix (after arch)

@@ -139,7 +139,7 @@ protocol RootJob {
 ```
 The problems with this method are
 
-- It only applies to the root job.  The debugger needs two logics for root job
+- It only applies to the root job.  The debugger needs two logic for root job
   and non-root job.
 - An exception channel created on a child job can stop events from propagating
   to the root.

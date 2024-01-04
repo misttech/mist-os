@@ -19,7 +19,7 @@ intensity of that value.
 Why even have non-linear colorspaces, if the linear one is so intuitive?
 
 The simple answer is that the human eye does not perceive light linearly. It is better able to
-discern differences in light in low-light environments than bright environents, for instance.
+discern differences in light in low-light environments than bright environments, for instance.
 Therefore non-linear colorspaces such as sRGB have the ability to better express images as we would
 see them in real life.
 

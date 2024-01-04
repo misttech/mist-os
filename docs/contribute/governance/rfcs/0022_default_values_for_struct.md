@@ -134,7 +134,7 @@ This implies two things at least:
 
 ## Implementation
 
-Here are some example implemention ideas for C, Rust, and Go Bindings
+Here are some example implementation ideas for C, Rust, and Go Bindings
 
 ```fidl {:.devsite-disable-click-to-copy}
 // in FIDL "default.fidl"
@@ -200,7 +200,7 @@ Func NewLocation() location {
     loc := location{}
     loc.pos_x = 10
     loc.pos_y = 20
-    // loc.pos_z = 0  Maybe ommited.
+    // loc.pos_z = 0  Maybe omitted.
     return loc
 }
 ```

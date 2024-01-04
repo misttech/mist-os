@@ -137,7 +137,7 @@ For `NewPhase1`, the configurable aspects are:
 
   + The device role
   + The transport type
-  + A struct that holds the the rest of the Phase1 arguments, which makes it
+  + A struct that holds the rest of the Phase1 arguments, which makes it
     easier to change only one of the "default" arguments:
 
 ##### `Phase1Args` struct

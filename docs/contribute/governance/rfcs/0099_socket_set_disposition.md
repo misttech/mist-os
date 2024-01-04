@@ -187,7 +187,7 @@ in the specified direction in the socket. An alternative choice is to allow
 that operation to succeed; we select the stricter option in the interest of
 preventing unintended consequences.
 
-Instead of creating a new right, an existing one could be used. A survery of
+Instead of creating a new right, an existing one could be used. A survey of
 existing rights suggests that no existing right is a good match for this use
 case.
 

@@ -206,7 +206,7 @@ handles. The rough design of how the manifest file would have looked like was:
 
 This approach was deemed undesirable for the reasons listed above regarding
 numbered handles and because introducing this at the component manager-level
-raises new questions about POSIX-compability from component manager. For example,
+raises new questions about POSIX-compatibility from component manager. For example,
 should all runners have to implement this? How would it look like for a runner
 that doesn't use stdout/stderr, like the "web" runner? Thus, we've decided to
 pursue the POSIX-compatibility question as a separate workstream, outside of the

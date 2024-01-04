@@ -14,7 +14,7 @@ We describe the current (as of Sept 2021) design principles underpinning the
 ## Motivation
 
 The FIDL wire format specifies how messages are to be encoded (and decoded), as
-well as the format for transport level metadata such as the the transactional
+well as the format for transport level metadata such as the transactional
 message header. Implicit in the wire format specification are theoretical
 boundaries which optimal implementation of it may attain. Just like data
 structures imply certain big-O bounds on operations, so does the wire format.
@@ -57,7 +57,7 @@ The goals for the wire format specification were as follows[^1]:
 [^2]: Some goals have since been relaxed (portability, no versioning of
     structures), or tightened ([endianness][RFC-0030]).
 
-While the the ongoing evolution of the wire format has followed very specific
+While the ongoing evolution of the wire format has followed very specific
 design principles, some outlined above, these were not necessarily written down
 along with rationale. This RFC is an attempt at clearly writing these design
 principles down.

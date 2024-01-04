@@ -40,7 +40,7 @@ automatically, follow the section below.
         1. In VS Code navigate to the main menu, click **Code**, then **Preferences**, then **Settings**.
         1. Under **Extensions** navigate to **Fuchsia SDK** then **Ffx Path**.
         1. Enter the path to `ffx` directory (for example, `~/fuchsia/getting-started/tools/ffx`).
-        1. Verify the extension is working via the the button in the bottom right corner. Click said button, which lists a Fuchsia target device and ensure that your device is connected.
+        1. Verify the extension is working via the button in the bottom right corner. Click said button, which lists a Fuchsia target device and ensure that your device is connected.
  
     If there is no Fuchsia device that is running, including the emulator, you
     will see the following in the **Output** tab:
@@ -61,7 +61,7 @@ automatically, follow the section below.
         1. In VS Code navigate to the main menu, click **Code**, then **Preferences**, then **Settings**.
         1. Under **Extensions** navigate to **Fuchsia SDK** then **Ffx Path**.
         1. Enter the path to `ffx` directory (for example, ` ~/fuchsia/tools/ffx`).
-        1. Verify the extension is working via the the button in the bottom right corner. Click said button, which lists a Fuchsia target device and ensure that your device is connected.
+        1. Verify the extension is working via the button in the bottom right corner. Click said button, which lists a Fuchsia target device and ensure that your device is connected.
 
     If there is no Fuchsia device that is running, including the emulator, you will see the following in the **Output** tab:
 

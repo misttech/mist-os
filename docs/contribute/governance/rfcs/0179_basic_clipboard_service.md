@@ -359,7 +359,7 @@ placed on the keyboard. As described [above](#unauthorized-access), the
 to at least have input focus (and hence be visible in the foreground) in order
 to access the clipboard. However, this does mean that an application can grab
 the contents of the clipboard as soon as it obtains focus momentarily, even if
-this is not the the user's intent. In the [future](#future-work), system shell
+this is not the user's intent. In the [future](#future-work), system shell
 notifications will alert the user whenever a component reads the contents of the
 clipboard.
 

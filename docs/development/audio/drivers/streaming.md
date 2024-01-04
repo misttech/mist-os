@@ -379,7 +379,7 @@ with USB, but choose to change its plugged/unplugged state as the user plugs and
 unplugs an analog device with the 3.5mm jack.
 
 The ability to query the currently plugged or unplugged state of a stream, and
-to register for asynchonous notifications of plug state changes (if supported)
+to register for asynchronous notifications of plug state changes (if supported)
 is handled through plug detection messages.
 
 ### Plug detect capabilities
@@ -643,5 +643,5 @@ they must ensure that the audio stream goes silent instead of looping. Once
 the transition to silence is complete, resources associated with playback or
 capture may be released and reused by the driver.
 
-This way, if a playback client teminates unexpectedly, the system will close the
+This way, if a playback client terminates unexpectedly, the system will close the
 client channels, causing audio playback to stop instead of continuing to loop.

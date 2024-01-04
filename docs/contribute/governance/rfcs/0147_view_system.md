@@ -52,7 +52,7 @@ decisions.
 Modifying these decisions requires an additional RFC and/or an update to this
 RFC.
 
-Note: The the current Fuchsia implementation does contain exceptions to these
+Note: The current Fuchsia implementation does contain exceptions to these
 statements, because it is a work in progress. For example, there is a legacy API
 that allows global access to pointer events. This RFC is a declaration of our
 intent to remove these exceptions.

@@ -203,7 +203,7 @@ implementations:
   * [In-tree Rust VFS](/src/storage/lib/vfs/rust): This is used by some Rust filesystems including
     the fat32 implementation. It is newer and currently has fewer features than the C++
     implementation.
-  * [SDK C++ VFS](/sdk/lib/vfs/cpp): A somewhat simplified version of of the "in-tree" C++ version
+  * [SDK C++ VFS](/sdk/lib/vfs/cpp): A somewhat simplified version of the "in-tree" C++ version
     for SDK users. This is most commonly used for simpler uses like service discovery.
 
 The VFS layer defines the interface of operations that may be routed to the

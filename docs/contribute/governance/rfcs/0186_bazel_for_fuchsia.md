@@ -272,7 +272,7 @@ documentation will also be public.
 
 We note that [RFC-0153][rfc-153], which proposes to use a temporary customized
 version of the open source Ninja tool used by the Fuchsia platform build,
-is still ongoing and is not superceded by this RFC. Fuchsia will continue to
+is still ongoing and is not superseded by this RFC. Fuchsia will continue to
 rely on Ninja for some time, so quality
 of life improvements to Ninja are valuable and welcome.
 

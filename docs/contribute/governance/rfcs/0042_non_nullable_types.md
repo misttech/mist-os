@@ -104,7 +104,7 @@ the new support for generalized type aliases in FIDL.
 ## Ergonomics
 
 Non-nullable types are a popular feature of languages like Kotlin, C#, Swift
-and Typescript.
+and TypeScript.
 It's a [heavily requested feature](https://github.com/dart-lang/sdk/issues/22)
 for Dart.
 
@@ -140,7 +140,7 @@ US-ASCII characters in FIDL syntax but this character
 
 ## Prior art and references
 
-As mentioned above Kotlin, C#, Swift and Typescript all allow types to be
+As mentioned above Kotlin, C#, Swift and TypeScript all allow types to be
 declared as non-nullable.
 
 <!-- xrefs -->

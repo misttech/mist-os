@@ -88,7 +88,7 @@ without an implemented `init()` hook, other device ops may be called by the
 Driver Host.
 
 When `device_async_remove()` is called on a device, this schedules the removal
-of the device and its descendents.
+of the device and its descendants.
 
 The removal of a device consists of four parts: running the device's `unbind()` hook,
 removal of the device from the Device Filesystem, dropping the reference acquired
@@ -183,7 +183,7 @@ Now, we unplug this USB WLAN device.
 ```c
     wlan_mac_unbind(void* ctx) {
         // Stop accepting new requests, and notify clients that this device is offline (often just
-        // by returning an ZX_ERR_IO_NOT_PRESENT to any requests that happen after unbind).
+        // by returning a ZX_ERR_IO_NOT_PRESENT to any requests that happen after unbind).
         ...
 
         device_unbind_reply(iface_mac_X);

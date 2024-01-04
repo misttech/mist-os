@@ -127,7 +127,7 @@ only network I/O.
 Simple products may specify a session component with no children, while complex
 products have many children of the session component.  For example, the
 workstation session instantiates components to display the system user
-interface, a command line shell, and a web browser as descendents of its session
+interface, a command line shell, and a web browser as descendants of its session
 component.
 
 Today, a single session component is present in the component topology of any
@@ -305,7 +305,7 @@ For now, Security team will be auto-CC'ed on CLs that change either
 The privacy implications of having a session component are similar to those for
 security. While Fuchsia platform can issue guidelines and best practices to
 session owners, it has no mechanism to enforce policy other than restricting
-the capabilities (and their respective backing implemenations) provided to the
+the capabilities (and their respective backing implementations) provided to the
 session component.
 
 ## Documentation

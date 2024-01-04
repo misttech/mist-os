@@ -222,7 +222,7 @@ default mix-ins, doing so is not considered best practice and should be avoided.
 While there is clearly some extra typing involved in starting to use tags and
 `ContainableBaseClases` to manage your object's container membership, once you
 have started to do so it is easy to extend the pattern. The consistency of
-always using tags with an given object (vs. sometimes using them and sometimes
+always using tags with a given object (vs. sometimes using them and sometimes
 not) will help with both readability and maintainability, particularly when it
 comes to testing for container membership, and when understanding which
 container type definitions use which piece of node storage in an object.

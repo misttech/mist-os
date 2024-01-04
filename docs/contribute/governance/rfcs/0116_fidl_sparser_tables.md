@@ -280,7 +280,7 @@ Some specifics:
   present fields.
 - If the maximum ordinal, the ordinal of the kth envelope, is *n* then the
   length of the bitmask array *m* MUST be `floor((n+63)/64)`. Recall that *n*
-  here uses 1-based indexes. That is, for for ordinals 1-64 *m* is 1 and for
+  here uses 1-based indexes. That is, for ordinals 1-64 *m* is 1 and for
   65-128 *m* is 2, etc. When *n* is zero, then `frame_present_marker` is set to
   absent and there is no table body.
 

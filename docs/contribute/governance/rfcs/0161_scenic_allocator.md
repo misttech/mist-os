@@ -18,7 +18,7 @@ RFC afterwards when the API design doc template was deprecated.
 ## Summary
 
 This document proposes a plan to extract Scenic's Image resource allocations into a
-seperate protocol.
+separate protocol.
 
 ## Goals and use cases
 
@@ -29,14 +29,14 @@ with the upcoming changes.
     BufferCollection can be used to create Image resources in multiple Scenic::Sessions,
     and our upcoming 2D API Flatland's sessions.
 
-  + Seperating buffer allocations from Scenic::Session makes the protocols' purpose clear.
+  + Separating buffer allocations from Scenic::Session makes the protocols' purpose clear.
     Allocator only deals with buffer allocations, whereas Scenic::Sessions are used for
     presentation and drawing.
 
   + Allocator can be used by our 3D API as well as the upcoming 2D API. This allows for
     more complex graphics use.
 
-Using this API, more complex users can shared Image resources between their independant
+Using this API, more complex users can shared Image resources between their independent
 Scenic::Sessions. That is currently not possible and often forces reallocations.
 
 ## Design

@@ -115,7 +115,7 @@ Finally, consider a `fuchsia.qux` FIDL library with an SDK category of
 general public is potentially unbounded and unknowable.
 
 Along with defining concentrically increasing sets of API consumers, SDK
-categories also define increasing stablity windows. For example, `fuchsia.foo`
+categories also define increasing stability windows. For example, `fuchsia.foo`
 can change dramatically from one day to the next because the `internal`
 category limits the exposure to the Fuchsia project itself. Someone changing
 `fuchsia.foo` can change all the clients and servers at the same time, which

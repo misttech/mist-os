@@ -43,7 +43,7 @@ configure the settings, buffers, and images to be used during screen capturing.
 
 ### GetNextFrame()
 GetNextFrame() returns the latest unseen frame to the client as soon as possible. If the client has 
-not recieved the last displayed frame, this will be returned immediately. If they have, this will 
+not received the last displayed frame, this will be returned immediately. If they have, this will 
 be the next frame to be rendered.
 
 ### Dropping a buffer

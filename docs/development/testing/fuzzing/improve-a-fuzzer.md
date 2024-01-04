@@ -243,7 +243,7 @@ languages using [Rust's FFI][rust-ffi]{:.external} or [Go's cgo][golang-cgo]{:.e
 In some case, the inputs being provided by the fuzzer may be transformed before being acted on.
 This can greatly reduce the fuzzer's ability to associate inputs with the behaviors they produce.
 For example, a library being fuzzed my first decompress its inputs before processing them. The most
-effective way to fuzz this library is to preform mutations on uncompressed inputs, then compress
+effective way to fuzz this library is to perform mutations on uncompressed inputs, then compress
 them before invoking the library.
 
 One way to achieve this is by adding custom mutators. These are user-provided implementations of

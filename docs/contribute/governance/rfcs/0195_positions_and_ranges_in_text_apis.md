@@ -443,7 +443,7 @@ JavaScript *characters* are UTF‑16 code units. The
 [`CaretPosition`][mdn-caretposition]{:.external} classes all deal with character
 offsets.
 
-(However, for integrations with the the Chromium runtime, it is worth noting
+(However, for integrations with the Chromium runtime, it is worth noting
 that internally, [Chromium uses UTF-8-encoded strings][chromium-string-usage].)
 
 [mdn-range]: https://developer.mozilla.org/en-US/docs/Web/API/Range
@@ -461,7 +461,7 @@ See, for example,
 
 ### MacOS and iOS
 
-In Objective C, the `NSString` documentation [says][apple-nsstring]{:.external}:
+In Objective-C, the `NSString` documentation [says][apple-nsstring]{:.external}:
 
 > An `NSString` object encodes a Unicode-compliant text string, represented as a
 > sequence of UTF‑16 code units. All lengths, character indexes, and ranges are
@@ -473,7 +473,7 @@ unit, with additional properties to expose Unicode code points, UTF‑16 code
 units, and bytes.
 
 Classes relating to text editing use different units depending on whether they
-originate in Objective C or in Swift. The
+originate in Objective-C or in Swift. The
 [`UITextInput`][apple-uitextinput]{:.external} protocol uses opaque, abstract
 classes [`UITextRange`][apple-uitextrange]{:.external} and
 [`UITextPosition`][apple-uitextposition]{:.external}, which are

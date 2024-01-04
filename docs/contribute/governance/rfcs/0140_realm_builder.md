@@ -393,7 +393,7 @@ unfamiliar in the manifest.
 
 ```
 protocol Realm {
-    /// Returns the the component decl for the given component. `name` must
+    /// Returns the component decl for the given component. `name` must
     /// refer to a component that is one of the following:
     ///
     /// - A component with a local implementation
@@ -412,7 +412,7 @@ protocol Realm {
         component_decl fuchsia.component.decl.Component;
     }) error RealmBuilderError;
 
-    /// Sets the the component decl for the given component. If the component
+    /// Sets the component decl for the given component. If the component
     /// was added to the realm with a modern (i.e. non-legacy), absolute (i.e.
     /// non-relative) URL, then an error will be returned, as realm builder is
     /// unable to retrieve or alter the declarations for these components.

@@ -148,7 +148,7 @@ To map a VMO:
     ```
 1.  Use [`zx_vmar_allocate(...)`](/reference/syscalls/vmar_allocate.md)
     to create a child VMAR within the parent VMAR.
-    This returns a VMAR handle and it's start address, for example:
+    This returns a VMAR handle and its start address, for example:
 
     ```cpp
     const size_t region_size = zx_system_get_page_size() * 10;

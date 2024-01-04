@@ -123,7 +123,7 @@ Replace the following:
 The example command below passes the arguments `hello` and `1234` directly to
 the tests:
 
-```none {:.devsite-disalbe-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 $ ffx test run fuchsia-pkg://fuchsia.com/example#example.cm -- hello 1234
 ```
 
@@ -133,7 +133,7 @@ $ ffx test run fuchsia-pkg://fuchsia.com/example#example.cm -- hello 1234
 format, which is suitable for consumption by other tools (see
 [test output format][test-output] for the details of the schema).
 
-To store structured test results after runing tests, run the following
+To store structured test results after running tests, run the following
 command:
 
 ```posix-terminal

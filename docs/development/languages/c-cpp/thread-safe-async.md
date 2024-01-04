@@ -203,7 +203,7 @@ tasks that can be canceled: destroying an
 [`async_patterns::TaskScope`][TaskScope] will discard unexecuted callbacks
 scheduled on that scope.
 
-Other objects will always call the the registered callback exactly once, even
+Other objects will always call the registered callback exactly once, even
 during destruction. Those calls would typically provide an error or status
 indicating cancellation. They are said to guarantee *exactly once delivery*.
 

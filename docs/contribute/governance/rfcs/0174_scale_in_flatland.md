@@ -201,7 +201,7 @@ the display. If a client wants to support HiDPI, they are expected to layout
 their content using the given LP, but allocate larger buffers by using the
 reported DPR to reverse the effects of Scenic's scaling.
 
-PSS is not communicated the the children. That means upscaling through Flatland
+PSS is not communicated the children. That means upscaling through Flatland
 may cause blurry artifacts. However, this is preferred to forcing the client to
 re-allocate and re-present, for example because buffer size would grow by the
 scale factor and risk OOMs.
@@ -258,12 +258,12 @@ Gfx API. In Gfx, DPR and PSS was multiplied into a single value and reported to
 the child. DPI-aware client would respond to the accumulation of all scales.
 As an example, if they were scaled by 5 by their parent and DPR of 2 applied,
 they would have received a `pixel_scale` of 10 and allocated a 10 times larger
-buffer. This proposal distinguishes DPR and PSS, so the unnecesssary allocations
+buffer. This proposal distinguishes DPR and PSS, so the unnecessary allocations
 are gone.
 
 This proposal reduces the expectations of re-allocate and re-layout from the
 clients. We can implement smoother upsample and downsample operations, because
-we no longer rely on the Flatland client to repond to scale changes.
+we no longer rely on the Flatland client to respond to scale changes.
 
 ## Security considerations
 

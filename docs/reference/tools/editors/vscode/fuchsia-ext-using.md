@@ -60,7 +60,7 @@ options that you have for your Fuchsia devices. These options display in the
 VS Code command palette. In most cases, you have the following options:
 
 <img class="vscode-image vscode-image-center"
-     alt="This figure shows the the various options to control a connected
+     alt="This figure shows the various options to control a connected
      Fuchsia device through the Fuchsia VS Code extension."
      src="images/extensions/ext-command-palette.png"/>
 
@@ -408,7 +408,7 @@ Once you have created a debugging profile, you can use your profile to
 run and debug a component that you are working on.
 
 Note: These steps are the default VS Code steps. For the complete VS Code
-documentation about debugging, see [Debugging][docs-debuggging-vscode]{: .external}.
+documentation about debugging, see [Debugging][docs-debugging-vscode]{: .external}.
 
 To start the debugger:
 
@@ -448,5 +448,5 @@ Once you have started the debugger:
 [vscode-errors]: https://code.visualstudio.com/Docs/editor/editingevolved#_errors-warnings
 [diagnostics-schema]: /docs/reference/platform-spec/diagnostics/schema.md#payload
 [docs-schema-logs]: /docs/reference/platform-spec/diagnostics/schema.md#logs
-[docs-debuggging-vscode]: https://code.visualstudio.com/docs/editor/debugging
+[docs-debugging-vscode]: https://code.visualstudio.com/docs/editor/debugging
 [component-moniker]: /docs/reference/components/moniker.md

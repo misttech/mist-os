@@ -69,7 +69,7 @@ In VS Code, do the following:
 
    This sets `fuchsia-emulator` as the default target at the bottom of VS Code:
 
-   ![Connected](/docs/get-started/sdk/images/get-started-vscode-connected-to-fuchsia-emulator.png "The fuchsia-emualtor icon at the bottom of VS Code"){: .screenshot}
+   ![Connected](/docs/get-started/sdk/images/get-started-vscode-connected-to-fuchsia-emulator.png "The fuchsia-emulator icon at the bottom of VS Code"){: .screenshot}
 
 1. In the terminal, start the Fuchsia package server:
 

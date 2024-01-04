@@ -46,7 +46,7 @@ The namespacing section consists of the information that can be applied to the e
 schema, across all data types; this information serves to describe the namespace of the source
 that generated this diagnostics data. The namespacing section is made up of two fields:
 
-- A component [`moniker`][moniker] describing the component that the the diagnostics data contained
+- A component [`moniker`][moniker] describing the component that the diagnostics data contained
   in the schema applies to.
 - A `data source` describing which diagnostics service generated the data.
 

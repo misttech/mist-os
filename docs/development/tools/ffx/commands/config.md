@@ -34,7 +34,7 @@ configurations set here will be assumed to be strings.
 
 The daemon runs as its own process and currently the runtime
 configuration is not transferred from the CLI to the daemon if the daemon is
-started up. It's expected that if you want to configure the the daemon using
+started up. It's expected that if you want to configure the daemon using
 the runtime configurations, the daemon command will be run manually:
 
 ```sh

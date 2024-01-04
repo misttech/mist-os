@@ -2606,7 +2606,7 @@ From //build/dist/verify_manifest_elf_binaries.gni:10
 
 ### disable_kernel_pci
 
-Disable kernel PCI driver support. A counterpart of the the build
+Disable kernel PCI driver support. A counterpart of the build
 flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
@@ -2723,7 +2723,7 @@ From //zircon/kernel/params.gni:40
 ### enable_lock_dep_tests
 
 Enable kernel lock dependency tracking tests.  By default this is
-enabled when tracking is enabled, but can also be eanbled independently
+enabled when tracking is enabled, but can also be enabled independently
 to assess whether the tests build and *fail correctly* when lockdep is
 disabled.
 
@@ -7267,7 +7267,7 @@ From //build/config/rust/BUILD.gn:29
 
 ### rust_lto
 
-Sets the default LTO type for rustc bulids.
+Sets the default LTO type for rustc builds.
 
 **Current value (from the default):** `""`
 

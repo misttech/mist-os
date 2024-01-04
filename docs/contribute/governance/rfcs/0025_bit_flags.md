@@ -147,7 +147,7 @@ Changing a type in FIDL from a `uint32` to a `bits` value adds some
 minor overhead in the bindings of checking that the serialized or deserialized
 value is valid.
 
-This is a bitmask and a branch, and unlikely to be noticable.
+This is a bitmask and a branch, and unlikely to be noticeable.
 
 ## Security
 

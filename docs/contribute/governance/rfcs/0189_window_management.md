@@ -76,7 +76,7 @@ and discussed extensively with stakeholders.
 
 For the purpose of this doc:
 
-*   *Display Server a.k.a Compositor:* A component that is responsible for
+*   *Display Server a.k.a. Compositor:* A component that is responsible for
     allowing application components to create and display views, allowing the
     placement and size of those views to be controlled, and making sure
     graphical input events are delivered to application components based on

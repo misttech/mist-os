@@ -11,7 +11,7 @@ _"You're Go-ing to love it"_
 
 When this proposal was drafted, and socialized, there was a strong consensus to
 consider syntax changes all at once, rather than one at a time (see also
-[RFC-0038](/docs/contribute/governance/rfcs/0038_seperating_layout_from_constraints.md)).
+[RFC-0038](/docs/contribute/governance/rfcs/0038_separating_layout_from_constraints.md)).
 We also wanted one person to be the syntax arbiter, rather than risk designing
 by committee.
 

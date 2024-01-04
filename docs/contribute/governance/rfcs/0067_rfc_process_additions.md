@@ -5,7 +5,7 @@
 
 ## Summary
 
-This RFC proposes a few additions to the the Fuchsia RFC process detailed in
+This RFC proposes a few additions to the Fuchsia RFC process detailed in
 [RFC-0001](0001_rfc_process.md). A "Last call" step is introduced in place of
 the "Approve" step. Exit criteria for each step of the process is called out.
 The process of amending an RFC is introduced.

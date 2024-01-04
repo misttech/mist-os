@@ -285,7 +285,7 @@ Feedback would still file a report.
 
 ### Alternative: Allow compatible requests to `zx_system_powerctl` during an OOM reboot
 
-This RFC proposes that once an kernel-iniated OOM reboot starts that only two
+This RFC proposes that once a kernel-iniated OOM reboot starts that only two
 things complete the reboot: userspace calls `zx_system_powerctl` with the `cmd`
 value of `ZX_SYSTEM_POWERCTL_ACK_KERNEL_INITIATED_REBOOT` or the kernel's reboot
 timer expires. As an alternative we could allow any compatible call to

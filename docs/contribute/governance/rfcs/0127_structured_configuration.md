@@ -1072,7 +1072,7 @@ centralized approach:
 
 1. In the future Fuchsia will need to run components that were not known to the
    base image (for example, as a result of app updates). The configuration for
-   these unknown components cannot not be distributed in a central package so
+   these unknown components cannot be distributed in a central package so
    would require a different solution.
 2. Delivering a binary and its configuration atomically lets us make stronger
    statements about their consistency, particularly when a package might be
@@ -1195,7 +1195,7 @@ because there were not delivered to devices as a monolithic) we can no longer
 guarantee the configuration definition compiled into the component matches the
 definition used for the configuration values. We would be introducing a new ABI
 between these two components but since this interface would be expressing in the
-PDK rather then the IDK we cannot use the process defined in
+PDK rather than the IDK we cannot use the process defined in
 [RFC-0002][rfc_0002] to manage version compatibility.
 
 Component surface and versioning are likely to be discussed more as the PDK and

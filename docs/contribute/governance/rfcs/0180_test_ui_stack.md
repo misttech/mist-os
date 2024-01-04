@@ -317,7 +317,7 @@ no alternative.
 
 ### Workstream: Refactor in-tree UITestManager library
 
-1. Factor realm configuration out of the existing internal UITestManger class,
+1. Factor realm configuration out of the existing internal UITestManager class,
    into a new UITestRealm class, which can be shared with Test UI Stack.
 2. (Optional) Implement a mechanism to share .cml with the production ui
    subrealms. If not now, we should do this cleanup once the One UI Stack

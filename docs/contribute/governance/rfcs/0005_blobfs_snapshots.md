@@ -346,7 +346,7 @@ format under this proposal.
 ## Implementation
 
 The implementation will require the following changes, which are roughly
-dependent on the changes that preceed them:
+dependent on the changes that precede them:
 
 1.  Changes to FVM, and partition set up.
 1.  Changes to Blobfs allocation.

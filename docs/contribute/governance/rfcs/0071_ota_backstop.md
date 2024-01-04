@@ -124,7 +124,7 @@ into `epoch.json` via the build system. The `epoch_history` file could be in the
 N=Most recent change (https://fxbug.dev/YYYYY)
 ```
 
-The `epoch_history` file should be manually bumped each time a backwards incompatabile change is
+The `epoch_history` file should be manually bumped each time a backwards incompatible change is
 introduced.
 
 While the intermediary `epoch_history` file adds another layer of complexity, this approach is

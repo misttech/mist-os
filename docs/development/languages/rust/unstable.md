@@ -79,7 +79,7 @@ Reviews are performed by the Rust Working Group.
 
 ## Currently Used Features
 
-Unstable features are tracked by issues filed under the the
+Unstable features are tracked by issues filed under the
 [`Rust>unstable`](https://fxbug.dev?q=component:Rust>unstable) component.
 
 [the edition guide]: https://rust-lang-nursery.github.io/edition-guide/editions/index.html

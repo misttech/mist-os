@@ -53,7 +53,7 @@ Each Flatland [Transform][glossary.transform] node is represented by a pair of
 numbers. The first number in the pair is the *Flatland **Instance Id***. It
 represents which *Flatland Instance* created that particular *Transform*. The
 second number in the pair is the ***Transform Id***. This is a user-defined
-identifier for the the Transform, unique among all Transforms created by an
+identifier for the Transform, unique among all Transforms created by an
 Instance. In the example above, `(2:0)`, `(2:1)`, `(4:1)` (and so on) represent
 Transform nodes. The Flatland Instance with the identifier `2` has created two
 Transforms (`0` and `2`).

@@ -182,7 +182,7 @@ there are cases where a package can be present in multiple package sets.
 
 Several related but subtly different definitions of "package set" have evolved
 based on the context in which the term is used. We introduce some of these
-below, along with a name that may be used to unamiguously refer to the
+below, along with a name that may be used to unambiguously refer to the
 definition.
 
 - **Eligible package set** - A set of packages that a device is allowed to

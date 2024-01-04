@@ -287,7 +287,7 @@ but are otherwise expected within the system's contract. Their goal is to
 demonstrate the system's resilience to stress, or to expose bugs that only
 happen under stress.
 
-In a stress test, the the system under test is isolated from the test workload
+In a stress test, the system under test is isolated from the test workload
 components. Test workload components can do whatever they wish, including
 crashing without bringing down the system under test.
 

@@ -95,7 +95,7 @@ will continue to see the old contents. Children of all other types will see the
 new contents. Once the move is complete, the pages in `src_vmo` will be zeroed
 out.
 
-The move can fail for a variety of reasons. Refer to the the errors section
+The move can fail for a variety of reasons. Refer to the errors section
 below for a complete enumeration of possible error codes and the scenarios that
 return them.
 

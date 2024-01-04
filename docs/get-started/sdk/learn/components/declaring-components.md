@@ -131,7 +131,7 @@ following import statements:
 #include "echo_component.h"
 ```
 
-Add the following code for the the `main()` function:
+Add the following code for the `main()` function:
 
 `echo/main.cc`:
 

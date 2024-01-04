@@ -275,7 +275,7 @@ _Legend:_
 [rfc-0035]: /docs/contribute/governance/rfcs/0035_automatic_flow_tracing.md
 [rfc-0036]: /docs/contribute/governance/rfcs/0036_update_struct_declarations.md
 [rfc-0037]: /docs/contribute/governance/rfcs/0037_transactional_message_header_v3.md
-[rfc-0038]: /docs/contribute/governance/rfcs/0038_seperating_layout_from_constraints.md
+[rfc-0038]: /docs/contribute/governance/rfcs/0038_separating_layout_from_constraints.md
 [rfc-0039]: /docs/contribute/governance/rfcs/0039_types_come_second.md
 [rfc-0040]: /docs/contribute/governance/rfcs/0040_identifier_uniqueness.md
 [rfc-0041]: /docs/contribute/governance/rfcs/0041_unifying_services_devices.md

@@ -321,7 +321,7 @@ pager backed VMOs, but could be extended to have meaning to anonymous VMOs.
 
 Just extending the semantics to cover anonymous VMOs leaves some gaps:
 
- * `ALWAYS_NEED` does not guarantee a lack of reclamation, as its a hint.
+ * `ALWAYS_NEED` does not guarantee a lack of reclamation, as it's a hint.
  * Pages may still need access faults as age is still tracked.
  * Does not disable page table reclamation.
  * Only be applied to existing mappings.

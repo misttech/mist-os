@@ -213,7 +213,7 @@ run a component from the installed package.
 To run the component, use the `ffx component run` tool. For help: `ffx component run --help`.
 
 For the `url` parameter provide a URL in the form of
-`fuchsia-pkg://<REPO>/<PACKAGE_NAME>#meta/<COMPONET_NAME>.cm`.
+`fuchsia-pkg://<REPO>/<PACKAGE_NAME>#meta/<COMPONENT_NAME>.cm`.
 
 ## Build a package using the legacy pm tool {#build-package-legacy-pm}
 

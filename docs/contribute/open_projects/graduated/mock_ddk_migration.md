@@ -317,7 +317,7 @@ Metadata is propagated to be available to all descendants.
 
 ##### Load Firmware
 
-Load firmware is an deprecated function, but is included for
+Load firmware is a deprecated function, but is included for
 the drivers that still need it:
 
 * {Fake DDK}

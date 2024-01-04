@@ -135,7 +135,7 @@ a good intermediate from which to create the block-device image files
 
 To create the `base` package, the tool needs:
 
-- The list of package files to incorporate into the system (packages in the the
+- The list of package files to incorporate into the system (packages in the
   "base" and "cache" package sets)
 
 

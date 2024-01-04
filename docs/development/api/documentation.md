@@ -27,7 +27,7 @@ documentation](https://developers.google.com/style/api-reference-comments).
 
 ## Communicating with care
 
-Fuchsia documentation is publically available, and should be
+Fuchsia documentation is publicly available, and should be
 written in a technical and neutral tone. There are some explicit restrictions
 on what you can write below, but they aren't intended to be comprehensive - use
 good judgment!

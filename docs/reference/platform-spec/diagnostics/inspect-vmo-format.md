@@ -405,7 +405,7 @@ Payload = byte data payload up to at most the end of the block. Size
 ```
 
 `EXTENT` blocks contain an arbitrary byte data payload and the index of
-the next `EXTENT` in the chain. The byte data for an buffer_value is retrieved
+the next `EXTENT` in the chain. The byte data for a buffer_value is retrieved
 by reading each `EXTENT` in order until **Total Length** bytes are read.
 
 ## NAME {#name}

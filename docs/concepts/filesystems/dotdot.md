@@ -47,7 +47,7 @@ filesystem servers in a function called `__fdio_cleanpath`.
 
 ## What about shell traversal?
 
-I.e, if someone “cd”s into a directory, how can they leave? Internally, the
+I.e., if someone “cd”s into a directory, how can they leave? Internally, the
 notion of “CWD” isn’t merely a file descriptor to an open directory; rather,
 it’s a combination of “file descriptor” and “absolute path interpreted to mean
 CWD”. If all operations to cd act on this absolute path, then “..” can always

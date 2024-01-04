@@ -293,7 +293,7 @@ ffx component capability fuchsia.buildinfo.Provider
 
 This command will print output similar to the following:
 
-```sh {:.devsite-disalbe-click-to-copy}
+```sh {:.devsite-disable-click-to-copy}
 Declarations:
   `core/build-info` declared capability `fuchsia.buildinfo.Provider`
 
@@ -344,7 +344,7 @@ print(f"{target} build info: {build_info}")
 
 If you were to run the above code, it would print something like below:
 
-```sh {:.devsite-disalbe-click-to-copy}
+```sh {:.devsite-disable-click-to-copy}
 foo-target-emu build info: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core', board_config='qemu-x64', version='2023-08-18T23:28:37+00:00', latest_commit_date='2023-08-18T23:28:37+00:00'))
 ```
 

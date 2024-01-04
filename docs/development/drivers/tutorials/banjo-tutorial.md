@@ -827,7 +827,7 @@ Instead of generating two structures, like:
 ```c
 struct interface {
    void* ctx;
-   inteface_function_ptr_table* callbacks;
+   interface_function_ptr_table* callbacks;
 };
 
 struct interface_function_ptr_table {

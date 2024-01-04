@@ -46,7 +46,7 @@ Your first step is to remove the suppression and address the issue. UBSan
 provides troubleshooting information by logging a root cause and a stack trace
 during a test, when the issue was surfaced at runtime. For instance:
 
-{# Disable variable substition to avoid '{{' being interpreted by the template engine #}
+{# Disable variable substitution to avoid '{{' being interpreted by the template engine #}
 {% verbatim %}
 
 ```
@@ -85,7 +85,7 @@ not ok 138 fuchsia-pkg://fuchsia.com/wlan-hw-sim-test#meta/configure_legacy_priv
 [2105.736] 1054084.1055594>
 ```
 
-{# Re-enable variable substition #}
+{# Re-enable variable substitution #}
 {% endverbatim %}
 
 If you're picking up a UBSan bug then the bug will already have this information

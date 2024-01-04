@@ -122,7 +122,7 @@ ffx debug fidl --remote-name echo_client --remote-name echo_server -- run echo_c
 
 If you want to monitor a service, you should use --extra-name instead of --remote-name. The option
 --extra-name also monitors some processes. However, for these processes, monitoring starts only
-when one of of the "--remote-name" process is launched. Also, fidlcat stops when the last
+when one of the "--remote-name" process is launched. Also, fidlcat stops when the last
 "--remote-name" process stops (even if some "--extra-name" processes are still monitored).
 
 ```sh

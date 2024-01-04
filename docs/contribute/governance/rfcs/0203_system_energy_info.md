@@ -24,7 +24,7 @@ on modern X86 CPUs that accurately estimates energy consumption across a set of
 power domains by using hardware performance counters and I/O models. If we have
 a mechanism to make energy consumption information accessible outside the
 kernel, we can build developer-facing and fleet-tracking tools to inspect the
-run-time power draw on an device in an ergonomic way, which is useful for
+run-time power draw on a device in an ergonomic way, which is useful for
 optimizing power footprint during development and identifying power regression
 across the fleet.
 

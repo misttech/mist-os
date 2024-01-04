@@ -95,7 +95,7 @@ terms of driver implementation complexity. Many drivers on the system do not
 choose to push work onto queues, and as such are likely one new client away from
 being used in a way that will inevitably end up deadlocking the system. We have
 a storied history of such bugs lurking in our drivers, and only surfacing in a
-flakey manner due to reentrancy only occurring on error conditions that rarely
+flaky manner due to reentrancy only occurring on error conditions that rarely
 occur.
 
 ### Boilerplate Serialization
@@ -250,7 +250,7 @@ For an in-process runtime, entering the runtime is cheap, and it's not actually
 necessary to pre-register a buffer to achieve zero-copy, so introducing
 differences in our API from that of the zircon channel is not necessarily a win.
 Additionally, rust as a language relies heavily on the pull based mechanism, and
-would likely have an impedance mismatch with it's model if we chose to shift
+would likely have an impedance mismatch with its model if we chose to shift
 away from pull at the transport level.
 
 ### Primitives
@@ -768,7 +768,7 @@ latencies, and increased CPU utilization.
     affect throughput, but had the most significant impact on tail latencies.
 *   CPU utilization had relative increases of 50%-150% depending on parameters
     on all experiments trialed. Absolute CPU utilization was always non-trivial
-    (10%-150%) so the the relative increases resulted in significant increases
+    (10%-150%) so the relative increases resulted in significant increases
     to absolute CPU utilization as well.
 
 Full results can be found [here][perf-results] and [here][perf-results-2].

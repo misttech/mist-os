@@ -322,7 +322,7 @@ ability to define what changes are meaningful.
 
 #### Building
 
-The packages specified for distribution must be built for for all
+The packages specified for distribution must be built for all
 architectures we produce an IDK for (at time of writing, `arm64`
 and `x64`). Additional flavors such as `debug` and `release` may
 be introduced as needed, but initially all packages will be built

@@ -454,7 +454,7 @@ testing.
 
 ## Conclusion
 
-Based on the evaluation above, it's seen that Go, Python, and Typescript are all
+Based on the evaluation above, it's seen that Go, Python, and TypeScript are all
 languages that can feasibly fit the task of OOT system testing. However, each
 language has its own tradeoffs that make selecting a clear consensus "winner"
 difficult. Ultimately, customer demand ("Ecosystem Adoption" dimension) is

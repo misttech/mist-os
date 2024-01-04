@@ -365,7 +365,7 @@ Because of these mitigations, we expect privacy impact to be minimal.
 ## Testing
 
 The implementation will have unit tests and platform-side integration tests.
-Additionally, as with any other SDK-visible FIDL, it will have an CTF test.
+Additionally, as with any other SDK-visible FIDL, it will have a CTF test.
 
 ## Documentation
 

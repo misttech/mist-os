@@ -1,6 +1,6 @@
 # HLCPP object pretty printing
 
-## Prequisites
+## Prerequisites
 
 This tutorial builds on the [Compiling FIDL][compiling] tutorial. For the
 full set of FIDL tutorials, refer to the [overview][overview].
