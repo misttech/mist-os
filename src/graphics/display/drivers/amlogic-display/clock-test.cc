@@ -33,15 +33,9 @@ const display_setting_t kDisplaySettingsWithoutClockFactor = {
 };
 
 static display_setting_t display_types[] = {
-    kDisplaySettingTV070WSM_FT,
-    kDisplaySettingP070ACB_FT,
-    kDisplaySettingG101B158_FT,
-    kDisplaySettingTV101WXM_FT,
-    /*kDisplaySettingIli9881c,*/ /*kDisplaySettingSt7701s,*/
-    kDisplaySettingTV080WXM_FT,
-    kDisplaySettingKD070D82_FT,
-    kDisplaySettingTV070WSM_ST7703I,
-    kDisplaySettingsWithoutClockFactor,
+    kDisplaySettingTV070WSM_FT,      kDisplaySettingP070ACB_FT,          kDisplaySettingG101B158_FT,
+    kDisplaySettingTV101WXM_FT,      kDisplaySettingTV080WXM_FT,         kDisplaySettingKD070D82_FT,
+    kDisplaySettingTV070WSM_ST7703I, kDisplaySettingsWithoutClockFactor,
 };
 
 // For now, simply test that timing calculations don't segfault.

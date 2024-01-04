@@ -12,8 +12,8 @@
 #define PANEL_P070ACB_FT UINT8_C(0x01)
 #define PANEL_TV101WXM_FT UINT8_C(0x02)
 #define PANEL_G101B158_FT UINT8_C(0x03)
-#define PANEL_ILI9881C UINT8_C(0x04)
-#define PANEL_ST7701S UINT8_C(0x05)
+// 0x04 was for PANEL_ILI9881C
+// 0x05 was for PANEL_ST7701S
 #define PANEL_TV080WXM_FT UINT8_C(0x06)
 #define PANEL_TV101WXM_FT_9365 UINT8_C(0x07)
 #define PANEL_TV070WSM_FT_9365 UINT8_C(0x08)
@@ -91,38 +91,6 @@ const display_setting_t kDisplaySettingTV101WXM_FT = {
     .vsync_width = 4,
     .vsync_bp = 20,
     .vsync_pol = 0,
-};
-const display_setting_t kDisplaySettingIli9881c = {
-    .lane_num = 4,
-    .bit_rate_max = 0,  // unused
-    .clock_factor = 0,  // unused
-    .lcd_clock = 270,
-    .h_active = 720,
-    .v_active = 1280,
-    .h_period = 900,   // Vendor provides front porch of 80. calculate period manually
-    .v_period = 1340,  // Vendor provides front porch of 40. calculate period manually
-    .hsync_width = 20,
-    .hsync_bp = 80,
-    .hsync_pol = 0,  // unused
-    .vsync_width = 4,
-    .vsync_bp = 16,
-    .vsync_pol = 0,  // unused
-};
-const display_setting_t kDisplaySettingSt7701s = {
-    .lane_num = 2,
-    .bit_rate_max = 0,  // unused
-    .clock_factor = 0,  // unused
-    .lcd_clock = 228,
-    .h_active = 480,
-    .v_active = 800,
-    .h_period = 740,  // Vendor provides front porch of 100. calculate period manually
-    .v_period = 848,  // Vendor provides front porch of 20. calculate period manually
-    .hsync_width = 60,
-    .hsync_bp = 100,
-    .hsync_pol = 0,  // unused
-    .vsync_width = 8,
-    .vsync_bp = 20,
-    .vsync_pol = 0,  // unused
 };
 const display_setting_t kDisplaySettingTV080WXM_FT = {
     .lane_num = 4,
