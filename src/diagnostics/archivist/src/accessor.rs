@@ -262,8 +262,8 @@ impl ArchiveAccessorServer {
             .unbounded_send(fasync::Task::spawn(async move {
                 let stats = pipeline.accessor_stats();
                 stats.global_stats.connections_opened.add(1);
-                while let Some(mut request) = stream.next().await {
-                    let control_handle = request.iterator.take_control_handle();
+                while let Some(request) = stream.next().await {
+                    let control_handle = request.iterator.get_control_handle();
                     stats.global_stats.stream_diagnostics_requests.add(1);
                     let pipeline = Arc::clone(&pipeline);
 
@@ -310,8 +310,13 @@ pub trait ArchiveAccessorWriter {
 
     /// Takes the control handle from the FIDL stream (or returns None
     /// if the handle has already been taken, or if this is a socket.
-    fn take_control_handle(&mut self) -> Option<BatchIteratorControlHandle> {
+    fn get_control_handle(&self) -> Option<BatchIteratorControlHandle> {
         None
+    }
+
+    /// Sends an on ready event.
+    async fn maybe_respond_ready(&mut self) -> Result<(), AccessorError> {
+        Ok(())
     }
 
     /// Waits for ZX_ERR_PEER_CLOSED
@@ -374,13 +379,40 @@ pub enum IteratorError {
 #[async_trait]
 impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
     async fn write(&mut self, data: Vec<FormattedContent>) -> Result<(), IteratorError> {
-        // TODO(https://fxbug.dev/126547): Fix compiler bug.
-        let Some(Ok(BatchIteratorRequest::GetNext { responder })) = __self.next().await else {
-            return Err(IteratorError::PeerClosed);
-        };
-        responder.send(Ok(data))?;
+        loop {
+            // TODO(https://fxbug.dev/126547): Fix compiler bug.
+            match __self.next().await {
+                Some(Ok(BatchIteratorRequest::GetNext { responder })) => {
+                    responder.send(Ok(data))?;
+                    return Ok(());
+                }
+                Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
+                    responder.send()?;
+                }
+                Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
+                    return Err(IteratorError::PeerClosed);
+                }
+                Some(Err(err)) => return Err(err.into()),
+                None => {
+                    return Err(IteratorError::PeerClosed);
+                }
+            }
+        }
+    }
+
+    async fn maybe_respond_ready(&mut self) -> Result<(), AccessorError> {
+        let mut this = Pin::new(self);
+        if matches!(this.as_mut().peek().await, Some(Ok(BatchIteratorRequest::WaitForReady { .. })))
+        {
+            let Some(Ok(BatchIteratorRequest::WaitForReady { responder })) = this.next().await
+            else {
+                unreachable!("We already checked the next request was WaitForReady");
+            };
+            responder.send()?;
+        }
         Ok(())
     }
+
     async fn wait_for_buffer(&mut self) -> anyhow::Result<()> {
         if let Some(Ok(_)) = Pin::new(self).peek().await {
             Ok(())
@@ -388,7 +420,8 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
             Err(IteratorError::PeerClosed.into())
         }
     }
-    fn take_control_handle(&mut self) -> Option<BatchIteratorControlHandle> {
+
+    fn get_control_handle(&self) -> Option<BatchIteratorControlHandle> {
         Some(self.get_ref().control_handle())
     }
 
@@ -615,6 +648,7 @@ impl BatchIterator {
     }
 
     pub async fn run(mut self) -> Result<(), AccessorError> {
+        self.requests.maybe_respond_ready().await?;
         while self.requests.wait_for_buffer().await.is_ok() {
             self.stats.add_request();
             let start_time = zx::Time::get_monotonic();
@@ -926,5 +960,38 @@ mod tests {
         drop(iterator_request_fut);
         drop(batch_iterator_proxy);
         assert_matches!(executor.run_singlethreaded(&mut batch_iterator_fut), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn batch_iterator_on_ready_is_called() {
+        let (accessor, stream) =
+            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
+        let pipeline = Arc::new(Pipeline::for_test(None));
+        let inspector = Inspector::default();
+        let log_repo = LogsRepository::new(1_000_000, inspector.root());
+        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let server = ArchiveAccessorServer::new(inspect_repo, log_repo, 4);
+        server.spawn_server(pipeline, stream);
+
+        // A selector of the form `component:node/path:property` is rejected.
+        let (batch_iterator, server_end) =
+            fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
+        assert!(accessor
+            .r#stream_diagnostics(
+                &StreamParameters {
+                    data_type: Some(DataType::Logs),
+                    stream_mode: Some(StreamMode::Subscribe),
+                    format: Some(Format::Json),
+                    client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(
+                        true
+                    )),
+                    ..Default::default()
+                },
+                server_end
+            )
+            .is_ok());
+
+        // We receive a response for WaitForReady
+        assert!(batch_iterator.wait_for_ready().await.is_ok());
     }
 }

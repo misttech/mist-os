@@ -211,6 +211,10 @@ open protocol BatchIterator {
     flexible GetNext() -> (resource struct {
         batch vector<FormattedContent>:MAXIMUM_ENTRIES_PER_BATCH;
     }) error ReaderError;
+
+    /// Indiciates that the BatchIterator has been connected. If the
+    /// BatchIterator hasn't been connected, this method will hang until it is.
+    WaitForReady() -> ();
 };
 
 /// Outer protocol for interacting with the different diagnostics data sources.

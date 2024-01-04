@@ -513,6 +513,7 @@ async fn serve_batch_iterator(
         .map(|request| request.context("failed request"))
         .try_for_each(|request| async {
             match request {
+                fdiagnostics::BatchIteratorRequest::WaitForReady { responder } => responder.send(),
                 fdiagnostics::BatchIteratorRequest::GetNext { responder } => {
                     let mut receiver = receiver.borrow_mut();
                     let mut logs = Vec::new();

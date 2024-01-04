@@ -926,6 +926,11 @@ mod tests {
                             let mut stream = result_stream.into_stream().expect("into stream");
                             while let Some(req) = stream.try_next().await.expect("stream request") {
                                 match req {
+                                    fdiagnostics::BatchIteratorRequest::WaitForReady {
+                                        responder,
+                                    } => {
+                                        let _ = responder.send();
+                                    }
                                     fdiagnostics::BatchIteratorRequest::GetNext { responder } => {
                                         if called {
                                             responder.send(Ok(Vec::new())).expect("send response");

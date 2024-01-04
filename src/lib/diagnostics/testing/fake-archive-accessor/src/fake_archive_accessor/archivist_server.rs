@@ -45,6 +45,7 @@ impl AccessorServer {
                     let response = self.build_vmo(data)?;
                     responder.send(Ok(response))?;
                 }
+                BatchIteratorRequest::WaitForReady { responder } => responder.send()?,
                 BatchIteratorRequest::_UnknownMethod { .. } => {
                     unreachable!("Unexpected method call");
                 }
@@ -52,6 +53,7 @@ impl AccessorServer {
             if let Some(res) = self.requests.next().await {
                 match res? {
                     BatchIteratorRequest::GetNext { responder } => responder.send(Ok(vec![]))?,
+                    BatchIteratorRequest::WaitForReady { responder } => responder.send()?,
                     BatchIteratorRequest::_UnknownMethod { .. } => {
                         unreachable!("Unexpected method call");
                     }

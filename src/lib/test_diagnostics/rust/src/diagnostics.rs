@@ -158,24 +158,30 @@ mod tests {
         ) {
             let mut request_stream = server_end.into_stream().expect("got stream");
             let mut values = vec![1i64, 2, 3].into_iter();
-            while let Some(BatchIteratorRequest::GetNext { responder }) =
-                request_stream.try_next().await.expect("get next request")
-            {
-                match values.next() {
-                    None => {
-                        responder.send(Ok(vec![])).expect("send empty response");
+            while let Some(request) = request_stream.try_next().await.expect("get next request") {
+                match request {
+                    BatchIteratorRequest::WaitForReady { responder } => {
+                        responder.send().expect("sent response")
                     }
-                    Some(value) => {
-                        if opts.with_error {
-                            responder.send(Err(ReaderError::Io)).expect("send error");
-                            continue;
+                    BatchIteratorRequest::GetNext { responder } => match values.next() {
+                        None => {
+                            responder.send(Ok(vec![])).expect("send empty response");
                         }
-                        let content = get_json_data(value);
-                        let size = content.len() as u64;
-                        let vmo = zx::Vmo::create(size).expect("create vmo");
-                        vmo.write(content.as_bytes(), 0).expect("write vmo");
-                        let result = FormattedContent::Json(fmem::Buffer { vmo, size });
-                        responder.send(Ok(vec![result])).expect("send response");
+                        Some(value) => {
+                            if opts.with_error {
+                                responder.send(Err(ReaderError::Io)).expect("send error");
+                                continue;
+                            }
+                            let content = get_json_data(value);
+                            let size = content.len() as u64;
+                            let vmo = zx::Vmo::create(size).expect("create vmo");
+                            vmo.write(content.as_bytes(), 0).expect("write vmo");
+                            let result = FormattedContent::Json(fmem::Buffer { vmo, size });
+                            responder.send(Ok(vec![result])).expect("send response");
+                        }
+                    },
+                    BatchIteratorRequest::_UnknownMethod { .. } => {
+                        unreachable!("We aren't expecting any other call");
                     }
                 }
             }
