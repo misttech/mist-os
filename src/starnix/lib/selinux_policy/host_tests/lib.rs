@@ -61,7 +61,7 @@ fn known_policies() {
         let by_value = ByValue::new(Cursor::new(policy_bytes));
 
         let policy = Policy::parse(by_value).expect("parse policy");
-        policy.validate().expect("validate policy");
+        let policy = policy.validate().expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
         assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());

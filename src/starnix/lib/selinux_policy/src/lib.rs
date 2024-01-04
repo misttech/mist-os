@@ -135,19 +135,14 @@ where
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub fn parse(bytes: PS) -> Result<Self, anyhow::Error> {
+    pub fn parse(bytes: PS) -> Result<Unvalidated<PS>, anyhow::Error> {
         let (policy, tail) =
             <Policy<PS> as Parse<PS>>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();
         if num_bytes > 0 {
             return Err(ParseError::TrailingBytes { num_bytes }.into());
         }
-        Ok(policy)
-    }
-
-    /// Validates this binary policy.
-    pub fn validate(&self) -> Result<(), anyhow::Error> {
-        Validate::validate(self)
+        Ok(Unvalidated(policy))
     }
 
     /// The policy version stored in the underlying binary policy.
@@ -509,6 +504,16 @@ impl<PS: ParseStrategy> Validate for Policy<PS> {
             .context("validating attribute_maps")?;
 
         Ok(())
+    }
+}
+
+/// A [`Policy`] that has been successfully parsed, but not validated.
+pub struct Unvalidated<PS: ParseStrategy>(Policy<PS>);
+
+impl<PS: ParseStrategy> Unvalidated<PS> {
+    pub fn validate(self) -> Result<Policy<PS>, anyhow::Error> {
+        Validate::validate(&self.0)?;
+        Ok(self.0)
     }
 }
 
