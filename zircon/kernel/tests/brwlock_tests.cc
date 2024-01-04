@@ -108,21 +108,38 @@ class BrwLockTest {
       Thread::Current::Yield();
     }
 
+    // Like `Thread::Join` with an infinite timeout except that it will
+    // periodically print a message that includes `description` so that it's
+    // easier to debug hangs.
+    //
+    // Why an infinite timeout?  Because tests often run in virtualized/emulated
+    // environments where any reasonable fixed timeout could can be exceeded.
+    auto join = [](Thread* t, const char* description) -> zx_status_t {
+      constexpr int64_t kTimeoutMs = 5000;
+      while (true) {
+        Deadline deadline = Deadline::after(zx_duration_from_msec(kTimeoutMs));
+        zx_status_t status = t->Join(nullptr, deadline.when());
+        if (status != ZX_ERR_TIMED_OUT) {
+          return status;
+        }
+        printf("failed to join %s after %ld msec, retrying\n", description, kTimeoutMs);
+      }
+    };
+
     // Shutdown all the threads. Validating they can shutdown is important
     // to ensure they didn't get stuck on the waitqueue and never woken up.
     test.kill_.store(true, ktl::memory_order_seq_cst);
-    zx_time_t join_deadline = current_time() + ZX_SEC(5);
     for (auto& t : reader_threads) {
-      zx_status_t status = t->Join(nullptr, join_deadline);
-      EXPECT_EQ(status, ZX_OK, "Reader failed to complete");
+      zx_status_t status = join(t, "Reader");
+      EXPECT_EQ(status, ZX_OK, "Reader failed to join");
     }
     for (auto& t : writer_threads) {
-      zx_status_t status = t->Join(nullptr, join_deadline);
-      EXPECT_EQ(status, ZX_OK, "Writer failed to complete");
+      zx_status_t status = join(t, "Writer");
+      EXPECT_EQ(status, ZX_OK, "Writer failed to join");
     }
     for (auto& t : upgrader_threads) {
-      zx_status_t status = t->Join(nullptr, join_deadline);
-      EXPECT_EQ(status, ZX_OK, "Upgrader failed to complete");
+      zx_status_t status = join(t, "Upgrader");
+      EXPECT_EQ(status, ZX_OK, "Upgrader failed to join");
     }
     EXPECT_EQ(test.state_.load(ktl::memory_order_seq_cst), 0u, "Threads still holding lock");
 
