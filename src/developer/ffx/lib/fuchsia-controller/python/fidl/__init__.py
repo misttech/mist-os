@@ -7,6 +7,7 @@ from ._client import StopEventHandler
 from ._fidl_common import DomainError
 from ._fidl_common import StopServer
 from ._import import AsyncSocket
+from ._import import EpitaphError
+from ._import import FrameworkError
 from ._import import GlobalHandleWaker
 from ._import import HandleWaker
-from ._import import FrameworkError

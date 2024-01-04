@@ -123,6 +123,55 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         server_task.cancel()
         # [END use_echoer_example]
 
+    async def test_epitaph_propagation(self):
+        (tx, rx) = Channel.create()
+        client = ffx.Echo.Client(tx)
+        coro1 = client.echo_string(value="foobar")
+        # Creating a task here so at least one task is awaiting on a staged
+        # message/notification.
+        task = asyncio.get_running_loop().create_task(
+            client.echo_string(value="foobar")
+        )
+        coro2 = client.echo_string(value="foobar")
+        # Put `task` onto the executor so it makes partial progress, since this will yield
+        # to the executor.
+        await asyncio.sleep(0)
+        err_msg = ZxStatus.ZX_ERR_NOT_SUPPORTED
+        rx.close_with_epitaph(err_msg)
+
+        # The main thing here is to ensure that PEER_CLOSED is not sent early.
+        # After running rx.close_with_epitaph, the channel will be closed, and
+        # that message will have been queued for the client.
+        with self.assertRaises(ZxStatus):
+            try:
+                await coro1
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], err_msg)
+                raise e
+
+        with self.assertRaises(ZxStatus):
+            try:
+                await task
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], err_msg)
+                raise e
+
+        with self.assertRaises(ZxStatus):
+            try:
+                await coro2
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], err_msg)
+                raise e
+
+        # Finally, ensure that the channel is just plain-old closed for new
+        # interactions.
+        with self.assertRaises(ZxStatus):
+            try:
+                await client.echo_string(value="foobar")
+            except ZxStatus as e:
+                self.assertEqual(e.args[0], ZxStatus.ZX_ERR_PEER_CLOSED)
+                raise e
+
     async def test_echo_server_async(self):
         (tx, rx) = Channel.create()
         server = AsyncEchoer(rx)

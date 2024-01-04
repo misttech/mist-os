@@ -349,6 +349,30 @@ class Channel:
         """Releases the underlying handle."""
         self._handle = None
 
+    def close_with_epitaph(self, epitaph: int):
+        """Sends an epitaph to the channel before closing it."""
+        # Header txid: 0u32
+        msg = bytearray(b"\x00\x00\x00\x00")
+        # Header at-rest flag 1. (use FIDLv2)
+        msg.extend(bytes(b"\x02"))
+        # Header at-rest flag 2: 0.
+        msg.extend(bytes(b"\x00"))
+        # Header dynamic flags: none.
+        msg.extend(bytes(b"\x00"))
+        # Header magic no: 1.
+        msg.extend(bytes(b"\x01"))
+        # Epitaph ordinal: 64bytes of 1's.
+        msg.extend(bytes(b"\xff\xff\xff\xff\xff\xff\xff\xff"))
+        if epitaph < 0:
+            # If negative do two's complement.
+            epitaph = epitaph + (1 << 32)
+        epitaph_bytes = epitaph.to_bytes(4, byteorder="little")
+        # Encode u32.
+        msg.extend(epitaph_bytes)
+        msg.extend(bytes(b"\x00\x00\x00\x00"))
+        self.write((msg, []))
+        self.close()
+
     @classmethod
     def create(cls) -> tuple["Channel", "Channel"]:
         """Classmethod for creating a pair of channels.

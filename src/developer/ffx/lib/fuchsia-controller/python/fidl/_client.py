@@ -11,6 +11,7 @@ import fuchsia_controller_py as fc
 
 from ._fidl_common import *
 from ._ipc import GlobalHandleWaker
+from ._ipc import EventWrapper
 
 TXID: TXID_Type = 0
 
@@ -27,6 +28,8 @@ class FidlClient(object):
             self.channel_waker = channel_waker
         self.pending_txids: Set[TXID_Type] = set({})
         self.staged_messages: Dict[TXID_Type, asyncio.Queue[FidlMessage]] = {}
+        self.epitaph_received: EpitaphError | None = None
+        self.epitaph_event = EventWrapper()
 
     def __del__(self):
         if self.channel is not None:
@@ -75,6 +78,23 @@ class FidlClient(object):
                 raise e
         return None
 
+    def _epitaph_check(self, msg: FidlMessage):
+        # If the epitaph is already set, no need to continue with the remaining
+        # work.
+        if self.epitaph_received is not None:
+            raise self.epitaph_received
+
+        ordinal = parse_ordinal(msg)
+        if ordinal == FIDL_EPITAPH_ORDINAL:
+            if self.epitaph_received is None:
+                self.epitaph_received = EpitaphError(parse_epitaph_value(msg))
+                self.epitaph_event.set()
+            raise self.epitaph_received
+
+    async def _epitaph_event_wait(self):
+        await self.epitaph_event.wait()
+        raise self.epitaph_received
+
     async def _read_and_decode(self, txid: int):
         if txid not in self.staged_messages:
             self.staged_messages[txid] = asyncio.Queue(1)
@@ -93,7 +113,10 @@ class FidlClient(object):
             # It's pretty straightforward on paper but requires a bit of bookkeeping for the corner
             # cases to prevent memory leaks.
             try:
+                if self.epitaph_received is not None:
+                    raise self.epitaph_received
                 msg = self.channel.read()
+                self._epitaph_check(msg)
                 recvd_txid = parse_txid(msg)
                 if recvd_txid == txid:
                     if txid != 0:
@@ -112,6 +135,11 @@ class FidlClient(object):
                         + "in undefined behavior"
                     )
                 self._stage_message(recvd_txid, msg)
+            except EpitaphError:
+                # This is to avoid some possible race conditions with the below
+                # where unregistering can happen at the same time as receiving
+                # an epitaph error. It should not unregister the channel.
+                raise
             except fc.ZxStatus as e:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     self.channel_waker.unregister(self.channel)
@@ -121,18 +149,26 @@ class FidlClient(object):
                 self.channel_waker.wait_channel_ready(self.channel)
             )
             staged_msg_task = loop.create_task(self._get_staged_message(txid))
+            epitaph_event_task = loop.create_task(self._epitaph_event_wait())
             done, pending = await asyncio.wait(
                 [
                     channel_waker_task,
                     staged_msg_task,
+                    epitaph_event_task,
                 ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            # Both notifications happened at the same time.
-            if len(done) == 2:
-                # Order of asyncio.wait is not guaranteed.
-                first = done.pop().result()
-                second = done.pop().result()
+            for p in pending:
+                p.cancel()
+            # Multiple notifications happened at the same time.
+            if len(done) > 1:
+                results = [r.result() for r in done]
+                # Order of asyncio.wait is not guaranteed, so check all
+                # results. If there's an epitaph, running the "result()"
+                # function will raise an exception, so there are
+                # only two values we can ever have here.
+                first = results.pop()
+                second = results.pop()
                 if type(first) == int:
                     msg = second
                 else:
@@ -144,10 +180,8 @@ class FidlClient(object):
                 # another task.
                 self.channel_waker.post_channel_ready(self.channel)
                 return self._decode(txid, msg)
-
             # Only one notification came in.
             msg = done.pop().result()
-            pending.pop().cancel()
             if type(msg) != int:  # Not a FIDL channel response
                 return self._decode(txid, msg)
 

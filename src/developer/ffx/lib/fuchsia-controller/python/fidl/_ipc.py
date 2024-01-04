@@ -42,6 +42,38 @@ class _QueueWrapper(object):
         self.queue.task_done()
 
 
+class EventWrapper(object):
+    def __init__(self):
+        self.event = asyncio.Event()
+        try:
+            self.loop: asyncio.AbstractEventLoop | None = (
+                asyncio.get_running_loop()
+            )
+        except RuntimeError:
+            self.loop = None
+
+    def _precheck(self):
+        """Checks if this event is being used across loops. If it is, then this will reset state."""
+        if self.loop is None or self.loop.is_closed():
+            self.loop = asyncio.get_running_loop()
+            event_state: bool = self.event.is_set()
+            self.event = asyncio.Event()
+            if event_state:
+                self.event.set()
+
+    def wait(self):
+        self._precheck()
+        return self.event.wait()
+
+    def set(self):
+        self._precheck()
+        self.event.set()
+
+    def is_set(self):
+        self._precheck()
+        self.event.is_set()
+
+
 HANDLE_READY_QUEUES: typing.Dict[int, _QueueWrapper] = {}
 
 

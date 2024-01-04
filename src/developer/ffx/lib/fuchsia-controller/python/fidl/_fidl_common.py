@@ -22,6 +22,7 @@ FidlMessage = Tuple[bytearray, List[fc.Channel]]
 FIDL_HEADER_SIZE = 8
 # The number of bytes in a FIDL ordinal.
 FIDL_ORDINAL_SIZE = 8
+FIDL_EPITAPH_ORDINAL = 0xFFFFFFFFFFFFFFFF
 
 
 @dataclass
@@ -59,6 +60,10 @@ def internal_kind_to_type(internal_kind: str):
     raise RuntimeError(f"Unrecognized internal type: {internal_kind}")
 
 
+class EpitaphError(fc.ZxStatus):
+    """An exception received when an epitaph has been sent on the channel."""
+
+
 class FrameworkError(IntEnum):
     UNKNOWN_METHOD = -2
 
@@ -85,6 +90,18 @@ def parse_ordinal(msg: FidlMessage):
     start = FIDL_HEADER_SIZE
     end = FIDL_HEADER_SIZE + FIDL_ORDINAL_SIZE
     return int.from_bytes(b[start:end], sys.byteorder)
+
+
+def parse_epitaph_value(msg: FidlMessage):
+    (b, _) = msg
+    start = FIDL_HEADER_SIZE + FIDL_ORDINAL_SIZE
+    end = start + 4
+    res = int.from_bytes(b[start:end], sys.byteorder)
+
+    # Do two's complement here to get the true value if it's negative.
+    if res & (1 << 31) != 0:
+        return res - (1 << 32)
+    return res
 
 
 def camel_case_to_snake_case(s: str):

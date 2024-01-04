@@ -7,6 +7,7 @@ import sys
 
 from ._async_socket import AsyncSocket
 from ._fidl_common import FrameworkError
+from ._fidl_common import EpitaphError
 from ._ipc import GlobalHandleWaker
 from ._ipc import HandleWaker
 from ._library import load_module
