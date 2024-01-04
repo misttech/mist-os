@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_ext as net_ext;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::HashSet;
 
 /// Alias for a list of [`net::SocketAddress`].
