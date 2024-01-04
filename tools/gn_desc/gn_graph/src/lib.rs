@@ -36,9 +36,10 @@ pub enum GraphInitError {
     MissingDependencyForTarget(String, String),
 }
 
+#[derive(Debug)]
 pub struct Graph {
     /// All targets in the build graph (keyed by target label)
-    pub targets: BTreeMap<String, Target>,
+    targets: BTreeMap<String, Target>,
 
     /// The graph of dependencies of all targets.
     dependencies: DiGraph<String, ()>,
@@ -87,6 +88,11 @@ impl Graph {
         }
 
         Ok(self)
+    }
+
+    /// All targets in the build graph (keyed by target label)
+    pub fn targets(&self) -> &BTreeMap<String, Target> {
+        &self.targets
     }
 
     /// Return the labels of the dependencies of a target, given the target's label

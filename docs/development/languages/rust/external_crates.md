@@ -235,9 +235,10 @@ To do this, you'll need to add the crate's files to `/third_party/rust_crates/fo
    ...
    ```
 1. Re-run `fx update-rustc-third-party` and `fx build`.
-1. Add a `/third_party/rust_crates/forks/<my_crate>/README.fuchsia` file which matches the format of
-   other crates' `README.fuchsia`s there. See [/third_party/rust_crates/forks/README.md] for what it
-   should contain.
+1. Add a `/third_party/rust_crates/forks/<my_crate>/README.fuchsia` file which
+   matches the format of other crates' `README.fuchsia`s there. See
+   [`/third_party/rust_crates/forks/README.md`][external-forks-readme] for what
+   it should contain.
 
 ## Unicode crates
 
@@ -288,7 +289,7 @@ override file.
 The `update-rustc-third-party` tool makes a best effort to update these files
 with the limited data it has, but it can make mistakes. The `update-3p-owners`
 tool can do better by regenerating the OWNERS files directly from our build
-graph, but it tends to be very slow and still has a few issues.
+graph.
 
 ### Running the tool
 
@@ -298,14 +299,7 @@ needs the metadata from the completion of a maximal "kitchen sink" build:
 1. Run `fx set core.x64 --with //bundles/buildbot/core --with //bundles/kitchen_sink`
 2. Run `fx build`
 3. Run `fx update-3p-owners --rust-metadata
-   <FUCHSIA_BUILD_DIR>/rustlang/3p-crates-metadata.json --num-threads
-   <NUM_THREADS>`. It's usually a good idea to limit the number of threads to
-   50% of available CPUs (see [#75382] for details).
-
-This tool can take a significant amount of time to run - upwards of 45 minutes
-in some cases.
-
-[#75382]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=75382
+   <FUCHSIA_BUILD_DIR>/rustlang/3p-crates-metadata.json`.
 
 ### Manually updating OWNERS
 
@@ -400,6 +394,7 @@ This issue is being tracked [upstream](https://github.com/rust-lang/cargo/issues
 
 [external-crates]: /third_party/rust_crates/
 [external-cargo-toml]: /third_party/rust_crates/Cargo.toml
+[external-forks-readme]: /third_party/rust_crates/forks/README.md
 [external-vendor]: /third_party/rust_crates/vendor
 [cargo-gnaw-readme]: /tools/cargo-gnaw/README.md
 [osrb-process]: /docs/contribute/governance/policy/osrb-process.md#process_for_adding_external_code_to_new_repositories

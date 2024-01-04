@@ -12,7 +12,6 @@ if (is_host) {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:rayon",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:toml",
     "//third_party/rust_crates:tracing",
@@ -20,6 +19,8 @@ if (is_host) {
     "//third_party/rust_crates:walkdir",
     "//third_party/rust_crates:xml-rs",
     "//tools/cargo-gnaw:cargo-gnaw-lib",
+    "//tools/gn_desc/gn_graph",
+    "//tools/gn_desc/gn_json",
   ]
 
   rustc_binary("auto_owners_bin") {
@@ -36,6 +37,7 @@ if (is_host) {
     sources = [ "src/main.rs" ]
 
     deps = crate_deps + [
+             "//third_party/rust_crates:assert_matches",
              "//third_party/rust_crates:once_cell",
              "//third_party/rust_crates:pretty_assertions",
              "//third_party/rust_crates:serial_test",

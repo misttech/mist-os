@@ -47,7 +47,7 @@ fn main() -> Result<(), anyhow::Error> {
     if args.verbose {
         println!(
             "    added {} total target nodes with {} edges in {:.3} seconds",
-            graph.targets.len(),
+            graph.targets().len(),
             graph.edges_count(),
             start_time.elapsed().as_secs_f32()
         );

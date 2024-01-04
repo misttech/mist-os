@@ -46,7 +46,7 @@ impl AllDeps {
             if !self.deps.contains(dep) {
                 self.deps.insert(dep.clone());
                 if keep_going {
-                    if let Some(dep_target) = graph.targets.get(dep) {
+                    if let Some(dep_target) = graph.targets().get(dep) {
                         self.gather_deps_impl(dep_target, graph, depth.map(|v| v - 1))
                     }
                 }
@@ -97,7 +97,7 @@ mod tests {
     fn test_all_deps() {
         let graph = make_test_graph();
 
-        let default_target = graph.targets.get("//:default").unwrap();
+        let default_target = graph.targets().get("//:default").unwrap();
         let all_deps = AllDeps::gather_deps(default_target, &graph, None);
 
         let output = format!("{}", all_deps);
@@ -109,7 +109,7 @@ mod tests {
     fn test_depth_limit() {
         let graph = make_test_graph();
 
-        let default_target = graph.targets.get("//:default").unwrap();
+        let default_target = graph.targets().get("//:default").unwrap();
         let all_deps = AllDeps::gather_deps(default_target, &graph, Some(2));
 
         let output = format!("{}", all_deps);
@@ -121,7 +121,7 @@ mod tests {
     fn test_start_not_default() {
         let graph = make_test_graph();
 
-        let default_target = graph.targets.get("//:foo").unwrap();
+        let default_target = graph.targets().get("//:foo").unwrap();
         let all_deps = AllDeps::gather_deps(default_target, &graph, None);
 
         let output = format!("{}", all_deps);

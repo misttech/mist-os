@@ -155,7 +155,7 @@ fn filter_targets<'a, F>(graph: &'a Graph, mut f: F) -> Vec<&'a Target>
 where
     F: FnMut(&'a Target) -> bool,
 {
-    graph.targets.iter().by_ref().filter(|(_, v)| (f)(v)).map(|(_, v)| v).collect()
+    graph.targets().iter().by_ref().filter(|(_, v)| (f)(v)).map(|(_, v)| v).collect()
 }
 
 #[cfg(test)]

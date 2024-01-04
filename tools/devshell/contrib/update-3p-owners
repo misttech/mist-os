@@ -6,8 +6,7 @@
 #### CATEGORY=Source tree
 ### updates OWNERS files for third_party dependencies
 
-## usage: fx update-3p-owners  [--num-threads N]
-##                             [--rust-metadata FILE]
+## usage: fx update-3p-owners  [--rust-metadata FILE]
 ##                             [--integration-manifest FILE]
 ##                             [--path PROJECT_PATH]
 ##                             [--skip-rustc-3p-update]
@@ -20,8 +19,6 @@
 ##
 ##
 ## Arguments:
-## --num-threads N:               run on N threads.
-##
 ## --rust-metadata FILE:          update OWNERS for the projects specified in
 ##                                the rust metadata JSON FILE.
 ##
@@ -52,17 +49,15 @@ fx-config-read
 OWNERS_TOOL_TARGET="host-tools/auto_owners"
 OWNERS_TOOL_BIN="${FUCHSIA_BUILD_DIR}/${OWNERS_TOOL_TARGET}"
 
+GN_DESC_TOOL_TARGET="host-tools/gn_desc"
+GN_DESC_TOOL_BIN="${FUCHSIA_BUILD_DIR}/${GN_DESC_TOOL_TARGET}"
+
 # Parse arguments
 while [[ $# -ge 1 ]]; do
   case "$1" in
     -h|--help)
       fx-command-help
       exit 0
-      ;;
-    --num-threads)
-      shift
-      [[ ! $1 ]] && die "--num-threads requires an argument after it"
-      NUM_THREADS="--num-threads $1"
       ;;
     --rust-metadata)
       shift
@@ -104,18 +99,12 @@ while [[ $# -ge 1 ]]; do
   shift
 done
 
-if [[ ! -n "$NUM_THREADS" ]]; then
-  fx-error "Must specify --num-threads. Recommended value is NCPUS / 2 or less."
-  fx-error "NOTE: using all cores can deadlock your kernel. See https://fxbug.dev/75382."
-  exit 1
-fi
-
 if [[ -z "$RUST_METADATA" ]] && [[ -z "$INTEGRATION_MANIFEST" ]] && [[ -z "$PROJECT_PATH " ]]; then
   fx-warn "No project OWNERS will be updated."
   fx-warn "Use [ --rust-metadata | --integration-manifest | --path ] to specify projects."
 fi
 
-fx-command-run build ${OWNERS_TOOL_TARGET} || ( \
+fx-command-run build ${OWNERS_TOOL_TARGET} ${GN_DESC_TOOL_TARGET} || ( \
   fx-error "Failed to build owners tool."; \
   exit 1
 )
@@ -128,12 +117,12 @@ if [[ ! -n "$SKIP_RUSTC_3P_UPDATE" ]]; then
 fi
 
 (cd $FUCHSIA_DIR; $OWNERS_TOOL_BIN \
-  $NUM_THREADS \
   $RUST_METADATA \
   $INTEGRATION_MANIFEST \
-  --overrides $FUCHSIA_DIR/third_party/owners.toml \
-  --out-dir $FUCHSIA_BUILD_DIR \
-  --gn-bin $PREBUILT_GN \
+  --overrides "$FUCHSIA_DIR/third_party/owners.toml" \
+  --fuchsia-dir "$FUCHSIA_DIR" \
+  --gn-desc "$FUCHSIA_BUILD_DIR/gn_desc.json" \
+  --filter <( git -C "$FUCHSIA_DIR" ls-files | grep "\/OWNERS$" ) \
   $PROJECT_PATH \
   $SKIP_EXISTING \
   $DRY_RUN)

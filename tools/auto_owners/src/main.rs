@@ -6,13 +6,10 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use argh::FromArgs;
 use camino::{Utf8Path, Utf8PathBuf};
 use gnaw_lib::CrateOutputMetadata;
-use rayon::prelude::*;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs::File,
-    io::{BufReader, Write},
-    path::{Path, PathBuf},
-    process::Command,
+    io::{BufRead, BufReader, Write},
 };
 use walkdir::WalkDir;
 use xml::reader::{EventReader, XmlEvent};
@@ -26,32 +23,32 @@ use xml::reader::{EventReader, XmlEvent};
 struct Options {
     /// path to the JSON metadata produced by cargo-gnaw
     #[argh(option)]
-    rust_metadata: Option<PathBuf>,
+    rust_metadata: Option<Utf8PathBuf>,
 
     /// path to the 3P integration manifest
     #[argh(option)]
-    integration_manifest: Option<PathBuf>,
+    integration_manifest: Option<Utf8PathBuf>,
+
+    /// file that contains newline-separated list of OWNERS files that can be
+    /// added to generated OWNERS.
+    #[argh(option)]
+    filter: Option<Utf8PathBuf>,
 
     /// path to the ownership overrides config file
     #[argh(option)]
     overrides: Utf8PathBuf,
 
-    /// path to out/default (or the equivalent for the current build)
+    /// path to the source directory
     #[argh(option)]
-    out_dir: PathBuf,
-
-    /// number of threads to allow, each thread runs 0-1 instances of GN at a time
-    #[argh(option)]
-    num_threads: Option<usize>,
+    fuchsia_dir: Utf8PathBuf,
 
     /// path to the prebuilt GN binary
     #[argh(option)]
-    gn_bin: PathBuf,
+    gn_desc: Utf8PathBuf,
 
-    /// generate OWNERS only for the given projects path. Can contain multiple comma-separated
-    /// paths.
-    #[argh(option)]
-    path: Option<String>,
+    /// generate OWNERS only for the given projects path. Can be repeated.
+    #[argh(option, long = "path")]
+    project_paths: Vec<String>,
 
     /// don't updated existing OWNERS files
     #[argh(switch)]
@@ -64,39 +61,12 @@ struct Options {
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt().compact().with_max_level(tracing::Level::INFO).init();
-    let Options {
-        rust_metadata,
-        integration_manifest,
-        overrides,
-        out_dir,
-        gn_bin,
-        num_threads,
-        path: projects_path,
-        skip_existing,
-        dry_run,
-    } = argh::from_env();
-    let update_strategy = match skip_existing {
-        true => UpdateStrategy::OnlyMissing,
-        false => UpdateStrategy::AllFiles,
-    };
+    let options = argh::from_env();
 
-    if let Some(num_threads) = num_threads {
-        rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
-    }
-
-    OwnersDb::new(
-        rust_metadata,
-        integration_manifest,
-        overrides,
-        gn_bin,
-        out_dir,
-        update_strategy,
-        projects_path,
-        dry_run,
-    )?
-    .update_all_files()
+    OwnersDb::new(options)?.update_all_files()
 }
 
+#[derive(Debug, PartialEq)]
 struct ProjectMetadata {
     /// name of the project
     pub name: String,
@@ -126,7 +96,7 @@ struct OwnersDb {
     owners_path_cache: BTreeMap<String, Utf8PathBuf>,
 
     /// path to the JSON metadata produced by cargo-gnaw
-    rust_metadata: Option<PathBuf>,
+    rust_metadata: Option<Utf8PathBuf>,
 
     /// explicit lists of OWNERS files to include instead of inferring, indexed by project name
     overrides: BTreeMap<String, Vec<Utf8PathBuf>>,
@@ -135,47 +105,68 @@ struct OwnersDb {
     dry_run: bool,
 
     update_strategy: UpdateStrategy,
-    gn_bin: PathBuf,
-    out_dir: PathBuf,
+
+    fuchsia_dir: Utf8PathBuf,
+
+    gn_graph: gn_graph::Graph,
+
+    /// The set of all potential OWNERS files we may include in any generated
+    /// OWNERS file.
+    filter: Option<HashSet<Utf8PathBuf>>,
+
+    /// Create a map from source file to GN target.
+    source_deps: HashMap<String, String>,
 }
 
 impl OwnersDb {
-    fn new(
-        rust_metadata: Option<PathBuf>,
-        integration_manifest: Option<PathBuf>,
-        overrides: Utf8PathBuf,
-        gn_bin: PathBuf,
-        out_dir: PathBuf,
-        update_strategy: UpdateStrategy,
-        projects_path: Option<String>,
-        dry_run: bool,
-    ) -> Result<Self> {
-        let rust_crates: Vec<CrateOutputMetadata> = rust_metadata
-            .as_ref()
-            .map(|metadata| {
-                Ok::<_, anyhow::Error>(
-                    serde_json::from_reader(
-                        File::open(metadata)
-                            .with_context(|| format!("opening {}", metadata.display()))?,
-                    )
-                    .with_context(|| format!("parsing {}", metadata.display()))?,
-                )
-            })
-            .transpose()?
-            .unwrap_or_default();
+    fn new(options: Options) -> Result<Self> {
+        let Options {
+            rust_metadata,
+            integration_manifest,
+            overrides,
+            fuchsia_dir,
+            gn_desc,
+            project_paths,
+            filter,
+            skip_existing,
+            dry_run,
+        } = options;
+
+        let update_strategy = match skip_existing {
+            true => UpdateStrategy::OnlyMissing,
+            false => UpdateStrategy::AllFiles,
+        };
+
+        let rust_crates = if let Some(rust_metadata) = &rust_metadata {
+            let mut rust_crates: Vec<CrateOutputMetadata> = serde_json::from_reader(
+                File::open(rust_metadata).with_context(|| format!("opening {}", rust_metadata))?,
+            )
+            .with_context(|| format!("parsing {}", rust_metadata))?;
+
+            for metadata in &mut rust_crates {
+                // Make the path relative to the fuchsia directory.
+                if let Ok(path) = metadata.path.strip_prefix(&fuchsia_dir) {
+                    metadata.path = path.into();
+                }
+            }
+
+            rust_crates
+        } else {
+            vec![]
+        };
+
+        let gn_targets = gn_json::parse_file(gn_desc)?;
+        let gn_graph = gn_graph::Graph::create_from(gn_targets)?;
 
         // OWNERS path is currently only cached for rust projects.
         let mut owners_path_cache = rust_crates
             .iter()
             .map(|metadata| (metadata.canonical_target.clone(), metadata.path.clone()))
             .collect::<BTreeMap<_, _>>();
-        let mut path_by_top_level_target = rust_crates
-            .iter()
-            .filter_map(|metadata| {
-                metadata.shortcut_target.as_ref().map(|t| (t.clone(), metadata.path.clone()))
-            })
-            .collect::<BTreeMap<_, _>>();
-        owners_path_cache.append(&mut path_by_top_level_target);
+
+        owners_path_cache.extend(rust_crates.iter().filter_map(|metadata| {
+            metadata.shortcut_target.as_ref().map(|t| (t.clone(), metadata.path.clone()))
+        }));
 
         let rust_projects: Vec<ProjectMetadata> = rust_crates
             .into_iter()
@@ -188,20 +179,18 @@ impl OwnersDb {
                 ),
             })
             .collect();
+
         let integration_projects = integration_manifest
             .map(|manifest| {
-                Ok::<_, anyhow::Error>(
-                    parse_integration_manifest(&manifest)
-                        .with_context(|| format!("parsing {}", manifest.display()))?,
-                )
+                parse_integration_manifest(&gn_graph, &manifest)
+                    .with_context(|| format!("parsing {}", manifest))
             })
             .transpose()?
             .unwrap_or_default();
 
-        let path_projects = match projects_path {
-            Some(path) => parse_path(path),
-            None => vec![],
-        };
+        let path_projects =
+            project_paths.iter().map(|path| parse_path(&gn_graph, path)).collect::<Vec<_>>();
+
         let projects = rust_projects
             .into_iter()
             .chain(integration_projects)
@@ -214,6 +203,19 @@ impl OwnersDb {
         )
         .with_context(|| format!("parsing {}", overrides))?;
 
+        let filter = if let Some(filter) = &filter { Some(parse_filter(filter)?) } else { None };
+
+        // The gn graph doesn't track source dependencies, so build up our own
+        // lookup table.
+        let source_deps = gn_graph
+            .targets()
+            .iter()
+            .map(|(label, desc)| {
+                desc.description.sources.iter().map(|source| (source.clone(), label.clone()))
+            })
+            .flatten()
+            .collect::<HashMap<_, _>>();
+
         Ok(Self {
             projects,
             owners_path_cache,
@@ -221,21 +223,25 @@ impl OwnersDb {
             overrides,
             update_strategy,
             dry_run,
-            gn_bin,
-            out_dir,
+            fuchsia_dir,
+            gn_graph,
+            filter,
+            source_deps,
         })
     }
 
     /// Update all OWNERS files for all projects.
     fn update_all_files(&self) -> Result<()> {
         tracing::info!("Updating OWNERS files...");
-        self.projects
-            .par_iter()
-            .filter(|metadata| !metadata.path.starts_with("third_party/rust_crates/mirrors"))
-            .map(|metadata| self.update_owners_file(metadata, &mut std::io::stdout()))
-            .panic_fuse()
-            .collect::<Result<()>>()?;
-        tracing::info!("\nDone!");
+
+        for metadata in &self.projects {
+            if !metadata.path.starts_with("third_party/rust_crates/mirrors") {
+                self.update_owners_file(&metadata, &mut std::io::stdout())
+                    .with_context(|| format!("updating {:?}", metadata))?;
+            }
+        }
+
+        tracing::info!("Done!");
 
         Ok(())
     }
@@ -247,22 +253,29 @@ impl OwnersDb {
         output_buffer: &mut W,
     ) -> Result<()> {
         if self.update_strategy == UpdateStrategy::OnlyMissing {
-            if let Some(owners_path) = find_owners_including_secondary(&metadata.path) {
-                tracing::info!("\n{} has OWNERS file at {}, skipping", metadata.path, owners_path);
+            if let Some(owners_path) =
+                find_owners_including_secondary(&self.fuchsia_dir, &metadata.path)
+            {
+                tracing::info!("{} has OWNERS file at {}, skipping", metadata.path, owners_path);
                 return Ok(());
             }
         }
-        let file = self.compute_owners_file(metadata)?;
-        let owners_path = metadata.path.join("OWNERS");
+
+        let file = self
+            .compute_owners_file(metadata)
+            .with_context(|| format!("computing owners for {}", metadata.path))?;
+
+        let owners_path = self.fuchsia_dir.join(&metadata.path).join("OWNERS");
+
         if self.dry_run {
             tracing::info!("Dry-run: generated {} with content:\n", owners_path);
             output_buffer.write_all(file.to_string().as_bytes())?;
         } else {
             // We need to write every OWNERS file, even if it would be empty,
             // because the other OWNERS files may include the empty ones.
-            std::fs::write(owners_path, file.to_string().as_bytes())?;
+            std::fs::write(&owners_path, file.to_string().as_bytes())
+                .with_context(|| format!("writing {owners_path}"))?;
         }
-        eprint!(".");
 
         Ok(())
     }
@@ -275,6 +288,7 @@ impl OwnersDb {
         } else {
             metadata.path.to_owned().into_string()
         };
+
         if let Some(owners_overrides) = self.overrides.get(&override_key) {
             Ok(OwnersFile {
                 path: metadata.path.join("OWNERS"),
@@ -286,7 +300,7 @@ impl OwnersDb {
         }
     }
 
-    /// Run `gn refs` for the project's GN target(s) and find the OWNERS files that correspond to its
+    /// Run `gn desc` for the project's GN target(s) and find the OWNERS files that correspond to its
     /// reverse deps.
     ///
     /// For Rust projects, cargo-gnaw metadata encodes version-unambiguous GN targets like
@@ -296,10 +310,8 @@ impl OwnersDb {
     fn owners_files_from_reverse_deps(&self, metadata: &ProjectMetadata) -> Result<OwnersFile> {
         let mut deps = metadata
             .targets
-            .par_iter()
+            .iter()
             .map(|target| self.reverse_deps(target))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
             .flatten()
             .collect::<BTreeSet<String>>();
 
@@ -307,53 +319,72 @@ impl OwnersDb {
         // references to any of the files in the project.
         if deps.is_empty() && !metadata.path.starts_with("third_party/rust_crates") {
             tracing::info!(
-                "\n{} has no target references, searching for all file references",
+                "{} has no target references, searching for all file references",
                 metadata.path
             );
-            let targets: Vec<String> = WalkDir::new(&metadata.path)
-                .into_iter()
-                .filter_map(|entry| {
-                    entry
-                        .ok()
-                        .filter(|e| e.path().is_file())
-                        .map(|e| e.into_path().into_os_string().into_string().unwrap())
-                })
-                .collect();
+
+            let mut targets = vec![];
+            for entry in WalkDir::new(&self.fuchsia_dir.join(&metadata.path)) {
+                let path = Utf8PathBuf::try_from(entry?.into_path())?;
+
+                if path.is_file() {
+                    let path = if let Ok(path) = path.strip_prefix(&self.fuchsia_dir) {
+                        path.into()
+                    } else {
+                        path
+                    };
+
+                    targets.push(path);
+                }
+            }
+
             deps = targets
-                .par_iter()
-                .map(|target| self.reverse_deps(target))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
+                .iter()
+                .map(|target| self.source_deps.get(&format!("//{target}")))
                 .flatten()
+                .cloned()
                 .collect::<BTreeSet<String>>();
         }
 
         let mut includes = BTreeSet::new();
         for dep in &deps {
-            let included = self.owners_file_for_gn_target(&*dep)?;
-            if should_include(&included) {
-                includes.insert(included);
+            if let Some(included) = self.owners_file_for_gn_target(&*dep)? {
+                if should_include(&included) {
+                    includes.insert(included);
+                }
             }
         }
 
+        let includes =
+            includes.into_iter().filter(|i| !metadata.path.starts_with(i.parent().unwrap()));
+
+        // Optionally remove files from `includes` if they are not in the filter list.
+        let includes = if let Some(filter) = &self.filter {
+            includes.filter(|i| filter.contains(i)).collect()
+        } else {
+            includes.collect()
+        };
+
         Ok(OwnersFile {
             path: metadata.path.join("OWNERS"),
-            includes: includes
-                .into_iter()
-                .filter(|i| !metadata.path.starts_with(i.parent().unwrap()))
-                .collect(),
+            includes,
             source: OwnersSource::ReverseDependencies { targets: metadata.targets.clone(), deps },
         })
     }
 
-    /// Run `gn refs $OUT_DIR $GN_TARGET` and return a list of GN targets which depend on the
-    /// target.
-    fn reverse_deps(&self, target: &str) -> Result<BTreeSet<String>> {
-        gn_reverse_deps(&self.gn_bin, &self.out_dir, target)
+    /// Find all the dependencies for the GN target `target` and return a list of GN targets which
+    /// depend on the target.
+    fn reverse_deps(&self, target: &str) -> BTreeSet<String> {
+        if let Some(refs) = self.gn_graph.targets_dependent_on(target) {
+            refs.into_iter().map(|s| s.to_owned()).collect()
+        } else {
+            // the target exists in the filesystem but isn't in the existing build graph
+            BTreeSet::new()
+        }
     }
 
     /// Given a GN target, find the most likely path for its corresponding OWNERS file.
-    fn owners_file_for_gn_target(&self, target: &str) -> Result<Utf8PathBuf> {
+    fn owners_file_for_gn_target(&self, target: &str) -> Result<Option<Utf8PathBuf>> {
         // none of the metadata we have emits toolchain suffices, so remove them. the target
         // toolchain is the default toolchain so we don't encounter an targets suffixed that way
         let target = if let Some(idx) = target.find(GN_TOOLCHAIN_SUFFIX_PREFIX) {
@@ -361,40 +392,68 @@ impl OwnersDb {
         } else {
             target
         };
-        Ok(if target.starts_with(RUST_EXTERNAL_TARGET_PREFIX) && self.rust_metadata.is_some() {
+
+        if target.starts_with(RUST_EXTERNAL_TARGET_PREFIX) && self.rust_metadata.is_some() {
             // if the target is for a 3p crate it might not have an owners file yet, so we don't
             // want to rely on probing the filesystem. instead we'll construct a path *a priori*
-            if let Some(path) = self.owners_path_cache.get(target) {
-                path.join("OWNERS")
+            return Ok(if let Some(path) = self.owners_path_cache.get(target) {
+                Some(path.join("OWNERS"))
             } else {
-                bail!(
+                tracing::warn!(
                     "{} not in {}",
                     target,
-                    self.rust_metadata.as_ref().expect("metadata is set").display()
+                    self.rust_metadata.as_ref().expect("metadata is set")
                 );
+                None
+            });
+        }
+
+        // the target is outside of the 3p directory, so we need to probe for the closest file
+        let no_slashes =
+            target.strip_prefix("//").expect("GN targets from refs should be absolute");
+
+        // remove the target name after the colon
+        let path_portion = no_slashes.rsplitn(2, ":").skip(1).next().unwrap();
+
+        // Search up the directories for an OWNERS file. All paths are
+        // relative to `fuchsia_dir`, so we need to prepend it in order to
+        // see if it exists.
+        for dir in Utf8Path::new(path_portion).ancestors() {
+            let path = dir.join("OWNERS");
+            if self.fuchsia_dir.join(&path).exists() {
+                return Ok(Some(path));
             }
-        } else {
-            // the target is outside of the 3p directory, so we need to probe for the closest file
-            let no_slashes =
-                target.strip_prefix("//").expect("GN targets from refs should be absolute");
-            // remove the target name after the colon
-            let path_portion = no_slashes.rsplitn(2, ":").skip(1).next().unwrap();
-            let mut target = Utf8Path::new(path_portion);
-            while !target.join("OWNERS").exists() {
-                target =
-                    target.parent().expect("we will always find an OWNERS file in the source tree");
-            }
-            target.join("OWNERS")
-        })
+        }
+
+        panic!("we will always find an OWNERS file in the source tree");
     }
+}
+
+fn parse_filter(filter_path: &Utf8Path) -> Result<HashSet<Utf8PathBuf>> {
+    let filter_file = File::open(filter_path).with_context(|| format!("opening {filter_path}"))?;
+
+    let mut files = HashSet::new();
+    for line in BufReader::new(filter_file).lines() {
+        let line = line?;
+        if line.ends_with("OWNERS") {
+            files.insert(line.into());
+        } else {
+            bail!("each line must end with `OWNERS`, not {line}")
+        }
+    }
+
+    Ok(files)
 }
 
 const THIRD_PARTY: &str = "third_party";
 const BUILD_SECONDARY_THIRD_PARTY: &str = "build/secondary/third_party";
 
-fn find_owners_including_secondary(project_path: &Utf8PathBuf) -> Option<Utf8PathBuf> {
+fn find_owners_including_secondary(
+    fuchsia_dir: &Utf8Path,
+    project_path: &Utf8PathBuf,
+) -> Option<Utf8PathBuf> {
     let owners_path = project_path.join("OWNERS");
-    if owners_path.exists() {
+    if fuchsia_dir.join(&owners_path).exists() {
         return Some(owners_path);
     }
 
@@ -407,29 +466,40 @@ fn find_owners_including_secondary(project_path: &Utf8PathBuf) -> Option<Utf8Pat
     // Some third-party projects share owners up the path. Look for owners up to one level down
     // from //third_party, i.e //third_party/<project-root>.
     if project_path.starts_with(THIRD_PARTY) {
-        let owners_path = find_owners_up_to_dir_with_parent(project_path, THIRD_PARTY);
+        let owners_path = find_owners_up_to_dir_with_parent(fuchsia_dir, project_path, THIRD_PARTY);
+
         if owners_path.is_some() {
             return owners_path;
         }
         // Some third-party projects have their OWNERS files placed in //build/secondary/.
         let build_secondary_path = Utf8Path::new("build/secondary").join(project_path);
-        let owners_path =
-            find_owners_up_to_dir_with_parent(&build_secondary_path, BUILD_SECONDARY_THIRD_PARTY);
+        let owners_path = find_owners_up_to_dir_with_parent(
+            fuchsia_dir,
+            &build_secondary_path,
+            BUILD_SECONDARY_THIRD_PARTY,
+        );
+
         if owners_path.is_some() {
             return owners_path;
         }
     }
     // Some third-party projects are in //build/secondary.
     if project_path.starts_with(BUILD_SECONDARY_THIRD_PARTY) {
-        return find_owners_up_to_dir_with_parent(project_path, BUILD_SECONDARY_THIRD_PARTY);
+        return find_owners_up_to_dir_with_parent(
+            fuchsia_dir,
+            project_path,
+            BUILD_SECONDARY_THIRD_PARTY,
+        );
     }
+
     None
 }
 
 // Search for an OWNERS file up the directory structure until reaching the directory whose parent
 // is `parent_path`.
 fn find_owners_up_to_dir_with_parent(
-    project_path: &Utf8PathBuf,
+    fuchsia_dir: &Utf8Path,
+    project_path: &Utf8Path,
     parent_path: &str,
 ) -> Option<Utf8PathBuf> {
     if !project_path.starts_with(parent_path) {
@@ -437,7 +507,7 @@ fn find_owners_up_to_dir_with_parent(
     }
 
     let owners_path = project_path.join("OWNERS");
-    if owners_path.exists() {
+    if fuchsia_dir.join(&owners_path).exists() {
         return Some(owners_path);
     }
 
@@ -446,7 +516,7 @@ fn find_owners_up_to_dir_with_parent(
             // If the parent is `parent_path`, stop searching.
             return None;
         }
-        return find_owners_up_to_dir_with_parent(&parent.to_path_buf(), parent_path);
+        return find_owners_up_to_dir_with_parent(fuchsia_dir, &parent.to_path_buf(), parent_path);
     }
     None
 }
@@ -533,27 +603,6 @@ impl std::fmt::Display for OwnersFile {
     }
 }
 
-fn gn_reverse_deps(gn_bin: &Path, out_dir: &Path, target: &str) -> Result<BTreeSet<String>> {
-    let output = Command::new(gn_bin).arg("refs").arg(out_dir).arg(target).output()?;
-    let stdout = String::from_utf8(output.stdout.clone())?;
-
-    if !output.status.success() {
-        if stdout.contains("The input matches no targets, configs, or files.") {
-            // the target exists in the filesystem but isn't in the existing build graph
-            return Ok(Default::default());
-        }
-        bail!("`gn refs {}` failed: {:?}", target, output);
-    }
-
-    let revdeps: BTreeSet<String> = if stdout.contains("Nothing references this.") {
-        Default::default()
-    } else {
-        stdout.lines().map(ToString::to_string).collect()
-    };
-
-    Ok(revdeps)
-}
-
 fn should_include(owners_file: &Utf8Path) -> bool {
     let owners_file = owners_file.as_os_str().to_str().unwrap();
     // many of these repos aren't open
@@ -562,8 +611,13 @@ fn should_include(owners_file: &Utf8Path) -> bool {
     owners_file != "OWNERS"
 }
 
-fn parse_integration_manifest(manifest_path: &PathBuf) -> Result<Vec<ProjectMetadata>> {
-    let parser = EventReader::new(BufReader::new(File::open(&manifest_path)?));
+fn parse_integration_manifest(
+    gn_graph: &gn_graph::Graph,
+    manifest_path: &Utf8Path,
+) -> Result<Vec<ProjectMetadata>> {
+    let parser = EventReader::new(BufReader::new(
+        File::open(manifest_path).with_context(|| format!("opening {manifest_path}"))?,
+    ));
 
     parser
         .into_iter()
@@ -581,17 +635,19 @@ fn parse_integration_manifest(manifest_path: &PathBuf) -> Result<Vec<ProjectMeta
                     .find(|&a| a.name.local_name == "name")
                     .ok_or(anyhow!("no name attribute"))?
                     .value;
+
                 let path = &attributes
                     .iter()
                     .find(|&a| a.name.local_name == "path")
                     .ok_or(anyhow!("no path attribute"))?
                     .value
                     .trim_end_matches("/src");
+
                 Ok(ProjectMetadata {
                     name: name.to_string(),
                     path: Utf8PathBuf::from(path),
                     // the project can be referred by any of its inner targets.
-                    targets: vec![path.to_string() + "/*"],
+                    targets: get_targets_in_directory(gn_graph, path),
                 })
             }
             _ => bail!("unreachable"),
@@ -599,31 +655,41 @@ fn parse_integration_manifest(manifest_path: &PathBuf) -> Result<Vec<ProjectMeta
         .collect()
 }
 
-fn parse_path(project_paths: String) -> Vec<ProjectMetadata> {
-    let projects = project_paths
-        .split_terminator(",")
-        .map(|path| {
-            let path = path.trim_end_matches('/');
-            ProjectMetadata {
-                name: path.to_string(),
-                path: Utf8PathBuf::from(path.to_string()),
-                targets: vec![path.to_owned() + ("/*")],
-            }
-        })
-        .collect::<Vec<_>>();
+fn parse_path(gn_graph: &gn_graph::Graph, path: &str) -> ProjectMetadata {
+    let path = path.trim_end_matches('/');
 
-    projects
+    ProjectMetadata {
+        name: path.to_string(),
+        path: Utf8PathBuf::from(path.to_string()),
+        targets: get_targets_in_directory(gn_graph, path),
+    }
+}
+
+fn get_targets_in_directory(gn_graph: &gn_graph::Graph, path: &str) -> Vec<String> {
+    let prefixes = [format!("//{path}/"), format!("//{path}:")];
+
+    let mut targets = vec![];
+    for (target, _) in gn_graph.targets().range(format!("//{path}")..) {
+        if prefixes.iter().any(|prefix| target.starts_with(prefix)) {
+            targets.push(target.clone());
+        } else {
+            break;
+        }
+    }
+
+    targets
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
     use serial_test::serial;
-    use std::{path::PathBuf, process::Command};
+    use std::process::{Command, Stdio};
 
-    fn read_owners(dir: &Path) -> BTreeMap<String, String> {
+    fn read_owners(dir: &Utf8Path) -> BTreeMap<String, String> {
         let mut owners: BTreeMap<String, String> = BTreeMap::new();
         for entry in WalkDir::new(dir) {
             let entry = entry.unwrap();
@@ -638,30 +704,17 @@ mod tests {
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
-    fn parse_gn_reverse_deps() {
-        let mut expected = BTreeSet::new();
-        expected.insert("//:bar".to_string());
-        assert_eq!(get_rev_deps("pass", "//foo"), expected);
-    }
-
-    #[test]
-    #[serial] // these tests mutate the current process' working directory
-    fn parse_gn_empty_reverse_deps() {
-        assert_eq!(get_rev_deps("empty", "//foo"), Default::default());
-    }
-
-    #[test]
-    #[serial] // these tests mutate the current process' working directory
-    #[should_panic] // if the target is altogether missing, it should return an error
-    fn parse_gn_target_isnt_in_build() {
-        get_rev_deps("missing", "//foo");
-    }
-
-    #[test]
     fn parse_integration_manifest_projects() {
+        let test_dir = setup_test_dir("owners");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
+
+        let gn_desc = test_dir_path.join("out/gn_desc.json");
+        let gn_targets = gn_json::parse_file(gn_desc).unwrap();
+        let gn_graph = gn_graph::Graph::create_from(gn_targets).unwrap();
+
         let projects =
-            parse_integration_manifest(&PATHS.test_base_dir.join("integration/manifest")).unwrap();
+            parse_integration_manifest(&gn_graph, &test_dir_path.join("manifest")).unwrap();
+
         assert_eq!(
             projects
                 .into_iter()
@@ -677,46 +730,44 @@ mod tests {
 
     #[test]
     fn parse_path_projects() {
-        let projects = parse_path("foo/,bar".to_string());
+        let test_dir = setup_test_dir("owners");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
+
+        let gn_desc = test_dir_path.join("out/gn_desc.json");
+        let gn_targets = gn_json::parse_file(gn_desc).unwrap();
+        let gn_graph = gn_graph::Graph::create_from(gn_targets).unwrap();
+
         assert_eq!(
-            projects
-                .into_iter()
-                .map(|ProjectMetadata { name: _, path, targets: _ }| path
-                    .as_os_str()
-                    .to_str()
-                    .unwrap()
-                    .to_string())
-                .collect::<Vec<String>>(),
-            ["foo", "bar"]
+            parse_path(&gn_graph, "third_party/bar/"),
+            ProjectMetadata {
+                name: "third_party/bar".into(),
+                path: "third_party/bar".into(),
+                targets: vec!["//third_party/bar:bar".into()],
+            }
         );
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
     fn override_owners() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
-
-        let rust_metadata = Some(PATHS.test_base_dir.join("owners/rust_metadata.json"));
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // an OWNERS file should be generated for projects missing owners
         let mut expected_owner_files = read_owners(&test_dir_path);
         assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
         assert!(!expected_owner_files.contains_key("third_party/rust_crates/foo/OWNERS"));
 
-        assert!(OwnersDb::new(
-            rust_metadata,
-            None,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::AllFiles,
-            None,
-            false,
-        )
+        assert!(OwnersDb::new(Options {
+            rust_metadata: Some(PATHS.test_base_dir.join("owners/rust_metadata.json")),
+            integration_manifest: None,
+            filter: Some(test_dir_path.join("filter-files")),
+            overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+            gn_desc: test_dir_path.join("out/gn_desc.json"),
+            fuchsia_dir: test_dir_path.to_path_buf(),
+            skip_existing: false,
+            project_paths: vec![],
+            dry_run: false,
+        })
         .expect("valid OwnersDb")
         .update_all_files()
         .is_ok());
@@ -739,30 +790,26 @@ mod tests {
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
     fn update_outdated_owners() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
-        let rust_metadata = Some(PATHS.test_base_dir.join("owners/rust_metadata.json"));
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // an OWNERS file should be generated for projects missing owners
         let mut expected_owner_files = read_owners(&test_dir_path);
         assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
         assert!(!expected_owner_files.contains_key("third_party/rust_crates/foo/OWNERS"));
 
-        assert!(OwnersDb::new(
-            rust_metadata,
-            None,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::AllFiles,
-            None,
-            false,
-        )
+        assert!(OwnersDb::new(Options {
+            rust_metadata: Some(PATHS.test_base_dir.join("owners/rust_metadata.json")),
+            integration_manifest: None,
+            filter: Some(test_dir_path.join("filter-files")),
+            overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+            gn_desc: test_dir_path.join("out/gn_desc.json"),
+            fuchsia_dir: test_dir_path.to_path_buf(),
+            skip_existing: false,
+            project_paths: vec![],
+            dry_run: false,
+        })
         .expect("valid OwnersDb")
         .update_all_files()
         .is_ok());
@@ -785,34 +832,31 @@ mod tests {
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
     fn generate_missing() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
-        let manifest = Some(PATHS.test_base_dir.join("owners/manifest"));
-        let rust_metadata = Some(PATHS.test_base_dir.join("owners/rust_metadata.json"));
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // an OWNERS file should be generated for projects missing owners
         let mut expected_owner_files = read_owners(&test_dir_path);
         assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
         assert!(!expected_owner_files.contains_key("third_party/rust_crates/foo/OWNERS"));
 
-        assert!(OwnersDb::new(
-            rust_metadata,
-            manifest,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::OnlyMissing,
-            None,
-            false,
-        )
-        .expect("valid OwnersDb")
-        .update_all_files()
-        .is_ok());
+        assert_matches!(
+            OwnersDb::new(Options {
+                rust_metadata: Some(PATHS.test_base_dir.join("owners/rust_metadata.json")),
+                integration_manifest: Some(PATHS.test_base_dir.join("owners/manifest")),
+                filter: Some(test_dir_path.join("filter-files")),
+                overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+                gn_desc: test_dir_path.join("out/gn_desc.json"),
+                fuchsia_dir: test_dir_path.to_path_buf(),
+                skip_existing: true,
+                project_paths: vec![],
+                dry_run: false,
+            })
+            .expect("valid OwnersDb")
+            .update_all_files(),
+            Ok(())
+        );
 
         // Only these paths should be created.
         expected_owner_files.insert(
@@ -835,31 +879,30 @@ mod tests {
     #[serial] // these tests mutate the current process' working directory
     fn dry_run() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
-        let manifest = Some(PATHS.test_base_dir.join("owners/manifest"));
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // check that the project doesn't have an OWNERS file
         assert!(!test_dir_path.join("third_party/bar/OWNERS").exists());
 
-        let owners_db = OwnersDb::new(
-            None,
-            manifest,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::AllFiles,
-            None,
-            true,
-        )
+        let owners_db = OwnersDb::new(Options {
+            rust_metadata: None,
+            integration_manifest: Some(PATHS.test_base_dir.join("owners/manifest")),
+            filter: Some(test_dir_path.join("filter-files")),
+            overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+            gn_desc: test_dir_path.join("out/gn_desc.json"),
+            fuchsia_dir: test_dir_path.to_path_buf(),
+            skip_existing: false,
+            project_paths: vec![],
+            dry_run: true,
+        })
         .expect("OwnersDb is valid");
+
         let unowned_metadata = owners_db
             .projects
             .iter()
             .find(|m| m.name.contains("bar"))
             .expect("should contain project metadata");
+
         let mut output_buffer = vec![];
         assert!(owners_db.update_owners_file(&unowned_metadata, &mut output_buffer).is_ok());
 
@@ -868,44 +911,35 @@ mod tests {
 
         // check that the dry-run output is correct
         let output = String::from_utf8(output_buffer).unwrap();
-        assert_eq!(
-            output,
-            format!(
-                "{}\n{}
-include /dep/OWNERS
-",
-                AUTOGENERATED_HEADER, HEADER
-            )
-        );
+        assert_eq!(output, format!("{AUTOGENERATED_HEADER}\n{HEADER}\ninclude /dep/OWNERS\n"));
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
     fn update_owners_for_path() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // an OWNERS file should be generated for projects missing owners
         let mut expected_owner_files = read_owners(&test_dir_path);
         assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
         assert!(!expected_owner_files.contains_key("third_party/rust_crates/foo/OWNERS"));
 
-        assert!(OwnersDb::new(
-            None,
-            None,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::AllFiles,
-            Some("third_party/bar/".to_string()),
-            false,
-        )
-        .expect("valid OwnersDb")
-        .update_all_files()
-        .is_ok());
+        assert_matches!(
+            OwnersDb::new(Options {
+                rust_metadata: None,
+                integration_manifest: None,
+                filter: Some(test_dir_path.join("filter-files")),
+                overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+                gn_desc: test_dir_path.join("out/gn_desc.json"),
+                fuchsia_dir: test_dir_path.to_path_buf(),
+                skip_existing: false,
+                project_paths: vec!["third_party/bar/".to_string()],
+                dry_run: false,
+            })
+            .expect("valid OwnersDb")
+            .update_all_files(),
+            Ok(())
+        );
 
         // Only this path should be created.
         expected_owner_files.insert(
@@ -919,29 +953,26 @@ include /dep/OWNERS
     }
 
     #[test]
-    #[serial] // these tests mutate the current process' working directory
     fn search_for_file_refs() {
         let test_dir = setup_test_dir("owners");
-        let test_dir_path = test_dir.path().to_path_buf();
-        let out_dir = test_dir_path.join("out");
-        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
-            .expect("path is valid");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // an OWNERS file should be generated for projects missing owners
         let mut expected_owner_files = read_owners(&test_dir_path);
         assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
 
         // the 'baz' project is depended on by file, not gn target.
-        assert!(OwnersDb::new(
-            None,
-            None,
-            overrides,
-            PATHS.gn_binary_path.clone(),
-            out_dir,
-            UpdateStrategy::AllFiles,
-            Some("third_party/baz/".to_string()),
-            false,
-        )
+        assert!(OwnersDb::new(Options {
+            rust_metadata: None,
+            integration_manifest: None,
+            filter: Some(test_dir_path.join("filter-files")),
+            overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+            gn_desc: test_dir_path.join("out/gn_desc.json"),
+            fuchsia_dir: test_dir_path.to_path_buf(),
+            skip_existing: false,
+            project_paths: vec!["third_party/baz/".to_string()],
+            dry_run: false,
+        })
         .expect("valid OwnersDb")
         .update_all_files()
         .is_ok());
@@ -960,65 +991,91 @@ include /dep/OWNERS
     #[test]
     #[serial] // these tests mutate the current process' working directory
     fn find_owners() {
-        let _test_dir = setup_test_dir("owners");
+        let test_dir = setup_test_dir("owners");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
 
         // The OWNERS file for the child project is in its parent directory.
         assert_eq!(
             Some(Utf8Path::new("third_party/foo/OWNERS").to_path_buf()),
-            find_owners_including_secondary(&Utf8Path::new("third_party/foo/child").to_path_buf()),
+            find_owners_including_secondary(
+                &test_dir_path,
+                &Utf8Path::new("third_party/foo/child").to_path_buf()
+            ),
         );
         // The OWNERS file for this project is in the alternative location //build/secondary.
         assert_eq!(
             Some(Utf8Path::new("build/secondary/third_party/baz/foo/OWNERS").to_path_buf()),
-            find_owners_including_secondary(&Utf8Path::new("third_party/baz/foo").to_path_buf()),
+            find_owners_including_secondary(
+                &test_dir_path,
+                &Utf8Path::new("third_party/baz/foo").to_path_buf()
+            ),
         );
     }
 
     fn setup_test_dir(test_subdir: &str) -> tempfile::TempDir {
         let original_test_dir = PATHS.test_base_dir.join(test_subdir);
         let test_dir = tempfile::tempdir().unwrap();
-        let test_dir_path = test_dir.path().to_path_buf();
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
         let out_dir = test_dir_path.join("out");
 
         copy_contents(&original_test_dir, &test_dir_path);
         copy_contents(&PATHS.test_base_dir.join("common"), &test_dir_path);
 
-        // cd to test directory so the below command *and* those in `gn_reverse_deps()` share cwd
-        std::env::set_current_dir(&test_dir_path).expect("setting current dir");
+        // Write all the files into `filter-files`.
+        let mut filter_file = File::create(test_dir_path.join("filter-files")).unwrap();
+        for entry in walkdir::WalkDir::new(&test_dir_path) {
+            let entry = entry.unwrap();
+            let path =
+                Utf8Path::from_path(entry.path().strip_prefix(&test_dir_path).unwrap()).unwrap();
+            if path.ends_with("OWNERS") {
+                writeln!(filter_file, "{}", path).unwrap();
+            }
+        }
+        drop(filter_file);
 
         // generate a gn out directory
         assert!(Command::new(&PATHS.gn_binary_path)
-            .current_dir(test_dir_path)
+            .current_dir(&test_dir_path)
             .arg("gen")
             .arg(&out_dir)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .expect("generating out directory")
             .success());
+
+        // generate a gn desc json file.
+        let gn_desc = out_dir.join("gn_desc.json");
+        assert!(Command::new(&PATHS.gn_binary_path)
+            .current_dir(test_dir_path)
+            .arg("desc")
+            .arg(&out_dir)
+            .arg("//*")
+            .arg("--format=json")
+            .arg("--all-toolhcains")
+            .stdout(File::create(gn_desc).unwrap())
+            .stderr(Stdio::null())
+            .status()
+            .expect("generating a gn_desc.json")
+            .success());
+
         test_dir
     }
 
-    fn get_rev_deps(test_subdir: &str, target: &str) -> BTreeSet<String> {
-        let test_dir = setup_test_dir(test_subdir);
-        let out_dir = test_dir.path().to_path_buf().join("out");
-
-        // parse the reverse deps
-        gn_reverse_deps(&PATHS.gn_binary_path, &out_dir, target).expect("getting reverse deps")
-    }
-
-    fn copy_contents(original_test_dir: &Path, test_dir_path: &Path) {
+    fn copy_contents(original_test_dir: &Utf8Path, test_dir_path: &Utf8Path) {
         // copy the contents of original test dir to test_dir
         for entry in walkdir::WalkDir::new(&original_test_dir) {
             let entry = entry.expect("walking original test directory to copy files to /tmp");
             if !entry.file_type().is_file() {
                 continue;
             }
-            let to_copy = entry.path();
+            let to_copy = Utf8Path::from_path(entry.path()).unwrap();
             let destination = test_dir_path.join(to_copy.strip_prefix(&original_test_dir).unwrap());
             std::fs::create_dir_all(destination.parent().unwrap())
                 .expect("making parent of file to copy");
             std::fs::copy(to_copy, destination).expect("copying file");
         }
-        tracing::info!("done copying files");
+        tracing::trace!("done copying files");
     }
 
     /// All the paths to runfiles and tools which are used in this test.
@@ -1035,28 +1092,28 @@ include /dep/OWNERS
         /// `.../host_x64`
         // TODO(fxbug.dev/84729)
         #[allow(unused)]
-        test_root_dir: PathBuf,
+        test_root_dir: Utf8PathBuf,
 
         /// `.../host_x64/test_data`, this is the root of the runfiles tree, a
         /// path //foo/bar will be copied at `.../host_x64/test_data/foo/bar` for
         /// this test.
         // TODO(fxbug.dev/84729)
         #[allow(unused)]
-        test_data_dir: PathBuf,
+        test_data_dir: Utf8PathBuf,
 
         /// `.../host_x64/test_data/tools/auto_owners/tests`: this is the directory
         /// where GN golden files are placed. Corresponds to `//tools/auto_owners/tests`.
-        test_base_dir: PathBuf,
+        test_base_dir: Utf8PathBuf,
 
         /// `.../host_x64/test_data/tools/auto_owners/runfiles`: this is the directory
         /// where the binary runfiles live.
         // TODO(fxbug.dev/84729)
         #[allow(unused)]
-        runfiles_dir: PathBuf,
+        runfiles_dir: Utf8PathBuf,
 
         /// `.../runfiles/gn`: the absolute path to the gn binary. gn is used for
         /// formatting.
-        gn_binary_path: PathBuf,
+        gn_binary_path: Utf8PathBuf,
     }
 
     /// Gets the hermetic test paths for the runfiles and tools used in this test.
@@ -1064,24 +1121,19 @@ include /dep/OWNERS
     /// The hermetic test paths are computed based on the parent directory of this
     /// binary.
     static PATHS: Lazy<Paths> = Lazy::new(|| {
-        let cwd = std::env::current_dir().unwrap();
-        let first_arg = dbg!(std::env::args().next().unwrap());
-        let test_binary_path = dbg!(cwd.join(first_arg));
+        let cwd = Utf8PathBuf::from_path_buf(std::env::current_dir().unwrap()).unwrap();
+
+        let first_arg = "host_x64/auto_owners_test";
+        //let first_arg = std::env::args().next().unwrap();
+        let test_binary_path = cwd.join(first_arg);
 
         let test_root_dir = test_binary_path.parent().unwrap();
 
-        let test_data_dir: PathBuf =
-            [test_root_dir.to_str().unwrap(), "test_data"].iter().collect();
-
-        let test_base_dir: PathBuf =
-            [test_data_dir.to_str().unwrap(), "tools", "auto_owners", "tests"].iter().collect();
-
-        let runfiles_dir: PathBuf =
-            [test_root_dir.to_str().unwrap(), "test_data", "tools", "auto_owners", "runfiles"]
-                .iter()
-                .collect();
-
-        let gn_binary_path: PathBuf = [runfiles_dir.to_str().unwrap(), "gn", "gn"].iter().collect();
+        let test_data_dir = test_root_dir.join("test_data");
+        let test_base_dir = test_data_dir.join("tools").join("auto_owners").join("tests");
+        let runfiles_dir =
+            test_root_dir.join("test_data").join("tools").join("auto_owners").join("runfiles");
+        let gn_binary_path = runfiles_dir.join("gn").join("gn");
 
         Paths {
             test_root_dir: test_root_dir.to_path_buf(),
