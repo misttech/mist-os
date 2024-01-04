@@ -107,7 +107,7 @@ def _scrutiny_validation(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        scrutiny_config.pre_signing_policy,
+        platform_scrutiny_config.pre_signing_policy,
     ))
     if not is_recovery:
         deps += _verify_route_sources(
@@ -115,21 +115,21 @@ def _scrutiny_validation(
             ffx_invocation,
             ffx_tool,
             pb_out_dir,
-            scrutiny_config.routes_config_golden,
+            platform_scrutiny_config.routes_config_golden,
         )
         deps += _verify_component_resolver_allowlist(
             ctx,
             ffx_invocation,
             ffx_tool,
             pb_out_dir,
-            scrutiny_config.component_resolver_allowlist,
+            platform_scrutiny_config.component_resolver_allowlist,
         )
         deps += _verify_routes(
             ctx,
             ffx_invocation,
             ffx_tool,
             pb_out_dir,
-            scrutiny_config.component_route_exceptions,
+            platform_scrutiny_config.component_route_exceptions,
             scrutiny_config.component_tree_config,
         )
         deps += _verify_structured_config(
@@ -137,7 +137,7 @@ def _scrutiny_validation(
             ffx_invocation,
             ffx_tool,
             pb_out_dir,
-            scrutiny_config.structured_config_policy,
+            platform_scrutiny_config.structured_config_policy,
         )
         deps += _extract_structured_config(
             ctx,
@@ -602,9 +602,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
     if ctx.attr.recovery_scrutiny_config:
         build_type = ctx.attr.recovery[FuchsiaProductImageInfo].build_type
         if build_type == "user":
-            platform_scrutiny_config = ctx.attr._platform_user_scrutiny_config[FuchsiaScrutinyConfigInfo]
+            platform_scrutiny_config = ctx.attr._platform_recovery_user_scrutiny_config[FuchsiaScrutinyConfigInfo]
         elif build_type == "userdebug":
-            platform_scrutiny_config = ctx.attr._platform_userdebug_scrutiny_config[FuchsiaScrutinyConfigInfo]
+            platform_scrutiny_config = ctx.attr._platform_recovery_userdebug_scrutiny_config[FuchsiaScrutinyConfigInfo]
         else:
             fail("scrutiny cannot run on 'recovery' because it is an eng build type")
 
@@ -698,6 +698,16 @@ _build_fuchsia_product_bundle = rule(
             doc = "Scrutiny config listing platform content of userdebug products",
             providers = [FuchsiaScrutinyConfigInfo],
             default = "//fuchsia/private/assembly/goldens:userdebug",
+        ),
+        "_platform_recovery_user_scrutiny_config": attr.label(
+            doc = "Scrutiny config listing platform content of recovery user products",
+            providers = [FuchsiaScrutinyConfigInfo],
+            default = "//fuchsia/private/assembly/goldens:user_recovery",
+        ),
+        "_platform_recovery_userdebug_scrutiny_config": attr.label(
+            doc = "Scrutiny config listing platform content of recovery userdebug products",
+            providers = [FuchsiaScrutinyConfigInfo],
+            default = "//fuchsia/private/assembly/goldens:userdebug_recovery",
         ),
     },
 )

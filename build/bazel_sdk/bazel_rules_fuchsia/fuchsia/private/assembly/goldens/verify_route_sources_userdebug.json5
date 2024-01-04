@@ -1,0 +1,124 @@
+{
+    component_routes: [
+        {
+            // pkg-resolver should have its configuration data and SSL
+            // certificates served directly from fshost out of a directory
+            // covered by verified boot hash chain.
+            target_node_path: "/core/pkg-resolver",
+
+            // Most routes are not read-only data covered by verified boot hash
+            // chain.
+            routes_to_skip: [
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.paver.Paver",
+                },
+                {
+                    use_type: "storage",
+                    use_path: "/data",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.logger.LogSink",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.net.name.Lookup",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.posix.socket.Provider",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.boot.Arguments",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.metrics.MetricEventLoggerFactory",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.pkg.LocalMirror",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.pkg.PackageCache",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.tracing.provider.Registry",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.inspect.InspectSink",
+                },
+
+                // TODO(fxbug.dev/121414) add verification for these routes (by uncommmenting
+                // the entries in routes_to_verify) once pkg_cache_resolver is removed.
+                {
+                    use_type: "directory",
+                    use_path: "/config/data",
+                },
+                {
+                    use_type: "directory",
+                    use_path: "/config/ssl",
+                },
+            ],
+
+            // TODO(fxbug.dev/121414) add verification for capabilities provided by
+            // /bootstrap/pkg-cache once pkg_cache_resolver is removed.
+            // Assumption: Read-only data covered by verified boot hash chain is
+            // served out of:
+            //   -   /bootstrap/pkg-cache:/pkgfs/packages/config-data/0/meta/data
+            //   -   /bootstrap/pkg-cache:/pkgfs/packages/root_ssl_certificates/0/data
+            routes_to_verify: [
+                //    {
+                //        use_type: "directory",
+                //        use_path: "/config/data",
+                //        source_node_path: "/bootstrap/pkg-cache",
+                //        source_path_prefix: "/pkgfs/packages/config-data/0/meta/data",
+                //    },
+                //    {
+                //        use_type: "directory",
+                //        use_path: "/config/ssl",
+                //        source_node_path: "/bootstrap/pkg-cache",
+                //        source_path_prefix: "/pkgfs/packages/root_ssl_certificates/0/data",
+                //    },
+            ],
+        },
+        {
+            // TODO(fxbug.dev/121414) remove once pkg_cache_resolver is removed.
+            // pkg_cache_resolver should access blobfs from the fshost child component blobfs.
+            target_node_path: "/bootstrap/pkg_cache_resolver",
+            skip_if_target_node_missing: true,
+            routes_to_skip: [
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.boot.Arguments",
+                },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.logger.LogSink",
+                },
+            ],
+
+            // Assumption: The system's blobfs is served out of:
+            //    -   /bootstrap/fshost/blobfs:/root
+            routes_to_verify: [
+                {
+                    use_type: "directory",
+                    use_path: "/blob",
+                    source_node_path: "/bootstrap/fshost/blobfs",
+                    source_path_prefix: "/root",
+                },
+            ],
+        },
+
+        // TODO(fxbug.dev/121414) add blobfs verification for target_node_path /bootstrap/pkg-cache
+        // once pkg_cache_resolver is removed.
+
+        // TODO(fxbug.dev/121414) add blobfs verification for target_node_path
+        // /bootstrap/base_resolver once pkg_cache_resolver is removed.
+    ],
+}
