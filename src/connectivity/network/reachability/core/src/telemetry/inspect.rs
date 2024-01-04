@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_inspect::{Inspector, Node as InspectNode};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
-use parking_lot::Mutex;
 use std::sync::Arc;
 use windowed_stats::aggregations::{create_saturating_add_fn, SumAndCount};
 use windowed_stats::{FifteenMinutelyWindows, HourlyWindows, MinutelyWindows, TimeSeries};
