@@ -17,7 +17,7 @@ product_assembly_configuration("minimal") {
     connectivity = {
       network = {
         netcfg_config_path =
-            rebase_path("//src/connectivity/network/netcfg/config/default.json",
+            rebase_path("//src/connectivity/policy/netcfg/config/default.json",
                         root_build_dir)
       }
     }

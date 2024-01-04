@@ -28,8 +28,8 @@ assembly_input_groups("legacy") {
 assembly_input_groups("network") {
   visibility = [ "*" ]
   base_packages = [
-    "//src/connectivity/network/netcfg:config-default",
     "//src/connectivity/network:for_transition",
+    "//src/connectivity/policy/netcfg:config-default",
   ]
 }
 

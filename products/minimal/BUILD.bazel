@@ -25,7 +25,7 @@ _PRODUCT_CONFIG_BASE_JSON = {
         },
         "connectivity": {
             "network": {
-                "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:default.json)",
+                "netcfg_config_path": "LABEL(//src/connectivity/policy/netcfg/config:default.json)",
             },
         },
         "fonts": {

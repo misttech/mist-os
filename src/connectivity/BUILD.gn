@@ -46,6 +46,7 @@ group("tests_no_e2e") {
     "lowpan:tests",
     "network:tests",
     "overnet:tests_no_e2e",
+    "policy:tests",
     "ppp:tests",
     "telephony:tests",
     "weave:tests",

@@ -96,9 +96,9 @@ template("assemble_network_conformance_system") {
     allow_eng_platform_bundle_use = true
     base_packages = [
       "//src/connectivity/network/mdns/bundles:services",
-      "//src/connectivity/network/netcfg:config-default",
       "//src/connectivity/network/net-cli",
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
+      "//src/connectivity/policy/netcfg:config-default",
       "//src/security/bin/root_ssl_certificates",
       "//src/sys/full-resolver:full-resolver-pkg",
     ]

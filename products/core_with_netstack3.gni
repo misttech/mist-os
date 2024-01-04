@@ -8,7 +8,7 @@ product_bootfs_labels = []
 legacy_base_package_labels = []
 
 legacy_base_package_labels +=
-    [ "//src/connectivity/network/netcfg:config-default" ]
+    [ "//src/connectivity/policy/netcfg:config-default" ]
 
 discoverable_package_labels = [ "//bundles/tools" ]
 

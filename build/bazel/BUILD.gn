@@ -10,7 +10,7 @@ import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
 import("//build/toolchain/rbe.gni")
-import("//src/connectivity/network/netcfg/delegated_network_provisioning.gni")
+import("//src/connectivity/policy/netcfg/delegated_network_provisioning.gni")
 
 assert(
     current_toolchain == default_toolchain,

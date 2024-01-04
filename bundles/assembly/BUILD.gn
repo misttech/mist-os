@@ -686,7 +686,7 @@ assembly_input_bundle("network_realm_packages_gub") {
 # It is mutually-exclusive with networking_basic.
 #
 assembly_input_bundle("networking_with_virtualization") {
-  base_packages = [ "//src/connectivity/network/netcfg:package-advanced" ]
+  base_packages = [ "//src/connectivity/policy/netcfg:package-advanced" ]
   compiled_packages = [
     {
       name = "network"
@@ -730,7 +730,7 @@ assembly_input_bundle("networking_basic") {
 # This AIB provides packages for the networking_basic configuration. It is
 # mutually exlucisve with networking_basic_packages_gub.
 assembly_input_bundle("networking_basic_packages") {
-  base_packages = [ "//src/connectivity/network/netcfg:package-basic" ]
+  base_packages = [ "//src/connectivity/policy/netcfg:package-basic" ]
 }
 
 # Basic networking packages with unified binary.
@@ -739,7 +739,7 @@ assembly_input_bundle("networking_basic_packages") {
 # configuration as found in networking_basic_packages. It is mutually exlucisve
 # with networking_basic_packages.
 assembly_input_bundle("networking_basic_packages_gub") {
-  base_packages = [ "//src/connectivity/network/netcfg:package-basic_gub" ]
+  base_packages = [ "//src/connectivity/policy/netcfg:package-basic_gub" ]
 }
 
 # networking_test_collection

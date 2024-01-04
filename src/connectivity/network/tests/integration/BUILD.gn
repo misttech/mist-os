@@ -110,8 +110,8 @@ package_deps = [
   ":netcfg-with-forwarding-netemul-config",
   ":netcfg-with-iface-name-prefix",
   ":netcfg-without-provisioning-netemul-config",
-  "//src/connectivity/network/netcfg:component-advanced",
-  "//src/connectivity/network/netcfg:component-basic",
+  "//src/connectivity/policy/netcfg:component-advanced",
+  "//src/connectivity/policy/netcfg:component-basic",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
