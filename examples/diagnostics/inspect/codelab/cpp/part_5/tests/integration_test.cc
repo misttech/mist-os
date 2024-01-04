@@ -45,10 +45,8 @@ class Part5IntegrationTest : public codelab::testing::IntegrationTest {
 
       bool done = false;
       iterator->GetNext([&](auto result) {
-        auto res =
-            fpromise::result<ContentVector, fuchsia::diagnostics::ReaderError>(std::move(result));
-        if (res.is_ok()) {
-          current_entries = res.take_value();
+        if (result.is_response()) {
+          current_entries = std::move(result.response().batch);
         }
 
         done = true;

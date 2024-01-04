@@ -155,7 +155,8 @@ type StreamParameters = table {
 
 /// Outer protocol for interacting with the different diagnostics data sources.
 @discoverable
-closed protocol ArchiveAccessor {
+@available(added=18)
+open protocol ArchiveAccessor {
     /// Creates an iterator over diagnostics data on the system.
     ///   * The iterator may be finite by streaming in SNAPSHOT mode, serving only the
     ///     current state of diagnostics data on the system.
@@ -173,7 +174,7 @@ closed protocol ArchiveAccessor {
     ///
     /// + request `stream_parameters` is a [fuchsia.diagnostics/StreamParameter] which
     ///   specifies how to configure the stream.
-    strict StreamDiagnostics(resource struct {
+    flexible StreamDiagnostics(resource struct {
         stream_parameters StreamParameters;
         result_stream server_end:BatchIterator;
     });
@@ -181,7 +182,8 @@ closed protocol ArchiveAccessor {
 
 /// Conceptually, a directory iterator, where each element in the iterator is a single
 /// complete file that can be concatenated with other results.
-closed protocol BatchIterator {
+@available(added=18)
+open protocol BatchIterator {
     /// Returns a vector of [fuchsia.diagnostics/FormattedContent] structs
     /// with a format dictated by the format_settings argument provided to the Reader protocol
     /// which spawned this BatchIterator.
@@ -206,6 +208,23 @@ closed protocol BatchIterator {
     ///   dropped, but future calls to GetNext will provide new subsets of
     ///   FormattedDataHierarchies.
     ///
+    flexible GetNext() -> (resource struct {
+        batch vector<FormattedContent>:MAXIMUM_ENTRIES_PER_BATCH;
+    }) error ReaderError;
+};
+
+/// Outer protocol for interacting with the different diagnostics data sources.
+@discoverable
+@available(replaced=18)
+closed protocol ArchiveAccessor {
+    strict StreamDiagnostics(resource struct {
+        stream_parameters StreamParameters;
+        result_stream server_end:BatchIterator;
+    });
+};
+
+@available(replaced=18)
+closed protocol BatchIterator {
     strict GetNext() -> (resource struct {
         batch vector<FormattedContent>:MAXIMUM_ENTRIES_PER_BATCH;
     }) error ReaderError;

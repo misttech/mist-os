@@ -70,11 +70,16 @@ impl FakeArchiveAccessor {
         &self,
         request: diagnostics::ArchiveAccessorRequest,
     ) -> Result<(), Error> {
-        let diagnostics::ArchiveAccessorRequest::StreamDiagnostics {
-            stream_parameters,
-            result_stream,
-            control_handle: _,
-        } = request;
+        let (stream_parameters, result_stream) = match request {
+            diagnostics::ArchiveAccessorRequest::StreamDiagnostics {
+                stream_parameters,
+                result_stream,
+                control_handle: _,
+            } => (stream_parameters, result_stream),
+            diagnostics::ArchiveAccessorRequest::_UnknownMethod { .. } => {
+                unreachable!("Unexpected method call");
+            }
+        };
         let selectors = ArchiveAccessor::validate_stream_request(stream_parameters)?;
         self.selectors_requested.lock().push(
             selectors

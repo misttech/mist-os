@@ -542,6 +542,9 @@ async fn serve_batch_iterator(
                     }
                     responder.send(Ok(batch))
                 }
+                fdiagnostics::BatchIteratorRequest::_UnknownMethod { .. } => {
+                    unreachable!("Not sending other requests");
+                }
             }
             .map_err(Error::msg)
             .context("failed response")

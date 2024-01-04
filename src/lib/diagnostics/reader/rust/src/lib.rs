@@ -946,10 +946,18 @@ mod tests {
                                             )]))
                                             .expect("send response");
                                     }
+                                    fdiagnostics::BatchIteratorRequest::_UnknownMethod {
+                                        ..
+                                    } => {
+                                        unreachable!("Unexpected method call");
+                                    }
                                 }
                             }
                         })
                         .detach();
+                    }
+                    fdiagnostics::ArchiveAccessorRequest::_UnknownMethod { .. } => {
+                        unreachable!("Unexpected method call");
                     }
                 }
             }
