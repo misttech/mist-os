@@ -15,6 +15,9 @@
 //! `LockAfter`, it also provides a blanket implementation equivalent to this:
 //!
 //! ```no_run
+//! # use lock_order::relation::LockAfter;
+//! # enum A {}
+//! # enum B {}
 //! impl <X> LockAfter<X> for B where A: LockAfter<X> {}
 //! ```
 //!
@@ -34,6 +37,10 @@
 //! implementations:
 //!
 //! ```no_run
+//! # use lock_order::relation::LockAfter;
+//! # enum A {}
+//! # enum B {}
+//! # enum C {}
 //! // Graph edges
 //! impl LockAfter<A> for B {}
 //! impl LockAfter<B> for C {}
@@ -45,6 +52,9 @@
 //! us these two impls:
 //!
 //! ```no_run
+//! # use lock_order::relation::LockAfter;
+//! # enum A {}
+//! # enum C {}
 //! // New edge
 //! impl LockAfter<C> for A {}
 //! // New blanket impl

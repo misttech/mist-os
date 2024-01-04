@@ -536,6 +536,31 @@ where
     /// Adopts reference `n` to the locked context.
     ///
     /// This allows access on disjoint structures to adopt the same lock level.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use lock_order::{Locked, relation::LockBefore};
+    /// struct StateA;
+    /// struct StateB;
+    /// # impl lock_order::lock::LockFor<LockX> for StateB {
+    /// #   type Data = u8;
+    /// #   type Guard<'l> = std::sync::MutexGuard<'l, u8>
+    /// #       where Self: 'l;
+    /// #   fn lock(&self) -> Self::Guard<'_> {
+    /// #       unimplemented!()
+    /// #   }
+    /// # }
+    /// enum LockX {}
+    ///
+    /// fn adopt_example<L: LockBefore<LockX>>(mut locked: Locked<&StateA, L>, state_b: &StateB) {
+    ///     let mut locked = locked.adopt(state_b);
+    ///     // Lock something from `StateB` advancing the lock level to `LockX`.
+    ///     let (guard, mut locked) = locked.lock_with_and::<LockX, _>(|c| c.right());
+    ///     // We can get back a `Locked` for `StateA` at the new lock level.
+    ///     let locked: Locked<&StateA, LockX> = locked.cast_with(|c| c.left());
+    /// }
+    /// ```
     pub fn adopt<'a, N>(
         &'a mut self,
         n: &'a N,
