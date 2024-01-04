@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::trace::duration;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::{
     io::{Error, Write},
     sync::Arc,
@@ -81,8 +81,8 @@ impl<W: 'static + Write + Send + Sync> ShellWriterView<W> {
         Self(inner)
     }
 
-    pub fn lock(&self) -> parking_lot::MappedMutexGuard<'_, W> {
-        parking_lot::MutexGuard::map(self.0.lock(), |handle_inner| &mut handle_inner.writer)
+    pub fn lock(&self) -> fuchsia_sync::MappedMutexGuard<'_, W> {
+        fuchsia_sync::MutexGuard::map(self.0.lock(), |handle_inner| &mut handle_inner.writer)
     }
 }
 

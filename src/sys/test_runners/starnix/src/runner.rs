@@ -6,7 +6,7 @@ use {
     crate::helpers::clone_start_info, crate::test_suite::handle_suite_requests, anyhow::anyhow,
     anyhow::Error, fidl::endpoints::ServerEnd, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx, futures::StreamExt, futures::TryStreamExt, parking_lot::Mutex,
+    fuchsia_sync::Mutex, fuchsia_zircon as zx, futures::StreamExt, futures::TryStreamExt,
     std::sync::Arc,
 };
 

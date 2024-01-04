@@ -9,9 +9,9 @@ use fidl_fuchsia_tracing_controller::{
 };
 use fuchsia_async;
 use fuchsia_component::{self as app};
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::{future, io::AsyncReadExt, TryFutureExt};
-use parking_lot::RwLock;
 use std::fs;
 use std::io::Write;
 

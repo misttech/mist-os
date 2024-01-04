@@ -7,7 +7,7 @@ use crate::output::{
     DynDirectoryArtifact, EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
 use fuchsia_async as fasync;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::{
     collections::HashMap,
     io::{Error, Write},

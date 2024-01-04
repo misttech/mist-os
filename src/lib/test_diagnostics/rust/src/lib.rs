@@ -6,6 +6,7 @@
 
 use {
     fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::{
         channel::mpsc,
         io::AsyncRead,
@@ -13,7 +14,6 @@ use {
         ready,
         task::{Context, Poll},
     },
-    parking_lot::Mutex,
     std::{cell::RefCell, io::Write, pin::Pin, sync::Arc},
 };
 

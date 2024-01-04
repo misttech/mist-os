@@ -7,7 +7,7 @@ use crate::output::{
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp, ZxTime,
 };
 use anyhow::format_err;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{DirBuilder, File};

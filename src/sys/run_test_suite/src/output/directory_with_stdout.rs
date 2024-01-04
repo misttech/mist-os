@@ -9,7 +9,7 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
     ReportedOutcome, Reporter, SuiteId, Timestamp,
 };
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Error};
@@ -38,7 +38,7 @@ impl DirectoryWithStdoutReporter {
         &self,
         suite: &SuiteId,
     ) -> impl '_ + std::ops::Deref<Target = ShellReporter<BufWriter<File>>> {
-        parking_lot::MutexGuard::map(self.shell_reporters.lock(), |reporters| {
+        fuchsia_sync::MutexGuard::map(self.shell_reporters.lock(), |reporters| {
             reporters.get_mut(suite).unwrap()
         })
     }

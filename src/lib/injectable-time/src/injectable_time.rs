@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_sync::Mutex;
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
-use parking_lot::Mutex;
 use std::sync::Arc;
 
 /// TimeSource provides the current time in nanoseconds since the Unix epoch.

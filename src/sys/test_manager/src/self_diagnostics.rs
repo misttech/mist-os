@@ -4,7 +4,7 @@
 
 use {
     fuchsia_inspect::Property,
-    parking_lot::Mutex,
+    fuchsia_sync::Mutex,
     std::{
         borrow::Cow,
         collections::{hash_map::Entry, HashMap},

@@ -6,7 +6,7 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DirectoryWrite, DynArtifact, DynDirectoryArtifact,
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::{collections::HashMap, io::Error, io::Write, path::Path, path::PathBuf, sync::Arc};
 
 /// A reporter that acts as a data sink and stores results for inspection in memory.
