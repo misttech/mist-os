@@ -69,7 +69,7 @@ source_set("audio_core_main") {
     ":audio_core_lib",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/media/audio/services/common",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

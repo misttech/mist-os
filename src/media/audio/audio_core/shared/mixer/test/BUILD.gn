@@ -39,6 +39,7 @@ executable("audio_fidelity_test_bin") {
   deps = [
     ":frequency_set",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/audio_core/shared/mixer",

@@ -17,7 +17,7 @@ executable("wav_player_bin") {
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/logging:cli",
     "//src/media/audio/lib/wav",
