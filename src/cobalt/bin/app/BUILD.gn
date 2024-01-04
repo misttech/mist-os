@@ -78,7 +78,7 @@ source_set("lib") {
     "//src/lib/backoff",
     "//src/lib/fostr/fidl/fuchsia.settings",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/json_parser",
     "//third_party/cobalt/src/lib/util:file_util",
     "//third_party/cobalt/src/lib/util:pem_util",

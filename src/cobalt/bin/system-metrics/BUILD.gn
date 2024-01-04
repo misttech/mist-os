@@ -40,7 +40,7 @@ source_set("system_metrics_daemon_lib") {
     "//src/cobalt/bin/utils:error_utils",
     "//src/lib/cobalt/cpp:metric_event_builder",
     "//src/lib/fsl",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//third_party/cobalt/src/lib/client/cpp:buckets_config",
     "//zircon/system/ulib/abs_clock",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
