@@ -31,7 +31,7 @@ if (is_host) {
     deps = [
       ":icu_headers",
       "//src/lib/files",
-      "//src/lib/fxl",
+      "//src/lib/fxl:fxl_cli",
       "//src/lib/icu:lib",
       "//zircon/system/ulib/fbl",
     ]
