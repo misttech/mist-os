@@ -10,7 +10,7 @@ executable("bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace",

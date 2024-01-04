@@ -303,7 +303,7 @@ executable("shared_provider_app") {
   deps = [
     ":integration_test_utils",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace",
