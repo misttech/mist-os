@@ -10,9 +10,9 @@ use {
     fuchsia_async::{DurationExt as _, TimeoutExt as _},
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::directory::{WatchEvent, Watcher},
+    fuchsia_sync::RwLock,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{channel::mpsc, future, TryStreamExt},
-    parking_lot::RwLock,
     std::{
         fmt,
         path::{Path, PathBuf},
