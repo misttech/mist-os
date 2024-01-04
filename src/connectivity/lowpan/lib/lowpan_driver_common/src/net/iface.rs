@@ -99,8 +99,8 @@ pub trait NetworkInterface: Send + Sync {
     async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<(), Error>;
 }
 
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
-use parking_lot::Mutex;
 
 pub struct DummyNetworkInterface {
     event_receiver: Mutex<Option<mpsc::Receiver<Result<NetworkInterfaceEvent, Error>>>>,

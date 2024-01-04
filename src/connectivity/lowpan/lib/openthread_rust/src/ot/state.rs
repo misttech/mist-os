@@ -11,7 +11,7 @@ use crate::prelude_internal::*;
 use bitflags::bitflags;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::sync::Arc;
 use std::task::Waker;
 

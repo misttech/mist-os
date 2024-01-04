@@ -100,7 +100,7 @@ pub trait TaskletsStreamExt {
     }
 }
 
-impl<T: AsRef<ot::Instance>> TaskletsStreamExt for parking_lot::Mutex<T> {
+impl<T: AsRef<ot::Instance>> TaskletsStreamExt for fuchsia_sync::Mutex<T> {
     fn tasklets_poll(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<()>> {
         use std::ops::Deref;
         let guard = self.lock();

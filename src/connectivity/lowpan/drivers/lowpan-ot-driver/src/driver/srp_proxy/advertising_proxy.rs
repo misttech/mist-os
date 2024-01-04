@@ -8,7 +8,7 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_net_mdns::*;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::sync::Arc;

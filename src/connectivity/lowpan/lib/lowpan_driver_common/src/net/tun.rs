@@ -22,10 +22,10 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_net_tun as ftun;
 use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::stream::BoxStream;
 use net_types::ip::{Ip as _, Ipv6};
-use parking_lot::Mutex;
 use socket2::{Domain, Protocol};
 use std::convert::TryInto;
 
@@ -35,7 +35,8 @@ const TUN_PORT_ID: u8 = 0;
 pub struct TunNetworkInterface {
     tun_dev: ftun::DeviceProxy,
     tun_port: ftun::PortProxy,
-    #[allow(unused)] // TODO(https://fxbug.dev/64704): use `control` after converting methods to async.
+    #[allow(unused)]
+    // TODO(https://fxbug.dev/64704): use `control` after converting methods to async.
     control: fnetifext::admin::Control,
     control_sync: Mutex<fnetifadmin::ControlSynchronousProxy>,
     stack_sync: Mutex<fnetstack::StackSynchronousProxy>,

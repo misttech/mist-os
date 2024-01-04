@@ -12,13 +12,13 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{LazyNode, Node, StringProperty};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_sync::Mutex;
 use lowpan_driver_common::lowpan_fidl::{
     CountersConnectorMarker, CountersMarker, DeviceConnectorMarker, DeviceExtraConnectorMarker,
     DeviceExtraMarker, DeviceMarker, DeviceState, DeviceTestConnectorMarker, DeviceTestMarker,
     DeviceWatcherMarker, DeviceWatcherProxyInterface, Identity, TelemetryProviderConnectorMarker,
     TelemetryProviderMarker,
 };
-use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 

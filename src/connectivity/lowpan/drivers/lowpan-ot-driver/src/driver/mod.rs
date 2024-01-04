@@ -66,7 +66,7 @@ impl std::fmt::Display for ResetRequested {
 #[derive(Debug)]
 pub struct OtDriver<OT, NI, BI> {
     /// Internal, mutex-protected driver state.
-    driver_state: parking_lot::Mutex<DriverState<OT>>,
+    driver_state: fuchsia_sync::Mutex<DriverState<OT>>,
 
     /// Condition that fires whenever the above `driver_state` changes.
     driver_state_change: AsyncCondition,
@@ -78,7 +78,7 @@ pub struct OtDriver<OT, NI, BI> {
     backbone_if: BI,
 
     /// Task for updating mDNS service for border agent
-    border_agent_service: parking_lot::Mutex<Option<fasync::Task<Result<(), anyhow::Error>>>>,
+    border_agent_service: fuchsia_sync::Mutex<Option<fasync::Task<Result<(), anyhow::Error>>>>,
 
     /// The current meshcop TXT records.
     #[allow(clippy::type_complexity)]
@@ -94,11 +94,11 @@ pub struct OtDriver<OT, NI, BI> {
 impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
     pub fn new(ot_instance: OT, net_if: NI, backbone_if: BI) -> Self {
         OtDriver {
-            driver_state: parking_lot::Mutex::new(DriverState::new(ot_instance)),
+            driver_state: fuchsia_sync::Mutex::new(DriverState::new(ot_instance)),
             driver_state_change: AsyncCondition::new(),
             net_if,
             backbone_if,
-            border_agent_service: parking_lot::Mutex::new(None),
+            border_agent_service: fuchsia_sync::Mutex::new(None),
             border_agent_current_txt_entries: std::sync::Arc::new(futures::lock::Mutex::new(
                 vec![],
             )),

@@ -13,13 +13,13 @@ use crate::prelude_internal::*;
 
 use anyhow::Error;
 use derivative::Derivative;
+use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::sink::Sink;
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
 use futures::FutureExt;
-use parking_lot::Mutex;
 use slab::Slab;
 use static_assertions::_core::pin::Pin;
 use std::fmt::Debug;

@@ -5,7 +5,7 @@
 use super::{Canceled, ResponseHandler};
 use crate::AsyncCondition;
 use core::fmt::Debug;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use static_assertions::const_assert;
 use std::num::NonZeroU8;
 use std::sync::{Arc, Weak};

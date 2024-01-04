@@ -82,7 +82,7 @@ pub trait Joiner {
     ) -> futures::channel::oneshot::Receiver<Result> {
         use futures::channel::oneshot::*;
         let (sender, receiver) = channel();
-        let sender = std::sync::Arc::new(parking_lot::Mutex::new(Some(sender)));
+        let sender = std::sync::Arc::new(fuchsia_sync::Mutex::new(Some(sender)));
         let sender_clone = sender.clone();
         if let Err(err) = self.joiner_start(
             pskd,

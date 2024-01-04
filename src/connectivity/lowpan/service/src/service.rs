@@ -13,6 +13,7 @@ use fidl_fuchsia_factory_lowpan::{
 use fidl_fuchsia_lowpan_driver::{
     DriverMarker, DriverProxy, Protocols, RegisterRequest, RegisterRequestStream,
 };
+use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use futures::task::{Spawn, SpawnExt};
 use lowpan_driver_common::lowpan_fidl::{
@@ -30,7 +31,6 @@ use lowpan_driver_common::lowpan_fidl::{
     TelemetryProviderConnectorRequest, TelemetryProviderConnectorRequestStream, MAX_LOWPAN_DEVICES,
 };
 use lowpan_driver_common::{AsyncCondition, ZxStatus};
-use parking_lot::Mutex;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;

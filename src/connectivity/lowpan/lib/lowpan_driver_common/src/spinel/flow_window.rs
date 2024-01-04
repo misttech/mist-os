@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
+use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use futures::task::{Context, Poll, Waker};
-use parking_lot::Mutex;
 use std::pin::Pin;
 
 #[cfg(test)]

@@ -8,9 +8,9 @@ use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_net_mdns::*;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::never::Never;
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::pin::Pin;
@@ -694,7 +694,7 @@ pub trait DiscoveryProxyPollerExt {
 }
 
 impl<T: AsRef<ot::Instance> + AsRef<Option<DiscoveryProxy>>> DiscoveryProxyPollerExt
-    for parking_lot::Mutex<T>
+    for fuchsia_sync::Mutex<T>
 {
     fn discovery_proxy_poll(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Never> {
         let guard = self.lock();

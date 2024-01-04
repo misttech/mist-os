@@ -6,9 +6,9 @@ use super::*;
 use crate::ot::{InfraInterface, Ip4Address, Ip6Address, Ip6Prefix};
 use crate::Platform;
 use anyhow::{Error, Result};
+use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use openthread_sys::*;
-use parking_lot::Mutex;
 use std::task::{Context, Poll};
 
 pub(crate) struct Nat64Instance {

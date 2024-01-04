@@ -6,9 +6,9 @@ use super::*;
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_lowpan_spinel::DeviceEvent as SpinelDeviceEvent;
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
-use parking_lot::Mutex;
 use spinel_pack::EUI64;
 use std::collections::HashMap;
 use std::sync::Arc;
