@@ -227,6 +227,20 @@ TEST(MessageTest, SourceCapabilitiesOneObject) {
   EXPECT_EQ(0x2701912c, message.data_objects()[0]);
 }
 
+TEST(MessageTest, SourceCapabilitiesMaximumObjects) {
+  // From Anker 30W Nano 511 model A2337.
+  Header header = Header::CreateFromBytes(0xa1, 0x71);
+  const uint32_t kDataObjects[] = {0x0a01912c, 0x0002d12c, 0x0003c0fa, 0x0004b0c8,
+                                   0x00064096, 0xc8dc213c, 0xc9402128};
+
+  Message message(header, kDataObjects);
+  EXPECT_EQ(MessageType::kSourceCapabilities, message.header().message_type());
+
+  ASSERT_EQ(7, message.data_objects().size());
+  EXPECT_EQ(0x0a01912c, message.data_objects()[0]);
+  EXPECT_EQ(0xc9402128, message.data_objects()[6]);
+}
+
 TEST(MessageTest, GetSourceCapabilities) {
   Message message(MessageType::kGetSourceCapabilities, MessageId(0), PowerRole::kSink,
                   SpecRevision::kRev2, DataRole::kUpstreamFacingPort, {});

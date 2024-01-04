@@ -82,7 +82,7 @@ TEST(FixedPowerSupplyDataTest, LaptopPowerSupply) {
   EXPECT_EQ(3'000, fixed_power_data3.maximum_current_ma());
 
   PowerData power_data4(0x00064145);
-  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data1.supply_type());
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data4.supply_type());
 
   FixedPowerSupplyData fixed_power_data4(power_data4);
   EXPECT_EQ(20'000, fixed_power_data4.voltage_mv());
@@ -103,6 +103,61 @@ TEST(FixedPowerSupplyDataTest, FrameworkLaptopPort) {
   EXPECT_TRUE(fixed_power_data1.supports_dual_role_data());
   EXPECT_TRUE(fixed_power_data1.supports_unchunked_extended_messages());
   EXPECT_FALSE(fixed_power_data1.supports_extended_power_range());
+}
+
+TEST(FixedPowerSupplyDataTest, AnkerModelA2377) {
+  // Anker 30W Nano 511 - Model A2377
+
+  PowerData power_data1(0x0a01912c);
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data1.supply_type());
+
+  FixedPowerSupplyData fixed_power_data1(power_data1);
+  EXPECT_EQ(5'000, fixed_power_data1.voltage_mv());
+  EXPECT_EQ(3'000, fixed_power_data1.maximum_current_ma());
+  EXPECT_EQ(PeakCurrentSupport::kNoOverload, fixed_power_data1.peak_current());
+  EXPECT_FALSE(fixed_power_data1.supports_dual_role_power());
+  EXPECT_FALSE(fixed_power_data1.requires_usb_suspend());
+  EXPECT_TRUE(fixed_power_data1.has_unconstrained_power());
+  EXPECT_FALSE(fixed_power_data1.supports_usb_communications());
+  EXPECT_TRUE(fixed_power_data1.supports_dual_role_data());
+  EXPECT_FALSE(fixed_power_data1.supports_unchunked_extended_messages());
+  EXPECT_FALSE(fixed_power_data1.supports_extended_power_range());
+
+  PowerData power_data2(0x00002d12c);
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data2.supply_type());
+
+  FixedPowerSupplyData fixed_power_data2(power_data2);
+  EXPECT_EQ(9'000, fixed_power_data2.voltage_mv());
+  EXPECT_EQ(3'000, fixed_power_data2.maximum_current_ma());
+
+  PowerData power_data3(0x0003c0fa);
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data3.supply_type());
+
+  FixedPowerSupplyData fixed_power_data3(power_data3);
+  EXPECT_EQ(12'000, fixed_power_data3.voltage_mv());
+  EXPECT_EQ(2'500, fixed_power_data3.maximum_current_ma());
+
+  PowerData power_data4(0x0004b0c8);
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data4.supply_type());
+
+  FixedPowerSupplyData fixed_power_data4(power_data4);
+  EXPECT_EQ(15'000, fixed_power_data4.voltage_mv());
+  EXPECT_EQ(2'000, fixed_power_data4.maximum_current_ma());
+
+  PowerData power_data5(0x00064096);
+  ASSERT_EQ(PowerSupplyType::kFixedSupply, power_data5.supply_type());
+
+  FixedPowerSupplyData fixed_power_data5(power_data5);
+  EXPECT_EQ(20'000, fixed_power_data5.voltage_mv());
+  EXPECT_EQ(1'500, fixed_power_data5.maximum_current_ma());
+}
+
+TEST(AugmentedPowerDataTest, AnkerModelA2377) {
+  PowerData power_data6(0xc8dc213c);
+  ASSERT_EQ(PowerSupplyType::kAugmentedPowerDataObject, power_data6.supply_type());
+
+  PowerData power_data7(0xc9402128);
+  ASSERT_EQ(PowerSupplyType::kAugmentedPowerDataObject, power_data7.supply_type());
 }
 
 TEST(VariablePowerSupplyDataTest, MaximumVoltageMv) {

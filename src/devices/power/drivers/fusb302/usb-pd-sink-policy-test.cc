@@ -4,13 +4,13 @@
 
 #include "src/devices/power/drivers/fusb302/usb-pd-sink-policy.h"
 
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/stdcompat/span.h>
+
 #include <cstdint>
-#include <type_traits>
-#include <utility>
 
 #include <zxtest/zxtest.h>
 
-#include "lib/stdcompat/span.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-objects.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
@@ -36,7 +36,18 @@ uint32_t FixedPowerSupply(int32_t voltage_mv, int32_t current_ma) {
       FixedPowerSupplyData().set_voltage_mv(voltage_mv).set_maximum_current_ma(current_ma));
 }
 
-TEST(SinkPolicyTest, GetPowerRequestCommonFields) {
+class SinkPolicyTest : public zxtest::Test {
+ public:
+  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
+
+  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+
+ private:
+  fdf::Logger logger_{"usb-pd-sink-policy-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>()};
+};
+
+TEST_F(SinkPolicyTest, GetPowerRequestCommonFields) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   const uint32_t power_data_objects[] = {
@@ -53,7 +64,7 @@ TEST(SinkPolicyTest, GetPowerRequestCommonFields) {
   EXPECT_FALSE(fixed_request_data.supports_extended_power_range());
 }
 
-TEST(SinkPolicyTest, GetPowerRequestOnePowerDataObject) {
+TEST_F(SinkPolicyTest, GetPowerRequestOnePowerDataObject) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   const uint32_t power_data_objects[] = {
@@ -69,7 +80,7 @@ TEST(SinkPolicyTest, GetPowerRequestOnePowerDataObject) {
   EXPECT_FALSE(fixed_request_data.capability_mismatch());
 }
 
-TEST(SinkPolicyTest, GetPowerRequestHighestPowerWins) {
+TEST_F(SinkPolicyTest, GetPowerRequestHighestPowerWins) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   const uint32_t power_data_objects[] = {
@@ -87,7 +98,7 @@ TEST(SinkPolicyTest, GetPowerRequestHighestPowerWins) {
   EXPECT_FALSE(fixed_request_data.capability_mismatch());
 }
 
-TEST(SinkPolicyTest, GetPowerRequestCurrentCappedToPowerConsumption) {
+TEST_F(SinkPolicyTest, GetPowerRequestCurrentCappedToPowerConsumption) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   const uint32_t power_data_objects[] = {
@@ -105,7 +116,7 @@ TEST(SinkPolicyTest, GetPowerRequestCurrentCappedToPowerConsumption) {
   EXPECT_FALSE(fixed_request_data.capability_mismatch());
 }
 
-TEST(SinkPolicyTest, GetPowerRequestMinimumVoltageThatHitsPowerTarget) {
+TEST_F(SinkPolicyTest, GetPowerRequestMinimumVoltageThatHitsPowerTarget) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   const uint32_t power_data_objects[] = {
@@ -123,7 +134,30 @@ TEST(SinkPolicyTest, GetPowerRequestMinimumVoltageThatHitsPowerTarget) {
   EXPECT_FALSE(fixed_request_data.capability_mismatch());
 }
 
-TEST(SinkPolicyTest, GetSinkCapabilitiesMultipleObjects) {
+TEST_F(SinkPolicyTest, GetPowerRequestIgnoresUnknownTypes) {
+  SinkPolicy sink_policy(kVim3PolicyInfo);
+
+  // From Anker 30W Nano 511 model A2337.
+  const uint32_t power_data_objects[] = {
+      FixedPowerSupply(5'000, 3'000),
+      FixedPowerSupply(9'000, 3'000),
+      FixedPowerSupply(12'000, 2'500),
+      FixedPowerSupply(15'000, 2'000),
+      FixedPowerSupply(20'000, 1'500),
+      0xc8dc213c,  // PPS 3.30-11.00 V @ 3.00 A
+      0xc9402128,  // PPS 3.30-16.00 V @ 2.00 A
+  };
+  sink_policy.DidReceiveSourceCapabilities(SourceCapabilitiesMessage(power_data_objects));
+
+  FixedVariableSupplyPowerRequestData fixed_request_data(sink_policy.GetPowerRequest());
+
+  EXPECT_EQ(2u, fixed_request_data.related_power_data_object_position());
+  EXPECT_EQ(2'660, fixed_request_data.limit_current_ma());
+  EXPECT_EQ(2'660, fixed_request_data.operating_current_ma());
+  EXPECT_FALSE(fixed_request_data.capability_mismatch());
+}
+
+TEST_F(SinkPolicyTest, GetSinkCapabilitiesMultipleObjects) {
   SinkPolicy sink_policy(kVim3PolicyInfo);
 
   cpp20::span<const uint32_t> sink_capabilities = sink_policy.GetSinkCapabilities();
