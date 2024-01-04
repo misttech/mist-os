@@ -9,7 +9,6 @@
 #include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 
 namespace fdf {
@@ -61,10 +60,6 @@ zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& de
     return result.take_error();
   }
 
-  if (IsIommu(node.name())) {
-    iommu_nodes_.push_back(*node.phandle());
-  }
-
   return zx::ok();
 }
 
@@ -72,6 +67,7 @@ zx::result<> BtiVisitor::ReferenceChildVisit(Node& child, ReferenceNode& parent,
                                              PropertyCells reference_cells) {
   std::optional<uint32_t> iommu_index;
 
+  // Check if iommu is already registered.
   for (uint32_t i = 0; i < iommu_nodes_.size(); i++) {
     if (iommu_nodes_[i] == parent.phandle()) {
       iommu_index = i;
@@ -79,10 +75,10 @@ zx::result<> BtiVisitor::ReferenceChildVisit(Node& child, ReferenceNode& parent,
     }
   }
 
+  // Register iommu if not found.
   if (!iommu_index) {
-    FDF_LOG(DEBUG, "Invalid iommu parent '%s' for child %s", parent.name().data(),
-            child.name().data());
-    return zx::error(ZX_ERR_INVALID_ARGS);
+    iommu_nodes_.push_back(*parent.phandle());
+    iommu_index = iommu_nodes_.size() - 1;
   }
 
   auto iommu_cell = IommuCell(reference_cells);

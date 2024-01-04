@@ -11,14 +11,14 @@
     #address-cells = <2>;
     #size-cells = <2>;
 
-    dummy_iommu:iommu {
-        #iommu-cells = <1>;
-        phandle = <TEST_IOMMU_PHANDLE>;
-    };
-
     sample-bti-device1 {
         compatible = "fuchsia,sample-bti-device";
         iommus = <&dummy_iommu TEST_BTI_ID1>;
+    };
+
+    dummy_iommu:iommu {
+        #iommu-cells = <1>;
+        phandle = <TEST_IOMMU_PHANDLE>;
     };
 
     sample-bti-device2 {
