@@ -61,6 +61,7 @@ include /src/lib/diagnostics/hierarchy/rust/OWNERS
 include /src/lib/diagnostics/inspect/contrib/rust/OWNERS
 include /src/lib/diagnostics/inspect/runtime/rust/OWNERS
 include /src/lib/fidl/rust/OWNERS
+include /src/lib/fidl_codec/OWNERS
 include /src/lib/fidl_table_validation/OWNERS
 include /src/lib/fuchsia-async/OWNERS
 include /src/lib/fuchsia-component/OWNERS
@@ -72,6 +73,7 @@ include /src/lib/http-sse/OWNERS
 include /src/lib/icu_data/OWNERS
 include /src/lib/network/OWNERS
 include /src/lib/network/fidl_fuchsia_net_ext/OWNERS
+include /src/lib/network/fidl_fuchsia_net_filter_ext/OWNERS
 include /src/lib/network/fidl_fuchsia_net_interfaces_ext/OWNERS
 include /src/lib/network/fidl_fuchsia_net_routes_ext/OWNERS
 include /src/lib/network/packet/OWNERS

@@ -5,6 +5,7 @@
 include /src/connectivity/network/tests/integration/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
+include /src/developer/ffx/plugins/product/OWNERS
 include /src/diagnostics/OWNERS
 include /src/diagnostics/lib/inspect-fidl-load/OWNERS
 include /src/diagnostics/lib/triage/OWNERS

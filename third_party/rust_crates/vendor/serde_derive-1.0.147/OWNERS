@@ -4,6 +4,7 @@
 
 include /src/diagnostics/OWNERS
 include /src/diagnostics/lib/triage/OWNERS
+include /src/lib/fidl_codec/OWNERS
 include /src/power/OWNERS
 include /src/security/bin/tee_manager/OWNERS
 include /src/sys/pkg/OWNERS

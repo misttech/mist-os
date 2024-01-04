@@ -11,6 +11,7 @@ include /src/diagnostics/lib/triage/OWNERS
 include /src/factory/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/diagnostics/selectors/OWNERS
+include /src/lib/fidl_codec/OWNERS
 include /src/performance/OWNERS
 include /src/ui/lib/input_pipeline/OWNERS
 include /third_party/rust_crates/vendor/nom_locate-2.1.0/OWNERS

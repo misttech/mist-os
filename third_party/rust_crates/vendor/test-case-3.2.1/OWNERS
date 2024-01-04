@@ -37,6 +37,7 @@ include /src/lib/fuchsia-component-test/OWNERS
 include /src/lib/fuchsia-hyper/OWNERS
 include /src/lib/network/OWNERS
 include /src/lib/network/fidl_fuchsia_net_ext/OWNERS
+include /src/lib/network/fidl_fuchsia_net_filter_ext/OWNERS
 include /src/lib/network/fidl_fuchsia_net_interfaces_ext/OWNERS
 include /src/lib/network/fidl_fuchsia_net_routes_ext/OWNERS
 include /src/lib/network/packet/OWNERS

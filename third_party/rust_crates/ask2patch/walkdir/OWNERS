@@ -5,6 +5,7 @@
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
+include /src/developer/ffx/plugins/test/OWNERS
 include /src/developer/fuchsia-criterion/OWNERS
 include /src/devices/lib/OWNERS
 include /src/sys/fuzzing/OWNERS

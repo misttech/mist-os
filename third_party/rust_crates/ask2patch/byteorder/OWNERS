@@ -38,7 +38,7 @@ include /third_party/rust_crates/vendor/proptest-1.0.0/OWNERS
 include /third_party/rust_crates/vendor/rand_xoshiro-0.1.0/OWNERS
 include /third_party/rust_crates/vendor/rustc-hash-1.0.1/OWNERS
 include /third_party/rust_crates/vendor/term-0.5.1/OWNERS
-include /third_party/rust_crates/vendor/zerocopy-0.7.15/OWNERS
+include /third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.1/OWNERS
 include /tools/blackout/OWNERS
 include /tools/make-fuchsia-vol/OWNERS
 include /tools/zedmon/OWNERS
