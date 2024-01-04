@@ -7,12 +7,12 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_wlanix as fidl_wlanix,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::StreamExt,
     ieee80211::{Bssid, MacAddrBytes},
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
-    parking_lot::Mutex,
     std::{
         convert::{TryFrom, TryInto},
         sync::Arc,

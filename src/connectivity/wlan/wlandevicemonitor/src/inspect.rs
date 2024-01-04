@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_inspect::Inspector, fuchsia_inspect_contrib::nodes::BoundedListNode, parking_lot::Mutex,
+    fuchsia_inspect::Inspector, fuchsia_inspect_contrib::nodes::BoundedListNode,
+    fuchsia_sync::Mutex,
 };
 
 pub const VMO_SIZE_BYTES: usize = 1000 * 1024;

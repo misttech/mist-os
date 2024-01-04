@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_inspect::{InspectType, Node};
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 

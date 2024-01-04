@@ -34,6 +34,7 @@ use {
         make_inspect_loggable,
         nodes::BoundedListNode,
     },
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, DurationNum},
     futures::{
         channel::{mpsc, oneshot},
@@ -42,7 +43,6 @@ use {
     },
     ieee80211::OuiFmt,
     num_traits::SaturatingAdd,
-    parking_lot::Mutex,
     static_assertions::const_assert_eq,
     std::{
         cmp::{max, min, Reverse},

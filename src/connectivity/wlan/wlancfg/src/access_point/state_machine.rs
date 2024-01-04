@@ -18,6 +18,7 @@ use {
     anyhow::format_err,
     fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::{self as fasync, DurationExt},
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, DurationNum},
     futures::{
         channel::{mpsc, oneshot},
@@ -25,7 +26,6 @@ use {
         select,
         stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt},
     },
-    parking_lot::Mutex,
     std::{convert::Infallible, sync::Arc},
     tracing::{info, warn},
     wlan_common::{

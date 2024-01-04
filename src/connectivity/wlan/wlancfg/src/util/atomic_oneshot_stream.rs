@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use {
+    fuchsia_sync::RwLock,
     futures::{
         stream::{iter, FusedStream},
         StreamExt,
     },
-    parking_lot::RwLock,
     std::{fmt::Debug, pin::Pin, sync::Arc},
 };
 

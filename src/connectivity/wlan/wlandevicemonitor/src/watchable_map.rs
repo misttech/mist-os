@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;

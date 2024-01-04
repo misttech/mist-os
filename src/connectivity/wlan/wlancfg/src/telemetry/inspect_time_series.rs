@@ -4,8 +4,8 @@
 
 use {
     fuchsia_inspect::{Inspector, LazyNode, Node as InspectNode},
+    fuchsia_sync::Mutex,
     futures::FutureExt,
-    parking_lot::Mutex,
     std::sync::Arc,
     windowed_stats::{
         aggregations::create_saturating_add_fn, FifteenMinutelyWindows, HourlyWindows,

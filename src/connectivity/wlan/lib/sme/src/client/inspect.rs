@@ -13,9 +13,9 @@ use {
         log::{InspectListClosure, InspectUintArray},
         nodes::{BoundedListNode, NodeExt, TimeProperty},
     },
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     ieee80211::Ssid,
-    parking_lot::Mutex,
     wlan_common::ie::{self, wsc},
     wlan_inspect::IfaceTree,
 };

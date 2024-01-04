@@ -8,10 +8,10 @@ use fidl::prelude::*;
 use fidl_fuchsia_wlan_device_service::{
     self as fidl_svc, DeviceWatcherControlHandle, DeviceWatcherRequestStream,
 };
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use futures::try_join;
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
