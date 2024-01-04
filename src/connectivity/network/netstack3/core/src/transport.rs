@@ -56,8 +56,8 @@
 //!       of the "weak host model" vs "strong host model" discussion.
 
 mod integration;
-pub mod tcp;
-pub mod udp;
+pub(crate) mod tcp;
+pub(crate) mod udp;
 
 use derivative::Derivative;
 use lock_order::lock::RwLockFor;

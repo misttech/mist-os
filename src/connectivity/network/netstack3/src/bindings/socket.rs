@@ -26,7 +26,7 @@ use netstack3_core::{
         ConnectError, NotDualStackCapableError, SetDualStackEnabledError,
         SetMulticastMembershipError, SocketZonedIpAddr,
     },
-    transport::{tcp, udp},
+    tcp, udp,
 };
 
 use crate::bindings::{
@@ -676,7 +676,7 @@ impl IntoErrno for ZonedAddressError {
     }
 }
 
-impl IntoErrno for tcp::socket::SetDeviceError {
+impl IntoErrno for tcp::SetDeviceError {
     fn into_errno(self) -> Errno {
         match self {
             Self::Conflict => Errno::Eaddrinuse,

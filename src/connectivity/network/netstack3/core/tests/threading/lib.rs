@@ -277,8 +277,8 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let socket = netstack3_core::transport::udp::create_udp::<I, _>(&core_ctx);
-        netstack3_core::transport::udp::listen_udp(
+        let socket = netstack3_core::udp::create_udp::<I, _>(&core_ctx);
+        netstack3_core::udp::listen_udp(
             &core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -286,7 +286,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
             Some(LOCAL_PORT),
         )
         .unwrap();
-        netstack3_core::transport::udp::set_udp_device(
+        netstack3_core::udp::set_udp_device(
             &core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -296,7 +296,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Trigger creation of an INCOMPLETE neighbor entry by queueing an
         // outgoing packet to that neighbor's IP address.
-        netstack3_core::transport::udp::send_udp_to(
+        netstack3_core::udp::send_udp_to(
             &core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -336,7 +336,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         let queue_packet = loom::thread::spawn(move || {
             let (core_ctx, mut bindings_ctx, socket) = thread_vars;
 
-            netstack3_core::transport::udp::send_udp_to(
+            netstack3_core::udp::send_udp_to(
                 &core_ctx,
                 &mut bindings_ctx,
                 &socket,
@@ -411,8 +411,8 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let socket = netstack3_core::transport::udp::create_udp::<I, _>(&core_ctx);
-        netstack3_core::transport::udp::listen_udp(
+        let socket = netstack3_core::udp::create_udp::<I, _>(&core_ctx);
+        netstack3_core::udp::listen_udp(
             &core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -420,7 +420,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
             Some(LOCAL_PORT),
         )
         .unwrap();
-        netstack3_core::transport::udp::set_udp_device(
+        netstack3_core::udp::set_udp_device(
             &core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -444,7 +444,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         let create_incomplete_neighbor = loom::thread::spawn(move || {
             let (core_ctx, mut bindings_ctx, socket) = thread_vars;
 
-            netstack3_core::transport::udp::send_udp_to(
+            netstack3_core::udp::send_udp_to(
                 &core_ctx,
                 &mut bindings_ctx,
                 &socket,

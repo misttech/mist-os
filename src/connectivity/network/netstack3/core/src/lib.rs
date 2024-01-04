@@ -34,6 +34,7 @@ mod lock_ordering;
 mod state;
 mod time;
 mod trace;
+mod transport;
 mod uninstantiable;
 mod work_queue;
 
@@ -41,8 +42,6 @@ mod work_queue;
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
-
-pub mod transport;
 
 /// The device layer.
 pub mod device {
@@ -250,9 +249,64 @@ pub mod sync {
     };
 }
 
+/// Methods for dealing with TCP sockets.
+pub mod tcp {
+    // Re-exported functions
+    //
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
+    // objects.
+    pub use crate::transport::tcp::socket::{
+        accept, bind, close, connect, create_socket, do_send, get_info, get_socket_error, listen,
+        receive_buffer_size, reuseaddr, send_buffer_size, set_device, set_receive_buffer_size,
+        set_reuseaddr, set_send_buffer_size, shutdown, with_info, with_socket_options,
+        with_socket_options_mut,
+    };
+
+    // TODO(https://fxbug.dev/42083910): Expose a single marker IP extension
+    // trait.
+    pub use crate::transport::tcp::socket::DualStackIpExt;
+
+    // Re-exported types.
+    pub use crate::transport::tcp::{
+        buffer::{
+            Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+        },
+        segment::Payload,
+        socket::{
+            AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, InfoVisitor,
+            ListenError, ListenerNotifier, NoConnection, SetDeviceError, SetReuseAddrError,
+            SocketAddr, SocketInfo, SocketStats, TcpBindingsTypes, TcpSocketId, UnboundInfo,
+        },
+        state::Takeable,
+        BufferSizes, ConnectionError, SocketOptions, DEFAULT_FIN_WAIT2_TIMEOUT,
+    };
+}
+
 /// Miscellaneous and common types.
 pub mod types {
     pub use crate::work_queue::WorkQueueReport;
+}
+
+/// Methods for dealing with UDP sockets.
+pub mod udp {
+    // Re-exported functions
+    //
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
+    // objects.
+    pub use crate::transport::udp::{
+        close, connect, create_udp, disconnect_udp_connected, get_shutdown, get_udp_bound_device,
+        get_udp_dual_stack_enabled, get_udp_info, get_udp_multicast_hop_limit,
+        get_udp_posix_reuse_port, get_udp_transparent, get_udp_unicast_hop_limit, listen_udp,
+        send_udp, send_udp_to, set_udp_device, set_udp_dual_stack_enabled,
+        set_udp_multicast_hop_limit, set_udp_multicast_membership, set_udp_posix_reuse_port,
+        set_udp_transparent, set_udp_unicast_hop_limit, shutdown,
+    };
+
+    // Re-exported types.
+    pub use crate::transport::udp::{
+        ConnInfo, ListenerInfo, SendError, SendToError, SocketId, SocketInfo, UdpBindingsContext,
+        UdpRemotePort,
+    };
 }
 
 pub use context::{

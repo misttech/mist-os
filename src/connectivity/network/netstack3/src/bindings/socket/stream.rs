@@ -28,22 +28,12 @@ use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     ip::IpExt,
     socket::ShutdownType,
-    transport::tcp::{
-        self,
-        buffer::{
-            Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-        },
-        segment::Payload,
-        socket::{
-            accept, bind, close, connect, create_socket, get_info, get_socket_error, listen,
-            receive_buffer_size, reuseaddr, send_buffer_size, set_device, set_receive_buffer_size,
-            set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
-            with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
-            ConnectionInfo, DualStackIpExt, ListenError, ListenerNotifier, NoConnection,
-            SetReuseAddrError, SocketAddr, SocketInfo, TcpBindingsTypes, UnboundInfo,
-        },
-        state::Takeable,
-        BufferSizes, ConnectionError, SocketOptions,
+    tcp::{
+        self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
+        ConnectionError, ConnectionInfo, DualStackIpExt, IntoBuffers, ListenError,
+        ListenerNotifier, NoConnection, Payload, ReceiveBuffer, RingBuffer, SendBuffer,
+        SendPayload, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
+        TcpBindingsTypes, UnboundInfo,
     },
 };
 use once_cell::sync::Lazy;
@@ -69,7 +59,7 @@ const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
 const MAX_TCP_KEEPINTVL_SECS: u64 = 32767;
 const MAX_TCP_KEEPCNT: u8 = 127;
 
-type TcpSocketId<I> = tcp::socket::TcpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
+type TcpSocketId<I> = tcp::TcpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
 
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
@@ -459,7 +449,7 @@ impl<I: IpExt + DualStackIpExt> BindingData<I> {
         let SocketWorkerProperties {} = properties;
         let notifier = NeedsDataNotifier::default();
         let watcher = notifier.watcher();
-        let id = create_socket::<I, _>(
+        let id = tcp::create_socket::<I, _>(
             core_ctx,
             bindings_ctx,
             LocalZirconSocketAndNotifier(Arc::clone(&local), notifier),
@@ -527,7 +517,7 @@ where
     fn close(self, ctx: &mut Ctx) {
         let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        close::<I, _>(core_ctx, bindings_ctx, id);
+        tcp::close::<I, _>(core_ctx, bindings_ctx, id);
         if let Some(send_task_abort) = send_task_abort {
             // Signal the task to stop but drop the canceled error. The data
             // notifier might have been closed in `close` or due to state
@@ -685,11 +675,7 @@ fn spawn_send_task<I: IpExt + DualStackIpExt>(
                 Work::Signals(observed) => {
                     assert!(observed.contains(zx::Signals::SOCKET_READABLE));
                     let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-                    netstack3_core::transport::tcp::socket::do_send::<I, _>(
-                        core_ctx,
-                        bindings_ctx,
-                        &id,
-                    );
+                    tcp::do_send::<I, _>(core_ctx, bindings_ctx, &id);
                 }
             }
         }
@@ -722,7 +708,7 @@ where
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (addr, port) =
             addr.try_into_core_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?;
-        bind::<I, _>(core_ctx, bindings_ctx, id, addr, NonZeroU16::new(port))
+        tcp::bind::<I, _>(core_ctx, bindings_ctx, id, addr, NonZeroU16::new(port))
             .map_err(IntoErrno::into_errno)?;
         Ok(())
     }
@@ -742,7 +728,8 @@ where
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&bindings_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
-        connect::<I, _>(core_ctx, bindings_ctx, id, ip, port).map_err(IntoErrno::into_errno)?;
+        tcp::connect::<I, _>(core_ctx, bindings_ctx, id, ip, port)
+            .map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, id.clone(), spawner);
             assert_matches::assert_matches!(send_task_abort.replace(sender), None);
@@ -780,7 +767,7 @@ where
             NonZeroUsize::min(MAXIMUM_BACKLOG_SIZE, NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE))
         });
 
-        listen::<I, _>(core_ctx, id, backlog).map_err(IntoErrno::into_errno)?;
+        tcp::listen::<I, _>(core_ctx, id, backlog).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -790,7 +777,7 @@ where
             ctx,
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let fidl = match get_info::<I, _>(core_ctx, id) {
+        let fidl = match tcp::get_info::<I, _>(core_ctx, id) {
             SocketInfo::Unbound(UnboundInfo { device: _ }) => {
                 Ok(<<I as IpSockAddrExt>::SocketAddress as SockAddr>::UNSPECIFIED)
             }
@@ -811,7 +798,7 @@ where
             ctx,
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        match get_info::<I, _>(core_ctx, id) {
+        match tcp::get_info::<I, _>(core_ctx, id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
                 info.remote_addr
@@ -837,7 +824,7 @@ where
 
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (accepted, addr, peer) =
-            accept::<I, _>(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)?;
+            tcp::accept::<I, _>(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)?;
         let addr = addr
             .map_zone(AllowBindingIdFromWeak)
             .try_into_fidl_with_ctx(bindings_ctx)
@@ -865,7 +852,7 @@ where
             ctx,
         } = self;
         let core_ctx = ctx.core_ctx();
-        match get_socket_error(core_ctx, id) {
+        match tcp::get_socket_error(core_ctx, id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
         }
@@ -881,7 +868,7 @@ where
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
         let shutdown_type = ShutdownType::from_send_receive(shutdown_send, shutdown_recv)
             .ok_or(fposix::Errno::Einval)?;
-        let is_conn = shutdown::<I, _>(&core_ctx, bindings_ctx, id, shutdown_type)
+        let is_conn = tcp::shutdown::<I, _>(&core_ctx, bindings_ctx, id, shutdown_type)
             .map_err(IntoErrno::into_errno)?;
         if is_conn {
             let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
@@ -902,7 +889,7 @@ where
             .map(|name| bindings_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
 
-        set_device(core_ctx, bindings_ctx, id, device).map_err(IntoErrno::into_errno)
+        tcp::set_device(core_ctx, bindings_ctx, id, device).map_err(IntoErrno::into_errno)
     }
 
     fn set_send_buffer_size(self, new_size: u64) {
@@ -913,7 +900,7 @@ where
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        set_send_buffer_size(core_ctx, bindings_ctx, id, new_size);
+        tcp::set_send_buffer_size(core_ctx, bindings_ctx, id, new_size);
     }
 
     fn send_buffer_size(self) -> u64 {
@@ -922,7 +909,7 @@ where
             ctx,
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        send_buffer_size(core_ctx, bindings_ctx, id)
+        tcp::send_buffer_size(core_ctx, bindings_ctx, id)
             // If the socket doesn't have a send buffer (e.g. because it was shut
             // down for writing and all the data was sent to the peer), return 0.
             .unwrap_or(0)
@@ -939,7 +926,7 @@ where
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        set_receive_buffer_size(core_ctx, bindings_ctx, id, new_size);
+        tcp::set_receive_buffer_size(core_ctx, bindings_ctx, id, new_size);
     }
 
     fn receive_buffer_size(self) -> u64 {
@@ -948,7 +935,7 @@ where
             ctx,
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        receive_buffer_size(core_ctx, bindings_ctx, id)
+        tcp::receive_buffer_size(core_ctx, bindings_ctx, id)
             // If the socket doesn't have a receive buffer (e.g. because the remote
             // end signalled FIN and all data was sent to the client), return 0.
             .unwrap_or(0)
@@ -963,7 +950,7 @@ where
             ctx,
         } = self;
         let core_ctx = ctx.core_ctx();
-        set_reuseaddr(core_ctx, id, value).map_err(IntoErrno::into_errno)
+        tcp::set_reuseaddr(core_ctx, id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {
@@ -972,7 +959,7 @@ where
             ctx,
         } = self;
         let core_ctx = ctx.core_ctx();
-        reuseaddr(core_ctx, id)
+        tcp::reuseaddr(core_ctx, id)
     }
 
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
@@ -1556,7 +1543,7 @@ where
             ctx,
         } = self;
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        with_socket_options_mut(core_ctx, bindings_ctx, id, f)
+        tcp::with_socket_options_mut(core_ctx, bindings_ctx, id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
@@ -1564,7 +1551,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        with_socket_options(ctx.core_ctx(), id, f)
+        tcp::with_socket_options(ctx.core_ctx(), id, f)
     }
 }
 

@@ -39,7 +39,7 @@ use netstack3_core::{
         SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType, SocketZonedIpAddr,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    transport::udp::{self, UdpBindingsContext},
+    udp::{self, UdpBindingsContext},
     BindingsContext, SyncCtx,
 };
 use packet::{Buf, BufferMut};

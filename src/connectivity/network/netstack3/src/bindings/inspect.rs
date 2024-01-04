@@ -20,7 +20,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{self, DeviceId, WeakDeviceId},
-    transport::tcp,
+    tcp,
 };
 use std::{fmt, string::ToString as _};
 
@@ -61,9 +61,9 @@ impl Visitor {
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor {
-        fn visit(&mut self, socket: tcp::socket::SocketStats<I, WeakDeviceId<BindingsCtx>>) {
-            let tcp::socket::SocketStats { local, remote } = socket;
+    impl<I: Ip> tcp::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor {
+        fn visit(&mut self, socket: tcp::SocketStats<I, WeakDeviceId<BindingsCtx>>) {
+            let tcp::SocketStats { local, remote } = socket;
             self.record_unique_child(|node| {
                 node.record_string("TransportProtocol", "TCP");
                 node.record_string(
@@ -90,8 +90,8 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     }
     let core_ctx = ctx.core_ctx();
     let mut visitor = DualIpVisitor::new();
-    tcp::socket::with_info::<Ipv4, _, _>(core_ctx, &mut visitor);
-    tcp::socket::with_info::<Ipv6, _, _>(core_ctx, &mut visitor);
+    tcp::with_info::<Ipv4, _, _>(core_ctx, &mut visitor);
+    tcp::with_info::<Ipv6, _, _>(core_ctx, &mut visitor);
 
     visitor.inspector
 }

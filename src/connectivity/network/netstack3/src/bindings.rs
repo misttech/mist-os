@@ -80,7 +80,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    transport::udp::{self, UdpBindingsContext},
+    udp::{self, UdpBindingsContext},
     BindingsContext, EventContext, InstantBindingsTypes, InstantContext, RngContext, SyncCtx,
     TimerContext, TimerId, TracingContext,
 };
