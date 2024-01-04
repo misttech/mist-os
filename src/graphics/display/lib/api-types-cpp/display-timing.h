@@ -265,6 +265,14 @@ struct DisplayTiming {
     }
     return vertical_active_lines + vertical_blank_lines();
   }
+
+  // The number of fields the display device can display in 1,000 seconds.
+  //
+  // Rounded to the nearest millihertz (0.001 Hz).
+  //
+  // If `IsValid()` is true, the value is guaranteed to be >= 0 and
+  // <= kMaxRefreshRateMillihertz.
+  constexpr int32_t vertical_field_refresh_rate_millihertz() const;
 };
 
 constexpr bool DisplayTiming::IsValid() const {
@@ -302,6 +310,10 @@ constexpr bool DisplayTiming::IsValid() const {
     return false;
   }
   if (vertical_total_lines() < 0 || vertical_total_lines() > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_field_refresh_rate_millihertz() < 0 ||
+      vertical_field_refresh_rate_millihertz() > kMaxRefreshRateMillihertz) {
     return false;
   }
   return true;
@@ -343,6 +355,62 @@ constexpr void DisplayTiming::DebugAssertIsValid() const {
 
   ZX_DEBUG_ASSERT(vertical_total_lines() >= 0);
   ZX_DEBUG_ASSERT(vertical_total_lines() <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_field_refresh_rate_millihertz() >= 0);
+  ZX_DEBUG_ASSERT(vertical_field_refresh_rate_millihertz() <= kMaxRefreshRateMillihertz);
+}
+
+constexpr int32_t DisplayTiming::vertical_field_refresh_rate_millihertz() const {
+  constexpr int kMillihertzPerKilohertz = 1'000 * 1'000;
+
+  // The multiplication won't overflow, which would cause an undefined
+  // behavior.
+  //
+  // `pixel_clock_frequency_khz` is a signed 32-bit integer and
+  // `kMillihertzPerKilohertz` < 2^20. Thus, the multiplication result is
+  // less than 2^51, which falls within the valid range of an int64_t number.
+  const int64_t pixel_clock_millihertz =
+      int64_t{pixel_clock_frequency_khz} * kMillihertzPerKilohertz;
+
+  // The multiplication won't overflow, which would cause an undefined
+  // behavior.
+  //
+  // Both `horizontal_total` and `vertical_total` won't exceed 2^16, thus
+  // the multiplication result is less than 2^32, which falls within the
+  // valid range of an int64_t number.
+  const int64_t pixels_per_frame = int64_t{horizontal_total_px()} * vertical_total_lines();
+
+  const int num_fields_per_frame = (fields_per_frame == FieldsPerFrame::kInterlaced) ? 2 : 1;
+
+  // The formula below is correct, which can be proved as follows:
+  //
+  //    Vertical frame refresh rate = Pixel clock / Pixels per frame.
+  //
+  // Thus,
+  //
+  //    Vertical field refresh rate =
+  //  = Vertical frame refresh rate * Fields per frame
+  //  = Pixel clock * Fields per frame / Pixels per frame.
+  //
+  // Taking units and rounding into consideration,
+  //
+  //    Vertical field refresh rate (millihertz)
+  //  = round(Pixel clock (millihertz) * Fields per frame / Pixels per frame)
+  //  = (Pixel clock (millihertz) * Fields per frame + Pixels per frame / 2) div Pixels per frame
+  //
+  // Because Pixel clock (millihertz) < 2^51, Pixels per frame < 2^32 and
+  // Fields per frame = 1 or 2, the intermediate and final arithmetic results
+  // will all fit in int64_t numbers.
+  const int64_t vertical_field_refresh_rate_millihertz =
+      (pixel_clock_millihertz * num_fields_per_frame + pixels_per_frame / 2) / pixels_per_frame;
+
+  ZX_DEBUG_ASSERT(vertical_field_refresh_rate_millihertz >= 0);
+  ZX_DEBUG_ASSERT(vertical_field_refresh_rate_millihertz <= kMaxRefreshRateMillihertz);
+
+  // Since `vertical_field_refresh_rate_millihertz` is guaranteed to be within
+  // [0, kMaxRefreshRateMillihertz] where the lower and upper bounds are int32_t
+  // values, it's safe to cast it to int32_t.
+  return static_cast<int32_t>(vertical_field_refresh_rate_millihertz);
 }
 
 constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {

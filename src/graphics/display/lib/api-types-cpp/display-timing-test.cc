@@ -923,6 +923,122 @@ TEST(DisplayTimingIsValid, InvalidVerticalTotal) {
   EXPECT_FALSE(kParam.IsValid());
 }
 
+TEST(DisplayTiming, RefreshRateProgressive) {
+  // DisplayTiming of the VESA DMT timing 0x02, which has progressive scanning
+  // and no repeating pixels.
+  constexpr DisplayTiming kDisplayTimingDmt0x02 = {
+      .horizontal_active_px = 640,
+      .horizontal_front_porch_px = 32,
+      .horizontal_sync_width_px = 64,
+      .horizontal_back_porch_px = 96,
+      .vertical_active_lines = 400,
+      .vertical_front_porch_lines = 1,
+      .vertical_sync_width_lines = 3,
+      .vertical_back_porch_lines = 41,
+      .pixel_clock_frequency_khz = 31'500,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kNegative,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_EQ(kDisplayTimingDmt0x02.vertical_field_refresh_rate_millihertz(), int64_t{85'080});
+}
+
+TEST(DisplayTiming, RefreshRateProgressiveWithRepeatingPixels) {
+  // DisplayTiming of the CTA-861 timing for Video Identification Code 24,
+  // which has progressive scanning and horizontally repeating pixels.
+  constexpr DisplayTiming kDisplayTimingCta24 = {
+      .horizontal_active_px = 1440,
+      .horizontal_front_porch_px = 24,
+      .horizontal_sync_width_px = 126,
+      .horizontal_back_porch_px = 138,
+      .vertical_active_lines = 288,
+      .vertical_front_porch_lines = 2,
+      .vertical_sync_width_lines = 3,
+      .vertical_back_porch_lines = 19,
+      .pixel_clock_frequency_khz = 27'000,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kNegative,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 1,
+  };
+  EXPECT_EQ(kDisplayTimingCta24.vertical_field_refresh_rate_millihertz(), int64_t{50'080});
+}
+
+TEST(DisplayTiming, RefreshRateInterlaced) {
+  // DisplayTiming of the CTA-861 timing for Video Identification Code 39,
+  // which has interlaced scanning and doesn't have alternating vertical blank
+  // lines or repeating pixels.
+  constexpr DisplayTiming kDisplayTimingCta39 = {
+      .horizontal_active_px = 1920,
+      .horizontal_front_porch_px = 32,
+      .horizontal_sync_width_px = 168,
+      .horizontal_back_porch_px = 184,
+      .vertical_active_lines = 1080,
+      .vertical_front_porch_lines = 23,
+      .vertical_sync_width_lines = 5,
+      .vertical_back_porch_lines = 57,
+      .pixel_clock_frequency_khz = 72'000,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_EQ(kDisplayTimingCta39.vertical_field_refresh_rate_millihertz(), int64_t{50'000});
+}
+
+TEST(DisplayTiming, RefreshRateInterlacedWithAlternatingVblanks) {
+  // DisplayTiming of the VESA DMT timing 0x0f, which has interlaced scanning
+  // and alternating vertical blank lines.
+  constexpr DisplayTiming kDisplayTimingDmt0x0f = {
+      .horizontal_active_px = 1024,
+      .horizontal_front_porch_px = 8,
+      .horizontal_sync_width_px = 176,
+      .horizontal_back_porch_px = 56,
+      .vertical_active_lines = 768,
+      .vertical_front_porch_lines = 0,
+      .vertical_sync_width_lines = 4,
+      .vertical_back_porch_lines = 20,
+      .pixel_clock_frequency_khz = 44'900,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+  EXPECT_EQ(kDisplayTimingDmt0x0f.vertical_field_refresh_rate_millihertz(), int64_t{86'958});
+}
+
+// There's no VESA DMT or CTA-861 timing that is interlaced and has alternating
+// vblanks but no repeating pixels. So we don't test refresh rate calculation
+// using real timings for that case.
+
+TEST(DisplayTiming, RefreshRateInterlacedWithRepeatingPixelsAndAlternatingVblanks) {
+  // DisplayTiming of the CTA-861 timing for Video Identification Code 21,
+  // which has interlaced scanning, horizontally repeating pixels and
+  // alternating vertical blank lines.
+  constexpr DisplayTiming kDisplayTimingCta21 = {
+      .horizontal_active_px = 1440,
+      .horizontal_front_porch_px = 24,
+      .horizontal_sync_width_px = 126,
+      .horizontal_back_porch_px = 138,
+      .vertical_active_lines = 576,
+      .vertical_front_porch_lines = 2,
+      .vertical_sync_width_lines = 3,
+      .vertical_back_porch_lines = 19,
+      .pixel_clock_frequency_khz = 27'000,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kNegative,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = true,
+      .pixel_repetition = 1,
+  };
+  EXPECT_EQ(kDisplayTimingCta21.vertical_field_refresh_rate_millihertz(), int64_t{50'000});
+}
+
 }  // namespace
 
 }  // namespace display
