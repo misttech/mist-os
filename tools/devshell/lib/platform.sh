@@ -1,32 +1,32 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # unused variables used outside this file.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
-case "$(uname -s)" in
-  Linux)
+# Use the OSTYPE and MACHTYPE Bash builtin variables to determine host
+# machine type.
+case "$OSTYPE" in
+  linux*)
     readonly HOST_OS="linux"
     ;;
-  Darwin)
+  darwin*)
     readonly HOST_OS="mac"
     ;;
   *)
-    echo >&2 "Unknown operating system: $(uname -s)."
+    echo >&2 "Unknown operating system: $OSTYPE."
     exit 1
     ;;
 esac
 
-case "$(uname -m)" in
-  x86_64)
+case "$MACHTYPE" in
+  x86_64*)
     readonly HOST_CPU="x64"
     ;;
-  aarch64)
-    readonly HOST_CPU="arm64"
-    ;;
-  arm64)
+  aarch64*|arm64*)
     readonly HOST_CPU="arm64"
     ;;
   *)
-    echo >&2 "Unknown architecture: $(uname -m)."
+    echo >&2 "Unknown architecture: $MACHTYPE."
     exit 1
     ;;
 esac
