@@ -42,7 +42,9 @@ group("per_test_timeout_allowlist") {
     "//src/starnix/tests/gvisor:*",
     "//src/storage/lib/paver/test:paver-test_test_paver-test_component",
     "//src/virtualization/tests:termina_container_tests_pkg_test_termina_container_tests_cmp",
-    "//third_party/gvisor_syscall_tests:netstack2_syncudp_tcp_syscall_test_netstack2_syncudp_tcp_syscall_tests",
-    "//third_party/gvisor_syscall_tests:netstack3_tcp_syscall_test_netstack3_tcp_syscall_tests",
+
+    # TODO(https://issues.fuchsia.dev/318529127): Shard syscall tests so that
+    # we can remove the following line.
+    "//third_party/gvisor_syscall_tests:*",
   ]
 }
