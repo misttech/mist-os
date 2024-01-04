@@ -16,6 +16,7 @@
 #error "Unsupported architecture"
 #endif
 
+__WEAK zx_handle_t mmio_resource_handle;
 __WEAK zx_handle_t root_resource_handle;
 __WEAK zx_handle_t ioport_resource_handle;
 
@@ -63,7 +64,7 @@ ACPI_STATUS AcpiOsTerminate() {
  */
 ACPI_PHYSICAL_ADDRESS AcpiOsGetRootPointer() {
   zx_paddr_t acpi_rsdp, smbios;
-  zx_status_t zx_status = zx_pc_firmware_tables(root_resource_handle, &acpi_rsdp, &smbios);
+  zx_status_t zx_status = zx_pc_firmware_tables(mmio_resource_handle, &acpi_rsdp, &smbios);
   if (zx_status == ZX_OK && acpi_rsdp != 0) {
     return acpi_rsdp;
   }

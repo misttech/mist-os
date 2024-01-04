@@ -54,7 +54,7 @@ class SmbiosState {
   // Must only be invoked once on an instance.  On success, |entry_point()|
   // and |struct_table_mapping()| are usable.  |entry_point()| will be
   // guaranteed to be a valid SMBIOS entry point structure.
-  zx_status_t LoadFromFirmware(zx::unowned_resource root_resource);
+  zx_status_t LoadFromFirmware(zx::unowned_resource mmio_resource);
 
   // These values are only valid as long as the instance is around.
   const smbios::EntryPoint* entry_point() const {
@@ -70,9 +70,9 @@ class SmbiosState {
   uintptr_t struct_table_start_ = 0;
 };
 
-zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource root_resource) {
+zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource mmio_resource) {
   zx_paddr_t acpi_rsdp, smbios_ep;
-  zx_status_t status = zx_pc_firmware_tables(root_resource->get(), &acpi_rsdp, &smbios_ep);
+  zx_status_t status = zx_pc_firmware_tables(mmio_resource->get(), &acpi_rsdp, &smbios_ep);
   if (status != ZX_OK) {
     return status;
   }
@@ -85,7 +85,7 @@ zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource root_resource) {
   fzl::OwnedVmoMapper ep_mapping;
   uintptr_t ep_start;
   status =
-      MapStructure(*root_resource, smbios_ep, zx_system_get_page_size(), &ep_mapping, &ep_start);
+      MapStructure(*mmio_resource, smbios_ep, zx_system_get_page_size(), &ep_mapping, &ep_start);
   if (status != ZX_OK) {
     return status;
   }
@@ -98,7 +98,7 @@ zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource root_resource) {
   // Map the struct table
   fzl::OwnedVmoMapper struct_table_mapping;
   uintptr_t struct_table_start;
-  status = MapStructure(*root_resource, ep->struct_table_phys(), ep->struct_table_length(),
+  status = MapStructure(*mmio_resource, ep->struct_table_phys(), ep->struct_table_length(),
                         &struct_table_mapping, &struct_table_start);
   if (status != ZX_OK) {
     return status;
@@ -134,9 +134,9 @@ bool smbios_product_name_is_valid(const char* product_name) {
   return true;
 }
 
-zx_status_t SmbiosInfo::Load(zx::unowned_resource root_resource) {
+zx_status_t SmbiosInfo::Load(zx::unowned_resource mmio_resource) {
   SmbiosState smbios;
-  zx_status_t status = smbios.LoadFromFirmware(std::move(root_resource));
+  zx_status_t status = smbios.LoadFromFirmware(std::move(mmio_resource));
   if (status != ZX_OK) {
     return status;
   }

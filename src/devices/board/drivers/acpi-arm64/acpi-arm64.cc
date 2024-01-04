@@ -112,7 +112,7 @@ zx::result<> AcpiArm64::SmbiosInit() {
 
   // Load SMBIOS information.
   smbios::SmbiosInfo smbios;
-  zx_status_t status = smbios.Load(zx::unowned_resource(get_root_resource(parent())));
+  zx_status_t status = smbios.Load(zx::unowned_resource(get_mmio_resource(parent())));
   if (status == ZX_OK) {
     board_info.board_name() = smbios.board_name();
     bootloader_info.vendor() = smbios.vendor();
