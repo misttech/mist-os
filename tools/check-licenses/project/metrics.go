@@ -19,6 +19,7 @@ const (
 	NumPreviousProjectRetrieved = "Initialized Custom Project Retrieval Count"
 	DuplicateReadmeFiles        = "Duplicate README.fuchsia Files"
 	UnknownReadmeLines          = "Unexpected Line Found In README.fuchsia File"
+	ReadmeFileInitError         = "Error Processing Custom README File"
 	ProjectURLs                 = "Project URLs"
 
 	MissingName        = "Projects Missing Names"

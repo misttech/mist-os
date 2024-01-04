@@ -7,8 +7,8 @@ package project
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
-	"log"
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
@@ -94,13 +94,15 @@ func initializeCustomReadmes() error {
 					r, err := readme.NewReadmeFromFileCustomLocation(projectRoot, currentPath)
 					if err != nil {
 						// Don't error out with these custom README.fuchsia files, so we don't break rollers.
-						log.Printf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)
+						msg := fmt.Sprintf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)
+						plusVal(ReadmeFileInitError, msg)
 
 						return nil
 					}
 
 					if _, err := NewProject(r, projectRoot); err != nil {
-						log.Printf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)
+						msg := fmt.Sprintf("Found issue with NON-custom README.fuchsia file: %v: %v\n", currentPath, err)
+						plusVal(ReadmeFileInitError, msg)
 						return nil
 					}
 				}
