@@ -445,10 +445,10 @@ if (current_toolchain != default_toolchain) {
     # Number of times to perform chain loading after initial bootstrapping.
     # Currently in x86(with kvm) it takes ~40 secs to chain load 100 times,
     # the biggest time consumption being printing to serial.
-    # On arm64, 100 iterations occasionally takes over 5 minutes, but 90 seems
-    # to pretty reliably complete before infra times us out, so 80 leaves a
-    # little headroom for variance in performance.
-    args = [ "trampoline.user_total_iters=80" ]
+    # On arm64, 80 iterations occasionally takes over 5 minutes (boot
+    # performance appears to have regressed since March 2023)
+    # so 70 leaves a little headroom for variance in performance.
+    args = [ "trampoline.user_total_iters=70" ]
   }
 
   mobius_turducken_test("trampoline-boot-zbi-test") {
