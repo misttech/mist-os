@@ -74,15 +74,15 @@ use netstack3_core::{
     handle_timer,
     icmp::{self, IcmpEchoBindingsContext},
     ip::{
-        AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent, IpExt,
+        AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
         Lifetime, SlaacConfiguration,
     },
     neighbor,
     routes::RawMetric,
     udp::{self, UdpBindingsContext},
-    BindingsContext, EventContext, InstantBindingsTypes, InstantContext, RngContext, SyncCtx,
-    TimerContext, TimerId, TracingContext,
+    BindingsContext, EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext,
+    SyncCtx, TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {
@@ -523,11 +523,8 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
     }
 }
 
-impl<
-        I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
-            + icmp::IcmpIpExt
-            + IpExt,
-    > IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
+impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + IpExt>
+    IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
@@ -546,7 +543,7 @@ impl<
 
 impl<I> UdpBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
 where
-    I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
+    I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
 {
     fn receive_udp<B: BufferMut>(
         &mut self,

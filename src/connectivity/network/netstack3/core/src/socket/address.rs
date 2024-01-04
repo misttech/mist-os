@@ -174,7 +174,7 @@ impl<A: IpAddress> ScopeableAddress for SocketIpAddr<A> {
 /// The IP address and identifier (port) of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip(A, IpAddress)]
-pub(crate) struct ListenerIpAddr<A: IpAddress, LI> {
+pub struct ListenerIpAddr<A: IpAddress, LI> {
     /// The specific address being listened on, or `None` for all addresses.
     pub(crate) addr: Option<SocketIpAddr<A>>,
     /// The local identifier (i.e. port for TCP/UDP).
@@ -206,7 +206,7 @@ pub struct ConnAddr<A, D> {
 
 /// The IP address and identifier (port) of a dual-stack listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum DualStackListenerIpAddr<A: IpAddress, LI>
+pub enum DualStackListenerIpAddr<A: IpAddress, LI>
 where
     A::Version: DualStackIpExt,
 {
@@ -226,7 +226,7 @@ where
 
 /// The IP address and identifiers (ports) of a dual-stack connected socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum DualStackConnIpAddr<A: IpAddress, LI, RI>
+pub enum DualStackConnIpAddr<A: IpAddress, LI, RI>
 where
     A::Version: DualStackIpExt,
 {

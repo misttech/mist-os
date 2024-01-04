@@ -26,15 +26,14 @@ use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
 use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
-    ip::IpExt,
     socket::ShutdownType,
     tcp::{
         self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-        ConnectionError, ConnectionInfo, DualStackIpExt, IntoBuffers, ListenError,
-        ListenerNotifier, NoConnection, Payload, ReceiveBuffer, RingBuffer, SendBuffer,
-        SendPayload, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
-        TcpBindingsTypes, UnboundInfo,
+        ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetReuseAddrError, SocketAddr,
+        SocketInfo, SocketOptions, Takeable, TcpBindingsTypes, UnboundInfo,
     },
+    IpExt,
 };
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
@@ -434,14 +433,14 @@ impl SendBuffer for SendBufferWithZirconSocket {
     }
 }
 
-struct BindingData<I: IpExt + DualStackIpExt> {
+struct BindingData<I: IpExt> {
     id: TcpSocketId<I>,
     peer: zx::Socket,
     local_socket_and_watcher: Option<(Arc<zx::Socket>, NeedsDataWatcher)>,
     send_task_abort: Option<futures::channel::oneshot::Sender<()>>,
 }
 
-impl<I: IpExt + DualStackIpExt> BindingData<I> {
+impl<I: IpExt> BindingData<I> {
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (local, peer) = zx::Socket::create_stream();
@@ -469,7 +468,7 @@ enum InitialSocketState {
     Connected,
 }
 
-impl<I: IpExt + DualStackIpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
+impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -633,7 +632,7 @@ impl IntoErrno for ConnectionError {
 
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
-fn spawn_send_task<I: IpExt + DualStackIpExt>(
+fn spawn_send_task<I: IpExt>(
     mut ctx: crate::bindings::Ctx,
     socket: Arc<zx::Socket>,
     mut watcher: NeedsDataWatcher,
@@ -689,12 +688,12 @@ fn spawn_send_task<I: IpExt + DualStackIpExt>(
     sender
 }
 
-struct RequestHandler<'a, I: IpExt + DualStackIpExt> {
+struct RequestHandler<'a, I: IpExt> {
     data: &'a mut BindingData<I>,
     ctx: &'a mut Ctx,
 }
 
-impl<I: IpSockAddrExt + IpExt + DualStackIpExt> RequestHandler<'_, I>
+impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -1555,7 +1554,7 @@ where
     }
 }
 
-fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt + DualStackIpExt>(
+fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     ctx: Ctx,
     accepted: TcpSocketId<I>,
     peer: zx::Socket,

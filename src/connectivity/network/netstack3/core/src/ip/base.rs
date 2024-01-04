@@ -441,7 +441,7 @@ impl<S: GenericOverIp<I>, I: Ip> GenericOverIp<I> for AddressStatus<S> {
 }
 
 /// The status of an IPv4 address.
-pub(crate) enum Ipv4PresentAddressStatus {
+pub enum Ipv4PresentAddressStatus {
     LimitedBroadcast,
     SubnetBroadcast,
     Multicast,
@@ -449,14 +449,14 @@ pub(crate) enum Ipv4PresentAddressStatus {
 }
 
 /// The status of an IPv6 address.
-pub(crate) enum Ipv6PresentAddressStatus {
+pub enum Ipv6PresentAddressStatus {
     Multicast,
     UnicastAssigned,
     UnicastTentative,
 }
 
 /// An extension trait providing IP layer properties.
-pub(crate) trait IpLayerIpExt: IpExt {
+pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
     type State<I: Instant, StrongDeviceId: StrongId>: AsRef<IpStateInner<Self, I, StrongDeviceId>>;
     type PacketIdState;
@@ -1127,7 +1127,7 @@ impl Ipv6StateBuilder {
     }
 }
 
-pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
+pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     pub(super) next_packet_id: AtomicU16,
@@ -1162,7 +1162,7 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
-pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
+pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
     pub(super) counters: Ipv6Counters,
@@ -1497,7 +1497,7 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct IpStateInner<I: Ip, Instant: crate::Instant, DeviceId> {
+pub struct IpStateInner<I: Ip, Instant: crate::Instant, DeviceId> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, Instant>>,
     pmtu_cache: Mutex<PmtuCache<I, Instant>>,

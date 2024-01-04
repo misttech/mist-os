@@ -31,6 +31,7 @@ mod convert;
 mod counters;
 mod data_structures;
 mod lock_ordering;
+mod marker;
 mod state;
 mod time;
 mod trace;
@@ -143,7 +144,7 @@ pub mod icmp {
     };
 
     // Re-exported types.
-    pub use crate::ip::icmp::{IcmpEchoBindingsContext, IcmpIpExt, SocketId, SocketInfo};
+    pub use crate::ip::icmp::{IcmpEchoBindingsContext, SocketId, SocketInfo};
 }
 
 /// The Internet Protocol, versions 4 and 6.
@@ -167,7 +168,7 @@ pub mod ip {
 
     // Re-exported types.
     pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
-    pub use base::{IpExt, IpLayerEvent, ResolveRouteError};
+    pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
         state::{
@@ -262,10 +263,6 @@ pub mod tcp {
         with_socket_options_mut,
     };
 
-    // TODO(https://fxbug.dev/42083910): Expose a single marker IP extension
-    // trait.
-    pub use crate::transport::tcp::socket::DualStackIpExt;
-
     // Re-exported types.
     pub use crate::transport::tcp::{
         buffer::{
@@ -313,6 +310,7 @@ pub use context::{
     BindingsContext, BindingsTypes, CoreCtx, EventContext, InstantBindingsTypes, InstantContext,
     ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
+pub use marker::IpExt;
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 

@@ -43,7 +43,7 @@ use thiserror::Error;
 use tracing::{debug, error, trace};
 
 /// We use this trait to turn [`DualStackIpExt::DemuxSocketId`]s into a TimerId.
-pub(crate) trait ToTimerId<D: device::WeakId, BT: TcpBindingsTypes> {
+pub trait ToTimerId<D: device::WeakId, BT: TcpBindingsTypes> {
     fn to_timer_id(&self) -> TimerId<D, BT>;
 }
 
@@ -68,9 +68,6 @@ impl<D: device::WeakId, BT: TcpBindingsTypes> ToTimerId<D, BT>
 pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
-    // TODO(https://issues.fuchsia.dev/316412877): Use sealed traits so we can
-    // remove this lint.
-    #[allow(private_bounds)]
     type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes>: SpecSocketId + ToTimerId<D, BT>;
 
     /// The type for a connection, for [`Ipv4`], this will be just the single
@@ -609,7 +606,7 @@ pub(crate) enum TcpIpTransportContext {}
 /// implemented for [`TcpSocketId`] but defining a trait effectively reduces the
 /// number of type parameters percolating down to the socket map types since
 /// they only really care about the identifier's behavior.
-pub(crate) trait SpecSocketId: Clone + Eq + PartialEq + Debug + 'static {}
+pub trait SpecSocketId: Clone + Eq + PartialEq + Debug + 'static {}
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> SpecSocketId
     for TcpSocketId<I, D, BT>
 {

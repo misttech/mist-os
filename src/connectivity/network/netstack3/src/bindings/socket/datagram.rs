@@ -32,7 +32,7 @@ use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
     icmp::{self, IcmpEchoBindingsContext},
-    ip::{IpExt, IpSockCreateAndSendError},
+    ip::IpSockCreateAndSendError,
     socket::{
         self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
@@ -40,7 +40,7 @@ use netstack3_core::{
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     udp::{self, UdpBindingsContext},
-    BindingsContext, SyncCtx,
+    BindingsContext, IpExt, SyncCtx,
 };
 use packet::{Buf, BufferMut};
 use tracing::{error, trace, warn};
@@ -595,7 +595,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
     }
 }
 
-impl<I: icmp::IcmpIpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
+impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,

@@ -131,7 +131,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
 const DEVICE_MAC: Mac = net_mac!("22:33:44:55:66:77");
 const NEIGHBOR_MAC: Mac = net_mac!("88:88:88:88:88:88");
 
-trait TestIpExt: netstack3_core::ip::IpExt {
+trait TestIpExt: netstack3_core::IpExt {
     const DEVICE_ADDR: Self::Addr;
     const DEVICE_SUBNET: Subnet<Self::Addr>;
     const DEVICE_GATEWAY: Subnet<Self::Addr>;

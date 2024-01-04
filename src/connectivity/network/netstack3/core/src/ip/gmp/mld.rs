@@ -342,7 +342,7 @@ impl ProtocolSpecific for MldProtocolSpecific {
 
 /// The state on a multicast address.
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct MldGroupState<I: Instant>(GmpStateMachine<I, MldProtocolSpecific>);
+pub struct MldGroupState<I: Instant>(GmpStateMachine<I, MldProtocolSpecific>);
 
 impl<I: Instant> From<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
     fn from(state: GmpStateMachine<I, MldProtocolSpecific>) -> MldGroupState<I> {

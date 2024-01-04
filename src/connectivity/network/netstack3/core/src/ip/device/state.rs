@@ -48,7 +48,7 @@ pub(crate) enum DelIpv6AddrReason {
 }
 
 /// An `Ip` extension trait adding IP device state properties.
-pub(crate) trait IpDeviceStateIpExt: Ip {
+pub trait IpDeviceStateIpExt: Ip {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Debug;
 
@@ -728,7 +728,7 @@ impl<I> Default for Ipv4AddrConfig<I> {
 
 /// Data associated with an IPv4 address on an interface.
 #[derive(Debug)]
-pub(crate) struct Ipv4AddressEntry<Instant> {
+pub struct Ipv4AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv4Addr>,
     pub(crate) state: RwLock<Ipv4AddressState<Instant>>,
 }
@@ -916,7 +916,7 @@ pub(crate) struct Ipv6AddressState<Instant> {
 /// Data associated with an IPv6 address on an interface.
 // TODO(https://fxbug.dev/91753): Should this be generalized for loopback?
 #[derive(Debug)]
-pub(crate) struct Ipv6AddressEntry<Instant> {
+pub struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
     pub(crate) dad_state: Mutex<Ipv6DadState>,
     pub(crate) state: RwLock<Ipv6AddressState<Instant>>,

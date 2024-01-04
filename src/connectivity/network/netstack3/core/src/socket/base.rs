@@ -30,9 +30,6 @@ use crate::{
 
 /// A dual stack IP extention trait that provides the `OtherVersion` associated
 /// type.
-// TODO(https://issues.fuchsia.dev/316412877): Use sealed traits so we can
-// remove this lint.
-#[allow(private_bounds)]
 pub trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
     /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
     type OtherVersion: IpLayerIpExt
@@ -211,7 +208,7 @@ pub(crate) fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I:
 ///
 /// This is a convenience trait for bundling together the local and remote
 /// identifiers for a protocol.
-pub(crate) trait SocketMapAddrSpec {
+pub trait SocketMapAddrSpec {
     /// The local identifier portion of a socket address.
     type LocalIdentifier: Copy + Clone + Debug + Hash + Eq;
     /// The remote identifier portion of a socket address.
@@ -231,7 +228,7 @@ impl<A: IpAddress, D: device::Id, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
 }
 
 /// Specifies the types parameters for [`BoundSocketMap`] state as a single bundle.
-pub(crate) trait SocketMapStateSpec {
+pub trait SocketMapStateSpec {
     /// The tag value of a socket address vector entry.
     ///
     /// These values are derived from [`Self::ListenerAddrState`] and

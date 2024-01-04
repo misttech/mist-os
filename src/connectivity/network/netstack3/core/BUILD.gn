@@ -58,6 +58,7 @@ lib_sources = [
   "src/lib.rs",
   "src/lock_ordering.rs",
   "src/macros.rs",
+  "src/marker.rs",
   "src/socket/address.rs",
   "src/socket/base.rs",
   "src/socket/datagram.rs",

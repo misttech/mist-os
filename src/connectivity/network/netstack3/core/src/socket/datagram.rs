@@ -90,10 +90,7 @@ impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOv
     type Type = SocketsState<NewIp, D, S>;
 }
 
-pub(crate) trait IpExt:
-    crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt
-{
-}
+pub trait IpExt: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt {}
 impl<I: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt> IpExt for I {}
 
 #[derive(Derivative, GenericOverIp)]
@@ -270,12 +267,7 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) struct ConnState<
-    WireI: IpExt,
-    SocketI: IpExt,
-    D: Eq + Hash,
-    S: DatagramSocketSpec + ?Sized,
-> {
+pub struct ConnState<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
     pub(crate) socket: IpSock<WireI, D, SocketHopLimits<WireI>>,
     pub(crate) ip_options: IpOptions<SocketI, D, S>,
     pub(crate) shutdown: Shutdown,
@@ -362,11 +354,8 @@ impl<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec>
 /// Connection state belong to either this-stack or the other-stack.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum DualStackConnState<
-    I: IpExt + DualStackIpExt,
-    D: Eq + Hash,
-    S: DatagramSocketSpec + ?Sized,
-> {
+pub enum DualStackConnState<I: IpExt + DualStackIpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized>
+{
     /// The [`ConnState`] for a socked connected with [`I::Version`].
     ThisStack(ConnState<I, I, D, S>),
     /// The [`ConnState`] for a socked connected with [`I::OtherVersion`].
@@ -420,7 +409,7 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Clone(bound = "D: Clone"), Debug(bound = "D: Debug"), Default(bound = ""))]
-pub(crate) struct IpOptions<I: IpExt, D, S: DatagramSocketSpec + ?Sized> {
+pub struct IpOptions<I: IpExt, D, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits<I>,
     other_stack: S::OtherStackIpOptions<I>,
@@ -903,7 +892,7 @@ impl<BC: RngContext, I: Ip, S> DatagramStateBindingsContext<I, S> for BC {}
 ///
 /// `I: Ip` describes the type of packets that can be received by sockets in
 /// the map.
-pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
+pub trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
     SocketMapStateSpec<ListenerId = Self::BoundSocketId, ConnId = Self::BoundSocketId>
     + SocketMapConflictPolicy<
         ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
@@ -938,7 +927,7 @@ pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub(crate) trait DualStackIpExt: super::DualStackIpExt {
+pub trait DualStackIpExt: super::DualStackIpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -991,7 +980,7 @@ pub(crate) trait DualStackIpExt: super::DualStackIpExt {
     Eq(bound = "S::SocketId<Ipv4>: Eq, S::SocketId<Ipv6>: Eq"),
     PartialEq(bound = "S::SocketId<Ipv4>: PartialEq, S::SocketId<Ipv6>: PartialEq")
 )]
-pub(crate) enum EitherIpSocket<S: DatagramSocketSpec> {
+pub enum EitherIpSocket<S: DatagramSocketSpec> {
     V4(S::SocketId<Ipv4>),
     V6(S::SocketId<Ipv6>),
 }
@@ -1102,7 +1091,7 @@ pub(crate) struct WrapOtherStackIpOptionsMut<'a, I: DualStackIpExt, S: 'a + Clon
 /// Types and behavior for datagram sockets.
 ///
 /// These sockets may or may not support dual-stack operation.
-pub(crate) trait DatagramSocketSpec {
+pub trait DatagramSocketSpec {
     /// The socket address spec for the datagram socket type.
     ///
     /// This describes the types of identifiers the socket uses, e.g.
@@ -1221,7 +1210,7 @@ pub(crate) trait DatagramSocketSpec {
     ) -> ConnAddr<Self::ConnIpAddr<I>, D>;
 }
 
-pub(crate) struct InUseError;
+pub struct InUseError;
 
 pub(crate) fn create<I: IpExt, S: DatagramSocketSpec, BC, CC: DatagramStateContext<I, BC, S>>(
     core_ctx: &mut CC,
