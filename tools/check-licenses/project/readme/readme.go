@@ -36,6 +36,7 @@ var (
 		" -> License File URL":        true,
 		" -> License Exceptions":      true,
 		" -> License Skip Reason":     true,
+		" -> Notes":                   true,
 		"Version":                     true,
 		"Modifications":               true,
 		"Local Modifications":         true,
@@ -47,6 +48,7 @@ var (
 		// Unused or non-standard
 		"Files":                      true,
 		"Upstream":                   true,
+		"Shipped":                    true,
 		"Upstream git":               true,
 		"License Android Compatible": true,
 		"Versions":                   true,
@@ -104,6 +106,7 @@ type ReadmeLicense struct {
 	LicenseFileURL         string `json:"licenseFileURL"`
 	LicenseSkipReason      string `json:"licenseSkipReason"`
 	LicenseExceptions      string `json:"licenseExceptions"`
+	LicenseNotes           string `json:"licenseNotes"`
 
 	LicenseFileRef *file.File
 }
@@ -216,6 +219,8 @@ func NewReadme(r io.Reader, projectRoot string, readmePath string) (*Readme, err
 			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseExceptions: value})
 		case " -> License Skip Reason":
 			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseSkipReason: value})
+		case " -> Notes":
+			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseNotes: value})
 		case "Upstream git", "Upstream Git":
 			readme.UpstreamGit = value
 		case "Security Critical":
@@ -306,11 +311,13 @@ func (r *Readme) ProcessReadmeLicense(rl *ReadmeLicense) {
 	case rl.LicenseFile != "" && last.LicenseFile != "":
 	case rl.LicenseFileURL != "" && last.LicenseFileURL != "":
 	case rl.LicenseFileFormat != "" && last.LicenseFileFormat != "":
+	case rl.LicenseNotes != "" && last.LicenseNotes != "":
 	default:
 		last.LicenseClassifications = last.LicenseClassifications + rl.LicenseClassifications
 		last.LicenseFile = last.LicenseFile + rl.LicenseFile
 		last.LicenseFileURL = last.LicenseFileURL + rl.LicenseFileURL
 		last.LicenseFileFormat = last.LicenseFileFormat + rl.LicenseFileFormat
+		last.LicenseNotes = last.LicenseNotes + rl.LicenseNotes
 		return
 	}
 	r.Licenses = append(r.Licenses, rl)
@@ -451,6 +458,7 @@ func (rl *ReadmeLicense) String() string {
 		addIfNotEmpty(&sb, " -> License Exceptions", rl.LicenseExceptions)
 		addIfNotEmpty(&sb, " -> License File URL", rl.LicenseFileURL)
 		addIfNotEmpty(&sb, " -> License Skip Reason", rl.LicenseSkipReason)
+		addIfNotEmpty(&sb, " -> Notes", rl.LicenseNotes)
 	}
 
 	return strings.TrimSpace(sb.String())
