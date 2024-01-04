@@ -552,10 +552,36 @@ pub struct ProvisioningRule {
 // unnecessarily. Devices without MAC are not supported yet, see
 // `add_new_device` in `lib.rs`. This makes mac into a required field for
 // ease of use.
-struct DeviceInfoRef<'a> {
-    device_class: fidl_fuchsia_hardware_network::DeviceClass,
-    mac: &'a fidl_fuchsia_net_ext::MacAddress,
-    topological_path: &'a str,
+pub(super) struct DeviceInfoRef<'a> {
+    pub(super) device_class: fidl_fuchsia_hardware_network::DeviceClass,
+    pub(super) mac: &'a fidl_fuchsia_net_ext::MacAddress,
+    pub(super) topological_path: &'a str,
+}
+
+impl<'a> DeviceInfoRef<'a> {
+    pub(super) fn interface_type(&self) -> crate::InterfaceType {
+        let DeviceInfoRef { device_class, mac: _, topological_path: _ } = self;
+        (*device_class).into()
+    }
+
+    pub(super) fn is_wlan_ap(&self) -> bool {
+        /// The string present in the topological path of a WLAN AP interface.
+        const WLAN_AP_TOPO_PATH_CONTAINS: &str = "wlanif-ap";
+
+        let DeviceInfoRef { device_class, mac: _, topological_path } = self;
+        match device_class {
+            fidl_fuchsia_hardware_network::DeviceClass::WlanAp => true,
+            // TODO: Remove string matching once integration tests don't
+            // need it to detect a WLAN AP interface.
+            fidl_fuchsia_hardware_network::DeviceClass::Virtual => {
+                topological_path.contains(WLAN_AP_TOPO_PATH_CONTAINS)
+            }
+            fidl_fuchsia_hardware_network::DeviceClass::Wlan
+            | fidl_fuchsia_hardware_network::DeviceClass::Ethernet
+            | fidl_fuchsia_hardware_network::DeviceClass::Ppp
+            | fidl_fuchsia_hardware_network::DeviceClass::Bridge => false,
+        }
+    }
 }
 
 impl ProvisioningRule {
@@ -573,12 +599,9 @@ impl ProvisioningRule {
 // indicates otherwise.
 pub(crate) fn find_provisioning_action_from_provisioning_rules(
     provisioning_rules: &[ProvisioningRule],
-    topological_path: &str,
-    mac: &fidl_fuchsia_net_ext::MacAddress,
-    device_class: fidl_fuchsia_hardware_network::DeviceClass,
+    info: &DeviceInfoRef<'_>,
     interface_name: &str,
 ) -> ProvisioningAction {
-    let info = DeviceInfoRef { topological_path, mac, device_class };
     provisioning_rules
         .iter()
         .find_map(|rule| {
@@ -1494,9 +1517,11 @@ mod tests {
                 ))]),
                 provisioning: ProvisioningAction::Delegated,
             }],
-            "",
-            &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
-            fhwnet::DeviceClass::Wlan,
+            &DeviceInfoRef {
+                device_class: fhwnet::DeviceClass::Wlan,
+                mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+                topological_path: "",
+            },
             "wlans5009",
         );
         assert_eq!(provisioning_action, expected);

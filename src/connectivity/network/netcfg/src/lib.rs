@@ -58,6 +58,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
+use self::interface::DeviceInfoRef;
 
 /// Interface metrics.
 ///
@@ -2002,6 +2003,12 @@ impl<'a> NetCfg<'a> {
             )))
         })?;
 
+        let device_info = DeviceInfoRef {
+            device_class: *device_class,
+            mac: &mac,
+            topological_path: &topological_path,
+        };
+
         let interface_type = device_info.interface_type();
         let metric = match interface_type {
             InterfaceType::Wlan | InterfaceType::Ap => self.interface_metrics.wlan_metric,
@@ -2036,7 +2043,6 @@ impl<'a> NetCfg<'a> {
             interface_name,
             interface_naming_id,
             &device_info,
-            &mac,
         )
         .await
         .context("error configuring ethernet interface")
@@ -2054,12 +2060,7 @@ impl<'a> NetCfg<'a> {
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         interface_name: String,
         interface_naming_id: interface::InterfaceNamingIdentifier,
-        // TODO(fxbug.dev/136874): Use DeviceInfoRef directly when the
-        // same functions are  implemented for `is_wlan_ap`, `interface_type`
-        device_info: &DeviceInfo,
-        // Pass the MAC separately although it is also present in DeviceInfo
-        // since we have already unwrapped this Option.
-        mac: &fidl_fuchsia_net_ext::MacAddress,
+        device_info: &DeviceInfoRef<'_>,
     ) -> Result<(), errors::Error> {
         let class: DeviceClass = device_info.device_class.into();
         let ForwardedDeviceClasses { ipv4, ipv6 } = &self.forwarded_device_classes;
@@ -2090,9 +2091,7 @@ impl<'a> NetCfg<'a> {
 
         let provisioning_action = interface::find_provisioning_action_from_provisioning_rules(
             &self.interface_provisioning_policy,
-            &device_info.topological_path,
-            &mac,
-            device_info.device_class,
+            &device_info,
             &interface_name,
         );
         info!(
@@ -2235,7 +2234,7 @@ impl<'a> NetCfg<'a> {
         filter: &fnet_filter::FilterProxy,
         stack: &fnet_stack::StackProxy,
         interface_id: NonZeroU64,
-        device_info: &DeviceInfo,
+        device_info: &DeviceInfoRef<'_>,
         start_in_stack_dhcpv4: bool,
     ) -> Result<(), errors::Error> {
         filter_enabled_state
@@ -2272,7 +2271,7 @@ impl<'a> NetCfg<'a> {
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         stack: &fidl_fuchsia_net_stack::StackProxy,
         name: String,
-        device_info: &DeviceInfo,
+        device_info: &DeviceInfoRef<'_>,
     ) -> Result<(), errors::Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
@@ -5160,8 +5159,11 @@ mod tests {
 
         let id = const_unwrap_option(NonZeroU64::new(10));
 
-        let make_info =
-            |device_class| DeviceInfo { device_class, mac: None, topological_path: "".to_string() };
+        let make_info = |device_class| DeviceInfoRef {
+            device_class,
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            topological_path: "",
+        };
 
         let wlan_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::Wlan);
         let wlan_ap_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::WlanAp);

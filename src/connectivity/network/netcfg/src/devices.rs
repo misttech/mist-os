@@ -50,35 +50,13 @@ impl errors::ContextExt for AddDeviceError {
     }
 }
 
+// Cannot be completely replaced by `DeviceInfoRef` due to `get_device_info`
+// not being able to return a struct of references.
 #[derive(Debug, Clone)]
 pub(super) struct DeviceInfo {
     pub(super) device_class: fhwnet::DeviceClass,
     pub(super) mac: Option<fidl_fuchsia_net_ext::MacAddress>,
     pub(super) topological_path: String,
-}
-
-impl DeviceInfo {
-    pub(super) fn interface_type(&self) -> crate::InterfaceType {
-        let Self { device_class, mac: _, topological_path: _ } = self;
-        (*device_class).into()
-    }
-
-    pub(super) fn is_wlan_ap(&self) -> bool {
-        /// The string present in the topological path of a WLAN AP interface.
-        const WLAN_AP_TOPO_PATH_CONTAINS: &str = "wlanif-ap";
-
-        let Self { device_class, mac: _, topological_path } = self;
-        match device_class {
-            fhwnet::DeviceClass::WlanAp => true,
-            // TODO(https://fxbug.dev/95273): Remove string matching once integration tests don't
-            // need it to detect a WLAN AP interface.
-            fhwnet::DeviceClass::Virtual => topological_path.contains(WLAN_AP_TOPO_PATH_CONTAINS),
-            fhwnet::DeviceClass::Wlan
-            | fhwnet::DeviceClass::Ethernet
-            | fhwnet::DeviceClass::Ppp
-            | fhwnet::DeviceClass::Bridge => false,
-        }
-    }
 }
 
 /// An instance of a network device.
