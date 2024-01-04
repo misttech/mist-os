@@ -18,10 +18,11 @@ use fidl_fuchsia_netemul_network as fnetemul_network;
 use fnet_dhcp_ext::ClientExt;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{join, pin_mut, FutureExt, StreamExt, TryStreamExt};
+use futures::{future::ready, join, pin_mut, FutureExt, StreamExt, TryStreamExt};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     annotate, dhcpv4 as dhcpv4_helper,
+    interfaces::TestInterfaceExt as _,
     realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
@@ -176,6 +177,7 @@ async fn create_test_realm<'a, N: Netstack>(
         )
         .await
         .expect("join network with realm should succeed");
+    client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let server_realm: netemul::TestRealm<'_> = sandbox
         .create_netstack_realm_with::<N, _, _>(
@@ -196,6 +198,7 @@ async fn create_test_realm<'a, N: Netstack>(
         )
         .await
         .expect("join network with realm should succeed");
+    server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     DhcpTestRealm { client_realm, client_iface, server_realm, server_iface, _network: network }
 }
@@ -700,14 +703,17 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
         responder.send().expect("responding to UpdateAddressProperties should succeed");
     }
 
-    let shutdown_fut = assert_client_shutdown(client.clone(), request_stream);
+    let shutdown_fut = assert_client_shutdown(client, request_stream);
     // We still need to drive the client's event loop while shutting it down.
-    let watch_fut = client.watch_configuration();
+    let watch_fut = config_stream.try_for_each(|_config| ready(Ok(())));
 
     let (watch_result, ()) = join!(watch_fut, shutdown_fut);
     assert_matches!(
         watch_result,
-        Err(fidl::Error::ClientChannelClosed { status: _, protocol_name: _ })
+        Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
+            status: _,
+            protocol_name: _
+        }))
     );
 }
 
