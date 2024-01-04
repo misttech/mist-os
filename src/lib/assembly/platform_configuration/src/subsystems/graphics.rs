@@ -29,3 +29,52 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::ConfigurationBuilderImpl;
+    use assembly_config_schema::BuildType;
+
+    #[test]
+    fn test_user_default() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let config = GraphicsConfig { enable_virtual_console: None };
+        let mut builder = ConfigurationBuilderImpl::default();
+        GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
+        let config = builder.build();
+        assert_eq!(config.bundles, ["virtcon_disable".to_string()].into());
+    }
+
+    #[test]
+    fn test_user_disabled() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let config = GraphicsConfig { enable_virtual_console: Some(false) };
+        let mut builder = ConfigurationBuilderImpl::default();
+        GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
+        let config = builder.build();
+        assert_eq!(config.bundles, ["virtcon_disable".to_string()].into());
+    }
+
+    #[test]
+    fn test_user_enabled() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let config = GraphicsConfig { enable_virtual_console: Some(true) };
+        let mut builder = ConfigurationBuilderImpl::default();
+        GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
+        let config = builder.build();
+        assert_eq!(config.bundles, ["virtcon".to_string()].into());
+    }
+}
