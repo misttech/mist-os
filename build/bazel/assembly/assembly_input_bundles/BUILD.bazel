@@ -7,11 +7,8 @@ load(
     "//:bundles/assembly/platform_aib_names.bzl",
     "BRINGUP_PLATFORM_AIB_NAMES",
     "ENG_PLATFORM_AIB_NAMES",
-    "ENG_PLATFORM_AIB_NAMES_RISCV64",
     "USERDEBUG_PLATFORM_AIB_NAMES",
-    "USERDEBUG_PLATFORM_AIB_NAMES_RISCV64",
     "USER_PLATFORM_AIB_NAMES",
-    "USER_PLATFORM_AIB_NAMES_RISCV64",
 )
 load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
 load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
@@ -80,15 +77,6 @@ platform_aibs(
 )
 
 platform_aibs(
-    name = "platform_user_riscv64",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in USER_PLATFORM_AIB_NAMES_RISCV64
-    ],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-)
-
-platform_aibs(
     name = "platform_userdebug",
     aib_dirs = [
         "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
@@ -98,28 +86,10 @@ platform_aibs(
 )
 
 platform_aibs(
-    name = "platform_userdebug_riscv64",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in USERDEBUG_PLATFORM_AIB_NAMES_RISCV64
-    ],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-)
-
-platform_aibs(
     name = "platform_eng",
     aib_dirs = [
         "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
         for aib in ENG_PLATFORM_AIB_NAMES
-    ],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-)
-
-platform_aibs(
-    name = "platform_eng_riscv64",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in ENG_PLATFORM_AIB_NAMES_RISCV64
     ],
     applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )

@@ -173,7 +173,7 @@ fuchsia_product_image(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng_riscv64",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 

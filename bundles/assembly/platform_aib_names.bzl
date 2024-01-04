@@ -58,7 +58,7 @@ BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERD
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
 # Please keep sorted, it makes merge conflicts less likely vs adding to the
 # end of the list.
-USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
+USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_core",
     "audio_core_routing",
     "audio_core_use_adc_device",
@@ -97,9 +97,13 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services_small_with_timezone.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services_small_with_timezone.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "minimal_user",
+    "netstack2",
     "netstack3",
     "netstack3_packages",
     "netstack3_packages_gub",
+    "netstack_migration",
+    "netstack_migration_packages",
+    "netstack_migration_packages_gub",
     "network_realm",
     "network_realm_packages",
     "network_realm_packages_gub",
@@ -131,6 +135,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "ui_user_and_userdebug.icu_default_{}".format(icu_flavors.default_git_commit),
     "ui_user_and_userdebug.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "ui_user_and_userdebug.icu_stable_{}".format(icu_flavors.stable_git_commit),
+    "virtualization_support",
     "wlan_base",
     "wlan_contemporary_privacy_only_support",
     "wlan_fullmac_support",
@@ -138,26 +143,8 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "wlan_softmac_support",
     "wlan_wlanix",
 ]
-USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
-    # The following are not currently supported on RISC-V. They must be added
-    # separately to each list that (indirectly) builds on
-    # USER_PLATFORM_AIB_NAMES_RISCV64.
 
-    # The Go toolchain used for netstack2 does not support RISC-V.
-    # netstack-migration contains netstack2, so equally no support on RISC-V.
-    "netstack2",
-    "netstack_migration",
-    "netstack_migration_packages",
-    "netstack_migration_packages_gub",
-
-    # TODO(https://fxbug.dev/128551): Move to the list above once build errors are
-    # resolved and/or define a formal mechanism for AIBs to vary across
-    # architectures.
-    "virtualization_support",
-]
-USER_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
-
-USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLATFORM_AIB_NAMES_RISCV64 + [
+USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLATFORM_AIB_NAMES + [
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
@@ -169,10 +156,9 @@ USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + 
     "sl4f",
     "wlan_development",
 ]
-USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
 
 # The names of all of the platform's Assembly Input Bundles.
-ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + [
+ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES + [
     "audio_development_support",
     "core_realm_eng",
     "example_assembly_bundle",
@@ -188,4 +174,3 @@ ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PL
     "ui_package_eng",
     "video_development_support",
 ]
-ENG_PLATFORM_AIB_NAMES = ENG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64

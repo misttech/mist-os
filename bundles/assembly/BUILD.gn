@@ -2362,26 +2362,29 @@ assembly_input_bundle("pkgfs_disable_executability_restrictions") {
 # valid build-types: all
 #
 assembly_input_bundle("virtualization_support") {
-  base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
-  compiled_packages = [
-    {
-      name = "core"
-      component_shards = [
-        {
-          component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/connectivity/network/meta/virtualization.core_shard.cml",
-                    "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
-                    "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
-                    "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
-                    "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
-                  ],
-                  root_build_dir)
-        },
-      ]
-    },
-  ]
+  # TODO(https://fxbug.dev/128551): Move to the list above once build errors are resolved.
+  if (current_cpu != "riscv64") {
+    base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
+    compiled_packages = [
+      {
+        name = "core"
+        component_shards = [
+          {
+            component_name = "core"
+            shards = rebase_path(
+                    [
+                      "//src/connectivity/network/meta/virtualization.core_shard.cml",
+                      "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
+                      "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
+                      "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
+                      "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
+                    ],
+                    root_build_dir)
+          },
+        ]
+      },
+    ]
+  }
 }
 
 # AIB to enable running Fuchsia as a virtualized guest.
@@ -2400,20 +2403,23 @@ assembly_input_bundle("paravirtualization_support") {
 # build-types: all
 #
 assembly_input_bundle("netstack2") {
-  base_packages = [ "//src/connectivity/network:netstack2" ]
-  compiled_packages = [
-    {
-      name = "network"
-      component_shards = [
-        {
-          component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/netstack2.shard.cml" ],
-                  root_build_dir)
-        },
-      ]
-    },
-  ]
+  # The Go toolchain used for netstack2 does not support RISC-V.
+  if (current_cpu != "riscv64") {
+    base_packages = [ "//src/connectivity/network:netstack2" ]
+    compiled_packages = [
+      {
+        name = "network"
+        component_shards = [
+          {
+            component_name = "network"
+            shards = rebase_path(
+                    [ "//src/connectivity/network/meta/netstack2.shard.cml" ],
+                    root_build_dir)
+          },
+        ]
+      },
+    ]
+  }
 }
 
 # Netstack3 as the netstack for use by base networking.
@@ -2464,30 +2470,34 @@ assembly_input_bundle("netstack3_packages_gub") {
 # Must be used in conjunction with netstack_migration_packages or
 # netstack_migration_packages_gub.
 assembly_input_bundle("netstack_migration") {
-  compiled_packages = [
-    {
-      name = "network"
-      component_shards = [
-        {
-          component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/netstack-migration.shard.cml" ],
-                  root_build_dir)
-        },
-      ]
-    },
-    {
-      name = "core"
-      component_shards = [
-        {
-          component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/netstack-migration.core.shard.cml" ],
-                  root_build_dir)
-        },
-      ]
-    },
-  ]
+  # The Go toolchain used for netstack2 does not support RISC-V and
+  # netstack_migration contains netstack2.
+  if (current_cpu != "riscv64") {
+    compiled_packages = [
+      {
+        name = "network"
+        component_shards = [
+          {
+            component_name = "network"
+            shards = rebase_path(
+                    [ "//src/connectivity/network/meta/netstack-migration.shard.cml" ],
+                    root_build_dir)
+          },
+        ]
+      },
+      {
+        name = "core"
+        component_shards = [
+          {
+            component_name = "core"
+            shards = rebase_path(
+                    [ "//src/connectivity/network/meta/netstack-migration.core.shard.cml" ],
+                    root_build_dir)
+          },
+        ]
+      },
+    ]
+  }
 }
 
 # Netstack migration packages without unified binary.
@@ -2495,7 +2505,9 @@ assembly_input_bundle("netstack_migration") {
 # This AIB provides packages for the netstack_migration configuration. It is
 # mutually exclusive with netstack_migration_packages_gub.
 assembly_input_bundle("netstack_migration_packages") {
-  base_packages = [ "//src/connectivity/network:netstack-migration" ]
+  if (current_cpu != "riscv64") {
+    base_packages = [ "//src/connectivity/network:netstack-migration" ]
+  }
 }
 
 # Netstack migration packages with unified binary.
@@ -2503,7 +2515,9 @@ assembly_input_bundle("netstack_migration_packages") {
 # This AIB provides packages for the netstack_migration configuration. It is
 # mutually exclusive with netstack_migration_packages.
 assembly_input_bundle("netstack_migration_packages_gub") {
-  base_packages = [ "//src/connectivity/network:netstack-migration_gub" ]
+  if (current_cpu != "riscv64") {
+    base_packages = [ "//src/connectivity/network:netstack-migration_gub" ]
+  }
 }
 
 # Includes network-tun functionality.
