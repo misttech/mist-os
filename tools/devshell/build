@@ -6,30 +6,42 @@
 #### CATEGORY=Build
 ### Run Ninja to build Fuchsia
 
-## usage: fx build [--log FILENAME] [-SWITCH...] | TARGET ...]
+## usage: fx build [options] [TARGET...] [-- NINJA_OPTIONS...]
 ##
-## This runs Ninja after performing a few correctness checks for the Fuchsia build.
+## Builds a set of targets after performing a few correctness checks for the Fuchsia build.
+## Ninja-specific options must be provided after a -- specifier.
+## Each TARGET value must be a Ninja target path.
 ##
 ## optional arguments:
+##   -h, --help               Print this message. Use '-- --help' to print
+##                            Ninja-specific help.
+##   --no-checks              Disable consistency checks (for fx development only).
 ##   --log LOGFILE            Print debug information to LOGFILE. Please attach
 ##                            the resulting file when reporting bugs.
 ##   --fint-params-path PATH  Path to a fint params file used by an infra
 ##                            builder. This is useful for reproducing the exact
 ##                            set of targets built by the infrastructure.
 ##
-## Other arguments are passed through to Ninja.
 ## Run `fx build -h` to see Ninja argument details.
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
+# Note: Do not use $(dirname "${BASH_SOURCE[0]}") to locate the script's
+# directory to save about 7ms of startup time. See https://fxbug.dev/136106
+# The fallback is only needed when invoking directly with bash as in:
+# `(cd tools/devshell && bash build)`
+_script_dir="${BASH_SOURCE[0]%/*}"; if [[ "${_script_dir}" == "${BASH_SOURCE[0]}" ]]; then _script_dir=.; fi
+# shellcheck source=/dev/null
+source "${_script_dir}/lib/vars.sh" || exit 1
 fx-config-read
 
 function main {
-  local switches=() fuchsia_targets=()
+  local switches=() fuchsia_targets=() ninja_switches=()
   local log_file is_logging fint_params_path
+  local has_ninja_options no_checks
   is_logging=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --log)
+        switches+=("$1")
         if [[ $# -lt 2 ]]; then
           fx-command-help
           return 1
@@ -47,6 +59,7 @@ function main {
         shift
         ;;
       --fint-params-path)
+        switches+=("$1")
         if [[ $# -lt 2 ]]; then
           fx-command-help
           return 1
@@ -54,13 +67,63 @@ function main {
         fint_params_path="$2"
         shift
         ;;
-      # These Ninja switches take an argument.
-      -[Cfjkldtw])
-        switches+=("$1" "$2")
+      # Use -- as a separator for command-line options for Ninja.
+      # Anything that follows that goes directly into ninja_switches and the loop exits.
+      --)
+        shift
+        ninja_switches+=("$@")
+        break
+        ;;
+
+      --no-checks)
+        no_checks=true
+        ;;
+
+      # Recognize Ninja options and add them to ninja_switches directly instead of switches.
+      # Set has_ninja_options to true to indicate that Ninja-specific options were used
+      # before -- on the command-line.
+      --version|-v|--verbose|--dry-run|--quiet|-n)
+        has_ninja_options=true
+        ninja_switches+=("$1")
+        ;;
+
+      # These Ninja options take an argument, with or without a space separator.
+      -[Cfjkldw])
+        has_ninja_options=true
+        ninja_switches+=("$1" "$2")
         shift
         ;;
+
+      -[Cfjkldw]*)
+        has_ninja_options=true
+        ninja_switches+=("$1")
+        ;;
+
+      -h|--help)
+        fx-print-command-help "${BASH_SOURCE[0]}"
+        exit 1
+        ;;
+
+      # Anything that follows the Ninja tool name is passed to the tool itself
+      # and not processed by Ninja itself, so stop the loop right here. If
+      # there were fuchsia targets specificied before that, they will be
+      # ignored.
+      #
+      #  ninja -t <tool> --help
+      #  ninja -t<tool> --help
+      #
+      -t*)
+        has_ninja_options=true
+        ninja_switches+=("$@")
+        if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
+          fx-warn "Fuchsia targets before a Ninja tool name are ignored!"
+          fuchsia_targets=()
+        fi
+        break
+        ;;
       -*)
-        switches+=("$1")
+        fx-error "Unsupported option $1, see 'fx help build' for details."
+        exit 1
         ;;
       *)
         fuchsia_targets+=("$1")
@@ -69,8 +132,23 @@ function main {
     shift
   done
 
+  # Set no_checks=true when running a Ninja tool or printing the Ninja help.
+  for arg in "${ninja_switches[@]}"; do
+    case "${arg}" in
+      -h|--help|-t*)
+        no_checks=true
+        break
+    esac
+  done
+
+  if [ -n "${has_ninja_options}" ]; then
+    fx-warn "Use -- to pass Ninja-specific options, as in:"
+    fx-warn "  fx build ${switches[*]} -- ${ninja_switches[*]}"
+    fx-warn "This warning will soon become an error."
+  fi
+
   if [ -n "${fint_params_path}" ]; then
-    if [ ${#switches[@]} -gt 0 ]; then
+    if [ ${#ninja_switches[@]} -gt 0 ]; then
       fx-error "It's invalid to specify extra Ninja flags along with --fint-params-path."
       exit 1
     elif [ ${#fuchsia_targets[@]} -gt 0 ]; then
@@ -113,7 +191,7 @@ function main {
                      )
   local mine
   for mine in "${landmines[@]}"; do
-    if [[ "$mine" -nt "${FUCHSIA_BUILD_DIR}/build.ninja" ]]; then
+    if [[ "$mine" -nt "${FUCHSIA_BUILD_DIR}/build.ninja" && -z "${no_checks}" ]]; then
       if [[ "${is_logging}" = true ]]; then
         echo -e "\\n------ RUNNING gn gen ------"
       fi
@@ -129,7 +207,7 @@ function main {
     fi
     echo >&2 "Re-running gn gen first (missing $FUCHSIA_BUILD_DIR)"
     fx-gen || return
-  else
+  elif [[ -z "${no_checks}" ]]; then
     # We have a build directory, execute force clean checker, usually a no-op
     "$FUCHSIA_DIR/scripts/fuchsia-vendored-python" \
       "$FUCHSIA_DIR/build/force_clean/force_clean_if_needed.py" \
@@ -151,7 +229,9 @@ function main {
   # Moving the goma-check before we actually start the build.
   # We used to check goma only when build failed but the user pays a few seconds
   # to kick off the build and wait for the failure.
-  goma-check
+  if [[ -z "${no_checks}" ]]; then
+    goma-check
+  fi
 
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
@@ -172,7 +252,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
 ")
   else
     (fx-run-ninja "${is_logging}" "$PREBUILT_NINJA" -C "${FUCHSIA_BUILD_DIR}" \
-      "${switches[@]}" "${fuchsia_targets[@]}")
+      "${ninja_switches[@]}" "${fuchsia_targets[@]}")
   fi
 
   status=$?
