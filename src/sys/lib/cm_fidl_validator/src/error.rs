@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_component_decl as fdecl, std::fmt, std::fmt::Display, thiserror::Error};
+use {
+    cm_types::ParseError, fidl_fuchsia_component_decl as fdecl, std::fmt, std::fmt::Display,
+    thiserror::Error,
+};
 
 /// Enum type that can represent any error encountered during validation.
 #[derive(Debug, Error, PartialEq, Clone)]
@@ -263,6 +266,23 @@ impl Error {
 
     pub fn different_availability_in_aggregation(availability: Vec<fdecl::Availability>) -> Self {
         Error::DifferentAvailabilityInAggregation(AvailabilityList(availability))
+    }
+
+    pub fn from_parse_error(
+        err: ParseError,
+        prop: &String,
+        decl_type: DeclType,
+        keyword: &str,
+    ) -> Self {
+        match err {
+            ParseError::Empty => Error::empty_field(decl_type, keyword),
+            ParseError::TooLong => Error::field_too_long(decl_type, keyword),
+            ParseError::InvalidComponentUrl { details } => {
+                Error::invalid_url(decl_type, keyword, format!(r#""{prop}": {details}"#))
+            }
+            ParseError::InvalidValue => Error::invalid_field(decl_type, keyword),
+            ParseError::InvalidSegment => Error::field_invalid_segment(decl_type, keyword),
+        }
     }
 }
 

@@ -82,34 +82,15 @@ fn check_identifier(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let start_err_len = errors.len();
-    if let Some(prop) = prop {
-        match conversion_ctor(prop) {
-            Ok(()) => {}
-            Err(ParseError::Empty) => {
-                errors.push(Error::empty_field(decl_type, keyword));
-            }
-            Err(ParseError::TooLong) => {
-                errors.push(Error::field_too_long(decl_type, keyword));
-            }
-            Err(ParseError::InvalidComponentUrl { details }) => {
-                errors.push(Error::invalid_url(
-                    decl_type,
-                    keyword,
-                    format!(r#""{prop}": {details}"#),
-                ));
-            }
-            Err(ParseError::InvalidValue) => {
-                errors.push(Error::invalid_field(decl_type, keyword));
-            }
-            Err(ParseError::InvalidSegment) => {
-                errors.push(Error::field_invalid_segment(decl_type, keyword));
-            }
-        }
-    } else {
+    let Some(prop) = prop else {
         errors.push(Error::missing_field(decl_type, keyword));
+        return false;
+    };
+    if let Err(e) = conversion_ctor(prop) {
+        errors.push(Error::from_parse_error(e, prop, decl_type, keyword));
+        return false;
     }
-    start_err_len == errors.len()
+    true
 }
 
 pub(crate) fn check_use_availability(
