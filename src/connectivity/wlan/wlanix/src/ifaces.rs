@@ -172,9 +172,7 @@ impl ClientIface for SmeClientIface {
         bssid: Option<Bssid>,
     ) -> Result<ConnectedResult, Error> {
         let last_scan_results = self.last_scan_results.lock().clone();
-        // TODO(b/316033554): handle the case when there are multiple BSS candidates when no
-        //                    specific BSSID is requested.
-        let selected_scan_result = last_scan_results
+        let mut scan_results = last_scan_results
             .iter()
             .filter_map(|r| {
                 let bss_description = BssDescription::try_from(r.bss_description.clone());
@@ -190,9 +188,18 @@ impl ClientIface for SmeClientIface {
                     _ => None,
                 }
             })
-            .next();
+            .collect::<Vec<_>>();
+        scan_results.sort_by_key(|(bss_description, _)| {
+            // 5GHz score bonus taken from wlancfg. Why this particular value was picked:
+            // "This was from intuition + looking at scans in a couple crowded locations
+            // (apartments), where a ~10dB difference between 2.4GHz and 5GHz signals from
+            // the same AP was pretty common, so 15 gives an edge to 5GHz most of the time"
+            const FIVE_GHZ_BONUS: i8 = 15;
+            let score_bonus = if bss_description.channel.is_5ghz() { FIVE_GHZ_BONUS } else { 0 };
+            bss_description.rssi_dbm + score_bonus
+        });
 
-        let (bss_description, compatibility) = match selected_scan_result {
+        let (bss_description, compatibility) = match scan_results.pop() {
             Some(scan_result) => scan_result,
             None => {
                 return Err(format_err!("Requested network not found"));
@@ -446,12 +453,16 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common_security as fidl_security,
+        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
         futures::{task::Poll, StreamExt},
-        ieee80211::Ssid,
+        ieee80211::{MacAddrBytes, Ssid},
         test_case::test_case,
         wlan_common::{
-            assert_variant, fake_fidl_bss_description, test_utils::fake_stas::FakeProtectionCfg,
+            assert_variant,
+            channel::{Cbw, Channel},
+            fake_fidl_bss_description,
+            test_utils::fake_stas::FakeProtectionCfg,
         },
     };
 
@@ -752,6 +763,85 @@ mod tests {
         let connect_result =
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
         assert_variant!(connect_result, Err(_e));
+    }
+
+    #[test_case(
+        vec![
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [1, 2, 3, 4, 5, 6],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -40,
+            ),
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [2, 3, 4, 5, 6, 7],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -30,
+            ),
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [3, 4, 5, 6, 7, 8],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -50,
+            ),
+        ],
+        Bssid::from([2, 3, 4, 5, 6, 7]);
+        "same_channel_band"
+    )]
+    #[test_case(
+        vec![
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [1, 2, 3, 4, 5, 6],
+                channel: Channel::new(44, Cbw::Cbw40),
+                rssi_dbm: -40,
+            ),
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [2, 3, 4, 5, 6, 7],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -30,
+            ),
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [3, 4, 5, 6, 7, 8],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -50,
+            ),
+        ],
+        Bssid::from([1, 2, 3, 4, 5, 6]);
+        "5ghz_bonus"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_connect_to_network_bss_selection(
+        scan_bss_descriptions: Vec<fidl_internal::BssDescription>,
+        expected_bssid: Bssid,
+    ) {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        *iface.last_scan_results.lock() = scan_bss_descriptions
+            .into_iter()
+            .map(|bss_description| fidl_sme::ScanResult {
+                bss_description,
+                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                })),
+                timestamp_nanos: 1,
+            })
+            .collect::<Vec<_>>();
+
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, _connect_txn) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+        assert_eq!(req.bss_description.bssid, expected_bssid.to_array());
     }
 
     #[test]
