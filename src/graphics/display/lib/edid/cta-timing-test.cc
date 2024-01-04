@@ -272,6 +272,155 @@ TEST(CtaTimingToTimingParams, Progressive) {
   EXPECT_EQ(kConverted.vertical_refresh_e2, 49'80u);
 }
 
+TEST(CtaTimingToDisplayTiming, InterlacedWithAlternatingVblank) {
+  constexpr CtaTiming kCtaTiming = {
+      .video_identification_code = 0x99,
+
+      .horizontal_active_px = 0x0a'0a,
+      .vertical_active_lines = 0x07'07,
+      .fields_per_frame = display::FieldsPerFrame::kInterlaced,
+
+      .horizontal_total_px = 0x10'10,
+      .horizontal_blank_px = 0x06'06,
+      .horizontal_front_porch_px = 0x01'01,
+      .horizontal_sync_width_px = 0x02'02,
+      .horizontal_back_porch_px = 0x03'03,
+      .horizontal_sync_polarity = display::SyncPolarity::kPositive,
+
+      .vertical_total_lines = 0x1f'1f,
+      .vertical_blank_lines = 0x0c'0c,
+      .second_field_has_extra_vertical_blank_line = false,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .vertical_sync_polarity = display::SyncPolarity::kNegative,
+
+      .vertical_field_refresh_rate_millihertz = 61'049,
+      .pixel_clock_khz = 1'000'000,
+  };
+
+  const display::DisplayTiming kConverted = ToDisplayTiming(kCtaTiming);
+  EXPECT_EQ(kConverted.horizontal_total_px(), 0x10'10);
+  EXPECT_EQ(kConverted.horizontal_active_px, 0x0a'0a);
+  EXPECT_EQ(kConverted.horizontal_blank_px(), 0x06'06);
+  EXPECT_EQ(kConverted.horizontal_front_porch_px, 0x01'01);
+  EXPECT_EQ(kConverted.horizontal_sync_width_px, 0x02'02);
+  EXPECT_EQ(kConverted.horizontal_back_porch_px, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_total_lines(), 0x1f'1f);
+  EXPECT_EQ(kConverted.vertical_active_lines, 0x07'07);
+  EXPECT_EQ(kConverted.vertical_blank_lines(), 0x0c'0c);
+  EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
+  EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kInterlaced);
+  EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
+  EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);
+  EXPECT_EQ(kConverted.vblank_alternates, false);
+  EXPECT_EQ(kConverted.pixel_repetition, false);
+  EXPECT_EQ(kConverted.vertical_field_refresh_rate_millihertz(), 61'049);
+}
+
+TEST(CtaTimingToDisplayTiming, InterlacedWithConstantVblank) {
+  constexpr CtaTiming kCtaTiming = {
+      .video_identification_code = 0x99,
+
+      .horizontal_active_px = 0x0a'0a,
+      .vertical_active_lines = 0x07'07,
+      .pixel_repeated = false,
+      .fields_per_frame = display::FieldsPerFrame::kInterlaced,
+
+      .horizontal_total_px = 0x10'10,
+      .horizontal_blank_px = 0x06'06,
+      .horizontal_front_porch_px = 0x01'01,
+      .horizontal_sync_width_px = 0x02'02,
+      .horizontal_back_porch_px = 0x03'03,
+      .horizontal_sync_polarity = display::SyncPolarity::kPositive,
+
+      .vertical_total_lines = 0x1f'20,
+      .vertical_blank_lines = 0x0c'0c,
+      .second_field_has_extra_vertical_blank_line = true,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .vertical_sync_polarity = display::SyncPolarity::kNegative,
+
+      .vertical_field_refresh_rate_millihertz = 61'042,
+      .pixel_clock_khz = 1'000'000,
+  };
+
+  const display::DisplayTiming kConverted = ToDisplayTiming(kCtaTiming);
+  EXPECT_EQ(kConverted.horizontal_total_px(), 0x10'10);
+  EXPECT_EQ(kConverted.horizontal_active_px, 0x0a'0a);
+  EXPECT_EQ(kConverted.horizontal_blank_px(), 0x06'06);
+  EXPECT_EQ(kConverted.horizontal_front_porch_px, 0x01'01);
+  EXPECT_EQ(kConverted.horizontal_sync_width_px, 0x02'02);
+  EXPECT_EQ(kConverted.horizontal_back_porch_px, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_total_lines(), 0x1f'20);
+  EXPECT_EQ(kConverted.vertical_active_lines, 0x07'07);
+  EXPECT_EQ(kConverted.vertical_blank_lines(), 0x0c'0c);
+  EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
+  EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kInterlaced);
+  EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
+  EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);
+  EXPECT_EQ(kConverted.vblank_alternates, true);
+  EXPECT_EQ(kConverted.pixel_repetition, false);
+  EXPECT_EQ(kConverted.vertical_field_refresh_rate_millihertz(), 61'042);
+}
+
+TEST(CtaTimingToDisplayTiming, Progressive) {
+  constexpr CtaTiming kCtaTiming = {
+      .video_identification_code = 0x99,
+
+      .horizontal_active_px = 0x0a'0a,
+      .vertical_active_lines = 0x07'07,
+      .pixel_repeated = false,
+      .fields_per_frame = display::FieldsPerFrame::kProgressive,
+
+      .horizontal_total_px = 0x10'10,
+      .horizontal_blank_px = 0x06'06,
+      .horizontal_front_porch_px = 0x01'01,
+      .horizontal_sync_width_px = 0x02'02,
+      .horizontal_back_porch_px = 0x03'03,
+      .horizontal_sync_polarity = display::SyncPolarity::kPositive,
+
+      .vertical_total_lines = 0x13'13,
+      .vertical_blank_lines = 0x0c'0c,
+      .second_field_has_extra_vertical_blank_line = false,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .vertical_sync_polarity = display::SyncPolarity::kNegative,
+
+      .vertical_field_refresh_rate_millihertz = 49'804,
+      .pixel_clock_khz = 1'000'000,
+  };
+
+  const display::DisplayTiming kConverted = ToDisplayTiming(kCtaTiming);
+  EXPECT_EQ(kConverted.horizontal_total_px(), 0x10'10);
+  EXPECT_EQ(kConverted.horizontal_active_px, 0x0a'0a);
+  EXPECT_EQ(kConverted.horizontal_blank_px(), 0x06'06);
+  EXPECT_EQ(kConverted.horizontal_front_porch_px, 0x01'01);
+  EXPECT_EQ(kConverted.horizontal_sync_width_px, 0x02'02);
+  EXPECT_EQ(kConverted.horizontal_back_porch_px, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_total_lines(), 0x13'13);
+  EXPECT_EQ(kConverted.vertical_active_lines, 0x07'07);
+  EXPECT_EQ(kConverted.vertical_blank_lines(), 0x0c'0c);
+  EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
+  EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
+  EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kProgressive);
+  EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
+  EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);
+  EXPECT_EQ(kConverted.vblank_alternates, false);
+  EXPECT_EQ(kConverted.pixel_repetition, false);
+  EXPECT_EQ(kConverted.vertical_field_refresh_rate_millihertz(), 49'804);
+}
+
 }  // namespace
 
 }  // namespace edid::internal

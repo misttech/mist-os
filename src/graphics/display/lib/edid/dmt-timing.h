@@ -198,6 +198,36 @@ constexpr timing_params_t ToTimingParams(const DmtTiming& dmt) {
   };
 }
 
+constexpr display::DisplayTiming ToDisplayTiming(const DmtTiming& dmt) {
+  const bool is_interlaced = dmt.fields_per_frame == display::FieldsPerFrame::kInterlaced;
+  const int32_t total_vertical_blank_including_borders_lines_per_frame =
+      dmt.vertical_total_lines - dmt.vertical_active_lines;
+  const bool vblank_alternates =
+      is_interlaced && total_vertical_blank_including_borders_lines_per_frame % 2 == 1;
+
+  return display::DisplayTiming{
+      .horizontal_active_px = dmt.horizontal_active_px,
+      // The borders are included in the front and back porches in DisplayTiming
+      // but not in DmtTiming, so we need to recalculate them to include
+      // borders.
+      .horizontal_front_porch_px = dmt.horizontal_right_border_px + dmt.horizontal_front_porch_px,
+      .horizontal_sync_width_px = dmt.horizontal_sync_width_px,
+      .horizontal_back_porch_px = dmt.horizontal_back_porch_px + dmt.horizontal_left_border_px,
+      .vertical_active_lines = dmt.vertical_active_lines,
+      .vertical_front_porch_lines =
+          dmt.vertical_bottom_border_lines + dmt.vertical_front_porch_lines,
+      .vertical_sync_width_lines = dmt.vertical_sync_width_lines,
+      .vertical_back_porch_lines = dmt.vertical_back_porch_lines + dmt.vertical_top_border_lines,
+      .pixel_clock_frequency_khz = dmt.pixel_clock_khz,
+      .fields_per_frame = dmt.fields_per_frame,
+      .hsync_polarity = dmt.horizontal_sync_polarity,
+      .vsync_polarity = dmt.vertical_sync_polarity,
+      .vblank_alternates = vblank_alternates,
+      // DMT formats never repeat the pixels.
+      .pixel_repetition = false,
+  };
+}
+
 // Timings taken from the DMT standard.
 constexpr DmtTiming kDmtTimingArray[] = {
     DmtTiming{
