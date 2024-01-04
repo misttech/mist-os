@@ -386,9 +386,9 @@ fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
     let pid = task.thread_group.leader as i64;
     let mut argv = task
         .read_argv()
-        .unwrap_or_else(|_| vec![b"<unknown>".to_vec()])
+        .unwrap_or_else(|_| vec!["<unknown>".into()])
         .into_iter()
-        .map(|a| String::from_utf8_lossy(&a).to_string())
+        .map(|a| a.to_string())
         .collect::<Vec<_>>()
         .join(" ");
 
@@ -437,17 +437,15 @@ where
     let (sender, receiver) = sync_channel::<Result<R, Errno>>(1);
     execute_task(
         task_builder,
-        move |current_task, locked| {
-            match pre_run(current_task, locked) {
-                Err(errno) => {
-                    let _ = sender.send(Err(errno.clone()));
-                    Err(errno)
-                }
-                Ok(value) => sender.send(Ok(value)).map_err(|error| {
-                    log_error!("Unable to send `pre_run` result: {error:?}");
-                    errno!(EINVAL)
-                }),
+        move |current_task, locked| match pre_run(current_task, locked) {
+            Err(errno) => {
+                let _ = sender.send(Err(errno.clone()));
+                Err(errno)
             }
+            Ok(value) => sender.send(Ok(value)).map_err(|error| {
+                log_error!("Unable to send `pre_run` result: {error:?}");
+                errno!(EINVAL)
+            }),
         },
         task_complete,
     );

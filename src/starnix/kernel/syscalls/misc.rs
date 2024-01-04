@@ -12,6 +12,7 @@ use starnix_sync::{Locked, Unlocked};
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
+    vfs::FsString,
 };
 use starnix_logging::{log_error, log_info, log_warn, not_implemented};
 use starnix_syscalls::{
@@ -112,7 +113,7 @@ pub fn sys_sysinfo(
 }
 
 // Used to read a hostname or domainname from task memory
-fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<Vec<u8>, Errno> {
+fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<FsString, Errno> {
     const MAX_LEN: usize = 64;
     let len = len as usize;
 
@@ -233,7 +234,7 @@ pub fn sys_reboot(
             {
                 fpower::RebootReason::UserRequest
             } else {
-                log_warn!("Unknown reboot args: {}", String::from_utf8_lossy(&arg_bytes));
+                log_warn!("Unknown reboot args: {arg_bytes}");
                 not_implemented!("unknown reboot args, see logs for strings");
                 return error!(ENOSYS);
             };

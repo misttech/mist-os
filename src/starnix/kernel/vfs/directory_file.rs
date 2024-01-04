@@ -42,10 +42,15 @@ impl MemoryDirectoryFile {
 /// necessary to subtract 2 from the offset in subsequent logic.
 pub fn emit_dotdot(file: &FileObject, sink: &mut dyn DirentSink) -> Result<(), Errno> {
     if sink.offset() == 0 {
-        sink.add(file.node().node_id, 1, DirectoryEntryType::DIR, b".")?;
+        sink.add(file.node().node_id, 1, DirectoryEntryType::DIR, ".".into())?;
     }
     if sink.offset() == 1 {
-        sink.add(file.name.entry.parent_or_self().node.node_id, 2, DirectoryEntryType::DIR, b"..")?;
+        sink.add(
+            file.name.entry.parent_or_self().node.node_id,
+            2,
+            DirectoryEntryType::DIR,
+            "..".into(),
+        )?;
     }
     Ok(())
 }
@@ -103,9 +108,9 @@ impl FileOps for MemoryDirectoryFile {
                         entry.node.node_id,
                         sink.offset() + 1,
                         DirectoryEntryType::from_mode(mode),
-                        name,
+                        name.as_ref(),
                     )?;
-                    *readdir_position = Bound::Excluded(name.to_vec());
+                    *readdir_position = Bound::Excluded(name.clone());
                 }
             }
             Ok(())

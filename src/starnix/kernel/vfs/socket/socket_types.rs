@@ -177,7 +177,7 @@ pub const SA_FAMILY_SIZE: usize = std::mem::size_of::<uapi::__kernel_sa_family_t
 impl SocketAddress {
     pub fn default_for_domain(domain: SocketDomain) -> SocketAddress {
         match domain {
-            SocketDomain::Unix => SocketAddress::Unix(FsString::new()),
+            SocketDomain::Unix => SocketAddress::Unix(FsString::default()),
             SocketDomain::Vsock => SocketAddress::Vsock(0xffff),
             SocketDomain::Inet => {
                 SocketAddress::Inet(uapi::sockaddr_in::default().as_bytes().to_vec())
@@ -206,17 +206,17 @@ impl SocketAddress {
                 }
                 if sun_path.is_empty() {
                     // Possibly an autobind address, depending on context.
-                    SocketAddress::Unix(vec![])
+                    SocketAddress::Unix(Default::default())
                 } else {
                     let null_index =
                         sun_path.iter().position(|&r| r == b'\0').unwrap_or(sun_path.len());
                     if null_index == 0 {
                         // If there is a null byte at the start of the sun_path, then the
                         // address is abstract.
-                        SocketAddress::Unix(sun_path.to_vec())
+                        SocketAddress::Unix(sun_path.into())
                     } else {
                         // Otherwise, the name is a path.
-                        SocketAddress::Unix(sun_path[..null_index].to_vec())
+                        SocketAddress::Unix(sun_path[..null_index].into())
                     }
                 }
             }

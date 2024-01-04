@@ -40,7 +40,7 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     RemoteFs::new_fs(
         kernel,
         client,
-        FileSystemOptions { source: b"/pkg".to_vec(), ..Default::default() },
+        FileSystemOptions { source: "/pkg".into(), ..Default::default() },
         rights,
     )
     .unwrap()
@@ -471,7 +471,7 @@ impl FileSystemOps for TestFs {
         Ok(statfs::default(0))
     }
     fn name(&self) -> &'static FsStr {
-        b"test"
+        "test".into()
     }
 
     fn generate_node_ids(&self) -> bool {

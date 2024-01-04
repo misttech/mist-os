@@ -261,11 +261,11 @@ pub fn fb_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let graphics_class = registry.get_or_create_class(b"graphics", registry.virtual_bus());
+    let graphics_class = registry.get_or_create_class("graphics".into(), registry.virtual_bus());
     registry.add_and_register_device(
         system_task,
-        b"fb0",
-        DeviceMetadata::new(b"fb0", DeviceType::FB0, DeviceMode::Char),
+        "fb0".into(),
+        DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
         graphics_class,
         DeviceDirectory::new,
         kernel.framebuffer.clone(),

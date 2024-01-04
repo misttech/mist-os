@@ -694,7 +694,8 @@ impl SocketOps for UEventNetlinkSocket {
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext) {
         let kobject = device.kobject();
-        let subsystem = kobject.parent().unwrap().name();
+        let subsystem = kobject.parent().unwrap();
+        let subsystem = subsystem.name();
         // TODO(https://fxbug.dev/127713): Pass the synthetic UUID when available.
         // Otherwise, default as "0".
         let message = format!(
@@ -707,9 +708,9 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MAJOR={major}\0\
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
-            path = String::from_utf8_lossy(&kobject.path()),
-            name = String::from_utf8_lossy(&device.metadata.name),
-            subsystem = String::from_utf8_lossy(&subsystem),
+            path = kobject.path(),
+            name = device.metadata.name,
+            subsystem = subsystem,
             major = device.metadata.device_type.major(),
             minor = device.metadata.device_type.minor(),
             seqnum = context.seqnum,

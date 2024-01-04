@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::vfs::FsString;
 use starnix_sync::RwLock;
 use std::sync::Arc;
 
-const DEFAULT_HOST_NAME: &[u8] = b"localhost";
-const DEFAULT_DOMAIN_NAME: &[u8] = b"localdomain";
+const DEFAULT_HOST_NAME: &str = "localhost";
+const DEFAULT_DOMAIN_NAME: &str = "localdomain";
 
 pub type UtsNamespaceHandle = Arc<RwLock<UtsNamespace>>;
 
@@ -16,12 +17,12 @@ pub type UtsNamespaceHandle = Arc<RwLock<UtsNamespace>>;
 // See https://man7.org/linux/man-pages/man7/uts_namespaces.7.html
 #[derive(Clone)]
 pub struct UtsNamespace {
-    pub hostname: Vec<u8>,
-    pub domainname: Vec<u8>,
+    pub hostname: FsString,
+    pub domainname: FsString,
 }
 
 impl Default for UtsNamespace {
     fn default() -> Self {
-        Self { hostname: DEFAULT_HOST_NAME.to_owned(), domainname: DEFAULT_DOMAIN_NAME.to_owned() }
+        Self { hostname: DEFAULT_HOST_NAME.into(), domainname: DEFAULT_DOMAIN_NAME.into() }
     }
 }

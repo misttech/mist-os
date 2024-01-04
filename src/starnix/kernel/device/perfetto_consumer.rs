@@ -7,7 +7,7 @@ use crate::{
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         socket::{resolve_unix_socket_address, syscalls::sys_socket, SocketPeer},
-        FdEvents, FileHandle,
+        FdEvents, FileHandle, FsStr, FsString,
     },
 };
 use once_cell::sync::OnceCell;
@@ -121,7 +121,7 @@ impl PerfettoConnection {
     fn new(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
-        socket_path: &[u8],
+        socket_path: &FsStr,
     ) -> Result<Self, anyhow::Error> {
         let conn_fd = sys_socket(locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
         let conn_file = current_task.files.get(conn_fd)?;
@@ -282,7 +282,7 @@ struct CallbackState {
     /// The previously observed trace state.
     prev_state: TraceState,
     /// Path to the Perfetto consumer socket.
-    socket_path: Vec<u8>,
+    socket_path: FsString,
     /// Connection to the consumer socket, if it has been initialized. This gets initialized the
     /// first time it is needed.
     connection: Option<PerfettoConnection>,
@@ -302,7 +302,7 @@ impl CallbackState {
         match self.connection {
             None => {
                 self.connection =
-                    Some(PerfettoConnection::new(locked, current_task, &self.socket_path)?);
+                    Some(PerfettoConnection::new(locked, current_task, self.socket_path.as_ref())?);
                 Ok(self.connection.as_mut().unwrap())
             }
             Some(ref mut conn) => Ok(conn),
@@ -513,11 +513,10 @@ impl CallbackState {
 
 pub fn start_perfetto_consumer_thread(
     kernel: &Arc<Kernel>,
-    socket_path: &[u8],
+    socket_path: FsString,
 ) -> Result<(), Errno> {
     let (sender, receiver) = channel::<TraceState>();
     kernel.kthreads.spawner().spawn({
-        let socket_path = socket_path.to_owned();
         move |locked, current_task| {
             let mut callback_state = CallbackState {
                 prev_state: TraceState::Stopped,

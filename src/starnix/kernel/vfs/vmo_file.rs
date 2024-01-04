@@ -368,7 +368,7 @@ pub fn new_memfd(
     let ops = node.open(current_task, &MountInfo::detached(), flags, false)?;
 
     // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
-    let mut local_name = b"/memfd:".to_vec();
+    let mut local_name = FsString::from("/memfd:");
     local_name.append(&mut name);
 
     let name = NamespaceNode::new_anonymous(DirEntry::new(node, None, local_name));

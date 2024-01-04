@@ -42,12 +42,12 @@ impl DeviceDirectory {
         vec![
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
-                name: b"dev".to_vec(),
+                name: "dev".into(),
                 inode: None,
             },
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
-                name: b"uevent".to_vec(),
+                name: "uevent".into(),
                 inode: None,
             },
         ]
@@ -84,7 +84,7 @@ impl FsNodeOps for DeviceDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
+        match &**name {
             b"dev" => Ok(node.fs().create_node(
                 current_task,
                 BytesFile::new_node(
@@ -124,12 +124,12 @@ impl BlockDeviceDirectory {
         let mut entries = DeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::DIR,
-            name: b"queue".to_vec(),
+            name: b"queue".into(),
             inode: None,
         });
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
-            name: b"size".to_vec(),
+            name: "size".into(),
             inode: None,
         });
         entries
@@ -166,7 +166,7 @@ impl FsNodeOps for BlockDeviceDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
+        match &**name {
             b"queue" => Ok(node.fs().create_node(
                 current_task,
                 BlockDeviceQueueDirectory::new(self.kobject()),
@@ -201,7 +201,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
-            name: b"read_ahead_kb".to_vec(),
+            name: b"read_ahead_kb".into(),
             inode: None,
         }]))
     }
@@ -212,7 +212,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
+        match &**name {
             b"read_ahead_kb" => Ok(node.fs().create_node(
                 current_task,
                 ReadAheadKbNode,

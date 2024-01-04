@@ -35,8 +35,8 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
         .unwrap();
     };
 
-    mkdir(b"shm");
-    create_symlink(current_task, root, b"fd", b"/proc/self/fd").unwrap();
+    mkdir("shm".into());
+    create_symlink(current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
     fs
 }
 
@@ -54,12 +54,12 @@ pub fn devtmpfs_create_device(
         // Avoid EEXIST for 'foo//bar' and the last directory name.
         .filter(|dir_name| dir_name.len() > 0)
         .try_fold(dev_tmp_fs(current_task).root().clone(), |parent_dir, dir_name| {
-            devtmpfs_get_or_create_directory_at(current_task, parent_dir, dir_name)
+            devtmpfs_get_or_create_directory_at(current_task, parent_dir, dir_name.into())
         })?;
     devtmpfs_create_device_node(
         current_task,
         parent_dir,
-        device_name,
+        device_name.into(),
         device.mode,
         device.device_type,
     )

@@ -336,7 +336,7 @@ impl CurrentTask {
         dir_fd: FdNumber,
         mut path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
-        let dir = if !path.is_empty() && path[0] == b'/' {
+        let dir = if path.starts_with(b"/") {
             path = &path[1..];
             self.fs().root()
         } else if dir_fd == FdNumber::AT_FDCWD {
@@ -351,7 +351,7 @@ impl CurrentTask {
             }
             dir.check_access(self, Access::EXEC)?;
         }
-        Ok((dir, path))
+        Ok((dir, path.into()))
     }
 
     /// A convenient wrapper for opening files relative to FdNumber::AT_FDCWD.
@@ -416,7 +416,7 @@ impl CurrentTask {
                     match name.readlink(self)? {
                         SymlinkTarget::Path(path) => {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
-                            self.resolve_open_path(context, &dir, &path, mode, flags)
+                            self.resolve_open_path(context, &dir, path.as_ref(), mode, flags)
                         }
                         SymlinkTarget::Node(node) => Ok((node, false)),
                     }
@@ -507,7 +507,7 @@ impl CurrentTask {
             Ok((n, c)) => (n, c),
             Err(e) => {
                 let mut abs_path = dir.path(&self.task);
-                abs_path.extend(path);
+                abs_path.extend(&**path);
                 track_file_not_found(abs_path);
                 return Err(e);
             }
@@ -609,8 +609,8 @@ impl CurrentTask {
         context.update_for_path(path);
 
         let mut current_node = dir.clone();
-        let mut it = path.split(|c| *c == b'/').filter(|p| !p.is_empty());
-        let mut current_path_component = it.next().unwrap_or(b"");
+        let mut it = path.split(|c| *c == b'/').filter(|p| !p.is_empty()).map(<&FsStr>::from);
+        let mut current_path_component = it.next().unwrap_or_default();
         for next_path_component in it {
             current_node = current_node.lookup_child(self, context, current_path_component)?;
             current_path_component = next_path_component;

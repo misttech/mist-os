@@ -111,12 +111,8 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
             errno!(
                 ENOENT,
                 format!(
-                    "looking for {:?} in {:?}",
-                    String::from_utf8_lossy(name),
-                    entries
-                        .keys()
-                        .map(|e| String::from_utf8_lossy(e).to_string())
-                        .collect::<Vec<String>>()
+                    "looking for {name} in {:?}",
+                    entries.keys().map(ToString::to_string).collect::<Vec<_>>()
                 )
             )
         })
@@ -153,7 +149,7 @@ impl FileOps for Arc<NetstackDevicesDirectory> {
                 node.node_id,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(node.info().mode),
-                name,
+                name.as_ref(),
             )?;
         }
         Ok(())

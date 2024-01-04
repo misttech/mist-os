@@ -7,6 +7,7 @@ use crate::zxio::{
     ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
 };
 use bitflags::bitflags;
+use bstr::BString;
 use fidl::{encoding::const_assert_eq, endpoints::ServerEnd};
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
@@ -98,7 +99,7 @@ pub struct ZxioDirent {
     pub protocols: Option<zxio::zxio_node_protocols_t>,
     pub abilities: Option<zxio::zxio_abilities_t>,
     pub id: Option<zxio::zxio_id_t>,
-    pub name: Vec<u8>,
+    pub name: BString,
 }
 
 pub struct DirentIterator<'a> {
@@ -176,7 +177,7 @@ impl ZxioDirent {
         let id = if dirent.has.id { Some(dirent.id) } else { None };
         let mut name = name_buffer;
         unsafe { name.set_len(dirent.name_length as usize) };
-        ZxioDirent { protocols, abilities, id, name }
+        ZxioDirent { protocols, abilities, id, name: name.into() }
     }
 
     pub fn is_dir(&self) -> bool {
@@ -1607,7 +1608,7 @@ mod test {
             .expect("open");
         for entry in bin_io.create_dirent_iterator().expect("failed to create iterator") {
             let dirent = entry.expect("dirent");
-            if dirent.name == b"." {
+            if dirent.name == "." {
                 assert!(dirent.is_dir());
             } else {
                 assert!(dirent.is_file());

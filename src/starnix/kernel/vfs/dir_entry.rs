@@ -138,7 +138,7 @@ impl DirEntry {
 
     /// Returns a new DirEntry for the given `node` without parent. The entry has no local name.
     pub fn new_unrooted(node: FsNodeHandle) -> DirEntryHandle {
-        Self::new(node, None, FsString::new())
+        Self::new(node, None, FsString::default())
     }
 
     /// Returns a file handle to this entry, associated with an anonymous namespace.
@@ -218,7 +218,7 @@ impl DirEntry {
     /// Specifically, whether the name is empty (which means "self"), dot
     /// (which also means "self"), or dot dot (which means "parent").
     pub fn is_reserved_name(name: &FsStr) -> bool {
-        name.is_empty() || name == b"." || name == b".."
+        name.is_empty() || name == "." || name == ".."
     }
 
     /// Look up a directory entry with the given name as direct child of this
@@ -627,12 +627,12 @@ impl DirEntry {
                 // we are renaming to reflect its new parent and its new name.
                 let mut renamed_state = renamed.state.write();
                 renamed_state.parent = Some(new_parent.clone());
-                renamed_state.local_name = new_basename.to_owned();
+                renamed_state.local_name = new_basename.into();
             }
             // Actually add the renamed child to the new_parent's child list.
             // This operation implicitly removes the replaced child (if any)
             // from the child list.
-            state.new_parent().children.insert(new_basename.to_owned(), Arc::downgrade(&renamed));
+            state.new_parent().children.insert(new_basename.into(), Arc::downgrade(&renamed));
 
             if flags.contains(RenameFlags::EXCHANGE) {
                 // Reparent `replaced` when exchanging.
@@ -641,9 +641,9 @@ impl DirEntry {
                 {
                     let mut replaced_state = replaced.state.write();
                     replaced_state.parent = Some(old_parent.clone());
-                    replaced_state.local_name = old_basename.to_owned();
+                    replaced_state.local_name = old_basename.into();
                 }
-                state.old_parent().children.insert(old_basename.to_vec(), Arc::downgrade(replaced));
+                state.old_parent().children.insert(old_basename.into(), Arc::downgrade(replaced));
             } else {
                 // Remove the renamed child from the old_parent's child list.
                 state.old_parent().children.remove(old_basename);
@@ -665,7 +665,7 @@ impl DirEntry {
         let cookie = current_task.kernel().get_next_inotify_cookie();
         old_parent.node.watchers.notify(InotifyMask::MOVE_FROM, cookie, old_basename, mode);
         new_parent.node.watchers.notify(InotifyMask::MOVE_TO, cookie, new_basename, mode);
-        renamed.node.watchers.notify(InotifyMask::MOVE_SELF, 0, b"", mode);
+        renamed.node.watchers.notify(InotifyMask::MOVE_SELF, 0, Default::default(), mode);
 
         Ok(())
     }
@@ -750,9 +750,9 @@ impl DirEntry {
     pub fn notify(&self, event_mask: InotifyMask) {
         let mode = self.node.info().mode;
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(event_mask, 0, &self.local_name(), mode);
+            parent.node.watchers.notify(event_mask, 0, self.local_name().as_ref(), mode);
         }
-        self.node.watchers.notify(event_mask, 0, b"", mode);
+        self.node.watchers.notify(event_mask, 0, Default::default(), mode);
     }
 
     /// Notifies parents about creation, and notifies current node about link_count change.
@@ -760,10 +760,10 @@ impl DirEntry {
         let mode = self.node.info().mode;
         if Arc::strong_count(&self.node) > 1 {
             // Notify about link change only if there is already a hardlink.
-            self.node.watchers.notify(InotifyMask::ATTRIB, 0, b"", mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode);
         }
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::CREATE, 0, &self.local_name(), mode);
+            parent.node.watchers.notify(InotifyMask::CREATE, 0, self.local_name().as_ref(), mode);
         }
     }
 
@@ -774,15 +774,15 @@ impl DirEntry {
         let mode = self.node.info().mode;
         if !mode.is_dir() {
             // Linux notifies link count change for non-directories.
-            self.node.watchers.notify(InotifyMask::ATTRIB, 0, b"", mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode);
         }
 
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::DELETE, 0, &self.local_name(), mode);
+            parent.node.watchers.notify(InotifyMask::DELETE, 0, self.local_name().as_ref(), mode);
         }
 
         if Arc::strong_count(&self.node) == 1 {
-            self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, b"", mode);
+            self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), mode);
         }
     }
 }
@@ -825,7 +825,7 @@ impl<'a> DirEntryLockedChildren<'a> {
                 "FsNode initialization did not populate the FileMode in FsNodeInfo."
             );
 
-            let entry = DirEntry::new(node, Some(self.entry.clone()), name.to_vec());
+            let entry = DirEntry::new(node, Some(self.entry.clone()), name.to_owned());
             #[cfg(any(test, debug_assertions))]
             {
                 // Take the lock on child while holding the one on the parent to ensure any wrong
@@ -835,7 +835,7 @@ impl<'a> DirEntryLockedChildren<'a> {
             Ok((entry, exists))
         };
 
-        let (child, exists) = match self.children.entry(name.to_vec()) {
+        let (child, exists) = match self.children.entry(name.to_owned()) {
             Entry::Vacant(entry) => {
                 let (child, exists) = create_child()?;
                 entry.insert(Arc::downgrade(&child));
@@ -864,12 +864,12 @@ impl fmt::Debug for DirEntry {
         let mut parents = vec![];
         let mut maybe_parent = self.parent();
         while let Some(parent) = maybe_parent {
-            parents.push(String::from_utf8_lossy(&parent.local_name()).into_owned());
+            parents.push(parent.local_name().to_string());
             maybe_parent = parent.parent();
         }
         let mut builder = f.debug_struct("DirEntry");
         builder.field("id", &(self as *const DirEntry));
-        builder.field("local_name", &String::from_utf8_lossy(&self.local_name()));
+        builder.field("local_name", &self.local_name());
         if !parents.is_empty() {
             builder.field("parents", &parents);
         }

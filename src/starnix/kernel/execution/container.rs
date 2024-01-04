@@ -382,7 +382,7 @@ async fn create_container(
             .collect::<Vec<_>>();
 
     let executable = system_task
-        .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
+        .open_file(argv[0].as_bytes().into(), OpenFlags::RDONLY)
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
     let init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
@@ -417,7 +417,7 @@ fn create_fs_context(
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
-    if root_point != b"/" {
+    if root_point != "/" {
         anyhow::bail!("First mount in mounts list is not the root");
     }
 
@@ -432,17 +432,17 @@ fn create_fs_context(
             kernel,
             pkg_dir_proxy,
             rights,
-            FileSystemOptions { source: b"data".to_vec(), ..Default::default() },
+            FileSystemOptions { source: "data".into(), ..Default::default() },
         )?,
-        BTreeMap::from([(b"component".to_vec(), TmpFs::new_fs(kernel))]),
+        BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
     );
     let mut mappings =
-        vec![(b"container".to_vec(), container_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
+        vec![("container".into(), container_fs), ("data".into(), TmpFs::new_fs(kernel))];
     if kernel.features.custom_artifacts {
-        mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
+        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }
     if kernel.features.test_data {
-        mappings.push((b"test_data".to_vec(), TmpFs::new_fs(kernel)));
+        mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
 
@@ -503,10 +503,9 @@ fn mount_filesystems(
                 .with_source_context(|| {
                     format!("creating filesystem from spec: {}", &mount_spec)
                 })?;
-        let mount_point =
-            system_task.lookup_path_from_root(mount_point).with_source_context(|| {
-                format!("lookup path from root: {}", String::from_utf8_lossy(mount_point))
-            })?;
+        let mount_point = system_task
+            .lookup_path_from_root(mount_point)
+            .with_source_context(|| format!("lookup path from root: {mount_point}"))?;
         mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
     }
     Ok(())
@@ -521,7 +520,7 @@ async fn wait_for_init_file(
         fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
         let root = current_task.fs().root();
         let mut context = LookupContext::default();
-        match current_task.lookup_path(&mut context, root, startup_file_path.as_bytes()) {
+        match current_task.lookup_path(&mut context, root, startup_file_path.into()) {
             Ok(_) => break,
             Err(error) if error == ENOENT => continue,
             Err(error) => return Err(anyhow::Error::from(error)),
@@ -548,12 +547,7 @@ mod test {
 
         let path = "/path";
         current_task
-            .open_file_at(
-                FdNumber::AT_FDCWD,
-                path.as_bytes(),
-                OpenFlags::CREAT,
-                FileMode::default(),
-            )
+            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::CREAT, FileMode::default())
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
@@ -587,12 +581,7 @@ mod test {
 
         // Create the file that is being waited on.
         current_task
-            .open_file_at(
-                FdNumber::AT_FDCWD,
-                path.as_bytes(),
-                OpenFlags::CREAT,
-                FileMode::default(),
-            )
+            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::CREAT, FileMode::default())
             .expect("Failed to create file");
 
         // Wait for the file creation to be detected.

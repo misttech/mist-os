@@ -49,7 +49,7 @@ use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 /// The default selinux context to use for each BPF object.
-const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";
+const DEFAULT_BPF_SELINUX_CONTEXT: &str = "u:object_r:fs_bpf:s0";
 
 trait BpfObject: Send + Sync + AsAny + 'static {}
 
@@ -173,10 +173,10 @@ fn get_bpf_fd(current_task: &CurrentTask, fd: u32) -> Result<BpfHandle, Errno> {
 // TODO(b/278731253): Returns custom selinux context for everything under /sys/fs/bpf/net_shared/*.
 // Otherwise, returns default selinux context for BPF objects.
 fn get_selinux_context(path: &FsStr) -> FsString {
-    if String::from_utf8_lossy(path).contains("net_shared") {
-        b"u:object_r:fs_bpf_net_shared:s0".to_vec()
+    if bstr::ByteSlice::contains_str(&**path, "net_shared") {
+        b"u:object_r:fs_bpf_net_shared:s0".into()
     } else {
-        DEFAULT_BPF_SELINUX_CONTEXT.to_vec()
+        DEFAULT_BPF_SELINUX_CONTEXT.into()
     }
 }
 
@@ -315,12 +315,18 @@ pub fn sys_bpf(
             let (parent, basename) = current_task.lookup_parent_at(
                 &mut LookupContext::default(),
                 FdNumber::AT_FDCWD,
-                &pathname,
+                pathname.as_ref(),
             )?;
             let bpf_dir =
                 parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
-            let selinux_context = get_selinux_context(&pathname);
-            bpf_dir.register_pin(current_task, &parent, basename, object, &selinux_context)?;
+            let selinux_context = get_selinux_context(pathname.as_ref());
+            bpf_dir.register_pin(
+                current_task,
+                &parent,
+                basename,
+                object,
+                selinux_context.as_ref(),
+            )?;
             Ok(SUCCESS)
         }
 
@@ -330,7 +336,7 @@ pub fn sys_bpf(
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
             let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
-            let node = current_task.lookup_path_from_root(&pathname)?;
+            let node = current_task.lookup_path_from_root(pathname.as_ref())?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let node =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
@@ -405,10 +411,12 @@ impl BpfFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options);
-        let node =
-            FsNode::new_root_with_properties(BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT), |info| {
+        let node = FsNode::new_root_with_properties(
+            BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT.into()),
+            |info| {
                 info.mode |= FileMode::ISVTX;
-            });
+            },
+        );
         fs.set_root_node(node);
         Ok(fs)
     }
@@ -419,7 +427,7 @@ impl FileSystemOps for BpfFs {
         Ok(statfs::default(BPF_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"bpf"
+        "bpf".into()
     }
 
     fn rename(
@@ -445,7 +453,7 @@ impl BpfFsDir {
     fn new(selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr(b"security.selinux", selinux_context, XattrOp::Create)
+            .set_xattr("security.selinux".into(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { xattrs }
     }
@@ -492,7 +500,7 @@ impl FsNodeOps for BpfFsDir {
         let selinux_context = get_selinux_context(name);
         Ok(node.fs().create_node(
             current_task,
-            BpfFsDir::new(&selinux_context),
+            BpfFsDir::new(selinux_context.as_ref()),
             FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
         ))
     }
@@ -550,7 +558,7 @@ impl BpfFsObject {
     fn new(handle: BpfHandle, selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr(b"security.selinux", selinux_context, XattrOp::Create)
+            .set_xattr("security.selinux".as_ref(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { handle, xattrs }
     }

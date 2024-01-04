@@ -166,7 +166,7 @@ impl StarnixNodeConnection {
                 name: &FsStr,
             ) -> Result<(), Errno> {
                 // Ignore ..
-                if name != b".." {
+                if name != ".." {
                     // Ignore entries with unknown types.
                     if let Some(dirent_type) = fio::DirentType::from_primitive(entry_type.bits()) {
                         let entry_info = directory::entry::EntryInfo::new(inode_num, dirent_type);
@@ -244,7 +244,7 @@ impl StarnixNodeConnection {
 
             // Open a path under the current directory.
             let path = path.into_string();
-            let (node, name) = self.lookup_parent(path.as_bytes()).await?;
+            let (node, name) = self.lookup_parent(path.as_bytes().into()).await?;
             let must_create_directory =
                 flags.contains(fio::OpenFlags::DIRECTORY | fio::OpenFlags::CREATE);
             let file = match current_task.open_namespace_node_at(
@@ -461,7 +461,7 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         self.file.name.entry.unlink(
             &*self.task().await?,
             &self.file.name.mount,
-            name.as_bytes(),
+            name.into(),
             kind,
             false,
         )?;
@@ -480,8 +480,8 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         let dst_name = dst_name.into_string();
         let src_dir =
             src_dir.into_any().downcast::<StarnixNodeConnection>().map_err(|_| errno!(EXDEV))?;
-        let (src_node, src_name) = src_dir.lookup_parent(src_name.as_bytes()).await?;
-        let (dst_node, dst_name) = self.lookup_parent(dst_name.as_bytes()).await?;
+        let (src_node, src_name) = src_dir.lookup_parent(src_name.as_str().into()).await?;
+        let (dst_node, dst_name) = self.lookup_parent(dst_name.as_str().into()).await?;
         NamespaceNode::rename(
             &*self.task().await?,
             &src_node,
@@ -668,13 +668,13 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::tmpfs::TmpFs, testing::*};
+    use crate::{fs::tmpfs::TmpFs, testing::*, vfs::FsString};
     use fuchsia_async as fasync;
     use std::collections::HashSet;
     use syncio::{zxio_node_attr_has_t, Zxio};
 
     fn assert_directory_content(zxio: &Zxio, content: &[&[u8]]) {
-        let expected = content.iter().map(|x| x.to_vec()).collect::<HashSet<_>>();
+        let expected = content.iter().map(|&x| FsString::from(x)).collect::<HashSet<_>>();
         let mut iterator = zxio.create_dirent_iterator().expect("iterator");
         iterator.rewind().expect("iterator");
         let found =

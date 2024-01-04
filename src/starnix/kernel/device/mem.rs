@@ -356,51 +356,51 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let mem_class = registry.get_or_create_class(b"mem", registry.virtual_bus());
+    let mem_class = registry.get_or_create_class("mem".into(), registry.virtual_bus());
     registry.add_and_register_device(
         system_task,
-        b"null",
-        DeviceMetadata::new(b"null", DeviceType::NULL, DeviceMode::Char),
+        "null".into(),
+        DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevNull>,
     );
     registry.add_and_register_device(
         system_task,
-        b"zero",
-        DeviceMetadata::new(b"zero", DeviceType::ZERO, DeviceMode::Char),
+        "zero".into(),
+        DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevZero>,
     );
     registry.add_and_register_device(
         system_task,
-        b"full",
-        DeviceMetadata::new(b"full", DeviceType::FULL, DeviceMode::Char),
+        "full".into(),
+        DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevFull>,
     );
     registry.add_and_register_device(
         system_task,
-        b"random",
-        DeviceMetadata::new(b"random", DeviceType::RANDOM, DeviceMode::Char),
+        "random".into(),
+        DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
         system_task,
-        b"urandom",
-        DeviceMetadata::new(b"urandom", DeviceType::URANDOM, DeviceMode::Char),
+        "urandom".into(),
+        DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
         system_task,
-        b"kmsg",
-        DeviceMetadata::new(b"kmsg", DeviceType::KMSG, DeviceMode::Char),
+        "kmsg".into(),
+        DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,
         DeviceDirectory::new,
         open_kmsg,

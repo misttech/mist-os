@@ -92,13 +92,13 @@ impl RemoteBundle {
             CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
             RemoteBundle { metadata, root, rights },
             FileSystemOptions {
-                source: path.as_bytes().to_vec(),
+                source: path.into(),
                 flags: if rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
                     MountFlags::empty()
                 } else {
                     MountFlags::RDONLY
                 },
-                params: b"".to_vec(),
+                params: Default::default(),
             },
         );
         let mut root_node = FsNode::new_root(DirectoryObject);
@@ -127,7 +127,7 @@ impl FileSystemOps for RemoteBundle {
         Ok(statfs::default(REMOTE_BUNDLE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"remote_bundle"
+        "remote_bundle".into()
     }
 }
 
@@ -215,18 +215,19 @@ impl FsNodeOps for File {
         &self,
         node: &FsNode,
         _current_task: &CurrentTask,
-        name: &crate::vfs::FsStr,
+        name: &FsStr,
         _size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        Ok(bundle
-            .get_node(node.node_id)
-            .extended_attributes
-            .get(name)
-            .ok_or(errno!(ENOENT))?
-            .to_vec()
-            .into())
+        Ok(FsString::from(
+            &bundle
+                .get_node(node.node_id)
+                .extended_attributes
+                .get(&**name)
+                .ok_or(errno!(ENOENT))?[..],
+        )
+        .into())
     }
 
     fn list_xattrs(
@@ -241,7 +242,7 @@ impl FsNodeOps for File {
             .get_node(node.node_id)
             .extended_attributes
             .keys()
-            .map(|k| k.clone().to_vec())
+            .map(|k| FsString::from(&k[..]))
             .collect::<Vec<_>>()
             .into())
     }
@@ -368,7 +369,7 @@ impl FileOps for DirectoryObject {
                 *inode_num,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(FileMode::from_bits(node.mode.into())),
-                name.as_bytes(),
+                name.as_str().into(),
             )?;
         }
 
@@ -441,17 +442,18 @@ impl FsNodeOps for DirectoryObject {
         &self,
         node: &FsNode,
         _current_task: &CurrentTask,
-        name: &crate::vfs::FsStr,
+        name: &FsStr,
         _size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let value = bundle
-            .get_node(node.node_id)
-            .extended_attributes
-            .get(name)
-            .ok_or(errno!(ENOENT))?
-            .to_vec();
+        let value = FsString::from(
+            &bundle
+                .get_node(node.node_id)
+                .extended_attributes
+                .get(&**name)
+                .ok_or(errno!(ENOENT))?[..],
+        );
         Ok(value.into())
     }
 
@@ -467,7 +469,7 @@ impl FsNodeOps for DirectoryObject {
             .get_node(node.node_id)
             .extended_attributes
             .keys()
-            .map(|k| k.clone().to_vec())
+            .map(|k| FsString::from(&**k))
             .collect::<Vec<_>>()
             .into())
     }
@@ -482,7 +484,7 @@ impl FsNodeOps for SymlinkObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let target = bundle.get_node(node.node_id).symlink().ok_or(errno!(EIO))?.target.clone();
-        Ok(SymlinkTarget::Path(target.into_bytes()))
+        Ok(SymlinkTarget::Path(target.into()))
     }
 }
 
@@ -533,10 +535,10 @@ mod test {
         let mut context = LookupContext::default().with(SymlinkMode::NoFollow);
 
         let test_dir =
-            root.lookup_child(&current_task, &mut context, b"foo").expect("lookup failed");
+            root.lookup_child(&current_task, &mut context, "foo".into()).expect("lookup failed");
 
         let test_file = test_dir
-            .lookup_child(&current_task, &mut context, b"file")
+            .lookup_child(&current_task, &mut context, "file".into())
             .expect("lookup failed")
             .open(&current_task, OpenFlags::RDONLY, true)
             .expect("open failed");
@@ -549,18 +551,18 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, b"user.a", usize::MAX)
+                .get_xattr(&current_task, &test_dir.mount, "user.a".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
-            b"apple"
+            "apple"
         );
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, b"user.b", usize::MAX)
+                .get_xattr(&current_task, &test_dir.mount, "user.b".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
-            b"ball"
+            "ball"
         );
         assert_eq!(
             test_file
@@ -570,7 +572,7 @@ mod test {
                 .unwrap()
                 .into_iter()
                 .collect::<HashSet<_>>(),
-            [b"user.a".to_vec(), b"user.b".to_vec()].into(),
+            ["user.a".into(), "user.b".into()].into_iter().collect::<HashSet<_>>(),
         );
 
         {
@@ -580,13 +582,14 @@ mod test {
             assert_eq!(info.gid, 24403); // ext4_to_pkg.
         }
 
-        let test_symlink =
-            test_dir.lookup_child(&current_task, &mut context, b"symlink").expect("lookup failed");
+        let test_symlink = test_dir
+            .lookup_child(&current_task, &mut context, "symlink".into())
+            .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
             test_symlink.readlink(&current_task).expect("readlink failed")
         {
-            assert_eq!(&target, b"file");
+            assert_eq!(&target, "file");
         } else {
             panic!("unexpected symlink type");
         }
@@ -624,10 +627,10 @@ mod test {
         assert_eq!(
             sink.entries,
             [
-                (b".".to_vec(), (test_dir.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"..".to_vec(), (root.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"file".to_vec(), (test_file.node().node_id, DirectoryEntryType::REG)),
-                (b"symlink".to_vec(), (test_symlink.entry.node.node_id, DirectoryEntryType::LNK))
+                (b".".into(), (test_dir.entry.node.node_id, DirectoryEntryType::DIR)),
+                (b"..".into(), (root.entry.node.node_id, DirectoryEntryType::DIR)),
+                (b"file".into(), (test_file.node().node_id, DirectoryEntryType::REG)),
+                (b"symlink".into(), (test_symlink.entry.node.node_id, DirectoryEntryType::LNK))
             ]
             .into()
         );

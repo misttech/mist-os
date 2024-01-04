@@ -238,7 +238,7 @@ impl DeviceRegistry {
 
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> Bus {
-        Bus::new(self.root_kobject.get_or_create_child(b"virtual", SysfsDirectory::new), None)
+        Bus::new(self.root_kobject.get_or_create_child("virtual".into(), SysfsDirectory::new), None)
     }
 
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
@@ -321,15 +321,16 @@ impl DeviceRegistry {
     }
 
     pub fn remove_device(&self, current_task: &CurrentTask, device: Device) {
-        let name = device.kobject().name();
-        device.class.collection.kobject().remove_child(&name);
+        let kobject = device.kobject();
+        let name = kobject.name();
+        device.class.collection.kobject().remove_child(name);
         if let Some(bus_collection) = &device.class.bus.collection {
-            bus_collection.kobject().remove_child(&name);
+            bus_collection.kobject().remove_child(name);
         }
         device.kobject().remove();
         self.dispatch_uevent(UEventAction::Remove, device.clone());
 
-        devtmpfs_remove_child(current_task, &device.metadata.name);
+        devtmpfs_remove_child(current_task, device.metadata.name.as_ref());
     }
 
     fn major_devices(&self, mode: DeviceMode) -> MappedMutexGuard<'_, MajorDevices> {
@@ -450,10 +451,10 @@ impl Default for DeviceRegistry {
             .register_major(DYN_MAJOR, Arc::clone(&state.dyn_devices))
             .expect("Failed to register DYN_MAJOR");
         Self {
-            root_kobject: KObject::new_root(SYSFS_DEVICES),
-            class_subsystem_kobject: KObject::new_root(SYSFS_CLASS),
-            block_subsystem_kobject: KObject::new_root(SYSFS_BLOCK),
-            bus_subsystem_kobject: KObject::new_root(SYSFS_BUS),
+            root_kobject: KObject::new_root(SYSFS_DEVICES.into()),
+            class_subsystem_kobject: KObject::new_root(SYSFS_CLASS.into()),
+            block_subsystem_kobject: KObject::new_root(SYSFS_BLOCK.into()),
+            bus_subsystem_kobject: KObject::new_root(SYSFS_BUS.into()),
             state: Mutex::new(state),
         }
     }
@@ -586,20 +587,20 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let input_class = registry.get_or_create_class(b"input", registry.virtual_bus());
+        let input_class = registry.get_or_create_class("input".into(), registry.virtual_bus());
         registry.add_device(
             &current_task,
-            b"mice",
-            DeviceMetadata::new(b"mice", DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            "mice".into(),
+            DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class,
             DeviceDirectory::new,
         );
 
-        assert!(registry.class_subsystem_kobject().has_child(b"input"));
+        assert!(registry.class_subsystem_kobject().has_child("input".into()));
         assert!(registry
             .class_subsystem_kobject()
-            .get_child(b"input")
-            .and_then(|collection| collection.get_child(b"mice"))
+            .get_child("input".into())
+            .and_then(|collection| collection.get_child("mice".into()))
             .is_some());
     }
 
@@ -608,20 +609,20 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let bus = registry.get_or_create_bus(b"bus");
-        let class = registry.get_or_create_class(b"class", bus);
+        let bus = registry.get_or_create_bus("bus".into());
+        let class = registry.get_or_create_class("class".into(), bus);
         registry.add_device(
             &current_task,
-            b"device",
-            DeviceMetadata::new(b"device", DeviceType::new(0, 0), DeviceMode::Char),
+            "device".into(),
+            DeviceMetadata::new("device".into(), DeviceType::new(0, 0), DeviceMode::Char),
             class,
             DeviceDirectory::new,
         );
-        assert!(registry.bus_subsystem_kobject().has_child(b"bus"));
+        assert!(registry.bus_subsystem_kobject().has_child("bus".into()));
         assert!(registry
             .bus_subsystem_kobject()
-            .get_child(b"bus")
-            .and_then(|collection| collection.get_child(b"device"))
+            .get_child("bus".into())
+            .and_then(|collection| collection.get_child("device".into()))
             .is_some());
     }
 
@@ -630,28 +631,28 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let pci_bus = registry.get_or_create_bus(b"pci");
-        let input_class = registry.get_or_create_class(b"input", pci_bus);
+        let pci_bus = registry.get_or_create_bus("pci".into());
+        let input_class = registry.get_or_create_class("input".into(), pci_bus);
         let mice_dev = registry.add_device(
             &current_task,
-            b"mice",
-            DeviceMetadata::new(b"mice", DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            "mice".into(),
+            DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class.clone(),
             DeviceDirectory::new,
         );
 
         registry.remove_device(&current_task, mice_dev);
-        assert!(!input_class.kobject().has_child(b"mice"));
+        assert!(!input_class.kobject().has_child("mice".into()));
         assert!(!registry
             .bus_subsystem_kobject()
-            .get_child(b"pci")
+            .get_child("pci".into())
             .expect("get pci collection")
-            .has_child(b"mice"));
+            .has_child("mice".into()));
         assert!(!registry
             .class_subsystem_kobject()
-            .get_child(b"input")
+            .get_child("input".into())
             .expect("get input collection")
-            .has_child(b"mice"));
+            .has_child("mice".into()));
     }
 
     #[::fuchsia::test]

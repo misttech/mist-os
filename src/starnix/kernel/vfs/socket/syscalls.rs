@@ -12,7 +12,7 @@ use crate::{
             SocketFile, SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags,
             SocketType, UnixSocket, SA_FAMILY_SIZE,
         },
-        FdEvents, FdFlags, FdNumber, FileHandle, LookupContext,
+        FdEvents, FdFlags, FdNumber, FileHandle, FsString, LookupContext,
     },
 };
 use fuchsia_zircon as zx;
@@ -139,11 +139,11 @@ fn maybe_parse_socket_address(
 }
 
 // See "Autobind feature" section of https://man7.org/linux/man-pages/man7/unix.7.html
-fn generate_autobind_address() -> Vec<u8> {
+fn generate_autobind_address() -> FsString {
     let mut bytes = [0u8; 4];
     zx::cprng_draw(&mut bytes);
     let value = u32::from_ne_bytes(bytes) & 0xFFFFF;
-    format!("\0{value:05x}").into_bytes()
+    format!("\0{value:05x}").into()
 }
 
 pub fn sys_bind(
@@ -184,7 +184,7 @@ pub fn sys_bind(
                 let (parent, basename) = current_task.lookup_parent_at(
                     &mut LookupContext::default(),
                     FdNumber::AT_FDCWD,
-                    &name,
+                    name.as_ref(),
                 )?;
 
                 parent
@@ -277,11 +277,11 @@ pub fn sys_connect(
     let peer = match address {
         SocketAddress::Unspecified => return error!(EAFNOSUPPORT),
         SocketAddress::Unix(ref name) => {
-            log_trace!("connect to unix socket named {:?}", String::from_utf8_lossy(name));
+            log_trace!("connect to unix socket named \"{name}\"");
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
-            SocketPeer::Handle(resolve_unix_socket_address(current_task, &name)?)
+            SocketPeer::Handle(resolve_unix_socket_address(current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),

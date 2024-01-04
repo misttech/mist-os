@@ -513,7 +513,7 @@ impl SocketOps for UnixSocket {
             (None, Some(_), SocketType::SeqPacket) => return error!(ENOTCONN),
             (Some(_), Some(_), _) => return error!(EISCONN),
             (_, Some(SocketAddress::Unix(ref name)), _) => {
-                resolve_unix_socket_address(current_task, name)?
+                resolve_unix_socket_address(current_task, name.as_ref())?
             }
             (_, Some(_), _) => return error!(EINVAL),
             (None, None, _) => return error!(ENOTCONN),
@@ -935,7 +935,7 @@ mod tests {
         )
         .expect("Failed to create socket.");
         socket
-            .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
+            .bind(&current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
         socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
         let connecting_socket = Socket::new(

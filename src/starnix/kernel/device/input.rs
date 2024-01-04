@@ -13,7 +13,7 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode,
+        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString,
     },
 };
 use starnix_logging::{log_info, log_warn, not_implemented};
@@ -868,14 +868,14 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let input_class = registry.get_or_create_class(b"input", registry.virtual_bus());
+    let input_class = registry.get_or_create_class("input".into(), registry.virtual_bus());
 
     let device_id = get_next_device_id();
     registry.add_and_register_device(
         system_task,
-        format!("event{}", device_id).as_bytes(),
+        FsString::from(format!("event{}", device_id)).as_ref(),
         DeviceMetadata::new(
-            format!("input/event{}", device_id).as_bytes(),
+            format!("input/event{}", device_id).into(),
             DeviceType::new(INPUT_MAJOR, device_id),
             DeviceMode::Char,
         ),
@@ -1001,7 +1001,7 @@ mod test {
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.
             current_task
-                .lookup_path_from_root(b".")
+                .lookup_path_from_root(".".into())
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
         )

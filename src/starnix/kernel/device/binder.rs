@@ -3375,7 +3375,7 @@ impl BinderDriver {
                         .current_sid;
                     let mut security_context = security_server
                         .sid_to_security_context(&sid)
-                        .map_or(Vec::new(), |context| format!("{}", context).into_bytes().to_vec());
+                        .map_or(FsString::default(), |context| FsString::from(context.to_string()));
                     security_context.push(b'\0');
                     Some(security_context)
                 } else {
@@ -3391,7 +3391,7 @@ impl BinderDriver {
                     target_proc.get_resource_accessor(&target_task),
                     &target_proc,
                     &data,
-                    security_context.as_deref(),
+                    security_context.as_ref().map(|c| c.as_ref()),
                 )?;
 
                 let transaction = TransactionData {
@@ -3683,7 +3683,7 @@ impl BinderDriver {
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
-        security_context: Option<&[u8]>,
+        security_context: Option<&FsStr>,
     ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError> {
         profile_duration!("CopyTransactionBuffers");
         // Get the shared memory of the target process.
@@ -4307,7 +4307,7 @@ impl FileSystemOps for BinderFs {
         Ok(statfs::default(BINDERFS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"binder"
+        "binder".into()
     }
 }
 
@@ -4320,7 +4320,7 @@ impl BinderFsDir {
     fn new(kernel: &Kernel) -> Result<Self, Errno> {
         let remote_dev = kernel.device_registry.register_dyn_chrdev(RemoteBinderDevice {})?;
         let mut devices = BTreeMap::default();
-        devices.insert(b"remote".to_vec(), remote_dev);
+        devices.insert("remote".into(), remote_dev);
         Ok(Self { devices })
     }
 
@@ -4361,19 +4361,19 @@ impl FsNodeOps for BinderFsDir {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if let Some(dev) = self.devices.get(name) {
-            let mode = if name == b"remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
+            let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
             Ok(node.fs().create_node(current_task, SpecialNode, |ino| {
                 let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
                 info.rdev = *dev;
                 info
             }))
         } else {
-            error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
+            error!(ENOENT, format!("looking for {name}"))
         }
     }
 }
 
-const DEFAULT_BINDERS: &[&FsStr] = &[b"binder", b"hwbinder", b"vndbinder"];
+const DEFAULT_BINDERS: [&str; 3] = ["binder", "hwbinder", "vndbinder"];
 
 impl BinderFs {
     pub fn new_fs(
@@ -4383,7 +4383,7 @@ impl BinderFs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options);
         let mut root = BinderFsDir::new(kernel)?;
         for name in DEFAULT_BINDERS {
-            root.add_binder_device(kernel, name.to_vec())?;
+            root.add_binder_device(kernel, FsString::from(name))?;
         }
         fs.set_root(root);
         Ok(fs)
@@ -5496,7 +5496,7 @@ pub mod tests {
         };
 
         // Copy the data from process 1 to process 2
-        const kSecContext: &[u8] = b"hello\0";
+        let security_context = "hello\0".into();
         let (buffers, transaction_state) = test
             .driver
             .copy_transaction_buffers(
@@ -5507,7 +5507,7 @@ pub mod tests {
                 &receiver.task,
                 &receiver.proc,
                 &transaction,
-                Some(kSecContext),
+                Some(security_context),
             )
             .expect("copy data");
         let data_buffer = buffers.data;
@@ -5532,10 +5532,10 @@ pub mod tests {
         vmo.read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read offsets");
         assert_eq!(&buffer[..], offsets_data.as_bytes());
-        let mut buffer = [0u8; kSecContext.len()];
-        vmo.read(&mut buffer, (security_context_buffer.address - BASE_ADDR) as u64)
+        let mut buffer = vec![0u8; security_context.len()];
+        vmo.read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read security_context");
-        assert_eq!(&buffer[..], kSecContext);
+        assert_eq!(&buffer[..], security_context);
         transaction_state.release(());
     }
 

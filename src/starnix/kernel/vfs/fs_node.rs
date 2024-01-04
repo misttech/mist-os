@@ -518,7 +518,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ) -> Result<FsNodeHandle, Errno> {
         // The default implementation here is suitable for filesystems that have permanent entries;
         // entries that already exist will get found in the cache and shouldn't get this far.
-        error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
+        error!(ENOENT, format!("looking for {name}"))
     }
 
     /// Create and return the given child node.
@@ -1795,7 +1795,8 @@ impl FsNode {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
             v.retain(|name| {
-                self.check_trusted_attribute_access(current_task, name, || errno!(EPERM)).is_ok()
+                self.check_trusted_attribute_access(current_task, name.as_ref(), || errno!(EPERM))
+                    .is_ok()
             });
             v
         }))
@@ -1917,7 +1918,7 @@ impl FsNode {
 impl std::fmt::Debug for FsNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FsNode")
-            .field("fs", &String::from_utf8_lossy(self.fs().name()))
+            .field("fs", &self.fs().name())
             .field("node_id", &self.node_id)
             .field("info", &*self.info())
             .field("ops_ty", &self.ops().type_name())
@@ -1953,7 +1954,7 @@ mod tests {
         current_task
             .fs()
             .root()
-            .create_node(&current_task, b"zero", mode!(IFCHR, 0o666), DeviceType::ZERO)
+            .create_node(&current_task, "zero".into(), mode!(IFCHR, 0o666), DeviceType::ZERO)
             .expect("create_node");
 
         const CONTENT_LEN: usize = 10;
@@ -1961,7 +1962,7 @@ mod tests {
 
         // Read from the zero device.
         let device_file =
-            current_task.open_file(b"zero", OpenFlags::RDONLY).expect("open device file");
+            current_task.open_file("zero".into(), OpenFlags::RDONLY).expect("open device file");
         device_file.read(&current_task, &mut buffer).expect("read from zero");
 
         // Assert the contents.
@@ -1976,7 +1977,7 @@ mod tests {
         let node = &current_task
             .fs()
             .root()
-            .create_node(&current_task, b"zero", FileMode::IFCHR, DeviceType::ZERO)
+            .create_node(&current_task, "zero".into(), FileMode::IFCHR, DeviceType::ZERO)
             .expect("create_node")
             .entry
             .node;
@@ -2043,7 +2044,7 @@ mod tests {
         let node = &current_task
             .fs()
             .root()
-            .create_node(&current_task, b"foo", FileMode::IFREG, DeviceType::NONE)
+            .create_node(&current_task, "foo".into(), FileMode::IFREG, DeviceType::NONE)
             .expect("create_node")
             .entry
             .node;

@@ -1420,7 +1420,7 @@ impl fmt::Debug for FileObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FileObject")
             .field("name", &self.name)
-            .field("fs", &String::from_utf8_lossy(self.fs.name()))
+            .field("fs", &self.fs.name())
             .field("offset", &self.offset)
             .field("flags", &self.flags)
             .field("ops_ty", &self.ops().type_name())
@@ -1454,7 +1454,7 @@ mod tests {
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
-            .create_entry(&current_task, &mount, b"test", |dir, mount, name| {
+            .create_entry(&current_task, &mount, "test".into(), |dir, mount, name| {
                 dir.mknod(
                     &current_task,
                     mount,

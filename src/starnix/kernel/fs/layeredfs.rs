@@ -111,7 +111,12 @@ impl FileOps for LayeredFsRootNodeOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         for (key, fs) in self.fs.mappings.iter().skip(sink.offset() as usize) {
-            sink.add(fs.root().node.info().ino, sink.offset() + 1, DirectoryEntryType::DIR, key)?;
+            sink.add(
+                fs.root().node.info().ino,
+                sink.offset() + 1,
+                DirectoryEntryType::DIR,
+                key.as_ref(),
+            )?;
         }
 
         struct DirentSinkWrapper<'a> {
@@ -191,8 +196,8 @@ mod test {
     async fn test_remove_duplicates() {
         let (kernel, current_task) = create_kernel_and_task();
         let base = TmpFs::new_fs(&kernel);
-        base.root().create_dir(&current_task, b"d1").expect("create_dir");
-        base.root().create_dir(&current_task, b"d2").expect("create_dir");
+        base.root().create_dir(&current_task, "d1".into()).expect("create_dir");
+        base.root().create_dir(&current_task, "d2".into()).expect("create_dir");
         let base_entries = get_root_entry_names(&current_task, &base);
         assert_eq!(base_entries.len(), 4);
         assert!(base_entries.contains(&b".".to_vec()));
@@ -204,8 +209,8 @@ mod test {
             &kernel,
             base,
             BTreeMap::from([
-                (b"d1".to_vec(), TmpFs::new_fs(&kernel)),
-                (b"d3".to_vec(), TmpFs::new_fs(&kernel)),
+                ("d1".into(), TmpFs::new_fs(&kernel)),
+                ("d3".into(), TmpFs::new_fs(&kernel)),
             ]),
         );
         let layered_fs_entries = get_root_entry_names(&current_task, &layered_fs);

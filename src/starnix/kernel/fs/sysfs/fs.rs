@@ -16,10 +16,10 @@ use crate::{
 };
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
 
-pub const SYSFS_DEVICES: &'static FsStr = b"devices";
-pub const SYSFS_BUS: &'static FsStr = b"bus";
-pub const SYSFS_CLASS: &'static FsStr = b"class";
-pub const SYSFS_BLOCK: &'static FsStr = b"block";
+pub const SYSFS_DEVICES: &str = "devices";
+pub const SYSFS_BUS: &str = "bus";
+pub const SYSFS_CLASS: &str = "class";
+pub const SYSFS_BLOCK: &str = "block";
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -27,7 +27,7 @@ impl FileSystemOps for SysFs {
         Ok(statfs::default(SYSFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"sysfs"
+        "sysfs".into()
     }
 }
 
@@ -37,33 +37,43 @@ impl SysFs {
         let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
-        dir.subdir(current_task, b"fs", 0o755, |dir| {
-            dir.subdir(current_task, b"selinux", 0o755, |_| ());
-            dir.subdir(current_task, b"bpf", 0o755, |_| ());
+        dir.subdir(current_task, "fs".into(), 0o755, |dir| {
+            dir.subdir(current_task, "selinux".into(), 0o755, |_| ());
+            dir.subdir(current_task, "bpf".into(), 0o755, |_| ());
             dir.node(
-                b"cgroup",
+                "cgroup".into(),
                 fs.create_node(
                     current_task,
                     CgroupDirectoryNode::new(),
                     FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
                 ),
             );
-            dir.subdir(current_task, b"fuse", 0o755, |dir| {
-                dir.subdir(current_task, b"connections", 0o755, |_| ())
+            dir.subdir(current_task, "fuse".into(), 0o755, |dir| {
+                dir.subdir(current_task, "connections".into(), 0o755, |_| ())
             });
         });
 
         let registry = &kernel.device_registry;
-        dir.entry(current_task, SYSFS_DEVICES, registry.root_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS, registry.bus_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BLOCK, registry.block_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_DEVICES.into(), registry.root_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BUS.into(), registry.bus_subsystem_kobject().ops(), dir_mode);
+        dir.entry(
+            current_task,
+            SYSFS_BLOCK.into(),
+            registry.block_subsystem_kobject().ops(),
+            dir_mode,
+        );
+        dir.entry(
+            current_task,
+            SYSFS_CLASS.into(),
+            registry.class_subsystem_kobject().ops(),
+            dir_mode,
+        );
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
         kernel
             .device_registry
             .class_subsystem_kobject()
-            .get_or_create_child(b"net", |_| NetstackDevicesDirectory::new_sys_class_net());
+            .get_or_create_child("net".into(), |_| NetstackDevicesDirectory::new_sys_class_net());
 
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
@@ -72,8 +82,8 @@ impl SysFs {
         // Remove after registry.rs refactor is in place.
         registry
             .root_kobject()
-            .get_or_create_child(b"system", SysfsDirectory::new)
-            .get_or_create_child(b"cpu", CpuClassDirectory::new);
+            .get_or_create_child("system".into(), SysfsDirectory::new)
+            .get_or_create_child("cpu".into(), CpuClassDirectory::new);
 
         dir.build_root();
         fs
@@ -92,10 +102,10 @@ pub trait SysfsOps: FsNodeOps {
 /// a subsystem.
 pub fn sysfs_create_link(from: KObjectHandle, to: KObjectHandle) -> SymlinkNode {
     let mut path = PathBuilder::new();
-    path.prepend_element(&to.path());
+    path.prepend_element(to.path().as_ref());
     // Escape one more level from its subsystem to the root of sysfs.
-    path.prepend_element(b"..");
-    path.prepend_element(&from.path_to_root());
+    path.prepend_element("..".into());
+    path.prepend_element(from.path_to_root().as_ref());
     // Build a symlink with the relative path.
-    SymlinkNode::new(&path.build_relative())
+    SymlinkNode::new(path.build_relative().as_ref())
 }

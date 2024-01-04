@@ -95,12 +95,13 @@ mod tests {
     async fn class_collection_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
-        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
+        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
+        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
         let test_fs =
             create_fs(&kernel, ClassCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 
-        let device_entry = lookup_node(&current_task, &test_fs, b"0").expect("device 0 directory");
+        let device_entry =
+            lookup_node(&current_task, &test_fs, "0".into()).expect("device 0 directory");
         assert!(device_entry.entry.node.is_lnk());
     }
 }

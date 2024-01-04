@@ -17,7 +17,7 @@ impl FileSystemOps for SocketFs {
         Ok(statfs::default(SOCKFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"socket"
+        "socket".into()
     }
 }
 

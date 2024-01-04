@@ -10,7 +10,10 @@ use std::{
 
 use crate::{
     task::CurrentTask,
-    vfs::socket::{Socket, SocketAddress, SocketHandle},
+    vfs::{
+        socket::{Socket, SocketAddress, SocketHandle},
+        FsString,
+    },
 };
 use starnix_uapi::{errno, error, errors::Errno};
 
@@ -26,7 +29,7 @@ pub struct AbstractSocketNamespace<K> {
     address_maker: Box<dyn Fn(K) -> SocketAddress + Send + Sync>,
 }
 
-pub type AbstractUnixSocketNamespace = AbstractSocketNamespace<Vec<u8>>;
+pub type AbstractUnixSocketNamespace = AbstractSocketNamespace<FsString>;
 pub type AbstractVsockSocketNamespace = AbstractSocketNamespace<u32>;
 
 impl<K> AbstractSocketNamespace<K>

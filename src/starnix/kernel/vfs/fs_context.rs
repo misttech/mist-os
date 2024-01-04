@@ -191,34 +191,35 @@ mod test {
     async fn test_chdir() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
 
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
+        assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
 
-        let bin = current_task.open_file(b"bin", OpenFlags::RDONLY).expect("missing bin directory");
+        let bin =
+            current_task.open_file("bin".into(), OpenFlags::RDONLY).expect("missing bin directory");
         current_task.fs().chdir(&current_task, bin.name.clone()).expect("Failed to chdir");
-        assert_eq!(b"/bin".to_vec(), current_task.fs().cwd().path_escaping_chroot());
+        assert_eq!("/bin", current_task.fs().cwd().path_escaping_chroot());
 
         // Now that we have changed directories to bin, we're opening a file
         // relative to that directory, which doesn't exist.
-        assert!(current_task.open_file(b"bin", OpenFlags::RDONLY).is_err());
+        assert!(current_task.open_file("bin".into(), OpenFlags::RDONLY).is_err());
 
         // However, bin still exists in the root directory.
-        assert!(current_task.open_file(b"/bin", OpenFlags::RDONLY).is_ok());
+        assert!(current_task.open_file("/bin".into(), OpenFlags::RDONLY).is_ok());
 
         current_task
             .fs()
             .chdir(
                 &current_task,
                 current_task
-                    .open_file(b"..", OpenFlags::RDONLY)
+                    .open_file("..".into(), OpenFlags::RDONLY)
                     .expect("failed to open ..")
                     .name
                     .clone(),
             )
             .expect("Failed to chdir");
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
+        assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
 
         // Now bin exists again because we've gone back to the root.
-        assert!(current_task.open_file(b"bin", OpenFlags::RDONLY).is_ok());
+        assert!(current_task.open_file("bin".into(), OpenFlags::RDONLY).is_ok());
 
         // Repeating the .. doesn't do anything because we're already at the root.
         current_task
@@ -226,13 +227,13 @@ mod test {
             .chdir(
                 &current_task,
                 current_task
-                    .open_file(b"..", OpenFlags::RDONLY)
+                    .open_file("..".into(), OpenFlags::RDONLY)
                     .expect("failed to open ..")
                     .name
                     .clone(),
             )
             .expect("Failed to chdir");
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
-        assert!(current_task.open_file(b"bin", OpenFlags::RDONLY).is_ok());
+        assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
+        assert!(current_task.open_file("bin".into(), OpenFlags::RDONLY).is_ok());
     }
 }

@@ -12,6 +12,7 @@ use crate::{
         MemoryXattrStorage, SymlinkNode, VmoFileNode,
     },
 };
+use bstr::B;
 use starnix_logging::{log_warn, not_implemented};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::{
@@ -40,7 +41,7 @@ impl FileSystemOps for Arc<TmpFs> {
         })
     }
     fn name(&self) -> &'static FsStr {
-        b"tmpfs"
+        "tmpfs".into()
     }
 
     fn rename(
@@ -135,19 +136,19 @@ impl TmpFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options);
-        let mut mount_options = fs_args::generic_parse_mount_options(&fs.options.params);
-        let mode = if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
-            FileMode::from_string(mode)?
+        let mut mount_options = fs_args::generic_parse_mount_options(fs.options.params.as_ref());
+        let mode = if let Some(mode) = mount_options.remove(B("mode")) {
+            FileMode::from_string(mode.as_ref())?
         } else {
             mode!(IFDIR, 0o777)
         };
-        let uid = if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
-            fs_args::parse::<uid_t>(uid)?
+        let uid = if let Some(uid) = mount_options.remove(B("uid")) {
+            fs_args::parse::<uid_t>(uid.as_ref())?
         } else {
             0
         };
-        let gid = if let Some(gid) = mount_options.remove(b"gid" as &FsStr) {
-            fs_args::parse::<gid_t>(gid)?
+        let gid = if let Some(gid) = mount_options.remove(B("gid")) {
+            fs_args::parse::<gid_t>(gid.as_ref())?
         } else {
             0
         };
@@ -162,14 +163,7 @@ impl TmpFs {
             not_implemented!("unknown tmpfs options, see logs for strings");
             log_warn!(
                 "Unknown tmpfs options: {}",
-                itertools::join(
-                    mount_options.iter().map(|(k, v)| format!(
-                        "{}={}",
-                        String::from_utf8_lossy(k),
-                        String::from_utf8_lossy(v)
-                    )),
-                    ","
-                )
+                itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")
             );
         }
 
@@ -364,26 +358,26 @@ mod test {
         let (kernel, current_task) = create_kernel_and_task();
         let fs = TmpFs::new_fs(&kernel);
         let root = fs.root();
-        let usr = root.create_dir(&current_task, b"usr").unwrap();
-        let _etc = root.create_dir(&current_task, b"etc").unwrap();
-        let _usr_bin = usr.create_dir(&current_task, b"bin").unwrap();
+        let usr = root.create_dir(&current_task, "usr".into()).unwrap();
+        let _etc = root.create_dir(&current_task, "etc".into()).unwrap();
+        let _usr_bin = usr.create_dir(&current_task, "bin".into()).unwrap();
         let mut names = root.copy_child_names();
         names.sort();
-        assert!(names.iter().eq([b"etc", b"usr"].iter()));
+        assert!(names.iter().eq(["etc", "usr"].iter()));
     }
 
     #[::fuchsia::test]
     async fn test_write_read() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let path = b"test.bin";
+        let path = "test.bin";
         let _file = current_task
             .fs()
             .root()
-            .create_node(&current_task, path, mode!(IFREG, 0o777), DeviceType::NONE)
+            .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
 
-        let wr_file = current_task.open_file(path, OpenFlags::RDWR).unwrap();
+        let wr_file = current_task.open_file(path.into(), OpenFlags::RDWR).unwrap();
 
         let test_seq = 0..10000u16;
         let test_vec = test_seq.collect::<Vec<_>>();
@@ -403,13 +397,13 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Open an empty file
-        let path = b"test.bin";
+        let path = "test.bin";
         let _file = current_task
             .fs()
             .root()
-            .create_node(&current_task, path, mode!(IFREG, 0o777), DeviceType::NONE)
+            .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
-        let rd_file = current_task.open_file(path, OpenFlags::RDONLY).unwrap();
+        let rd_file = current_task.open_file(path.into(), OpenFlags::RDONLY).unwrap();
 
         // Verify that attempting to read past the EOF (i.e. at a non-zero offset) returns 0
         let buffer_size = 0x10000;
@@ -423,11 +417,11 @@ mod test {
     async fn test_permissions() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let path = b"test.bin";
+        let path = "test.bin";
         let file = current_task
             .open_file_at(
                 FdNumber::AT_FDCWD,
-                path,
+                path.into(),
                 OpenFlags::CREAT | OpenFlags::RDONLY,
                 FileMode::from_bits(0o777),
             )
@@ -439,7 +433,7 @@ mod test {
         assert!(file.write(&current_task, &mut VecInputBuffer::new(&[])).is_err());
 
         let file = current_task
-            .open_file_at(FdNumber::AT_FDCWD, path, OpenFlags::WRONLY, FileMode::EMPTY)
+            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::WRONLY, FileMode::EMPTY)
             .expect("failed to open file WRONLY");
         assert!(file.read(&current_task, &mut VecOutputBuffer::new(0)).is_err());
         assert_eq!(
@@ -448,7 +442,7 @@ mod test {
         );
 
         let file = current_task
-            .open_file_at(FdNumber::AT_FDCWD, path, OpenFlags::RDWR, FileMode::EMPTY)
+            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::RDWR, FileMode::EMPTY)
             .expect("failed to open file RDWR");
         assert_eq!(
             0,
@@ -466,48 +460,48 @@ mod test {
 
         {
             let root = &current_task.fs().root().entry;
-            let usr = root.create_dir(&current_task, b"usr").expect("failed to create usr");
-            root.create_dir(&current_task, b"etc").expect("failed to create usr/etc");
-            usr.create_dir(&current_task, b"bin").expect("failed to create usr/bin");
+            let usr = root.create_dir(&current_task, "usr".into()).expect("failed to create usr");
+            root.create_dir(&current_task, "etc".into()).expect("failed to create usr/etc");
+            usr.create_dir(&current_task, "bin".into()).expect("failed to create usr/bin");
         }
 
         // At this point, all the nodes are dropped.
 
         current_task
-            .open_file(b"/usr/bin", OpenFlags::RDONLY | OpenFlags::DIRECTORY)
+            .open_file("/usr/bin".into(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
             .expect("failed to open /usr/bin");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file(b"/usr/bin/test.txt", OpenFlags::RDWR).unwrap_err()
+            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
         );
         current_task
             .open_file_at(
                 FdNumber::AT_FDCWD,
-                b"/usr/bin/test.txt",
+                "/usr/bin/test.txt".into(),
                 OpenFlags::RDWR | OpenFlags::CREAT,
                 FileMode::from_bits(0o777),
             )
             .expect("failed to create test.txt");
         let txt = current_task
-            .open_file(b"/usr/bin/test.txt", OpenFlags::RDWR)
+            .open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR)
             .expect("failed to open test.txt");
 
         let usr_bin = current_task
-            .open_file(b"/usr/bin", OpenFlags::RDONLY)
+            .open_file("/usr/bin".into(), OpenFlags::RDONLY)
             .expect("failed to open /usr/bin");
         usr_bin
             .name
-            .unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory, false)
+            .unlink(&current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
             .expect("failed to unlink test.text");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file(b"/usr/bin/test.txt", OpenFlags::RDWR).unwrap_err()
+            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
         );
         assert_eq!(
             errno!(ENOENT),
             usr_bin
                 .name
-                .unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory, false)
+                .unlink(&current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
                 .unwrap_err()
         );
 
@@ -518,17 +512,18 @@ mod test {
         std::mem::drop(txt);
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file(b"/usr/bin/test.txt", OpenFlags::RDWR).unwrap_err()
+            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
         );
         std::mem::drop(usr_bin);
 
-        let usr = current_task.open_file(b"/usr", OpenFlags::RDONLY).expect("failed to open /usr");
+        let usr =
+            current_task.open_file("/usr".into(), OpenFlags::RDONLY).expect("failed to open /usr");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file(b"/usr/foo", OpenFlags::RDONLY).unwrap_err()
+            current_task.open_file("/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
         );
         usr.name
-            .unlink(&current_task, b"bin", UnlinkKind::Directory, false)
+            .unlink(&current_task, "bin".into(), UnlinkKind::Directory, false)
             .expect("failed to unlink /usr/bin");
     }
 
@@ -538,9 +533,9 @@ mod test {
         let fs = TmpFs::new_fs_with_options(
             &kernel,
             FileSystemOptions {
-                source: b"".to_vec(),
+                source: Default::default(),
                 flags: MountFlags::empty(),
-                params: b"mode=0123,uid=42,gid=84".to_vec(),
+                params: b"mode=0123,uid=42,gid=84".into(),
             },
         )
         .expect("new_fs");

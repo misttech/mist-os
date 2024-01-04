@@ -323,7 +323,7 @@ fn resolve_script(
     vmo.read(&mut buffer, 0).map_err(|_| errno!(EINVAL))?;
 
     let mut args = parse_interpreter_line(&buffer)?;
-    let interpreter = current_task.open_file(args[0].as_bytes(), OpenFlags::RDONLY)?;
+    let interpreter = current_task.open_file(args[0].as_bytes().into(), OpenFlags::RDONLY)?;
 
     // Append the original script executable path as an argument.
     args.push(path);
@@ -399,7 +399,7 @@ fn resolve_elf(
         vmo.read(&mut interp, interp_hdr.offset as u64)
             .map_err(|status| from_status_like_fdio!(status))?;
         let interp = CStr::from_bytes_until_nul(&interp).map_err(|_| errno!(EINVAL))?;
-        let interp_file = current_task.open_file(interp.to_bytes(), OpenFlags::RDONLY)?;
+        let interp_file = current_task.open_file(interp.to_bytes().into(), OpenFlags::RDONLY)?;
         let interp_vmo = interp_file.get_vmo(
             current_task,
             None,
@@ -676,7 +676,7 @@ mod tests {
 
     fn exec_hello_starnix(current_task: &mut CurrentTask) -> Result<(), Errno> {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
-        let executable = current_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
+        let executable = current_task.open_file(argv[0].as_bytes().into(), OpenFlags::RDONLY)?;
         current_task.exec(executable, argv[0].clone(), argv, vec![])?;
         Ok(())
     }

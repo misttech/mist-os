@@ -18,6 +18,7 @@ use crate::{
         SeekTarget, SymlinkTarget, ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
     },
 };
+use bstr::{ByteSlice, B};
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
@@ -107,7 +108,7 @@ impl FileSystemOps for RemoteFs {
     }
 
     fn name(&self) -> &'static FsStr {
-        b"remote"
+        "remote".into()
     }
 
     fn generate_node_ids(&self) -> bool {
@@ -209,10 +210,10 @@ impl RemoteFs {
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
         // selinux support is further along, we might want to remove this mount option.
-        let context = if kernel.has_fake_selinux() {
-            fs_args::generic_parse_mount_options(&options.params)
-                .get(&b"defcontext"[..])
-                .map(|c| c.to_vec())
+        let context: Option<FsString> = if kernel.has_fake_selinux() {
+            fs_args::generic_parse_mount_options(options.params.as_ref())
+                .get(B("defcontext"))
+                .map(|v| v.to_owned())
         } else {
             None
         };
@@ -335,8 +336,8 @@ fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
     Ok(mode)
 }
 
-fn get_name_str(name_bytes: &FsStr) -> Result<&str, Errno> {
-    std::str::from_utf8(name_bytes).map_err(|_| {
+fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
+    std::str::from_utf8(name_bytes.as_ref()).map_err(|_| {
         log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
         errno!(EINVAL)
     })
@@ -809,10 +810,14 @@ impl FsNodeOps for RemoteNode {
         name: &FsStr,
         _max_size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
-        let value = self.zxio.xattr_get(name).map_err(|status| match status {
-            zx::Status::NOT_FOUND => errno!(ENODATA),
-            status => from_status_like_fdio!(status),
-        })?;
+        let value: FsString = self
+            .zxio
+            .xattr_get(name)
+            .map_err(|status| match status {
+                zx::Status::NOT_FOUND => errno!(ENODATA),
+                status => from_status_like_fdio!(status),
+            })?
+            .into();
         Ok(value.into())
     }
 
@@ -856,7 +861,9 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         self.zxio
             .xattr_list()
-            .map(ValueOrSize::from)
+            .map(|attrs| {
+                ValueOrSize::from(attrs.into_iter().map(FsString::new).collect::<Vec<_>>())
+            })
             .map_err(|status| from_status_like_fdio!(status))
     }
 
@@ -950,7 +957,7 @@ impl FsNodeOps for RemoteSpecialNode {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             status => from_status_like_fdio!(status),
         })?;
-        Ok(value.into())
+        Ok(FsString::new(value).into())
     }
 
     fn set_xattr(
@@ -993,7 +1000,9 @@ impl FsNodeOps for RemoteSpecialNode {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         self.zxio
             .xattr_list()
-            .map(ValueOrSize::from)
+            .map(|attrs| {
+                ValueOrSize::from(attrs.into_iter().map(FsString::new).collect::<Vec<_>>())
+            })
             .map_err(|status| from_status_like_fdio!(status))
     }
 }
@@ -1106,7 +1115,7 @@ impl<'a> RemoteDirectoryIterator<'a> {
         // directory is unlinked, so if the remote filesystem has removed ., we know to omit the
         // .. entry.
         match &next {
-            Entry::Some(ZxioDirent { name, .. }) if name == b"." => {
+            Entry::Some(ZxioDirent { name, .. }) if name == "." => {
                 self.pending_entry = Entry::DotDot;
             }
             _ => {}
@@ -1209,7 +1218,7 @@ impl FileOps for RemoteDirectoryObject {
                     } else {
                         DirectoryEntryType::UNKNOWN
                     };
-                    sink.add(inode_num, sink.offset() + 1, entry_type, &entry.name)
+                    sink.add(inode_num, sink.offset() + 1, entry_type, entry.name.as_bstr())
                 }
                 Entry::DotDot => {
                     let inode_num = if let Some(parent) = file.name.parent_within_mount() {
@@ -1218,7 +1227,7 @@ impl FileOps for RemoteDirectoryObject {
                         // For the root .. should have the same inode number as .
                         file.name.entry.node.node_id
                     };
-                    sink.add(inode_num, sink.offset() + 1, DirectoryEntryType::DIR, b"..")
+                    sink.add(inode_num, sink.offset() + 1, DirectoryEntryType::DIR, "..".into())
                 }
                 Entry::None => break,
             } {
@@ -1443,7 +1452,7 @@ impl FsNodeOps for RemoteSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path(
-            self.zxio.read_link().map_err(|status| from_status_like_fdio!(status))?.to_vec(),
+            self.zxio.read_link().map_err(|status| from_status_like_fdio!(status))?.into(),
         ))
     }
 
@@ -1458,7 +1467,7 @@ impl FsNodeOps for RemoteSymlink {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             status => from_status_like_fdio!(status),
         })?;
-        Ok(value.into())
+        Ok(FsString::new(value).into())
     }
 
     fn set_xattr(
@@ -1501,7 +1510,9 @@ impl FsNodeOps for RemoteSymlink {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         self.zxio
             .xattr_list()
-            .map(ValueOrSize::from)
+            .map(|attrs| {
+                ValueOrSize::from(attrs.into_iter().map(FsString::new).collect::<Vec<_>>())
+            })
             .map_err(|status| from_status_like_fdio!(status))
     }
 }
@@ -1535,22 +1546,22 @@ mod test {
         let fs = RemoteFs::new_fs(
             &kernel,
             client,
-            FileSystemOptions { source: b"/pkg".to_vec(), ..Default::default() },
+            FileSystemOptions { source: b"/pkg".into(), ..Default::default() },
             rights,
         )?;
         let ns = Namespace::new(fs);
         let root = ns.root();
         let mut context = LookupContext::default();
         assert_eq!(
-            root.lookup_child(&current_task, &mut context, b"nib").err(),
+            root.lookup_child(&current_task, &mut context, "nib".into()).err(),
             Some(errno!(ENOENT))
         );
         let mut context = LookupContext::default();
-        root.lookup_child(&current_task, &mut context, b"lib").unwrap();
+        root.lookup_child(&current_task, &mut context, "lib".into()).unwrap();
 
         let mut context = LookupContext::default();
         let _test_file = root
-            .lookup_child(&current_task, &mut context, b"bin/hello_starnix")?
+            .lookup_child(&current_task, &mut context, "bin/hello_starnix".into())?
             .open(&current_task, OpenFlags::RDONLY, true)?;
         Ok(())
     }
@@ -1674,21 +1685,22 @@ mod test {
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                FileSystemOptions { source: b"/".into(), ..Default::default() },
                 rights,
             )
             .expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
-            root.create_symlink(&current_task, b"symlink", b"target").expect("symlink failed");
+            root.create_symlink(&current_task, "symlink".into(), "target".into())
+                .expect("symlink failed");
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
-                .lookup_child(&current_task, &mut context, b"symlink")
+                .lookup_child(&current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed");
 
             match child.readlink(&current_task).expect("readlink failed") {
-                SymlinkTarget::Path(path) => assert_eq!(path, b"target"),
+                SymlinkTarget::Path(path) => assert_eq!(path, "target"),
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
         }
@@ -1731,20 +1743,20 @@ mod test {
                         let fs = RemoteFs::new_fs(
                             &kernel,
                             client,
-                            FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                            FileSystemOptions { source: b"/".into(), ..Default::default() },
                             rights,
                         )
                         .expect("new_fs failed");
                         let ns = Namespace::new(fs);
                         current_task.fs().set_umask(FileMode::from_bits(0));
                         ns.root()
-                            .create_node(&current_task, b"file", FILE_MODE, DeviceType::NONE)
+                            .create_node(&current_task, "file".into(), FILE_MODE, DeviceType::NONE)
                             .expect("create_node failed");
                         ns.root()
-                            .create_node(&current_task, b"dir", DIR_MODE, DeviceType::NONE)
+                            .create_node(&current_task, "dir".into(), DIR_MODE, DeviceType::NONE)
                             .expect("create_node failed");
                         ns.root()
-                            .create_node(&current_task, b"dev", BLK_MODE, DeviceType::RANDOM)
+                            .create_node(&current_task, "dev".into(), BLK_MODE, DeviceType::RANDOM)
                             .expect("create_node failed");
                     }
                 })
@@ -1781,7 +1793,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -1789,7 +1801,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -1797,7 +1809,7 @@ mod test {
                     );
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"dir")
+                        .lookup_child(&current_task, &mut context, "dir".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -1805,7 +1817,7 @@ mod test {
                     );
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"dev")
+                        .lookup_child(&current_task, &mut context, "dev".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -1842,7 +1854,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -1850,10 +1862,10 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let sub_dir1 = ns
                         .root()
-                        .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "dir".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let sub_dir2 = sub_dir1
-                        .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "dir".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
 
                     let dir_handle = ns
@@ -1875,7 +1887,7 @@ mod test {
                             entry_type: DirectoryEntryType,
                             name: &FsStr,
                         ) -> Result<(), Errno> {
-                            if name == b".." {
+                            if name == ".." {
                                 self.dot_dot_inode_num = inode_num;
                                 assert_eq!(entry_type, DirectoryEntryType::DIR);
                             }
@@ -1941,7 +1953,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -1950,11 +1962,11 @@ mod test {
                     let root = ns.root();
 
                     // Create RemoteSpecialNode (e.g. FIFO)
-                    root.create_node(&current_task, b"fifo", FIFO_MODE, DeviceType::NONE)
+                    root.create_node(&current_task, "fifo".into(), FIFO_MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let fifo_node = root
-                        .lookup_child(&current_task, &mut context, b"fifo")
+                        .lookup_child(&current_task, &mut context, "fifo".into())
                         .expect("lookup_child failed");
 
                     // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
@@ -1970,11 +1982,11 @@ mod test {
                     };
 
                     // Create regular RemoteNode
-                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     // We should be able to perform truncate on regular files
@@ -2008,7 +2020,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2016,12 +2028,17 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let node = ns
                         .root()
-                        .create_node(&current_task, b"file1", mode!(IFREG, 0o666), DeviceType::NONE)
+                        .create_node(
+                            &current_task,
+                            "file1".into(),
+                            mode!(IFREG, 0o666),
+                            DeviceType::NONE,
+                        )
                         .expect("create_node failed");
                     ns.root()
                         .entry
                         .node
-                        .link(&current_task, &ns.root().mount, b"file2", &node.entry.node)
+                        .link(&current_task, &ns.root().mount, "file2".into(), &node.entry.node)
                         .expect("link failed");
                 }
             })
@@ -2056,7 +2073,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2064,11 +2081,11 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child1 = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file1")
+                        .lookup_child(&current_task, &mut context, "file1".into())
                         .expect("lookup_child failed");
                     let child2 = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file2")
+                        .lookup_child(&current_task, &mut context, "file2".into())
                         .expect("lookup_child failed");
                     assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
                 }
@@ -2101,7 +2118,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2109,7 +2126,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let file = ns
                         .root()
-                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Enable verity on the file.
                     let desc = fsverity_descriptor {
@@ -2154,7 +2171,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2162,7 +2179,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let _child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                 }
             })
@@ -2194,7 +2211,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2202,7 +2219,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let file = ns
                         .root()
-                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Change the mode, this change should persist
                     file.entry
@@ -2242,7 +2259,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2250,7 +2267,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
                 }
@@ -2281,7 +2298,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2324,7 +2341,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2333,11 +2350,11 @@ mod test {
                     let root = ns.root();
 
                     const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     reg_node
@@ -2373,7 +2390,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2382,11 +2399,11 @@ mod test {
                     let root = ns.root();
 
                     const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     reg_node
@@ -2429,7 +2446,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2437,7 +2454,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Write to file (this should update mtime (time_modify))
                     let file =
@@ -2496,7 +2513,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2504,7 +2521,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, b"file")
+                        .lookup_child(&current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     let last_modified = child
                         .entry
@@ -2544,7 +2561,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2552,7 +2569,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
 
                     let info_original = child
@@ -2628,7 +2645,7 @@ mod test {
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
-                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
                         rights,
                     )
                     .expect("new_fs failed");
@@ -2636,7 +2653,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let file =
                         child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");

@@ -166,12 +166,8 @@ impl FsNodeOps for Arc<StaticDirectory> {
             errno!(
                 ENOENT,
                 format!(
-                    "looking for {:?} in {:?}",
-                    String::from_utf8_lossy(name),
-                    self.entries
-                        .keys()
-                        .map(|e| String::from_utf8_lossy(e).to_string())
-                        .collect::<Vec<String>>()
+                    "looking for {name} in {:?}",
+                    self.entries.keys().map(|e| e.to_string()).collect::<Vec<_>>()
                 )
             )
         })

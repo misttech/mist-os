@@ -303,7 +303,7 @@ impl UnixControlData {
                     .ok_or_else(|| errno!(EINVAL))?;
                 Ok(UnixControlData::Credentials(credentials))
             }
-            SCM_SECURITY => Ok(UnixControlData::Security(message.data)),
+            SCM_SECURITY => Ok(UnixControlData::Security(message.data.into())),
             _ => error!(EINVAL),
         }
     }

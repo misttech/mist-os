@@ -45,7 +45,7 @@ pub fn gralloc_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class = registry.get_or_create_class(b"starnix", registry.virtual_bus());
+    let starnix_class = registry.get_or_create_class("starnix".into(), registry.virtual_bus());
 
     let gralloc_type: DeviceType = registry
         .register_dyn_chrdev(GrallocDevice::new(mode_setter))
@@ -53,8 +53,8 @@ pub fn gralloc_device_init(current_task: &CurrentTask) {
 
     registry.add_device(
         current_task,
-        b"virtgralloc0",
-        DeviceMetadata::new(b"virtgralloc0", gralloc_type, DeviceMode::Char),
+        "virtgralloc0".into(),
+        DeviceMetadata::new("virtgralloc0".into(), gralloc_type, DeviceMode::Char),
         starnix_class,
         DeviceDirectory::new,
     );

@@ -61,7 +61,7 @@ impl FileSystemOps for AnonFs {
         Ok(statfs::default(ANON_INODE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"anon"
+        "anon".into()
     }
 }
 pub fn anon_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {

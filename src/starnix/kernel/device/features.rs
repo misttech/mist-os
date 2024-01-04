@@ -9,6 +9,7 @@ use crate::{
         perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel},
+    vfs::FsString,
 };
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
@@ -48,7 +49,7 @@ pub struct Features {
 
     pub aspect_ratio: Option<AspectRatio>,
 
-    pub perfetto: Option<String>,
+    pub perfetto: Option<FsString>,
 }
 
 /// An aspect ratio, as defined by the `ASPECT_RATIO` feature.
@@ -89,7 +90,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
             ("perfetto", Some(socket_path)) => {
-                features.perfetto = Some(socket_path.to_string());
+                features.perfetto = Some(socket_path.into());
             }
             ("perfetto", None) => {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
@@ -136,10 +137,8 @@ pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
     if kernel.features.magma {
         magma_device_init(system_task);
     }
-    if kernel.features.perfetto.is_some() {
-        let socket_path =
-            kernel.features.perfetto.clone().ok_or(anyhow!("No perfetto socket path"))?;
-        start_perfetto_consumer_thread(kernel, socket_path.as_bytes())
+    if let Some(socket_path) = kernel.features.perfetto.clone() {
+        start_perfetto_consumer_thread(kernel, socket_path)
             .context("Failed to start perfetto consumer thread")?;
     }
     if kernel.features.self_profile {

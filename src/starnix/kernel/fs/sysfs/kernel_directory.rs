@@ -13,13 +13,13 @@ use std::sync::Arc;
 /// the running kernel.
 pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
     let kernel = current_task.kernel();
-    dir.subdir(current_task, b"kernel", 0o755, |dir| {
-        dir.subdir(current_task, b"tracing", 0o755, |_| ());
-        dir.subdir(current_task, b"wakeup_reasons", 0o755, |dir| {
+    dir.subdir(current_task, "kernel".into(), 0o755, |dir| {
+        dir.subdir(current_task, "tracing".into(), 0o755, |_| ());
+        dir.subdir(current_task, "wakeup_reasons".into(), 0o755, |dir| {
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(
                 current_task,
-                b"last_resume_reason",
+                "last_resume_reason".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().last_resume_reason.unwrap_or_default()
                 }),
@@ -27,7 +27,7 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
             );
             dir.entry(
                 current_task,
-                b"last_suspend_time",
+                "last_suspend_time".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     // TODO(b/303507442): It contains two numbers (in seconds) separated by space.
                     // First number is the time spent in suspend and resume processes.

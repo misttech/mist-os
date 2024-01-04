@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bstr::BString;
 use fuchsia_inspect::Inspector;
 use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
@@ -16,17 +17,17 @@ const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
 /// filesystems.
 const NUMBER_DEDUPER: &str = r#"(block/[A-Za-z]+|cpu|proc/|pid_|uid_)\d+"#;
 
-static NOT_FOUND_COUNTS: Lazy<Mutex<HashMap<Vec<u8>, u64>>> =
+static NOT_FOUND_COUNTS: Lazy<Mutex<HashMap<BString, u64>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn track_file_not_found(path: Vec<u8>) {
+pub fn track_file_not_found(path: BString) {
     if DESIRED_PATH_PREFIXES.iter().any(|&prefix| path.starts_with(prefix.as_bytes())) {
         match NOT_FOUND_COUNTS.lock().entry(path) {
             Entry::Occupied(mut o) => *o.get_mut() += 1,
             Entry::Vacant(v) => {
                 crate::log_warn!(
                     tag = "not_found",
-                    path = %String::from_utf8_lossy(v.key()),
+                    path = %v.key(),
                     "couldn't resolve",
                 );
                 v.insert(1);
@@ -60,9 +61,9 @@ fn dedupe_uninteresting_numbers_in_paths<'a>(
     let number_deduper = Regex::new(NUMBER_DEDUPER).unwrap();
     let mut numbers_collapsed = BTreeMap::new();
     for (orig_path, count) in original_counts {
-        let collapsed = number_deduper.replace_all(orig_path, "${1}N".as_bytes());
-        let collapsed = String::from_utf8_lossy(&collapsed);
-        *numbers_collapsed.entry(collapsed.to_string()).or_default() += count;
+        let collapsed = number_deduper.replace_all(&*orig_path, "${1}N".as_bytes());
+        *numbers_collapsed.entry(String::from_utf8_lossy(&*collapsed).to_string()).or_default() +=
+            count;
     }
     numbers_collapsed
 }

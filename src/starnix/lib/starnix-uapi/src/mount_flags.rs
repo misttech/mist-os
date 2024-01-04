@@ -49,34 +49,33 @@ bitflags! {
     }
 }
 
-impl ToString for MountFlags {
-    fn to_string(&self) -> String {
-        let mut result = String::with_capacity(32);
-        result += if self.contains(Self::RDONLY) { "ro" } else { "rw" };
+impl std::fmt::Display for MountFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", if self.contains(Self::RDONLY) { "ro" } else { "rw" })?;
         if self.contains(Self::NOEXEC) {
-            result += ",noexec"
+            write!(f, ",noexec")?;
         }
         if self.contains(Self::NOSUID) {
-            result += ",nosuid"
+            write!(f, ",nosuid")?;
         }
         if self.contains(Self::NODEV) {
-            result += ",nodev"
+            write!(f, ",nodev")?
         }
         if self.contains(Self::NOATIME) {
-            result += ",noatime"
+            write!(f, ",noatime")?;
         }
         if self.contains(Self::NOEXEC) {
-            result += ",noexec"
+            write!(f, ",noexec")?;
         }
         if self.contains(Self::SILENT) {
-            result += ",silent"
+            write!(f, ",silent")?;
         }
         if self.contains(Self::BIND) {
-            result += ",bind"
+            write!(f, ",bind")?;
         }
         if self.contains(Self::LAZYTIME) {
-            result += ",lazytime"
+            write!(f, ",lazytime")?;
         }
-        result
+        Ok(())
     }
 }

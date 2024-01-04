@@ -7,9 +7,10 @@ use crate::{
     task::CurrentTask,
     vfs::{
         CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsStr, StaticDirectoryBuilder,
+        FsNodeInfo, FsStr, FsString, StaticDirectoryBuilder,
     },
 };
+use once_cell::sync::Lazy;
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, TRACEFS_MAGIC};
 use std::sync::Arc;
 
@@ -25,7 +26,7 @@ impl FileSystemOps for Arc<TraceFs> {
     }
 
     fn name(&self) -> &'static FsStr {
-        b"tracefs"
+        "tracefs".into()
     }
 }
 
@@ -36,7 +37,7 @@ impl TraceFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(
-            b"trace",
+            "trace".into(),
             fs.create_node(
                 current_task,
                 ConstFile::new_node(vec![]),
@@ -46,36 +47,36 @@ impl TraceFs {
         // The remaining contents of the fs are a minimal set of files that we want to exist so
         // that Perfetto's ftrace controller will not error out. None of them provide any real
         // functionality.
-        dir.subdir(current_task, b"per_cpu", 0o755, |dir| {
-            for cpu in 0..fuchsia_zircon::system_get_num_cpus() {
-                let dir_name = format!("cpu{}", cpu);
-                dir.subdir(
-                    current_task,
-                    Box::leak(dir_name.into_boxed_str()).as_bytes(),
-                    0o755,
-                    |dir| {
-                        dir.node(
-                            b"trace_pipe_raw",
-                            fs.create_node(
-                                current_task,
-                                ConstFile::new_node(vec![]),
-                                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
-                            ),
-                        );
-                    },
-                );
+        dir.subdir(current_task, "per_cpu".into(), 0o755, |dir| {
+            /// A name for each cpu directory, cached to provide a 'static lifetime.
+            static CPU_DIR_NAMES: Lazy<Vec<FsString>> = Lazy::new(|| {
+                (0..fuchsia_zircon::system_get_num_cpus())
+                    .map(|cpu| FsString::from(format!("cpu{}", cpu)))
+                    .collect()
+            });
+            for dir_name in CPU_DIR_NAMES.iter() {
+                dir.subdir(current_task, dir_name.as_ref(), 0o755, |dir| {
+                    dir.node(
+                        "trace_pipe_raw".into(),
+                        fs.create_node(
+                            current_task,
+                            ConstFile::new_node(vec![]),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                        ),
+                    );
+                });
             }
         });
         dir.node(
-            b"tracing_on",
+            "tracing_on".into(),
             fs.create_node(
                 current_task,
-                ConstFile::new_node(b"0".to_vec()),
+                ConstFile::new_node("0".into()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
-            b"trace_marker",
+            "trace_marker".into(),
             fs.create_node(
                 current_task,
                 TraceMarkerFile::new_node(),

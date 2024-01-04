@@ -23,7 +23,7 @@ impl FileSystemOps for Arc<ProcFs> {
         Ok(statfs::default(PROC_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"proc"
+        "proc".into()
     }
 }
 

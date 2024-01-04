@@ -50,7 +50,7 @@ type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + 
 impl KObject {
     pub fn new_root(name: &FsStr) -> KObjectHandle {
         Arc::new(Self {
-            name: name.to_vec(),
+            name: name.to_owned(),
             parent: None,
             children: Default::default(),
             create_fs_node_ops: Box::new(|kobject| Box::new(SysfsDirectory::new(kobject))),
@@ -63,7 +63,7 @@ impl KObject {
         N: FsNodeOps,
     {
         Arc::new(Self {
-            name: name.to_vec(),
+            name: name.to_owned(),
             parent: Some(Arc::downgrade(&parent)),
             children: Default::default(),
             create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
@@ -71,8 +71,8 @@ impl KObject {
     }
 
     /// The name that will appear in sysfs.
-    pub fn name(&self) -> FsString {
-        self.name.clone()
+    pub fn name(&self) -> &FsStr {
+        self.name.as_ref()
     }
 
     /// The parent kobject.
@@ -94,7 +94,7 @@ impl KObject {
         let mut current = Some(self.clone());
         let mut path = PathBuilder::new();
         while let Some(n) = current {
-            path.prepend_element(&n.name());
+            path.prepend_element(n.name());
             current = n.parent();
         }
 
@@ -106,7 +106,7 @@ impl KObject {
         let mut parent = self.parent();
         let mut path = PathBuilder::new();
         while let Some(n) = parent {
-            path.prepend_element(b"..");
+            path.prepend_element("..".into());
             parent = n.parent();
         }
 
@@ -138,14 +138,14 @@ impl KObject {
             Some(child) => child,
             None => {
                 let child = KObject::new(name, self.clone(), create_fs_node_ops);
-                children.insert(name.to_vec(), child.clone());
+                children.insert(name.into(), child.clone());
                 child
             }
         }
     }
 
     pub fn insert_child(self: &KObjectHandle, child: KObjectHandle) {
-        self.children.lock().insert(child.name(), child);
+        self.children.lock().insert(child.name().to_owned(), child);
     }
 
     /// Collects all children names.
@@ -172,7 +172,7 @@ impl KObject {
 
 impl std::fmt::Debug for KObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KObject").field("name", &String::from_utf8_lossy(&self.name())).finish()
+        f.debug_struct("KObject").field("name", &self.name()).finish()
     }
 }
 
@@ -263,8 +263,8 @@ pub struct DeviceMetadata {
 }
 
 impl DeviceMetadata {
-    pub fn new(name: &FsStr, device_type: DeviceType, mode: DeviceMode) -> Self {
-        Self { name: name.to_vec(), device_type, mode }
+    pub fn new(name: FsString, device_type: DeviceType, mode: DeviceMode) -> Self {
+        Self { name, device_type, mode }
     }
 }
 
@@ -325,7 +325,7 @@ impl FileOps for UEventFile {
             "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
             self.device.metadata.device_type.major(),
             self.device.metadata.device_type.minor(),
-            String::from_utf8_lossy(&self.device.kobject().name()),
+            self.device.kobject().name(),
         );
         data.write(content[offset..].as_bytes())
     }
@@ -416,50 +416,50 @@ mod tests {
         let root = KObject::new_root(Default::default());
         assert!(root.parent().is_none());
 
-        assert!(!root.has_child(b"virtual"));
-        root.get_or_create_child(b"virtual", SysfsDirectory::new);
-        assert!(root.has_child(b"virtual"));
+        assert!(!root.has_child("virtual".into()));
+        root.get_or_create_child("virtual".into(), SysfsDirectory::new);
+        assert!(root.has_child("virtual".into()));
     }
 
     #[::fuchsia::test]
     fn kobject_path() {
-        let root = KObject::new_root(b"devices");
-        let bus = root.get_or_create_child(b"virtual", SysfsDirectory::new);
+        let root = KObject::new_root("devices".into());
+        let bus = root.get_or_create_child("virtual".into(), SysfsDirectory::new);
         let device = bus
-            .get_or_create_child(b"mem", SysfsDirectory::new)
-            .get_or_create_child(b"null", SysfsDirectory::new);
-        assert_eq!(device.path(), b"devices/virtual/mem/null".to_vec());
+            .get_or_create_child("mem".into(), SysfsDirectory::new)
+            .get_or_create_child("null".into(), SysfsDirectory::new);
+        assert_eq!(device.path(), "devices/virtual/mem/null");
     }
 
     #[::fuchsia::test]
     fn kobject_path_to_root() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child(b"bus", SysfsDirectory::new);
-        let device = bus.get_or_create_child(b"device", SysfsDirectory::new);
-        assert_eq!(device.path_to_root(), b"../..".to_vec());
+        let bus = root.get_or_create_child("bus".into(), SysfsDirectory::new);
+        let device = bus.get_or_create_child("device".into(), SysfsDirectory::new);
+        assert_eq!(device.path_to_root(), "../..");
     }
 
     #[::fuchsia::test]
     fn kobject_get_children_names() {
         let root = KObject::new_root(Default::default());
-        root.get_or_create_child(b"virtual", SysfsDirectory::new);
-        root.get_or_create_child(b"cpu", SysfsDirectory::new);
-        root.get_or_create_child(b"power", SysfsDirectory::new);
+        root.get_or_create_child("virtual".into(), SysfsDirectory::new);
+        root.get_or_create_child("cpu".into(), SysfsDirectory::new);
+        root.get_or_create_child("power".into(), SysfsDirectory::new);
 
         let names = root.get_children_names();
-        assert!(names.iter().any(|name| *name == b"virtual".to_vec()));
-        assert!(names.iter().any(|name| *name == b"cpu".to_vec()));
-        assert!(names.iter().any(|name| *name == b"power".to_vec()));
-        assert!(!names.iter().any(|name| *name == b"system".to_vec()));
+        assert!(names.iter().any(|name| *name == "virtual"));
+        assert!(names.iter().any(|name| *name == "cpu"));
+        assert!(names.iter().any(|name| *name == "power"));
+        assert!(!names.iter().any(|name| *name == "system"));
     }
 
     #[::fuchsia::test]
     fn kobject_remove() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child(b"virtual", SysfsDirectory::new);
-        let class = bus.get_or_create_child(b"mem", SysfsDirectory::new);
-        assert!(bus.has_child(b"mem"));
+        let bus = root.get_or_create_child("virtual".into(), SysfsDirectory::new);
+        let class = bus.get_or_create_child("mem".into(), SysfsDirectory::new);
+        assert!(bus.has_child("mem".into()));
         class.remove();
-        assert!(!bus.has_child(b"mem"));
+        assert!(!bus.has_child("mem".into()));
     }
 }

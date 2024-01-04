@@ -38,7 +38,7 @@ pub struct ExtFilesystem {
 
 impl FileSystemOps for ExtFilesystem {
     fn name(&self) -> &'static FsStr {
-        b"ext4"
+        "ext4".into()
     }
 
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
@@ -68,7 +68,7 @@ impl ExtFilesystem {
             prot_flags ^= ProtectionFlags::EXEC;
         }
 
-        let source_device = current_task.open_file(&options.source, open_flags)?;
+        let source_device = current_task.open_file(options.source.as_ref(), open_flags)?;
 
         // Note that we *require* get_vmo to work here for performance reasons.  Fallback to
         // FIDL-based read/write API is not an option.
@@ -101,11 +101,11 @@ impl ExtNode {
     }
 
     fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
-        Ok(self.xattrs.keys().map(FsString::clone).collect())
+        Ok(self.xattrs.keys().map(|k| k.clone().into()).collect())
     }
 
     fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
-        self.xattrs.get(name).map(FsString::clone).ok_or_else(|| errno!(ENODATA))
+        self.xattrs.get(&**name).map(|a| a.clone().into()).ok_or_else(|| errno!(ENODATA))
     }
 
     fn set_xattr(&self, _name: &FsStr, _value: &FsStr, _op: XattrOp) -> Result<(), Errno> {
@@ -146,7 +146,7 @@ impl FsNodeOps for ExtDirectory {
         let entry = dir_entries
             .iter()
             .find(|e| e.name_bytes() == name)
-            .ok_or_else(|| errno!(ENOENT, String::from_utf8_lossy(name)))?;
+            .ok_or_else(|| errno!(ENOENT, name))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
         fs.get_or_create_node(current_task, Some(inode_num as ino_t), |inode_num| {
@@ -158,12 +158,12 @@ impl FsNodeOps for ExtDirectory {
             let nlink = ext_node.inode.e2di_nlink.into();
 
             let ops: Box<dyn FsNodeOps> = match entry_type {
-                EntryType::RegularFile => Box::new(ExtFile::new(ext_node, name)),
+                EntryType::RegularFile => Box::new(ExtFile::new(ext_node, name.to_owned())),
                 EntryType::Directory => Box::new(ExtDirectory { inner: Arc::new(ext_node) }),
                 EntryType::SymLink => Box::new(ExtSymlink { inner: ext_node }),
                 _ => {
                     log_warn!("unhandled ext entry type {:?}", entry_type);
-                    Box::new(ExtFile::new(ext_node, name))
+                    Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
             };
 
@@ -194,8 +194,8 @@ struct ExtFile {
 }
 
 impl ExtFile {
-    fn new(inner: ExtNode, name: &FsStr) -> Self {
-        ExtFile { inner, name: name.to_owned(), vmo: OnceCell::new() }
+    fn new(inner: ExtNode, name: FsString) -> Self {
+        ExtFile { inner, name, vmo: OnceCell::new() }
     }
 }
 
@@ -231,7 +231,7 @@ impl FsNodeOps for ExtFile {
             Ok(Arc::new(
                 fs_ops
                     .pager
-                    .register(&self.name, inode_num, file_size, pager_extents.into())
+                    .register(self.name.as_ref(), inode_num, file_size, pager_extents.into())
                     .map_err(|e| errno!(EINVAL, e))?,
             ))
         })?;
@@ -261,7 +261,7 @@ impl FsNodeOps for ExtSymlink {
         let fs = node.fs();
         let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
         let data = fs_ops.parser.read_data(self.inner.inode_num).map_err(|e| errno!(EIO, e))?;
-        Ok(SymlinkTarget::Path(data))
+        Ok(SymlinkTarget::Path(data.into()))
     }
 }
 
@@ -302,7 +302,7 @@ impl FileOps for ExtDirFileObject {
             let entry_type = directory_entry_type(
                 EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?,
             );
-            sink.add(inode_num, sink.offset() + 1, entry_type, entry.name_bytes())?;
+            sink.add(inode_num, sink.offset() + 1, entry_type, entry.name_bytes().into())?;
         }
         Ok(())
     }

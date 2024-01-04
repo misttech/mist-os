@@ -92,9 +92,10 @@ pub fn new_fuse_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let mut mount_options = fs_args::generic_parse_mount_options(&options.params);
-    let fd =
-        fs_args::parse::<FdNumber>(mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?)?;
+    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
+    let fd = fs_args::parse::<FdNumber>(
+        mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?.as_ref(),
+    )?;
     let default_permissions = mount_options.remove(B("default_permissions")).is_some();
     let connection = current_task
         .files
@@ -183,7 +184,7 @@ impl FileSystemOps for FuseFs {
         })
     }
     fn name(&self) -> &'static FsStr {
-        b"fuse"
+        "fuse".into()
     }
     fn unmount(&self) {
         self.connection.disconnect();
@@ -521,7 +522,7 @@ impl FileOps for FuseFileObject {
                     if let Err(e) = node.fs_node_from_entry(
                         current_task,
                         file.node(),
-                        &name,
+                        name.as_ref(),
                         FuseResponse::Entry(entry),
                     ) {
                         log_error!("Unable to prefill entry: {e:?}");
@@ -535,7 +536,7 @@ impl FileOps for FuseFileObject {
                     DirectoryEntryType::from_bits(
                         dirent.type_.try_into().map_err(|_| errno!(EINVAL))?,
                     ),
-                    &name,
+                    name.as_ref(),
                 );
             }
         }
@@ -695,7 +696,7 @@ impl FsNodeOps for Arc<FuseNode> {
         } else {
             return error!(EINVAL);
         };
-        Ok(SymlinkTarget::Path(read_out))
+        Ok(SymlinkTarget::Path(read_out.into()))
     }
 
     fn link(
@@ -804,7 +805,7 @@ impl FsNodeOps for Arc<FuseNode> {
                     size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
                     padding: 0,
                 },
-                name: name.to_vec(),
+                name: name.to_owned(),
             },
         )?;
         if let FuseResponse::GetXAttr(result) = response {
@@ -869,7 +870,7 @@ impl FsNodeOps for Arc<FuseNode> {
         )?;
         if let FuseResponse::GetXAttr(result) = response {
             Ok(result.map(|s| {
-                let mut result = s.split(|c| *c == 0).map(|s| s.to_vec()).collect::<Vec<_>>();
+                let mut result = s.split(|c| *c == 0).map(FsString::from).collect::<Vec<_>>();
                 // The returned string ends with a '\0', so the split ends with an empty value that
                 // needs to be removed.
                 result.pop();
@@ -1697,7 +1698,7 @@ impl FuseOperation {
                     let getxattr_out = Self::to_response::<uapi::fuse_getxattr_out>(&buffer);
                     Ok(FuseResponse::GetXAttr(ValueOrSize::Size(getxattr_out.size as usize)))
                 } else {
-                    Ok(FuseResponse::GetXAttr(buffer.into()))
+                    Ok(FuseResponse::GetXAttr(FsString::new(buffer).into()))
                 }
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
@@ -1741,7 +1742,7 @@ impl FuseOperation {
                     if slice.len() < namelen {
                         return error!(EINVAL);
                     }
-                    let name: FsString = slice[..namelen].to_owned();
+                    let name = FsString::from(&slice[..namelen]);
                     result.push((dirent, name, entry));
                     let skipped = round_up_to_increment(namelen, 8)?;
                     if slice.len() < skipped {

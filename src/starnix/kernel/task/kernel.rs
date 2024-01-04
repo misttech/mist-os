@@ -21,7 +21,7 @@ use crate::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        DelayedReleaser, FileOps, FileSystemHandle, FsNode,
+        DelayedReleaser, FileOps, FileSystemHandle, FsNode, FsString,
     },
 };
 use bstr::BString;
@@ -270,7 +270,8 @@ impl Kernel {
         profile_provider: Option<ProfileProviderSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
     ) -> Result<Arc<Kernel>, zx::Status> {
-        let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
+        let unix_address_maker =
+            Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         let framebuffer =
             Framebuffer::new(features.aspect_ratio.as_ref()).expect("Failed to create framebuffer");

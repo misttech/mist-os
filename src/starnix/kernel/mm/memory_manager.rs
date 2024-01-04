@@ -7,7 +7,7 @@ use crate::{
     signals::{SignalDetail, SignalInfo},
     task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
     vfs::{
-        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsString, NamespaceNode,
+        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode,
         SequenceFileSource,
     },
 };
@@ -2272,7 +2272,11 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
     /// returning the results as a Vec.
-    fn read_c_string_to_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
+    fn read_c_string_to_vec(
+        &self,
+        string: UserCString,
+        max_size: usize,
+    ) -> Result<FsString, Errno> {
         let chunk_size = std::cmp::min(*PAGE_SIZE as usize, max_size);
 
         let mut buf = Vec::with_capacity(chunk_size);
@@ -2295,7 +2299,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
                     return error!(ENAMETOOLONG);
                 }
 
-                return Ok(buf);
+                return Ok(buf.into());
             }
             index += read_len;
 
@@ -2329,7 +2333,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
                 // Return the string without the null to match our other APIs, but advance the
                 // "cursor" of the buf variable past the null byte.
-                list.push(segment.to_bytes().to_owned());
+                list.push(segment.to_bytes().into());
                 segment.to_bytes_with_nul().len()
             };
             buf = &buf[len_consumed..];
@@ -2346,12 +2350,12 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         &self,
         string: UserCString,
         buffer: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a [u8], Errno> {
+    ) -> Result<&'a FsStr, Errno> {
         let buffer = self.read_memory_partial_until_null_byte(string.addr(), buffer)?;
         // Make sure the last element holds the null byte.
         if let Some((null_byte, buffer)) = buffer.split_last() {
             if null_byte == &0 {
-                return Ok(buffer);
+                return Ok(buffer.into());
             }
         }
 
@@ -3707,7 +3711,7 @@ mod tests {
         assert!(mapped_addr > UserAddress::default());
         assert!(has(&mapped_addr));
 
-        let node = current_task.lookup_path_from_root(b"/").unwrap();
+        let node = current_task.lookup_path_from_root("/".into()).unwrap();
         mm.exec(node).expect("failed to exec memory manager");
 
         assert!(!has(&brk_addr));
@@ -3995,7 +3999,7 @@ mod tests {
 
         // Expect success if the string is terminated.
         mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), b"foo");
+        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
@@ -4005,7 +4009,7 @@ mod tests {
         mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
         assert_eq!(
             mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(),
-            b"foobar"
+            "foobar",
         );
 
         // Expect error if the string exceeds max limit
@@ -4026,7 +4030,7 @@ mod tests {
         assert!(!addr.is_null());
 
         // Write an unterminated string.
-        let mut payload = b"first".to_vec();
+        let mut payload = "first".as_bytes().to_vec();
         let mut expected_parses = vec![];
         mm.write_memory(addr, &payload).unwrap();
 
@@ -4084,7 +4088,7 @@ mod tests {
 
         // Expect success if the string is terminated.
         mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), b"foo");
+        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
@@ -4092,7 +4096,7 @@ mod tests {
         // mappings will be collapsed.
         //assert_eq!(mm.get_mapping_count(), 2);
         mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), b"foobar");
+        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foobar");
 
         // Expect error if the string does not fit in the provided buffer.
         assert_eq!(
@@ -4610,7 +4614,7 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let vma_name = b"vma name".to_vec();
+        let vma_name = "vma name";
         current_task.write_memory(name_addr, vma_name.as_bytes()).unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -4626,7 +4630,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(current_task.mm().get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
+        assert_eq!(current_task.mm().get_mapping_name(mapping_addr).unwrap().unwrap(), vma_name);
     }
 
     #[::fuchsia::test]

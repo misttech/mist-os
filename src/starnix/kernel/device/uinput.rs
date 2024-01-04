@@ -278,7 +278,7 @@ mod test {
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.
             current_task
-                .lookup_path_from_root(b".")
+                .lookup_path_from_root(".".into())
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
         )

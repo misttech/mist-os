@@ -34,7 +34,7 @@ pub fn expose_root(
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
-    let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
+    let root_file = system_task.open_file("/".into(), OpenFlags::RDONLY)?;
     serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
 }
@@ -96,7 +96,7 @@ async fn spawn_console(
             current_task,
             move |_, current_task| {
                 let executable =
-                    current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+                    current_task.open_file(binary_path.as_bytes().into(), OpenFlags::RDONLY)?;
                 current_task.exec(executable, binary_path, argv, environ)?;
                 let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
                 let fd_flags = FdFlags::empty();

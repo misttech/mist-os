@@ -7,6 +7,7 @@ use crate::{
     open_flags::OpenFlags,
     uapi,
 };
+use bstr::BStr;
 use std::ops;
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -48,8 +49,8 @@ impl FileMode {
         FileMode(mask)
     }
 
-    pub fn from_string(mask: &[u8]) -> Result<FileMode, Errno> {
-        if mask[0] != b'0' {
+    pub fn from_string(mask: &BStr) -> Result<FileMode, Errno> {
+        if !mask.starts_with(b"0") {
             return error!(EINVAL);
         }
         let mask = std::str::from_utf8(mask).map_err(|_| errno!(EINVAL))?;
@@ -202,9 +203,9 @@ mod test {
 
     #[::fuchsia::test]
     fn test_file_mode_from_string() {
-        assert_eq!(FileMode::from_string(b"0123"), Ok(FileMode(0o123)));
-        assert!(FileMode::from_string(b"123").is_err());
-        assert!(FileMode::from_string(b"\x80").is_err());
-        assert!(FileMode::from_string(b"0999").is_err());
+        assert_eq!(FileMode::from_string(b"0123".into()), Ok(FileMode(0o123)));
+        assert!(FileMode::from_string(b"123".into()).is_err());
+        assert!(FileMode::from_string(b"\x80".into()).is_err());
+        assert!(FileMode::from_string(b"0999".into()).is_err());
     }
 }

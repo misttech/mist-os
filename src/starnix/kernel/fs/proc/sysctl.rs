@@ -9,7 +9,7 @@ use crate::{
     },
     vfs::{
         fs_args, inotify, inotify::InotifyLimits, BytesFile, BytesFileOps, FileSystemHandle,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, StaticDirectoryBuilder,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsString, StaticDirectoryBuilder,
     },
 };
 use starnix_sync::Mutex;
@@ -27,11 +27,11 @@ use std::{
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.subdir(current_task, b"kernel", 0o555, |dir| {
-        dir.entry(current_task, b"unprivileged_bpf_disable", StubSysctl::new_node(), mode);
-        dir.entry(current_task, b"kptr_restrict", StubSysctl::new_node(), mode);
+    dir.subdir(current_task, "kernel".into(), 0o555, |dir| {
+        dir.entry(current_task, "unprivileged_bpf_disable".into(), StubSysctl::new_node(), mode);
+        dir.entry(current_task, "kptr_restrict".into(), StubSysctl::new_node(), mode);
         dir.node(
-            b"overflowuid",
+            "overflowuid".into(),
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
@@ -39,7 +39,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
         );
         dir.node(
-            b"overflowgid",
+            "overflowgid".into(),
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
@@ -47,64 +47,74 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
         );
         dir.node(
-            b"pid_max",
+            "pid_max".into(),
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"4194304".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
-        dir.subdir(current_task, b"random", 0o555, |dir| {
+        dir.subdir(current_task, "random".into(), 0o555, |dir| {
             dir.entry(
                 current_task,
-                b"entropy_avail",
+                "entropy_avail".into(),
                 BytesFile::new_node(b"256".to_vec()),
                 mode!(IFREG, 0o444),
             );
-            dir.entry(current_task, b"actions_logged", SeccompActionsLogged::new_node(), mode);
-        });
-        dir.entry(current_task, b"tainted", KernelTaintedFile::new_node(), mode);
-        dir.subdir(current_task, b"seccomp", 0o555, |dir| {
             dir.entry(
                 current_task,
-                b"actions_avail",
+                "actions_logged".into(),
+                SeccompActionsLogged::new_node(),
+                mode,
+            );
+        });
+        dir.entry(current_task, "tainted".into(), KernelTaintedFile::new_node(), mode);
+        dir.subdir(current_task, "seccomp".into(), 0o555, |dir| {
+            dir.entry(
+                current_task,
+                "actions_avail".into(),
                 BytesFile::new_node(SeccompAction::get_actions_avail_file()),
                 mode!(IFREG, 0o444),
             );
-            dir.entry(current_task, b"actions_logged", SeccompActionsLogged::new_node(), mode);
-        });
-        dir.subdir(current_task, b"yama", 0o555, |dir| {
-            dir.entry(current_task, b"ptrace_scope", PtraceYamaScope::new_node(), mode);
-        });
-    });
-    dir.node(b"net", sysctl_net_diretory(current_task, fs));
-    dir.subdir(current_task, b"vm", 0o555, |dir| {
-        dir.entry(current_task, b"mmap_rnd_bits", StubSysctl::new_node(), mode);
-        dir.entry(current_task, b"mmap_rnd_compat_bits", StubSysctl::new_node(), mode);
-        dir.entry(current_task, b"drop_caches", StubSysctl::new_node(), mode);
-    });
-    dir.subdir(current_task, b"fs", 0o555, |dir| {
-        dir.subdir(current_task, b"inotify", 0o555, |dir| {
             dir.entry(
                 current_task,
-                b"max_queued_events",
+                "actions_logged".into(),
+                SeccompActionsLogged::new_node(),
+                mode,
+            );
+        });
+        dir.subdir(current_task, "yama".into(), 0o555, |dir| {
+            dir.entry(current_task, "ptrace_scope".into(), PtraceYamaScope::new_node(), mode);
+        });
+    });
+    dir.node("net".into(), sysctl_net_diretory(current_task, fs));
+    dir.subdir(current_task, "vm".into(), 0o555, |dir| {
+        dir.entry(current_task, "mmap_rnd_bits".into(), StubSysctl::new_node(), mode);
+        dir.entry(current_task, "mmap_rnd_compat_bits".into(), StubSysctl::new_node(), mode);
+        dir.entry(current_task, "drop_caches".into(), StubSysctl::new_node(), mode);
+    });
+    dir.subdir(current_task, "fs".into(), 0o555, |dir| {
+        dir.subdir(current_task, "inotify".into(), 0o555, |dir| {
+            dir.entry(
+                current_task,
+                "max_queued_events".into(),
                 inotify::InotifyMaxQueuedEvents::new_node(),
                 mode,
             );
             dir.entry(
                 current_task,
-                b"max_user_instances",
+                "max_user_instances".into(),
                 inotify::InotifyMaxUserInstances::new_node(),
                 mode,
             );
             dir.entry(
                 current_task,
-                b"max_user_watches",
+                "max_user_watches".into(),
                 inotify::InotifyMaxUserWatches::new_node(),
                 mode,
             );
         });
-        dir.entry(current_task, b"pipe-max-size", PipeMaxSizeFile::new_node(), mode);
+        dir.entry(current_task, "pipe-max-size".into(), PipeMaxSizeFile::new_node(), mode);
     });
     dir.build(current_task)
 }
@@ -152,8 +162,8 @@ impl BytesFileOps for StubSysctl {
 
 pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.subdir(current_task, b"xt_quota", 0o555, |dir| {
-        dir.entry(current_task, b"globalAlert", StubSysctl::new_node(), mode!(IFREG, 0o444));
+    dir.subdir(current_task, "xt_quota".into(), 0o555, |dir| {
+        dir.entry(current_task, "globalAlert".into(), StubSysctl::new_node(), mode!(IFREG, 0o444));
     });
     dir.build(current_task)
 }
@@ -171,7 +181,7 @@ impl BytesFileOps for KernelTaintedFile {
         Ok(())
     }
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(b"0\n".to_vec().into())
+        Ok(Cow::Borrowed(&b"0\n"[..]))
     }
 }
 
@@ -193,26 +203,46 @@ impl ProcSysNetDev {
         ProcSysNetDev {
             ipv4_neigh: {
                 let mut dir = StaticDirectoryBuilder::new(proc_fs);
-                dir.entry(current_task, b"ucast_solicit", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"retrans_time_ms", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"mcast_resolicit", StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "ucast_solicit".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(
+                    current_task,
+                    "retrans_time_ms".into(),
+                    StubSysctl::new_node(),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "mcast_resolicit".into(),
+                    StubSysctl::new_node(),
+                    file_mode,
+                );
                 dir.build(current_task)
             },
             ipv6_conf: {
                 let mut dir = StaticDirectoryBuilder::new(proc_fs);
-                dir.entry(current_task, b"accept_ra", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"dad_transmits", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"use_tempaddr", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"addr_gen_mode", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"stable_secret", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"disable_ipv6", StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "accept_ra".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "dad_transmits".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "use_tempaddr".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "addr_gen_mode".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "stable_secret".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "disable_ipv6".into(), StubSysctl::new_node(), file_mode);
                 dir.build(current_task)
             },
             ipv6_neigh: {
                 let mut dir = StaticDirectoryBuilder::new(proc_fs);
-                dir.entry(current_task, b"ucast_solicit", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"retrans_time_ms", StubSysctl::new_node(), file_mode);
-                dir.entry(current_task, b"mcast_resolicit", StubSysctl::new_node(), file_mode);
+                dir.entry(current_task, "ucast_solicit".into(), StubSysctl::new_node(), file_mode);
+                dir.entry(
+                    current_task,
+                    "retrans_time_ms".into(),
+                    StubSysctl::new_node(),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "mcast_resolicit".into(),
+                    StubSysctl::new_node(),
+                    file_mode,
+                );
                 dir.build(current_task)
             },
         }
@@ -249,28 +279,28 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
     devs.add_dev(current_task, "all", Some(fs), None /* sys_fs */);
     devs.add_dev(current_task, "default", Some(fs), None /* sys_fs */);
 
-    dir.subdir(current_task, b"core", 0o555, |dir| {
-        dir.entry(current_task, b"bpf_jit_enable", StubSysctl::new_node(), file_mode);
-        dir.entry(current_task, b"bpf_jit_kallsyms", StubSysctl::new_node(), file_mode);
+    dir.subdir(current_task, "core".into(), 0o555, |dir| {
+        dir.entry(current_task, "bpf_jit_enable".into(), StubSysctl::new_node(), file_mode);
+        dir.entry(current_task, "bpf_jit_kallsyms".into(), StubSysctl::new_node(), file_mode);
     });
-    dir.subdir(current_task, b"ipv4", 0o555, |dir| {
+    dir.subdir(current_task, "ipv4".into(), 0o555, |dir| {
         dir.entry(
             current_task,
-            b"neigh",
+            "neigh".into(),
             NetstackDevicesDirectory::new_proc_sys_net_ipv4_neigh(),
             dir_mode,
         );
     });
-    dir.subdir(current_task, b"ipv6", 0o555, |dir| {
+    dir.subdir(current_task, "ipv6".into(), 0o555, |dir| {
         dir.entry(
             current_task,
-            b"conf",
+            "conf".into(),
             NetstackDevicesDirectory::new_proc_sys_net_ipv6_conf(),
             dir_mode,
         );
         dir.entry(
             current_task,
-            b"neigh",
+            "neigh".into(),
             NetstackDevicesDirectory::new_proc_sys_net_ipv6_neigh(),
             dir_mode,
         );
@@ -346,7 +376,7 @@ impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for SystemLimitFile<G
         if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
             return error!(EPERM);
         }
-        let value = fs_args::parse::<usize>(&data)?;
+        let value = fs_args::parse::<usize>(FsString::from(data).as_ref())?;
         G::get_atomic(current_task).store(value, Ordering::Relaxed);
         Ok(())
     }

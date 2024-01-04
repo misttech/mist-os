@@ -8,7 +8,7 @@ use crate::{
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+        FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
     },
 };
 use fuchsia_zircon as zx;
@@ -50,12 +50,12 @@ impl FsNodeOps for CpuClassDirectory {
         let mut entries = vec![
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
-                name: b"online".to_vec(),
+                name: "online".into(),
                 inode: None,
             },
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
-                name: b"possible".to_vec(),
+                name: "possible".into(),
                 inode: None,
             },
         ];
@@ -63,7 +63,7 @@ impl FsNodeOps for CpuClassDirectory {
         for cpu_name in cpus {
             entries.push(VecDirectoryEntry {
                 entry_type: DirectoryEntryType::DIR,
-                name: cpu_name.as_bytes().to_vec(),
+                name: FsString::from(cpu_name.clone()),
                 inode: None,
             })
         }
@@ -78,7 +78,7 @@ impl FsNodeOps for CpuClassDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
+        match &**name {
             name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
                 current_task,
                 TmpfsDirectory::new(),

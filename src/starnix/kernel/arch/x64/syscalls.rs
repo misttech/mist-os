@@ -485,8 +485,9 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let fd = FdNumber::from_raw(42);
         assert_eq!(sys_dup2(&mut locked, &current_task, fd, fd), error!(EBADF));
-        let file_handle =
-            current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY).expect("open_file");
+        let file_handle = current_task
+            .open_file("data/testfile.txt".into(), OpenFlags::RDONLY)
+            .expect("open_file");
         let fd = current_task.add_file(file_handle, FdFlags::empty()).expect("add");
         assert_eq!(sys_dup2(&mut locked, &current_task, fd, fd), Ok(fd));
     }
@@ -495,15 +496,15 @@ mod tests {
     async fn test_sys_creat() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        let path = b"newfile.txt";
-        current_task.write_memory(path_addr, path)?;
+        let path = "newfile.txt";
+        current_task.write_memory(path_addr, path.as_bytes())?;
         let fd = sys_creat(
             &mut locked,
             &current_task,
             UserCString::new(path_addr),
             FileMode::default(),
         )?;
-        let _file_handle = current_task.open_file(path, OpenFlags::RDONLY)?;
+        let _file_handle = current_task.open_file(path.into(), OpenFlags::RDONLY)?;
         assert!(!current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
     }

@@ -23,15 +23,15 @@ pub fn magma_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class = registry.get_or_create_class(b"starnix", registry.virtual_bus());
+    let starnix_class = registry.get_or_create_class("starnix".into(), registry.virtual_bus());
 
     let magma_type: DeviceType =
         registry.register_dyn_chrdev(create_magma_device).expect("magma device register failed.");
 
     registry.add_device(
         current_task,
-        b"magma0",
-        DeviceMetadata::new(b"magma0", magma_type, DeviceMode::Char),
+        "magma0".into(),
+        DeviceMetadata::new("magma0".into(), magma_type, DeviceMode::Char),
         starnix_class,
         DeviceDirectory::new,
     );

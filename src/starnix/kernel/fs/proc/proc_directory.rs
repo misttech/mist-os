@@ -14,7 +14,8 @@ use crate::{
         fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
         BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
         FdEvents, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget,
+        FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+        SymlinkTarget,
     },
 };
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -49,33 +50,63 @@ impl ProcDirectory {
         let kernel = current_task.kernel();
 
         let nodes = btreemap! {
-            &b"cpuinfo"[..] => fs.create_node(current_task, CpuinfoFile::new_node(), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"cmdline"[..] => {
+            "cpuinfo".into() => fs.create_node(
+                current_task,
+                CpuinfoFile::new_node(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "cmdline".into() => {
                 let cmdline = Vec::from(kernel.cmdline.clone());
-                fs.create_node(current_task, BytesFile::new_node(cmdline), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
+                fs.create_node(
+                    current_task,
+                    BytesFile::new_node(cmdline),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                )
             },
-            &b"self"[..] => SelfSymlink::new_node(current_task, fs),
-            &b"thread-self"[..] => ThreadSelfSymlink::new_node(current_task, fs),
-            &b"meminfo"[..] =>
-                fs.create_node(current_task, MeminfoFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+            "self".into() => SelfSymlink::new_node(current_task, fs),
+            "thread-self".into() => ThreadSelfSymlink::new_node(current_task, fs),
+            "meminfo".into() => fs.create_node(
+                current_task,
+                MeminfoFile::new_node(&kernel.stats),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
             // Fake kmsg as being empty.
-            &b"kmsg"[..] =>
-                fs.create_node(current_task, SimpleFileNode::new(|| Ok(ProcKmsgFile)), FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root())),
-            &b"mounts"[..] => MountsSymlink::new_node(current_task, fs),
+            "kmsg".into() => fs.create_node(
+                current_task,
+                SimpleFileNode::new(|| Ok(ProcKmsgFile)),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
+            ),
+            "mounts".into() => MountsSymlink::new_node(current_task, fs),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
-            &b"cgroups"[..] => fs.create_node(current_task, BytesFile::new_node(vec![]), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"stat"[..] =>  fs.create_node(current_task, StatFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"sys"[..] => sysctl_directory(current_task, fs),
-            &b"pressure"[..] => pressure_directory(current_task, fs),
-            &b"net"[..] => net_directory(current_task, fs),
-            &b"uptime"[..] =>
-                fs.create_node(current_task, UptimeFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"loadavg"[..] =>
-                fs.create_node(current_task, LoadavgFile::new_node(kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"config.gz"[..] => {
-                fs.create_node(current_task, ConfigFile::new_node(),  FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
-            }
+            "cgroups".into() => fs.create_node(
+                current_task,
+                BytesFile::new_node(vec![]),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "stat".into() => fs.create_node(
+                current_task,
+                StatFile::new_node(&kernel.stats),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "sys".into() => sysctl_directory(current_task, fs),
+            "pressure".into() => pressure_directory(current_task, fs),
+            "net".into() => net_directory(current_task, fs),
+            "uptime".into() => fs.create_node(
+                current_task,
+                UptimeFile::new_node(&kernel.stats),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "loadavg".into() => fs.create_node(
+                current_task,
+                LoadavgFile::new_node(kernel),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "config.gz".into() => fs.create_node(
+                current_task,
+                ConfigFile::new_node(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
         };
 
         Arc::new(ProcDirectory { nodes })
@@ -160,11 +191,11 @@ impl FileOps for Arc<ProcDirectory> {
                 // TODO: Figure out if this inode number is fine, given the content of the task
                 // directories.
                 let inode_num = file.fs.next_node_id();
-                let name = format!("{pid}");
+                let name = FsString::from(format!("{pid}"));
 
                 // The + 1 is to set the offset to the next possible pid for subsequent reads.
                 let next_offset = (*pid + pid_offset + 1) as i64;
-                sink.add(inode_num, next_offset, DirectoryEntryType::DIR, name.as_bytes())?;
+                sink.add(inode_num, next_offset, DirectoryEntryType::DIR, name.as_ref())?;
             }
         }
 
@@ -245,7 +276,7 @@ impl FsNodeOps for SelfSymlink {
     fs_node_impl_symlink!();
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(current_task.get_pid().to_string().into_bytes()))
+        Ok(SymlinkTarget::Path(current_task.get_pid().to_string().into()))
     }
 }
 
@@ -268,7 +299,7 @@ impl FsNodeOps for ThreadSelfSymlink {
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path(
-            format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into_bytes(),
+            format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into(),
         ))
     }
 }
@@ -294,14 +325,14 @@ impl FsNodeOps for MountsSymlink {
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(b"self/mounts".to_vec()))
+        Ok(SymlinkTarget::Path("self/mounts".into()))
     }
 }
 
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
 fn pressure_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(current_task, b"memory", PressureFile::new_node(), mode!(IFREG, 0o666));
+    dir.entry(current_task, "memory".into(), PressureFile::new_node(), mode!(IFREG, 0o666));
     dir.build(current_task)
 }
 

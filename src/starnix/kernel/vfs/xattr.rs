@@ -45,6 +45,6 @@ impl MemoryXattrStorage {
 
     pub fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
         let xattrs = self.xattrs.lock();
-        Ok(xattrs.keys().map(|k| k.to_vec()).collect())
+        Ok(xattrs.keys().cloned().collect())
     }
 }

@@ -15,10 +15,10 @@ use crate::{
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
         splice, DirentSink64, EpollFileObject, FallocMode, FdEvents, FdFlags, FdNumber,
-        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, LookupContext,
-        NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
-        StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
-        ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString,
+        LookupContext, NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags,
+        SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType,
+        UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
 };
 use fuchsia_zircon as zx;
@@ -495,8 +495,8 @@ fn open_file_at(
     mode: FileMode,
 ) -> Result<FileHandle, Errno> {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!("open_file_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
-    current_task.open_file_at(dir_fd, &path, OpenFlags::from_bits_truncate(flags), mode)
+    log_trace!(%dir_fd, %path, "open_file_at");
+    current_task.open_file_at(dir_fd, path.as_ref(), OpenFlags::from_bits_truncate(flags), mode)
 }
 
 fn lookup_parent_at<T, F>(
@@ -509,12 +509,12 @@ where
     F: Fn(LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!("lookup_parent_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
+    log_trace!(%dir_fd, %path, "lookup_parent_at");
     if path.is_empty() {
         return error!(ENOENT);
     }
     let mut context = LookupContext::default();
-    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, &path)?;
+    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, path.as_ref())?;
     callback(context, parent, basename)
 }
 
@@ -576,17 +576,18 @@ fn lookup_at(
     options: LookupFlags,
 ) -> Result<NamespaceNode, Errno> {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!("lookup_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
+    log_trace!(%dir_fd, %path, "lookup_at");
     if path.is_empty() {
         if options.allow_empty_path {
-            let (node, _) = current_task.resolve_dir_fd(dir_fd, &path)?;
+            let (node, _) = current_task.resolve_dir_fd(dir_fd, path.as_ref())?;
             return Ok(node);
         }
         return error!(ENOENT);
     }
 
     let mut parent_context = LookupContext::default();
-    let (parent, basename) = current_task.lookup_parent_at(&mut parent_context, dir_fd, &path)?;
+    let (parent, basename) =
+        current_task.lookup_parent_at(&mut parent_context, dir_fd, path.as_ref())?;
 
     let mut child_context = if parent_context.must_be_directory {
         // The child must resolve to a directory. This is because a trailing slash
@@ -804,7 +805,7 @@ pub fn sys_mkdirat(
         return error!(ENOENT);
     }
     let (parent, basename) =
-        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, &path)?;
+        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, path.as_ref())?;
     parent.create_node(
         current_task,
         basename,
@@ -919,7 +920,7 @@ pub fn sys_renameat2(
 
     let lookup = |dir_fd, user_path| {
         lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
-            Ok((parent, basename.to_vec()))
+            Ok((parent, basename.to_owned()))
         })
     };
 
@@ -933,9 +934,9 @@ pub fn sys_renameat2(
     NamespaceNode::rename(
         current_task,
         &old_parent,
-        &old_basename,
+        old_basename.as_ref(),
         &new_parent,
-        &new_basename,
+        new_basename.as_ref(),
         flags,
     )
 }
@@ -1011,7 +1012,7 @@ pub fn sys_fchownat(
     Ok(())
 }
 
-fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<Vec<u8>, Errno> {
+fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<FsString, Errno> {
     let name = current_task
         .mm()
         .read_c_string_to_vec(name_addr, XATTR_NAME_MAX as usize + 1)
@@ -1038,7 +1039,7 @@ fn do_getxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = match node.entry.node.get_xattr(current_task, &node.mount, &name, size)? {
+    let value = match node.entry.node.get_xattr(current_task, &node.mount, name.as_ref(), size)? {
         ValueOrSize::Size(s) => return Ok(s),
         ValueOrSize::Value(v) => v,
     };
@@ -1110,8 +1111,8 @@ fn do_setxattr(
         _ => return error!(EINVAL),
     };
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = current_task.read_memory_to_vec(value_addr, size)?;
-    node.entry.node.set_xattr(current_task, &node.mount, &name, &value, op)
+    let value = FsString::from(current_task.read_memory_to_vec(value_addr, size)?);
+    node.entry.node.set_xattr(current_task, &node.mount, name.as_ref(), value.as_ref(), op)
 }
 
 pub fn sys_fsetxattr(
@@ -1163,7 +1164,7 @@ fn do_removexattr(
         return error!(EPERM);
     }
     let name = read_xattr_name(current_task, name_addr)?;
-    node.entry.node.remove_xattr(current_task, &node.mount, &name)
+    node.entry.node.remove_xattr(current_task, &node.mount, name.as_ref())
 }
 
 pub fn sys_removexattr(
@@ -1267,7 +1268,7 @@ pub fn sys_getcwd(
             let mut combined = vec![];
             combined.extend_from_slice(b"(unreachable)");
             combined.append(&mut path);
-            combined
+            combined.into()
         }
     };
     user_cwd.push(b'\0');
@@ -1359,7 +1360,7 @@ pub fn sys_symlinkat(
         if context.must_be_directory {
             return error!(ENOENT);
         }
-        parent.create_symlink(current_task, basename, &target)
+        parent.create_symlink(current_task, basename, target.as_ref())
     });
     res?;
     Ok(())
@@ -1506,10 +1507,10 @@ fn do_mount_bind(
 ) -> Result<(), Errno> {
     let source = lookup_at(current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
     log_trace!(
-        "mount(source={:?}, target={:?}, flags={:?})",
-        String::from_utf8_lossy(&source.path(current_task)),
-        String::from_utf8_lossy(&target.path(current_task)),
-        flags
+        source=%source.path(current_task),
+        target=%target.path(current_task),
+        ?flags,
+        "do_mount_bind",
     );
     target.mount(WhatToMount::Bind(source), flags)
 }
@@ -1520,9 +1521,9 @@ fn do_mount_change_propagation_type(
     flags: MountFlags,
 ) -> Result<(), Errno> {
     log_trace!(
-        "mount(target={:?}, flags={:?})",
-        String::from_utf8_lossy(&target.path(current_task)),
-        flags
+        target=%target.path(current_task),
+        ?flags,
+        "do_mount_change_propagation_type",
     );
 
     // Flag validation. Of the three propagation type flags, exactly one must be passed. The only
@@ -1558,7 +1559,7 @@ fn do_mount_create(
 ) -> Result<(), Errno> {
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {
-        b""
+        Default::default()
     } else {
         current_task.read_c_string(source_addr, &mut source_buf)?
     };
@@ -1566,22 +1567,22 @@ fn do_mount_create(
     let fs_type = current_task.read_c_string(filesystemtype_addr, &mut fs_buf)?;
     let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let data = if data_addr.is_null() {
-        b""
+        Default::default()
     } else {
         current_task.read_c_string(data_addr, &mut data_buf)?
     };
     log_trace!(
-        "mount(source={:?}, target={:?}, type={:?}, data={:?})",
-        String::from_utf8_lossy(source),
-        String::from_utf8_lossy(&target.path(current_task)),
-        String::from_utf8_lossy(fs_type),
-        String::from_utf8_lossy(data)
+        %source,
+        target=%target.path(current_task),
+        %fs_type,
+        %data,
+        "do_mount_create",
     );
 
     let options = FileSystemOptions {
-        source: source.to_vec(),
+        source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: data.to_vec(),
+        params: data.into(),
     };
 
     let fs = current_task.create_filesystem(fs_type, options)?;
@@ -2460,7 +2461,7 @@ pub fn sys_utimensat(
         if dir_fd == FdNumber::AT_FDCWD {
             return error!(EFAULT);
         }
-        let (node, _) = current_task.resolve_dir_fd(dir_fd, b"")?;
+        let (node, _) = current_task.resolve_dir_fd(dir_fd, Default::default())?;
         node
     } else {
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
@@ -2493,7 +2494,7 @@ mod tests {
     async fn test_sys_lseek() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let fd = FdNumber::from_raw(10);
-        let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
+        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let file_size = file_handle.node().stat(&current_task).unwrap().st_size;
         current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
@@ -2519,7 +2520,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_dup() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
+        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = sys_dup(&mut locked, &current_task, oldfd)?;
 
@@ -2535,7 +2536,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_dup3() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
+        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = FdNumber::from_raw(2);
         sys_dup3(&mut locked, &current_task, oldfd, newfd, O_CLOEXEC)?;
@@ -2557,7 +2558,8 @@ mod tests {
 
         // Makes sure that dup closes the old file handle before the fd points
         // to the new file handle.
-        let second_file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
+        let second_file_handle =
+            current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
         assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
         sys_dup3(&mut locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
@@ -2600,12 +2602,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         // Create the file that will be used to stat.
-        let file_path = b"data/testfile.txt";
-        let _file_handle = current_task.open_file(file_path, OpenFlags::RDONLY).unwrap();
+        let file_path = "data/testfile.txt";
+        let _file_handle = current_task.open_file(file_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.write_memory(path_addr, file_path).expect("failed to clear struct");
+        current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
         current_task
@@ -2668,20 +2670,26 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         // Create the file that will be renamed.
-        let old_user_path = b"data/testfile.txt";
-        let _old_file_handle = current_task.open_file(old_user_path, OpenFlags::RDONLY).unwrap();
+        let old_user_path = "data/testfile.txt";
+        let _old_file_handle =
+            current_task.open_file(old_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.write_memory(old_path_addr, old_user_path).expect("failed to clear struct");
+        current_task
+            .write_memory(old_path_addr, old_user_path.as_bytes())
+            .expect("failed to clear struct");
 
         // Create a second file that we will attempt to rename to.
-        let new_user_path = b"data/testfile2.txt";
-        let _new_file_handle = current_task.open_file(new_user_path, OpenFlags::RDONLY).unwrap();
+        let new_user_path = "data/testfile2.txt";
+        let _new_file_handle =
+            current_task.open_file(new_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.write_memory(new_path_addr, new_user_path).expect("failed to clear struct");
+        current_task
+            .write_memory(new_path_addr, new_user_path.as_bytes())
+            .expect("failed to clear struct");
 
         // Try to rename first file to second file's name with RENAME_NOREPLACE flag.
         // This should fail with EEXIST.

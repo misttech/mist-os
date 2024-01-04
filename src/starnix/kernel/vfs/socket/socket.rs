@@ -944,7 +944,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_dgram_socket() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let bind_address = SocketAddress::Unix(b"dgram_test".to_vec());
+        let bind_address = SocketAddress::Unix(b"dgram_test".into());
         let rec_dgram = Socket::new(
             &current_task,
             SocketDomain::Unix,

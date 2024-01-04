@@ -49,6 +49,7 @@ rustc_library("starnix-uapi") {
     "//src/starnix/lib/syncio",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:once_cell",

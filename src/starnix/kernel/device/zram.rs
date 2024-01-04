@@ -100,7 +100,7 @@ impl FsNodeOps for ZramDeviceDirectory {
         let mut entries = BlockDeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
-            name: b"mm_stat".to_vec(),
+            name: b"mm_stat".into(),
             inode: None,
         });
         Ok(VecDirectory::new_file(entries))
@@ -112,7 +112,7 @@ impl FsNodeOps for ZramDeviceDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
+        match &**name {
             b"mm_stat" => {
                 let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
                 Ok(node.fs().create_node(
@@ -169,15 +169,15 @@ pub fn zram_device_init(system_task: &CurrentTask) {
     let zram_dev_weak = Arc::downgrade(&zram_dev);
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
-    let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
+    let virtual_block_class = registry.get_or_create_class("block".into(), registry.virtual_bus());
     registry
         .register_device(ZRAM_MAJOR, 0, 1, zram_dev, DeviceMode::Block)
         .expect("Failed to register zram device.");
 
     registry.add_device(
         system_task,
-        b"zram0",
-        DeviceMetadata::new(b"zram0", DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
+        "zram0".into(),
+        DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
         virtual_block_class,
         move |dev| ZramDeviceDirectory::new(dev, zram_dev_weak.clone()),
     );

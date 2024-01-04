@@ -86,9 +86,9 @@ pub struct FileSystemOptions {
 impl FileSystemOptions {
     pub fn source_for_display(&self) -> &FsStr {
         if self.source.is_empty() {
-            return b"none";
+            return "none".into();
         }
-        &self.source
+        self.source.as_ref()
     }
 }
 
@@ -166,7 +166,7 @@ impl FileSystem {
         root.set_fs(self);
         let root_node: FsNodeHandle = root.into_handle();
         self.nodes.lock().insert(root_node.node_id, Arc::downgrade(&root_node));
-        let root = DirEntry::new(root_node, None, FsString::new());
+        let root = DirEntry::new(root_node, None, FsString::default());
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
     }
 
@@ -194,8 +194,8 @@ impl FileSystem {
             let _ = node.ops().set_xattr(
                 node,
                 current_task,
-                b"security.selinux",
-                label,
+                "security.selinux".into(),
+                label.as_ref(),
                 XattrOp::Create,
             );
         }

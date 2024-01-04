@@ -12,25 +12,25 @@ use std::sync::Arc;
 
 pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
     let kernel = current_task.kernel();
-    dir.subdir(current_task, b"power", 0o755, |dir| {
+    dir.subdir(current_task, "power".into(), 0o755, |dir| {
         dir.entry(
             current_task,
-            b"wakeup_count",
+            "wakeup_count".into(),
             PowerWakeupCountFile::new_node(),
             mode!(IFREG, 0o644),
         );
-        dir.entry(current_task, b"state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
+        dir.entry(current_task, "state".into(), PowerStateFile::new_node(), mode!(IFREG, 0o644));
         dir.entry(
             current_task,
-            b"sync_on_suspend",
+            "sync_on_suspend".into(),
             PowerSyncOnSuspendFile::new_node(),
             mode!(IFREG, 0o644),
         );
-        dir.subdir(current_task, b"suspend_stats", 0o755, |dir| {
+        dir.subdir(current_task, "suspend_stats".into(), 0o755, |dir| {
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(
                 current_task,
-                b"success",
+                "success".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().success_count.to_string()
                 }),
@@ -38,7 +38,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             );
             dir.entry(
                 current_task,
-                b"fail",
+                "fail".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().fail_count.to_string()
                 }),
@@ -46,7 +46,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             );
             dir.entry(
                 current_task,
-                b"last_failed_dev",
+                "last_failed_dev".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().last_failed_device.unwrap_or_default()
                 }),
@@ -54,7 +54,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             );
             dir.entry(
                 current_task,
-                b"last_failed_errno",
+                "last_failed_errno".into(),
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel
                         .power_manager

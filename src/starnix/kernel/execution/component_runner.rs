@@ -10,7 +10,7 @@ use crate::{
     fs::fuchsia::RemoteFs,
     signals,
     task::{CurrentTask, ExitStatus, Task},
-    vfs::{FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
+    vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount},
 };
 use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};
@@ -158,11 +158,12 @@ pub async fn start_component(
         {
             let mount_record = mount_record.clone();
             move |_, current_task| {
-                let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
+                let cwd_path =
+                    FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
                 let cwd = current_task.lookup_path(
                     &mut LookupContext::default(),
                     current_task.fs().root(),
-                    cwd_path.as_bytes(),
+                    cwd_path.as_ref(),
                 )?;
                 current_task.fs().chdir(current_task, cwd)?;
 
@@ -205,7 +206,7 @@ pub async fn start_component(
                 argv.extend(args);
 
                 let executable =
-                    current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+                    current_task.open_file(binary_path.as_bytes().into(), OpenFlags::RDONLY)?;
                 current_task.exec(executable, binary_path, argv, environ)?;
 
                 Ok(WeakRef::from(&current_task.task))
@@ -296,7 +297,7 @@ async fn serve_component_controller(
 /// Returns /container/component/{random} that doesn't already exist
 fn generate_component_path(system_task: &CurrentTask) -> Result<String, Error> {
     // Checking container directory already exists
-    let mount_point = system_task.lookup_path_from_root(b"/container/component/")?;
+    let mount_point = system_task.lookup_path_from_root("/container/component/".into())?;
 
     // Find /container/component/{random} that doesn't already exist
     let component_path = loop {
@@ -307,7 +308,7 @@ fn generate_component_path(system_task: &CurrentTask) -> Result<String, Error> {
         // If so, try again with another {random} string.
         match mount_point.create_node(
             system_task,
-            random_string.as_bytes(),
+            random_string.as_str().into(),
             mode!(IFDIR, 0o755),
             DeviceType::NONE,
         ) {
@@ -350,7 +351,7 @@ impl MountRecord {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(b".")?;
+        let mut current_node = system_task.lookup_path_from_root(".".into())?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -363,13 +364,13 @@ impl MountRecord {
 
             current_node = match current_node.create_node(
                 system_task,
-                sub_dir,
+                sub_dir.into(),
                 mode!(IFDIR, 0o755),
                 DeviceType::NONE,
             ) {
                 Ok(node) => node,
                 Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(system_task, &mut context, sub_dir)?
+                    current_node.lookup_child(system_task, &mut context, sub_dir.into())?
                 }
                 Err(e) => bail!(e),
             };
@@ -384,7 +385,7 @@ impl MountRecord {
         let fs = RemoteFs::new_fs(
             system_task.kernel(),
             client_end,
-            FileSystemOptions { source: path.as_bytes().to_vec(), ..Default::default() },
+            FileSystemOptions { source: path.into(), ..Default::default() },
             rights,
         )?;
         current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;

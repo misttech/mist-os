@@ -16,7 +16,7 @@ use crate::{
         fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
         DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps, FileSystem,
         FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
+        FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
 use starnix_logging::not_implemented;
@@ -74,15 +74,15 @@ pub fn create_main_and_replica(
     current_task: &CurrentTask,
     window_size: uapi::winsize,
 ) -> Result<(FileHandle, FileHandle), Errno> {
-    let pty_file = current_task.open_file(b"/dev/ptmx", OpenFlags::RDWR)?;
+    let pty_file = current_task.open_file("/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
     {
         let mut terminal = pty.terminal.write();
         terminal.locked = false;
         terminal.window_size = window_size;
     }
-    let pts_path = format!("/dev/pts/{}", pty.terminal.id);
-    let pts_file = current_task.open_file(pts_path.as_bytes(), OpenFlags::RDWR)?;
+    let pts_path = FsString::from(format!("/dev/pts/{}", pty.terminal.id));
+    let pts_file = current_task.open_file(pts_path.as_ref(), OpenFlags::RDWR)?;
     Ok((pty_file, pts_file))
 }
 
@@ -113,27 +113,27 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
 pub fn tty_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
-    let tty_class = registry.get_or_create_class(b"tty", registry.virtual_bus());
+    let tty_class = registry.get_or_create_class("tty".into(), registry.virtual_bus());
     registry.add_device(
         current_task,
-        b"tty",
-        DeviceMetadata::new(b"tty", DeviceType::TTY, DeviceMode::Char),
+        "tty".into(),
+        DeviceMetadata::new("tty".into(), DeviceType::TTY, DeviceMode::Char),
         tty_class.clone(),
         DeviceDirectory::new,
     );
     registry.add_device(
         current_task,
-        b"ptmx",
-        DeviceMetadata::new(b"ptmx", DeviceType::PTMX, DeviceMode::Char),
+        "ptmx".into(),
+        DeviceMetadata::new("ptmx".into(), DeviceType::PTMX, DeviceMode::Char),
         tty_class,
         DeviceDirectory::new,
     );
 
-    devtmpfs_mkdir(current_task, b"pts").unwrap();
+    devtmpfs_mkdir(current_task, "pts".into()).unwrap();
 
     // Create a symlink from /dev/ptmx to /dev/pts/ptmx for pseudo-tty subsystem.
-    devtmpfs_remove_child(current_task, b"ptmx");
-    devtmpfs_create_symlink(current_task, b"ptmx", b"pts/ptmx").unwrap();
+    devtmpfs_remove_child(current_task, "ptmx".into());
+    devtmpfs_create_symlink(current_task, "ptmx".into(), "pts/ptmx".into()).unwrap();
 }
 
 struct DevPtsFs;
@@ -142,7 +142,7 @@ impl FileSystemOps for DevPtsFs {
         Ok(statfs::default(DEVPTS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        b"devpts"
+        "devpts".into()
     }
 
     fn generate_node_ids(&self) -> bool {
@@ -171,7 +171,7 @@ impl FsNodeOps for DevPtsRootDir {
         let mut result = vec![];
         result.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::CHR,
-            name: b"ptmx".to_vec(),
+            name: "ptmx".into(),
             inode: Some(PTMX_NODE_ID),
         });
         for (id, terminal) in self.state.terminals.read().iter() {
@@ -179,7 +179,7 @@ impl FsNodeOps for DevPtsRootDir {
                 if !terminal.read().is_main_closed() {
                     result.push(VecDirectoryEntry {
                         entry_type: DirectoryEntryType::CHR,
-                        name: format!("{id}").as_bytes().to_vec(),
+                        name: format!("{id}").into(),
                         inode: Some((*id as ino_t) + FIRST_PTS_NODE_ID),
                     });
                 }
@@ -325,7 +325,8 @@ impl FileOps for DevPtmxFile {
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.terminal.main_close();
-        self.dev_pts_root.remove_child(format!("{}", self.terminal.id).as_bytes());
+        let id = FsString::from(self.terminal.id.to_string());
+        self.dev_pts_root.remove_child(id.as_ref());
     }
 
     fn read(
@@ -723,7 +724,7 @@ mod tests {
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno> {
-        let file = open_file_with_flags(current_task, fs, b"ptmx", OpenFlags::RDWR)?;
+        let file = open_file_with_flags(current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
 
         // Unlock terminal
         ioctl::<i32>(current_task, &file, TIOCSPTLCK, &0)?;
@@ -735,21 +736,21 @@ mod tests {
     async fn opening_ptmx_creates_pts() {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
-        lookup_node(&task, fs, b"0").unwrap_err();
+        lookup_node(&task, fs, "0".into()).unwrap_err();
         let _ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        lookup_node(&task, fs, b"0").expect("pty");
+        lookup_node(&task, fs, "0".into()).expect("pty");
     }
 
     #[::fuchsia::test]
     async fn closing_ptmx_closes_pts() {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
-        lookup_node(&task, fs, b"0").unwrap_err();
+        lookup_node(&task, fs, "0".into()).unwrap_err();
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let _pts = open_file(&task, fs, b"0").expect("open file");
+        let _pts = open_file(&task, fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
         task.trigger_delayed_releaser();
-        lookup_node(&task, fs, b"0").unwrap_err();
+        lookup_node(&task, fs, "0".into()).unwrap_err();
     }
 
     #[::fuchsia::test]
@@ -761,17 +762,17 @@ mod tests {
         let mut _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let _ptmx2 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
 
-        lookup_node(&task, fs, b"0").expect("component_lookup");
-        lookup_node(&task, fs, b"1").expect("component_lookup");
-        lookup_node(&task, fs, b"2").expect("component_lookup");
+        lookup_node(&task, fs, "0".into()).expect("component_lookup");
+        lookup_node(&task, fs, "1".into()).expect("component_lookup");
+        lookup_node(&task, fs, "2".into()).expect("component_lookup");
 
         std::mem::drop(_ptmx1);
         task.trigger_delayed_releaser();
 
-        lookup_node(&task, fs, b"1").unwrap_err();
+        lookup_node(&task, fs, "1".into()).unwrap_err();
 
         _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        lookup_node(&task, fs, b"1").expect("component_lookup");
+        lookup_node(&task, fs, "1".into()).expect("component_lookup");
     }
 
     #[::fuchsia::test]
@@ -783,7 +784,7 @@ mod tests {
         let mount = MountInfo::detached();
         let pts = fs
             .root()
-            .create_entry(&task, &mount, b"custom_pts", |dir, mount, name| {
+            .create_entry(&task, &mount, "custom_pts".into(), |dir, mount, name| {
                 dir.mknod(
                     &task,
                     mount,
@@ -806,7 +807,7 @@ mod tests {
 
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         set_controlling_terminal(&task, &ptmx, false).expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&task, devfs, b"tty", OpenFlags::RDWR).expect("tty");
+        let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
         // has the same result as on ptmx.
         assert_eq!(
@@ -816,9 +817,9 @@ mod tests {
 
         // Detach the controlling terminal.
         ioctl::<i32>(&task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
-        let pts = open_file(&task, fs, b"0").expect("open file");
+        let pts = open_file(&task, fs, "0".into()).expect("open file");
         set_controlling_terminal(&task, &pts, false).expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&task, devfs, b"tty", OpenFlags::RDWR).expect("tty");
+        let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
         // TIOCGPTN is not implemented on replica terminals
         assert!(ioctl::<i32>(&task, &tty, TIOCGPTN, &0).is_err());
     }
@@ -831,7 +832,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         assert_eq!(ptmx.ioctl(&task, 42, Default::default()), error!(ENOTTY));
 
-        let pts_file = open_file(&task, fs, b"0").expect("open file");
+        let pts_file = open_file(&task, fs, "0".into()).expect("open file");
         assert_eq!(pts_file.ioctl(&task, 42, Default::default()), error!(ENOTTY));
     }
 
@@ -853,9 +854,9 @@ mod tests {
     async fn test_new_terminal_is_locked() {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
-        let _ptmx_file = open_file(&task, fs, b"ptmx").expect("open file");
+        let _ptmx_file = open_file(&task, fs, "ptmx".into()).expect("open file");
 
-        let pts = lookup_node(&task, fs, b"0").expect("component_lookup");
+        let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
         assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
@@ -864,7 +865,7 @@ mod tests {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let pts = lookup_node(&task, fs, b"0").expect("component_lookup");
+        let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
 
         // Check that the lock is not set.
         assert_eq!(ioctl::<i32>(&task, &ptmx, TIOCGPTLCK, &0), Ok(0));
@@ -887,7 +888,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let ptmx_stat = ptmx.node().stat(&task).expect("stat");
         assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
-        let pts = open_file(&task, fs, b"0").expect("open file");
+        let pts = open_file(&task, fs, "0".into()).expect("open file");
         let pts_stats = pts.node().stat(&task).expect("stat");
         assert_eq!(pts_stats.st_mode & FileMode::PERMISSIONS.bits(), 0o620);
         assert_eq!(pts_stats.st_uid, 22);
@@ -910,7 +911,7 @@ mod tests {
             .is_none());
         // Opening the terminal should not set the terminal of the session with the NOCTTY flag.
         let _opened_replica2 =
-            open_file_with_flags(&task, fs, b"0", OpenFlags::RDWR | OpenFlags::NOCTTY)
+            open_file_with_flags(&task, fs, "0".into(), OpenFlags::RDWR | OpenFlags::NOCTTY)
                 .expect("open file");
         assert!(task
             .thread_group
@@ -923,7 +924,7 @@ mod tests {
 
         // Opening the replica terminal should set the terminal of the session.
         let _opened_replica2 =
-            open_file_with_flags(&task, fs, b"0", OpenFlags::RDWR).expect("open file");
+            open_file_with_flags(&task, fs, "0".into(), OpenFlags::RDWR).expect("open file");
         assert!(task
             .thread_group
             .read()
@@ -942,7 +943,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
-        let opened_replica = open_file(&task2, fs, b"0").expect("open file");
+        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
 
         assert_eq!(ioctl::<i32>(&task1, &opened_main, TIOCGPGRP, &0), error!(ENOTTY));
         assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCGPGRP, &0), error!(ENOTTY));
@@ -971,14 +972,14 @@ mod tests {
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
         let wo_opened_replica =
-            open_file_with_flags(&task1, fs, b"0", OpenFlags::WRONLY | OpenFlags::NOCTTY)
+            open_file_with_flags(&task1, fs, "0".into(), OpenFlags::WRONLY | OpenFlags::NOCTTY)
                 .expect("open file");
         assert!(!wo_opened_replica.can_read());
 
         // FD must be readable for setting the terminal.
         assert_eq!(set_controlling_terminal(&task1, &wo_opened_replica, false), error!(EPERM));
 
-        let opened_replica = open_file(&task2, fs, b"0").expect("open file");
+        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
         // Task must be session leader for setting the terminal.
         assert_eq!(set_controlling_terminal(&task2, &opened_replica, false), error!(EINVAL));
 
@@ -1027,7 +1028,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&init, fs).expect("ptmx");
-        let opened_replica = open_file(&task2, fs, b"0").expect("open file");
+        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
 
         // Cannot change the foreground process group if the terminal is not the controlling
         // terminal
@@ -1090,7 +1091,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
-        let opened_replica = open_file(&task1, fs, b"0").expect("open file");
+        let opened_replica = open_file(&task1, fs, "0".into()).expect("open file");
 
         // Cannot detach the controlling terminal when none is attached terminal
         assert_eq!(ioctl::<i32>(&task1, &opened_replica, TIOCNOTTY, &0), error!(ENOTTY));
@@ -1117,7 +1118,7 @@ mod tests {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let pts = open_file(&task, fs, b"0").expect("open file");
+        let pts = open_file(&task, fs, "0".into()).expect("open file");
 
         let has_data_ready_to_read = |fd: &FileHandle| {
             fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)

@@ -97,7 +97,7 @@ impl Pager {
         if did_create {
             let set_up_vmo = |vmo| -> Result<(), zx::Status> {
                 self.watch_for_zero_children(vmo, inode_num)?;
-                let name_slice = [b"ext4!".as_slice(), &name].concat();
+                let name_slice = [b"ext4!".as_slice(), name.as_ref()].concat();
                 let name_slice =
                     &name_slice[..std::cmp::min(name_slice.len(), zx::sys::ZX_MAX_NAME_LEN - 1)];
                 vmo.set_name(&std::ffi::CString::new(name_slice)?)?;
@@ -448,7 +448,7 @@ mod tests {
             pager.start_pager_threads(&current_task);
 
             // With no extent, we expect it to return zeroed data.
-            let vmo = pager.register(b"a", 1, 5, Box::new([])).expect("register failed");
+            let vmo = pager.register("a".into(), 1, 5, Box::new([])).expect("register failed");
 
             let mut buf = vec![1; 5];
             vmo.read(&mut buf, 0).expect("read failed");
@@ -457,7 +457,12 @@ mod tests {
 
             // A single extent:
             let vmo = pager
-                .register(b"b", 2, 5, Box::new([PagerExtent { logical: 0..1, physical_block: 0 }]))
+                .register(
+                    "b".into(),
+                    2,
+                    5,
+                    Box::new([PagerExtent { logical: 0..1, physical_block: 0 }]),
+                )
                 .expect("register failed");
             backing_vmo.write(b"hello", 0).expect("write failed");
             vmo.read(&mut buf, 0).expect("read failed");
@@ -469,7 +474,7 @@ mod tests {
             let file_size = (6 + 1 + 5 + 4) * 1024 + 100;
             let vmo = pager
                 .register(
-                    b"c",
+                    "c".into(),
                     3,
                     file_size,
                     Box::new([
@@ -490,7 +495,7 @@ mod tests {
             // Use the same file, but initiate a read that starts after the first extent.
             let vmo = pager
                 .register(
-                    b"d",
+                    "d".into(),
                     4,
                     file_size,
                     Box::new([

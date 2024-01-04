@@ -212,14 +212,7 @@ pub fn sys_execveat(
 
     let path = &current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
-    log_trace!(
-        "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
-        dir_fd,
-        String::from_utf8_lossy(path),
-        argv,
-        environ,
-        flags
-    );
+    log_trace!(?argv, ?environ, ?flags, "execveat({dir_fd}, {path})");
 
     let mut open_flags = OpenFlags::RDONLY;
 
@@ -246,7 +239,7 @@ pub fn sys_execveat(
         // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
         file.name.open(current_task, OpenFlags::RDONLY, false)?
     } else {
-        current_task.open_file_at(dir_fd, path, open_flags, FileMode::default())?
+        current_task.open_file_at(dir_fd, path.as_ref(), open_flags, FileMode::default())?
     };
 
     // This path can affect script resolution (the path is appended to the script args)

@@ -33,14 +33,14 @@ pub fn ashmem_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let misc_class = registry.get_or_create_class(b"misc", registry.virtual_bus());
+    let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
     let ashmem_device =
         registry.register_dyn_chrdev(Ashmem::open).expect("ashmem device register failed.");
 
     registry.add_device(
         system_task,
-        b"ashmem",
-        DeviceMetadata::new(b"ashmem", ashmem_device, DeviceMode::Char),
+        "ashmem".into(),
+        DeviceMetadata::new("ashmem".into(), ashmem_device, DeviceMode::Char),
         misc_class,
         DeviceDirectory::new,
     );

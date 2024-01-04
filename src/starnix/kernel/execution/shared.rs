@@ -21,7 +21,7 @@ use crate::{
     task::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, TaskFlags, ThreadGroup, ThreadState,
     },
-    vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions},
+    vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
 };
 use starnix_logging::log_trace;
 use starnix_syscalls::{
@@ -230,7 +230,7 @@ pub fn create_filesystem_from_spec<'a>(
     creator: &impl FileSystemCreator,
     pkg: &fio::DirectorySynchronousProxy,
     spec: &'a str,
-) -> Result<(&'a [u8], FileSystemHandle), Error> {
+) -> Result<(&'a FsStr, FileSystemHandle), Error> {
     let kernel = creator.kernel();
 
     let mut iter = spec.splitn(4, ':');
@@ -244,9 +244,9 @@ pub fn create_filesystem_from_spec<'a>(
     let params = iter.next().unwrap_or("");
 
     let options = FileSystemOptions {
-        source: fs_src.as_bytes().to_vec(),
+        source: fs_src.into(),
         flags: MountFlags::empty(),
-        params: params.as_bytes().to_vec(),
+        params: params.into(),
     };
 
     // Default rights for remotefs.
@@ -258,9 +258,9 @@ pub fn create_filesystem_from_spec<'a>(
     let fs = match fs_type {
         "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
         "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, options)?,
-        _ => creator.create_filesystem(fs_type.as_bytes(), options)?,
+        _ => creator.create_filesystem(fs_type.into(), options)?,
     };
-    Ok((mount_point.as_bytes(), fs))
+    Ok((mount_point.into(), fs))
 }
 
 #[cfg(test)]

@@ -34,8 +34,8 @@ use std::{
 
 // Name and value for the xattr used to mark opaque directories in the upper FS.
 // See https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
-const OPAQUE_DIR_XATTR: &FsStr = b"trusted.overlay.opaque";
-const OPAQUE_DIR_XATTR_VALUE: &FsStr = b"y";
+const OPAQUE_DIR_XATTR: &str = "trusted.overlay.opaque";
+const OPAQUE_DIR_XATTR_VALUE: &str = "y";
 
 #[derive(Clone)]
 struct DirEntryInfo {
@@ -61,7 +61,7 @@ impl DirentSink for DirentSinkAdapter {
         name: &FsStr,
     ) -> Result<(), Errno> {
         if !DirEntry::is_reserved_name(name) {
-            self.items.push(DirEntryInfo { name: name.to_vec(), inode_num, entry_type });
+            self.items.push(DirEntryInfo { name: name.to_owned(), inode_num, entry_type });
         }
         self.offset = offset;
         Ok(())
@@ -124,8 +124,8 @@ impl ActiveEntry {
         self.entry().node.set_xattr(
             current_task,
             self.mount(),
-            OPAQUE_DIR_XATTR,
-            OPAQUE_DIR_XATTR_VALUE,
+            OPAQUE_DIR_XATTR.into(),
+            OPAQUE_DIR_XATTR_VALUE.into(),
             XattrOp::Set,
         )
     }
@@ -135,7 +135,7 @@ impl ActiveEntry {
         match self.entry().node.get_xattr(
             current_task,
             self.mount(),
-            OPAQUE_DIR_XATTR,
+            OPAQUE_DIR_XATTR.into(),
             OPAQUE_DIR_XATTR_VALUE.len(),
         ) {
             Ok(ValueOrSize::Value(v)) if v == OPAQUE_DIR_XATTR_VALUE => true,
@@ -174,7 +174,7 @@ impl ActiveEntry {
         if info.entry_type != DirectoryEntryType::CHR {
             return Ok(false);
         }
-        let entry = self.component_lookup(current_task, &info.name)?;
+        let entry = self.component_lookup(current_task, info.name.as_ref())?;
         Ok(entry.is_whiteout())
     }
 
@@ -280,15 +280,15 @@ impl OverlayNode {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
                 };
-                parent_upper.create_entry(current_task, &name, |dir, mount, name| {
-                    dir.create_symlink(current_task, mount, name, link_path, info.cred())
+                parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
+                    dir.create_symlink(current_task, mount, name, link_path.as_ref(), info.cred())
                 })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
                 self.fs.create_upper_entry(
                     current_task,
                     parent_upper,
-                    &name,
+                    name.as_ref(),
                     |dir, name| {
                         dir.create_entry(current_task, name, |dir_node, mount, name| {
                             dir_node.mknod(
@@ -305,7 +305,7 @@ impl OverlayNode {
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
-                parent_upper.create_entry(current_task, &name, |dir, mount, name| {
+                parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
                     dir.mknod(current_task, mount, name, info.mode, info.rdev, cred)
                 })
             }
@@ -404,7 +404,7 @@ impl OverlayNode {
                     dir.entry().unlink(
                         current_task,
                         dir.mount(),
-                        name,
+                        name.as_ref(),
                         UnlinkKind::NonDirectory,
                         false,
                     )?;
@@ -716,7 +716,7 @@ impl FileOps for OverlayDirectory {
         emit_dotdot(file, sink)?;
 
         for item in self.dir_entries.read().iter().skip(sink.offset() as usize - 2) {
-            sink.add(item.inode_num, sink.offset() + 1, item.entry_type, &item.name)?;
+            sink.add(item.inode_num, sink.offset() + 1, item.entry_type, item.name.as_ref())?;
         }
 
         Ok(())
@@ -818,19 +818,19 @@ impl OverlayFs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let mount_options = fs_args::generic_parse_mount_options(&options.params);
-        const REDIRECT_DIR: &FsStr = b"redirect_dir";
-        match mount_options.get(&*REDIRECT_DIR) {
-            None | Some(&b"off") => (),
+        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
+        match mount_options.get("redirect_dir".as_bytes()) {
+            None => (),
+            Some(o) if o == "off" => (),
             Some(_) => {
                 not_implemented!("redirect_dir is not implemented in overlayfs yet.");
                 return error!(ENOTSUP);
             }
         }
 
-        let lower = resolve_dir_param(current_task, &mount_options, b"lowerdir")?;
-        let upper = resolve_dir_param(current_task, &mount_options, b"upperdir")?;
-        let work = resolve_dir_param(current_task, &mount_options, b"workdir")?;
+        let lower = resolve_dir_param(current_task, &mount_options, "lowerdir".into())?;
+        let upper = resolve_dir_param(current_task, &mount_options, "upperdir".into())?;
+        let work = resolve_dir_param(current_task, &mount_options, "workdir".into())?;
 
         let lower_fs = lower.entry().node.fs().clone();
         let upper_fs = upper.entry().node.fs().clone();
@@ -869,8 +869,8 @@ impl OverlayFs {
         let mut rng = rand::thread_rng();
         let (temp_name, entry) = loop {
             let x: u64 = rng.gen();
-            let temp_name = format!("tmp{:x}", x).into_bytes();
-            match try_create(&self.work, &temp_name) {
+            let temp_name = FsString::from(format!("tmp{:x}", x));
+            match try_create(&self.work, temp_name.as_ref()) {
                 Err(err) if err.code == EEXIST => continue,
                 Err(err) => return Err(err),
                 Ok(entry) => break (temp_name, entry),
@@ -883,7 +883,7 @@ impl OverlayFs {
                     current_task,
                     self.work.entry(),
                     self.work.mount(),
-                    &temp_name,
+                    temp_name.as_ref(),
                     target_dir.entry(),
                     target_dir.mount(),
                     name,
@@ -897,7 +897,7 @@ impl OverlayFs {
                     .unlink(
                         current_task,
                         self.work.mount(),
-                        &temp_name,
+                        temp_name.as_ref(),
                         UnlinkKind::NonDirectory,
                         false,
                     )
@@ -917,7 +917,7 @@ impl FileSystemOps for Arc<OverlayFs> {
     }
 
     fn name(&self) -> &'static FsStr {
-        b"overlay"
+        "overlay".into()
     }
 
     fn rename(
@@ -962,13 +962,7 @@ impl FileSystemOps for Arc<OverlayFs> {
         // If the old node existed in lower FS, then override it in the upper FS with a whiteout.
         if need_whiteout {
             match old_parent_upper.create_whiteout(current_task, old_name) {
-                Err(e) => {
-                    log_warn!(
-                        "overlayfs: failed to create whiteout for {}: {}",
-                        String::from_utf8_lossy(old_name),
-                        e
-                    )
-                }
+                Err(e) => log_warn!("overlayfs: failed to create whiteout for {old_name}: {e}"),
                 Ok(_) => (),
             }
         }
@@ -984,19 +978,19 @@ impl FileSystemOps for Arc<OverlayFs> {
 /// namespace). The corresponding file systems may be unmounted before overlayfs that uses them.
 fn resolve_dir_param(
     current_task: &CurrentTask,
-    mount_options: &HashMap<&FsStr, &FsStr>,
+    mount_options: &HashMap<FsString, FsString>,
     name: &FsStr,
 ) -> Result<ActiveEntry, Errno> {
-    let path = mount_options.get(name).ok_or_else(|| {
-        log_error!("overlayfs: {} was not specified", String::from_utf8_lossy(name));
+    let path = mount_options.get(&**name).ok_or_else(|| {
+        log_error!("overlayfs: {name} was not specified");
         errno!(EINVAL)
     })?;
 
     current_task
-        .open_file(path, OpenFlags::RDONLY | OpenFlags::DIRECTORY)
+        .open_file(path.as_ref(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
         .map(|f| ActiveEntry { entry: f.name.entry.clone(), mount: f.name.mount.clone() })
         .map_err(|e| {
-            log_error!("overlayfs: Failed to lookup {}: {}", String::from_utf8_lossy(path), e);
+            log_error!("overlayfs: Failed to lookup {path}: {}", e);
             e
         })
 }

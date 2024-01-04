@@ -10,7 +10,7 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless,
-        FdNumber, FileHandle, FileObject, FileOps, FsNode,
+        FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString,
     },
 };
 use bitflags::bitflags;
@@ -132,15 +132,16 @@ impl LoopDevice {
     fn new(current_task: &CurrentTask, minor: u32) -> Arc<Self> {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
-        let loop_device_name = format!("loop{minor}");
-        let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
+        let loop_device_name = FsString::from(format!("loop{minor}"));
+        let virtual_block_class =
+            registry.get_or_create_class("block".into(), registry.virtual_bus());
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
         registry.add_device(
             current_task,
-            loop_device_name.as_bytes(),
+            loop_device_name.as_ref(),
             DeviceMetadata::new(
-                loop_device_name.as_bytes(),
+                loop_device_name.clone(),
                 DeviceType::new(LOOP_MAJOR, minor),
                 DeviceMode::Block,
             ),

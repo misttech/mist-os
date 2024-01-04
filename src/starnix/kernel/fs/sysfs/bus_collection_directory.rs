@@ -42,7 +42,7 @@ impl FsNodeOps for BusCollectionDirectory {
             // TODO(b/297369112): add "drivers" directory.
             vec![VecDirectoryEntry {
                 entry_type: DirectoryEntryType::DIR,
-                name: b"devices".to_vec(),
+                name: "devices".into(),
                 inode: None,
             }],
         ))
@@ -54,13 +54,14 @@ impl FsNodeOps for BusCollectionDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match name {
-            b"devices" => Ok(node.fs().create_node(
+        if name == "devices" {
+            Ok(node.fs().create_node(
                 current_task,
                 BusDevicesDirectory::new(self.kobject.clone()),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-            )),
-            _ => error!(ENOENT),
+            ))
+        } else {
+            error!(ENOENT)
         }
     }
 }
@@ -148,7 +149,7 @@ mod tests {
         let root_kobject = KObject::new_root(Default::default());
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
-        lookup_node(&current_task, &test_fs, b"devices").expect("devices");
+        lookup_node(&current_task, &test_fs, "devices".into()).expect("devices");
         // TODO(b/297369112): uncomment when "drivers" are added.
         // lookup_node(&current_task, &test_fs, b"drivers").expect("drivers");
     }
@@ -157,12 +158,12 @@ mod tests {
     async fn bus_devices_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child(b"0", SysfsDirectory::new);
+        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 
         let device_entry =
-            lookup_node(&current_task, &test_fs, b"devices/0").expect("deivce 0 directory");
+            lookup_node(&current_task, &test_fs, "devices/0".into()).expect("deivce 0 directory");
         assert!(device_entry.entry.node.is_lnk());
     }
 }

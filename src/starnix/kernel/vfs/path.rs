@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub type FsString = Vec<u8>;
-pub type FsStr = [u8];
+pub type FsString = bstr::BString;
+pub type FsStr = bstr::BStr;
 
 pub const SEPARATOR: u8 = b'/';
 
@@ -18,7 +18,7 @@ impl PathBuilder {
     const INITIAL_CAPACITY: usize = 32;
 
     pub fn new() -> Self {
-        Self { data: vec![], pos: 0 }
+        Self { data: Default::default(), pos: 0 }
     }
 
     pub fn prepend_element(&mut self, element: &FsStr) {
@@ -32,7 +32,7 @@ impl PathBuilder {
     /// Build the absolute path string.
     pub fn build_absolute(mut self) -> FsString {
         if self.pos == self.data.len() {
-            return b"/".to_vec();
+            return "/".into();
         }
         self.data.drain(..self.pos);
         self.data
@@ -70,28 +70,28 @@ mod test {
     #[::fuchsia::test]
     fn test_path_builder() {
         let p = PathBuilder::new();
-        assert_eq!(p.build_absolute(), b"/");
+        assert_eq!(p.build_absolute(), "/");
 
         let p = PathBuilder::new();
-        assert_eq!(p.build_relative(), b"");
+        assert_eq!(p.build_relative(), "");
 
         let mut p = PathBuilder::new();
-        p.prepend_element(b"foo");
-        assert_eq!(p.build_absolute(), b"/foo");
+        p.prepend_element("foo".into());
+        assert_eq!(p.build_absolute(), "/foo");
 
         let mut p = PathBuilder::new();
-        p.prepend_element(b"foo");
-        assert_eq!(p.build_relative(), b"foo");
+        p.prepend_element("foo".into());
+        assert_eq!(p.build_relative(), "foo");
 
         let mut p = PathBuilder::new();
-        p.prepend_element(b"foo");
-        p.prepend_element(b"bar");
-        assert_eq!(p.build_absolute(), b"/bar/foo");
+        p.prepend_element("foo".into());
+        p.prepend_element("bar".into());
+        assert_eq!(p.build_absolute(), "/bar/foo");
 
         let mut p = PathBuilder::new();
-        p.prepend_element(b"foo");
-        p.prepend_element(b"1234567890123456789012345678901234567890");
-        p.prepend_element(b"bar");
-        assert_eq!(p.build_absolute(), b"/bar/1234567890123456789012345678901234567890/foo");
+        p.prepend_element("foo".into());
+        p.prepend_element("1234567890123456789012345678901234567890".into());
+        p.prepend_element("bar".into());
+        assert_eq!(p.build_absolute(), "/bar/1234567890123456789012345678901234567890/foo");
     }
 }

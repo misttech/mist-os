@@ -181,7 +181,7 @@ mod tests {
         current_task
             .fs()
             .root()
-            .create_node(&current_task, b"foo", FileMode::IFREG, DeviceType::NONE)
+            .create_node(&current_task, "foo".into(), FileMode::IFREG, DeviceType::NONE)
             .expect("create_node")
             .entry
             .node

@@ -8,7 +8,7 @@ use crate::{
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
+        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString, NamespaceNode,
     },
 };
 use anyhow::{Context, Error};
@@ -219,7 +219,7 @@ enum TaskRequest {
     },
     /// Open the binder device driver situated at `path` in the Task filesystem namespace.
     Open {
-        path: Vec<u8>,
+        path: FsString,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
         process: zx::Process,
         responder: oneshot::Sender<Result<Arc<RemoteBinderConnection>, Errno>>,
@@ -688,7 +688,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Serve the given `binder` handle, by opening `path`.
     async fn open_binder(
         self: Arc<Self>,
-        path: Vec<u8>,
+        path: FsString,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
         process: zx::Process,
         binder: ServerEnd<fbinder::BinderMarker>,
@@ -773,7 +773,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let handle = self.clone();
                         Ok((
                             fasync::Task::local(handle.open_binder(
-                                path,
+                                path.into(),
                                 process_accessor,
                                 process,
                                 binder,
@@ -887,11 +887,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     fn open(
         &self,
         current_task: &CurrentTask,
-        path: Vec<u8>,
+        path: FsString,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
         process: zx::Process,
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
-        let node = current_task.lookup_path_from_root(&path)?;
+        let node = current_task.lookup_path_from_root(path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
         let connection = current_task
             .kernel()
@@ -1108,10 +1108,11 @@ mod tests {
                 current_task
                     .fs()
                     .root()
-                    .create_node(&current_task, b"dev", mode!(IFDIR, 0o755), DeviceType::NONE)
+                    .create_node(&current_task, "dev".into(), mode!(IFDIR, 0o755), DeviceType::NONE)
                     .expect("mkdir dev");
-                let dev =
-                    current_task.lookup_path_from_root(b"/dev").expect("lookup_path_from_root");
+                let dev = current_task
+                    .lookup_path_from_root("/dev".into())
+                    .expect("lookup_path_from_root");
                 dev.mount(
                     WhatToMount::Fs(
                         BinderFs::new_fs(&kernel, FileSystemOptions::default()).expect("new_fs"),

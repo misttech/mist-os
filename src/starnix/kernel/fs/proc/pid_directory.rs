@@ -12,7 +12,7 @@ use crate::{
         fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file, BytesFile, BytesFileOps,
         CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, ProcMountinfoFile, ProcMountsFile, SeekTarget,
+        FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
         SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
     },
 };
@@ -124,7 +124,7 @@ pub fn pid_directory(
     );
     dir.entry(
         current_task,
-        b"task",
+        "task".into(),
         TaskListDirectory { thread_group: task.thread_group.clone() },
         mode!(IFDIR, 0o777),
     );
@@ -154,7 +154,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry_creds(task.as_fscred());
     dir.entry(
         current_task,
-        b"cwd",
+        "cwd".into(),
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().cwd()))
@@ -163,7 +163,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     );
     dir.entry(
         current_task,
-        b"exe",
+        "exe".into(),
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || {
@@ -176,57 +176,107 @@ fn static_directory_builder_with_common_task_entries<'a>(
         }),
         mode!(IFLNK, 0o777),
     );
-    dir.entry(current_task, b"fd", FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
-    dir.entry(current_task, b"fdinfo", FdInfoDirectory::new(task.into()), mode!(IFDIR, 0o777));
-    dir.entry(current_task, b"io", IoFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"limits", LimitsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"maps", ProcMapsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"mem", MemFile::new_node(task.into()), mode!(IFREG, 0o600));
+    dir.entry(current_task, "fd".into(), FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
     dir.entry(
         current_task,
-        b"root",
+        "fdinfo".into(),
+        FdInfoDirectory::new(task.into()),
+        mode!(IFDIR, 0o777),
+    );
+    dir.entry(current_task, "io".into(), IoFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(
+        current_task,
+        "limits".into(),
+        LimitsFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "maps".into(),
+        ProcMapsFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(current_task, "mem".into(), MemFile::new_node(task.into()), mode!(IFREG, 0o600));
+    dir.entry(
+        current_task,
+        "root".into(),
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().root()))
         }),
         mode!(IFLNK, 0o777),
     );
-    dir.entry(current_task, b"smaps", ProcSmapsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"stat", StatFile::new_node(task.into(), scope), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"statm", StatmFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        b"status",
+        "smaps".into(),
+        ProcSmapsFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "stat".into(),
+        StatFile::new_node(task.into(), scope),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(current_task, "statm".into(), StatmFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(
+        current_task,
+        "status".into(),
         StatusFile::new_node(task.into(), task.persistent_info.clone()),
         mode!(IFREG, 0o444),
     );
-    dir.entry(current_task, b"cmdline", CmdlineFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"environ", EnvironFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"auxv", AuxvFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        b"comm",
+        "cmdline".into(),
+        CmdlineFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "environ".into(),
+        EnvironFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(current_task, "auxv".into(), AuxvFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(
+        current_task,
+        "comm".into(),
         CommFile::new_node(task.into(), task.persistent_info.clone()),
         mode!(IFREG, 0o644),
     );
-    dir.subdir(current_task, b"attr", 0o555, |dir| {
+    dir.subdir(current_task, "attr".into(), 0o555, |dir| {
         dir.entry_creds(task.as_fscred());
         dir.dir_creds(task.as_fscred());
         selinux_proc_attrs(current_task, task, dir);
     });
-    dir.entry(current_task, b"ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
+    dir.entry(current_task, "ns".into(), NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
     dir.entry(
         current_task,
-        b"mountinfo",
+        "mountinfo".into(),
         ProcMountinfoFile::new_node(task.into()),
         mode!(IFREG, 0o444),
     );
-    dir.entry(current_task, b"mounts", ProcMountsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, b"oom_adj", OomAdjFile::new_node(task.into()), mode!(IFREG, 0o744));
-    dir.entry(current_task, b"oom_score", OomScoreFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        b"oom_score_adj",
+        "mounts".into(),
+        ProcMountsFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "oom_adj".into(),
+        OomAdjFile::new_node(task.into()),
+        mode!(IFREG, 0o744),
+    );
+    dir.entry(
+        current_task,
+        "oom_score".into(),
+        OomScoreFile::new_node(task.into()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "oom_score_adj".into(),
         OomScoreAdjFile::new_node(task.into()),
         mode!(IFREG, 0o744),
     );
@@ -318,9 +368,9 @@ impl FsNodeOps for NsDirectory {
         Ok(VecDirectory::new_file(
             NS_ENTRIES
                 .iter()
-                .map(|name| VecDirectoryEntry {
+                .map(|&name| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::LNK,
-                    name: name.as_bytes().to_vec(),
+                    name: FsString::from(name),
                     inode: None,
                 })
                 .collect(),
@@ -372,7 +422,7 @@ impl FsNodeOps for NsDirectory {
             Ok(node.fs().create_node(
                 current_task,
                 CallbackSymlinkNode::new(move || {
-                    Ok(SymlinkTarget::Path(format!("{name}:[{id}]").as_bytes().to_vec()))
+                    Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
                 FsNodeInfo::new_factory(mode!(IFLNK, 0o7777), task.as_fscred()),
             ))
@@ -433,7 +483,7 @@ fn fds_to_directory_entries(fds: Vec<FdNumber>) -> Vec<VecDirectoryEntry> {
     fds.into_iter()
         .map(|fd| VecDirectoryEntry {
             entry_type: DirectoryEntryType::DIR,
-            name: fd.raw().to_string().into_bytes(),
+            name: fd.raw().to_string().into(),
             inode: None,
         })
         .collect()
@@ -459,7 +509,7 @@ impl FsNodeOps for TaskListDirectory {
                 .task_ids()
                 .map(|tid| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
-                    name: tid.to_string().into_bytes(),
+                    name: tid.to_string().into(),
                     inode: None,
                 })
                 .collect(),
