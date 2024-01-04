@@ -42,7 +42,6 @@ pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
-pub mod socket;
 pub mod transport;
 
 /// The device layer.
@@ -206,6 +205,23 @@ pub mod routes {
     pub use crate::ip::types::{
         AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,
         NextHop, RawMetric, ResolvedRoute,
+    };
+}
+
+/// Common types for dealing with sockets.
+pub mod socket {
+    pub(crate) mod address;
+    mod base;
+    pub(crate) mod datagram;
+
+    pub(crate) use base::*;
+
+    pub use address::SocketZonedIpAddr;
+    pub use base::{NotDualStackCapableError, SetDualStackEnabledError, Shutdown};
+    pub use datagram::{
+        ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,
+        MulticastMembershipInterfaceSelector, SendError, SendToError, SetMulticastMembershipError,
+        ShutdownType,
     };
 }
 

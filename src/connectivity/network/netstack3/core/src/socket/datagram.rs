@@ -30,6 +30,7 @@ use crate::{
     context::RngContext,
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId},
+    error::ExistsError,
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
         socket::{
@@ -42,12 +43,12 @@ use crate::{
         self,
         address::{
             dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnIpAddr,
-            DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerIpAddr,
-            SocketIpAddr, SocketZonedIpAddr, TryUnmapResult,
+            DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerAddr,
+            ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr, TryUnmapResult,
         },
-        AddrVec, BoundSocketMap, EitherStack, ExistsError, InsertError, ListenerAddr,
-        MaybeDualStack, NotDualStackCapableError, Shutdown, SocketMapAddrSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec,
+        AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
+        NotDualStackCapableError, Shutdown, SocketMapAddrSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec,
     },
 };
 

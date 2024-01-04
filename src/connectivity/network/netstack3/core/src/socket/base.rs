@@ -5,9 +5,6 @@
 //! General-purpose socket utilities common to device layer and IP layer
 //! sockets.
 
-pub mod address;
-pub mod datagram;
-
 use core::{
     convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,
 };
@@ -40,7 +37,7 @@ pub trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
     /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
     type OtherVersion: IpLayerIpExt
         + IpDeviceStateIpExt
-        + datagram::DualStackIpExt<OtherVersion = Self>
+        + crate::socket::datagram::DualStackIpExt<OtherVersion = Self>
         + crate::transport::tcp::socket::DualStackIpExt<OtherVersion = Self>;
 }
 

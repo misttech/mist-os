@@ -41,10 +41,7 @@ use netstack3_core::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
         RawMetric,
     },
-    socket::{
-        address::SocketZonedIpAddr,
-        datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
-    },
+    socket::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SocketZonedIpAddr},
     types::WorkQueueReport,
 };
 

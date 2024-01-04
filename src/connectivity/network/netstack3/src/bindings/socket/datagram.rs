@@ -34,13 +34,9 @@ use netstack3_core::{
     icmp::{self, IcmpEchoBindingsContext},
     ip::{IpExt, IpSockCreateAndSendError},
     socket::{
-        address::SocketZonedIpAddr,
-        datagram::{
-            self as core_datagram, ConnectError, ExpectedConnError, ExpectedUnboundError,
-            MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-            SetMulticastMembershipError, ShutdownType,
-        },
-        NotDualStackCapableError, SetDualStackEnabledError,
+        self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
+        MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
+        SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType, SocketZonedIpAddr,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp::{self, UdpBindingsContext},
@@ -848,40 +844,40 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     }
 }
 
-impl<E> IntoErrno for core_datagram::SendError<E> {
+impl<E> IntoErrno for core_socket::SendError<E> {
     fn into_errno(self) -> fposix::Errno {
         match self {
-            core_datagram::SendError::NotConnected => fposix::Errno::Edestaddrreq,
-            core_datagram::SendError::NotWriteable => fposix::Errno::Epipe,
-            core_datagram::SendError::IpSock(err) => err.into_errno(),
-            core_datagram::SendError::SerializeError(_e) => fposix::Errno::Einval,
+            core_socket::SendError::NotConnected => fposix::Errno::Edestaddrreq,
+            core_socket::SendError::NotWriteable => fposix::Errno::Epipe,
+            core_socket::SendError::IpSock(err) => err.into_errno(),
+            core_socket::SendError::SerializeError(_e) => fposix::Errno::Einval,
         }
     }
 }
 
-impl<E> IntoErrno for core_datagram::SendToError<E> {
+impl<E> IntoErrno for core_socket::SendToError<E> {
     fn into_errno(self) -> fposix::Errno {
         match self {
-            core_datagram::SendToError::NotWriteable => fposix::Errno::Epipe,
-            core_datagram::SendToError::Zone(err) => err.into_errno(),
-            core_datagram::SendToError::CreateAndSend(IpSockCreateAndSendError::Mtu) => {
+            core_socket::SendToError::NotWriteable => fposix::Errno::Epipe,
+            core_socket::SendToError::Zone(err) => err.into_errno(),
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Mtu) => {
                 fposix::Errno::Emsgsize
             }
-            core_datagram::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
                 err.into_errno()
             }
-            core_datagram::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Enetunreach,
-            core_datagram::SendToError::RemoteUnexpectedlyNonMapped => fposix::Errno::Eafnosupport,
-            core_datagram::SendToError::SerializeError(_e) => fposix::Errno::Einval,
+            core_socket::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Enetunreach,
+            core_socket::SendToError::RemoteUnexpectedlyNonMapped => fposix::Errno::Eafnosupport,
+            core_socket::SendToError::SerializeError(_e) => fposix::Errno::Einval,
         }
     }
 }
 
 impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for IcmpEcho {
-    type SendError = core_datagram::SendError<packet_formats::error::ParseError>;
+    type SendError = core_socket::SendError<packet_formats::error::ParseError>;
     type SendToError = either::Either<
         LocalAddressError,
-        core_datagram::SendToError<packet_formats::error::ParseError>,
+        core_socket::SendToError<packet_formats::error::ParseError>,
     >;
 
     fn send<C: BindingsContext>(

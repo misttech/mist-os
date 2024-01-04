@@ -23,9 +23,8 @@ use netstack3_core::{
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{IpSockCreationError, IpSockSendError, ResolveRouteError},
     socket::{
-        address::SocketZonedIpAddr,
-        datagram::{ConnectError, SetMulticastMembershipError},
-        NotDualStackCapableError, SetDualStackEnabledError,
+        ConnectError, NotDualStackCapableError, SetDualStackEnabledError,
+        SetMulticastMembershipError, SocketZonedIpAddr,
     },
     transport::{tcp, udp},
 };
