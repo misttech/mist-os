@@ -7,11 +7,11 @@ include /src/connectivity/lib/network-device/rust/OWNERS
 include /src/connectivity/lib/packet-formats/OWNERS
 include /src/connectivity/lowpan/OWNERS
 include /src/connectivity/network/dhcpv6/OWNERS
-include /src/connectivity/network/netcfg/OWNERS
 include /src/connectivity/network/netlink/OWNERS
 include /src/connectivity/network/netstack3/OWNERS
 include /src/connectivity/network/testing/network-test-realm/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
+include /src/connectivity/policy/netcfg/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/diagnostics/OWNERS
 include /src/diagnostics/iquery/OWNERS

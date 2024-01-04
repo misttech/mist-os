@@ -3,11 +3,11 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/network/dhcpv6/OWNERS
-include /src/connectivity/network/netcfg/OWNERS
 include /src/connectivity/network/netlink/OWNERS
 include /src/connectivity/network/netstack3/OWNERS
 include /src/connectivity/network/tests/fidl/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
+include /src/connectivity/policy/netcfg/OWNERS
 include /src/developer/ffx/plugins/test/OWNERS
 include /src/diagnostics/iquery/OWNERS
 include /src/storage/OWNERS

@@ -10,5 +10,6 @@ include /src/lib/fidl_table_validation/OWNERS
 include /src/sys/test_runners/starnix/OWNERS
 include /third_party/rust_crates/vendor/enum-as-inner-0.5.1/OWNERS
 include /third_party/rust_crates/vendor/prost-build-0.11.1/OWNERS
+include /third_party/rust_crates/vendor/strum_macros-0.25.3/OWNERS
 include /tools/create/OWNERS
 include /tools/fidl/fidldoc/OWNERS

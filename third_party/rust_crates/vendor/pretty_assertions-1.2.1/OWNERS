@@ -3,8 +3,8 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/network/net-cli/OWNERS
-include /src/connectivity/network/netcfg/OWNERS
 include /src/connectivity/network/netlink/OWNERS
+include /src/connectivity/policy/netcfg/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/daemon/protocols/repo/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
