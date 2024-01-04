@@ -217,6 +217,14 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
+  if (!children_.empty()) {
+    FDF_LOGL(WARNING, *logger_, "%s: Destructing device, but still had %lu children", Name(),
+             children_.size());
+    // Ensure we do not get use-after-free from calling child_pre_release
+    // on a destructed parent device.
+    children_.clear();
+  }
+
   if (ShouldCallRelease()) {
     // Call the parent's pre-release.
     if (HasOp((*parent_)->ops_, &zx_protocol_device_t::child_pre_release)) {
