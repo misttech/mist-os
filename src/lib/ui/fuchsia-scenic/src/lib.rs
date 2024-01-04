@@ -30,9 +30,9 @@ use fidl_fuchsia_ui_gfx::{
 use fidl_fuchsia_ui_display_color as _;
 use fidl_fuchsia_ui_scenic::{Command, Present2Args, SessionEventStream, SessionProxy};
 use fidl_fuchsia_ui_views::{ViewHolderToken, ViewRef, ViewRefControl, ViewToken};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{Event, HandleBased, Rights, Status, Vmo};
 use mapped_vmo::Mapping;
-use parking_lot::Mutex;
 use std::ops::Deref;
 use std::sync::Arc;
 
