@@ -127,6 +127,20 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.env, ["A=B", "C=D"])
 
+    def test_env_references_other_source_file(self):
+        r = rustc.RustAction(
+            [
+                "A=foo/other.rs",
+                "C=D",
+                "../tools/rustc",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+            ]
+        )
+        self.assertEqual(r.env, ["A=foo/other.rs", "C=D"])
+        self.assertEqual(r.direct_sources, [Path("../foo/lib.rs")])
+
     def test_crate_type(self):
         cases = [
             ("rlib", rustc.CrateType.RLIB, False, False),

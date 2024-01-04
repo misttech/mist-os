@@ -182,15 +182,14 @@ class RustAction(object):
             )
         )
         self._compiler = find_compiler_from_command(remaining_args)
+        compiler_arg_index = remaining_args.index(str(self._compiler))
         self._env = [
-            tok
-            for tok in remaining_args[
-                : remaining_args.index(str(self._compiler))
-            ]
-            if "=" in tok
+            tok for tok in remaining_args[:compiler_arg_index] if "=" in tok
         ]
         self._crate_type = parse_crate_type(self._attributes.crate_type)
-        self._direct_inputs = list(find_direct_inputs(remaining_args))
+        self._direct_inputs = list(
+            find_direct_inputs(remaining_args[compiler_arg_index:])
+        )
         self._C_flags = cl_utils.keyed_flags_to_values_dict(
             self._attributes.C_flags
         )
