@@ -26,7 +26,10 @@ rustc_binary("encoding-bin") {
     "//third_party/rust_crates:tracing-subscriber",
   ]
 
-  sources = [ "src/encoding.rs" ]
+  sources = [
+    "src/common.rs",
+    "src/encoding.rs",
+  ]
 }
 
 rustc_binary("core-bin") {
@@ -51,10 +54,42 @@ rustc_binary("core-bin") {
   sources = [ "src/core.rs" ]
 }
 
+rustc_binary("decoding-bin") {
+  name = "diagnostics_log_decoding_bench"
+  edition = "2018"
+  with_unit_tests = true
+
+  source_root = "src/decoding.rs"
+
+  deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/log/encoding/rust",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-core",
+    "//third_party/rust_crates:tracing-subscriber",
+  ]
+
+  sources = [
+    "src/common.rs",
+    "src/decoding.rs",
+  ]
+}
+
 fuchsia_component("encoding-component") {
   component_name = "encoding"
   manifest = "meta/encoding.cml"
   deps = [ ":encoding-bin" ]
+}
+
+fuchsia_component("decoding-component") {
+  component_name = "decoding"
+  manifest = "meta/decoding.cml"
+  deps = [ ":decoding-bin" ]
 }
 
 fuchsia_component("core-component") {
@@ -66,6 +101,7 @@ fuchsia_component("core-component") {
 fuchsia_package("diagnostics-log-rust-benchmarks") {
   deps = [
     ":core-component",
+    ":decoding-component",
     ":encoding-component",
   ]
 }
@@ -82,9 +118,18 @@ fuchsia_component_perf_test("diagnostics-log-rust-encoding-benchmark") {
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics_log_rust.encoding.txt"
 }
 
+fuchsia_component_perf_test("diagnostics-log-rust-decoding-benchmark") {
+  package = ":diagnostics-log-rust-benchmarks"
+  component_name = "decoding"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics_log_rust.decoding.txt"
+}
+
 group("bench") {
   testonly = true
-  deps = [ ":diagnostics-log-rust-core-benchmark" ]
+  deps = [
+    ":diagnostics-log-rust-core-benchmark",
+    ":diagnostics-log-rust-decoding-benchmark",
+  ]
 
   # TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
   # currently fails to build for ARM64/VIM3 due to a toolchain bug.
