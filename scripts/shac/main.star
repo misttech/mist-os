@@ -16,11 +16,42 @@ load("./rust.star", "register_rust_checks")
 load("./starlark.star", "register_starlark_checks")
 # keep-sorted end
 
+def bug_urls(ctx):
+    """Checks that fuchsia bug URLs are correctly formatted.
+
+    Bug URLs should use the form "https://fxbug.dev/123456"; the form
+    "http://fxb/123456" isn't usable by non-Google employees, and
+    "fxbug.dev/123456" doesn't automatically linkify in most editors.
+
+    Args:
+        ctx: A ctx instance.
+    """
+    correct_format = "https://fxbug.dev/"
+    for f, meta in ctx.scm.affected_files().items():
+        for num, line in meta.new_lines():
+            for match in ctx.re.allmatches(
+                r"(https?://)?fxb(ug\.dev)?/(\d+)",
+                line,
+            ):
+                if match.groups[0].startswith(correct_format):
+                    continue
+                bug_number = match.groups[-1]
+                repl = correct_format + bug_number
+                ctx.emit.finding(
+                    level = "warning",
+                    message = "Bug links should use the form %s." % repl,
+                    filepath = f,
+                    line = num,
+                    col = match.offset + 1,
+                    end_col = match.offset + 1 + len(match.groups[0]),
+                    replacements = [repl],
+                )
+
 def _gn_format(ctx):
     """Runs gn format on .gn and .gni files.
 
     Args:
-      ctx: A ctx instance.
+        ctx: A ctx instance.
     """
     gn_files = [
         f
@@ -75,6 +106,7 @@ def register_all_checks():
     """
     shac.register_check(shac.check(_gn_format, formatter = True))
     shac.register_check(keep_sorted)
+    shac.register_check(bug_urls)
 
     # keeps-sorted start
     register_cml_checks()
