@@ -8,13 +8,20 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/syscalls/smc.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
+#include <bind/fuchsia/tee/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-video-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace sherlock {
@@ -79,7 +86,7 @@ static const std::vector<fpbus::Smc> sherlock_video_smcs{
 
 static const fpbus::Node video_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "aml-video";
+  dev.name() = "aml_video";
   dev.vid() = PDEV_VID_AMLOGIC;
   dev.pid() = PDEV_PID_AMLOGIC_T931;
   dev.did() = PDEV_DID_AMLOGIC_VIDEO;
@@ -93,18 +100,93 @@ static const fpbus::Node video_dev = []() {
 zx_status_t Sherlock::VideoInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('VIDE');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, video_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_video_fragments,
-                                               std::size(aml_video_fragments)),
-      "pdev");
+  auto video_sysmem = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+  }};
+
+  auto video_canvas = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::FIDL_PROTOCOL,
+                  bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+          },
+  }};
+
+  auto video_clock_dos_vdec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::CLOCK_ID,
+                  bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS_GCLK_VDEC),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
+          },
+  }};
+
+  auto video_clock_dos = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
+                                      bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS),
+          },
+  }};
+
+  auto video_tee = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_tee::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_tee::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+  }};
+
+  auto video_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "aml_video",
+      .parents = {{video_sysmem, video_canvas, video_clock_dos_vdec, video_clock_dos, video_tee}},
+  }};
+
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, video_dev),
+                                                          fidl::ToWire(fidl_arena, video_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Video(video_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Video(video_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Video(video_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Video(video_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

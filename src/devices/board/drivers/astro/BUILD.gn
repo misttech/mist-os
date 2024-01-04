@@ -37,21 +37,6 @@ driver_bind_rules("astro-pwm-bind") {
   ]
 }
 
-driver_bind_rules("astro-video-bind") {
-  rules = "bind/astro-video.bind"
-  header_output = "astro-video-bind.h"
-  bind_output = "astro-video_bind.bc"
-  tests = "bind-tests/astro-video-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
-  ]
-}
-
 driver_bind_rules("pd-armcore-bind") {
   rules = "bind/pd-armcore.bind"
   header_output = "pd-armcore-bind.h"
@@ -146,7 +131,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-bind",
     ":astro-pwm-bind_header",
-    ":astro-video-bind_header",
     ":astro-wifi-bind_header",
     ":pd-armcore-bind_header",
     ":pwm-ao-d-bind_header",
@@ -168,6 +152,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
@@ -244,7 +229,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-bind_test",
     ":astro-pwm-bind_test",
-    ":astro-video-bind_test",
     ":astro-wifi-bind_test",
     ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
