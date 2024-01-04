@@ -55,14 +55,18 @@ impl<Key: FutexKey> FutexTable<Key> {
         mask: u32,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
-        let (loaded_value, key) = Key::load_futex_value(current_task, addr)?;
+        let loaded_value = Self::load_futex_value(current_task, addr)?;
         if value != loaded_value {
             return Err(errno!(EAGAIN));
         }
 
+        let key = Key::get_key(current_task, addr)?;
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
         state.get_waiters_or_default(key).add(FutexWaiter {
@@ -85,6 +89,9 @@ impl<Key: FutexKey> FutexTable<Key> {
         count: usize,
         mask: u32,
     ) -> Result<usize, Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let key = Key::get_key(task, addr)?;
         Ok(self.state.lock().wake(key, count, mask))
     }
@@ -99,6 +106,9 @@ impl<Key: FutexKey> FutexTable<Key> {
         count: usize,
         new_addr: UserAddress,
     ) -> Result<usize, Errno> {
+        if !addr.is_aligned(4) || !new_addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let key = Key::get_key(current_task, addr)?;
         let new_key = Key::get_key(current_task, new_addr)?;
         let mut state = self.state.lock();
@@ -123,6 +133,9 @@ impl<Key: FutexKey> FutexTable<Key> {
         addr: UserAddress,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let mut state = self.state.lock();
         // As the state is locked, no unlock can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex unlock.
@@ -198,6 +211,9 @@ impl<Key: FutexKey> FutexTable<Key> {
     ///
     /// See FUTEX_UNLOCK_PI.
     pub fn unlock_pi(&self, current_task: &CurrentTask, addr: UserAddress) -> Result<(), Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let mut state = self.state.lock();
         let tid = current_task.get_tid() as u32;
 
@@ -267,18 +283,8 @@ impl<Key: FutexKey> FutexTable<Key> {
         Ok(())
     }
 
-    fn read_futex_value(vmo: &zx::Vmo, offset: u64) -> Result<u32, Errno> {
-        let mut buf = [0u8; 4];
-        vmo.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
-        Ok(u32::from_ne_bytes(buf))
-    }
-
-    fn check_futex_value(vmo: &zx::Vmo, offset: u64, value: u32) -> Result<(), Errno> {
-        // TODO: This read should be atomic.
-        if Self::read_futex_value(vmo, offset)? != value {
-            return error!(EAGAIN);
-        }
-        Ok(())
+    fn load_futex_value(current_task: &CurrentTask, addr: UserAddress) -> Result<u32, Errno> {
+        current_task.mm().atomic_load_u32_relaxed(addr)
     }
 }
 
@@ -296,7 +302,7 @@ impl FutexTable<SharedFutexKey> {
         let key = SharedFutexKey::new(&vmo, offset)?;
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
-        Self::check_futex_value(&vmo, offset, value)?;
+        Self::external_check_futex_value(&vmo, offset, value)?;
 
         let (sender, receiver) = oneshot::channel::<()>();
         state
@@ -317,6 +323,19 @@ impl FutexTable<SharedFutexKey> {
         mask: u32,
     ) -> Result<usize, Errno> {
         Ok(self.state.lock().wake(SharedFutexKey::new(&vmo, offset)?, count, mask))
+    }
+
+    fn external_check_futex_value(vmo: &zx::Vmo, offset: u64, value: u32) -> Result<(), Errno> {
+        let loaded_value = {
+            // TODO: This read should be atomic.
+            let mut buf = [0u8; 4];
+            vmo.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
+            u32::from_ne_bytes(buf)
+        };
+        if loaded_value != value {
+            return error!(EAGAIN);
+        }
+        Ok(())
     }
 }
 
@@ -396,8 +415,6 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         addr: UserAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
-
-    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -407,9 +424,6 @@ pub struct PrivateFutexKey {
 
 impl FutexKey for PrivateFutexKey {
     fn get_key(_task: &Task, addr: UserAddress) -> Result<Self, Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
         Ok(PrivateFutexKey { addr })
     }
 
@@ -424,11 +438,6 @@ impl FutexKey for PrivateFutexKey {
         let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { vmo, offset }, key))
-    }
-
-    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno> {
-        let key = Self::get_key(task, addr)?;
-        Ok((task.mm().atomic_load_u32_relaxed(addr)?, key))
     }
 }
 
@@ -456,15 +465,6 @@ impl FutexKey for SharedFutexKey {
         let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = SharedFutexKey::new(&vmo, offset)?;
         Ok((FutexOperand { vmo, offset }, key))
-    }
-
-    fn load_futex_value(task: &Task, addr: UserAddress) -> Result<(u32, Self), Errno> {
-        let (FutexOperand { vmo, offset }, key) =
-            Self::get_operand_and_key(task, addr, ProtectionFlags::READ)?;
-        // TODO: This should be an atomic load from mapped memory.
-        let mut buf = [0u8; 4];
-        vmo.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
-        Ok((u32::from_ne_bytes(buf), key))
     }
 }
 
