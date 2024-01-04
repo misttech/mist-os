@@ -18,6 +18,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/i2c-1c000",
       "sys/platform/clock-controller-ff63c000",
       "sys/platform/fuchsia-contiguous/sysmem",
+      "sys/platform/register-controller-1000/registers-device",
+      "sys/platform/nna-ff100000",
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
