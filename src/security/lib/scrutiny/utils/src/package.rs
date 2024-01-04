@@ -4,7 +4,7 @@
 
 use {
     crate::{artifact::ArtifactReader, io::ReadSeek, key_value::parse_key_value},
-    anyhow::{anyhow, Context, Result},
+    anyhow::{Context, Result},
     fuchsia_archive::Utf8Reader,
     fuchsia_merkle::{Hash, MerkleTree},
     fuchsia_url::{PackageName, PackageVariant},
@@ -47,6 +47,21 @@ pub enum PackageError {
     FailedToVerifyPackage { expected_merkle_root: Hash, computed_merkle_root: Hash },
 }
 
+#[derive(Debug, Deserialize, Serialize, Error)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadContentBlobError {
+    #[error("Failed to read package's meta/contents file: {error}")]
+    FailedToReadMetaContents { error: String },
+    #[error("Failed to convert package's meta/contents file's raw bytes to string: {error}")]
+    FailedToConvertMetaContentsToString { error: String },
+    #[error("Failed to parse path=merkle pairs in package's meta/contents file: {error}")]
+    FailedToParseMetaContents { error: String },
+    #[error("File not found in package's meta/contents map: {file_path}")]
+    MetaContentsDoesNotContainFile { file_path: String },
+    #[error("Failed to read file from package: {file_path}, error: {error}")]
+    FailedToReadFileFromPackage { file_path: String, error: String },
+}
+
 /// Path within a Fuchsia package that contains the package contents manifest.
 pub static META_CONTENTS_PATH: &str = "meta/contents";
 pub static PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY: &str = "zircon.system.pkgfs.cmd";
@@ -56,7 +71,7 @@ pub static PKGFS_BINARY_PATH: &str = "bin/pkgsvr";
 /// Assumption: the additional_boot_args provided have already split values by the `+` delimiter.
 /// Example: zircon.system.pkgfs.cmd=bin/pkgsvr+a5e7a3756cca7fc664de30d9fe6cec96f7923562763a4678b1a7c69f84aedce3
 pub fn extract_system_image_hash_string(
-    additional_boot_args: HashMap<String, Vec<String>>,
+    additional_boot_args: &HashMap<String, Vec<String>>,
 ) -> Result<String, SystemImageError> {
     let pkgfs_cmd = additional_boot_args
         .get(PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY)
@@ -81,7 +96,7 @@ pub fn extract_system_image_hash_string(
 
 /// Verify that the merkle given for the package matches the computed merkle of the associated blob.
 ///
-/// The merkle strings may be extracted from:
+/// The package merkle strings may be extracted from:
 /// 1. The zircon.system.pkgfs.cmd value from additional_boot_args for the system image blob.
 /// 2. The package listing in data/static_packages from the system image blob's data.
 /// 3. The bootfs package listing within a zbi from data/bootfs_packages.
@@ -158,20 +173,25 @@ pub fn read_content_blob(
     far_reader: &mut Utf8Reader<impl ReadSeek>,
     artifact_reader: &mut Box<dyn ArtifactReader>,
     path: &str,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, ReadContentBlobError> {
     let meta_contents = far_reader
         .read_file(META_CONTENTS_PATH)
-        .context("Failed to read meta/contents from package")?;
-    let meta_contents = from_utf8(meta_contents.as_slice())
-        .context("Failed to convert package meta/contents from bytes to string")?;
-    let paths_to_merkles = parse_key_value(meta_contents)
-        .context("Failed to parse path=merkle pairs in package meta/contents file")?;
-    let merkle_root = paths_to_merkles
-        .get(path)
-        .ok_or_else(|| anyhow!("Package does not contain file: {}", path))?;
-    artifact_reader
-        .read_bytes(&Path::new(merkle_root))
-        .with_context(|| format!("Failed to load file from package: {}", path))
+        .map_err(|err| ReadContentBlobError::FailedToReadMetaContents { error: err.to_string() })?;
+    let meta_contents = from_utf8(meta_contents.as_slice()).map_err(|err| {
+        ReadContentBlobError::FailedToConvertMetaContentsToString { error: err.to_string() }
+    })?;
+    let paths_to_merkles = parse_key_value(meta_contents).map_err(|err| {
+        ReadContentBlobError::FailedToParseMetaContents { error: err.to_string() }
+    })?;
+    let merkle_root = paths_to_merkles.get(path).ok_or_else(|| {
+        ReadContentBlobError::MetaContentsDoesNotContainFile { file_path: path.to_string() }
+    })?;
+    artifact_reader.read_bytes(&Path::new(merkle_root)).map_err(|err| {
+        ReadContentBlobError::FailedToReadFileFromPackage {
+            file_path: path.to_string(),
+            error: err.to_string(),
+        }
+    })
 }
 
 /// Package index files contain lines of the form:
@@ -371,7 +391,7 @@ mod tests {
     #[fuchsia::test]
     fn test_missing_pkgfs_cmd_entry() {
         let additional_boot_args = hashmap! {};
-        let result = extract_system_image_hash_string(additional_boot_args);
+        let result = extract_system_image_hash_string(&additional_boot_args);
         match result {
             Err(SystemImageError::MissingPkgfsCmdEntry { .. }) => return,
             _ => panic!("Unexpected result: {:?}", result),
@@ -383,7 +403,7 @@ mod tests {
         let additional_boot_args = hashmap! {
             PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![PKGFS_BINARY_PATH.to_string()],
         };
-        let result = extract_system_image_hash_string(additional_boot_args);
+        let result = extract_system_image_hash_string(&additional_boot_args);
         match result {
             Err(SystemImageError::UnexpectedPkgfsCmdLen { .. }) => return,
             _ => panic!("Unexpected result: {:?}", result),
@@ -399,7 +419,7 @@ mod tests {
                 "param2".to_string(),
             ],
         };
-        let result = extract_system_image_hash_string(additional_boot_args);
+        let result = extract_system_image_hash_string(&additional_boot_args);
         match result {
             Err(SystemImageError::UnexpectedPkgfsCmdLen { .. }) => return,
             _ => panic!("Unexpected result: {:?}", result),
@@ -415,7 +435,7 @@ mod tests {
                 Hash::from([0; HASH_SIZE]).to_string(),
             ],
         };
-        let result = extract_system_image_hash_string(additional_boot_args);
+        let result = extract_system_image_hash_string(&additional_boot_args);
         match result {
             Err(SystemImageError::UnexpectedPkgfsCmd { .. }) => return,
             _ => panic!("Unexpected result: {:?}", result),

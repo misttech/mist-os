@@ -24,4 +24,5 @@
             },
         ],
     },
+    package_checks: [],
 }

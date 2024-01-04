@@ -50,7 +50,7 @@ fn collect_static_pkgs(
     mut artifact_reader: Box<dyn ArtifactReader>,
 ) -> Result<StaticPkgsData, ErrorWithDeps> {
     // Get system image path from ["bin/pkgsvr", <system-image-hash>] cmd.
-    let system_image_merkle_string = extract_system_image_hash_string(additional_boot_args)
+    let system_image_merkle_string = extract_system_image_hash_string(&additional_boot_args)
         .map_err(|err| ErrorWithDeps { deps: artifact_reader.get_deps(), error: err.into() })?;
 
     // Read system image package and verify its merkle.

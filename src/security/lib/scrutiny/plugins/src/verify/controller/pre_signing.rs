@@ -3,14 +3,19 @@
 // found in the LICENSE file.
 
 use {
-    crate::additional_boot_args::AdditionalBootConfigCollection,
+    crate::{
+        additional_boot_args::AdditionalBootConfigCollection, static_pkgs::StaticPkgsCollection,
+    },
     anyhow::{anyhow, Context, Result},
     scrutiny::{model::controller::DataController, model::model::*},
-    scrutiny_utils::build_checks,
+    scrutiny_utils::{
+        artifact::{ArtifactReader, FileArtifactReader},
+        build_checks,
+    },
     serde::{Deserialize, Serialize},
     serde_json::{json, value::Value},
     serde_json5,
-    std::{collections::HashMap, fs::read_to_string, sync::Arc},
+    std::{collections::HashMap, fs::read_to_string, path::PathBuf, sync::Arc},
 };
 
 /// The input to the PreSigningController is the policy to validate against.
@@ -47,7 +52,7 @@ impl DataController for PreSigningController {
             .get::<AdditionalBootConfigCollection>()
             .context("Failed to get AdditionalBootConfigCollection")?;
         if boot_config_model.errors.len() > 0 {
-            return Err(anyhow!("Cannot validate additional boot args: AdditionalBootConfigCollector reported error {:?}", boot_config_model.errors[0]));
+            return Err(anyhow!("Cannot validate additional boot args: AdditionalBootConfigCollector reported errors {:?}", boot_config_model.errors));
         }
 
         let boot_args_data = match boot_config_model.additional_boot_args.clone() {
@@ -55,8 +60,31 @@ impl DataController for PreSigningController {
             None => HashMap::new(),
         };
 
-        let validation_errors = build_checks::validate_build_checks(policy, boot_args_data)
-            .context("Failed to run validation checks")?;
+        let static_pkgs =
+            model.get::<StaticPkgsCollection>().context("Failed to get StaticPkgsCollection")?;
+        if static_pkgs.errors.len() > 0 {
+            return Err(anyhow!("Cannot perform validations involving static packages: StaticPkgCollector reported errors {:?}", static_pkgs.errors));
+        }
+
+        let static_pkgs_map = static_pkgs.static_pkgs.clone().unwrap_or(HashMap::new());
+
+        // Remove variant from package name and convert hash to string.
+        // Build checks validation expects a map of package names to merkle hash strings.
+        let static_pkgs_map: HashMap<String, String> = static_pkgs_map
+            .into_iter()
+            .map(|((name, _variant), hash)| (name.as_ref().to_string(), hash.to_string()))
+            .collect();
+
+        let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
+            Box::new(FileArtifactReader::new(&PathBuf::new(), &model.config().blobs_directory()));
+
+        let validation_errors = build_checks::validate_build_checks(
+            policy,
+            boot_args_data,
+            static_pkgs_map,
+            &mut blobs_artifact_reader,
+        )
+        .context("Failed to run validation checks")?;
 
         Ok(json!(PreSigningResponse { errors: validation_errors }))
     }
